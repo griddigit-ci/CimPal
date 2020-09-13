@@ -1,7 +1,8 @@
 # CimPal
 
 
-CimPal is an open source Java application published by gridDigIt and Licensed under the [EUPL-1.2](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12)-or-later. 
+CimPal is an open source Java application published by gridDigIt and Licensed under the [EUPL-1.2](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12)-or-later.
+The application is based on Apache Jena, TopBraid SHACL API and JAVAFX.
 
 CimPal helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM.
 
