@@ -24,6 +24,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
@@ -90,9 +91,27 @@ public class MainController implements Initializable {
     private TextField fowlImportsCreateCompleteSMTab;
     @FXML
     private ChoiceBox cbProfilesVersionCreateCompleteSMTab;
+    @FXML
+    private ChoiceBox fcbRDFSformatShapes;
+    @FXML
+    private TextField fPathRdffileForExcel;
+    @FXML
+    private ChoiceBox fcbRDFSformatForExcel;
+    @FXML
+    private TextField fbaseURIShapeExcel;
+    @FXML
+    private TextField fPrefixExcelShape;
+    @FXML
+    private TextField fNSexcelShape;
+    @FXML
+    private Button btnRunExcelShape;
+    @FXML
+    private TextField fPathXLSfileForShape;
 
     public static File rdfModel1;
     public static File rdfModel2;
+    public static File rdfModelExcelShacl;
+    public static File xlsFileExcelShacl;
     public static ArrayList<Object> compareResults;
     public static List<String> rdfsCompareFiles;
     private List<File> selectedFile;
@@ -152,6 +171,20 @@ public class MainController implements Initializable {
                 "RDFS (augmented) by CimSyntaxGen"
 
         );
+        fcbRDFSformat.getSelectionModel().selectFirst();
+
+        fcbRDFSformatShapes.getItems().addAll(
+                "RDFS (augmented) by CimSyntaxGen"
+
+        );
+        fcbRDFSformatShapes.getSelectionModel().selectFirst();
+
+        fcbRDFSformatForExcel.getItems().addAll(
+                "RDFS (augmented) by CimSyntaxGen"
+
+        );
+        fcbRDFSformatForExcel.getSelectionModel().selectFirst();
+
 
         //TODO: see how to have this default on the screen
         defaultShapesURI="/constraints/";
@@ -212,6 +245,20 @@ public class MainController implements Initializable {
 
     }
 
+    @FXML
+    //Action for button "Reset" related to the Excel to Shacl
+    private void actionBtnResetExcelShape(ActionEvent actionEvent) {
+        fPathRdffileForExcel.clear();
+        fPathXLSfileForShape.clear();
+        fcbRDFSformatForExcel.getSelectionModel().selectFirst();
+        fbaseURIShapeExcel.clear();
+        fPrefixExcelShape.clear();
+        fNSexcelShape.clear();
+        progressBar.setProgress(0);
+
+    }
+
+
 
 
     @FXML
@@ -259,6 +306,47 @@ public class MainController implements Initializable {
             btnRunRDFcompare.setDisable(true);
         }
     }
+
+    @FXML
+    //action button RDF file Browse for Excel to SHACL
+    private void actionBrowseRDFfileForExcel(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        //select file
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+        File file = filechooser.showOpenDialog(null);
+
+        if (file != null) {// the file is selected
+
+            fPathRdffileForExcel.setText(file.toString());
+            MainController.rdfModelExcelShacl=file;
+
+        } else{
+            fPathRdffileForExcel.clear();
+        }
+    }
+
+    @FXML
+    //action button XLS file Browse for Excel to SHACL
+    private void actionBrowseExcelfileForShape(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        //select file
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
+        File file = filechooser.showOpenDialog(null);
+
+        if (file != null) {// the file is selected
+
+            fPathXLSfileForShape.setText(file.toString());
+            MainController.xlsFileExcelShacl=file;
+
+        } else{
+            fPathXLSfileForShape.clear();
+              }
+    }
+
+
+
 
 
     @FXML
@@ -400,6 +488,7 @@ public class MainController implements Initializable {
         this.selectedFile = filechooser.showOpenMultipleDialog(null);
 
         if (this.selectedFile != null) {// the file is selected
+            progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
             //System.out.println("Selected file: " + this.selectedFile);
             int iterSize = this.selectedFile.size();
 
@@ -418,7 +507,7 @@ public class MainController implements Initializable {
             cbApplyDefBaseURIDesignTab.setDisable(false);
             btnApply.setDisable(false);
 
-
+            progressBar.setProgress(1);
         }
     }
     //Loads model data
@@ -756,7 +845,14 @@ public class MainController implements Initializable {
     //action for button Create in the tab Constraints detail/Create complete shapes model
     private void actionBtnConstructShacl(ActionEvent actionEvent) throws IOException {
 
-        if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size()!=0) {
+        String cbvalue;
+        if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem()==null) {
+            cbvalue="";
+        }else{
+            cbvalue=fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
+        }
+
+        if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size()!=0 && cbvalue.equals("RDFS (augmented) by CimSyntaxGen")) {
             //depending on the value of the choice box "Save datatype map"
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
                 shaclNodataMap  = 1;
@@ -823,7 +919,7 @@ public class MainController implements Initializable {
                 return;
             }
 
-
+            progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
             for (int sel = 0; sel < modelNumber.size(); sel++) {
                 int m=modelNumber.get(sel);
@@ -832,7 +928,7 @@ public class MainController implements Initializable {
                 dataTypeMapFromShapes = new HashMap<>();
 
                 Model model = (Model) this.models.get(m);
-                String rdfNs = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
+                String rdfNs = MainController.prefs.get("cimsNamespace","");
                 String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
                 ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
@@ -929,7 +1025,7 @@ public class MainController implements Initializable {
                 //tabPaneLeft.getSelectionModel().select(1);
             }else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setContentText("Please select a profile for which you would like to generate Shapes.");
+                alert.setContentText("Please select a profile for which you would like to generate Shapes and the RDFS format.");
                 alert.setHeaderText(null);
                 alert.setTitle("Error - no profile selected");
                 alert.showAndWait();
@@ -950,125 +1046,72 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu "Excel to SHACL"
-    public void actionMenuExcelToSHACL(ActionEvent actionEvent) throws IOException {
+    private void actionBtnRunExcelShape(ActionEvent actionEvent) throws IOException {
+
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        if (fPathRdffileForExcel.getText().isBlank() || fPathXLSfileForShape.getText().isBlank() || fcbRDFSformatForExcel.getSelectionModel().getSelectedItem()==null
+        || fbaseURIShapeExcel.getText().isBlank() || fPrefixExcelShape.getText().isBlank() || fNSexcelShape.getText().isBlank()){
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setContentText("Please complete all fields.");
+            alert.setHeaderText(null);
+            alert.setTitle("Error - not all fields are filled in");
+            alert.showAndWait();
+            progressBar.setProgress(0);
+            return;
+        }
+
+
         //open the rdfs for the profile
-        FileChooser filechooserRDF = new FileChooser();
+        /*FileChooser filechooserRDF = new FileChooser();
         filechooserRDF.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
-        File fileRDF = filechooserRDF.showOpenDialog(null);
+        File fileRDF = filechooserRDF.showOpenDialog(null);*/
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         try {
-            RDFDataMgr.read(model, new FileInputStream(fileRDF.toString()), Lang.RDFXML);
+            RDFDataMgr.read(model, new FileInputStream(MainController.rdfModelExcelShacl), Lang.RDFXML);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
         shaclNodataMap  = 1; // as no mapping is to be used for this task
-        String cimsNs = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
+        String cimsNs = MainController.prefs.get("cimsNamespace","");
         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
         ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
 
 
         //select the xlsx file and read it
-        FileChooser filechooser = new FileChooser();
+      /*  FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
-        File file = filechooser.showOpenDialog(null);
+        File file = filechooser.showOpenDialog(null);*/
         ArrayList<Object> dataExcel=null;
 
-        if (file != null) {// the file is selected
+        //if (file != null) {// the file is selected
 
-            dataExcel = ExcelTools.importXLSX(String.valueOf(file));
+            dataExcel = ExcelTools.importXLSX(String.valueOf(MainController.xlsFileExcelShacl));
             //System.out.println(dataExcel);
-        }
+       // }
         //TODO: this can be made with many additional options e.g. what to be added and in which model to be added. Now it is primitive to solve a simple task
         //create a new Shapes model
         Model shapeModel = JenaUtil.createDefaultModel();
         //add the namespaces
         shapeModel.setNsPrefix("sh", SH.NS);
         shapeModel.setNsPrefix("dash", DASH.NS);
-        shapeModel.setNsPrefix("eu", "http://iec.ch/TC57/CIM100-EuropeanExtension/1/0#");
-        shapeModel.setNsPrefix("cims", "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#");
+        shapeModel.setNsPrefix(MainController.prefs.get("prefixEU",""), MainController.prefs.get("uriEU",""));
+        shapeModel.setNsPrefix("cims", MainController.prefs.get("cimsNamespace",""));
         shapeModel.setNsPrefix("rdf", RDF.uri);
         shapeModel.setNsPrefix("owl", OWL.NS);
-        shapeModel.setNsPrefix("cim", "http://iec.ch/TC57/CIM100#");
+        shapeModel.setNsPrefix("cim", MainController.prefs.get("CIMnamespace",""));
         shapeModel.setNsPrefix("xsd", XSD.NS);
         shapeModel.setNsPrefix("rdfs", RDFS.uri);
+        if (!MainController.prefs.get("prefixOther","").equals("") && !MainController.prefs.get("uriOther","").equals("")){
+            shapeModel.setNsPrefix(MainController.prefs.get("prefixOther",""), MainController.prefs.get("uriOther",""));
+        }
 
-        //Need to adjust this manually before each export
-        //String baseURI = "http://iec.ch/TC57/61970-600/EquipmentBoundary-European/3/0/cgmes/shapes/value#";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/EquipmentBoundary-European/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("eqbd", nsURIprofile);
 
-        //String baseURI = "http://iec.ch/TC57/61970-600/DiagramLayout-European/valueConstraints/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/DiagramLayout-European/valueConstraints/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("dlvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/Dynamics-European/valueConstraints/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/Dynamics-European/valueConstraints/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("dyvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/Dynamics-European/valueConstraints/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/Dynamics-European/valueConstraints/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("dyvcc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/CoreEquipment-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/CoreEquipment-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("eqvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/CoreEquipment-European/valueConstraints/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/CoreEquipment-European/valueConstraints/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("eqvcc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/EquipmentBoundary-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/EquipmentBoundary-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("eqbdvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/EquipmentBoundary-European/valueConstraints/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/EquipmentBoundary-European/valueConstraints/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("eqbdvcc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/Operation-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/Operation-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("opvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/ShartCircuit-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/ShortCircuit-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("scvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/SteadyStateHypothesis-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/SteadyStateHypothesis-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("sshvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/SteadyStateHypothesis-European/valueConstraints301UMLcrossProfile/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/SteadyStateHypothesis-European/valueConstraints301UMLcrossProfile/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("sshvccp", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/SteadyStateHypothesis-European/valueConstraints/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/SteadyStateHypothesis-European/valueConstraints/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("sshvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/StateVariables-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/StateVariables-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("svvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/StateVariables-European/valueConstraints456/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/StateVariables-European/valueConstraints456/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("svvcc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/Topology-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/Topology-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("tpvc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/Topology-European/valueConstraints456/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/Topology-European/valueConstraints456/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("tpvcc", nsURIprofile);
-
-        //String baseURI = "http://iec.ch/TC57/61970-600/TopologyBoundary-European/valueConstraints301UML/3/0/cgmes/shapes";
-        //String nsURIprofile= "http://iec.ch/TC57/61970-600/TopologyBoundary-European/valueConstraints301UML/3/0/cgmes/shapes#";
-        //shapeModel.setNsPrefix("tpbdvc", nsURIprofile);
-
-        String baseURI = "http://iec.ch/TC57/61970-600/TopologyBoundary-European/valueConstraints600/3/0/cgmes/shapes";
-        String nsURIprofile= "http://iec.ch/TC57/61970-600/TopologyBoundary-European/valueConstraints600/3/0/cgmes/shapes#";
-        shapeModel.setNsPrefix("tpbdvcc", nsURIprofile);
+        String baseURI = fbaseURIShapeExcel.getText();
+        String nsURIprofilePrefix=fPrefixExcelShape.getText();
+        String nsURIprofile=fNSexcelShape.getText();
+        shapeModel.setNsPrefix(nsURIprofilePrefix, nsURIprofile);
 
 
 
@@ -1119,7 +1162,7 @@ public class MainController implements Initializable {
                                     r.addProperty(SH.group, o1g);
 
                                     //add the order
-                                    RDFNode o1o = shapeModel.createTypedLiteral(row, "http://www.w3.org/2001/XMLSchema#integer");
+                                    RDFNode o1o = shapeModel.createTypedLiteral(row, XSDDatatype.XSDinteger.getURI());
                                     r.addProperty(SH.order, o1o);
 
                                     //add the message
@@ -1142,22 +1185,22 @@ public class MainController implements Initializable {
                                     //add columns Constraint 1/Value 1
 
                                     if (((LinkedList) dataExcel.get(row)).get(9).toString().equals("minExclusive")){
-                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),"http://www.w3.org/2001/XMLSchema#float");
+                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),XSDDatatype.XSDfloat.getURI());
                                         r.addProperty(SH.minExclusive, constr1);
                                     }else if (((LinkedList) dataExcel.get(row)).get(9).toString().equals("maxExclusive")){
-                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),"http://www.w3.org/2001/XMLSchema#float");
+                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),XSDDatatype.XSDfloat.getURI());
                                         r.addProperty(SH.maxExclusive, constr1);
                                     }else if (((LinkedList) dataExcel.get(row)).get(9).toString().equals("maxInclusive")) {
-                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),"http://www.w3.org/2001/XMLSchema#float");
+                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),XSDDatatype.XSDfloat.getURI());
                                         r.addProperty(SH.maxInclusive, constr1);
                                     }else if (((LinkedList) dataExcel.get(row)).get(9).toString().equals("minInclusive")) {
-                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),"http://www.w3.org/2001/XMLSchema#float");
+                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10),XSDDatatype.XSDfloat.getURI());
                                         r.addProperty(SH.minInclusive, constr1);
                                     }else if (((LinkedList) dataExcel.get(row)).get(9).toString().equals("maxLength")) {
-                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10), "http://www.w3.org/2001/XMLSchema#integer");
+                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10), XSDDatatype.XSDinteger.getURI());
                                         r.addProperty(SH.maxLength, constr1);
                                     }else if (((LinkedList) dataExcel.get(row)).get(9).toString().equals("minLength")) {
-                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10), "http://www.w3.org/2001/XMLSchema#integer");
+                                        RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(10), XSDDatatype.XSDinteger.getURI());
                                         r.addProperty(SH.minLength, constr1);
                                     }else if (((LinkedList) dataExcel.get(row)).get(9).toString().equals("equals")) {
                                         String prefix = ((LinkedList) dataExcel.get(row)).get(10).toString().split(":",2)[0];
@@ -1184,22 +1227,22 @@ public class MainController implements Initializable {
                                     if (((LinkedList) dataExcel.get(row)).size()==13) {
                                         //add columns Constraint 2/Value 2
                                         if (((LinkedList) dataExcel.get(row)).get(11).toString().equals("minExclusive")) {
-                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), "http://www.w3.org/2001/XMLSchema#float");
+                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
                                             r.addProperty(SH.minExclusive, constr2);
                                         } else if (((LinkedList) dataExcel.get(row)).get(11).toString().equals("maxExclusive")) {
-                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), "http://www.w3.org/2001/XMLSchema#float");
+                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
                                             r.addProperty(SH.maxExclusive, constr2);
                                         } else if (((LinkedList) dataExcel.get(row)).get(11).toString().equals("maxInclusive")) {
-                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), "http://www.w3.org/2001/XMLSchema#float");
+                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
                                             r.addProperty(SH.maxInclusive, constr2);
                                         } else if (((LinkedList) dataExcel.get(row)).get(11).toString().equals("minInclusive")) {
-                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), "http://www.w3.org/2001/XMLSchema#float");
+                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
                                             r.addProperty(SH.minInclusive, constr2);
                                         } else if (((LinkedList) dataExcel.get(row)).get(11).toString().equals("maxLength")) {
-                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), "http://www.w3.org/2001/XMLSchema#integer");
+                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), XSDDatatype.XSDinteger.getURI());
                                             r.addProperty(SH.maxLength, constr2);
                                         } else if (((LinkedList) dataExcel.get(row)).get(11).toString().equals("minLength")) {
-                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), "http://www.w3.org/2001/XMLSchema#integer");
+                                            RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList) dataExcel.get(row)).get(12), XSDDatatype.XSDinteger.getURI());
                                             r.addProperty(SH.minLength, constr2);
 
                                         } else if (((LinkedList) dataExcel.get(row)).get(11).toString().equals("equals")) {
@@ -1247,7 +1290,11 @@ public class MainController implements Initializable {
         }
 
 
-        //save the model as ttl
+        //open the ChoiceDialog for the save file and save the file in different formats
+        String titleSaveAs = "Save as for shape model: ";
+        File savedFile=ShaclTools.saveShapesFile(shapeModel, baseURI,0,titleSaveAs);
+
+      /*  //save the model as ttl
         FileChooser filechooserS = new FileChooser();
         filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Shapes files", "*.ttl"));
         //filechooserS.setInitialFileName(title.split(": ",2)[1]);
@@ -1262,7 +1309,8 @@ public class MainController implements Initializable {
             } finally {
                 out.close();
             }
-        }
+        }*/
+        progressBar.setProgress(1);
 
     }
 

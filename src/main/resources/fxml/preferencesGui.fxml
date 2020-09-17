@@ -75,6 +75,87 @@
                                           </TextField>
                                        </children>
                                     </HBox>
+                                    <HBox fillHeight="false">
+                                       <children>
+                                          <Label minWidth="100.0" text="Prefix and URI for the namespace of shapes related to IdentifiedObject:">
+                                             <HBox.margin>
+                                                <Insets left="5.0" />
+                                             </HBox.margin>
+                                          </Label>
+                                       </children>
+                                    </HBox>
+                                    <HBox fillHeight="false">
+                                       <children>
+                                          <Label minWidth="100.0" text="prefix:">
+                                             <HBox.margin>
+                                                <Insets left="5.0" />
+                                             </HBox.margin>
+                                          </Label>
+                                          <TextField fx:id="fIOprefix">
+                                             <HBox.margin>
+                                                <Insets right="5.0" />
+                                             </HBox.margin>
+                                          </TextField>
+                                          <Label minWidth="50.0" text="URI:" />
+                                          <TextField fx:id="fIOuri" HBox.hgrow="ALWAYS">
+                                             <HBox.margin>
+                                                <Insets right="5.0" />
+                                             </HBox.margin>
+                                          </TextField>
+                                       </children>
+                                    </HBox>
+                                    <HBox fillHeight="false">
+                                       <children>
+                                          <Label minWidth="100.0" text="Namespaces for extensions:">
+                                             <HBox.margin>
+                                                <Insets left="5.0" />
+                                             </HBox.margin>
+                                          </Label>
+                                       </children>
+                                    </HBox>
+                                    <HBox fillHeight="false">
+                                       <children>
+                                          <Label minWidth="100.0" text="prefix:">
+                                             <HBox.margin>
+                                                <Insets left="5.0" />
+                                             </HBox.margin>
+                                          </Label>
+                                          <TextField fx:id="fprefixEU">
+                                             <HBox.margin>
+                                                <Insets right="5.0" />
+                                             </HBox.margin>
+                                          </TextField>
+                                          <Label minWidth="50.0" text="URI:" />
+                                          <TextField fx:id="furiEU" HBox.hgrow="ALWAYS">
+                                             <HBox.margin>
+                                                <Insets right="5.0" />
+                                             </HBox.margin>
+                                          </TextField>
+                                       </children>
+                                       <VBox.margin>
+                                          <Insets bottom="5.0" />
+                                       </VBox.margin>
+                                    </HBox>
+                                    <HBox fillHeight="false">
+                                       <children>
+                                          <Label minWidth="100.0" text="prefix:">
+                                             <HBox.margin>
+                                                <Insets left="5.0" />
+                                             </HBox.margin>
+                                          </Label>
+                                          <TextField fx:id="fprefixOther">
+                                             <HBox.margin>
+                                                <Insets right="5.0" />
+                                             </HBox.margin>
+                                          </TextField>
+                                          <Label minWidth="50.0" text="URI:" />
+                                          <TextField fx:id="furiOther" HBox.hgrow="ALWAYS">
+                                             <HBox.margin>
+                                                <Insets right="5.0" />
+                                             </HBox.margin>
+                                          </TextField>
+                                       </children>
+                                    </HBox>
                                  </children>
                               </VBox>
                            </children>

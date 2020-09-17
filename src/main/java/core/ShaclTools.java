@@ -533,7 +533,7 @@ public class ShaclTools {
             //just linked with the nodeshape
             String nsURIprofileID="";
             if (localName.contains("IdentifiedObject")){
-                nsURIprofileID="http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#";
+                nsURIprofileID=MainController.prefs.get("IOuri","");
             } else {
                 nsURIprofileID=nsURIprofile;
             }
@@ -794,7 +794,7 @@ public class ShaclTools {
          */
         //The if here is to ensure that all property shapes for IdentifiedObjects are in one namespace
         if (localName.contains("IdentifiedObject")){
-            nsURIprofile="http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#";
+            nsURIprofile=MainController.prefs.get("IOuri","");
         }
 
         //the if is checking if the property shape is existing, if it is existing a new one is not added, but it is
@@ -936,8 +936,9 @@ public class ShaclTools {
     //open the ChoiceDialog for the save file and save the file in different formats
     public static File saveShapesFile(Model shapeModel, String baseURI, int dirOnly, String title) throws IOException {
         File savedFile = null;
-        String[] choiceDialogItems = {"TURTLE", "RDFXML", "RDFXML_PLAIN", "RDFXML_ABBREV" ,"NTRIPLES",
-                "JSONLD", "N3", "RDFJSON"};
+        //String[] choiceDialogItems = {"TURTLE", "RDFXML", "RDFXML_PLAIN", "RDFXML_ABBREV" ,"NTRIPLES",
+        //        "JSONLD", "N3", "RDFJSON"};
+        String[] choiceDialogItems = {"TURTLE", "RDFXML"};
         ChoiceDialog choiceDialog = new ChoiceDialog("TURTLE", Arrays.asList(choiceDialogItems));//Alert(Alert.AlertType.ERROR);
         choiceDialog.setContentText("Please select the type of the file.");
         choiceDialog.setHeaderText("Do you want to save the SHACL model as file?");
@@ -995,7 +996,7 @@ public class ShaclTools {
 
                     if (rdfFormat.getLang().getLabel().toUpperCase().equals("RDF/XML")) {
                         //Update - test the writer
-                        baseURI = "http://iec.ch/TC57/61970-600/CoreEquipment-European/3/0/cgmes/shapes";
+                        //baseURI = "http://iec.ch/TC57/61970-600/CoreEquipment-European/3/0/cgmes/shapes";
 
                         Map<String, Object> properties = new HashMap<>();
                         properties.put("showXmlDeclaration", "true");
@@ -1114,7 +1115,8 @@ public class ShaclTools {
         //add the additional two namespaces
         shapeModel.setNsPrefix("sh", SH.NS);
         shapeModel.setNsPrefix("dash", DASH.NS);
-        shapeModel.setNsPrefix("ido","http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#"); // the uri for the identified object related shapes
+
+        shapeModel.setNsPrefix(MainController.prefs.get("IOprefix",""),MainController.prefs.get("IOuri","")); // the uri for the identified object related shapes
 
         //adding the the two PropertyGroup-s
         String localNameGroup = "CardinalityGroup";

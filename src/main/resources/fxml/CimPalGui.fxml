@@ -46,7 +46,6 @@
             <Menu mnemonicParsing="false" text="Tools">
                <items>
                   <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportDescriptionMenu" text="Export RDFS descriptions" />
-                  <MenuItem mnemonicParsing="false" onAction="#actionMenuExcelToSHACL" text="Excel to SHACL" />
                   <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
                </items>
             </Menu>
@@ -76,7 +75,14 @@
                                                       <VBox minWidth="200.0" spacing="5.0">
                                                          <children>
                                                             <Label prefWidth="120.0" text="Profiles:" />
-                                                            <TreeView fx:id="treeViewProfileConstraints" disable="true" minHeight="70.0" onMouseClicked="#actionTreeProfileConstraintsTab" prefWidth="250.0" VBox.vgrow="ALWAYS" />
+                                                            <TreeView fx:id="treeViewProfileConstraints" disable="true" minHeight="70.0" onMouseClicked="#actionTreeProfileConstraintsTab" prefWidth="250.0" VBox.vgrow="ALWAYS">
+                                                               <tooltip>
+                                                                  <Tooltip contentDisplay="BOTTOM" graphicTextGap="5.0" text="The list of imported RDFS profiles." wrapText="true">
+                                                                     <font>
+                                                                        <Font size="14.0" />
+                                                                     </font>
+                                                                  </Tooltip>
+                                                               </tooltip></TreeView>
                                                          </children>
                                                          <HBox.margin>
                                                             <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
@@ -90,7 +96,14 @@
                                                                </padding>
                                                                <children>
                                                                   <Label minWidth="140.0" text="Save datatypes map:" wrapText="true" />
-                                                                  <ChoiceBox fx:id="fselectDatatypeMapDefineConstraints" disable="true" minWidth="250.0" HBox.hgrow="ALWAYS" />
+                                                                  <ChoiceBox fx:id="fselectDatatypeMapDefineConstraints" disable="true" minWidth="250.0" HBox.hgrow="ALWAYS">
+                                                                     <tooltip>
+                                                                        <Tooltip text="Doring the conversion process a datatype mapping can be generated. Plese select one of the three options. This datatype mapping can be used in the process to validate instance data using Shape graph." wrapText="true">
+                                                                           <font>
+                                                                              <Font size="14.0" />
+                                                                           </font>
+                                                                        </Tooltip>
+                                                                     </tooltip></ChoiceBox>
                                                                </children>
                                                             </HBox>
                                                             <HBox spacing="10.0">
@@ -99,7 +112,14 @@
                                                                </padding>
                                                                <children>
                                                                   <Label minWidth="140.0" text="Profile(s) version:" wrapText="true" />
-                                                                  <ChoiceBox fx:id="cbProfilesVersionCreateCompleteSMTab" disable="true" minWidth="250.0" HBox.hgrow="ALWAYS" />
+                                                                  <ChoiceBox fx:id="cbProfilesVersionCreateCompleteSMTab" disable="true" minWidth="250.0" HBox.hgrow="ALWAYS">
+                                                                     <tooltip>
+                                                                        <Tooltip text="This is the profile version rof the RDFS profile(s) that were imported." wrapText="true">
+                                                                           <font>
+                                                                              <Font size="14.0" />
+                                                                           </font>
+                                                                        </Tooltip>
+                                                                     </tooltip></ChoiceBox>
                                                                </children>
                                                             </HBox>
                                                             <HBox spacing="10.0">
@@ -150,11 +170,27 @@
                                                                   <Insets left="5.0" right="5.0" top="5.0" />
                                                                </padding>
                                                             </HBox>
+                                                            <HBox spacing="10.0">
+                                                               <padding>
+                                                                  <Insets left="5.0" right="5.0" top="5.0" />
+                                                               </padding>
+                                                               <children>
+                                                                  <Label minWidth="140.0" text="RDFS format:" wrapText="true" />
+                                                                  <ChoiceBox fx:id="fcbRDFSformatShapes" minWidth="400.0" />
+                                                               </children>
+                                                            </HBox>
                                                             <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                                                <children>
                                                                   <Button fx:id="btnConstructShacl" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnConstructShacl" text="Create" HBox.hgrow="ALWAYS" />
                                                                   <Button fx:id="btnApply" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnApply" text="Apply" />
-                                                                  <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionOpenRDFS" text="Open RDFS for profiles" />
+                                                                  <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionOpenRDFS" text="Open RDFS for profiles">
+                                                                     <tooltip>
+                                                                        <Tooltip contentDisplay="BOTTOM" graphicTextGap="5.0" text="Click here to open the RDFS profiles from which SHACL Shapes will be derived." wrapText="true">
+                                                                           <font>
+                                                                              <Font size="14.0" />
+                                                                           </font>
+                                                                        </Tooltip>
+                                                                     </tooltip></Button>
                                                                </children>
                                                                <VBox.margin>
                                                                   <Insets bottom="5.0" right="5.0" />
@@ -207,6 +243,84 @@
                                                          <children>
                                                             <Button fx:id="btnRunRDFcompare" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunRDFcompare" text="Run" HBox.hgrow="ALWAYS" />
                                                             <Button fx:id="btnResetRDFComp" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetRDFComp" text="Reset" />
+                                                         </children>
+                                                         <VBox.margin>
+                                                            <Insets bottom="5.0" right="5.0" />
+                                                         </VBox.margin>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
+                                             </children>
+                                          </AnchorPane>
+                                       </content>
+                                    </Tab>
+                                    <Tab fx:id="tabCreateCompleteSM11" text="Excel to SHACL">
+                                       <content>
+                                          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                                             <children>
+                                                <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                                   <children>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="90.0" text="RDF file:" wrapText="true" />
+                                                            <TextField fx:id="fPathRdffileForExcel" editable="false" HBox.hgrow="ALWAYS" />
+                                                            <Button mnemonicParsing="false" onAction="#actionBrowseRDFfileForExcel" text="Browse" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="90.0" text="RDFS format:" wrapText="true" />
+                                                            <ChoiceBox fx:id="fcbRDFSformatForExcel" minWidth="400.0" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="90.0" text="Excel file:" wrapText="true" />
+                                                            <TextField fx:id="fPathXLSfileForShape" editable="false" HBox.hgrow="ALWAYS" />
+                                                            <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShape" text="Browse" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="90.0" text="Base URI - Shape graph:" wrapText="true" />
+                                                            <TextField fx:id="fbaseURIShapeExcel" HBox.hgrow="ALWAYS" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="90.0" text="Namespace information for the resulted Shape graph:" wrapText="true" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="90.0" text="Prefix:" wrapText="true" />
+                                                            <TextField fx:id="fPrefixExcelShape" prefWidth="70.0" />
+                                                            <Label minWidth="90.0" text="Namespace:" wrapText="true" />
+                                                            <TextField fx:id="fNSexcelShape" HBox.hgrow="ALWAYS" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                                                         <children>
+                                                            <Button fx:id="btnRunExcelShape" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelShape" text="Run" HBox.hgrow="ALWAYS" />
+                                                            <Button fx:id="btnResetExcelShape" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetExcelShape" text="Reset" />
                                                          </children>
                                                          <VBox.margin>
                                                             <Insets bottom="5.0" right="5.0" />
