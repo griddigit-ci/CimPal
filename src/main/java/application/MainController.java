@@ -7,9 +7,11 @@ package application;
 
 import core.ComparisonRDFSprofile;
 import core.DataTypeMaping;
+import core.RdfConvert;
 import core.ShaclTools;
 import gui.GUIhelper;
 import javafx.application.Platform;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -38,6 +40,7 @@ import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import util.ExcelTools;
 
+import javax.swing.event.ChangeListener;
 import java.io.*;
 import java.net.URL;
 import java.util.*;
@@ -107,6 +110,27 @@ public class MainController implements Initializable {
     private Button btnRunExcelShape;
     @FXML
     private TextField fPathXLSfileForShape;
+    @FXML
+    private TextField fsourcePathTextField;
+    @FXML
+    private ChoiceBox fsourceFormatChoiceBox;
+    @FXML
+    private ChoiceBox ftargetFormatChoiceBox;
+    @FXML
+    private Button fbtnRunRDFConvert;
+    @FXML
+    private TextField frdfConvertXmlBase;
+    @FXML
+    private CheckBox fcbShowXMLDeclaration;
+    @FXML
+    private CheckBox fcbShowDoctypeDeclaration;
+    @FXML
+    private TextField fRDFconvertTab;
+    @FXML
+    private ChoiceBox fcbRelativeURIs;
+    @FXML
+    private ChoiceBox fcbRDFformat;
+
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -125,6 +149,7 @@ public class MainController implements Initializable {
     public static ArrayList<Object> shapeDatas;
     private static Map<String, RDFDatatype> dataTypeMapFromShapes;
     private static int shaclNodataMap;
+    public static File rdfConvertFile;
 
     private static String defaultShapesURI;
 
@@ -185,6 +210,42 @@ public class MainController implements Initializable {
         );
         fcbRDFSformatForExcel.getSelectionModel().selectFirst();
 
+        fsourceFormatChoiceBox.getItems().addAll(
+                "RDF XML (.rdf)",
+                "RDF Turtle (.ttl)"
+
+        );
+        fsourceFormatChoiceBox.getSelectionModel().clearSelection();
+
+        ftargetFormatChoiceBox.getItems().addAll(
+                "RDF XML (.rdf)",
+                "RDF Turtle (.ttl)"
+
+        );
+        ftargetFormatChoiceBox.getSelectionModel().clearSelection();
+
+        fcbRelativeURIs.getItems().addAll(
+                "same-document",
+                "network",
+                "absolute",
+                "relative",
+                "parent",
+                "grandparent"
+
+        );
+        fcbRelativeURIs.getSelectionModel().selectFirst();
+
+        fcbRDFformat.getItems().addAll(
+                "RDFXML_PLAIN",
+                "RDFXML",
+                "RDFXML_PRETTY",
+                "RDFXML_ABBREV"
+
+        );
+        fcbRDFformat.getSelectionModel().selectFirst();
+
+        //Adding action to the choice box
+        ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBRDFconvertTarget());
 
         //TODO: see how to have this default on the screen
         defaultShapesURI="/constraints/";
@@ -510,6 +571,114 @@ public class MainController implements Initializable {
             progressBar.setProgress(1);
         }
     }
+
+
+    @FXML
+    //action button Browse for RDFS convert
+    private void actionBrowseRDFConvert(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        //select file
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF file to convvert", "*.rdf", "*.ttl"));
+        File file = filechooser.showOpenDialog(null);
+
+        if (file != null) {// the file is selected
+
+            fsourcePathTextField.setText(file.toString());
+            MainController.rdfConvertFile=file;
+
+        }else{
+            fsourcePathTextField.clear();
+        }
+    }
+
+    @FXML
+    //Action for button "Convert" related to the RDF Convert
+    private void actionBtnRunRDFConvert(ActionEvent actionEvent) throws IOException {
+
+        progressBar.setProgress(0);
+        //format from
+        String sourceFormat = fsourceFormatChoiceBox.getSelectionModel().getSelectedItem().toString();
+        //format to
+        String targetFormat = ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString();
+        //xmlBase
+        String xmlBase=null;
+        if (!frdfConvertXmlBase.getText().isBlank()){
+            xmlBase= frdfConvertXmlBase.getText();
+        }
+
+        RDFFormat rdfFormat;
+        switch (fcbRDFformat.getSelectionModel().getSelectedItem().toString()) {
+            case "RDFXML":
+                rdfFormat=RDFFormat.RDFXML;
+                break;
+            case "RDFXML_ABBREV":
+                rdfFormat=RDFFormat.RDFXML_ABBREV;
+                break;
+            case "RDFXML_PLAIN":
+                rdfFormat=RDFFormat.RDFXML_PLAIN;
+                break;
+            case "RDFXML_PRETTY":
+                rdfFormat=RDFFormat.RDFXML_PRETTY;
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + fcbRDFformat.getSelectionModel().getSelectedItem().toString());
+        }
+        String showXmlDeclaration="false";
+        if (targetFormat.equals("RDF XML (.rdf)") && fcbShowXMLDeclaration.isSelected()){
+            showXmlDeclaration="true";
+        }
+
+        String showDoctypeDeclaration="false";
+        if (targetFormat.equals("RDF XML (.rdf)") && fcbShowDoctypeDeclaration.isSelected()){
+            showDoctypeDeclaration="true";
+        }
+        String tab="";
+        if (targetFormat.equals("RDF XML (.rdf)")){
+            tab=fRDFconvertTab.getText();
+        }
+        String relativeURIs="";
+        if (targetFormat.equals("RDF XML (.rdf)")){
+            relativeURIs=fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
+        }
+
+        RdfConvert.rdfConversion(MainController.rdfConvertFile,sourceFormat,targetFormat,xmlBase,rdfFormat,showXmlDeclaration,showDoctypeDeclaration,tab,relativeURIs);
+
+        progressBar.setProgress(1);
+    }
+
+    @FXML
+    //Action for button "Reset" related to RDF Convert
+    private void actionBrtResetRDFConvert(ActionEvent actionEvent) {
+
+        progressBar.setProgress(0);
+
+    }
+
+    @FXML
+    //Action for choice box "Target format" related to RDF Convert
+    private void actionCBRDFconvertTarget() {
+
+        progressBar.setProgress(0);
+        if(!ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().isBlank()) {
+            if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().equals("RDF XML (.rdf)")) {
+                fcbShowXMLDeclaration.setDisable(false);
+                fcbShowDoctypeDeclaration.setDisable(false);
+                fRDFconvertTab.setDisable(false);
+                fcbRelativeURIs.setDisable(false);
+                fcbRDFformat.setDisable(false);
+            } else {
+                fcbShowXMLDeclaration.setDisable(true);
+                fcbShowDoctypeDeclaration.setDisable(true);
+                fRDFconvertTab.setDisable(true);
+                fcbRelativeURIs.setDisable(true);
+                fcbRDFformat.setDisable(true);
+            }
+        }
+
+
+    }
+
     //Loads model data
     private void modelLoad(int m) {
 

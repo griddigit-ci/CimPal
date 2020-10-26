@@ -332,7 +332,7 @@
                                           </AnchorPane>
                                        </content>
                                     </Tab>
-                                    <Tab fx:id="tabCreateCompleteSM2" disable="true" text="RDF Convert">
+                                    <Tab fx:id="tabCreateCompleteSM2" text="RDF Convert">
                                        <content>
                                           <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                                              <children>
@@ -346,10 +346,10 @@
                                                                </padding>
                                                                <children>
                                                                   <Label minWidth="90.0" text="Source:" wrapText="true" />
-                                                                  <TextField fx:id="fowlImportsCreateCompleteSMTab2" editable="false" HBox.hgrow="ALWAYS" />
-                                                                  <Button mnemonicParsing="false" text="Browse" />
+                                                                  <TextField fx:id="fsourcePathTextField" editable="false" HBox.hgrow="ALWAYS" />
+                                                                  <Button mnemonicParsing="false" onAction="#actionBrowseRDFConvert" text="Browse" />
                                                                   <Label minWidth="70.0" text="Format:" />
-                                                                  <ChoiceBox fx:id="fselectDatatypeMapDefineConstraints2" disable="true" minWidth="150.0" HBox.hgrow="ALWAYS" />
+                                                                  <ChoiceBox fx:id="fsourceFormatChoiceBox" minWidth="150.0" HBox.hgrow="ALWAYS" />
                                                                </children>
                                                             </HBox>
                                                             <HBox spacing="10.0">
@@ -358,7 +358,7 @@
                                                                </padding>
                                                                <children>
                                                                   <Label minWidth="90.0" text="Target format:" wrapText="true" />
-                                                                  <ChoiceBox fx:id="cbProfilesVersionCreateCompleteSMTab2" disable="true" minWidth="250.0" HBox.hgrow="ALWAYS" />
+                                                                  <ChoiceBox fx:id="ftargetFormatChoiceBox" minWidth="250.0" HBox.hgrow="ALWAYS" />
                                                                </children>
                                                             </HBox>
                                                             <HBox spacing="10.0">
@@ -375,22 +375,33 @@
                                                                </padding>
                                                             </HBox>
                                                             <HBox spacing="10.0">
-                                                               <children>
-                                                                  <VBox spacing="10.0" HBox.hgrow="ALWAYS" />
-                                                               </children>
                                                                <padding>
                                                                   <Insets left="5.0" right="5.0" top="5.0" />
                                                                </padding>
+                                                               <children>
+                                                                  <Label minWidth="90.0" text="xml base:" wrapText="true" />
+                                                                  <TextField fx:id="frdfConvertXmlBase" HBox.hgrow="ALWAYS" />
+                                                               </children>
                                                             </HBox>
                                                             <HBox spacing="10.0">
                                                                <padding>
                                                                   <Insets left="5.0" right="5.0" top="5.0" />
                                                                </padding>
+                                                               <children>
+                                                                  <CheckBox fx:id="fcbShowXMLDeclaration" disable="true" minWidth="150.0" mnemonicParsing="false" selected="true" text="Show Xml declaration" />
+                                                                  <CheckBox fx:id="fcbShowDoctypeDeclaration" disable="true" minWidth="170.0" mnemonicParsing="false" text="Show Doctype declaration" />
+                                                                  <Label minWidth="50.0" text="Tab:" />
+                                                                  <TextField fx:id="fRDFconvertTab" disable="true" text="2" />
+                                                                  <Label text="Relative URIs: " />
+                                                                  <ChoiceBox fx:id="fcbRelativeURIs" disable="true" prefWidth="200.0" />
+                                                                  <Label text="RDF format: " />
+                                                                  <ChoiceBox fx:id="fcbRDFformat" disable="true" prefWidth="200.0" />
+                                                               </children>
                                                             </HBox>
                                                             <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                                                <children>
-                                                                  <Button fx:id="btnConstructShacl2" disable="true" minWidth="60.0" mnemonicParsing="false" text="Run" HBox.hgrow="ALWAYS" />
-                                                                  <Button fx:id="btnApply2" minWidth="60.0" mnemonicParsing="false" text="Reset" />
+                                                                  <Button fx:id="fbtnRunRDFConvert" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunRDFConvert" text="Convert" HBox.hgrow="ALWAYS" />
+                                                                  <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtResetRDFConvert" text="Reset" />
                                                                </children>
                                                                <VBox.margin>
                                                                   <Insets bottom="5.0" right="5.0" />
