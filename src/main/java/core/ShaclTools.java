@@ -452,7 +452,7 @@ public class ShaclTools {
          */
 
         //creates the resource
-        Resource r = shapeModel.createResource(nsURIprofile + localName+"ValueType");
+        Resource r = shapeModel.createResource(nsURIprofile + localName+"-valueType");
         r.addProperty(RDF.type, SH.NodeShape);
         RDFNode o1 = shapeModel.createResource(classFullURI);
         r.addProperty(SH.targetClass, o1);
@@ -765,7 +765,7 @@ public class ShaclTools {
 
                 shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
                 //RDFList orRDFlist = shapeModel.createList(classNames.iterator());
-                Resource nodeShapeResourceOr = shapeModel.getResource(nsURIprofile + localName+"ValueType");
+                Resource nodeShapeResourceOr = shapeModel.getResource(nsURIprofile + localName+"-valueType");
                 if (!shapeModel.getResource(nodeShapeResourceOr.toString()).hasProperty(SH.or)) { // creates sh:or only if it is missing
                     RDFList orRDFlist = shapeModel.createList(classNames.iterator());
                     nodeShapeResourceOr.addProperty(SH.or, orRDFlist);
@@ -1097,7 +1097,46 @@ public class ShaclTools {
         //shapeModels.set(m,shapeModel);
     }
 
+    //get owl:imports
+    public static String getOWLimports(Model shapeModel, String baseURI){
+        String owlImports="";
+        if (shapeModel.contains(shapeModel.getResource(baseURI),OWL2.imports)){
+            int count=0;
+            for (NodeIterator res=shapeModel.listObjectsOfProperty(shapeModel.getResource(baseURI),OWL2.imports);res.hasNext();){
+                if (count==0) {
+                    owlImports=res.next().toString();
+                }else {
+                    owlImports=owlImports+", "+res.next().toString();
+                }
+                count++;
+            }
+        }
+        return owlImports;
+    }
 
+
+    // lists all statements related to a shape
+    public static List<Statement> listShapeStatements(Model shapeModel, Resource resItem, int includeResItemStmt){
+        List<Statement> result = new LinkedList<>();
+
+        //find out what it is NodeShape, PropertyGroup, PropertyShape or SPARQLConstraint
+        RDFNode resItemType = null;
+        for (NodeIterator i=shapeModel.listObjectsOfProperty(resItem,RDF.type); i.hasNext();){
+            resItemType = i.next();
+        }
+        Statement askedStmt=shapeModel.listStatements(resItem,RDF.type, resItemType).next();
+
+        if (includeResItemStmt==1){ // it will add the statement of the main shape/class to the list
+            result.add(askedStmt);
+        }
+
+        //get all statements for the shape - resource
+        for (StmtIterator si = resItem.listProperties(); si.hasNext();){
+            Statement stmtItem = si.next();
+            result.add(stmtItem);
+        }
+        return result;
+    }
 
 
     //This creates a shape model from a profile
@@ -1450,8 +1489,164 @@ public class ShaclTools {
         return concrete;
     }
 
+    //List of SHACL NodeShape properties
+    public static ArrayList<String> getListShaclNodeShapeProperties(){
+        ArrayList<String> shaclNodeShapeProperties =new ArrayList<>();
+        //these are properties of sh:Shape
+        shaclNodeShapeProperties.add("targetClass");
+        shaclNodeShapeProperties.add("targetNode");
+        shaclNodeShapeProperties.add("targetObjectsOf");
+        shaclNodeShapeProperties.add("targetSubjectsOf");
+        shaclNodeShapeProperties.add("severity");
+        shaclNodeShapeProperties.add("message");
+        shaclNodeShapeProperties.add("deactivated");
+        shaclNodeShapeProperties.add("property");
+        shaclNodeShapeProperties.add("target");
+        shaclNodeShapeProperties.add("rule");
+        //these are properties of sh:NodeShape
+
+        //Constraints
+        shaclNodeShapeProperties.add("class");
+        shaclNodeShapeProperties.add("datatype");
+        shaclNodeShapeProperties.add("nodeKind");
+        shaclNodeShapeProperties.add("minExclusive");
+        shaclNodeShapeProperties.add("minInclusive");
+        shaclNodeShapeProperties.add("maxExclusive");
+        shaclNodeShapeProperties.add("maxInclusive");
+        shaclNodeShapeProperties.add("minLength");
+        shaclNodeShapeProperties.add("maxLength");
+        shaclNodeShapeProperties.add("pattern");
+        shaclNodeShapeProperties.add("flags");
+        shaclNodeShapeProperties.add("languageIn");
+        shaclNodeShapeProperties.add("not");
+        shaclNodeShapeProperties.add("and");
+        shaclNodeShapeProperties.add("or");
+        shaclNodeShapeProperties.add("xone");
+        shaclNodeShapeProperties.add("node");
+        shaclNodeShapeProperties.add("property");
+        shaclNodeShapeProperties.add("closed");
+        shaclNodeShapeProperties.add("ignoredProperties");
+        shaclNodeShapeProperties.add("hasValue");
+        shaclNodeShapeProperties.add("in");
+        shaclNodeShapeProperties.add("sparql");
 
 
 
+        return shaclNodeShapeProperties;
+    }
+
+    //List of SHACL PropertyShape properties
+    public static ArrayList<String> getListShaclPropertyShapeProperties(){
+        ArrayList<String> shaclPropertyShapeProperties =new ArrayList<>();
+        //these are properties of sh:Shape
+        shaclPropertyShapeProperties.add("targetClass");
+        shaclPropertyShapeProperties.add("targetNode");
+        shaclPropertyShapeProperties.add("targetObjectsOf");
+        shaclPropertyShapeProperties.add("targetSubjectsOf");
+        shaclPropertyShapeProperties.add("severity");
+        shaclPropertyShapeProperties.add("message");
+        shaclPropertyShapeProperties.add("deactivated");
+        shaclPropertyShapeProperties.add("property");
+        shaclPropertyShapeProperties.add("target");
+        //these are properties of sh:PropertyShape
+        shaclPropertyShapeProperties.add("path");
+        shaclPropertyShapeProperties.add("defaultValue");
+        shaclPropertyShapeProperties.add("description");
+        shaclPropertyShapeProperties.add("group");
+        shaclPropertyShapeProperties.add("name");
+        shaclPropertyShapeProperties.add("rule");
+        shaclPropertyShapeProperties.add("order");
+        //Constraints
+        shaclPropertyShapeProperties.add("class");
+        shaclPropertyShapeProperties.add("datatype");
+        shaclPropertyShapeProperties.add("nodeKind");
+        shaclPropertyShapeProperties.add("minCount");
+        shaclPropertyShapeProperties.add("maxCount");
+        shaclPropertyShapeProperties.add("minExclusive");
+        shaclPropertyShapeProperties.add("minInclusive");
+        shaclPropertyShapeProperties.add("maxExclusive");
+        shaclPropertyShapeProperties.add("maxInclusive");
+        shaclPropertyShapeProperties.add("minLength");
+        shaclPropertyShapeProperties.add("maxLength");
+        shaclPropertyShapeProperties.add("pattern");
+        shaclPropertyShapeProperties.add("flags");
+        shaclPropertyShapeProperties.add("languageIn");
+        shaclPropertyShapeProperties.add("uniqueLang");
+        shaclPropertyShapeProperties.add("equals");
+        shaclPropertyShapeProperties.add("disjoint");
+        shaclPropertyShapeProperties.add("lessThan");
+        shaclPropertyShapeProperties.add("lessThanOrEquals");
+        shaclPropertyShapeProperties.add("not");
+        shaclPropertyShapeProperties.add("and");
+        shaclPropertyShapeProperties.add("or");
+        shaclPropertyShapeProperties.add("xone");
+        shaclPropertyShapeProperties.add("node");
+        shaclPropertyShapeProperties.add("property");
+        shaclPropertyShapeProperties.add("qualifiedValueShape");
+        shaclPropertyShapeProperties.add("qualifiedValueShapesDisjoint");
+        shaclPropertyShapeProperties.add("qualifiedMinCount");
+        shaclPropertyShapeProperties.add("qualifiedMaxCount");
+        shaclPropertyShapeProperties.add("closed");
+        shaclPropertyShapeProperties.add("ignoredProperties");
+        shaclPropertyShapeProperties.add("hasValue");
+        shaclPropertyShapeProperties.add("in");
+        shaclPropertyShapeProperties.add("sparql");
+
+
+
+
+        return shaclPropertyShapeProperties;
+    }
+
+    //List of SHACL PropertyGroup properties
+    public static ArrayList<String> getListShaclPropertyGroupProperties(){
+        ArrayList<String> shaclPropertyGroupProperties =new ArrayList<>();
+        //these are properties of sh:Shape
+        //shaclPropertyGroupProperties.add("targetClass");
+        //shaclPropertyGroupProperties.add("targetNode");
+        //shaclPropertyGroupProperties.add("targetObjectsOf");
+        //shaclPropertyGroupProperties.add("targetSubjectsOf");
+        //shaclPropertyGroupProperties.add("severity");
+        //shaclPropertyGroupProperties.add("message");
+        //shaclPropertyGroupProperties.add("deactivated");
+        //shaclPropertyGroupProperties.add("property");
+        //these are properties of sh:PropertyGroup
+        shaclPropertyGroupProperties.add("label"); // it is the rdfs:label
+        shaclPropertyGroupProperties.add("order");
+        //TODO remove name and description from the auto generation for the PropertyGroup - see what Holger will reply
+
+
+        return shaclPropertyGroupProperties;
+    }
+
+    //List of SHACL type properties
+    public static ArrayList<String> getListShacltypeProperties(){
+        ArrayList<String> shacltypeProperties =new ArrayList<>();
+        shacltypeProperties.add("type"); // it is the rdfs:label
+
+        return shacltypeProperties;
+    }
+
+    //List of SHACL SPARQLConstraint properties
+    public static ArrayList<String> getListShaclSPARQLConstraintProperties(){
+        ArrayList<String> shaclSPARQLConstraintProperties =new ArrayList<>();
+        //these are properties of sh:Shape
+        //shaclSPARQLConstraintProperties.add("targetClass");
+        //shaclSPARQLConstraintProperties.add("targetNode");
+        //shaclSPARQLConstraintProperties.add("targetObjectsOf");
+        //shaclSPARQLConstraintProperties.add("targetSubjectsOf");
+        //shaclSPARQLConstraintProperties.add("severity");
+
+
+        //shaclSPARQLConstraintProperties.add("property");
+        //these are properties of sh:SPARQLConstraint
+        shaclSPARQLConstraintProperties.add("deactivated");
+        shaclSPARQLConstraintProperties.add("message");
+        shaclSPARQLConstraintProperties.add("prefixes");
+        shaclSPARQLConstraintProperties.add("select");
+
+
+        return shaclSPARQLConstraintProperties;
+    }
 
 }

@@ -5,25 +5,31 @@
  */
 package application;
 
-import core.ComparisonRDFSprofile;
-import core.DataTypeMaping;
-import core.RdfConvert;
-import core.ShaclTools;
+import core.*;
+import gui.ComboBoxCell;
 import gui.GUIhelper;
+import gui.TableColumnsSetup;
+import gui.TextAreaEditTableCell;
 import javafx.application.Platform;
-import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
+import javafx.event.Event;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Callback;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -31,6 +37,7 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.OWL;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
@@ -40,7 +47,6 @@ import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import util.ExcelTools;
 
-import javax.swing.event.ChangeListener;
 import java.io.*;
 import java.net.URL;
 import java.util.*;
@@ -130,6 +136,36 @@ public class MainController implements Initializable {
     private ChoiceBox fcbRelativeURIs;
     @FXML
     private ChoiceBox fcbRDFformat;
+    @FXML
+    private CheckBox fcbRDFConvertInheritanceOnly;
+    @FXML
+    private CheckBox fcbRDFconvertModelUnion;
+    @FXML
+    private CheckBox fcbRDFConverInheritanceList;
+    @FXML
+    private CheckBox fcbRDFConverInheritanceListConcrete;
+    @FXML
+    private TreeView treeViewConstraints;
+    @FXML
+    private  TextField fPrefixGenerateTab;
+    @FXML
+    private  TextField fURIGenerateTab;
+    @FXML
+    private TextField fshapesBaseURIDefineTab;
+    @FXML
+    private TextField fowlImportsDefineTab;
+    @FXML
+    private TableView tableViewBrowseModify;
+    @FXML
+    private TableColumn itemColumnBrowseModify;
+    @FXML
+    private TableColumn valueColumnBrowseModify;
+    @FXML
+    private Tab tabConstraintsSourceCode;
+    @FXML
+    private ToggleButton btnShowSourceCodeDefineTab;
+    @FXML
+    private TextArea fsourceDefineTab;
 
 
     public static File rdfModel1;
@@ -150,8 +186,15 @@ public class MainController implements Initializable {
     private static Map<String, RDFDatatype> dataTypeMapFromShapes;
     private static int shaclNodataMap;
     public static File rdfConvertFile;
+    public static List rdfConvertFileList;
 
     private static String defaultShapesURI;
+    public static String rdfFormatInput;
+
+    public static TreeView treeViewConstraintsStatic;
+    private static Map<TreeItem,String> treeMapConstraints;
+    private static Map<String,TreeItem> treeMapConstraintsInverse;
+
 
 
     public MainController() {
@@ -169,6 +212,31 @@ public class MainController implements Initializable {
         System.setOut(new PrintStream(out, true));
         System.setErr(new PrintStream(out, true));
 
+        treeViewConstraintsStatic=treeViewConstraints;
+        //initialization of the Browse and Modify table - SHACL Shapes Browse
+        tableViewBrowseModify.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        tableViewBrowseModify.setEditable(false);
+        tableViewBrowseModify.setPlaceholder(new Label("No shape properties present"));
+
+        Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
+
+        //set column 1
+        itemColumnBrowseModify.setCellValueFactory( new PropertyValueFactory<TableColumnsSetup, String>( "column1" ) );
+        itemColumnBrowseModify.setCellFactory( cellFactory );
+        itemColumnBrowseModify.setOnEditCommit(
+                (EventHandler<TableColumn.CellEditEvent<TableColumnsSetup, String>>) t -> t.getTableView().getItems().get(
+                        t.getTablePosition().getRow() ).setColumn1( t.getNewValue() )
+        );
+
+        //set column 2
+        valueColumnBrowseModify.setCellValueFactory( new PropertyValueFactory<TableColumnsSetup, String>( "column2" ) );
+        Callback<TableColumn, TableCell> cellFactoryC2 = p -> new TextAreaEditTableCell();
+        valueColumnBrowseModify.setCellFactory(cellFactoryC2);
+        valueColumnBrowseModify.setOnEditCommit(
+                (EventHandler<TableColumn.CellEditEvent<TableColumnsSetup, String>>) t -> t.getTableView().getItems().get(
+                        t.getTablePosition().getRow() ).setColumn2( t.getNewValue() )
+        );
+
         try {
             if (!Preferences.userRoot().nodeExists("CimPal")){
                 prefs = Preferences.userRoot().node("CimPal");
@@ -183,7 +251,8 @@ public class MainController implements Initializable {
 
         cbProfilesVersionCreateCompleteSMTab.getItems().addAll(
                 "IEC TS 61970-600-1&2 (CGMES 2.4.15)",
-                "IEC 61970-600-1&2 (CGMES 3.0.0)"
+                "IEC 61970-600-1&2 (CGMES 3.0.0)",
+                "Other"
         );
 
         fselectDatatypeMapDefineConstraints.getItems().addAll(
@@ -193,14 +262,15 @@ public class MainController implements Initializable {
         );
 
         fcbRDFSformat.getItems().addAll(
-                "RDFS (augmented) by CimSyntaxGen"
+                "RDFS (augmented) by CimSyntaxGen",
+                "SHACL Shapes"
 
         );
         fcbRDFSformat.getSelectionModel().selectFirst();
 
         fcbRDFSformatShapes.getItems().addAll(
-                "RDFS (augmented) by CimSyntaxGen"
-
+                "RDFS (augmented) by CimSyntaxGen",
+                "Merged OWL CIMTool"
         );
         fcbRDFSformatShapes.getSelectionModel().selectFirst();
 
@@ -212,15 +282,15 @@ public class MainController implements Initializable {
 
         fsourceFormatChoiceBox.getItems().addAll(
                 "RDF XML (.rdf)",
-                "RDF Turtle (.ttl)"
-
+                "RDF Turtle (.ttl)",
+                "JSON-LD (.jsonld)"
         );
         fsourceFormatChoiceBox.getSelectionModel().clearSelection();
 
         ftargetFormatChoiceBox.getItems().addAll(
                 "RDF XML (.rdf)",
-                "RDF Turtle (.ttl)"
-
+                "RDF Turtle (.ttl)",
+                "JSON-LD (.jsonld)"
         );
         ftargetFormatChoiceBox.getSelectionModel().clearSelection();
 
@@ -248,7 +318,7 @@ public class MainController implements Initializable {
         ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBRDFconvertTarget());
 
         //TODO: see how to have this default on the screen
-        defaultShapesURI="/constraints/";
+        defaultShapesURI="/Constraints";
     }
 
 
@@ -326,10 +396,17 @@ public class MainController implements Initializable {
     //action button Browse for RDFS comparison - file 1
     private void actionBrowseRDFfile1(ActionEvent actionEvent) {
         progressBar.setProgress(0);
-        //select file 1
-        FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
-        File file = filechooser.showOpenDialog(null);
+        File file=null;
+        if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen")) {
+            //select file 1
+            FileChooser filechooser = new FileChooser();
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+            file = filechooser.showOpenDialog(null);
+        }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
+            FileChooser filechooser = new FileChooser();
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shapes", "*.rdf", "*.ttl"));
+            file = filechooser.showOpenDialog(null);
+        }
 
         if (file != null) {// the file is selected
 
@@ -349,10 +426,17 @@ public class MainController implements Initializable {
     //action button Browse for RDFS comparison - file 2
     private void actionBrowseRDFfile2(ActionEvent actionEvent) {
         progressBar.setProgress(0);
+        File file=null;
+        if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen")) {
         //select file 2
-        FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
-        File file = filechooser.showOpenDialog(null);
+            FileChooser filechooser = new FileChooser();
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+            file = filechooser.showOpenDialog(null);
+        }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
+            FileChooser filechooser = new FileChooser();
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shapes", "*.rdf", "*.ttl"));
+            file = filechooser.showOpenDialog(null);
+        }
 
         if (file != null) {// the file is selected
 
@@ -412,52 +496,92 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> RDFS difference
-    private void actionBtnRunRDFcompare(ActionEvent actionEvent) {
+    private void actionBtnRunRDFcompare(ActionEvent actionEvent) throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-        Model model1 = ModelFactory.createDefaultModel(); // model for rdf file1
-        Model model2 = ModelFactory.createDefaultModel(); // model for rdf file2
 
-        try {
+        Lang rdfSourceFormat1=Lang.RDFXML;
+        Lang rdfSourceFormat2=Lang.RDFXML;
+        switch (fcbRDFSformat.getSelectionModel().getSelectedItem().toString()) {
+            case "RDFS (augmented) by CimSyntaxGen":
+                rdfSourceFormat1=Lang.RDFXML;
+                rdfSourceFormat2=Lang.RDFXML;
+                break;
+
+            case "SHACL Shapes":
+                if (MainController.rdfModel1.getName().endsWith(".ttl")) {
+                    rdfSourceFormat1 = Lang.TURTLE;
+                }else if (MainController.rdfModel1.getName().endsWith(".rdf")){
+                    rdfSourceFormat1 = Lang.RDFXML;
+                }
+                if (MainController.rdfModel2.getName().endsWith(".ttl")) {
+                    rdfSourceFormat2 = Lang.TURTLE;
+                }else if (MainController.rdfModel2.getName().endsWith(".rdf")){
+                    rdfSourceFormat2 = Lang.RDFXML;
+                }
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + fcbRDFSformat.getSelectionModel().getSelectedItem().toString());
+        }
+
+        List modelFiles1 = new LinkedList();
+        modelFiles1.add(MainController.rdfModel1);
+        List modelFiles2 = new LinkedList();
+        modelFiles2.add(MainController.rdfModel2);
+
+        Model model1 = util.ModelFactory.modelLoad(modelFiles1,null,rdfSourceFormat1);
+        Model model2 = util.ModelFactory.modelLoad(modelFiles2,null,rdfSourceFormat2);
+
+
+
+        //Model model1 = ModelFactory.createDefaultModel(); // model for rdf file1
+        //Model model2 = ModelFactory.createDefaultModel(); // model for rdf file2
+
+        /*try {
             RDFDataMgr.read(model1, new FileInputStream(MainController.rdfModel1), Lang.RDFXML);
             RDFDataMgr.read(model2, new FileInputStream(MainController.rdfModel2), Lang.RDFXML);
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
-        }
+        }*/
 
         rdfsCompareFiles = new LinkedList<>();
         rdfsCompareFiles.add(MainController.rdfModel1.getName());
         rdfsCompareFiles.add(MainController.rdfModel2.getName());
 
-        compareResults = ComparisonRDFSprofile.compareRDFSprofile(model1, model2);
+        if (fcbRDFSformat.getSelectionModel().getSelectedItem().toString().equals("RDFS (augmented) by CimSyntaxGen")) {
+            compareResults = ComparisonRDFSprofile.compareRDFSprofile(model1, model2);
 
-        if (compareResults.size() != 0) {
+            if (compareResults.size() != 0) {
 
-            try {
-                Stage guiRdfDiffResultsStage = new Stage();
-                //Scene for the menu RDF differences
-                FXMLLoader fxmlLoader = new FXMLLoader();
-                Parent rootRDFdiff = fxmlLoader.load(getClass().getResource("/fxml/rdfDiffResult.fxml"));
-                Scene rdfDiffscene = new Scene(rootRDFdiff);
-                guiRdfDiffResultsStage.setScene(rdfDiffscene);
-                guiRdfDiffResultsStage.setTitle("Comparison RDFS profiles");
-                guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
-                rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                try {
+                    Stage guiRdfDiffResultsStage = new Stage();
+                    //Scene for the menu RDF differences
+                    FXMLLoader fxmlLoader = new FXMLLoader();
+                    Parent rootRDFdiff = fxmlLoader.load(getClass().getResource("/fxml/rdfDiffResult.fxml"));
+                    Scene rdfDiffscene = new Scene(rootRDFdiff);
+                    guiRdfDiffResultsStage.setScene(rdfDiffscene);
+                    guiRdfDiffResultsStage.setTitle("Comparison RDFS profiles");
+                    guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
+                    rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                    progressBar.setProgress(1);
+                    guiRdfDiffResultsStage.showAndWait();
+
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setContentText("The two models are identical if the CIM namespace would be the same.");
+                alert.setHeaderText(null);
+                alert.setTitle("Information");
                 progressBar.setProgress(1);
-                guiRdfDiffResultsStage.showAndWait();
-
-
-            } catch (IOException e) {
-                e.printStackTrace();
+                alert.showAndWait();
             }
-        } else {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setContentText("The two models are identical if the CIM namespace would be the same.");
-            alert.setHeaderText(null);
-            alert.setTitle("Information");
-            progressBar.setProgress(1);
-            alert.showAndWait();
+        } else if(fcbRDFSformat.getSelectionModel().getSelectedItem().toString().equals("SHACL Shapes")){
+            compareResults = ComparisonSHACLshapes.compareSHACLshapes(model1, model2);
         }
+        progressBar.setProgress(1);
 
     }
 
@@ -545,7 +669,13 @@ public class MainController implements Initializable {
     @FXML
     private void actionOpenRDFS(ActionEvent actionEvent) {
         FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+        if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen")) {
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDFS (augmented) by CimSyntaxGen files", "*.rdf"));
+            rdfFormatInput="CimSyntaxGen-RDFS-Augmented-2019";
+        }else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool")) {
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Merged OWL CIMTool files", "*.owl"));
+            rdfFormatInput="CIMTool-merged-owl";
+        }
         this.selectedFile = filechooser.showOpenMultipleDialog(null);
 
         if (this.selectedFile != null) {// the file is selected
@@ -579,13 +709,23 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         //select file
         FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF file to convvert", "*.rdf", "*.ttl"));
-        File file = filechooser.showOpenDialog(null);
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF file to convert", "*.rdf", "*.ttl"));
+        File file=null;
+        List fileL=null;
+        if (fcbRDFconvertModelUnion.isSelected()) {
+            fileL = filechooser.showOpenMultipleDialog(null);
+        }else{
+            file = filechooser.showOpenDialog(null);
+        }
 
-        if (file != null) {// the file is selected
-
-            fsourcePathTextField.setText(file.toString());
-            MainController.rdfConvertFile=file;
+        if (file != null || fileL!=null) {// the file is selected
+            if (file != null) {
+                fsourcePathTextField.setText(file.toString());
+                MainController.rdfConvertFile = file;
+            }else {
+                fsourcePathTextField.setText(fileL.toString());
+                MainController.rdfConvertFileList = fileL;
+            }
 
         }else{
             fsourcePathTextField.clear();
@@ -607,22 +747,24 @@ public class MainController implements Initializable {
             xmlBase= frdfConvertXmlBase.getText();
         }
 
-        RDFFormat rdfFormat;
-        switch (fcbRDFformat.getSelectionModel().getSelectedItem().toString()) {
-            case "RDFXML":
-                rdfFormat=RDFFormat.RDFXML;
-                break;
-            case "RDFXML_ABBREV":
-                rdfFormat=RDFFormat.RDFXML_ABBREV;
-                break;
-            case "RDFXML_PLAIN":
-                rdfFormat=RDFFormat.RDFXML_PLAIN;
-                break;
-            case "RDFXML_PRETTY":
-                rdfFormat=RDFFormat.RDFXML_PRETTY;
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + fcbRDFformat.getSelectionModel().getSelectedItem().toString());
+        RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
+        if (!fcbRDFformat.getSelectionModel().isSelected(-1)) {
+            switch (fcbRDFformat.getSelectionModel().getSelectedItem().toString()) {
+                case "RDFXML":
+                    rdfFormat = RDFFormat.RDFXML;
+                    break;
+                case "RDFXML_ABBREV":
+                    rdfFormat = RDFFormat.RDFXML_ABBREV;
+                    break;
+                case "RDFXML_PLAIN":
+                    rdfFormat = RDFFormat.RDFXML_PLAIN;
+                    break;
+                case "RDFXML_PRETTY":
+                    rdfFormat = RDFFormat.RDFXML_PRETTY;
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + fcbRDFformat.getSelectionModel().getSelectedItem().toString());
+            }
         }
         String showXmlDeclaration="false";
         if (targetFormat.equals("RDF XML (.rdf)") && fcbShowXMLDeclaration.isSelected()){
@@ -642,7 +784,28 @@ public class MainController implements Initializable {
             relativeURIs=fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
         }
 
-        RdfConvert.rdfConversion(MainController.rdfConvertFile,sourceFormat,targetFormat,xmlBase,rdfFormat,showXmlDeclaration,showDoctypeDeclaration,tab,relativeURIs);
+        Boolean modelUnionFlag=false;
+        if (fcbRDFconvertModelUnion.isSelected()) {
+            modelUnionFlag=true;
+        }
+
+        Boolean inheritanceOnly=false;
+        if (fcbRDFConvertInheritanceOnly.isSelected()) {
+            inheritanceOnly=true;
+        }
+        Boolean inheritanceList=false;
+        if (fcbRDFConverInheritanceList.isSelected()) {
+            inheritanceList=true;
+        }
+
+        Boolean inheritanceListConcrete=false;
+        if (fcbRDFConverInheritanceListConcrete.isSelected()) {
+            inheritanceListConcrete=true;
+        }
+
+        RdfConvert.rdfConversion(MainController.rdfConvertFile,MainController.rdfConvertFileList,sourceFormat,
+                targetFormat,xmlBase,rdfFormat,showXmlDeclaration,showDoctypeDeclaration,tab,
+                relativeURIs,modelUnionFlag,inheritanceOnly,inheritanceList,inheritanceListConcrete);
 
         progressBar.setProgress(1);
     }
@@ -652,28 +815,80 @@ public class MainController implements Initializable {
     private void actionBrtResetRDFConvert(ActionEvent actionEvent) {
 
         progressBar.setProgress(0);
+        fsourcePathTextField.clear();
+        fsourceFormatChoiceBox.getSelectionModel().clearSelection();
+        ftargetFormatChoiceBox.getSelectionModel().clearSelection();
+        frdfConvertXmlBase.clear();
+        fcbRDFconvertModelUnion.setSelected(false);
+        fcbRDFConvertInheritanceOnly.setSelected(false);
+        fcbRDFConverInheritanceList.setSelected(false);
+        fcbRDFConverInheritanceList.setDisable(true);
+        fcbRDFConverInheritanceListConcrete.setSelected(false);
+        fcbRDFConverInheritanceListConcrete.setDisable(true);
 
     }
 
+
     @FXML
+    //Action for check box "Process only inheritance related properties" related to RDF Convert
+    private void actionRDFConvertInheritanceOnly(ActionEvent actionEvent) {
+        if (fcbRDFConvertInheritanceOnly.isSelected()) {
+            fcbRDFConverInheritanceList.setDisable(false);
+        }else{
+            fcbRDFConverInheritanceList.setDisable(true);
+            fcbRDFConverInheritanceList.setSelected(false);
+            fcbRDFConverInheritanceListConcrete.setSelected(false);
+            fcbRDFConverInheritanceListConcrete.setDisable(true);
+        }
+    }
+
+    @FXML
+    //Action for check box "Generate inheritance list in Turtle" related to RDF Convert
+    private void actionRDFConvertInheritanceList(ActionEvent actionEvent) {
+        if (fcbRDFConverInheritanceList.isSelected()) {
+            fcbRDFConverInheritanceListConcrete.setDisable(false);
+        }else{
+            fcbRDFConverInheritanceListConcrete.setDisable(true);
+            fcbRDFConverInheritanceListConcrete.setSelected(false);
+        }
+    }
+
     //Action for choice box "Target format" related to RDF Convert
     private void actionCBRDFconvertTarget() {
 
         progressBar.setProgress(0);
-        if(!ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().isBlank()) {
+        if(!ftargetFormatChoiceBox.getSelectionModel().isSelected(-1)) {
             if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().equals("RDF XML (.rdf)")) {
                 fcbShowXMLDeclaration.setDisable(false);
                 fcbShowDoctypeDeclaration.setDisable(false);
                 fRDFconvertTab.setDisable(false);
                 fcbRelativeURIs.setDisable(false);
+                fcbRelativeURIs.getSelectionModel().selectFirst();
                 fcbRDFformat.setDisable(false);
+                fcbRDFformat.getSelectionModel().selectFirst();
             } else {
                 fcbShowXMLDeclaration.setDisable(true);
+                fcbShowXMLDeclaration.setSelected(true);
                 fcbShowDoctypeDeclaration.setDisable(true);
+                fcbShowDoctypeDeclaration.setSelected(false);
                 fRDFconvertTab.setDisable(true);
+                fRDFconvertTab.setText("2");
                 fcbRelativeURIs.setDisable(true);
+                fcbRelativeURIs.getSelectionModel().clearSelection();
                 fcbRDFformat.setDisable(true);
+                fcbRDFformat.getSelectionModel().clearSelection();
             }
+        } else {
+            fcbShowXMLDeclaration.setDisable(true);
+            fcbShowXMLDeclaration.setSelected(true);
+            fcbShowDoctypeDeclaration.setDisable(true);
+            fcbShowDoctypeDeclaration.setSelected(false);
+            fRDFconvertTab.setDisable(true);
+            fRDFconvertTab.setText("2");
+            fcbRelativeURIs.setDisable(true);
+            fcbRelativeURIs.getSelectionModel().clearSelection();
+            fcbRDFformat.setDisable(true);
+            fcbRDFformat.getSelectionModel().clearSelection();
         }
 
 
@@ -724,29 +939,35 @@ public class MainController implements Initializable {
         //set package structure
         Model model = (Model) this.models.get(m);
         this.packages = new ArrayList<>();
-        for (ResIterator i = model.listSubjects(); i.hasNext(); ) { //iterate on the items found in the rdf file
-            Resource resItem = i.next();
-            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
-            String rdfType;
-            if (rdfTypeInit.length == 0) {
-                rdfType = rdfTypeInit[0];
-            } else {
-                rdfType = rdfTypeInit[1];
-            }
-            String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString().split("@", 2)[0]; // the first part of the rdfs:label
-            if (rdfType.equals("ClassCategory")) { // if it is a package
-                this.packages.add(rdfsLabel);
-            }
-        }
+        int multiPackage = 0;
 
-        int multiPackage=0;
-        if (this.packages.size() != 1) {
-            for (int pak = 0; pak < this.packages.size(); pak++) {
-                if (this.packages.get(pak).contains("Profile")){
-                    multiPackage=pak;
-                    break;
+        if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019")) {
+            for (ResIterator i = model.listSubjects(); i.hasNext(); ) { //iterate on the items found in the rdf file
+                Resource resItem = i.next();
+                String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
+                String rdfType;
+                if (rdfTypeInit.length == 0) {
+                    rdfType = rdfTypeInit[0];
+                } else {
+                    rdfType = rdfTypeInit[1];
+                }
+                String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString().split("@", 2)[0]; // the first part of the rdfs:label
+                if (rdfType.equals("ClassCategory")) { // if it is a package
+                    this.packages.add(rdfsLabel);
                 }
             }
+
+
+            if (this.packages.size() != 1) {
+                for (int pak = 0; pak < this.packages.size(); pak++) {
+                    if (this.packages.get(pak).contains("Profile")) {
+                        multiPackage = pak;
+                        break;
+                    }
+                }
+            }
+        } else if (rdfFormatInput.equals("CIMTool-merged-owl")) {
+            this.packages.add(this.selectedFile.get(m).getName());
         }
 
         if (this.packages.size() == 1) {
@@ -871,7 +1092,7 @@ public class MainController implements Initializable {
                 }
             }
 
-            //TODO: temporary option until a way to automate is found
+            //TODO: temporary option until a way to automate is implemented
             if (cbApplyDefNsDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();
                 for (Object modelsNames : this.modelsNames) {
@@ -880,51 +1101,51 @@ public class MainController implements Initializable {
                             switch (treeitem.getValue()) {
                                 case "CoreEquipmentProfile":
                                     ((ArrayList) modelsNames).set(1, "eq");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints#");
                                     break;
                                 case "OperationProfile":
                                     ((ArrayList) modelsNames).set(1, "op");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Operation-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints#");
                                     break;
                                 case "ShortCircuitProfile":
                                     ((ArrayList) modelsNames).set(1, "sc");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints#");
                                     break;
                                 case "SteadyStateHypothesisProfile":
                                     ((ArrayList) modelsNames).set(1, "ssh");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints#");
                                     break;
                                 case "TopologyProfile":
                                     ((ArrayList) modelsNames).set(1, "tp");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Topology-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints#");
                                     break;
                                 case "StateVariablesProfile":
                                     ((ArrayList) modelsNames).set(1, "sv");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/StateVariable-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/StateVariable-EU/Constraints#");
                                     break;
                                 case "DiagramLayoutProfile":
                                     ((ArrayList) modelsNames).set(1, "dl");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints#");
                                     break;
                                 case "GeographicalLocationProfile":
                                     ((ArrayList) modelsNames).set(1, "gl");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints#");
                                     break;
                                 case "DynamicsProfile":
                                     ((ArrayList) modelsNames).set(1, "dy");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Dynamics/constraints/1.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints#");
                                     break;
                                 case "EquipmentBoundaryProfile":
                                     ((ArrayList) modelsNames).set(1, "eqbd");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints#");
                                     break;
                                 case "TopologyBoundaryProfile":
                                     ((ArrayList) modelsNames).set(1, "tpbd");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/constraints/3.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints#");
                                     break;
                                 case "FileHeaderProfile":
                                     ((ArrayList) modelsNames).set(1, "fh");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/61970-552/ModelDescription/constraints/1.0#");
+                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/61970-552/ModelDescription/Constraints#");
                                     break;
                             }
                         }
@@ -945,40 +1166,40 @@ public class MainController implements Initializable {
                         if (treeitem.getValue().equals(((ArrayList) modelsNames).get(0))) {
                             switch (treeitem.getValue()) {
                                 case "CoreEquipmentProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints");
                                     break;
                                 case "OperationProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Operation-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints");
                                     break;
                                 case "ShortCircuitProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints");
                                     break;
                                 case "SteadyStateHypothesisProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints");
                                     break;
                                 case "TopologyProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Topology-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints");
                                     break;
                                 case "StateVariablesProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/StateVariable-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/StateVariable-EU/Constraints");
                                     break;
                                 case "DiagramLayoutProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints");
                                     break;
                                 case "GeographicalLocationProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints");
                                     break;
                                 case "DynamicsProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Dynamics/constraints/1.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints");
                                     break;
                                 case "EquipmentBoundaryProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints");
                                     break;
                                 case "TopologyBoundaryProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/constraints/3.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints");
                                     break;
                                 case "FileHeaderProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/61970-552/ModelDescription/constraints/1.0");
+                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/61970-552/ModelDescription/Constraints");
                                     break;
                             }
                         }
@@ -1011,7 +1232,7 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    //action for button Create in the tab Constraints detail/Create complete shapes model
+    //action for button Create in the tab RDFS to SHACL
     private void actionBtnConstructShacl(ActionEvent actionEvent) throws IOException {
 
         String cbvalue;
@@ -1021,7 +1242,7 @@ public class MainController implements Initializable {
             cbvalue=fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
         }
 
-        if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size()!=0 && cbvalue.equals("RDFS (augmented) by CimSyntaxGen")) {
+        if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size()!=0 ) {
             //depending on the value of the choice box "Save datatype map"
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
                 shaclNodataMap  = 1;
@@ -1091,21 +1312,23 @@ public class MainController implements Initializable {
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
             for (int sel = 0; sel < modelNumber.size(); sel++) {
-                int m=modelNumber.get(sel);
+                int m = modelNumber.get(sel);
 
                 //here the preparation starts
                 dataTypeMapFromShapes = new HashMap<>();
 
                 Model model = (Model) this.models.get(m);
-                String rdfNs = MainController.prefs.get("cimsNamespace","");
-                String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
-                ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
+                String rdfNs = MainController.prefs.get("cimsNamespace", "");
 
-                shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
-                //here the preparation ends
+                if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019")) {
+                    String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+                    ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
-                String nsPrefixprofile =((ArrayList) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
-                String nsURIprofile = ((ArrayList) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+                    shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+                    //here the preparation ends
+
+                    String nsPrefixprofile = ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+                    String nsURIprofile = ((ArrayList) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
 
          /*           String baseURI=null;
                 if (fshapesBaseURICreateCompleteSMTab.getText().isEmpty()) {
@@ -1123,14 +1346,14 @@ public class MainController implements Initializable {
                         baseURI = nsURIprofile;
                     }
                 }else{*/
-                    String baseURI=((ArrayList) this.modelsNames.get(m)).get(3).toString();
+                    String baseURI = ((ArrayList) this.modelsNames.get(m)).get(3).toString();
                     //}
-                    String owlImport=((ArrayList) this.modelsNames.get(m)).get(4).toString();
+                    String owlImport = ((ArrayList) this.modelsNames.get(m)).get(4).toString();
                     //generate the shape model
-                    Model shapeModel=ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+                    Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
 
                     //add the owl:imports
-                    shapeModel= ShaclTools.addOWLimports(shapeModel,baseURI,owlImport);
+                    shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
 
                     shapeModels.add(shapeModel);
                     shapeModelsNames.add(this.modelsNames.get(m));
@@ -1138,8 +1361,8 @@ public class MainController implements Initializable {
                     //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
 
                     //open the ChoiceDialog for the save file and save the file in different formats
-                    String titleSaveAs = "Save as for shape model: "+ ((ArrayList) this.modelsNames.get(m)).get(0).toString();
-                    File savedFile=ShaclTools.saveShapesFile(shapeModel, baseURI,0,titleSaveAs);
+                    String titleSaveAs = "Save as for shape model: " + ((ArrayList) this.modelsNames.get(m)).get(0).toString();
+                    File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
 
                     //this is used for the printing of the complete map in option "All profiles in one map"
                     for (Object key : dataTypeMapFromShapes.keySet()) {
@@ -1152,8 +1375,8 @@ public class MainController implements Initializable {
                         for (Object key : dataTypeMapFromShapes.keySet()) {
                             properties.put(key, dataTypeMapFromShapes.get(key).toString());
                         }
-                        String fileName=FilenameUtils.getBaseName(String.valueOf(savedFile));
-                        properties.store(new FileOutputStream(savedFile.getParent()+"\\"+fileName+".properties"), null);
+                        String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+                        properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
 
                     }
                     //add the shapes in the tree view
@@ -1174,24 +1397,73 @@ public class MainController implements Initializable {
                     }
 
                  */
-                }
-                if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
-                    FileChooser filechooser = new FileChooser();
-                    filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Datatypes mapping files", "*.properties"));
-                    filechooser.setInitialFileName("CompleteDatatypeMap");
-                    File saveFile = filechooser.showSaveDialog(null);
+                } else if (rdfFormatInput.equals("CIMTool-merged-owl")){
+                    String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+                    ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
-                    if (saveFile != null) {
+                    shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+                    //here the preparation ends
+
+                    String nsPrefixprofile = ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+                    String nsURIprofile = ((ArrayList) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+
+                    String baseURI = ((ArrayList) this.modelsNames.get(m)).get(3).toString();
+                    //}
+                    String owlImport = ((ArrayList) this.modelsNames.get(m)).get(4).toString();
+                    //generate the shape model
+                    Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+
+                    //add the owl:imports
+                    shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
+
+                    shapeModels.add(shapeModel);
+                    shapeModelsNames.add(this.modelsNames.get(m));
+                    //System.out.println(dataTypeMapFromShapes);
+                    //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
+
+                    //open the ChoiceDialog for the save file and save the file in different formats
+                    String titleSaveAs = "Save as for shape model: " + ((ArrayList) this.modelsNames.get(m)).get(0).toString();
+                    File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+
+                    //this is used for the printing of the complete map in option "All profiles in one map"
+                    for (Object key : dataTypeMapFromShapes.keySet()) {
+                        dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
+                    }
+                    //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
+                    if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
                         Properties properties = new Properties();
 
-                        for (Object key : dataTypeMapFromShapesComplete.keySet()) {
-                            properties.put(key, dataTypeMapFromShapesComplete.get(key).toString());
+                        for (Object key : dataTypeMapFromShapes.keySet()) {
+                            properties.put(key, dataTypeMapFromShapes.get(key).toString());
                         }
-                        properties.store(new FileOutputStream(saveFile.toString()), null);
+                        String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+                        properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+
                     }
                 }
-                //guiTreeDesignShapesInit();
-                //tabPaneLeft.getSelectionModel().select(1);
+            }
+
+
+
+
+            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
+                FileChooser filechooser = new FileChooser();
+                filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Datatypes mapping files", "*.properties"));
+                filechooser.setInitialFileName("CompleteDatatypeMap");
+                File saveFile = filechooser.showSaveDialog(null);
+
+                if (saveFile != null) {
+                    Properties properties = new Properties();
+
+                    for (Object key : dataTypeMapFromShapesComplete.keySet()) {
+                        properties.put(key, dataTypeMapFromShapesComplete.get(key).toString());
+                    }
+                    properties.store(new FileOutputStream(saveFile.toString()), null);
+                }
+            }
+            progressBar.setProgress(1);
+            //guiTreeDesignShapesInit();
+            //tabPaneLeft.getSelectionModel().select(1);
             }else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setContentText("Please select a profile for which you would like to generate Shapes and the RDFS format.");
@@ -1200,6 +1472,370 @@ public class MainController implements Initializable {
                 alert.showAndWait();
             }
         }
+
+
+    @FXML
+    //Action for button "Open" related to tab SHACL Shape Browser
+    private void actionBtnOpenShapeBrowser(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+
+        //select file
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shape file", "*.rdf", "*.ttl"));
+
+        List fileL=null;
+        fileL = filechooser.showOpenMultipleDialog(null);
+
+        if (fileL != null) {// the file is selected
+            for (int m = 0; m < fileL.size(); m++) {
+                util.ModelFactory.shapeModelLoad(m,fileL); //loads shape model
+                ArrayList<String> mpak1 = new ArrayList<>();
+                mpak1.add(FilenameUtils.getBaseName(((File) fileL.get(m)).getName())); // adds the name without the extension.
+                Map prefixMap = ((Model) shapeModels.get(m)).getNsPrefixMap();
+                for (Iterator map = prefixMap.values().iterator(); map.hasNext();){
+                    String value = map.next().toString();
+                    if (value.contains(defaultShapesURI) || value.toLowerCase().contains("constraints")){
+                        mpak1.add(((Model) shapeModels.get(m)).getNsURIPrefix(value)); //reserved for the prefix of the profile/shapes
+                        mpak1.add(value); // reserved for the URI of the profile/shapes
+                        mpak1.add(value); // reserved for the baseURI of the shapes
+                        mpak1.add("");// reserved for the owl:imports
+                        break;
+                    }
+                }
+
+                shapeModelsNames.add(mpak1);
+            }
+            guiTreeDesignShapesInit(); //initializes the tree in the design shapes tab //Perhaps not forMalte
+        }
+
+
+    }
+
+    @FXML
+    //Action for button "Unload Shapes" related to tab SHACL Shape Browser
+    private void actionBrtUnloadShapes(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        MainController.shapeModels = null;
+        MainController.shapeModelsNames = null;
+        treeViewConstraints.setRoot(null);
+        fPrefixGenerateTab.clear();
+        fURIGenerateTab.clear();
+        fshapesBaseURIDefineTab.clear();
+        fowlImportsDefineTab.clear();
+        fsourceDefineTab.clear();
+        tableViewBrowseModify.getItems().clear();
+
+
+    }
+
+    @FXML
+    // action on button "Show/Hide source code" in the SHACL Shapes Browser
+    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
+        if (btnShowSourceCodeDefineTab.isSelected()) {
+            btnShowSourceCodeDefineTab.setText("Hide");
+        }else{
+            btnShowSourceCodeDefineTab.setText("Show");
+            fsourceDefineTab.clear();
+        }
+    }
+
+    //initializes the TreeView in the SHACL Shape Browser
+    private static void guiTreeDesignShapesInit() {
+
+        TreeItem<String> rootMain = treeViewConstraintsStatic.getRoot();
+        if (rootMain == null){
+            //define the Treeview
+            rootMain = new CheckBoxTreeItem<>("Main root");
+            rootMain.setExpanded(true);
+            treeViewConstraintsStatic.setRoot(rootMain); // sets the root to the gui object
+            treeViewConstraintsStatic.setShowRoot(false);
+            treeMapConstraints = new HashMap<>();
+            treeMapConstraintsInverse = new HashMap<>();
+        }
+        for (int sm = 0; sm < shapeModels.size(); sm++) {
+            Model shapeModel=(Model) shapeModels.get(sm);
+            String profileItemString=((ArrayList) shapeModelsNames.get(sm)).get(1).toString()+":"+((ArrayList) shapeModelsNames.get(sm)).get(0).toString();
+            if (!treeMapConstraints.containsValue(profileItemString)) {
+                TreeItem<String> profileItem = new TreeItem<>(profileItemString);
+                rootMain.getChildren().add(profileItem);
+                treeMapConstraints.putIfAbsent(profileItem, profileItemString);
+                treeMapConstraintsInverse.putIfAbsent(profileItemString, profileItem);
+
+                //showing the PropertyGroup
+                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "PropertyGroup")); i.hasNext(); ) {
+                    Resource resItem = i.next();
+                    String propertyGroupItemString = resItem.getLocalName();
+                    String propertyGroupPrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
+                    TreeItem<String> propertyGroupItem = new TreeItem<>(propertyGroupPrefix + ":" + propertyGroupItemString); // level for the NodeShapes
+                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(propertyGroupItem);
+                }
+
+                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "SPARQLConstraint")); i.hasNext(); ) {
+                    Resource resItem = i.next();
+                    String sparqlItemString = resItem.getLocalName();
+                    String sparqlPrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
+                    TreeItem<String> sparqlItem = new TreeItem<>(sparqlPrefix + ":" + sparqlItemString); // level for the SPARQLConstraint
+                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(sparqlItem);
+                }
+
+                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "NodeShape")); i.hasNext(); ) {
+                    Resource resItem = i.next();
+                    String nodeShapeItemString = resItem.getLocalName();
+                    String nodeShapePrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
+                    TreeItem<String> nodeShapeItem = new TreeItem<>(nodeShapePrefix + ":" + nodeShapeItemString); // level for the NodeShapes
+                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(nodeShapeItem);
+                    for (NodeIterator j = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "sparql")); j.hasNext(); ) { // this is if the NodeShape has sparqlConstraint
+                        RDFNode resItemObject = j.next();
+                        String sparqlConstraintPrefix = shapeModel.getNsURIPrefix(resItemObject.asResource().getNameSpace());
+                        TreeItem<String> sparqlConstraintItem = new TreeItem<>(sparqlConstraintPrefix + ":" + resItemObject.asResource().getLocalName()); // level for the sparqlConstraint
+                        nodeShapeItem.getChildren().add(sparqlConstraintItem);
+                    }
+                    for (NodeIterator j = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "property")); j.hasNext(); ) {
+                        RDFNode resItemObject = j.next();
+                        String propertyShapePrefix = shapeModel.getNsURIPrefix(resItemObject.asResource().getNameSpace());
+                        TreeItem<String> propertyShapeItem = new TreeItem<>(propertyShapePrefix + ":" + resItemObject.asResource().getLocalName()); // level for the PropertyShapes
+                        nodeShapeItem.getChildren().add(propertyShapeItem);
+                        for (NodeIterator sc = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "sparql")); sc.hasNext(); ) { // this is if the PropertyShape has sparqlConstraint
+                            RDFNode resItemObjectSC = sc.next();
+                            String sparqlConstraintPrefix = shapeModel.getNsURIPrefix(resItemObjectSC.asResource().getNameSpace());
+                            TreeItem<String> sparqlConstraintItem = new TreeItem<>(sparqlConstraintPrefix + ":" + resItemObjectSC.asResource().getLocalName()); // level for the sparqlConstraint
+                            propertyShapeItem.getChildren().add(sparqlConstraintItem);
+                        }
+                    }
+                }
+            }
+        }
+        //treeViewConstraints.setCellFactory(CheckBoxTreeCell.<String>forTreeView()); //this sets checkbox in front
+        treeViewConstraintsStatic.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+
+    }
+
+
+    @FXML
+    //select action on the tree view SHACL Shapes
+    private void selectActionTreeItemConstraits(MouseEvent mouseEvent) throws IOException {
+        //Initialisation GUI
+        tableViewBrowseModify.getItems().clear();
+
+        fPrefixGenerateTab.setText(""); // namespace "Prefix"
+        fURIGenerateTab.setText(""); //namespace "URI"
+        fshapesBaseURIDefineTab.setText(""); //baseURI
+        fowlImportsDefineTab.setText(""); // "owl:imports"
+
+        Node node = mouseEvent.getPickResult().getIntersectedNode();
+        // Accept clicks only on node cells, and not on empty spaces of the TreeView
+        if (node instanceof Text || (node instanceof TreeCell && ((TreeCell) node).getText() != null)) {
+            //String name = (String) ((TreeItem)treeViewRDFS.getSelectionModel().getSelectedItem()).getValue();
+            ArrayList<Object> parentInfo=getParent(treeViewConstraints); //returns a structure containing the profile parent, the tree level, the selected item
+
+            int m = 0;
+            for (int i = 0; i < shapeModelsNames.size(); i++) {
+                //if (((ArrayList) shapeModelsNames.get(i)).get(0).equals(parentInfo.get(0))) {
+                if (parentInfo.get(0).equals(((ArrayList) shapeModelsNames.get(i)).get(1)+":"+((ArrayList) shapeModelsNames.get(i)).get(0))) {
+                    m = i;
+                }
+            }
+
+            Model shapeModel = (Model) shapeModels.get(m);
+            //selectedShapeModel=m; // used for the combobox constraints
+
+            String prefix=((TreeItem<String>) parentInfo.get(2)).getValue().split(":",2)[0];
+            // set namespace "Prefix"
+            fPrefixGenerateTab.setText(prefix);
+            String uri=shapeModel.getNsPrefixURI(prefix);
+            //set namespace "URI"
+            fURIGenerateTab.setText(uri);
+            //set baseURI
+            String baseURI=((ArrayList) shapeModelsNames.get(m)).get(3).toString();
+            fshapesBaseURIDefineTab.setText(baseURI);
+            //set Owl:imports
+            int printSource=0; //important for the printing of the source of the elements
+            if (((TreeView<String>) treeViewConstraints).getSelectionModel().getSelectedItems().get(0).getValue().equals(parentInfo.get(0))) {
+                //this is when the parent (the shape model/profile) is selected
+                String owlImports = ShaclTools.getOWLimports(shapeModel, uri);
+                fowlImportsDefineTab.setText(owlImports);
+
+                //set "As source code" for the whole shape model
+                if (btnShowSourceCodeDefineTab.isSelected()) {
+                    ByteArrayOutputStream os = new ByteArrayOutputStream();
+
+                    shapeModel.write(os, "TURTLE", baseURI);
+                    String stringForGui = os.toString("UTF-8");
+                    fsourceDefineTab.setText(stringForGui);
+                    os.close();
+                }
+                //fshapeTypeDefineTab.setText("Type: Shape model");
+                return;
+            }else{
+                //this is when other thing is selected is selected
+                //set "As source code" for the whole shape model
+                if (btnShowSourceCodeDefineTab.isSelected()) {// the button to show the source is selected
+                    printSource = 1;
+                }
+            }
+
+
+            String name=((TreeItem<String>) parentInfo.get(2)).getValue().split(":",2)[1];
+            // set "Shape IRI"
+            //fShapeIRIDefineTab.setText(((TreeItem<String>) parentInfo.get(2)).getValue());
+            Resource resItem=shapeModel.getResource(uri+name);
+            //selectedShapeResource=resItem; // used for the combobox constraints
+
+            //This is used for the printing of the source code
+            Model shapeModelPart=JenaUtil.createDefaultModel();
+            shapeModelPart.setNsPrefixes(shapeModel.getNsPrefixMap()); // set the same prefixes like the shapeModel
+            List<Statement> shapeModelPartStmt = new LinkedList<>();
+
+            //gives all statements related to the resource. 0 means that the resource trippe is not included
+            List<Statement> statementsList = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
+
+            ObservableList<TableColumnsSetup> tableData= tableViewBrowseModify.getItems();
+
+            ArrayList shaclNodeShapeProperties =ShaclTools.getListShaclNodeShapeProperties();
+            ArrayList shaclPropertyShapeProperties =ShaclTools.getListShaclPropertyShapeProperties();
+            ArrayList shaclPropertyGroupProperties =ShaclTools.getListShaclPropertyGroupProperties();
+            ArrayList shaclSPARQLConstraintProperties =ShaclTools.getListShaclSPARQLConstraintProperties();
+            ArrayList shaclTypeProperties =ShaclTools.getListShacltypeProperties();
+
+
+            String ShapeType="";
+            for (int stmt=0; stmt < statementsList.size(); stmt++) {
+                if (stmt==0){
+                    ShapeType=statementsList.get(stmt).getObject().asResource().getLocalName();
+                    String propertyValue="";
+                    String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
+                    String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
+                    propertyValue = propertyValuePrefix + ":" + propertyValueLN;
+                    shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+                    tableData.add(new TableColumnsSetup("rdf:type",
+                            propertyValue, FXCollections.<String>observableArrayList(shaclTypeProperties)));
+                } else {
+                    if (!statementsList.get(stmt).getPredicate().equals(RDF.type)) {
+                        //if (!ShapeType.equals(statementsList.get(stmt).getObject().asResource().getLocalName())) {
+                        String propertyValue="";
+                        String shapePropertyPrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getPredicate().getNameSpace());
+                        String shapePropertyLN = statementsList.get(stmt).getPredicate().getLocalName();
+
+                        if (statementsList.get(stmt).getObject().isResource()) {
+                            if (!statementsList.get(stmt).getObject().isAnon()) {
+                                String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
+                                String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
+                                propertyValue = propertyValuePrefix + ":" + propertyValueLN;
+                                shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+                            }else{ //if the object is a blank node
+                                //it is assumed that this is a list, e.g. this works for sh:in and sh:or
+
+                                Resource list = statementsList.get(stmt).getObject().asResource();
+                                RDFList rdfList = list.as( RDFList.class );
+                                ExtendedIterator<RDFNode> items = rdfList.iterator();
+
+                                // add in the the blank node info for the source code
+                                Resource blankNode = shapeModelPart.getResource(statementsList.get(stmt).getSubject().getURI());
+                                RDFList orRDFlist = shapeModelPart.createList(rdfList.iterator());
+                                blankNode.addProperty(statementsList.get(stmt).getPredicate(), orRDFlist);
+
+                                int firstTime=0;
+                                while ( items.hasNext() ) {
+                                    Resource item = items.next().asResource();
+
+                                    String propertyValuePrefix = shapeModel.getNsURIPrefix(item.getNameSpace());
+                                    String propertyValueLN = item.getLocalName();
+                                    if (firstTime==0) {
+                                        propertyValue=propertyValuePrefix + ":" + propertyValueLN;
+
+                                        firstTime=1;
+                                    }else{
+                                        propertyValue = propertyValue +" , "+propertyValuePrefix + ":" + propertyValueLN;
+                                    }
+                                }
+                            }
+                        }else if (statementsList.get(stmt).getObject().isLiteral()){
+                            propertyValue = statementsList.get(stmt).getObject().asLiteral().getString();//TODO see if the datatype should be shown
+                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+                        }else{
+                            propertyValue=statementsList.get(stmt).getObject().toString();
+                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+                        }
+                        if (ShapeType.equals("NodeShape")) {
+
+                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                    propertyValue, FXCollections.<String>observableArrayList(shaclNodeShapeProperties)));
+
+                        } else if (ShapeType.equals("PropertyShape")) {
+                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                    propertyValue, FXCollections.<String>observableArrayList(shaclPropertyShapeProperties)));
+                        } else if (ShapeType.equals("PropertyGroup")) {
+                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                    propertyValue, FXCollections.<String>observableArrayList(shaclPropertyGroupProperties)));
+                        } else if (ShapeType.equals("SPARQLConstraint")) {
+                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                    propertyValue, FXCollections.<String>observableArrayList(shaclSPARQLConstraintProperties)));
+                            //TODO also for the rest
+                        }
+                        //}
+                    }
+                }
+            }
+            tableViewBrowseModify.setItems(tableData);
+
+
+            // set "As source code" this is when other thing is selected is selected
+            if (printSource==1){
+                ByteArrayOutputStream os = new ByteArrayOutputStream();
+                //LocationMapper.setGlobalLocationMapper(new LocationMapper());
+
+
+                //TODO see how to cut prefix information not to be printed
+
+                //List<Statement> result = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
+                shapeModelPart.add(shapeModelPartStmt);
+
+                shapeModelPart.write(os, "TURTLE", baseURI);
+                String stringForGui = os.toString("UTF-8");
+                fsourceDefineTab.setText(stringForGui);
+                os.close();
+            }
+        }
+
+    }
+
+    //find parent in a tree view
+    private ArrayList<Object> getParent(TreeView<String> treeViewToProcess){
+        int parentFound = 0;
+        String parentProfile = ""; // this is the name of the profile
+        TreeItem<String> selectedItem = treeViewToProcess.getSelectionModel().getSelectedItem();
+        TreeItem<String> selectedItemP = selectedItem;
+        int treeLevel=0; //treeLevel=1 if it is the profile level; 2 if it is NodeShape level (for the constraints) or PropertyGroup;
+        // 3 is it is PropertyShape level (for the constraints); 4 is if there is a sparql constraint on the PropertyShape
+        while (parentFound == 0) {
+            if (selectedItemP.getParent().getValue()!=null) {
+                if (selectedItemP.getParent().getValue().equals("Main root")) {
+                    parentProfile = selectedItemP.getValue();
+                    treeLevel++;
+                    parentFound = 1;
+                } else {
+                    selectedItemP = selectedItemP.getParent();
+                    treeLevel++;
+                }
+            }
+        }
+        ArrayList<Object> getParentInfo = new ArrayList<>();
+        getParentInfo.add(parentProfile);
+        getParentInfo.add(treeLevel);
+        getParentInfo.add(selectedItem);
+        return getParentInfo;
+    }
+
+    @FXML
+    // //action for tab pane down - the tab pane with the source code
+    private void actionTabConstraintsSourceCode(Event event) {
+        if (tabConstraintsSourceCode.isSelected() && treeViewConstraints.getRoot()!=null) {
+            btnShowSourceCodeDefineTab.setDisable(false);
+        }else{
+            btnShowSourceCodeDefineTab.setDisable(true);
+        }
+    }
+
 
     public static Map getDataTypeMapFromShapes(){
         return dataTypeMapFromShapes;

@@ -53,7 +53,7 @@ public class ComparisonRDFSprofile {
         return compareResults;
     }
 
-    //checks if a subject os a given type is in another model
+    //checks if a subject of a given type is in another model
     private static Pair<Boolean, Map> contains(Model model, String rdftype, Resource value, String cimNSmodelValue){
         Pair<Boolean,Map> result = new Pair<>(false, null);
         Map<String,String> map = new HashMap<>();
@@ -94,6 +94,8 @@ public class ComparisonRDFSprofile {
                         if (resItem.hasProperty(RDFS.comment)) {
                             String rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
                             map.putIfAbsent("comment", rdfsComment);
+                        }else{
+                            map.putIfAbsent("comment", "-");// added 30 Oct 2020
                         }
 
                     }else if (rdfType.equals("Class")){
@@ -102,10 +104,14 @@ public class ComparisonRDFSprofile {
                         if (resItem.hasProperty(RDFS.comment)) {
                             String rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
                             map.putIfAbsent("comment", rdfsComment);
+                        }else{
+                            map.putIfAbsent("comment", "-");// added 30 Oct 2020
                         }
                         if (resItem.hasProperty(RDFS.subClassOf)) {
                             String subClassOf = resItem.getRequiredProperty(RDFS.subClassOf).getObject().toString().split("#", 2)[1];
                             map.putIfAbsent("subClassOf", subClassOf);
+                        }else{
+                            map.putIfAbsent("subClassOf", "-"); //added 30 Oct 2020
                         }
                         List<String> ClassStereotypes = new LinkedList<>();
                         String enumeration = "false";
@@ -142,7 +148,7 @@ public class ComparisonRDFSprofile {
         return result;
     }
 
-    //checks if a property os a given type is in another model
+    //checks if a property of a given type is in another model
     private static Pair<Boolean,Map> containsProperty(Model model, String attribute, Resource value, String cimNSmodelValue){
         Pair<Boolean,Map> result = new Pair<>(false, null);
         Map<String,String> map = new HashMap<>();
@@ -174,6 +180,8 @@ public class ComparisonRDFSprofile {
                 if (resItem.hasProperty(RDFS.comment)) {
                     String rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
                     map.putIfAbsent("comment", rdfsComment);
+                }else{
+                    map.putIfAbsent("comment", "-"); //added 30 Oct 2020
                 }
                 String rdfsDomain = resItem.getRequiredProperty(RDFS.domain).getObject().toString().split("#", 2)[1];
                 map.putIfAbsent("domain", rdfsDomain);

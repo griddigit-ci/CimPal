@@ -20,6 +20,8 @@
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ToggleButton?>
@@ -176,7 +178,7 @@
                                                                </padding>
                                                                <children>
                                                                   <Label minWidth="140.0" text="RDFS format:" wrapText="true" />
-                                                                  <ChoiceBox fx:id="fcbRDFSformatShapes" minWidth="400.0" />
+                                                                  <ChoiceBox fx:id="fcbRDFSformatShapes" disable="true" minWidth="400.0" />
                                                                </children>
                                                             </HBox>
                                                             <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
@@ -204,7 +206,7 @@
                                           </AnchorPane>
                                     </content>
                                   </Tab>
-                                    <Tab fx:id="tabCreateCompleteSM1" text="RDFS Comparison">
+                                    <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison">
                                        <content>
                                           <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                                              <children>
@@ -235,7 +237,7 @@
                                                             <Insets left="5.0" right="5.0" top="5.0" />
                                                          </padding>
                                                          <children>
-                                                            <Label minWidth="140.0" text="RDFS format:" wrapText="true" />
+                                                            <Label minWidth="140.0" text="RDF scope and format:" wrapText="true" />
                                                             <ChoiceBox fx:id="fcbRDFSformat" minWidth="400.0" />
                                                          </children>
                                                       </HBox>
@@ -345,6 +347,17 @@
                                                                   <Insets left="5.0" right="5.0" top="5.0" />
                                                                </padding>
                                                                <children>
+                                                                  <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" prefWidth="200.0" text="Union model" />
+                                                                  <CheckBox fx:id="fcbRDFConvertInheritanceOnly" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceOnly" prefWidth="300.0" text="Process only inheritance related properties" />
+                                                                  <CheckBox fx:id="fcbRDFConverInheritanceList" disable="true" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceList" prefWidth="300.0" text="Generate inheritance list in Turtle" />
+                                                                  <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" prefWidth="300.0" text="Inherited members - only concrete classes" />
+                                                               </children>
+                                                            </HBox>
+                                                            <HBox spacing="10.0">
+                                                               <padding>
+                                                                  <Insets left="5.0" right="5.0" top="5.0" />
+                                                               </padding>
+                                                               <children>
                                                                   <Label minWidth="90.0" text="Source:" wrapText="true" />
                                                                   <TextField fx:id="fsourcePathTextField" editable="false" HBox.hgrow="ALWAYS" />
                                                                   <Button mnemonicParsing="false" onAction="#actionBrowseRDFConvert" text="Browse" />
@@ -415,6 +428,107 @@
                                           </AnchorPane>
                                        </content>
                                     </Tab>
+                                    <Tab text="SHACL Shape Browser">
+                                       <content>
+                                          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                                             <children>
+                                                <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                                   <children>
+                                                      <VBox minWidth="300.0" spacing="5.0">
+                                                         <children>
+                                                            <Label prefWidth="120.0" text="SHACL Shapes" />
+                                                            <TreeView fx:id="treeViewConstraints" minHeight="70.0" onMouseClicked="#selectActionTreeItemConstraits" prefWidth="300.0" VBox.vgrow="ALWAYS">
+                                                               <tooltip>
+                                                                  <Tooltip contentDisplay="BOTTOM" graphicTextGap="5.0" text="The list of imported SHACL Shapes." wrapText="true">
+                                                                     <font>
+                                                                        <Font size="14.0" />
+                                                                     </font>
+                                                                  </Tooltip>
+                                                               </tooltip>
+                                                            </TreeView>
+                                                         </children>
+                                                         <HBox.margin>
+                                                            <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                         </HBox.margin>
+                                                      </VBox>
+                                                      <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                                                         <children>
+                                                            <VBox prefHeight="200.0" prefWidth="100.0">
+                                                               <children>
+                                                                  <HBox spacing="10.0">
+                                                                     <children>
+                                                                        <Label prefWidth="140.0" text="Shapes namespace:" />
+                                                                        <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
+                                                                        <TextField fx:id="fPrefixGenerateTab" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
+                                                                        <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
+                                                                        <TextField fx:id="fURIGenerateTab" editable="false" prefWidth="300.0" />
+                                                                     </children>
+                                                                     <padding>
+                                                                        <Insets left="5.0" right="5.0" top="5.0" />
+                                                                     </padding>
+                                                                  </HBox>
+                                                                  <HBox spacing="10.0">
+                                                                     <children>
+                                                                        <Label prefWidth="140.0" text="Shapes base URI:" />
+                                                                        <TextField fx:id="fshapesBaseURIDefineTab" editable="false" prefWidth="530.0" />
+                                                                     </children>
+                                                                     <padding>
+                                                                        <Insets left="5.0" right="5.0" top="5.0" />
+                                                                     </padding>
+                                                                  </HBox>
+                                                                  <HBox spacing="10.0">
+                                                                     <children>
+                                                                        <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
+                                                                        <TextField fx:id="fowlImportsDefineTab" editable="false" prefWidth="530.0" />
+                                                                     </children>
+                                                                     <padding>
+                                                                        <Insets left="5.0" right="5.0" top="5.0" />
+                                                                     </padding>
+                                                                  </HBox>
+                                                               </children>
+                                                               <VBox.margin>
+                                                                  <Insets />
+                                                               </VBox.margin>
+                                                            </VBox>
+                                                            <TableView fx:id="tableViewBrowseModify">
+                                                               <columns>
+                                                                  <TableColumn fx:id="itemColumnBrowseModify" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Shape property" />
+                                                                  <TableColumn fx:id="valueColumnBrowseModify" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
+                                                               </columns>
+                                                            </TableView>
+                                                            <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                                               <children>
+                                                                  <VBox minWidth="200.0" spacing="5.0">
+                                                                     <children>
+                                                                        <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
+                                                                           <children>
+                                                                              <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadShapes" text="Unload Shapes" />
+                                                                           </children>
+                                                                        </HBox>
+                                                                     </children>
+                                                                  </VBox>
+                                                                  <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
+                                                                     <children>
+                                                                        <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
+                                                                           <children>
+                                                                              <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnOpenShapeBrowser" text="Open" HBox.hgrow="ALWAYS" />
+                                                                           </children>
+                                                                        </HBox>
+                                                                     </children>
+                                                                  </VBox>
+                                                               </children>
+                                                            </HBox>
+                                                         </children>
+                                                         <HBox.margin>
+                                                            <Insets bottom="5.0" right="5.0" top="5.0" />
+                                                         </HBox.margin>
+                                                      </VBox>
+                                                   </children>
+                                                </HBox>
+                                             </children>
+                                          </AnchorPane>
+                                       </content>
+                                    </Tab>
                                 </tabs>
                               </TabPane>
                            </children>
@@ -428,7 +542,7 @@
                               <VBox alignment="TOP_CENTER" prefWidth="50.0" spacing="10.0" HBox.hgrow="NEVER">
                                  <children>
                                     <Button mnemonicParsing="false" onAction="#actionBtnClear" text="Clear" />
-                                    <ToggleButton fx:id="btnShowSourceCodeDefineTab" disable="true" mnemonicParsing="false" text="Show" visible="false">
+                                    <ToggleButton fx:id="btnShowSourceCodeDefineTab" mnemonicParsing="false" onAction="#actionBtnShowSourceCodeShacl" text="Show">
                                        <tooltip>
                                           <Tooltip text="Show or hide the source code of the constraints." />
                                        </tooltip>
@@ -453,6 +567,19 @@
                                           </AnchorPane>
                                     </content>
                                   </Tab>
+                                    <Tab fx:id="tabConstraintsSourceCode" closable="false" onSelectionChanged="#actionTabConstraintsSourceCode" text="Source code">
+                                       <content>
+                                          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                                             <children>
+                                                <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true" prefHeight="215.2" prefWidth="960.8" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                                   <content>
+                                                      <TextArea fx:id="fsourceDefineTab" editable="false" minHeight="150.0" wrapText="true" />
+                                                   </content>
+                                                </ScrollPane>
+                                             </children>
+                                          </AnchorPane>
+                                       </content>
+                                    </Tab>
                                 </tabs>
                               </TabPane>
                            </children>
@@ -478,7 +605,7 @@
                      </padding>
                   </ProgressBar>
                </children></Pane>
-        <Label font="$x3" maxWidth="-1.0" text="Version: 2020-1.0.0" HBox.hgrow="NEVER" />
+        <Label font="$x3" maxWidth="-1.0" text="Version: 2020-1.1.0" HBox.hgrow="NEVER" />
       </children>
       <padding>
         <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />

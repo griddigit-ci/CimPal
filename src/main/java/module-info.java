@@ -33,4 +33,7 @@ module CimPal {
     requires poi.ooxml;
     requires poi.ooxml.schemas;
     requires java.prefs;
+    requires com.fasterxml.jackson.annotation;
+    requires com.fasterxml.jackson.core;
+    requires com.fasterxml.jackson.databind;
 }
