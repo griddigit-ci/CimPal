@@ -16,6 +16,7 @@
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SeparatorMenuItem?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.Tab?>
@@ -525,6 +526,104 @@
                                                       </VBox>
                                                    </children>
                                                 </HBox>
+                                             </children>
+                                          </AnchorPane>
+                                       </content>
+                                    </Tab>
+                                    <Tab text="Instance Data Comparison">
+                                       <content>
+                                          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                                             <children>
+                                                <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                                   <children>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="140.0" text="File A (Model A):" wrapText="true" />
+                                                            <TextField fx:id="fPathIDfile1" editable="false" HBox.hgrow="ALWAYS" />
+                                                            <Button mnemonicParsing="false" onAction="#actionBrowseIDfile1" text="Browse" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="140.0" text="File B (Model B):" wrapText="true" />
+                                                            <TextField fx:id="fPathIDfile2" editable="false" HBox.hgrow="ALWAYS" />
+                                                            <Button mnemonicParsing="false" onAction="#actionBrowseIDfile2" text="Browse" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="140.0" text="Profile(s) version:" wrapText="true" />
+                                                            <ChoiceBox fx:id="fcbIDformat" minWidth="400.0" />
+                                                            <Label minWidth="140.0" text="Base namespace:" wrapText="true" />
+                                                            <TextField fx:id="fPathIDmapXmlBase" editable="false" HBox.hgrow="ALWAYS" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <Label minWidth="140.0" text="Datatypes Map:" wrapText="true" />
+                                                            <ChoiceBox fx:id="fcbIDmap" minWidth="300.0" />
+                                                            <TextField fx:id="fPathIDmap" editable="false" HBox.hgrow="ALWAYS" />
+                                                            <Button fx:id="fBTbrowseIDmap" mnemonicParsing="false" onAction="#actionBrowseIDmap" text="Browse" />
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox spacing="10.0">
+                                                         <padding>
+                                                            <Insets left="5.0" right="5.0" top="5.0" />
+                                                         </padding>
+                                                         <children>
+                                                            <VBox spacing="10.0">
+                                                               <children>
+                                                                  <CheckBox fx:id="fcbIDcompIgnoreTP" mnemonicParsing="false" text="Ignore Topology non-persistent classes" />
+                                                                  <CheckBox fx:id="fcbIDcompIgnoreSV" mnemonicParsing="false" text="Ignore State variable non-persistent classes" />
+                                                                  <CheckBox fx:id="fcbIDcompIgnoreDL" mnemonicParsing="false" text="Ignore Diagram layout non-persistent classes" />
+                                                               </children>
+                                                               <padding>
+                                                                  <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                               </padding>
+                                                            </VBox>
+                                                            <VBox spacing="10.0">
+                                                               <children>
+                                                                  <CheckBox fx:id="fcbIDcompSVonly" mnemonicParsing="false" text="Compare only solution (State Variables) profile " />
+                                                                  <CheckBox fx:id="fcbIDcompSVonlyCN" mnemonicParsing="false" text="Rely on ConnectivityNode-s">
+                                                                     <VBox.margin>
+                                                                        <Insets />
+                                                                     </VBox.margin>
+                                                                  </CheckBox>
+                                                                  <Separator />
+                                                                  <CheckBox fx:id="fcbIDcompCount" mnemonicParsing="false" text="Compare only count or classes" />
+                                                               </children>
+                                                               <padding>
+                                                                  <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                               </padding>
+                                                               <HBox.margin>
+                                                                  <Insets left="50.0" />
+                                                               </HBox.margin>
+                                                            </VBox>
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                                                         <children>
+                                                            <Button fx:id="btnRunIDcompare" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunIDcompare" text="Run" HBox.hgrow="ALWAYS" />
+                                                            <Button fx:id="btnResetIDComp" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetIDComp" text="Reset" />
+                                                         </children>
+                                                         <VBox.margin>
+                                                            <Insets bottom="5.0" right="5.0" />
+                                                         </VBox.margin>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
                                              </children>
                                           </AnchorPane>
                                        </content>

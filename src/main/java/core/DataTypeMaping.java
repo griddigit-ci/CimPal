@@ -5,6 +5,7 @@
  */
 package core;
 
+import javafx.scene.control.Alert;
 import javafx.stage.FileChooser;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -44,6 +45,7 @@ public class DataTypeMaping {
                     break;
                 case "http://www.w3.org/2001/XMLSchema#string":
                 case "String":
+                case "StringFixedLanguage":
                     dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDstring);
                     break;
                 case "http://www.w3.org/2001/XMLSchema#boolean":
@@ -76,6 +78,9 @@ public class DataTypeMaping {
                     break;
                 case "http://www.w3.org/2001/XMLSchema#anyURI":
                 case "URI":
+                case "URL":
+                case "IRI":
+                case "StringIRI":
                     dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDanyURI);
                     break;
             }
@@ -99,6 +104,7 @@ public class DataTypeMaping {
                     break;
                 case "http://www.w3.org/2001/XMLSchema#string":
                 case "String":
+                case "StringFixedLanguage":
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDstring);
                     break;
                 case "http://www.w3.org/2001/XMLSchema#boolean":
@@ -131,6 +137,9 @@ public class DataTypeMaping {
                     break;
                 case "http://www.w3.org/2001/XMLSchema#anyURI":
                 case "URI":
+                case "URL":
+                case "IRI":
+                case "StringIRI":
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDanyURI);
                     break;
             }
@@ -315,6 +324,42 @@ public class DataTypeMaping {
 
         return propertyStringDatatype;
 
+    }
+
+    //Support methog to identify the datatypes in cases where the mapping information comes from a saved mapping file
+    public static RDFDatatype mapFromMapDefaultFile(String value){
+        RDFDatatype valueRDFdatatype = null;
+        if (value.contains("integer")) {
+            valueRDFdatatype = XSDDatatype.XSDinteger;
+        } else if (value.contains("float")){
+            valueRDFdatatype = XSDDatatype.XSDfloat;
+        } else if (value.contains("string")){
+            valueRDFdatatype = XSDDatatype.XSDstring;
+        } else if (value.contains("boolean")){
+            valueRDFdatatype = XSDDatatype.XSDboolean;
+        } else if (value.equals("date")){
+            valueRDFdatatype = XSDDatatype.XSDdate;
+        } else if (value.contains("dateTime")){
+            valueRDFdatatype = XSDDatatype.XSDdateTime;
+        } else if (value.contains("decimal")){
+            valueRDFdatatype = XSDDatatype.XSDdecimal;
+        } else if (value.contains("duration")){
+            valueRDFdatatype = XSDDatatype.XSDduration;
+        } else if (value.contains("gMonthDay")){
+            valueRDFdatatype = XSDDatatype.XSDgMonthDay;
+        } else if (value.equals("time")) {
+            valueRDFdatatype = XSDDatatype.XSDtime;
+        } else if (value.contains("anyURI")) {
+            valueRDFdatatype = XSDDatatype.XSDanyURI;
+        }else{
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setContentText("The following datatype is not properly mapped:"+value);
+            alert.setHeaderText(null);
+            alert.setTitle("Error - unknown datatype");
+            alert.showAndWait();
+        }
+
+        return valueRDFdatatype;
     }
 
 }

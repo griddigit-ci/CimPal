@@ -650,8 +650,16 @@ public class ShaclTools {
                         o10 = shapeModel.createResource(XSDDatatype.XSDtime.getURI());
                     } else if (propertyNodeFeatures.get(6).toString().equals("URI")) {
                         o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                    } else if (propertyNodeFeatures.get(6).toString().equals("IRI")) {
+                        o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                    } else if (propertyNodeFeatures.get(6).toString().equals("StringIRI")) {
+                        o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                    } else if (propertyNodeFeatures.get(6).toString().equals("StringFixedLanguage")) {
+                        o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
+                    } else if (propertyNodeFeatures.get(6).toString().equals("URL")) {
+                        o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
                     }
-                    r.addProperty(SH.datatype, o10);
+                        r.addProperty(SH.datatype, o10);
                 }
             }
         }else if (checkType.equals("associationValueType")){

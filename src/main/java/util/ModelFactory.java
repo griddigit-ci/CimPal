@@ -8,18 +8,20 @@ package util;
 
 
 import application.MainController;
+import javafx.scene.control.Alert;
+import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.sparql.graph.GraphFactory;
 import org.topbraid.jenax.util.JenaUtil;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class ModelFactory {
 
@@ -36,6 +38,50 @@ public class ModelFactory {
         }
         modelUnion.setNsPrefixes(prefixMap);
         return modelUnion;
+    }
+
+
+    //Loads model data with datatype mapping
+    public static Model modelLoadXMLmapping(InputStream inputStream, Map dataTypeMap, String xmlBase) {
+        //in case of xml files and if mapping should be from RDF file or saved datatype mapping file
+
+        Graph graph = GraphFactory.createDefaultGraph();
+        util.DataTypeStreamRDF sink = new util.DataTypeStreamRDF(graph, dataTypeMap);
+
+        RDFDataMgr.parse(sink, inputStream, xmlBase, Lang.RDFXML);
+        graph=sink.getGraph();
+        Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph); // that should be the model that includes the datatypes definitions
+        Map prefixMapping=sink.getPrefixMapping();
+        model.setNsPrefixes(prefixMapping);
+
+        return model;
+
+    }
+
+    //Loads model data with datatype mapping - Multiple XML selected
+    public static Model modelLoadMultipleXMLmapping(List files, Map dataTypeMap, String xmlBase,Lang rdfSourceFormat) throws FileNotFoundException {
+        //in case of xml files and if mapping should be from RDF file or saved datatype mapping file
+
+        Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Map prefixMap = modelUnion.getNsPrefixMap();
+        for (int i=0; i<files.size();i++) {
+            InputStream inputStream = new FileInputStream(files.get(i).toString());
+
+            Graph graph = GraphFactory.createDefaultGraph();
+            util.DataTypeStreamRDF sink = new util.DataTypeStreamRDF(graph, dataTypeMap);
+
+            RDFDataMgr.parse(sink, inputStream, xmlBase, rdfSourceFormat);
+            graph=sink.getGraph();
+            Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph); // that should be the model that includes the datatypes definitions
+            Map prefixMapping=sink.getPrefixMapping();
+            model.setNsPrefixes(prefixMapping);
+
+            prefixMap.putAll(model.getNsPrefixMap());
+            modelUnion.add(model);
+        }
+        modelUnion.setNsPrefixes(prefixMap);
+        return modelUnion;
+
     }
 
     //Loads shape model data
@@ -59,5 +105,62 @@ public class ModelFactory {
         MainController.shapeModels.add(model);
     }
 
+    public static Model unzip(File selectedFile, Map dataTypeMap, String xmlBase, Integer mappingType) {
+        Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Map prefixMap = modelUnion.getNsPrefixMap();
+        Model model;
+        try{
+            ZipFile zipFile = new ZipFile(selectedFile);
+
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+
+
+            while(entries.hasMoreElements()){
+                ZipEntry entry = entries.nextElement();
+                if(entry.isDirectory()){
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setContentText("Selected zip file contains folder. This is a violation of data exchange standard.");
+                    alert.setHeaderText(null);
+                    alert.setTitle("Error - violation of a zip file packaging requirement.");
+                    alert.showAndWait();
+                } else {
+                    String destPath = selectedFile.getParent() + File.separator+ entry.getName();
+
+                    if(! isValidDestPath(selectedFile.getParent(), destPath)){
+                        throw new IOException("Final file output path is invalid: " + destPath);
+                    }
+
+                    try(InputStream inputStream = zipFile.getInputStream(entry)){
+                        if (mappingType==3) {//no mapping
+                            model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                            RDFDataMgr.read(model, inputStream, xmlBase, Lang.RDFXML);
+                            modelUnion.add(model);
+                        }else if (mappingType==1 || mappingType==2){ //mapping from RDF file (1) //mapping from saved mapping file (2)
+                            model = modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
+                            prefixMap.putAll(model.getNsPrefixMap());
+                            modelUnion.add(model);
+                        }
+
+
+                    }
+                }
+            }
+        } catch(IOException e){
+            throw new RuntimeException("Error unzipping file " + selectedFile, e);
+        }
+        modelUnion.setNsPrefixes(prefixMap);
+        return modelUnion;
+    }
+
+    private static boolean isValidDestPath(String targetDir, String destPathStr) {
+        // validate the destination path of a ZipFile entry,
+        // and return true or false telling if it's valid or not.
+
+        Path destPath           = Paths.get(destPathStr);
+        Path destPathNormalized = destPath.normalize(); //remove ../../ etc.
+
+        return destPathNormalized.toString().startsWith(targetDir + File.separator);
+    }
 
 }

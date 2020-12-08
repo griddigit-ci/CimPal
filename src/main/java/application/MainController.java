@@ -166,10 +166,48 @@ public class MainController implements Initializable {
     private ToggleButton btnShowSourceCodeDefineTab;
     @FXML
     private TextArea fsourceDefineTab;
+    @FXML
+    private ChoiceBox fcbIDformat;
+    @FXML
+    private Button btnResetIDComp;
+    @FXML
+    private Button btnRunIDcompare;
+    @FXML
+    private TextField fPathIDfile1;
+    @FXML
+    private TextField fPathIDfile2;
+    @FXML
+    private ChoiceBox fcbIDmap;
+    @FXML
+    private TextField fPathIDmap;
+    @FXML
+    private TextField fPathIDmapXmlBase;
+    @FXML
+    private CheckBox fcbIDcompCount;
+    @FXML
+    private CheckBox fcbIDcompSVonly;
+    @FXML
+    private CheckBox fcbIDcompIgnoreDL;
+    @FXML
+    private CheckBox fcbIDcompIgnoreSV;
+    @FXML
+    private CheckBox fcbIDcompIgnoreTP;
+    @FXML
+    private Button fBTbrowseIDmap;
+    @FXML
+    private CheckBox fcbIDcompSVonlyCN;
+
+
+
+
 
 
     public static File rdfModel1;
     public static File rdfModel2;
+    public static List<File> IDModel1;
+    public static List<File> IDModel2;
+    public static List<File> IDmapList;
+    public static int IDmapSelect;
     public static File rdfModelExcelShacl;
     public static File xlsFileExcelShacl;
     public static ArrayList<Object> compareResults;
@@ -314,8 +352,30 @@ public class MainController implements Initializable {
         );
         fcbRDFformat.getSelectionModel().selectFirst();
 
+        fcbIDformat.getItems().addAll(
+                "IEC 61970-600-1&2 (CGMES 3.0.0)",
+                "IEC 61970-45x (CIM17)",
+                "IEC TS 61970-600-1&2 (CGMES 2.4.15)",
+                "IEC 61970-45x (CIM16)",
+                "Other CIM version"
+
+        );
+
+
+        fcbIDmap.getItems().addAll(
+                "No datatypes mapping",
+                "Generate from RDFS",
+                "Use saved map"
+        );
+
         //Adding action to the choice box
         ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBRDFconvertTarget());
+
+        //Adding action to the choice box
+        fcbIDformat.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBIDformat());
+
+        //Adding action to the choice box
+        fcbIDmap.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBIDmap());
 
         //TODO: see how to have this default on the screen
         defaultShapesURI="/Constraints";
@@ -372,6 +432,26 @@ public class MainController implements Initializable {
         fPathRdffile1.clear();
         fPathRdffile2.clear();
         btnRunRDFcompare.setDisable(true);
+        progressBar.setProgress(0);
+
+    }
+
+    @FXML
+    //Action for button "Reset" related to the Instance data Comparison
+    private void actionBtnResetIDComp(ActionEvent actionEvent) {
+        fPathIDfile1.clear();
+        fPathIDfile2.clear();
+        fPathIDmap.clear();
+        fPathIDmapXmlBase.clear();
+        fcbIDformat.getSelectionModel().clearSelection();
+        fcbIDmap.getSelectionModel().clearSelection();
+        btnRunIDcompare.setDisable(true);
+        fcbIDcompIgnoreSV.setSelected(false);
+        fcbIDcompIgnoreDL.setSelected(false);
+        fcbIDcompIgnoreTP.setSelected(false);
+        fcbIDcompSVonly.setSelected(false);
+        fcbIDcompCount.setSelected(false);
+        fcbIDcompSVonlyCN.setSelected(false);
         progressBar.setProgress(0);
 
     }
@@ -453,6 +533,80 @@ public class MainController implements Initializable {
     }
 
     @FXML
+    //action button Browse for Instance data comparison - file 1
+    private void actionBrowseIDfile1(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+
+        //select file 1
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
+        List<File> fileL=null;
+        fileL = filechooser.showOpenMultipleDialog(null);
+
+        if (fileL != null) {// the file is selected
+
+            fPathIDfile1.setText(fileL.toString());
+            MainController.IDModel1=fileL;
+        } else{
+            fPathIDfile1.clear();
+        }
+    }
+
+    @FXML
+    //action button Browse for Instance data comparison - file 2
+    private void actionBrowseIDfile2(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        //select file 1
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
+        List<File> fileL=null;
+        fileL = filechooser.showOpenMultipleDialog(null);
+
+        if (fileL != null) {// the file is selected
+
+            fPathIDfile2.setText(fileL.toString());
+            MainController.IDModel2=fileL;
+        }else{
+            fPathIDfile2.clear();
+        }
+    }
+
+    @FXML
+    //action button Browse for Instance data comparison - mapping
+    private void actionBrowseIDmap(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        MainController.IDmapSelect=0;
+        List fileL=null;
+        FileChooser filechooser = new FileChooser();
+
+        if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Generate from RDFS")) {
+            MainController.IDmapSelect = 1;
+            //select file
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+        }else if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Use saved map")){
+            MainController.IDmapSelect = 2;
+            //select file
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Map file", "*.properties"));
+        }
+        fileL = filechooser.showOpenMultipleDialog(null);
+
+        if (fileL != null) {// the file is selected
+
+            fPathIDmap.setText(fileL.toString());
+            MainController.IDmapList = fileL;
+
+            if (!fPathIDfile1.getText().equals("") && !fPathIDfile2.getText().equals("")) {
+                btnRunIDcompare.setDisable(false);
+            }
+
+        }else{
+            fPathIDmap.clear();
+            btnRunIDcompare.setDisable(true);
+        }
+    }
+
+
+    @FXML
     //action button RDF file Browse for Excel to SHACL
     private void actionBrowseRDFfileForExcel(ActionEvent actionEvent) {
         progressBar.setProgress(0);
@@ -490,12 +644,169 @@ public class MainController implements Initializable {
               }
     }
 
+    @FXML
+    //action button Run in instance data comparison
+    private void actionBtnRunIDcompare(ActionEvent actionEvent) throws IOException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        String xmlBase = fPathIDmapXmlBase.getText();
+        Map<String, RDFDatatype> dataTypeMap = new HashMap<>();
+        compareResults = new ArrayList<>();
+
+        //if the datatypes map is from RDFS - make union of RDFS and generate map
+        if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("Generate from RDFS") && MainController.IDmapSelect ==1) {
+
+
+        }else if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("Use saved map") && MainController.IDmapSelect ==2) {
+            //if the datatypes map is previously saved - load it
+
+            if (MainController.IDmapList != null) {// the file is selected
+                for (File item : MainController.IDmapList) {
+                    Properties properties = new Properties();
+                    properties.load(new FileInputStream(item.toString()));
+                    for (Object key : properties.keySet()) {
+                        String value = properties.get(key).toString();
+                        RDFDatatype valueRDFdatatype = DataTypeMaping.mapFromMapDefaultFile(value);
+                        dataTypeMap.put(key.toString(), valueRDFdatatype);
+                    }
+                }
+            }
+        }
+        // if model 1 is more that 1 zip or xml - merge
+
+        Model model1single = null;
+        Model model2single = null;
+        Model model1 = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Map prefixMap = model1.getNsPrefixMap();
+
+        for (File item : MainController.IDModel1) {
+            if (item.getName().toLowerCase().endsWith(".zip")) {
+                if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
+                    model1single = util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 3);
+                }else{
+                    model1single = util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 2);
+                }
+            } else if (item.getName().toLowerCase().endsWith(".xml")) {
+                InputStream inputStream = new FileInputStream(item);
+                if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
+                    model1single = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    RDFDataMgr.read(model1single, inputStream, xmlBase, Lang.RDFXML);
+                }else {
+                    model1single = util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
+                }
+            }
+            prefixMap.putAll(model1single.getNsPrefixMap());
+            model1.add(model1single);
+        }
+        model1.setNsPrefixes(prefixMap);
+
+
+        // if model 2 is more that 1 zip or xml - merge
+        Model model2 = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        prefixMap = model2.getNsPrefixMap();
+
+        for (File item : MainController.IDModel2) {
+            if (item.getName().toLowerCase().endsWith(".zip")) {
+                if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
+                    model2single = util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 3);
+                }else{
+                    model2single = util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 2);
+                }
+            } else if (item.getName().toLowerCase().endsWith(".xml")) {
+                InputStream inputStream = new FileInputStream(item);
+                if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
+                    model2single = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    RDFDataMgr.read(model2single, inputStream, xmlBase, Lang.RDFXML);
+                }else{
+                    model2single = util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
+                }
+
+            }
+            prefixMap.putAll(model2single.getNsPrefixMap());
+            model2.add(model2single);
+        }
+        model2.setNsPrefixes(prefixMap);
+
+        //proceed with the comparisson
+
+        rdfsCompareFiles = new LinkedList<>();
+        if (MainController.IDModel1.size()==1) {
+            rdfsCompareFiles.add(MainController.IDModel1.get(0).getName());
+        }else{
+            rdfsCompareFiles.add("Model 1");
+        }
+        if (MainController.IDModel2.size()==1) {
+            rdfsCompareFiles.add(MainController.IDModel2.get(0).getName());
+        }else {
+            rdfsCompareFiles.add("Model 2");
+        }
+
+        LinkedList<Integer> options = new LinkedList<Integer>();
+        options.add(0); //1 is ignore sv classes
+        options.add(0);
+        options.add(0);
+        options.add(0);
+        options.add(0);
+        options.add(0);
+        if (fcbIDcompIgnoreSV.isSelected()) {
+            options.set(0,1);
+        }
+        if (fcbIDcompIgnoreDL.isSelected()) {
+            options.set(1,1);
+        }
+        if (fcbIDcompCount.isSelected()) {
+            options.set(3,1);
+            compareResults = ComparisonInstanceData.compareCountClasses(compareResults,model1,model2);
+        }
+        if (fcbIDcompIgnoreTP.isSelected()) {
+            options.set(4,1);
+        }
+        if (fcbIDcompSVonlyCN.isSelected()) {
+            options.set(5,1);
+        }
+        if (fcbIDcompSVonly.isSelected()) {
+            options.set(2,1);
+            compareResults = ComparisonInstanceData.compareSolution(compareResults,model1,model2,xmlBase,options);
+        }
+        if (!fcbIDcompCount.isSelected() && !fcbIDcompSVonly.isSelected()) {
+            compareResults = ComparisonInstanceData.compareInstanceData(compareResults, model1, model2, options);
+        }
+
+
+        if (compareResults.size() != 0) {
+
+            try {
+                Stage guiRdfDiffResultsStage = new Stage();
+                //Scene for the menu RDF differences
+                FXMLLoader fxmlLoader = new FXMLLoader();
+                Parent rootRDFdiff = fxmlLoader.load(getClass().getResource("/fxml/rdfDiffResult.fxml"));
+                Scene rdfDiffscene = new Scene(rootRDFdiff);
+                guiRdfDiffResultsStage.setScene(rdfDiffscene);
+                guiRdfDiffResultsStage.setTitle("Comparison Instance data");
+                guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
+                rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                guiRdfDiffResultsStage.showAndWait();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setContentText("The two models are identical.");
+            alert.setHeaderText(null);
+            alert.setTitle("Information");
+            alert.showAndWait();
+        }
+
+        progressBar.setProgress(1);
+
+    }
 
 
 
 
     @FXML
-    //action menu item Tools -> RDFS difference
+    //action button Run in RDF comparison
     private void actionBtnRunRDFcompare(ActionEvent actionEvent) throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
@@ -891,6 +1202,47 @@ public class MainController implements Initializable {
             fcbRDFformat.getSelectionModel().clearSelection();
         }
 
+
+    }
+
+    //Action for choice box "Profile version" related to Instance data comparison
+    private void actionCBIDformat() {
+
+        progressBar.setProgress(0);
+        if(!fcbIDformat.getSelectionModel().isSelected(-1)) {
+            if (fcbIDformat.getSelectionModel().getSelectedItem().toString().equals("Other CIM version")) {
+                fPathIDmapXmlBase.setEditable(true);
+                fPathIDmapXmlBase.clear();
+            } else if (fcbIDformat.getSelectionModel().getSelectedItem().toString().equals("IEC 61970-600-1&2 (CGMES 3.0.0)") ||
+                    fcbIDformat.getSelectionModel().getSelectedItem().toString().equals("IEC 61970-45x (CIM17)")){
+                fPathIDmapXmlBase.setEditable(false);
+                fPathIDmapXmlBase.setText("http://iec.ch/TC57/CIM100");
+            } else if (fcbIDformat.getSelectionModel().getSelectedItem().toString().equals("IEC TS 61970-600-1&2 (CGMES 2.4.15)") ||
+                    fcbIDformat.getSelectionModel().getSelectedItem().toString().equals("IEC 61970-45x (CIM16)")){
+                fPathIDmapXmlBase.setEditable(false);
+                fPathIDmapXmlBase.setText("http://iec.ch/TC57/2013/CIM-schema-cim16");
+            }
+        } else {
+            fPathIDmapXmlBase.setEditable(false);
+        }
+
+    }
+
+    //Action for choice box "Datatypes map" related to Instance data comparison
+    private void actionCBIDmap() {
+
+        progressBar.setProgress(0);
+        if(!fcbIDmap.getSelectionModel().isSelected(-1)) {
+            fPathIDmap.clear();
+            if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
+                fBTbrowseIDmap.setDisable(true);
+            } else {
+                fBTbrowseIDmap.setDisable(false);
+            }
+        } else {
+            fBTbrowseIDmap.setDisable(false);
+            fPathIDmap.clear();
+        }
 
     }
 
