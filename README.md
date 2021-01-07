@@ -6,14 +6,15 @@ The application is based on Apache Jena (Apache License v2.0), TopBraid SHACL AP
 
 CimPal helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM.
 
-Currently the following features are either supported or under development:
+Currently, the following features are either supported or under development:
 
 -Convert from RDFS to SHACL\
 -Export SHACL constraints (not full scope) from an excel template\
 -Perform RDFS comparison\
 -Export RDFS descriptions and cardinalities in Excel\
 -Generate datatypes mapping\
--RDF convert – conversion between different RDF serializations (under development)
+-RDF convert – conversion between different RDF serializations\
+-Instance data comparison (in prototype version)
 
 gridDigIt aims at providing support and further enhancement of the CimPal. Please address any requests either via the support email or in GitHub, by submitting an issue in the repository.
 
