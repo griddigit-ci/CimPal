@@ -104,6 +104,7 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("uriEU", "http://iec.ch/TC57/CIM100-European#");
         MainController.prefs.put("prefixOther", "");
         MainController.prefs.put("uriOther", "");
+        MainController.prefs.put("LastWorkingFolder", "C:");
 
     }
 

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
 
+import static application.MainController.associationValueTypeOption;
 
 
 public class ShaclTools {
@@ -450,9 +451,14 @@ public class ShaclTools {
          * localName - is the name of the NodeShape
          * classFullURI - is the full URI of the CIM class
          */
-
+        String valueType;
+        if (associationValueTypeOption==1) {
+            valueType = "-valueTypeNodeShape";
+        }else{
+            valueType = "-valueType";
+        }
         //creates the resource
-        Resource r = shapeModel.createResource(nsURIprofile + localName+"-valueType");
+        Resource r = shapeModel.createResource(nsURIprofile + localName+valueType);
         r.addProperty(RDF.type, SH.NodeShape);
         RDFNode o1 = shapeModel.createResource(classFullURI);
         r.addProperty(SH.targetClass, o1);
@@ -573,18 +579,29 @@ public class ShaclTools {
                 r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
 
                 if (propertyNodeFeatures.get(13).toString().equals("")) {
-                    //Property p5 = shapeModel.createProperty(shaclURI, "path");
                     RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                    r.addProperty(SH.path, o5);
+                    if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
+                        List<RDFNode> pathList = new ArrayList<>();
+                        pathList.add(o5);
+                        pathList.add(RDF.type.asResource());
+
+                        RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                        r.addProperty(SH.path, pathRDFlist);
+                    }else{
+                        //Property p5 = shapeModel.createProperty(shaclURI, "path");
+
+                        r.addProperty(SH.path, o5);
+                    }
+
+
                 }else { // it enters here when it is  compound and the sh:path needs to be a list
                     //path for the case when the attribute is a compound
                     List<RDFNode> pathList = (List<RDFNode>) propertyNodeFeatures.get(13);
+                    if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
+                        pathList.add(RDF.type.asResource());
+                    }
                     RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
                     r.addProperty(SH.path, pathRDFlist);
-                    //Resource nodeShapeResourcePath = shapeModel.getResource(nsURIprofile + localName+"Cardinality");
-                    //if (!shapeModel.getResource(nodeShapeResourcePath.toString()).hasProperty(SH.path)) { // creates sh:path only if it is missing
-                    //    nodeShapeResourcePath.addProperty(SH.path, pathRDFlist);
-                    //}
                 }
 
                 //Property p6 = shapeModel.createProperty(shaclURI, "name");
@@ -615,9 +632,21 @@ public class ShaclTools {
                     }
                 }else if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
                     //this is the case where the datatype is compound
+
                     r.addProperty(SH.nodeKind, SH.BlankNode);
-                    RDFNode oC = shapeModel.createResource(propertyNodeFeatures.get(12).toString());
-                    r.addProperty(SH.class_, oC);
+                    if (associationValueTypeOption==1) {// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
+                        RDFNode oC = shapeModel.createResource(propertyNodeFeatures.get(12).toString());
+                        //adding sh:in
+                        List<RDFNode> classIn = new ArrayList<>();
+                        classIn.add(oC);
+
+                        RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
+                        r.addProperty(SH.in, classInRDFlist);
+
+                    }else{
+                        RDFNode oC = shapeModel.createResource(propertyNodeFeatures.get(12).toString());
+                        r.addProperty(SH.class_, oC);
+                    }
 
                 }else {
                     //this is the case where the datatype is a primitive or it is the primitive of the .value attribute of CIMDatatype
@@ -691,10 +720,6 @@ public class ShaclTools {
                     RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
                     r.addProperty(SH.order, o1o);
 
-                    //adding path
-                    RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                    r.addProperty(SH.path, o5);
-
                     //adding name
                     r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
 
@@ -705,30 +730,72 @@ public class ShaclTools {
                     RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
                     r.addProperty(SH.severity, o8);
 
-                    //adding the sh:class
+                    //the 09 is the class - value type
                     RDFNode o9 = shapeModel.createResource(((LinkedList) propertyNodeFeatures.get(10)).get(0).toString());
-                    r.addProperty(SH.class_, o9);
+
+
+                    if (associationValueTypeOption==1){// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
+
+                        //adding path
+                        List<RDFNode> pathList = new ArrayList<>();
+                        pathList.add(shapeModel.createResource(propertyFullURI));
+                        pathList.add(RDF.type.asResource());
+
+                        RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                        r.addProperty(SH.path, pathRDFlist);
+
+                        //adding a message
+                        //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+                        r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                                +shapeModel.getNsURIPrefix(o9.asResource().getNameSpace())+":"+o9.asResource().getLocalName());
+
+                        //adding sh:in
+                        List<RDFNode> classIn = new ArrayList<>();
+                        classIn.add(o9);
+
+                        RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
+                        r.addProperty(SH.in, classInRDFlist);
+
+                    }else {
+                        //adding path
+                        RDFNode o5 = shapeModel.createResource(propertyFullURI);
+                        r.addProperty(SH.path, o5);
+
+                        //adding the sh:class
+
+                        r.addProperty(SH.class_, o9);
+
+                        //adding a message
+                        //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+                        r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                                +shapeModel.getNsURIPrefix(o9.asResource().getNameSpace())+":"+o9.asResource().getLocalName());
+                    }
 
                     //adding sh:nodeKind
                     r.addProperty(SH.nodeKind, SH.IRI);
 
-                    //adding a message
-                    //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                    r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
-                            +shapeModel.getNsURIPrefix(o9.asResource().getNameSpace())+":"+o9.asResource().getLocalName());
-
                 }
             }else{
                 //in case there are multiple concrete classes that inherit the association
-                List<RDFNode> classNames = new ArrayList<>();
-                for (int item=0; item<((LinkedList) propertyNodeFeatures.get(10)).size(); item++) {
-                    Resource classNameRes = (Resource) ((LinkedList) propertyNodeFeatures.get(10)).get(item);
-                    if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType"))) {
-                        classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                if (associationValueTypeOption==1) {// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
+
+                    String classFullURI = propertyNodeFeatures.get(11).toString();
+
+                    shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
+
+                    Resource nodeShapeResourceValueType = shapeModel.getResource(nsURIprofile + localName + "-valueTypeNodeShape");
+
+                    if (shapeModel.containsResource(shapeModel.createResource(nsURIprofile + localName+ "-valueType"))) {
+                        //adding the reference in the NodeShape
+                        RDFNode o = shapeModel.createResource(nsURIprofile + localName+ "-valueType");
+                        nodeShapeResourceValueType.addProperty(SH.property, o);
                     } else {
-                        classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                        //adding the reference in the NodeShape
+                        RDFNode o = shapeModel.createResource(nsURIprofile + localName+ "-valueType");
+                        nodeShapeResourceValueType.addProperty(SH.property, o);
+
                         //adding the properties for the PropertyShape
-                        Resource r = shapeModel.createResource(nsURIprofile + localName +  classNameRes.getLocalName() + "-valueType");
+                        Resource r = shapeModel.createResource(nsURIprofile + localName + "-valueType");
                         r.addProperty(RDF.type, SH.PropertyShape);
 
                         //adding the property for the sh:group
@@ -740,12 +807,8 @@ public class ShaclTools {
                         RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
                         r.addProperty(SH.order, o1o);
 
-                        //adding path
-                        RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                        r.addProperty(SH.path, o5);
-
                         //adding name
-                        r.addProperty(SH.name, localName + classNameRes.getLocalName() + "-valueType");//propertyNodeFeatures.get(2).toString()
+                        r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
 
                         //adding description
                         r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
@@ -754,31 +817,94 @@ public class ShaclTools {
                         RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
                         r.addProperty(SH.severity, o8);
 
-                        //adding the sh:class
-                        RDFNode o9 = shapeModel.createResource(((LinkedList) propertyNodeFeatures.get(10)).get(item).toString());
-                        r.addProperty(SH.class_, o9);
+                        //adding path
+                        List<RDFNode> pathList = new ArrayList<>();
+                        pathList.add(shapeModel.createResource(propertyFullURI));
+                        pathList.add(RDF.type.asResource());
+
+                        RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                        r.addProperty(SH.path, pathRDFlist);
+
+                        //adding a message
+                        //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+                        r.addProperty(SH.message, "One of the following occurs: 1) The value type is not IRI; 2) The value type is not the right class.");
+
+                        //adding sh:in
+                        List<RDFNode> classNames = new ArrayList<>();
+                        for (int item = 0; item < ((LinkedList) propertyNodeFeatures.get(10)).size(); item++) {
+                            classNames.add(shapeModel.createResource(((LinkedList) propertyNodeFeatures.get(10)).get(item).toString()));
+                        }
+
+                        RDFList classInRDFlist = shapeModel.createList(classNames.iterator());
+                        r.addProperty(SH.in, classInRDFlist);
+
+
 
                         //adding sh:nodeKind
                         r.addProperty(SH.nodeKind, SH.IRI);
 
-                        //adding a message
-                        //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                        r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
-                                + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
+                    }
 
+                }else { // in case the option "Use sh:in for association value type constraint instead of sh:class and sh:or" is not selected
+                    List<RDFNode> classNames = new ArrayList<>();
+                    for (int item = 0; item < ((LinkedList) propertyNodeFeatures.get(10)).size(); item++) {
+                        Resource classNameRes = (Resource) ((LinkedList) propertyNodeFeatures.get(10)).get(item);
+                        if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType"))) {
+                            classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                        } else {
+                            classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                            //adding the properties for the PropertyShape
+                            Resource r = shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType");
+                            r.addProperty(RDF.type, SH.PropertyShape);
+
+                            //adding the property for the sh:group
+                            //creates the object which is the Group
+                            RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                            r.addProperty(SH.group, o1g);
+
+                            //adding a property for the order
+                            RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                            r.addProperty(SH.order, o1o);
+
+                            //adding path
+                            RDFNode o5 = shapeModel.createResource(propertyFullURI);
+                            r.addProperty(SH.path, o5);
+
+                            //adding name
+                            r.addProperty(SH.name, localName + classNameRes.getLocalName() + "-valueType");//propertyNodeFeatures.get(2).toString()
+
+                            //adding description
+                            r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
+
+                            //adding severity
+                            RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
+                            r.addProperty(SH.severity, o8);
+
+                            //adding the sh:class
+                            RDFNode o9 = shapeModel.createResource(((LinkedList) propertyNodeFeatures.get(10)).get(item).toString());
+                            r.addProperty(SH.class_, o9);
+
+                            //adding sh:nodeKind
+                            r.addProperty(SH.nodeKind, SH.IRI);
+
+                            //adding a message
+                            //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+                            r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                                    + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
+
+                        }
+                    }
+
+                    String classFullURI = propertyNodeFeatures.get(11).toString();
+
+                    shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
+                    //RDFList orRDFlist = shapeModel.createList(classNames.iterator());
+                    Resource nodeShapeResourceOr = shapeModel.getResource(nsURIprofile + localName + "-valueType");
+                    if (!shapeModel.getResource(nodeShapeResourceOr.toString()).hasProperty(SH.or)) { // creates sh:or only if it is missing
+                        RDFList orRDFlist = shapeModel.createList(classNames.iterator());
+                        nodeShapeResourceOr.addProperty(SH.or, orRDFlist);
                     }
                 }
-
-                String classFullURI=propertyNodeFeatures.get(11).toString();
-
-                shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
-                //RDFList orRDFlist = shapeModel.createList(classNames.iterator());
-                Resource nodeShapeResourceOr = shapeModel.getResource(nsURIprofile + localName+"-valueType");
-                if (!shapeModel.getResource(nodeShapeResourceOr.toString()).hasProperty(SH.or)) { // creates sh:or only if it is missing
-                    RDFList orRDFlist = shapeModel.createList(classNames.iterator());
-                    nodeShapeResourceOr.addProperty(SH.or, orRDFlist);
-                }
-
             }
         }
 
@@ -995,9 +1121,11 @@ public class ShaclTools {
             FileChooser filechooserS = new FileChooser();
             filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionText, extension));
             filechooserS.setInitialFileName(title.split(": ",2)[1]);
+            filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             filechooserS.setTitle(title);
             saveFile = filechooserS.showSaveDialog(null);
             if (saveFile != null) {
+                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
                 OutputStream out = new FileOutputStream(saveFile);
                 try {
                     //model.write(out, rdfFormat.getLang().getLabel().toUpperCase(),baseURI);//String.valueOf(rdfFormat)

@@ -55,9 +55,11 @@ public class ExcelExportTableView {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
         filechooser.setInitialFileName(initialFileName);
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
+            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);

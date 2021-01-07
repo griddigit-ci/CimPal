@@ -182,6 +182,14 @@
                                                                   <ChoiceBox fx:id="fcbRDFSformatShapes" disable="true" minWidth="400.0" />
                                                                </children>
                                                             </HBox>
+                                                            <HBox spacing="10.0">
+                                                               <padding>
+                                                                  <Insets left="5.0" right="5.0" top="5.0" />
+                                                               </padding>
+                                                               <children>
+                                                                  <CheckBox fx:id="cbRDFSSHACLoption1" disable="true" mnemonicParsing="false" text="Use sh:in for association value type constraint instead of sh:class and sh:or" />
+                                                               </children>
+                                                            </HBox>
                                                             <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                                                <children>
                                                                   <Button fx:id="btnConstructShacl" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnConstructShacl" text="Create" HBox.hgrow="ALWAYS" />
@@ -575,7 +583,7 @@
                                                             <Label minWidth="140.0" text="Datatypes Map:" wrapText="true" />
                                                             <ChoiceBox fx:id="fcbIDmap" minWidth="300.0" />
                                                             <TextField fx:id="fPathIDmap" editable="false" HBox.hgrow="ALWAYS" />
-                                                            <Button fx:id="fBTbrowseIDmap" mnemonicParsing="false" onAction="#actionBrowseIDmap" text="Browse" />
+                                                            <Button fx:id="fBTbrowseIDmap" disable="true" mnemonicParsing="false" onAction="#actionBrowseIDmap" text="Browse" />
                                                          </children>
                                                       </HBox>
                                                       <HBox spacing="10.0">
@@ -610,6 +618,15 @@
                                                                <HBox.margin>
                                                                   <Insets left="50.0" />
                                                                </HBox.margin>
+                                                            </VBox>
+                                                            <VBox spacing="10.0">
+                                                               <children>
+                                                                  <CheckBox fx:id="fcbIDcompSolutionOverview" mnemonicParsing="false" text="Create solution overview " />
+                                                                  <CheckBox fx:id="fcbIDcompShowDetails" mnemonicParsing="false" text="Show details" />
+                                                               </children>
+                                                               <padding>
+                                                                  <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                               </padding>
                                                             </VBox>
                                                          </children>
                                                       </HBox>
@@ -704,7 +721,7 @@
                      </padding>
                   </ProgressBar>
                </children></Pane>
-        <Label font="$x3" maxWidth="-1.0" text="Version: 2020-1.1.0" HBox.hgrow="NEVER" />
+        <Label font="$x3" maxWidth="-1.0" text="Version: 2021-1.0.0" HBox.hgrow="NEVER" />
       </children>
       <padding>
         <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />

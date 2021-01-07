@@ -5,6 +5,7 @@
  */
 package core;
 
+import application.MainController;
 import javafx.stage.FileChooser;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
@@ -34,7 +35,7 @@ public class RdfConvert {
 
         Lang rdfSourceFormat;
         switch (sourceFormat) {
-            case "RDF XML (.rdf)":
+            case "RDF XML (.rdf or .xml)":
                 rdfSourceFormat=Lang.RDFXML;
                 break;
 
@@ -72,7 +73,7 @@ public class RdfConvert {
         }
 
         switch (targetFormat) {
-            case "RDF XML (.rdf)":
+            case "RDF XML (.rdf or .xml)":
                 OutputStream outXML = fileSaveDialog("Save RDF XML for: "+filename, "RDF XML", "*.rdf");
                 if (outXML!=null) {
                     try {
@@ -82,6 +83,7 @@ public class RdfConvert {
                         //properties.put("blockRules", RDFSyntax.propertyAttr.toString()); //???? not sure
                         properties.put("xmlbase", xmlBase);
                         properties.put("tab", tab);
+                        //properties.put("prettyTypes",new Resource[] {ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")});
                         properties.put("relativeURIs", relativeURIs);
 
 
@@ -151,10 +153,12 @@ public class RdfConvert {
         FileChooser filechooserS = new FileChooser();
         filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionName, extension));
         filechooserS.setInitialFileName(title.split(": ", 2)[1]);
+        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         filechooserS.setTitle(title);
         saveFile = filechooserS.showSaveDialog(null);
         OutputStream out=null;
         if (saveFile!=null) {
+            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             out = new FileOutputStream(saveFile);
         }
         return out;

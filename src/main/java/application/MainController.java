@@ -196,6 +196,12 @@ public class MainController implements Initializable {
     private Button fBTbrowseIDmap;
     @FXML
     private CheckBox fcbIDcompSVonlyCN;
+    @FXML
+    private CheckBox cbRDFSSHACLoption1;
+    @FXML
+    private CheckBox fcbIDcompSolutionOverview;
+    @FXML
+    private CheckBox fcbIDcompShowDetails;
 
 
 
@@ -232,7 +238,9 @@ public class MainController implements Initializable {
     public static TreeView treeViewConstraintsStatic;
     private static Map<TreeItem,String> treeMapConstraints;
     private static Map<String,TreeItem> treeMapConstraintsInverse;
+    public static Integer associationValueTypeOption;
 
+    public static TextArea foutputWindowVar;
 
 
     public MainController() {
@@ -251,6 +259,7 @@ public class MainController implements Initializable {
         System.setErr(new PrintStream(out, true));
 
         treeViewConstraintsStatic=treeViewConstraints;
+        foutputWindowVar=foutputWindow;
         //initialization of the Browse and Modify table - SHACL Shapes Browse
         tableViewBrowseModify.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         tableViewBrowseModify.setEditable(false);
@@ -319,14 +328,14 @@ public class MainController implements Initializable {
         fcbRDFSformatForExcel.getSelectionModel().selectFirst();
 
         fsourceFormatChoiceBox.getItems().addAll(
-                "RDF XML (.rdf)",
+                "RDF XML (.rdf or .xml)",
                 "RDF Turtle (.ttl)",
                 "JSON-LD (.jsonld)"
         );
         fsourceFormatChoiceBox.getSelectionModel().clearSelection();
 
         ftargetFormatChoiceBox.getItems().addAll(
-                "RDF XML (.rdf)",
+                "RDF XML (.rdf or .xml)",
                 "RDF Turtle (.ttl)",
                 "JSON-LD (.jsonld)"
         );
@@ -393,11 +402,13 @@ public class MainController implements Initializable {
         //open RDFS file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file = filechooser.showOpenDialog(null);
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file != null) {// the file is selected
 
+            MainController.prefs.put("LastWorkingFolder", file.getParent());
             try {
                 RDFDataMgr.read(model, new FileInputStream(file), Lang.RDFXML);
             } catch (FileNotFoundException e) {
@@ -452,6 +463,8 @@ public class MainController implements Initializable {
         fcbIDcompSVonly.setSelected(false);
         fcbIDcompCount.setSelected(false);
         fcbIDcompSVonlyCN.setSelected(false);
+        fcbIDcompSolutionOverview.setSelected(false);
+        fcbIDcompShowDetails.setSelected(false);
         progressBar.setProgress(0);
 
     }
@@ -481,14 +494,18 @@ public class MainController implements Initializable {
             //select file 1
             FileChooser filechooser = new FileChooser();
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
             FileChooser filechooser = new FileChooser();
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shapes", "*.rdf", "*.ttl"));
+            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }
 
         if (file != null) {// the file is selected
+
+            MainController.prefs.put("LastWorkingFolder", file.getParent());
 
             fPathRdffile1.setText(file.toString());
             MainController.rdfModel1=file;
@@ -511,14 +528,18 @@ public class MainController implements Initializable {
         //select file 2
             FileChooser filechooser = new FileChooser();
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
             FileChooser filechooser = new FileChooser();
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shapes", "*.rdf", "*.ttl"));
+            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }
 
         if (file != null) {// the file is selected
+
+            MainController.prefs.put("LastWorkingFolder", file.getParent());
 
             fPathRdffile2.setText(file.toString());
             MainController.rdfModel2=file;
@@ -540,11 +561,13 @@ public class MainController implements Initializable {
         //select file 1
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         List<File> fileL=null;
         fileL = filechooser.showOpenMultipleDialog(null);
 
         if (fileL != null) {// the file is selected
 
+            MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
             fPathIDfile1.setText(fileL.toString());
             MainController.IDModel1=fileL;
         } else{
@@ -559,11 +582,13 @@ public class MainController implements Initializable {
         //select file 1
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         List<File> fileL=null;
         fileL = filechooser.showOpenMultipleDialog(null);
 
         if (fileL != null) {// the file is selected
 
+            MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
             fPathIDfile2.setText(fileL.toString());
             MainController.IDModel2=fileL;
         }else{
@@ -576,7 +601,7 @@ public class MainController implements Initializable {
     private void actionBrowseIDmap(ActionEvent actionEvent) {
         progressBar.setProgress(0);
         MainController.IDmapSelect=0;
-        List fileL=null;
+        List<File> fileL=null;
         FileChooser filechooser = new FileChooser();
 
         if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Generate from RDFS")) {
@@ -588,10 +613,12 @@ public class MainController implements Initializable {
             //select file
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Map file", "*.properties"));
         }
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         fileL = filechooser.showOpenMultipleDialog(null);
 
         if (fileL != null) {// the file is selected
 
+            MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
             fPathIDmap.setText(fileL.toString());
             MainController.IDmapList = fileL;
 
@@ -613,10 +640,12 @@ public class MainController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file = filechooser.showOpenDialog(null);
 
         if (file != null) {// the file is selected
 
+            MainController.prefs.put("LastWorkingFolder", file.getParent());
             fPathRdffileForExcel.setText(file.toString());
             MainController.rdfModelExcelShacl=file;
 
@@ -632,10 +661,12 @@ public class MainController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file = filechooser.showOpenDialog(null);
 
         if (file != null) {// the file is selected
 
+            MainController.prefs.put("LastWorkingFolder", file.getParent());
             fPathXLSfileForShape.setText(file.toString());
             MainController.xlsFileExcelShacl=file;
 
@@ -772,23 +803,30 @@ public class MainController implements Initializable {
             compareResults = ComparisonInstanceData.compareInstanceData(compareResults, model1, model2, options);
         }
 
+        if (fcbIDcompSolutionOverview.isSelected() ) {
+            compareResults = ComparisonInstanceData.compareSolution(compareResults,model1,model2,xmlBase,options);
+            List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
+        }
 
-        if (compareResults.size() != 0) {
 
-            try {
-                Stage guiRdfDiffResultsStage = new Stage();
-                //Scene for the menu RDF differences
-                FXMLLoader fxmlLoader = new FXMLLoader();
-                Parent rootRDFdiff = fxmlLoader.load(getClass().getResource("/fxml/rdfDiffResult.fxml"));
-                Scene rdfDiffscene = new Scene(rootRDFdiff);
-                guiRdfDiffResultsStage.setScene(rdfDiffscene);
-                guiRdfDiffResultsStage.setTitle("Comparison Instance data");
-                guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
-                rdfDiffResultController.initData(guiRdfDiffResultsStage);
-                guiRdfDiffResultsStage.showAndWait();
+        if (compareResults.size() != 0 ) {
 
-            } catch (IOException e) {
-                e.printStackTrace();
+            if (fcbIDcompShowDetails.isSelected()) {
+                try {
+                    Stage guiRdfDiffResultsStage = new Stage();
+                    //Scene for the menu RDF differences
+                    FXMLLoader fxmlLoader = new FXMLLoader();
+                    Parent rootRDFdiff = fxmlLoader.load(getClass().getResource("/fxml/rdfDiffResult.fxml"));
+                    Scene rdfDiffscene = new Scene(rootRDFdiff);
+                    guiRdfDiffResultsStage.setScene(rdfDiffscene);
+                    guiRdfDiffResultsStage.setTitle("Comparison Instance data");
+                    guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
+                    rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                    guiRdfDiffResultsStage.showAndWait();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         } else {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -916,6 +954,7 @@ public class MainController implements Initializable {
             if (result.get() == btnYes) {*/
                 FileChooser filechooser = new FileChooser();
                 filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Datatypes mapping files", "*.properties"));
+                filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
                 File saveFile = filechooser.showSaveDialog(null);
 
                 Properties properties = new Properties();
@@ -925,6 +964,7 @@ public class MainController implements Initializable {
                 }
                 if (saveFile!=null) {
                     properties.store(new FileOutputStream(saveFile.toString()), null);
+                    MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
                 }
             //}
             progressBar.setProgress(1);
@@ -987,9 +1027,12 @@ public class MainController implements Initializable {
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Merged OWL CIMTool files", "*.owl"));
             rdfFormatInput="CIMTool-merged-owl";
         }
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         this.selectedFile = filechooser.showOpenMultipleDialog(null);
 
         if (this.selectedFile != null) {// the file is selected
+
+            MainController.prefs.put("LastWorkingFolder", this.selectedFile.get(0).getParent());
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
             //System.out.println("Selected file: " + this.selectedFile);
             int iterSize = this.selectedFile.size();
@@ -1008,6 +1051,7 @@ public class MainController implements Initializable {
             cbApplyDefNsDesignTab.setDisable(false);
             cbApplyDefBaseURIDesignTab.setDisable(false);
             btnApply.setDisable(false);
+            cbRDFSSHACLoption1.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -1020,9 +1064,10 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         //select file
         FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF file to convert", "*.rdf", "*.ttl"));
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF file to convert", "*.rdf","*.xml", "*.ttl"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file=null;
-        List fileL=null;
+        List<File> fileL=null;
         if (fcbRDFconvertModelUnion.isSelected()) {
             fileL = filechooser.showOpenMultipleDialog(null);
         }else{
@@ -1031,9 +1076,11 @@ public class MainController implements Initializable {
 
         if (file != null || fileL!=null) {// the file is selected
             if (file != null) {
+                MainController.prefs.put("LastWorkingFolder", file.getParent());
                 fsourcePathTextField.setText(file.toString());
                 MainController.rdfConvertFile = file;
             }else {
+                MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
                 fsourcePathTextField.setText(fileL.toString());
                 MainController.rdfConvertFileList = fileL;
             }
@@ -1078,20 +1125,20 @@ public class MainController implements Initializable {
             }
         }
         String showXmlDeclaration="false";
-        if (targetFormat.equals("RDF XML (.rdf)") && fcbShowXMLDeclaration.isSelected()){
+        if (targetFormat.equals("RDF XML (.rdf or .xml)") && fcbShowXMLDeclaration.isSelected()){
             showXmlDeclaration="true";
         }
 
         String showDoctypeDeclaration="false";
-        if (targetFormat.equals("RDF XML (.rdf)") && fcbShowDoctypeDeclaration.isSelected()){
+        if (targetFormat.equals("RDF XML (.rdf or .xml)") && fcbShowDoctypeDeclaration.isSelected()){
             showDoctypeDeclaration="true";
         }
         String tab="";
-        if (targetFormat.equals("RDF XML (.rdf)")){
+        if (targetFormat.equals("RDF XML (.rdf or .xml)")){
             tab=fRDFconvertTab.getText();
         }
         String relativeURIs="";
-        if (targetFormat.equals("RDF XML (.rdf)")){
+        if (targetFormat.equals("RDF XML (.rdf or .xml)")){
             relativeURIs=fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
         }
 
@@ -1169,7 +1216,7 @@ public class MainController implements Initializable {
 
         progressBar.setProgress(0);
         if(!ftargetFormatChoiceBox.getSelectionModel().isSelected(-1)) {
-            if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().equals("RDF XML (.rdf)")) {
+            if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().equals("RDF XML (.rdf or .xml)")) {
                 fcbShowXMLDeclaration.setDisable(false);
                 fcbShowDoctypeDeclaration.setDisable(false);
                 fRDFconvertTab.setDisable(false);
@@ -1593,6 +1640,11 @@ public class MainController implements Initializable {
         }else{
             cbvalue=fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
         }
+        if (cbRDFSSHACLoption1.isSelected()) {
+            associationValueTypeOption = 1;
+        }else{
+            associationValueTypeOption = 0;
+        }
 
         if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size()!=0 ) {
             //depending on the value of the choice box "Save datatype map"
@@ -1801,10 +1853,12 @@ public class MainController implements Initializable {
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
                 FileChooser filechooser = new FileChooser();
                 filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Datatypes mapping files", "*.properties"));
+                filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
                 filechooser.setInitialFileName("CompleteDatatypeMap");
                 File saveFile = filechooser.showSaveDialog(null);
 
                 if (saveFile != null) {
+                    MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
                     Properties properties = new Properties();
 
                     for (Object key : dataTypeMapFromShapesComplete.keySet()) {
@@ -1834,11 +1888,12 @@ public class MainController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shape file", "*.rdf", "*.ttl"));
-
-        List fileL=null;
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        List<File> fileL=null;
         fileL = filechooser.showOpenMultipleDialog(null);
 
         if (fileL != null) {// the file is selected
+            MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
             for (int m = 0; m < fileL.size(); m++) {
                 util.ModelFactory.shapeModelLoad(m,fileL); //loads shape model
                 ArrayList<String> mpak1 = new ArrayList<>();

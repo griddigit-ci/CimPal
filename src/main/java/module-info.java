@@ -29,6 +29,8 @@ module CimPal {
     requires org.apache.jena.base;
     requires org.apache.jena.cmds;
     requires org.apache.commons.io;
+    requires commons.math3;
+    requires org.apache.commons.lang3;
     requires poi;
     requires poi.ooxml;
     requires poi.ooxml.schemas;

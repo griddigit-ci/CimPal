@@ -6,6 +6,7 @@
 package gui;
 
 import application.MainController;
+import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
@@ -16,6 +17,8 @@ import org.apache.jena.rdf.model.Model;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+
+import static application.MainController.foutputWindowVar;
 
 public class GUIhelper {
 
@@ -158,5 +161,13 @@ public class GUIhelper {
 
         Pair<Integer,Model> result = new Pair(index, shapeModel);
         return result;
+    }
+
+    //Append text to output window
+    public static void appendTextToOutputWindow(String valueOf,Boolean nextLine) {
+        if (nextLine){
+            foutputWindowVar.appendText("\n");
+        }
+        foutputWindowVar.appendText(valueOf);
     }
 }

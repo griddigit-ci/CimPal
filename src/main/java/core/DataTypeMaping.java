@@ -5,6 +5,7 @@
  */
 package core;
 
+import application.MainController;
 import javafx.scene.control.Alert;
 import javafx.stage.FileChooser;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -180,11 +181,13 @@ public class DataTypeMaping {
         //select the file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         List<File> selFile = filechooser.showOpenMultipleDialog(null);
 
 
         if (selFile != null) {// the file is selected
 
+            MainController.prefs.put("LastWorkingFolder", selFile.get(0).getParent());
             //System.out.println("Selected file: " + selFile);
             Model model = ModelFactory.createDefaultModel(); // model is the rdf file
             Map<String, RDFDatatype> dataTypeMap = new HashMap<>();
