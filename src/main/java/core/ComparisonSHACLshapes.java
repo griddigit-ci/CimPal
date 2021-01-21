@@ -10,13 +10,39 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.topbraid.shacl.vocabulary.SH;
+import util.CompareFactory;
 
 import java.util.*;
 
 public class ComparisonSHACLshapes {
 
     public static ArrayList<Object> compareSHACLshapes(Model modelA, Model modelB){
+
         ArrayList<Object> compareResults = new ArrayList<>();
+        LinkedList<String> skiplist = new LinkedList<>();
+        //first run - this compared model A with model B. Identified common parts and reports differences. New
+        //classes in Model A that are not in Model B are reported
+        compareResults = CompareFactory.compareModels(compareResults, modelA, modelB, 0,skiplist);
+        //second run - reverse run. Model B is compared to Model A. Only if there are new parts (classes, attributes, associations) in Model B that are not in Model A
+        //are reported
+        compareResults = CompareFactory.compareModels(compareResults, modelB, modelA, 1,skiplist);
+
+        return compareResults;
+
+//!!!!!!!!!!!!!!!!! this is for the blank mode
+        /*if (resItemStmt.getObject().isAnon()){ this is when it is blank node
+        resItemStmt.toList() - gives the list and the list can be compared
+
+            modelA.listStatements(new SimpleSelector(resItemStmt.getObject().asResource(),(Property) null,(RDFNode) null)).toList()
+            // collects all statements that have the same subject; then properties and objects can be compared.
+            //sparql select statements are appearing as object - string and the string can be compared.
+            // see how to tackle nested blank node; have a separate method to process blank nodes including nested ...
+        }*/
+        ///!!!!!!!!!!
+
+
+
+        /*ArrayList<Object> compareResults = new ArrayList<>();
         //first run - this compared model A with model B. Identified common parts and reports differences. New
         //classes in Model A that are not in Model B are reported
         compareResults = compareModels(compareResults, modelA, modelB, 0);
@@ -24,10 +50,10 @@ public class ComparisonSHACLshapes {
         //are reported
         compareResults = compareModels(compareResults, modelB, modelA, 1);
 
-        return compareResults;
+        return compareResults;*/
 
     }
-
+/*
 
     //compares two models (RDFS)
     private static ArrayList<Object> compareModels(ArrayList<Object> compareResults, Model modelA, Model modelB, int reverse){
@@ -37,7 +63,7 @@ public class ComparisonSHACLshapes {
 
 
         }
-        /*String cimNSmodelA=modelA.getNsPrefixURI("cim");
+        *//*String cimNSmodelA=modelA.getNsPrefixURI("cim");
         for (ResIterator i = modelA.listSubjects(); i.hasNext(); ) {
             Resource resItem = i.next();
 
@@ -55,7 +81,7 @@ public class ComparisonSHACLshapes {
             } else if (rdfType.equals("Class")) { // if it is a class
                 compareResults= compareClass(compareResults, modelA, modelB, rdfType, resItem, cimNSmodelA, reverse);
             }
-        }*/
+        }*//*
         return compareResults;
     }
 
@@ -560,5 +586,5 @@ public class ComparisonSHACLshapes {
             }
         }
         return compareResults;
-    }
+    }*/
 }
