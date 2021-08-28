@@ -31,9 +31,9 @@ module CimPal {
     requires org.apache.commons.io;
     requires commons.math3;
     requires org.apache.commons.lang3;
-    requires poi;
-    requires poi.ooxml;
-    requires poi.ooxml.schemas;
+    requires org.apache.poi.poi;
+    requires org.apache.poi.ooxml;
+    requires org.apache.poi.ooxml.schemas;
     requires java.prefs;
     requires com.fasterxml.jackson.annotation;
     requires com.fasterxml.jackson.core;

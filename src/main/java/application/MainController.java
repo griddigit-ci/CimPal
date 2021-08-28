@@ -305,6 +305,7 @@ public class MainController implements Initializable {
         cbProfilesVersionCreateCompleteSMTab.getItems().addAll(
                 "IEC TS 61970-600-1&2 (CGMES 2.4.15)",
                 "IEC 61970-600-1&2 (CGMES 3.0.0)",
+                "IEC 61970-452:Ed4",
                 "Other"
         );
 
@@ -316,6 +317,7 @@ public class MainController implements Initializable {
 
         fcbRDFSformat.getItems().addAll(
                 "RDFS (augmented) by CimSyntaxGen",
+                "RDFS (augmented) by CimSyntaxGen with CIMTool",
                 "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen",
                 "SHACL Shapes"
 
@@ -501,10 +503,11 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         File file=null;
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
+                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
             //select file 1
             FileChooser filechooser = new FileChooser();
-            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf", "*.legacy-rdfs-augmented"));
             filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
@@ -536,10 +539,11 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         File file=null;
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
+                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
         //select file 2
             FileChooser filechooser = new FileChooser();
-            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf", "*.legacy-rdfs-augmented"));
             filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
@@ -864,6 +868,7 @@ public class MainController implements Initializable {
         Lang rdfSourceFormat2=Lang.RDFXML;
         switch (fcbRDFSformat.getSelectionModel().getSelectedItem().toString()) {
             case "RDFS (augmented) by CimSyntaxGen":
+            case "RDFS (augmented) by CimSyntaxGen with CIMTool":
             case "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen":
                 rdfSourceFormat1=Lang.RDFXML;
                 rdfSourceFormat2=Lang.RDFXML;
@@ -959,6 +964,9 @@ public class MainController implements Initializable {
         switch (fcbRDFSformat.getSelectionModel().getSelectedItem().toString()) {
             case "RDFS (augmented) by CimSyntaxGen":
                 compareResults = ComparisonRDFSprofile.compareRDFSprofile(model1, model2);
+                break;
+            case "RDFS (augmented) by CimSyntaxGen with CIMTool":
+                compareResults = ComparisonRDFSprofileCIMTool.compareRDFSprofileCIMTool(model1, model2);
                 break;
             case "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen":
                 compareResults = ComparissonRDFS501Ed2.compareRDFS501Ed2(model1, model2);
@@ -1448,9 +1456,11 @@ public class MainController implements Initializable {
                 } else {
                     rdfType = rdfTypeInit[1];
                 }
-                String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString().split("@", 2)[0]; // the first part of the rdfs:label
-                if (rdfType.equals("ClassCategory")) { // if it is a package
-                    this.packages.add(rdfsLabel);
+                if (model.contains(resItem,ResourceFactory.createProperty(RDFS.label.toString()))) {
+                    String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString().split("@", 2)[0]; // the first part of the rdfs:label
+                    if (rdfType.equals("ClassCategory")) { // if it is a package
+                        this.packages.add(rdfsLabel);
+                    }
                 }
             }
 
@@ -1590,6 +1600,14 @@ public class MainController implements Initializable {
             }
 
             //TODO: temporary option until a way to automate is implemented
+            int profileVersion =0;
+            if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("IEC 61970-600-1&2 (CGMES 3.0.0)")) {
+                profileVersion=1; // CGMESv3
+            }else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("IEC TS 61970-600-1&2 (CGMES 2.4.15)")){
+                profileVersion=2; // CGMESv2.4
+            }else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("IEC 61970-452:Ed4")){
+                profileVersion=3; // IEC 61970-452:Ed4
+            }
             if (cbApplyDefNsDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();
                 for (Object modelsNames : this.modelsNames) {
@@ -1597,48 +1615,99 @@ public class MainController implements Initializable {
                         if (treeitem.getValue().equals(((ArrayList) modelsNames).get(0))) {
                             switch (treeitem.getValue()) {
                                 case "CoreEquipmentProfile":
+                                case "EquipmentProfile":
                                     ((ArrayList) modelsNames).set(1, "eq");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentCore/3/1/Constraints#");
+                                    }else if (profileVersion==3){
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/CoreEquipment/Constraints#");
+                                    }
                                     break;
                                 case "OperationProfile":
                                     ((ArrayList) modelsNames).set(1, "op");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentOperation/3/1/Constraints#");
+                                    }else if (profileVersion==3){
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Operation/Constraints#");
+                                    }
                                     break;
                                 case "ShortCircuitProfile":
                                     ((ArrayList) modelsNames).set(1, "sc");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentShortCircuit/3/1/Constraints#");
+                                    }else if (profileVersion==3){
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/ShortCircuit/Constraints#");
+                                    }
                                     break;
                                 case "SteadyStateHypothesisProfile":
                                     ((ArrayList) modelsNames).set(1, "ssh");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/SteadyStateHypothesis/1/1/Constraints#");
+                                    }
                                     break;
                                 case "TopologyProfile":
                                     ((ArrayList) modelsNames).set(1, "tp");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/Topology/4/1/Constraints#");
+                                    }
                                     break;
                                 case "StateVariablesProfile":
                                     ((ArrayList) modelsNames).set(1, "sv");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/StateVariable-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/StateVariables-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/StateVariables/4/1/Constraints#");
+                                    }
                                     break;
                                 case "DiagramLayoutProfile":
                                     ((ArrayList) modelsNames).set(1, "dl");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/DiagramLayout/3/1/Constraints#");
+                                    }
                                     break;
                                 case "GeographicalLocationProfile":
                                     ((ArrayList) modelsNames).set(1, "gl");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/GeographicalLocation/2/1/Constraints#");
+                                    }
                                     break;
                                 case "DynamicsProfile":
                                     ((ArrayList) modelsNames).set(1, "dy");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/Dynamics/3/1/Constraints#");
+                                    }
                                     break;
                                 case "EquipmentBoundaryProfile":
                                     ((ArrayList) modelsNames).set(1, "eqbd");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentBoundary/3/1/Constraints#");
+                                    }
                                     break;
                                 case "TopologyBoundaryProfile":
                                     ((ArrayList) modelsNames).set(1, "tpbd");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints#");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints#");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/TopologyBoundary/3/1/Constraints#");
+                                    }
                                     break;
                                 case "FileHeaderProfile":
                                     ((ArrayList) modelsNames).set(1, "fh");
@@ -1663,37 +1732,88 @@ public class MainController implements Initializable {
                         if (treeitem.getValue().equals(((ArrayList) modelsNames).get(0))) {
                             switch (treeitem.getValue()) {
                                 case "CoreEquipmentProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints");
+                                case "EquipmentProfile":
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentCore/3/1/Constraints");
+                                    }else if (profileVersion==3){
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/CoreEquipment/Constraints");
+                                    }
                                     break;
                                 case "OperationProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentOperation/3/1/Constraints");
+                                    }else if (profileVersion==3){
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Operation/Constraints");
+                                    }
                                     break;
                                 case "ShortCircuitProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentShortCircuit/3/1/Constraints");
+                                    }else if (profileVersion==3){
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/ShortCircuit/Constraints");
+                                    }
                                     break;
                                 case "SteadyStateHypothesisProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/SteadyStateHypothesis/1/1/Constraints");
+                                    }
                                     break;
                                 case "TopologyProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/Topology/4/1/Constraints");
+                                    }
                                     break;
                                 case "StateVariablesProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/StateVariable-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/StateVariables-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/StateVariables/4/1/Constraints");
+                                    }
                                     break;
                                 case "DiagramLayoutProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/DiagramLayout/3/1/Constraints");
+                                    }
                                     break;
                                 case "GeographicalLocationProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/GeographicalLocation/2/1/Constraints");
+                                    }
                                     break;
                                 case "DynamicsProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/Dynamics/3/1/Constraints");
+                                    }
                                     break;
                                 case "EquipmentBoundaryProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentBoundary/3/1/Constraints");
+                                    }
                                     break;
                                 case "TopologyBoundaryProfile":
-                                    ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints");
+                                    if (profileVersion==1) {
+                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints");
+                                    }else if (profileVersion==2){
+                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/TopologyBoundary/3/1/Constraints");
+                                    }
                                     break;
                                 case "FileHeaderProfile":
                                     ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/61970-552/ModelDescription/Constraints");

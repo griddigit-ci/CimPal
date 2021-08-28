@@ -7,7 +7,7 @@
         <jdk.version>11</jdk.version>
         <log4j.version>2.12.1</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jena.version>3.17.0</jena.version>
+        <jena.version>4.1.0</jena.version>
     </properties>
 
     <groupId>eu.griddigit</groupId>
@@ -76,7 +76,7 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
-            <version>4.1.2</version>
+            <version>5.0.0</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-codec</artifactId>
@@ -87,7 +87,7 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>4.1.2</version>
+            <version>5.0.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -97,43 +97,43 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.11</version>
+            <version>3.12.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>16-ea+1</version>
+            <version>16-ea+7</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
-            <version>16-ea+5</version>
+            <version>16-ea+7</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
-            <version>16-ea+5</version>
+            <version>16-ea+7</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>16-ea+5</version>
+            <version>16-ea+7</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-web</artifactId>
-            <version>16-ea+5</version>
+            <version>16-ea+7</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-media</artifactId>
-            <version>16-ea+5</version>
+            <version>16-ea+7</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-swing</artifactId>
-            <version>16-ea+5</version>
+            <version>16-ea+7</version>
         </dependency>
         <dependency>
             <groupId>org.apache.jena</groupId>
@@ -259,17 +259,17 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.12.0-rc1</version>
+            <version>2.12.4</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.12.0-rc1</version>
+            <version>2.12.4</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.12.0-rc1</version>
+            <version>2.12.4</version>
         </dependency>
 
 
@@ -287,7 +287,7 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.10</version>
+            <version>4.5.13</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-codec</artifactId>

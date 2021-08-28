@@ -104,7 +104,7 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("uriEU", "http://iec.ch/TC57/CIM100-European#");
         MainController.prefs.put("prefixOther", "");
         MainController.prefs.put("uriOther", "");
-        MainController.prefs.put("LastWorkingFolder", "C:");
+        MainController.prefs.put("LastWorkingFolder", "/Users/<myhomedir>/"); // it was "C:" before but this was causing issue for MAC
 
     }
 

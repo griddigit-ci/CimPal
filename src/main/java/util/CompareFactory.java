@@ -36,7 +36,7 @@ public class CompareFactory {
                     if (!resItemStmt.getPredicate().equals(RDF.type)) {
                         if (!resItemStmt.getPredicate().equals(OWL2.oneOf)) {
 
-                           if (resItemStmt.getObject().isAnon()) {// if it is a blnk node
+                           if (resItemStmt.getObject().isAnon()) {// if it is a blank node
                                Map<String,String> resultBN=compareBlankNode(modelA, modelB, resItemStmt,reverse);
                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resultBN.get("modelA"), resultBN.get("modelB"));
                            }else {
@@ -319,6 +319,7 @@ public class CompareFactory {
         }else{ // more complex blank node
             // collects all statements that have the same subject; then properties and objects can be compared.
             //sparql select statements are appearing as object - string and the string can be compared.
+            int k=1;
             //modelA.listStatements(new SimpleSelector(stmt.getObject().asResource(),(Property) null,(RDFNode) null)).toList();
 
             if (reverse==0) {

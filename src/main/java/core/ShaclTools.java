@@ -567,11 +567,17 @@ public class ShaclTools {
                 //Property p1g = shapeModel.createProperty(shaclURI, "group");
                 //creates the object which is the Group
                 RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                if (localName.contains("IdentifiedObject")){
+                    o1g = shapeModel.createResource(MainController.prefs.get("IOuri","")+"DatatypesGroupIO");
+                }
                 r.addProperty(SH.group, o1g);
 
                 //adding a property for the order
                 //Property p1o = shapeModel.createProperty(shaclURI, "order");
                 RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                if (localName.contains("IdentifiedObject")){
+                    o1o = shapeModel.createTypedLiteral("0.1", "http://www.w3.org/2001/XMLSchema#decimal");
+                }
                 r.addProperty(SH.order, o1o);
 
                 //adding a message
@@ -957,11 +963,17 @@ public class ShaclTools {
             //Property p1g = shapeModel.createProperty(shaclURI, "group");
             //creates the object which is the Group
             RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+            if (localName.contains("IdentifiedObject")){
+                o1g = shapeModel.createResource(MainController.prefs.get("IOuri","")+"CardinalityIO");
+            }
             r.addProperty(SH.group, o1g);
 
             //adding a property for the order
             //Property p1o = shapeModel.createProperty(shaclURI, "order");
             RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+            if (localName.contains("IdentifiedObject")){
+                o1o = shapeModel.createTypedLiteral("0.1", "http://www.w3.org/2001/XMLSchema#decimal");
+            }
             r.addProperty(SH.order, o1o);
 
             if (multiplicity.equals("required")) {
@@ -1155,7 +1167,6 @@ public class ShaclTools {
                                 .output(out);
 
 
-                        //Update - end
                     }else{
                         model.write(out, rdfFormat.getLang().getLabel().toUpperCase(),baseURI);
                         //RDFDataMgr.write(out, model, RDFFormat.JSONLD_PRETTY);
@@ -1312,6 +1323,14 @@ public class ShaclTools {
         groupFeatures.set(3, 0);
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
+
+        //for IdentifiedObject
+        groupFeatures.set(0, "CardinalityIO");
+        groupFeatures.set(1, "This group of validation rules relate to cardinality validation of properties (attributes and associations).");
+        groupFeatures.set(2, "CardinalityIO");
+        groupFeatures.set(3, 0);
+
+        shapeModel = ShaclTools.addPropertyGroup(shapeModel, MainController.prefs.get("IOuri",""), localNameGroup, groupFeatures);
         //for Datatypes group
         localNameGroup = "DatatypesGroup";
         groupFeatures.set(0, "Datatypes");
@@ -1320,6 +1339,14 @@ public class ShaclTools {
         groupFeatures.set(3, 1);
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
+        //for IdentifiedObject
+        localNameGroup = "DatatypesGroupIO";
+        groupFeatures.set(0, "DatatypesIO");
+        groupFeatures.set(1, "This group of validation rules relate to validation of datatypes.");
+        groupFeatures.set(2, "DatatypesIO");
+        groupFeatures.set(3, 1);
+
+        shapeModel = ShaclTools.addPropertyGroup(shapeModel, MainController.prefs.get("IOuri",""), localNameGroup, groupFeatures);
 
         //for Associations group
         localNameGroup = "AssociationsGroup";

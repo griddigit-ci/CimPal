@@ -116,7 +116,7 @@ public class ComparisonRDFSprofile {
                         List<String> ClassStereotypes = new LinkedList<>();
                         String enumeration = "false";
                         String concreteClass = "false";
-                        for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
+                        for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
                             RDFNode resItemNode = j.next();
                             if (resItemNode.isResource()){
                                 if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#enumeration")) {
@@ -134,7 +134,7 @@ public class ComparisonRDFSprofile {
                         String stereotypes = String.join(",", ClassStereotypes);
                         map.putIfAbsent("stereotype",stereotypes);
                         String ClassBelongsToCategory = "";
-                        for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "belongsToCategory")); j.hasNext(); ) {
+                        for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "belongsToCategory")); j.hasNext(); ) {
                             RDFNode resItemNode = j.next();
                             ClassBelongsToCategory = resItemNode.toString().split("#Package_", 2)[1];
                         }
@@ -186,16 +186,18 @@ public class ComparisonRDFSprofile {
                 String rdfsDomain = resItem.getRequiredProperty(RDFS.domain).getObject().toString().split("#", 2)[1];
                 map.putIfAbsent("domain", rdfsDomain);
                 List<String> AttrAssocStereotypes = new LinkedList<>();
-                for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
+                for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
                     RDFNode resItemNode = j.next();
                     if (resItemNode.isLiteral()) {
                         AttrAssocStereotypes.add(resItemNode.toString());
+                    }else{ //added 21 June 2021
+                        AttrAssocStereotypes.add(resItemNode.asResource().getLocalName());
                     }
                 }
                 Collections.sort(AttrAssocStereotypes);
                 String stereotypes = String.join(",", AttrAssocStereotypes);
                 map.putIfAbsent("stereotype", stereotypes);
-                for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "multiplicity")); j.hasNext(); ) {
+                for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "multiplicity")); j.hasNext(); ) {
                     RDFNode resItemNode = j.next();
                     map.putIfAbsent("multiplicity", resItemNode.toString().split("#M:", 2)[1]);
                 }
@@ -206,24 +208,26 @@ public class ComparisonRDFSprofile {
                 }
 
                 if (attribute.equals("true")) {// it is an attribute
-                    if (resItem.hasProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))){
+                    if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))){
                         //the datatype is used for primitive, datatype and compound
-                        String dataType = resItem.getRequiredProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType")).getObject().toString().split("#", 2)[1];
+                        String dataType = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType")).getObject().toString().split("#", 2)[1];
                         map.putIfAbsent("dataType", dataType);
                     }
-                    if (resItem.hasProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))){
-                        String isFixed = resItem.getRequiredProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed")).getObject().toString();
+                    if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))){
+                        String isFixed = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed")).getObject().toString();
                         map.putIfAbsent("isFixed", isFixed);
                     }
 
                 }else { //it is an association
-                    if (resItem.hasProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))){
-                        String inverseRoleName = resItem.getRequiredProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName")).getObject().toString().split("#", 2)[1];
+                    if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))){
+                        String inverseRoleName = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName")).getObject().toString().split("#", 2)[1];
                         map.putIfAbsent("inverseRoleName", inverseRoleName);
                     }
-                    if (resItem.hasProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))){
-                        String AssociationUsed = resItem.getRequiredProperty(model.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed")).getObject().toString();
+                    if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))){
+                        String AssociationUsed = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed")).getObject().toString();
                         map.putIfAbsent("AssociationUsed", AssociationUsed);
+                    }else{
+                        map.putIfAbsent("AssociationUsed", "-"); //added 21 Jun 2021
                     }
                 }
                 result= new Pair<>(true,map);
@@ -298,7 +302,7 @@ public class ComparisonRDFSprofile {
         List<String> ClassStereotypes = new LinkedList<>();
         String enumeration = "false";
         String concreteClass = "false";
-        for (NodeIterator j = modelA.listObjectsOfProperty(resItem, modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
+        for (NodeIterator j = modelA.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
             RDFNode resItemNode = j.next();
             if (resItemNode.isResource()){
                 if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#enumeration")) {
@@ -313,7 +317,7 @@ public class ComparisonRDFSprofile {
         Collections.sort(ClassStereotypes);
         String stereotypes = String.join(",", ClassStereotypes);
         String ClassBelongsToCategory = "";
-        for (NodeIterator j = modelA.listObjectsOfProperty(resItem, modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "belongsToCategory")); j.hasNext(); ) {
+        for (NodeIterator j = modelA.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "belongsToCategory")); j.hasNext(); ) {
             RDFNode resItemNode = j.next();
             ClassBelongsToCategory = resItemNode.toString().split("#Package_", 2)[1];
         }
@@ -391,7 +395,7 @@ public class ComparisonRDFSprofile {
 
             List<String> AttrAssocStereotypes = new LinkedList<>();
             String attribute = "false";
-            for (NodeIterator j = modelA.listObjectsOfProperty(resItemAttr, modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
+            for (NodeIterator j = modelA.listObjectsOfProperty(resItemAttr, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
                 RDFNode resItemNode = j.next();
                 if (resItemNode.isResource()){
                     if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#attribute")) {
@@ -411,7 +415,7 @@ public class ComparisonRDFSprofile {
             Collections.sort(AttrAssocStereotypes);
             String stereotypes = String.join(",", AttrAssocStereotypes);
             String multiplicity="";
-            for (NodeIterator j = modelA.listObjectsOfProperty(resItemAttr, modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "multiplicity")); j.hasNext(); ) {
+            for (NodeIterator j = modelA.listObjectsOfProperty(resItemAttr, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "multiplicity")); j.hasNext(); ) {
                 RDFNode resItemNode = j.next();
                 multiplicity = resItemNode.toString().split("#M:", 2)[1];
             }
@@ -421,23 +425,24 @@ public class ComparisonRDFSprofile {
                 rdfsRange = resItemAttr.getRequiredProperty(RDFS.range).getObject().toString().split("#", 2)[1];
             }
             String dataType="";
-            if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))){
-                dataType = resItemAttr.getRequiredProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType")).getObject().toString().split("#", 2)[1];
+            if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))){
+                dataType = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType")).getObject().toString().split("#", 2)[1];
             }
             String isFixed="";
-            if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))){
-                isFixed = resItemAttr.getRequiredProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed")).getObject().toString();
+            if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))){
+                isFixed = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed")).getObject().toString();
             }
             //special for association
             String inverseRoleName="";
-            if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))){
-                inverseRoleName = resItemAttr.getRequiredProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName")).getObject().asResource().getLocalName();
+            if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))){
+                inverseRoleName = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName")).getObject().asResource().getLocalName();
             }
             //special for association
             String AssociationUsed="";
-            if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))){
-                AssociationUsed = resItemAttr.getRequiredProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed")).getObject().toString();
+            if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
+                AssociationUsed = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed")).getObject().toString();
             }
+
 
             Pair<Boolean,Map> result = new Pair<>(false, null);
             if (doCompare==1) {
@@ -469,10 +474,10 @@ public class ComparisonRDFSprofile {
                         compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:stereotype", stereotypes, propertiesMap.get("stereotype").toString());
                     }
                     if (attribute.equals("true")) { //it is an attribute
-                        if (!dataType.equals(propertiesMap.get("dataType")) && resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))) {
+                        if (!dataType.equals(propertiesMap.get("dataType")) && resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:dataType", dataType, propertiesMap.get("dataType").toString());
                         }
-                        if (!isFixed.equals(propertiesMap.get("isFixed")) && resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
+                        if (!isFixed.equals(propertiesMap.get("isFixed")) && resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
                             String isFixednull="";
                             if (propertiesMap.get("isFixed")==null) {
                                 isFixednull = "-";
@@ -482,10 +487,10 @@ public class ComparisonRDFSprofile {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:isFixed", isFixed, isFixednull);
                         }
                     } else {
-                        if (!inverseRoleName.equals(propertiesMap.get("inverseRoleName")) && resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))) {
+                        if (!inverseRoleName.equals(propertiesMap.get("inverseRoleName")) && resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:inverseRoleName", inverseRoleName, propertiesMap.get("inverseRoleName").toString());
                         }
-                        if (!AssociationUsed.equals(propertiesMap.get("AssociationUsed")) && resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
+                        if (!AssociationUsed.equals(propertiesMap.get("AssociationUsed")) && resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:AssociationUsed", AssociationUsed, propertiesMap.get("AssociationUsed").toString());
                         }
                     }
@@ -507,17 +512,17 @@ public class ComparisonRDFSprofile {
                         compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:stereotype", stereotypes, "-");
                     }
                     if (attribute.equals("true")) { //it is an attribute
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:dataType", dataType, "-");
                         }
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:isFixed", isFixed, "-");
                         }
                     } else {
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:inverseRoleName", inverseRoleName, "-");
                         }
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:AssociationUsed", AssociationUsed, "-");
                         }
                     }
@@ -536,17 +541,17 @@ public class ComparisonRDFSprofile {
                         compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:stereotype", "-", stereotypes);
                     }
                     if (attribute.equals("true")) { //it is an attribute
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:dataType", "-", dataType);
                         }
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:isFixed", "-", isFixed);
                         }
                     } else {
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:inverseRoleName", "-", inverseRoleName);
                         }
-                        if (resItemAttr.hasProperty(modelA.getProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
+                        if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:AssociationUsed", "-", AssociationUsed);
                         }
                     }
