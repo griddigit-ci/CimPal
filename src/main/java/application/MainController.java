@@ -208,6 +208,8 @@ public class MainController implements Initializable {
     private CheckBox fcbRDFcompareProfileNS;
     @FXML
     private  TextField fPrefixRDFCompare;
+    @FXML
+    private CheckBox cbRDFSSHACLoptionDescr;
 
 
 
@@ -247,6 +249,7 @@ public class MainController implements Initializable {
     public static Integer associationValueTypeOption;
 
     public static TextArea foutputWindowVar;
+    public static boolean excludeMRID;
 
 
     public MainController() {
@@ -1129,6 +1132,7 @@ public class MainController implements Initializable {
             cbApplyDefBaseURIDesignTab.setDisable(false);
             btnApply.setDisable(false);
             cbRDFSSHACLoption1.setDisable(false);
+            cbRDFSSHACLoptionDescr.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -1851,6 +1855,11 @@ public class MainController implements Initializable {
     @FXML
     //action for button Create in the tab RDFS to SHACL
     private void actionBtnConstructShacl(ActionEvent actionEvent) throws IOException {
+
+        excludeMRID=false;
+        if (cbRDFSSHACLoptionDescr.isSelected()){
+            excludeMRID=true;
+        }
 
         String cbvalue;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem()==null) {

@@ -42,8 +42,19 @@ public class ShaclTools {
         ArrayList<Object> shapeData = new ArrayList<Object>();
         for (ResIterator i = model.listResourcesWithProperty(model.getProperty(rdfNs, "stereotype")); i.hasNext(); ) {
             Resource resItem = i.next();
+            boolean descriptionStereotype=false;
+            //check if there is Description stereotype
+            for (NodeIterator k = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "stereotype")); k.hasNext(); ) {
+                RDFNode resItemNodeDescr = k.next();
+                if (resItemNodeDescr.toString().equals("Description")){
+                    descriptionStereotype=true; // the description stereotype
+                    break;
+                }
+            }
+
             for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "stereotype")); j.hasNext(); ) {
                 RDFNode resItemNode = j.next();
+
                 if (resItemNode.toString().equals(concreteNs)) {// the resource is concrete - it is a concrete class
                     int root = 0;
                     Resource classItem = resItem;
@@ -53,6 +64,12 @@ public class ShaclTools {
                     classMyData.add(resItem.getNameSpace()); // the namespace of the resource of the class
                     classMyData.add(resItem.getLocalName()); // the local name i.e. identifiedObject
                     classMyData.add(resItem.getRequiredProperty(RDFS.label).getObject().toString()); // the label
+                    if (descriptionStereotype){
+                        classMyData.add("Yes"); // there is description stereotype
+                    }else{
+                        classMyData.add("No");
+                    }
+
 
                     classData.add(classMyData); // adds the 0 element for the class where
                     /*
@@ -60,6 +77,7 @@ public class ShaclTools {
                      * 1 is the namespace of the resource of the class
                      * 2 is the local name i.e. identifiedObject
                      * 3 is the label - RDFS label
+                     * 4 has "DescriptionStereotype" is the class is stereotyped description
                      */
                     while (root == 0) {
                         classData = ShaclTools.getLocalAttributesAssociations(classItem, model, classData, rdfNs);
@@ -1363,6 +1381,11 @@ public class ShaclTools {
             String classFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(0).toString();
             //add NodeShape for the CIM class
             shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
+            //check if the class is stereotyped Description
+            boolean classDescripStereo=false;
+            if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(4).toString().equals("Yes")){
+                classDescripStereo=true;
+            }
 
 
             for (int atas = 1; atas < ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).size(); atas++) {
@@ -1434,17 +1457,30 @@ public class ShaclTools {
                     }
 
                 } else if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
+
                     Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
                     String localNameAttr = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(4).toString();
                     String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(1).toString();
 
-                    shapeModel= addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource,localNameAttr,propertyFullURI);
+                    if (MainController.excludeMRID) { // user selects that mRID should be skipped for description classes
+                        if (classDescripStereo) { //the class is stereotyped description
+                            if (!localNameAttr.equals("IdentifiedObject.mRID")){ //the attribute is not mRID
+                                shapeModel = addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource, localNameAttr, propertyFullURI);
+                            }
+                        }else{
+                            shapeModel = addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource, localNameAttr, propertyFullURI);
+                        }
+                    }else{
+                        shapeModel = addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource, localNameAttr, propertyFullURI);
+                    }
+
                     //check if the attribute is datatype, if yes the whole structure of the compound should be checked and property nodes should be created
                     // for each attribute of the compound
                     if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(8).toString().equals("Compound")) {
                         ArrayList shapeDataCompound = ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10));
-                        shapeModel= addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompound, nsURIprofile, nodeShapeResource, localNameAttr,propertyFullURI);
+                        shapeModel = addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompound, nsURIprofile, nodeShapeResource, localNameAttr, propertyFullURI);
                     }
+
                 }
             }
         }

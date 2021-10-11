@@ -190,6 +190,14 @@
                                                                   <CheckBox fx:id="cbRDFSSHACLoption1" disable="true" mnemonicParsing="false" text="Use sh:in for association value type constraint instead of sh:class and sh:or" />
                                                                </children>
                                                             </HBox>
+                                                            <HBox spacing="10.0">
+                                                               <padding>
+                                                                  <Insets left="5.0" right="5.0" top="5.0" />
+                                                               </padding>
+                                                               <children>
+                                                                  <CheckBox fx:id="cbRDFSSHACLoptionDescr" disable="true" mnemonicParsing="false" selected="true" text="Exclude IdentifiedObject.mRID for classes stereotypes with Description" />
+                                                               </children>
+                                                            </HBox>
                                                             <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                                                <children>
                                                                   <Button fx:id="btnConstructShacl" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnConstructShacl" text="Create" HBox.hgrow="ALWAYS" />
