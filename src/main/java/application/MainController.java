@@ -1094,6 +1094,48 @@ public class MainController implements Initializable {
         }
     }
 
+    @FXML
+    // action on menu Convert Reference Data
+    private void actionMenuConvertRefData(ActionEvent actionEvent) throws IOException {
+            //select file 1
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        List<File> fileL=null;
+        fileL = filechooser.showOpenMultipleDialog(null);
+
+        if (fileL != null) {// the file is selected
+
+            MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
+            fPathIDfile1.setText(fileL.toString());
+            MainController.IDModel1=fileL;
+        } else{
+            fPathIDfile1.clear();
+        }
+
+
+        List<File> fileL1=null;
+        FileChooser filechooser1 = new FileChooser();
+
+        filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Map file", "*.properties"));
+        filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        fileL1 = filechooser1.showOpenMultipleDialog(null);
+
+        if (fileL1 != null) {// the file is selected
+
+            MainController.prefs.put("LastWorkingFolder", fileL1.get(0).getParent());
+            fPathIDmap.setText(fileL1.toString());
+            MainController.IDmapList = fileL1;
+
+        }
+
+
+        RdfConvert.refDataConvert();
+        progressBar.setProgress(1);
+
+    }
+
+
 
     //the action for button Open RDFS for profile
     //It opens RDF files for the profiles saved locally
