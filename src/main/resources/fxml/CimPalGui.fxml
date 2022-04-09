@@ -34,7 +34,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/18" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
   <children>
     <MenuBar VBox.vgrow="NEVER">
       <menus>
@@ -51,6 +51,7 @@
                   <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportDescriptionMenu" text="Export RDFS descriptions" />
                   <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
                   <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
+                  <MenuItem mnemonicParsing="false" onAction="#actionRDFSinstanceDataTemplateMenu" text="Instance data Excel template based on RDFS" />
                </items>
             </Menu>
         <Menu mnemonicParsing="false" text="Help">

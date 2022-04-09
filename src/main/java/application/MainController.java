@@ -438,6 +438,36 @@ public class MainController implements Initializable {
 
     }
 
+
+    @FXML
+    //action menu item Tools -> Instance data Excel template based on RDFS
+    private void actionRDFSinstanceDataTemplateMenu(ActionEvent actionEvent) throws FileNotFoundException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        //open RDFS file
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        File file = filechooser.showOpenDialog(null);
+
+        Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+        if (file != null) {// the file is selected
+
+            MainController.prefs.put("LastWorkingFolder", file.getParent());
+            try {
+                RDFDataMgr.read(model, new FileInputStream(file), Lang.RDFXML);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                progressBar.setProgress(0);
+            }
+            shaclNodataMap  = 1; // as no mapping is to be used for this task
+            ExportInstanceDataTemplate.rdfsContent(model);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+
+    }
+
     @FXML
     //Action for button "Clear" related to the output window
     private void actionBtnClear(ActionEvent actionEvent) {
