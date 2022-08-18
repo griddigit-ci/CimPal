@@ -447,7 +447,15 @@ public class MainController implements Initializable {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
         filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        File file = filechooser.showOpenDialog(null);
+        File file;
+
+        try {
+            file = filechooser.showOpenDialog(null);
+        } catch (Exception k){
+            filechooser.setInitialDirectory(new File("C:\\\\"));
+            file = filechooser.showOpenDialog(null);
+        }
+
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file != null) {// the file is selected

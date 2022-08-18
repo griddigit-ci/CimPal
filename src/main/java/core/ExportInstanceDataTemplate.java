@@ -140,23 +140,26 @@ public class ExportInstanceDataTemplate {
                     rdfsClassName.add(classLocalName);
                     rdfsClass.add(classFullURI);
                     rdfsAttrAssoc.add(propertyFullURI);
-                    rdfsAttrOrAssocFlag.add("Attribute");
+
                     rdfsItemMultiplicity.add(cardinality);
                     //add datatypes checks depending on it is Primitive, Datatype or Enumeration
                     switch (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(8).toString()) {
                         case "Primitive": {
                             String datatypePrimitive = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
                             rdfsItemAttrDatatype.add(datatypePrimitive);
+                            rdfsAttrOrAssocFlag.add("Attribute");
                             break;
                         }
                         case "CIMDatatype": {
                             String datatypePrimitive = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
                             rdfsItemAttrDatatype.add(datatypePrimitive);
+                            rdfsAttrOrAssocFlag.add("Attribute");
                             break;
                         }
                         case "Compound": {
                             String datatypeCompound = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
                             rdfsItemAttrDatatype.add(datatypeCompound);
+                            rdfsAttrOrAssocFlag.add("Compound");
                             break;
                         }
                         case "Enumeration":
@@ -165,6 +168,7 @@ public class ExportInstanceDataTemplate {
                             //this adds the structure which is a list of possible enumerated values
                             //propertyNodeFeatures.set(7, ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10));
                             rdfsItemAttrDatatype.add(((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10).toString());
+                            rdfsAttrOrAssocFlag.add("Enumeration");
                             break;
                     }
 
