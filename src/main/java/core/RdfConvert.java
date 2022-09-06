@@ -36,7 +36,7 @@ public class RdfConvert {
     //RDF conversion
     public static void rdfConversion(File file, List files, String sourceFormat, String targetFormat, String xmlBase,RDFFormat rdfFormat,
                                      String showXmlDeclaration, String showDoctypeDeclaration, String tab,String relativeURIs, Boolean modelUnionFlag,
-                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete) throws IOException {
+                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl) throws IOException {
 
         Lang rdfSourceFormat;
         switch (sourceFormat) {
@@ -69,6 +69,39 @@ public class RdfConvert {
             model = modelInheritance(model,inheritanceList,inheritanceListConcrete);
         }
 
+        List<Statement> stmttoadd = new LinkedList<>();
+        String rdfNs = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
+        if (addowl==true){
+            for (ResIterator i = model.listSubjectsWithProperty(RDF.type); i.hasNext(); ) {
+                Resource resItem = i.next();
+                //String className = resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName();
+
+                RDFNode obje=resItem.getRequiredProperty(RDF.type).getObject();
+                if (obje.equals(RDFS.Class)){
+                    stmttoadd.add(ResourceFactory.createStatement(resItem,RDF.type,OWL2.Class));
+                }else if (obje.equals(RDF.Property)) {
+                    stmttoadd.add(ResourceFactory.createStatement(resItem,RDF.type,OWL2.ObjectProperty));
+                }
+
+                for (NodeIterator k = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "stereotype")); k.hasNext(); ) {
+                    RDFNode resItemNodeDescr = k.next();
+                    if (resItemNodeDescr.toString().equals("enum")){
+                        stmttoadd.add(ResourceFactory.createStatement(resItem,RDF.type,OWL2.NamedIndividual));
+                        break;
+                    }
+                    if (resItemNodeDescr.toString().equals("CIMDatatype")){
+                        stmttoadd.add(ResourceFactory.createStatement(resItem,RDF.type,OWL2.DatatypeProperty));
+                        break;
+                    }
+                    if (resItemNodeDescr.toString().equals("Primitive")){
+                        stmttoadd.add(ResourceFactory.createStatement(resItem,RDF.type,OWL2.DatatypeProperty));
+                        break;
+                    }
+                }
+            }
+        }
+
+        model.add(stmttoadd);
 
         String filename="";
         if (modelUnionFlag==false && file!=null) {

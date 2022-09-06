@@ -210,6 +210,8 @@ public class MainController implements Initializable {
     private  TextField fPrefixRDFCompare;
     @FXML
     private CheckBox cbRDFSSHACLoptionDescr;
+    @FXML
+    private CheckBox fcbRDFConveraddowl;
 
 
 
@@ -1322,9 +1324,14 @@ public class MainController implements Initializable {
             inheritanceListConcrete=true;
         }
 
+        Boolean addowl=false;
+        if (fcbRDFConveraddowl.isSelected()) {
+            addowl=true;
+        }
+
         RdfConvert.rdfConversion(MainController.rdfConvertFile,MainController.rdfConvertFileList,sourceFormat,
                 targetFormat,xmlBase,rdfFormat,showXmlDeclaration,showDoctypeDeclaration,tab,
-                relativeURIs,modelUnionFlag,inheritanceOnly,inheritanceList,inheritanceListConcrete);
+                relativeURIs,modelUnionFlag,inheritanceOnly,inheritanceList,inheritanceListConcrete,addowl);
 
         progressBar.setProgress(1);
     }

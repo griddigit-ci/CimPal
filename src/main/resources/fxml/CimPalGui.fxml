@@ -377,6 +377,7 @@
                                                                   <CheckBox fx:id="fcbRDFConvertInheritanceOnly" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceOnly" prefWidth="300.0" text="Process only inheritance related properties" />
                                                                   <CheckBox fx:id="fcbRDFConverInheritanceList" disable="true" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceList" prefWidth="300.0" text="Generate inheritance list in Turtle" />
                                                                   <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" prefWidth="300.0" text="Inherited members - only concrete classes" />
+                                                                  <CheckBox fx:id="fcbRDFConveraddowl" mnemonicParsing="false" prefHeight="17.0" prefWidth="201.0" text="Add OWL" />
                                                                </children>
                                                             </HBox>
                                                             <HBox spacing="10.0">
