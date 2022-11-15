@@ -1232,9 +1232,19 @@ public class MainController implements Initializable {
         File file=null;
         List<File> fileL=null;
         if (fcbRDFconvertModelUnion.isSelected()) {
-            fileL = filechooser.showOpenMultipleDialog(null);
+            try {
+                fileL = filechooser.showOpenMultipleDialog(null);
+            }catch (Exception e){
+                filechooser.setInitialDirectory(new File("C:/"));
+                fileL = filechooser.showOpenMultipleDialog(null);
+            }
         }else{
-            file = filechooser.showOpenDialog(null);
+            try {
+                file = filechooser.showOpenDialog(null);
+            }catch (Exception e) {
+                filechooser.setInitialDirectory(new File("C:/"));
+                file = filechooser.showOpenDialog(null);
+            }
         }
 
         if (file != null || fileL!=null) {// the file is selected

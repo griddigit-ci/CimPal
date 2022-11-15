@@ -35,7 +35,7 @@ public class ComparisonRDFSprofile {
         for (ResIterator i = modelA.listSubjects(); i.hasNext(); ) {
             Resource resItem = i.next();
 
-            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
+            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of the rdf:type
             String rdfType;
             if (rdfTypeInit.length == 0) {
                 rdfType = rdfTypeInit[0];
@@ -63,7 +63,7 @@ public class ComparisonRDFSprofile {
         for (ResIterator i = model.listSubjects(); i.hasNext(); ) {
             Resource resItem = i.next();
 
-            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
+            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of the rdf:type
             String rdfType;
             if (rdfTypeInit.length == 0) {
                 rdfType = rdfTypeInit[0];

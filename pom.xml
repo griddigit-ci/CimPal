@@ -7,7 +7,7 @@
         <jdk.version>11</jdk.version>
         <log4j.version>2.12.1</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jena.version>4.2.0</jena.version>
+        <jena.version>4.6.1</jena.version>
     </properties>
 
     <groupId>eu.griddigit</groupId>
@@ -298,7 +298,7 @@
         <dependency>
             <groupId>org.topbraid</groupId>
             <artifactId>shacl</artifactId>
-            <version>1.4.0</version>
+            <version>1.4.2</version>
             <exclusions>
                 <exclusion>
                     <artifactId>jena-arq</artifactId>
