@@ -324,10 +324,10 @@ public class MainController implements Initializable {
                 "RDFS (augmented) by CimSyntaxGen",
                 "RDFS (augmented) by CimSyntaxGen with CIMTool",
                 "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen",
-                "SHACL Shapes"
+                "Universal method inlc. SHACL Shapes"
 
         );
-        fcbRDFSformat.getSelectionModel().selectFirst();
+        fcbRDFSformat.getSelectionModel().selectLast();
 
         fcbRDFSformatShapes.getItems().addAll(
                 "RDFS (augmented) by CimSyntaxGen",
@@ -553,9 +553,9 @@ public class MainController implements Initializable {
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf", "*.legacy-rdfs-augmented"));
             filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
-        }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
+        }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")){
             FileChooser filechooser = new FileChooser();
-            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shapes", "*.rdf", "*.ttl"));
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Universal method inlc. SHACL Shapes", "*.rdf", "*.ttl"));
             filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }
@@ -589,9 +589,9 @@ public class MainController implements Initializable {
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf", "*.legacy-rdfs-augmented"));
             filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
-        }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("SHACL Shapes")){
+        }else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")){
             FileChooser filechooser = new FileChooser();
-            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL Shapes", "*.rdf", "*.ttl"));
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Universal method inlc. SHACL Shapes", "*.rdf", "*.ttl"));
             filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
             file = filechooser.showOpenDialog(null);
         }
@@ -917,7 +917,7 @@ public class MainController implements Initializable {
                 rdfSourceFormat2=Lang.RDFXML;
                 break;
 
-            case "SHACL Shapes":
+            case "Universal method inlc. SHACL Shapes":
                 if (MainController.rdfModel1.getName().endsWith(".ttl")) {
                     rdfSourceFormat1 = Lang.TURTLE;
                 }else if (MainController.rdfModel1.getName().endsWith(".rdf")){
@@ -1014,7 +1014,7 @@ public class MainController implements Initializable {
             case "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen":
                 compareResults = ComparissonRDFS501Ed2.compareRDFS501Ed2(model1, model2);
                 break;
-            case "SHACL Shapes":
+            case "Universal method inlc. SHACL Shapes":
                 compareResults = ComparisonSHACLshapes.compareSHACLshapes(model1, model2);
                 break;
         }
@@ -1477,7 +1477,7 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         if(!fcbRDFSformat.getSelectionModel().isSelected(-1)) {
             if (fcbRDFSformat.getSelectionModel().getSelectedItem().toString().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen") ||
-                    fcbRDFSformat.getSelectionModel().getSelectedItem().toString().equals("SHACL Shapes")) {
+                    fcbRDFSformat.getSelectionModel().getSelectedItem().toString().equals("Universal method inlc. SHACL Shapes")) {
                 fcbRDFcompareCimVersion.setDisable(false);
                 fcbRDFcompareProfileNS.setDisable(false);
                 fPrefixRDFCompare.setDisable(false);

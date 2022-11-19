@@ -104,22 +104,26 @@ public class CompareFactory {
                     }
                 } else {
                     if (reverse==0) {
-                        //TODO check this
+                        //TODO check this; added for the property instead of class
                         if (resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Property") || resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Class")) {
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "new class " , "N/A");
+                                    "New class: " , "N/A");
                         }else {
+                            //compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
+                            //        "new class " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A");
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "new class " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A");
+                                    "New property: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getLocalName() + " in class: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A");
                         }
                     }else{
-//TODO check this
+//TODO check this; added for the property instead of class
                         if (resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Property") || resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Class")) {
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "N/A","new class " );
+                                    "N/A","New class: " );
                         }else {
+                            //compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
+                            //        "N/A","new class " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName());
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "N/A","new class " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName());
+                                    "N/A","New property: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getLocalName() + " in class: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName());
                         }
                     }
                 }

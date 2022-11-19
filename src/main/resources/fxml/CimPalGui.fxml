@@ -258,13 +258,13 @@
                                                          <children>
                                                             <Label minWidth="140.0" text="RDF scope and format:" wrapText="true" />
                                                             <ChoiceBox fx:id="fcbRDFSformat" minWidth="400.0" />
-                                                            <CheckBox fx:id="fcbRDFcompareCimVersion" disable="true" mnemonicParsing="false" text="Assume same CIM namespace">
+                                                            <CheckBox fx:id="fcbRDFcompareCimVersion" mnemonicParsing="false" text="Assume same CIM namespace">
                                                                <HBox.margin>
                                                                   <Insets left="30.0" />
                                                                </HBox.margin>
                                                             </CheckBox>
-                                                            <CheckBox fx:id="fcbRDFcompareProfileNS" disable="true" mnemonicParsing="false" text="Assume same Profile/Ontology namespace for prefix: " />
-                                                            <TextField fx:id="fPrefixRDFCompare" disable="true" HBox.hgrow="ALWAYS" />
+                                                            <CheckBox fx:id="fcbRDFcompareProfileNS" mnemonicParsing="false" text="Assume same Profile/Ontology namespace for prefix: " />
+                                                            <TextField fx:id="fPrefixRDFCompare" HBox.hgrow="ALWAYS" />
                                                          </children>
                                                       </HBox>
                                                       <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
