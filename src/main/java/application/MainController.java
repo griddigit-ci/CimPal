@@ -478,6 +478,17 @@ public class MainController implements Initializable {
 
     }
 
+
+    @FXML
+    //action menu item Tools -> Split boundary per TSO border
+    private void actionSplitBoundaryPerBorderMenu(ActionEvent actionEvent) throws IOException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        ModelManipulationFactory.SplitBoundaryPerBorder();
+        progressBar.setProgress(1);
+
+    }
+
     @FXML
     //Action for button "Clear" related to the output window
     private void actionBtnClear(ActionEvent actionEvent) {

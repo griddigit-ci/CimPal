@@ -43,8 +43,16 @@ public class CompareFactory {
                                if (!modelB.contains(resItemStmt)) {// does not contain the statement, i.e. the attribute/association; then the value needs to be compared as maybe it is either missing or just the value is different
 
                                    if (modelB.contains(resItemStmt.getSubject(), resItemStmt.getPredicate())) {// the class has same attribute in modelB, but the object is different as does not contain the complete statement
-                                       compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                       if (resItemStmt.getPredicate().getLocalName().equals("comment")){
+                                           //if (resItemStmt.getPredicate().getLocalName().equals("UnitMultiplier.n")){
 
+                                           //}
+                                           if (!modelB.listStatements(new SimpleSelector(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null)).nextStatement().getObject().asLiteral().getString().equals(modelA.listStatements(new SimpleSelector(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null)).nextStatement().getObject().asLiteral().getString())){
+                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                           }
+                                       }else {
+                                           compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                       }
                                    } else {//the class in model B does not contain that attribute => this attribute/association is a difference
 
                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), "N/A");
