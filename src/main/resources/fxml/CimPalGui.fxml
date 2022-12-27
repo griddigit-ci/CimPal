@@ -52,7 +52,9 @@
                   <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
                   <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
                   <MenuItem mnemonicParsing="false" onAction="#actionRDFSinstanceDataTemplateMenu" text="Instance data Excel template based on RDFS" />
-                  <MenuItem mnemonicParsing="false" onAction="#actionSplitBoundaryPerBorderMenu" text="Split boundary set per TSO  border" />
+                  <MenuItem mnemonicParsing="false" onAction="#actionConvertBoundaryMenu" text="Convert CGMES v2.4 Boundary Set to CGMES v3.0" />
+                  <MenuItem mnemonicParsing="false" onAction="#actionSplitBoundaryAnfRefDataMenu" text="Split Boundary and Reference data (CGMES v3.0)" />
+                  <MenuItem mnemonicParsing="false" onAction="#actionSplitBoundaryPerBorderMenu" text="Split boundary set per TSO  border (CGMES v3.0)" />
                </items>
             </Menu>
         <Menu mnemonicParsing="false" text="Help">

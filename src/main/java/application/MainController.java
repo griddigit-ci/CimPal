@@ -490,6 +490,26 @@ public class MainController implements Initializable {
     }
 
     @FXML
+    //action menu item Tools -> Split Boundary and Reference data (CGMES v3.0)
+    private void actionSplitBoundaryAnfRefDataMenu(ActionEvent actionEvent) throws IOException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        ModelManipulationFactory.SplitBoundaryAnfRefData();
+        progressBar.setProgress(1);
+
+    }
+
+    @FXML
+    //action menu item Tools -> Convert CGMES v2.4 Boundary Set to CGMES v3.0
+    private void actionConvertBoundaryMenu(ActionEvent actionEvent) throws IOException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        ModelManipulationFactory.ConvertBoundarySetCGMESv2v3();
+        progressBar.setProgress(1);
+
+    }
+
+    @FXML
     //Action for button "Clear" related to the output window
     private void actionBtnClear(ActionEvent actionEvent) {
         if (tabPaneDown.getSelectionModel().getSelectedItem().getText().equals("Output window")) { //clears Output window
@@ -773,7 +793,7 @@ public class MainController implements Initializable {
                 }
             }
         }
-        // if model 1 is more that 1 zip or xml - merge
+        // if model 1 is more than 1 zip or xml - merge
 
         Model model1single = null;
         Model model2single = null;
@@ -802,7 +822,7 @@ public class MainController implements Initializable {
         model1.setNsPrefixes(prefixMap);
 
 
-        // if model 2 is more that 1 zip or xml - merge
+        // if model 2 is more than 1 zip or xml - merge
         Model model2 = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
         prefixMap = model2.getNsPrefixMap();
 
@@ -828,7 +848,7 @@ public class MainController implements Initializable {
         }
         model2.setNsPrefixes(prefixMap);
 
-        //proceed with the comparisson
+        //proceed with the comparison
 
         rdfsCompareFiles = new LinkedList<>();
         if (MainController.IDModel1.size()==1) {
