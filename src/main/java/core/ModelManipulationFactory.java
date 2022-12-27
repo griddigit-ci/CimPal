@@ -20,9 +20,6 @@ import java.util.*;
 
 public class ModelManipulationFactory {
 
-    private static Map<String,Model> baseInstanceModelMapOriginal;
-
-
     //action menu item Tools -> Split boundary per TSO border
     public static void SplitBoundaryPerBorder() throws IOException {
 
@@ -135,7 +132,7 @@ public class ModelManipulationFactory {
                 //add the header statements
                 Resource headerRes=ResourceFactory.createResource("urn:uuid:"+UUID.randomUUID());
                 newBoderModel.add(ResourceFactory.createStatement(headerRes,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")));
-                for (StmtIterator n = instanceModelBD.listStatements(new SimpleSelector(instanceModelBD.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).nextResource(),(Property) null,(RDFNode) null)); n.hasNext();) {
+                for (StmtIterator n = instanceModelBD.listStatements(new SimpleSelector(instanceModelBD.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).nextResource(), null,(RDFNode) null)); n.hasNext();) {
                 Statement stmt = n.next();
                 newBoderModel.add(ResourceFactory.createStatement(headerRes,stmt.getPredicate(),stmt.getObject()));
                 }
@@ -264,7 +261,7 @@ public class ModelManipulationFactory {
                 //add the header statements
                 Resource headerRes=ResourceFactory.createResource("urn:uuid:"+UUID.randomUUID());
                 newBoderModel.add(ResourceFactory.createStatement(headerRes,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")));
-                for (StmtIterator n = instanceModelBD.listStatements(new SimpleSelector(instanceModelBD.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).nextResource(),(Property) null,(RDFNode) null)); n.hasNext();) {
+                for (StmtIterator n = instanceModelBD.listStatements(new SimpleSelector(instanceModelBD.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).nextResource(), null,(RDFNode) null)); n.hasNext();) {
                     Statement stmt = n.next();
                     newBoderModel.add(ResourceFactory.createStatement(headerRes,stmt.getPredicate(),stmt.getObject()));
                 }
@@ -325,7 +322,7 @@ public class ModelManipulationFactory {
 
         Map<String,ArrayList<Object>> profileDataMap=new HashMap<>();
         Map<String,Model> profileDataMapAsModel=new HashMap<>();
-        Map<String,Model> conversionInstruction=new HashMap<>();
+        //Map<String,Model> conversionInstruction=new HashMap<>();
 
         // load all profile models
         Map<String,Model> profileModelMap = null;
@@ -488,9 +485,9 @@ public class ModelManipulationFactory {
                     }
                 }
             }else {
-                Resource newSub=null;
-                Property newPre=null;
-                RDFNode newObj=null;
+                Resource newSub;
+                Property newPre;
+                RDFNode newObj;
                 Resource newBPres=null;
 
                 if (stmt.getObject().asResource().getLocalName().equals("ConnectivityNode")) {
@@ -648,7 +645,7 @@ public class ModelManipulationFactory {
 
         //filter extensions
         List<Statement> StmtDeleteList = new LinkedList<>();
-        int deleteClass=0;
+        int deleteClass;
         if (keepExtensions==0){
             for (StmtIterator i = newBoderModel.listStatements(new SimpleSelector(null, RDF.type, (RDFNode) null)); i.hasNext(); ) { // loop on all classes
                 Statement stmt = i.next();
@@ -685,7 +682,7 @@ public class ModelManipulationFactory {
 
 
     //add BP
-    private static Model addBP(Model modelSource, Model newModel, Resource resItem) throws IOException {
+    private static Model addBP(Model modelSource, Model newModel, Resource resItem) {
         for (StmtIterator bp = modelSource.listStatements(new SimpleSelector(resItem, null,(RDFNode) null)); bp.hasNext();) {
             Statement stmt = bp.next();
             newModel.add(stmt);
@@ -711,25 +708,19 @@ public class ModelManipulationFactory {
     //Replace namespace
     private static Property rebaseProperty(Property prop, String newBase)  {
 
-        Property newProp=ResourceFactory.createProperty(newBase+prop.getLocalName());
-
-        return newProp;
+        return ResourceFactory.createProperty(newBase+prop.getLocalName());
     }
 
     //Replace namespace
     private static RDFNode rebaseRDFNode(RDFNode prop, String newBase)  {
 
-        RDFNode newProp=ResourceFactory.createProperty(newBase+prop.asResource().getLocalName());
-
-        return newProp;
+        return ResourceFactory.createProperty(newBase+prop.asResource().getLocalName());
     }
 
     //Replace namespace
     private static Resource rebaseResource(Resource res, String newBase)  {
 
-        Resource newRes=ResourceFactory.createResource(newBase+res.getLocalName());
-
-        return newRes;
+        return ResourceFactory.createResource(newBase+res.getLocalName());
     }
 
     //Save data

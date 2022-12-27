@@ -448,7 +448,7 @@ public class ComparisonRDFSprofileCIMTool {
                 inverseRoleName = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName")).getObject().asResource().getLocalName();
             }
             //special for association
-            String AssociationUsed="";
+            String AssociationUsed;
             if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
                 AssociationUsed = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed")).getObject().toString();
             }else {
@@ -495,7 +495,7 @@ public class ComparisonRDFSprofileCIMTool {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:dataType", dataType, propertiesMap.get("dataType").toString());
                         }
                         if (!isFixed.equals(propertiesMap.get("isFixed")) && resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
-                            String isFixednull="";
+                            String isFixednull;
                             if (propertiesMap.get("isFixed")==null) {
                                 isFixednull = "-";
                             }else{

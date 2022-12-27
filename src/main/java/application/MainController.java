@@ -5,7 +5,6 @@
  */
 package application;
 
-import com.fasterxml.jackson.databind.annotation.JsonAppend;
 import core.*;
 import gui.ComboBoxCell;
 import gui.GUIhelper;
@@ -15,7 +14,6 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
-import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -38,9 +36,11 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
-import org.apache.jena.util.ResourceUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
-import org.apache.jena.vocabulary.*;
+import org.apache.jena.vocabulary.OWL;
+import org.apache.jena.vocabulary.RDF;
+import org.apache.jena.vocabulary.RDFS;
+import org.apache.jena.vocabulary.XSD;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
@@ -49,6 +49,7 @@ import util.ExcelTools;
 
 import java.io.*;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
@@ -414,7 +415,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Export RDFS description
-    private void actionRDFSexportDescriptionMenu(ActionEvent actionEvent) throws FileNotFoundException {
+    private void actionRDFSexportDescriptionMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         FileChooser filechooser = new FileChooser();
@@ -443,7 +444,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Instance data Excel template based on RDFS
-    private void actionRDFSinstanceDataTemplateMenu(ActionEvent actionEvent) throws FileNotFoundException {
+    private void actionRDFSinstanceDataTemplateMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         FileChooser filechooser = new FileChooser();
@@ -481,7 +482,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Split boundary per TSO border
-    private void actionSplitBoundaryPerBorderMenu(ActionEvent actionEvent) throws IOException {
+    private void actionSplitBoundaryPerBorderMenu() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         ModelManipulationFactory.SplitBoundaryPerBorder();
@@ -491,7 +492,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Split Boundary and Reference data (CGMES v3.0)
-    private void actionSplitBoundaryAnfRefDataMenu(ActionEvent actionEvent) throws IOException {
+    private void actionSplitBoundaryAnfRefDataMenu() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         ModelManipulationFactory.SplitBoundaryAnfRefData();
@@ -501,7 +502,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Convert CGMES v2.4 Boundary Set to CGMES v3.0
-    private void actionConvertBoundaryMenu(ActionEvent actionEvent) throws IOException {
+    private void actionConvertBoundaryMenu() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         ModelManipulationFactory.ConvertBoundarySetCGMESv2v3();
@@ -511,7 +512,7 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for button "Clear" related to the output window
-    private void actionBtnClear(ActionEvent actionEvent) {
+    private void actionBtnClear() {
         if (tabPaneDown.getSelectionModel().getSelectedItem().getText().equals("Output window")) { //clears Output window
             foutputWindow.clear();
         }
@@ -519,13 +520,13 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for menu item "Quit"
-    private void menuQuit(ActionEvent actionEvent) {
+    private void menuQuit() {
         Platform.exit(); // Exit the application
     }
 
     @FXML
     //Action for button "Reset" related to the RDFS Comparison
-    private void actionBtnResetRDFComp(ActionEvent actionEvent) {
+    private void actionBtnResetRDFComp() {
         fPathRdffile1.clear();
         fPathRdffile2.clear();
         btnRunRDFcompare.setDisable(true);
@@ -535,7 +536,7 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for button "Reset" related to the Instance data Comparison
-    private void actionBtnResetIDComp(ActionEvent actionEvent) {
+    private void actionBtnResetIDComp() {
         fPathIDfile1.clear();
         fPathIDfile2.clear();
         fPathIDmap.clear();
@@ -557,7 +558,7 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for button "Reset" related to the Excel to Shacl
-    private void actionBtnResetExcelShape(ActionEvent actionEvent) {
+    private void actionBtnResetExcelShape() {
         fPathRdffileForExcel.clear();
         fPathXLSfileForShape.clear();
         fcbRDFSformatForExcel.getSelectionModel().selectFirst();
@@ -573,7 +574,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Browse for RDFS comparison - file 1
-    private void actionBrowseRDFfile1(ActionEvent actionEvent) {
+    private void actionBrowseRDFfile1() {
         progressBar.setProgress(0);
         File file=null;
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
@@ -609,7 +610,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Browse for RDFS comparison - file 2
-    private void actionBrowseRDFfile2(ActionEvent actionEvent) {
+    private void actionBrowseRDFfile2() {
         progressBar.setProgress(0);
         File file=null;
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
@@ -645,14 +646,14 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Browse for Instance data comparison - file 1
-    private void actionBrowseIDfile1(ActionEvent actionEvent) {
+    private void actionBrowseIDfile1() {
         progressBar.setProgress(0);
 
         //select file 1
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
         filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        List<File> fileL=null;
+        List<File> fileL;
         fileL = filechooser.showOpenMultipleDialog(null);
 
         if (fileL != null) {// the file is selected
@@ -667,13 +668,13 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Browse for Instance data comparison - file 2
-    private void actionBrowseIDfile2(ActionEvent actionEvent) {
+    private void actionBrowseIDfile2() {
         progressBar.setProgress(0);
         //select file 1
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
         filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        List<File> fileL=null;
+        List<File> fileL;
         fileL = filechooser.showOpenMultipleDialog(null);
 
         if (fileL != null) {// the file is selected
@@ -688,10 +689,10 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Browse for Instance data comparison - mapping
-    private void actionBrowseIDmap(ActionEvent actionEvent) {
+    private void actionBrowseIDmap() {
         progressBar.setProgress(0);
         MainController.IDmapSelect=0;
-        List<File> fileL=null;
+        List<File> fileL;
         FileChooser filechooser = new FileChooser();
 
         if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Generate from RDFS")) {
@@ -725,7 +726,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button RDF file Browse for Excel to SHACL
-    private void actionBrowseRDFfileForExcel(ActionEvent actionEvent) {
+    private void actionBrowseRDFfileForExcel() {
         progressBar.setProgress(0);
         //select file
         FileChooser filechooser = new FileChooser();
@@ -746,7 +747,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button XLS file Browse for Excel to SHACL
-    private void actionBrowseExcelfileForShape(ActionEvent actionEvent) {
+    private void actionBrowseExcelfileForShape() {
         progressBar.setProgress(0);
         //select file
         FileChooser filechooser = new FileChooser();
@@ -767,7 +768,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Run in instance data comparison
-    private void actionBtnRunIDcompare(ActionEvent actionEvent) throws IOException {
+    private void actionBtnRunIDcompare() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         String xmlBase = fPathIDmapXmlBase.getText();
@@ -862,7 +863,7 @@ public class MainController implements Initializable {
             rdfsCompareFiles.add("Model 2");
         }
 
-        LinkedList<Integer> options = new LinkedList<Integer>();
+        LinkedList<Integer> options = new LinkedList<>();
         options.add(0); //1 is ignore sv classes
         options.add(0);
         options.add(0);
@@ -935,7 +936,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Run in RDF comparison
-    private void actionBtnRunRDFcompare(ActionEvent actionEvent) throws FileNotFoundException {
+    private void actionBtnRunRDFcompare() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         Lang rdfSourceFormat1=Lang.RDFXML;
@@ -1087,7 +1088,7 @@ public class MainController implements Initializable {
 
     @FXML
     //This is the menu item "Create datatypes map" - loads RDFfile(s) and creates the map
-    private void actionMenuDatatypeMap(ActionEvent actionEvent) throws IOException {
+    private void actionMenuDatatypeMap() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         Map dataTypeMap = DataTypeMaping.mapDatatypesFromRDF();
@@ -1126,7 +1127,7 @@ public class MainController implements Initializable {
 
     @FXML
     // action on menu Preferences
-    private void actionMenuPreferences(ActionEvent actionEvent) {
+    private void actionMenuPreferences() {
         try {
             Stage guiPrefStage = new Stage();
             //Scene for the menu Preferences
@@ -1147,7 +1148,7 @@ public class MainController implements Initializable {
 
     @FXML
     // action on menu About
-    private void actionMenuAbout(ActionEvent actionEvent) {
+    private void actionMenuAbout() {
         try {
             Stage guiAboutStage = new Stage();
             //Scene for the menu Preferences
@@ -1167,12 +1168,12 @@ public class MainController implements Initializable {
 
     @FXML
     // action on menu Convert Reference Data
-    private void actionMenuConvertRefData(ActionEvent actionEvent) throws IOException {
+    private void actionMenuConvertRefData() throws IOException {
             //select file 1
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Instance files", "*.xml","*.zip"));
         filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        List<File> fileL=null;
+        List<File> fileL;
         fileL = filechooser.showOpenMultipleDialog(null);
 
         if (fileL != null) {// the file is selected
@@ -1185,7 +1186,7 @@ public class MainController implements Initializable {
         }
 
 
-        List<File> fileL1=null;
+        List<File> fileL1;
         FileChooser filechooser1 = new FileChooser();
 
         filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Map file", "*.properties"));
@@ -1211,7 +1212,7 @@ public class MainController implements Initializable {
     //the action for button Open RDFS for profile
     //It opens RDF files for the profiles saved locally
     @FXML
-    private void actionOpenRDFS(ActionEvent actionEvent) {
+    private void actionOpenRDFS() {
         FileChooser filechooser = new FileChooser();
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen")) {
             filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDFS (augmented) by CimSyntaxGen files", "*.rdf"));
@@ -1254,7 +1255,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Browse for RDFS convert
-    private void actionBrowseRDFConvert(ActionEvent actionEvent) {
+    private void actionBrowseRDFConvert() {
         progressBar.setProgress(0);
         //select file
         FileChooser filechooser = new FileChooser();
@@ -1296,7 +1297,7 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for button "Convert" related to the RDF Convert
-    private void actionBtnRunRDFConvert(ActionEvent actionEvent) throws IOException {
+    private void actionBtnRunRDFConvert() throws IOException {
 
         progressBar.setProgress(0);
         //format from
@@ -1346,29 +1347,14 @@ public class MainController implements Initializable {
             relativeURIs=fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
         }
 
-        Boolean modelUnionFlag=false;
-        if (fcbRDFconvertModelUnion.isSelected()) {
-            modelUnionFlag=true;
-        }
+        boolean modelUnionFlag= fcbRDFconvertModelUnion.isSelected();
 
-        Boolean inheritanceOnly=false;
-        if (fcbRDFConvertInheritanceOnly.isSelected()) {
-            inheritanceOnly=true;
-        }
-        Boolean inheritanceList=false;
-        if (fcbRDFConverInheritanceList.isSelected()) {
-            inheritanceList=true;
-        }
+        boolean inheritanceOnly= fcbRDFConvertInheritanceOnly.isSelected();
+        boolean inheritanceList= fcbRDFConverInheritanceList.isSelected();
 
-        Boolean inheritanceListConcrete=false;
-        if (fcbRDFConverInheritanceListConcrete.isSelected()) {
-            inheritanceListConcrete=true;
-        }
+        boolean inheritanceListConcrete= fcbRDFConverInheritanceListConcrete.isSelected();
 
-        Boolean addowl=false;
-        if (fcbRDFConveraddowl.isSelected()) {
-            addowl=true;
-        }
+        boolean addowl= fcbRDFConveraddowl.isSelected();
 
         RdfConvert.rdfConversion(MainController.rdfConvertFile,MainController.rdfConvertFileList,sourceFormat,
                 targetFormat,xmlBase,rdfFormat,showXmlDeclaration,showDoctypeDeclaration,tab,
@@ -1379,7 +1365,7 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for button "Reset" related to RDF Convert
-    private void actionBrtResetRDFConvert(ActionEvent actionEvent) {
+    private void actionBrtResetRDFConvert() {
 
         progressBar.setProgress(0);
         fsourcePathTextField.clear();
@@ -1398,7 +1384,7 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for check box "Process only inheritance related properties" related to RDF Convert
-    private void actionRDFConvertInheritanceOnly(ActionEvent actionEvent) {
+    private void actionRDFConvertInheritanceOnly() {
         if (fcbRDFConvertInheritanceOnly.isSelected()) {
             fcbRDFConverInheritanceList.setDisable(false);
         }else{
@@ -1411,7 +1397,7 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for check box "Generate inheritance list in Turtle" related to RDF Convert
-    private void actionRDFConvertInheritanceList(ActionEvent actionEvent) {
+    private void actionRDFConvertInheritanceList() {
         if (fcbRDFConverInheritanceList.isSelected()) {
             fcbRDFConverInheritanceListConcrete.setDisable(false);
         }else{
@@ -1490,11 +1476,7 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         if(!fcbIDmap.getSelectionModel().isSelected(-1)) {
             fPathIDmap.clear();
-            if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
-                fBTbrowseIDmap.setDisable(true);
-            } else {
-                fBTbrowseIDmap.setDisable(false);
-            }
+            fBTbrowseIDmap.setDisable(fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping"));
         } else {
             fBTbrowseIDmap.setDisable(false);
             fPathIDmap.clear();
@@ -1630,7 +1612,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action on check box in constraints Create complete shapes model Tab
-    private void cbApplyDefBaseURI(ActionEvent actionEvent) {
+    private void cbApplyDefBaseURI() {
         if (cbApplyDefBaseURIDesignTab.isSelected()) {
             fshapesBaseURICreateCompleteSMTab.setText("");
             fshapesBaseURICreateCompleteSMTab.setDisable(true);
@@ -1641,7 +1623,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action on check box in constraints Create complete shapes model Tab
-    private void cbApplyDefNamespace(ActionEvent actionEvent) {
+    private void cbApplyDefNamespace() {
         if (cbApplyDefNsDesignTab.isSelected()) {
             fPrefixCreateCompleteSMTab.setText("");
             fPrefixCreateCompleteSMTab.setDisable(true);
@@ -1656,7 +1638,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action for button Apply in tab Generate Shapes
-    private void actionBtnApply(ActionEvent actionEvent) {
+    private void actionBtnApply() {
 
         if (tabCreateCompleteSM.isSelected()) {
             if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size() == 1 &&
@@ -1718,13 +1700,13 @@ public class MainController implements Initializable {
 
             if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size() == 1) {
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().get(0).getValue();
-                for (int i=0; i<this.modelsNames.size();i++) {
-                    if (selectedProfile.equals(((ArrayList) this.modelsNames.get(i)).get(0).toString())) {
+                for (Object modelsName : this.modelsNames) {
+                    if (selectedProfile.equals(((ArrayList) modelsName).get(0).toString())) {
                         if (fowlImportsCreateCompleteSMTab.getText().isEmpty()) {
-                            ((ArrayList) this.modelsNames.get(i)).set(4, "");
+                            ((ArrayList) modelsName).set(4, "");
                             break;
                         } else {
-                            ((ArrayList) this.modelsNames.get(i)).set(4, fowlImportsCreateCompleteSMTab.getText());
+                            ((ArrayList) modelsName).set(4, fowlImportsCreateCompleteSMTab.getText());
                             break;
                         }
                     }
@@ -1983,11 +1965,7 @@ public class MainController implements Initializable {
     @FXML
     //action for button Create in the tab RDFS to SHACL
     private void actionBtnConstructShacl(ActionEvent actionEvent) throws IOException {
-
-        excludeMRID=false;
-        if (cbRDFSSHACLoptionDescr.isSelected()){
-            excludeMRID=true;
-        }
+        excludeMRID= cbRDFSSHACLoptionDescr.isSelected();
 
         String cbvalue;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem()==null) {
@@ -2070,9 +2048,7 @@ public class MainController implements Initializable {
 
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-            for (int sel = 0; sel < modelNumber.size(); sel++) {
-                int m = modelNumber.get(sel);
-
+            for (int m : modelNumber) {
                 //here the preparation starts
                 dataTypeMapFromShapes = new HashMap<>();
 
@@ -2156,7 +2132,7 @@ public class MainController implements Initializable {
                     }
 
                  */
-                } else if (rdfFormatInput.equals("CIMTool-merged-owl")){
+                } else if (rdfFormatInput.equals("CIMTool-merged-owl")) {
                     String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
                     ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
@@ -2254,9 +2230,9 @@ public class MainController implements Initializable {
                 ArrayList<String> mpak1 = new ArrayList<>();
                 mpak1.add(FilenameUtils.getBaseName(((File) fileL.get(m)).getName())); // adds the name without the extension.
                 Map prefixMap = ((Model) shapeModels.get(m)).getNsPrefixMap();
-                for (Iterator map = prefixMap.values().iterator(); map.hasNext();){
-                    String value = map.next().toString();
-                    if (value.contains(defaultShapesURI) || value.toLowerCase().contains("constraints")){
+                for (Object o : prefixMap.values()) {
+                    String value = o.toString();
+                    if (value.contains(defaultShapesURI) || value.toLowerCase().contains("constraints")) {
                         mpak1.add(((Model) shapeModels.get(m)).getNsURIPrefix(value)); //reserved for the prefix of the profile/shapes
                         mpak1.add(value); // reserved for the URI of the profile/shapes
                         mpak1.add(value); // reserved for the baseURI of the shapes
@@ -2464,7 +2440,7 @@ public class MainController implements Initializable {
             for (int stmt=0; stmt < statementsList.size(); stmt++) {
                 if (stmt==0){
                     ShapeType=statementsList.get(stmt).getObject().asResource().getLocalName();
-                    String propertyValue="";
+                    String propertyValue;
                     String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
                     String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
                     propertyValue = propertyValuePrefix + ":" + propertyValueLN;
@@ -2518,21 +2494,26 @@ public class MainController implements Initializable {
                             propertyValue=statementsList.get(stmt).getObject().toString();
                             shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
                         }
-                        if (ShapeType.equals("NodeShape")) {
+                        switch (ShapeType) {
+                            case "NodeShape":
 
-                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                    propertyValue, FXCollections.<String>observableArrayList(shaclNodeShapeProperties)));
+                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                        propertyValue, FXCollections.<String>observableArrayList(shaclNodeShapeProperties)));
 
-                        } else if (ShapeType.equals("PropertyShape")) {
-                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                    propertyValue, FXCollections.<String>observableArrayList(shaclPropertyShapeProperties)));
-                        } else if (ShapeType.equals("PropertyGroup")) {
-                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                    propertyValue, FXCollections.<String>observableArrayList(shaclPropertyGroupProperties)));
-                        } else if (ShapeType.equals("SPARQLConstraint")) {
-                            tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                    propertyValue, FXCollections.<String>observableArrayList(shaclSPARQLConstraintProperties)));
-                            //TODO also for the rest
+                                break;
+                            case "PropertyShape":
+                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyShapeProperties)));
+                                break;
+                            case "PropertyGroup":
+                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyGroupProperties)));
+                                break;
+                            case "SPARQLConstraint":
+                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+                                        propertyValue, FXCollections.<String>observableArrayList(shaclSPARQLConstraintProperties)));
+                                //TODO also for the rest
+                                break;
                         }
                         //}
                     }
@@ -2553,7 +2534,7 @@ public class MainController implements Initializable {
                 shapeModelPart.add(shapeModelPartStmt);
 
                 shapeModelPart.write(os, "TURTLE", baseURI);
-                String stringForGui = os.toString("UTF-8");
+                String stringForGui = os.toString(StandardCharsets.UTF_8);
                 fsourceDefineTab.setText(stringForGui);
                 os.close();
             }
@@ -2590,12 +2571,8 @@ public class MainController implements Initializable {
 
     @FXML
     // //action for tab pane down - the tab pane with the source code
-    private void actionTabConstraintsSourceCode(Event event) {
-        if (tabConstraintsSourceCode.isSelected() && treeViewConstraints.getRoot()!=null) {
-            btnShowSourceCodeDefineTab.setDisable(false);
-        }else{
-            btnShowSourceCodeDefineTab.setDisable(true);
-        }
+    private void actionTabConstraintsSourceCode() {
+        btnShowSourceCodeDefineTab.setDisable(!tabConstraintsSourceCode.isSelected() || treeViewConstraints.getRoot() == null);
     }
 
 

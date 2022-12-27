@@ -189,12 +189,12 @@ public class CompareFactory {
                 compareResults = addResult(compareResults, compRes, entry.getKey(), entry.getValue().toString(), mapClassesModel2.get(entry.getKey()).toString());
             }else{
                 compareResults = addResult(compareResults, "Different - Compare class count", entry.getKey(), entry.getValue().toString(), "0");
-            };
+            }
 
         for (Map.Entry<String, Integer> entry : mapClassesModel2.entrySet())
             if (!mapClassesModel1.containsKey(entry.getKey())) {
                 compareResults = addResult(compareResults, "Different - Compare class count", entry.getKey(), "0", entry.getValue().toString());
-            };
+            }
 
 
         return compareResults;
@@ -248,9 +248,9 @@ public class CompareFactory {
             Resource subject = stmtItem.getSubject();
             Property predicate = stmtItem.getPredicate();
             RDFNode object = stmtItem.getObject();
-            Resource subjectNew = null;
-            Property predicateNew =null;
-            RDFNode objectNew = null;
+            Resource subjectNew;
+            Property predicateNew;
+            RDFNode objectNew;
 
             if (subject.isURIResource()) {
                 if (subject.getNameSpace().equals(namespaceToChange)){

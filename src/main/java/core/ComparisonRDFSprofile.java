@@ -478,7 +478,7 @@ public class ComparisonRDFSprofile {
                             compareResults = addResult(compareResults, resItemAttr.getLocalName(), "cims:dataType", dataType, propertiesMap.get("dataType").toString());
                         }
                         if (!isFixed.equals(propertiesMap.get("isFixed")) && resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))) {
-                            String isFixednull="";
+                            String isFixednull;
                             if (propertiesMap.get("isFixed")==null) {
                                 isFixednull = "-";
                             }else{
