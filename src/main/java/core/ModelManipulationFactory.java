@@ -150,7 +150,7 @@ public class ModelManipulationFactory {
     }
 
     //action menu item Tools -> Split Boundary and Reference data (CGMES v3.0)
-    public static void SplitBoundaryAnfRefData() throws IOException {
+    public static void SplitBoundaryAndRefData() throws IOException {
 
 
         Map<String, Map> loadDataMap= new HashMap<>();
@@ -235,44 +235,101 @@ public class ModelManipulationFactory {
 
         }
 
+        List<String> keepInBD= new LinkedList<>();
+        keepInBD.add("ConnectivityNode");
+        keepInBD.add("BoundaryPoint");
+        keepInBD.add("Line");
+        keepInBD.add("Substation");
+        keepInBD.add("VoltageLevel");
+        keepInBD.add("Bay");
+        keepInBD.add("Terminal");
+        keepInBD.add("Junction");
+        keepInBD.add("FullModel");
+
         Map<String,Model> newBDModelMap=new HashMap<>();
 
+        //create the new model for BP
+        Model newBoderModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        newBoderModel.setNsPrefix("cim","http://iec.ch/TC57/CIM100#");
+        newBoderModel.setNsPrefix("eu","http://iec.ch/TC57/CIM100-European#");
+        newBoderModel.setNsPrefix("md","http://iec.ch/TC57/61970-552/ModelDescription/1#");
+        newBoderModel.setNsPrefix("rdf","http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+
+        //create the new model for ref data
+        Model newRefModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        newRefModel.setNsPrefix("cim","http://iec.ch/TC57/CIM100#");
+        newRefModel.setNsPrefix("eu","http://iec.ch/TC57/CIM100-European#");
+        newRefModel.setNsPrefix("md","http://iec.ch/TC57/61970-552/ModelDescription/1#");
+        newRefModel.setNsPrefix("rdf","http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+
         assert instanceModelBD != null;
-        for (ResIterator i = instanceModelBD.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/CIM100-European#BoundaryPoint")); i.hasNext(); ) {
-            Resource resItem = i.next();
-            String fromTSOname = instanceModelBD.getRequiredProperty(resItem,ResourceFactory.createProperty("http://iec.ch/TC57/CIM100-European#BoundaryPoint.fromEndNameTso")).getObject().toString();
-            String toTSOname = instanceModelBD.getRequiredProperty(resItem,ResourceFactory.createProperty("http://iec.ch/TC57/CIM100-European#BoundaryPoint.toEndNameTso")).getObject().toString();
+        Map<String, String> oldPrefix = instanceModelBD.getNsPrefixMap();
+        int keepExtensions = 1; // keep extensions
+        if (oldPrefix.containsKey("cgmbp")){
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setContentText("The Boundary Set includes non CIM (cgmbp) extensions. Do you want to keep them in the split Boundary Set?");
+            alert.setHeaderText(null);
+            alert.setTitle("Question - cgmbp extensions are present");
+            ButtonType btnYes = new ButtonType("Yes");
+            ButtonType btnNo = new ButtonType("No", ButtonBar.ButtonData.CANCEL_CLOSE);
+            alert.getButtonTypes().setAll(btnYes, btnNo);
+            Optional<ButtonType> result = alert.showAndWait();
 
-            if (newBDModelMap.containsKey("Border-"+fromTSOname+"-"+toTSOname+".xml")){
-                Model borderModel = newBDModelMap.get("Border-"+fromTSOname+"-"+toTSOname+".xml");
-                //add the BoundaryPoint
-                borderModel=addBP(instanceModelBD,borderModel,resItem);
-                newBDModelMap.put("Border-"+fromTSOname+"-"+toTSOname+".xml",borderModel);
-
-            }else if (newBDModelMap.containsKey("Border-"+toTSOname+"-"+fromTSOname+".xml")){
-                Model borderModel = newBDModelMap.get("Border-"+toTSOname+"-"+fromTSOname+".xml");
-                //add the BoundaryPoint
-                borderModel=addBP(instanceModelBD,borderModel,resItem);
-                newBDModelMap.put("Border-"+toTSOname+"-"+fromTSOname+".xml",borderModel);
-
+            if (result.get() == btnNo) {
+                keepExtensions=0;
             }else{
-                Model newBoderModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-                newBoderModel.setNsPrefixes(instanceModelBD.getNsPrefixMap());
-                //add the header statements
-                Resource headerRes=ResourceFactory.createResource("urn:uuid:"+UUID.randomUUID());
-                newBoderModel.add(ResourceFactory.createStatement(headerRes,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")));
-                for (StmtIterator n = instanceModelBD.listStatements(new SimpleSelector(instanceModelBD.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).nextResource(), null,(RDFNode) null)); n.hasNext();) {
-                    Statement stmt = n.next();
-                    newBoderModel.add(ResourceFactory.createStatement(headerRes,stmt.getPredicate(),stmt.getObject()));
+                if (oldPrefix.containsKey("cgmbp")){
+                    newBoderModel.setNsPrefix("cgmbp","http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
+                    newRefModel.setNsPrefix("cgmbp","http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
                 }
-                //add the BoundaryPoint
-                newBoderModel=addBP(instanceModelBD,newBoderModel,resItem);
-                //add the model to the map
-                newBDModelMap.put("Border-"+fromTSOname+"-"+toTSOname+".xml",newBoderModel);
             }
         }
 
 
+        for (StmtIterator i = instanceModelBD.listStatements(null,RDF.type,(RDFNode) null); i.hasNext(); ) {
+            Statement stmt = i.next();
+            if (keepExtensions==1) {
+                if (keepInBD.contains(stmt.getObject().asResource().getLocalName())) {
+                    for (StmtIterator k = instanceModelBD.listStatements(stmt.getSubject(), null, (RDFNode) null); k.hasNext(); ) {
+                        Statement stmtKeep = k.next();
+                        newBoderModel.add(stmtKeep);
+                        if (stmt.getObject().asResource().getLocalName().equals("FullModel")){
+                            newRefModel.add(stmtKeep);
+                        }
+                    }
+                } else {
+                    for (StmtIterator r = instanceModelBD.listStatements(stmt.getSubject(), null, (RDFNode) null); r.hasNext(); ) {
+                        Statement stmtRef = r.next();
+                        newRefModel.add(stmtRef);
+                    }
+                }
+            }else{
+                if (!stmt.getObject().asResource().getNameSpace().equals("http://entsoe.eu/CIM/Extensions/CGM-BP/2020#")){
+                    if (keepInBD.contains(stmt.getObject().asResource().getLocalName())) {
+                        for (StmtIterator k = instanceModelBD.listStatements(stmt.getSubject(), null, (RDFNode) null); k.hasNext(); ) {
+                            Statement stmtKeep = k.next();
+                            if (!stmtKeep.getPredicate().getNameSpace().equals("http://entsoe.eu/CIM/Extensions/CGM-BP/2020#")) {
+                                newBoderModel.add(stmtKeep);
+                                if (stmt.getObject().asResource().getLocalName().equals("FullModel")){
+                                    newRefModel.add(stmtKeep);
+                                }
+                            }
+                        }
+                    } else {
+                        for (StmtIterator r = instanceModelBD.listStatements(stmt.getSubject(), null, (RDFNode) null); r.hasNext(); ) {
+                            Statement stmtRef = r.next();
+                            if (!stmtRef.getPredicate().getNameSpace().equals("http://entsoe.eu/CIM/Extensions/CGM-BP/2020#")) {
+                                newRefModel.add(stmtRef);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
+        newBDModelMap.put("BoundaryData.xml",newBoderModel);
+        newBDModelMap.put("ReferenceData.xml",newRefModel);
         //save the borders
         saveInstanceModelData(newBDModelMap, saveProperties, profileModelMap);
 

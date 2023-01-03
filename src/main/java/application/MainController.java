@@ -492,10 +492,10 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Split Boundary and Reference data (CGMES v3.0)
-    private void actionSplitBoundaryAnfRefDataMenu() throws IOException {
+    private void actionSplitBoundaryAndRefDataMenu() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-        ModelManipulationFactory.SplitBoundaryAnfRefData();
+        ModelManipulationFactory.SplitBoundaryAndRefData();
         progressBar.setProgress(1);
 
     }
