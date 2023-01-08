@@ -31,7 +31,7 @@
                      </image>
                   </ImageView>
                   <Line endX="667.0" layoutX="115.0" layoutY="203.0" startX="-100.0" strokeLineCap="ROUND" strokeWidth="2.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" />
-                  <Label contentDisplay="TOP" layoutX="69.0" layoutY="216.0" text="CimPal&#10;Version: 2023&#10;Date: 27-Dec-2022&#10;&#10;Based on &#10;- Apache Jena (Apache License v2.0), &#10;- TopBraid SHACL API (Apache License v2.0), and &#10;- JAVAFX (GPLv2+CE license)&#10;&#10;CimPal is licensed under  EUPL-1.2-or-later&#10;Copyright 2020, gridDigIt Kft. All rights reserved.&#10;&#10;gridDigIt aims at providing support and further enhancement of the CimPal. &#10;Please address any requests either via the support email or in GitHub." textAlignment="CENTER" wrapText="true">
+                  <Label contentDisplay="TOP" layoutX="69.0" layoutY="216.0" text="CimPal&#10;Version: 2023&#10;Date: 8-Jan-2023&#10;&#10;Based on &#10;- Apache Jena (Apache License v2.0), &#10;- TopBraid SHACL API (Apache License v2.0), and &#10;- JAVAFX (GPLv2+CE license)&#10;&#10;CimPal is licensed under  EUPL-1.2-or-later&#10;Copyright 2020, gridDigIt Kft. All rights reserved.&#10;&#10;gridDigIt aims at providing support and further enhancement of the CimPal. &#10;Please address any requests either via the support email or in GitHub." textAlignment="CENTER" wrapText="true">
                      <font>
                         <Font name="System Bold" size="18.0" />
                      </font>

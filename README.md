@@ -21,4 +21,4 @@ gridDigIt aims at providing support and further enhancement of the CimPal. Pleas
 Web site: https://cimpal.app/ \
 Support email: cimpal@griddigit.eu 
 
-Copyright 2020, [gridDigIt Kft](https://griddigit.eu). All rights reserved.
+Copyright 2023, [gridDigIt Kft](https://griddigit.eu). All rights reserved.

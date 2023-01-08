@@ -742,7 +742,7 @@
                      </padding>
                   </ProgressBar>
                </children></Pane>
-        <Label font="$x3" maxWidth="-1.0" text="Version: 2021-1.0.2" HBox.hgrow="NEVER" />
+        <Label font="$x3" maxWidth="-1.0" text="Version: 2023" HBox.hgrow="NEVER" />
       </children>
       <padding>
         <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
