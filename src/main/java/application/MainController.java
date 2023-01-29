@@ -213,6 +213,8 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLoptionDescr;
     @FXML
     private CheckBox fcbRDFConveraddowl;
+    @FXML
+    private CheckBox fcbRDFconvertModelUnionDetailed;
 
 
 
@@ -478,38 +480,7 @@ public class MainController implements Initializable {
         }
 
     }
-
-
-    @FXML
-    //action menu item Tools -> Split boundary per TSO border
-    private void actionSplitBoundaryPerBorderMenu() throws IOException {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-        ModelManipulationFactory.SplitBoundaryPerBorder();
-        progressBar.setProgress(1);
-
-    }
-
-    @FXML
-    //action menu item Tools -> Split Boundary and Reference data (CGMES v3.0)
-    private void actionSplitBoundaryAndRefDataMenu() throws IOException {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-        ModelManipulationFactory.SplitBoundaryAndRefData();
-        progressBar.setProgress(1);
-
-    }
-
-    @FXML
-    //action menu item Tools -> Convert CGMES v2.4 Boundary Set to CGMES v3.0
-    private void actionConvertBoundaryMenu() throws IOException {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-        ModelManipulationFactory.ConvertBoundarySetCGMESv2v3();
-        progressBar.setProgress(1);
-
-    }
-
+    
     @FXML
     //Action for button "Clear" related to the output window
     private void actionBtnClear() {
@@ -1349,6 +1320,8 @@ public class MainController implements Initializable {
 
         boolean modelUnionFlag= fcbRDFconvertModelUnion.isSelected();
 
+        boolean modelUnionFlagDetailed= fcbRDFconvertModelUnionDetailed.isSelected();
+
         boolean inheritanceOnly= fcbRDFConvertInheritanceOnly.isSelected();
         boolean inheritanceList= fcbRDFConverInheritanceList.isSelected();
 
@@ -1358,7 +1331,7 @@ public class MainController implements Initializable {
 
         RdfConvert.rdfConversion(MainController.rdfConvertFile,MainController.rdfConvertFileList,sourceFormat,
                 targetFormat,xmlBase,rdfFormat,showXmlDeclaration,showDoctypeDeclaration,tab,
-                relativeURIs,modelUnionFlag,inheritanceOnly,inheritanceList,inheritanceListConcrete,addowl);
+                relativeURIs,modelUnionFlag,inheritanceOnly,inheritanceList,inheritanceListConcrete,addowl,modelUnionFlagDetailed);
 
         progressBar.setProgress(1);
     }

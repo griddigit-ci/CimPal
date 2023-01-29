@@ -6,15 +6,7 @@
 package core;
 
 import application.MainController;
-import application.rdfDiffResultController;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ProgressIndicator;
 import javafx.stage.FileChooser;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
@@ -23,7 +15,6 @@ import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.SysRIOT;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
-import util.CompareFactory;
 
 import java.io.*;
 import java.util.*;
@@ -34,9 +25,9 @@ public class RdfConvert {
     private static Model modelInheritance;
 
     //RDF conversion
-    public static void rdfConversion(File file, List files, String sourceFormat, String targetFormat, String xmlBase,RDFFormat rdfFormat,
+    public static void rdfConversion(File file, List<File> files, String sourceFormat, String targetFormat, String xmlBase,RDFFormat rdfFormat,
                                      String showXmlDeclaration, String showDoctypeDeclaration, String tab,String relativeURIs, Boolean modelUnionFlag,
-                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl) throws IOException {
+                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl, Boolean modelUnionFlagDetailed) throws IOException {
 
         Lang rdfSourceFormat;
         switch (sourceFormat) {
@@ -54,15 +45,146 @@ public class RdfConvert {
             default:
                 throw new IllegalStateException("Unexpected value: " + sourceFormat);
         }
-        List modelFiles = new LinkedList();
-        if (modelUnionFlag==false && file!=null) {
-            modelFiles.add(file);
-        }else{
-            modelFiles=files;
+        List<File> modelFiles = new LinkedList<File>();
+        if (!modelUnionFlagDetailed) {
+            if (!modelUnionFlag && file != null) {
+                modelFiles.add(file);
+            } else {
+                modelFiles = files;
+            }
         }
 
-        // load all models
-        Model model = util.ModelFactory.modelLoad(modelFiles,xmlBase,rdfSourceFormat);
+        Model model;
+
+        if (modelUnionFlagDetailed) {
+            //put first the main RDF
+            FileChooser filechooser = new FileChooser();
+            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Main RDF file", "*.rdf","*.xml", "*.ttl"));
+            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+            File fileDet1=null;
+            try {
+                fileDet1 = filechooser.showOpenDialog(null);
+            }catch (Exception e){
+                filechooser.setInitialDirectory(new File("C:/"));
+                fileDet1 = filechooser.showOpenDialog(null);
+            }
+            modelFiles.add(fileDet1);
+
+
+            FileChooser filechooser1 = new FileChooser();
+            filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Deviation RDF file", "*.rdf","*.xml", "*.ttl"));
+            filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+            File fileDet2=null;
+            try {
+                fileDet2 = filechooser1.showOpenDialog(null);
+            }catch (Exception e){
+                filechooser1.setInitialDirectory(new File("C:/"));
+                fileDet2 = filechooser1.showOpenDialog(null);
+            }
+            modelFiles.add(fileDet2);
+
+
+            FileChooser filechooser2 = new FileChooser();
+            filechooser2.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Extended RDF file", "*.rdf","*.xml", "*.ttl"));
+            filechooser2.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+            File fileDet3=null;
+            try {
+                fileDet3 = filechooser2.showOpenDialog(null);
+            }catch (Exception e){
+                filechooser2.setInitialDirectory(new File("C:/"));
+                fileDet3 = filechooser2.showOpenDialog(null);
+            }
+            modelFiles.add(fileDet3);
+
+            model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+            Model modelOrig = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+            Map<String, String> prefixMap = model.getNsPrefixMap();
+            int count=1;
+            for (File modelFile : modelFiles) {
+                Model modelPart = ModelFactory.createDefaultModel();
+                InputStream inputStream = new FileInputStream(modelFile.toString());
+                RDFDataMgr.read(modelPart, inputStream, xmlBase, rdfSourceFormat);
+                prefixMap.putAll(modelPart.getNsPrefixMap());
+                model.add(modelPart);
+                if (count==1){
+                    modelOrig=modelPart;
+                }
+                count=count+1;
+            }
+            model.setNsPrefixes(prefixMap);
+
+            List<Statement> stmtToDeleteClass = new LinkedList<>();
+            for (StmtIterator i = model.listStatements(new SimpleSelector(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","belongsToCategory"),(RDFNode) null)); i.hasNext(); ) {
+                Statement stmt = i.next();
+                if (stmt.getObject().asResource().getLocalName().equals("Package_LTDSnotDefined")){
+                    //delete all classes
+                    List<Statement> stdelete=model.listStatements(new SimpleSelector(stmt.getSubject(), null, (RDFNode) null)).toList();
+                    stmtToDeleteClass.addAll(stdelete);
+                    //delete all attributes and associations with domain of the deleted classes
+                    for (Statement stmpProp : stdelete) {
+                        List<Statement> stdeleteProp = model.listStatements(new SimpleSelector(null, RDFS.domain, stmpProp.getSubject())).toList();
+                        stmtToDeleteClass.addAll(stdeleteProp);
+                        for (Statement stmpProp1 : stdeleteProp) {
+                            if (stmpProp1.getSubject().getLocalName().split("\\.", 2)[0].equals(stmpProp.getSubject().getLocalName())) {
+                                List<Statement> stdeleteProp1 = model.listStatements(new SimpleSelector(stmpProp1.getSubject(), null, (RDFNode) null)).toList();
+                                stmtToDeleteClass.addAll(stdeleteProp1);
+                            }
+                        }
+
+                        //delete all attributes and associations with range of the deleted classes
+
+                        List<Statement> stdeleteProp1 = model.listStatements(new SimpleSelector(null, RDFS.range, stmpProp.getSubject())).toList();
+                        stmtToDeleteClass.addAll(stdeleteProp1);
+                        for (Statement stmpProp2 : stdeleteProp1) {
+                            List<Statement> stdeleteProp2 = model.listStatements(new SimpleSelector(stmpProp2.getSubject(), null, (RDFNode) null)).toList();
+                            stmtToDeleteClass.addAll(stdeleteProp2);
+                        }
+
+                    }
+
+                }
+            }
+
+
+
+            for (StmtIterator i = model.listStatements(new SimpleSelector(null, RDFS.label,ResourceFactory.createLangLiteral("LTDSnotDefined","en"))); i.hasNext(); ) {
+                Statement stmt = i.next();
+                List<Statement> stdelete=model.listStatements(new SimpleSelector(stmt.getSubject(), null, (RDFNode) null)).toList();
+                stmtToDeleteClass.addAll(stdelete);
+            }
+
+            model.remove(stmtToDeleteClass);
+
+            List<Statement> stmtToDeleteProperty = new LinkedList<>();
+            for (StmtIterator i = model.listStatements(new SimpleSelector(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","stereotype"),(RDFNode) null)); i.hasNext(); ) {
+                Statement stmt = i.next();
+                if (stmt.getObject().toString().equals("LTDSnotDefined")){
+                    List<Statement> stdelete=model.listStatements(new SimpleSelector(stmt.getSubject(), null, (RDFNode) null)).toList();
+                    stmtToDeleteProperty.addAll(stdelete);
+                }
+            }
+
+            //delete double multiplicity
+            for (StmtIterator k = model.listStatements(new SimpleSelector(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity"),(RDFNode) null)); k.hasNext(); ) {
+                Statement stmt = k.next();
+                List<Statement> multi = model.listStatements(new SimpleSelector(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity"),(RDFNode) null)).toList();
+                if (multi.size()>1){
+                    for (Statement stmtM : multi) {
+                        if (modelOrig.contains(stmtM)) {
+                            stmtToDeleteProperty.add(stmtM);
+                        }
+                    }
+                }
+            }
+
+            model.remove(stmtToDeleteProperty);
+
+        }else{
+            // load all models
+            model = util.ModelFactory.modelLoad(modelFiles,xmlBase,rdfSourceFormat);
+        }
+
+
 
         //in case only inheritance related structure should be converted
         if(inheritanceOnly==true){
