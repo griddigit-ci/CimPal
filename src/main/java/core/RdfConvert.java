@@ -68,7 +68,9 @@ public class RdfConvert {
                 filechooser.setInitialDirectory(new File("C:/"));
                 fileDet1 = filechooser.showOpenDialog(null);
             }
-            modelFiles.add(fileDet1);
+            if (fileDet1!=null) {
+                modelFiles.add(fileDet1);
+            }
 
 
             FileChooser filechooser1 = new FileChooser();
@@ -81,7 +83,9 @@ public class RdfConvert {
                 filechooser1.setInitialDirectory(new File("C:/"));
                 fileDet2 = filechooser1.showOpenDialog(null);
             }
-            modelFiles.add(fileDet2);
+            if (fileDet2!=null) {
+                modelFiles.add(fileDet2);
+            }
 
 
             FileChooser filechooser2 = new FileChooser();
@@ -94,7 +98,9 @@ public class RdfConvert {
                 filechooser2.setInitialDirectory(new File("C:/"));
                 fileDet3 = filechooser2.showOpenDialog(null);
             }
-            modelFiles.add(fileDet3);
+            if (fileDet3!=null) {
+                modelFiles.add(fileDet3);
+            }
 
             model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
             Model modelOrig = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
@@ -315,13 +321,22 @@ public class RdfConvert {
         filechooserS.setInitialFileName(title.split(": ", 2)[1]);
         filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         filechooserS.setTitle(title);
-        saveFile = filechooserS.showSaveDialog(null);
-        OutputStream out=null;
-        if (saveFile!=null) {
-            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
-            out = new FileOutputStream(saveFile);
+        try {
+            try {
+                saveFile = filechooserS.showSaveDialog(null);
+            } catch (Exception e) {
+                filechooserS.setInitialDirectory(new File("C:\\"));
+                saveFile = filechooserS.showSaveDialog(null);
+            }
+            OutputStream out = null;
+            if (saveFile != null) {
+                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+                out = new FileOutputStream(saveFile);
+            }
+            return out;
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
         }
-        return out;
     }
 
 
