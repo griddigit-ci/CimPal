@@ -11,21 +11,18 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
+import org.apache.commons.io.FileUtils;
 
 import java.net.URL;
 import java.util.ResourceBundle;
 
 public class PreferencesController implements Initializable {
     @FXML
-    private Button btnOK;
-    @FXML
     private TextField fCIMnamespace;
     @FXML
     private TextField fcimsnamespace;
     @FXML
     private TextField frdfnamespace;
-    @FXML
-    private Button btnCancel;
     @FXML
     private TextField fIOprefix;
     @FXML
@@ -104,7 +101,7 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("uriEU", "http://iec.ch/TC57/CIM100-European#");
         MainController.prefs.put("prefixOther", "");
         MainController.prefs.put("uriOther", "");
-        MainController.prefs.put("LastWorkingFolder", "/Users/<myhomedir>/"); // it was "C:" before but this was causing issue for MAC
+        MainController.prefs.put("LastWorkingFolder", String.valueOf(FileUtils.getUserDirectory())); // it was "C:" before but this was causing issue for MAC
 
     }
 

@@ -1177,16 +1177,17 @@ public class ShaclTools {
     public static File fileSave(Model model, String extensionText, String extension, RDFFormat rdfFormat, String baseURI, int dirOnly, String title) throws IOException {
         //export to ttl
         File saveFile=null;
-        File selectedDirectory=null;
+        File selectedDirectory;
         if (dirOnly==0) {// this is the normal save when the user selects the file
-            FileChooser filechooserS = new FileChooser();
-            filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionText, extension));
-            filechooserS.setInitialFileName(title.split(": ",2)[1]);
-            filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-            filechooserS.setTitle(title);
-            saveFile = filechooserS.showSaveDialog(null);
+//            FileChooser filechooserS = new FileChooser();
+//            filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionText, extension));
+//            filechooserS.setInitialFileName(title.split(": ",2)[1]);
+//            filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//            filechooserS.setTitle(title);
+//            saveFile = filechooserS.showSaveDialog(null);
+            saveFile = util.ModelFactory.filesavecustom(extensionText, List.of(extension),title,title.split(": ",2)[1]);
             if (saveFile != null) {
-                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+                //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
                 OutputStream out = new FileOutputStream(saveFile);
                 try {
                     //model.write(out, rdfFormat.getLang().getLabel().toUpperCase(),baseURI);//String.valueOf(rdfFormat)

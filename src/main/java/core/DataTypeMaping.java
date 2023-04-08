@@ -187,15 +187,16 @@ public class DataTypeMaping {
 
     public static Map<String, RDFDatatype> mapDatatypesFromRDF (){
         //select the file
-        FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        List<File> selFile = filechooser.showOpenMultipleDialog(null);
+//        FileChooser filechooser = new FileChooser();
+//        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
+//        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//        List<File> selFile = filechooser.showOpenMultipleDialog(null);
+        List<File> selFile = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"));
 
 
         if (selFile != null) {// the file is selected
 
-            MainController.prefs.put("LastWorkingFolder", selFile.get(0).getParent());
+            //MainController.prefs.put("LastWorkingFolder", selFile.get(0).getParent());
             //System.out.println("Selected file: " + selFile);
             Model model = ModelFactory.createDefaultModel(); // model is the rdf file
             Map<String, RDFDatatype> dataTypeMap = new HashMap<>();

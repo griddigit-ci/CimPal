@@ -9,6 +9,8 @@ package util;
 
 import application.MainController;
 import javafx.scene.control.Alert;
+import javafx.stage.FileChooser;
+import org.apache.commons.io.FileUtils;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.riot.Lang;
@@ -161,6 +163,67 @@ public class ModelFactory {
         Path destPathNormalized = destPath.normalize(); //remove ../../ etc.
 
         return destPathNormalized.toString().startsWith(targetDir + File.separator);
+    }
+
+
+    //File(s) selection Filechooser
+    public static List<File> filechoosercustom(Boolean typeSingleFile, String titleExtensionFilter , List<String> extExtensionFilter) {
+
+        List<File> fileL = null;
+        File file = null;
+
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(titleExtensionFilter, extExtensionFilter));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
+
+        try {
+            if (typeSingleFile) {
+                file = filechooser.showOpenDialog(null);
+            }else{
+                fileL = filechooser.showOpenMultipleDialog(null);
+            }
+        } catch (Exception e) {
+            if (typeSingleFile) {
+                filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+                file = filechooser.showOpenDialog(null);
+            }else{
+                filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+                fileL = filechooser.showOpenMultipleDialog(null);
+            }
+        }
+
+        if (typeSingleFile) {
+            if (file != null) {// the file is selected
+                MainController.prefs.put("LastWorkingFolder", file.getParent());
+                fileL.add(file);
+            }
+        }else{
+            if (fileL != null) {// the file is selected
+                MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
+            }
+        }
+        return fileL;
+    }
+
+    //File(s) selection Filechooser
+    public static File filesavecustom(String titleExtensionFilter , List<String> extExtensionFilter, String Dialogtitle, String filename) {
+
+        File file = null;
+
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(titleExtensionFilter, extExtensionFilter));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
+        filechooser.setTitle(Dialogtitle);
+        filechooser.setInitialFileName(filename);
+
+        try {
+            file = filechooser.showSaveDialog(null);
+        } catch (Exception e) {
+            filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+            file = filechooser.showSaveDialog(null);
+        }
+
+        return file;
     }
 
 }

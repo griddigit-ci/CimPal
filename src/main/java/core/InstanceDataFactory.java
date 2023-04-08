@@ -309,16 +309,17 @@ public class InstanceDataFactory {
 
     //File save dialog
     private static OutputStream fileSaveDialog(String title, String filename, String extensionName, String extension) throws FileNotFoundException {
-        File saveFile;
-        FileChooser filechooserS = new FileChooser();
-        filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionName, extension));
-        filechooserS.setInitialFileName(filename);
-        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        filechooserS.setTitle(title);
-        saveFile = filechooserS.showSaveDialog(null);
+//        File saveFile;
+//        FileChooser filechooserS = new FileChooser();
+//        filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionName, extension));
+//        filechooserS.setInitialFileName(filename);
+//        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//        filechooserS.setTitle(title);
+//        saveFile = filechooserS.showSaveDialog(null);
+        File saveFile = util.ModelFactory.filesavecustom(extensionName, List.of(extension),title,filename);
         OutputStream out=null;
         if (saveFile!=null) {
-            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             out = new FileOutputStream(saveFile);
         }
         return out;

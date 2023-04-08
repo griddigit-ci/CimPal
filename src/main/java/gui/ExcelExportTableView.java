@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 
 public class ExcelExportTableView {
@@ -52,12 +53,13 @@ public class ExcelExportTableView {
                 }
             }
         }
-        FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
-        filechooser.setInitialFileName(initialFileName);
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        filechooser.setTitle(title);
-        File saveFile = filechooser.showSaveDialog(null);
+//        FileChooser filechooser = new FileChooser();
+//        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
+//        filechooser.setInitialFileName(initialFileName);
+//        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//        filechooser.setTitle(title);
+//        File saveFile = filechooser.showSaveDialog(null);
+        File saveFile = util.ModelFactory.filesavecustom("Excel files", List.of("*.xlsx"),title,"");
         if (saveFile != null) {
             MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             try {

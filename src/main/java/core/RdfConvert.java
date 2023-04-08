@@ -7,6 +7,7 @@ package core;
 
 import application.MainController;
 import javafx.stage.FileChooser;
+import org.apache.commons.io.FileUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
@@ -58,48 +59,51 @@ public class RdfConvert {
 
         if (modelUnionFlagDetailed) {
             //put first the main RDF
-            FileChooser filechooser = new FileChooser();
-            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Main RDF file", "*.rdf","*.xml", "*.ttl"));
-            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-            File fileDet1=null;
-            try {
-                fileDet1 = filechooser.showOpenDialog(null);
-            }catch (Exception e){
-                filechooser.setInitialDirectory(new File("C:/"));
-                fileDet1 = filechooser.showOpenDialog(null);
-            }
-            if (fileDet1!=null) {
-                modelFiles.add(fileDet1);
-            }
-
-
-            FileChooser filechooser1 = new FileChooser();
-            filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Deviation RDF file", "*.rdf","*.xml", "*.ttl"));
-            filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-            File fileDet2=null;
-            try {
-                fileDet2 = filechooser1.showOpenDialog(null);
-            }catch (Exception e){
-                filechooser1.setInitialDirectory(new File("C:/"));
-                fileDet2 = filechooser1.showOpenDialog(null);
-            }
-            if (fileDet2!=null) {
-                modelFiles.add(fileDet2);
+//            FileChooser filechooser = new FileChooser();
+//            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Main RDF file", "*.rdf","*.xml", "*.ttl"));
+//            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//            File fileDet1=null;
+            List<File> fileDet1 = util.ModelFactory.filechoosercustom(true,"Main RDF file", List.of("*.rdf","*.xml", "*.ttl"));
+//            try {
+//                fileDet1 = filechooser.showOpenDialog(null);
+//            }catch (Exception e){
+//                filechooser.setInitialDirectory(new File("C:/"));
+//                fileDet1 = filechooser.showOpenDialog(null);
+//            }
+            if (fileDet1.get(0)!=null) {
+                modelFiles.add(fileDet1.get(0));
             }
 
 
-            FileChooser filechooser2 = new FileChooser();
-            filechooser2.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Extended RDF file", "*.rdf","*.xml", "*.ttl"));
-            filechooser2.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-            File fileDet3=null;
-            try {
-                fileDet3 = filechooser2.showOpenDialog(null);
-            }catch (Exception e){
-                filechooser2.setInitialDirectory(new File("C:/"));
-                fileDet3 = filechooser2.showOpenDialog(null);
+//            FileChooser filechooser1 = new FileChooser();
+//            filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Deviation RDF file", "*.rdf","*.xml", "*.ttl"));
+//            filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//            File fileDet2=null;
+            List<File> fileDet2 = util.ModelFactory.filechoosercustom(true,"Deviation RDF file", List.of("*.rdf","*.xml", "*.ttl"));
+//            try {
+//                fileDet2 = filechooser1.showOpenDialog(null);
+//            }catch (Exception e){
+//                filechooser1.setInitialDirectory(new File("C:/"));
+//                fileDet2 = filechooser1.showOpenDialog(null);
+//            }
+            if (fileDet2.get(0)!=null) {
+                modelFiles.add(fileDet2.get(0));
             }
-            if (fileDet3!=null) {
-                modelFiles.add(fileDet3);
+
+
+//            FileChooser filechooser2 = new FileChooser();
+//            filechooser2.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Extended RDF file", "*.rdf","*.xml", "*.ttl"));
+//            filechooser2.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//            File fileDet3=null;
+            List<File> fileDet3 = util.ModelFactory.filechoosercustom(true,"Extended RDF file", List.of("*.rdf","*.xml", "*.ttl"));
+//            try {
+//                fileDet3 = filechooser2.showOpenDialog(null);
+//            }catch (Exception e){
+//                filechooser2.setInitialDirectory(new File("C:/"));
+//                fileDet3 = filechooser2.showOpenDialog(null);
+//            }
+            if (fileDet3.get(0)!=null) {
+                modelFiles.add(fileDet3.get(0));
             }
 
             model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
@@ -232,7 +236,7 @@ public class RdfConvert {
         model.add(stmttoadd);
 
         String filename="";
-        if (modelUnionFlag==false && file!=null) {
+        if (!modelUnionFlag && file!=null) {
             filename=file.getName().split("\\.",2)[0];
         }else{
             filename="MultipleModels";
@@ -263,7 +267,7 @@ public class RdfConvert {
                                 .context(cxt)
                                 .source(model)
                                 .output(outXML);
-                        if (inheritanceList==true) {
+                        if (inheritanceList) {
                             fileSaveDialogInheritance(filename+"Inheritance",xmlBase);
                         }
                     } finally {
@@ -277,7 +281,7 @@ public class RdfConvert {
                 if (outTTL!=null) {
                     try {
                         model.write(outTTL, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
-                        if (inheritanceList==true) {
+                        if (inheritanceList) {
                             fileSaveDialogInheritance(filename+"Inheritance",xmlBase);
                         }
                     } finally {
@@ -291,7 +295,7 @@ public class RdfConvert {
                 if (outJsonLD!=null) {
                     try {
                         model.write(outJsonLD, RDFFormat.JSONLD.getLang().getLabel().toUpperCase(), xmlBase);
-                        if (inheritanceList==true) {
+                        if (inheritanceList) {
                             fileSaveDialogInheritance(filename+"Inheritance",xmlBase);
                         }
                     } finally {
@@ -315,22 +319,23 @@ public class RdfConvert {
 
     //File save dialog
     private static OutputStream fileSaveDialog(String title, String extensionName, String extension) throws FileNotFoundException {
-        File saveFile;
-        FileChooser filechooserS = new FileChooser();
-        filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionName, extension));
-        filechooserS.setInitialFileName(title.split(": ", 2)[1]);
-        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-        filechooserS.setTitle(title);
+//        File saveFile;
+//        FileChooser filechooserS = new FileChooser();
+//        filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionName, extension));
+//        filechooserS.setInitialFileName(title.split(": ", 2)[1]);
+//        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+//        filechooserS.setTitle(title);
+        File saveFile = util.ModelFactory.filesavecustom(extensionName, List.of(extension), title,title.split(": ", 2)[1]);
         try {
-            try {
-                saveFile = filechooserS.showSaveDialog(null);
-            } catch (Exception e) {
-                filechooserS.setInitialDirectory(new File("C:\\"));
-                saveFile = filechooserS.showSaveDialog(null);
-            }
+//            try {
+//                saveFile = filechooserS.showSaveDialog(null);
+//            } catch (Exception e) {
+//                filechooserS.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+//                saveFile = filechooserS.showSaveDialog(null);
+//            }
             OutputStream out = null;
             if (saveFile != null) {
-                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+                //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
                 out = new FileOutputStream(saveFile);
             }
             return out;
@@ -350,7 +355,7 @@ public class RdfConvert {
 
         for (StmtIterator i = model.listStatements(); i.hasNext(); ) {
             Statement stmt = i.next();
-            if (inheritanceList==false) {
+            if (!inheritanceList) {
                 if (stmt.getPredicate().equals(RDF.type) || stmt.getPredicate().equals(RDFS.subClassOf) || stmt.getPredicate().equals(RDFS.subPropertyOf) ||
                         stmt.getPredicate().equals(RDFS.domain) || stmt.getPredicate().equals(RDFS.range)) {
                     modelProcessed.add(stmt);
@@ -380,8 +385,8 @@ public class RdfConvert {
                 Resource resSub = j.next();
                 //check if the class is concrete
 
-                if (inheritanceListConcrete==true ) {
-                    Boolean addConcrete=false;
+                if (inheritanceListConcrete) {
+                    boolean addConcrete=false;
                     if (model.listObjectsOfProperty(resSub,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype")).hasNext()) {
                         for (NodeIterator k = model.listObjectsOfProperty(resSub,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype")); k.hasNext(); ) {
                             RDFNode objC = k.next();
