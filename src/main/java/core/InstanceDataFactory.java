@@ -8,42 +8,30 @@ package core;
 import application.MainController;
 import customWriter.CustomRDFFormat;
 import javafx.scene.control.Alert;
-import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.jena.datatypes.RDFDatatype;
-import org.apache.jena.datatypes.xsd.XSDDatatype;
-import org.apache.jena.datatypes.xsd.impl.XSDBaseNumericType;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.SysRIOT;
 import org.apache.jena.sparql.util.Context;
-import org.apache.jena.vocabulary.*;
-import org.topbraid.shacl.vocabulary.SH;
+import org.apache.jena.vocabulary.DCAT;
+import org.apache.jena.vocabulary.RDF;
 
 import java.io.*;
-import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.SecureRandom;
-import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 public class InstanceDataFactory {
 
-    public static Map<Property,Map> shaclConstraints;
-
 
     //Loads one or many models
-    public static Map<String,Model> modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat) throws FileNotFoundException {
+    public static Map<String,Model> modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat, boolean isSHACL) throws FileNotFoundException {
 
         Map<String,Model> unionModelMap=new HashMap<>();
         Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
@@ -86,11 +74,15 @@ public class InstanceDataFactory {
         modelUnion.setNsPrefixes(prefixMap);
         modelUnionWithoutHeader.setNsPrefixes(prefixMap);
 
-
-        unionModelMap.put("unionModel",modelUnion);
-        unionModelMap.put("modelUnionWithoutHeader",modelUnionWithoutHeader);
-        return unionModelMap;
-
+        if (isSHACL){
+            Model shaclModel= ShapeFactory.createShapeModelWithOwlImport(modelUnion);
+            unionModelMap.put("shacl",shaclModel);
+            return unionModelMap;
+        }else {
+            unionModelMap.put("unionModel",modelUnion);
+            unionModelMap.put("modelUnionWithoutHeader",modelUnionWithoutHeader);
+            return unionModelMap;
+        }
     }
 
     //get the keyword for the profile

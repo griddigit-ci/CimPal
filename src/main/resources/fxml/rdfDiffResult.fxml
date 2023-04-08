@@ -15,67 +15,63 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.rdfDiffResultController">
-   <children>
-      <HBox spacing="10.0">
-         <children>
-            <Label text="Model A:">
-               <font>
-                  <Font name="System Bold" size="12.0" />
-               </font></Label>
-            <Label fx:id="labelModelA" minWidth="500.0">
-               <HBox.margin>
-                  <Insets />
-               </HBox.margin>
-            </Label>
-         </children>
-         <VBox.margin>
-            <Insets left="5.0" right="5.0" top="5.0" />
-         </VBox.margin>
-      </HBox>
-      <HBox spacing="10.0">
-         <children>
-            <Label text="Model B:">
-               <font>
-                  <Font name="System Bold" size="12.0" />
-               </font></Label>
-            <Label fx:id="labelModelB" minWidth="500.0" />
-         </children>
-         <VBox.margin>
-            <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-         </VBox.margin>
-      </HBox>
-      <HBox spacing="10.0">
-         <children>
-            <Label text="Result details: " />
-         </children>
-         <VBox.margin>
-            <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-         </VBox.margin>
-      </HBox>
-      <HBox VBox.vgrow="ALWAYS">
-         <VBox.margin>
-            <Insets bottom="5.0" left="5.0" right="5.0" />
-         </VBox.margin>
-         <children>
-            <TableView fx:id="tableViewResults" HBox.hgrow="ALWAYS">
-              <columns>
-                <TableColumn fx:id="cItem" prefWidth="164.80001240968704" text="Item" />
-                <TableColumn fx:id="cProperty" prefWidth="236.00003051757812" text="Property" />
-                  <TableColumn fx:id="cValueModelA" prefWidth="260.0" text="Value Model A" />
-                  <TableColumn fx:id="cValueModelB" prefWidth="258.39996337890625" text="Value Model B" />
-              </columns>
-            </TableView>
-         </children>
-      </HBox>
-      <ButtonBar>
-        <buttons>
-          <Button fx:id="btnExportResult" mnemonicParsing="false" onAction="#actionBtnExportResult" text="Export result" />
-            <Button fx:id="btnCancel" cancelButton="true" mnemonicParsing="false" onAction="#actionBtnCancel" text="Cancel" />
-        </buttons>
-         <VBox.margin>
-            <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-         </VBox.margin>
-      </ButtonBar>
-   </children>
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0"
+      prefWidth="1200.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="application.rdfDiffResultController">
+   <HBox spacing="10.0">
+      <VBox.margin>
+         <Insets left="5.0" right="5.0" top="5.0"/>
+      </VBox.margin>
+      <Label text="Model A:">
+         <font>
+            <Font name="System Bold" size="12.0"/>
+         </font>
+      </Label>
+      <Label fx:id="labelModelA" minWidth="500.0">
+         <HBox.margin>
+            <Insets/>
+         </HBox.margin>
+      </Label>
+   </HBox>
+   <HBox spacing="10.0">
+      <VBox.margin>
+         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+      </VBox.margin>
+      <Label text="Model B:">
+         <font>
+            <Font name="System Bold" size="12.0"/>
+         </font>
+      </Label>
+      <Label fx:id="labelModelB" minWidth="500.0"/>
+   </HBox>
+   <HBox spacing="10.0">
+      <VBox.margin>
+         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+      </VBox.margin>
+      <Label text="Result details: "/>
+   </HBox>
+   <HBox VBox.vgrow="ALWAYS">
+      <VBox.margin>
+         <Insets bottom="5.0" left="5.0" right="5.0"/>
+      </VBox.margin>
+      <TableView fx:id="tableViewResults" HBox.hgrow="ALWAYS">
+         <columns>
+            <TableColumn fx:id="cItem" prefWidth="164.80001240968704" text="Item"/>
+            <TableColumn fx:id="cProperty" prefWidth="236.00003051757812" text="Property"/>
+            <TableColumn fx:id="cValueModelA" prefWidth="260.0" text="Value Model A"/>
+            <TableColumn fx:id="cValueModelB" prefWidth="258.39996337890625" text="Value Model B"/>
+         </columns>
+      </TableView>
+   </HBox>
+   <ButtonBar>
+      <buttons>
+         <Button fx:id="btnExportResult" mnemonicParsing="false" onAction="#actionBtnExportResult"
+                 text="Export result"/>
+         <Button fx:id="btnCancel" cancelButton="true" mnemonicParsing="false" onAction="#actionBtnCancel"
+                 text="Cancel"/>
+      </buttons>
+      <VBox.margin>
+         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+      </VBox.margin>
+   </ButtonBar>
 </VBox>

@@ -1,6 +1,7 @@
+
 /*
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2022, gridDigIt Kft. All rights reserved.
+ * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
 package customWriter;

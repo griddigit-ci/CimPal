@@ -22,13 +22,13 @@ import java.util.LinkedList;
 
 public class ExcelTools {
 
-    public static ArrayList<Object> importXLSX(String fileName) {
+    public static ArrayList<Object> importXLSX(String fileName, int sheetnum) {
         ArrayList<Object> dataExcel = new ArrayList();
         try {
             File excel = new File(fileName);
             FileInputStream fis = new FileInputStream(excel);
             XSSFWorkbook book = new XSSFWorkbook(fis);
-            XSSFSheet sheet = book.getSheetAt(0);
+            XSSFSheet sheet = book.getSheetAt(sheetnum);
             Iterator<Row> iterator = sheet.iterator();
             // Iterating over Excel file in Java
 

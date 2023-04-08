@@ -1,6 +1,7 @@
+
 /*
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2022, gridDigIt Kft. All rights reserved.
+ * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
 package customWriter;
@@ -128,8 +129,6 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
     Boolean showXmlEncoding = null;
 
     String instanceData = null;
-
-    String showXmlBaseDeclaration = null;
 
     protected Boolean showDoctypeDeclaration = Boolean.FALSE;
 
@@ -659,10 +658,6 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
             //return setinstanceData(propValue);
             String result = instanceData;
             instanceData = (String) propValue;
-            return result;
-        } else if (propName.equalsIgnoreCase("showXmlBaseDeclaration")) {
-            String result = showXmlBaseDeclaration;
-            showXmlBaseDeclaration = (String) propValue;
             return result;
         } else if(propName.equalsIgnoreCase("aboutRules")) {
             return setAboutRules((Set<Resource>) propValue);

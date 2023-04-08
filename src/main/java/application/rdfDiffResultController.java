@@ -11,10 +11,7 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Label;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -27,6 +24,8 @@ import java.util.ResourceBundle;
 import static gui.ExcelExportTableView.export;
 
 public class rdfDiffResultController implements Initializable {
+    public Button btnCancel;
+    public Button btnExportResult;
     @FXML
     private TableView tableViewResults;
     @FXML

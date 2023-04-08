@@ -6,6 +6,7 @@
 package application;
 
 import core.*;
+import customWriter.CustomRDFFormat;
 import gui.ComboBoxCell;
 import gui.GUIhelper;
 import gui.TableColumnsSetup;
@@ -24,6 +25,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
@@ -59,6 +61,16 @@ import static core.ExportRDFSdescriptions.rdfsDescriptions;
 
 public class MainController implements Initializable {
 
+    public TabPane tabPaneConstraintsDetails;
+    public Tab tabCreateCompleteSM1;
+    public Tab tabCreateCompleteSM11;
+    public Button btnRunExcelShape;
+    public Button btnResetExcelShape;
+    public Tab tabCreateCompleteSM2;
+    public Button fbtnRunRDFConvert;
+    public Tab tabOutputWindow;
+    public Button btnResetIDComp;
+    public Font x3;
     @FXML
     private TextArea foutputWindow;
     @FXML
@@ -67,8 +79,6 @@ public class MainController implements Initializable {
     private TextField fPathRdffile1;
     @FXML
     private TextField fPathRdffile2;
-    @FXML
-    private Button btnResetRDFComp;
     @FXML
     private Button btnRunRDFcompare;
     @FXML
@@ -114,8 +124,6 @@ public class MainController implements Initializable {
     @FXML
     private TextField fNSexcelShape;
     @FXML
-    private Button btnRunExcelShape;
-    @FXML
     private TextField fPathXLSfileForShape;
     @FXML
     private TextField fsourcePathTextField;
@@ -123,8 +131,6 @@ public class MainController implements Initializable {
     private ChoiceBox fsourceFormatChoiceBox;
     @FXML
     private ChoiceBox ftargetFormatChoiceBox;
-    @FXML
-    private Button fbtnRunRDFConvert;
     @FXML
     private TextField frdfConvertXmlBase;
     @FXML
@@ -169,8 +175,6 @@ public class MainController implements Initializable {
     private TextArea fsourceDefineTab;
     @FXML
     private ChoiceBox fcbIDformat;
-    @FXML
-    private Button btnResetIDComp;
     @FXML
     private Button btnRunIDcompare;
     @FXML
@@ -255,6 +259,8 @@ public class MainController implements Initializable {
 
     public static TextArea foutputWindowVar;
     public static boolean excludeMRID;
+    public static List<File> inputXLS;
+    public static List<File> rdfProfileFileList;
 
 
     public MainController() {
@@ -1055,7 +1061,124 @@ public class MainController implements Initializable {
 
     }
 
+    @FXML
+    // action on menu Generation of instance data based on xls template
+    private void actionMenuInstanceDataGenxls() throws IOException {
 
+        System.out.print("Conversion in progress.\n");
+        progressBar.setProgress(0);
+        shaclNodataMap  = 1; // as this mapping should not be used for this task
+        //select file
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Input template instance data XLS", "*.xlsx"));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        List<File>  fileLxml;
+        fileLxml = filechooser.showOpenMultipleDialog(null);
+
+
+        if (fileLxml != null ) {// the file is selected
+            MainController.prefs.put("LastWorkingFolder", fileLxml.get(0).getParent());
+            MainController.inputXLS = fileLxml;
+
+            //select file
+            FileChooser filechooser1 = new FileChooser();
+            filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF profile file", "*.rdf", "*.ttl"));
+            filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+            List<File> fileL;
+            fileL = filechooser1.showOpenMultipleDialog(null);
+
+
+            if (fileL!=null) {// the file is selected
+                MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
+                MainController.rdfProfileFileList = fileL;
+
+                //String xmlBase = "http://entsoe.eu/ns/nc";
+                //String xmlBase = "http://iec.ch/TC57/CIM100";
+                String xmlBase = "";
+
+                //set properties for the export
+                String formatGeneratedModel = "61970-552 CIM XML (.xml)"; //fcbGenDataFormat.getSelectionModel().getSelectedItem().toString();
+                Map<String, Object> saveProperties = new HashMap<>();
+                if (formatGeneratedModel.equals("61970-552 CIM XML (.xml)")) {
+                    saveProperties.put("filename", "test");
+                    saveProperties.put("showXmlDeclaration", "true");
+                    saveProperties.put("showDoctypeDeclaration", "false");
+                    saveProperties.put("tab", "2");
+                    saveProperties.put("relativeURIs", "same-document");
+                    saveProperties.put("showXmlEncoding", "true");
+                    saveProperties.put("xmlBase", xmlBase);
+                    saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
+                    saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
+                    saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
+                    saveProperties.put("useFileDialog", true);
+                    saveProperties.put("fileFolder", "C:");
+                    saveProperties.put("dozip", false);
+                    saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+                    saveProperties.put("showXmlBaseDeclaration", "false");
+
+                    saveProperties.put("putHeaderOnTop", true);
+                    saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+                    saveProperties.put("extensionName", "RDF XML");
+                    saveProperties.put("fileExtension", "*.xml");
+                    saveProperties.put("fileDialogTitle", "Save RDF XML for");
+                    //RDFFormat rdfFormat=RDFFormat.RDFXML;
+                    //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
+                    //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
+                    //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
+                    //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
+
+                } else if (formatGeneratedModel.equals("Custom RDF XML Plain (.xml)")) {
+                    saveProperties.put("filename", "test");
+                    saveProperties.put("showXmlDeclaration", "true");
+                    saveProperties.put("showDoctypeDeclaration", "false");
+                    saveProperties.put("tab", "2");
+                    saveProperties.put("relativeURIs", "same-document");
+                    saveProperties.put("showXmlEncoding", "true");
+                    saveProperties.put("xmlBase", xmlBase);
+                    saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
+                    saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
+                    saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
+                    saveProperties.put("useFileDialog", true);
+                    saveProperties.put("fileFolder", "C:");
+                    saveProperties.put("dozip", false);
+                    saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+                    saveProperties.put("showXmlBaseDeclaration", "false");
+
+                    saveProperties.put("putHeaderOnTop", true);
+                    saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+                    saveProperties.put("extensionName", "RDF XML");
+                    saveProperties.put("fileExtension", "*.xml");
+                    saveProperties.put("fileDialogTitle", "Save RDF XML for");
+                }
+
+
+
+                boolean profileModelUnionFlag = false;
+                boolean instanceModelUnionFlag = false;
+                boolean shaclModelUnionFlag = false;
+                String eqbdID = null;
+                String tpbdID = null;
+                boolean persistentEQflag = false;
+
+
+                Map<String, Boolean> inputData = new HashMap<>();
+                inputData.put("rdfs", true);
+                inputData.put("baseModel", false);
+                inputData.put("shacl", false);
+
+                progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+                ModelManipulationFactory.generateDataFromXls(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag,eqbdID,tpbdID,saveProperties,persistentEQflag);
+
+                progressBar.setProgress(1);
+                System.out.print("Conversion finished.\n");
+            }else{
+                System.out.print("Conversion terminated.\n");
+            }
+        }else{
+            System.out.print("Conversion terminated.\n");
+        }
+    }
 
     @FXML
     //This is the menu item "Create datatypes map" - loads RDFfile(s) and creates the map
@@ -2604,7 +2727,7 @@ public class MainController implements Initializable {
 
         //if (file != null) {// the file is selected
 
-            dataExcel = ExcelTools.importXLSX(String.valueOf(MainController.xlsFileExcelShacl));
+        dataExcel = ExcelTools.importXLSX(String.valueOf(MainController.xlsFileExcelShacl),0);
             //System.out.println(dataExcel);
        // }
         //TODO: this can be made with many additional options e.g. what to be added and in which model to be added. Now it is primitive to solve a simple task

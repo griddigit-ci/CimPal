@@ -1,6 +1,6 @@
 /*
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
 package core;
@@ -21,6 +21,7 @@ import org.apache.jena.vocabulary.RDFS;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
+import org.apache.jena.datatypes.RDFDatatype;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -30,11 +31,20 @@ import java.util.*;
 
 import static application.MainController.associationValueTypeOption;
 
-
 public class ShaclTools {
+
+    private static Map<String, RDFDatatype> dataTypeMapFromProfile;
+    public static Model profileDataMapAsModelTemp;
+    public static Resource mainClassTemp;
+
 
     //constructs the shape data necessary to create the set of shapes for the basic profile validations
     public static ArrayList<Object> constructShapeData(Model model, String rdfNs, String concreteNs) {
+
+        dataTypeMapFromProfile = new HashMap<>();
+        profileDataMapAsModelTemp = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+
+
         // structure for the list rdfToShacl
         // level 0: the profile, element 0 data for the profile
         // level 1..*: the class and then all attributes and associations including the inherited
@@ -72,6 +82,8 @@ public class ShaclTools {
 
 
                     classData.add(classMyData); // adds the 0 element for the class where
+                    //add the class data to the temp model
+                    profileDataMapAsModelTemp.add(resItem,RDF.type,RDFS.Class);
                     /*
                      * 0 is the complete resource of the class
                      * 1 is the namespace of the resource of the class
@@ -79,6 +91,7 @@ public class ShaclTools {
                      * 3 is the label - RDFS label
                      * 4 has "DescriptionStereotype" is the class is stereotyped description
                      */
+                    mainClassTemp=classItem;
                     while (root == 0) {
                         classData = ShaclTools.getLocalAttributesAssociations(classItem, model, classData, rdfNs);
                         if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
@@ -175,6 +188,7 @@ public class ShaclTools {
         Map dataTypeMapFromShapes= MainController.getDataTypeMapFromShapes();
         int shaclNodataMap= MainController.getShaclNodataMap();
 
+
         for (ResIterator i=model.listResourcesWithProperty(RDFS.domain); i.hasNext();) {
             Resource resItemDomain = i.next();
             //System.out.println(resItem.toString());
@@ -200,13 +214,26 @@ public class ShaclTools {
                     classProperty.add("Attribute"); // it is an attribute - item 0
                 }
 
+                profileDataMapAsModelTemp.add(resItemDomain,RDF.type,RDF.Property);
+                profileDataMapAsModelTemp.add(resItemDomain,RDFS.domain,mainClassTemp); //this is to assign not yo the original class but as property of the class that is processed
+
                 classProperty.add(resItemDomain.toString()); // the complete resource of the attribute - item 1 for attribute, item 2 for association
                 classProperty.add(resItemDomain.getNameSpace()); // the namespace of the resource of the attribute - item 2 for attribute, item 3 for association
                 classProperty.add(model.getNsURIPrefix(resItemDomain.getNameSpace())); // this is the prefix - item 3 for attribute, item 4 for association
                 classProperty.add(resItemDomain.getLocalName()); // the local name i.e. identifiedObject - item 4 for attribute, item 5 for association
+//                if (resItemDomain.getLocalName().equals("IdentifiedObject.name")) {
+//                    int test = 1;
+//                }
                 for (NodeIterator j = model.listObjectsOfProperty(resItemDomain, model.getProperty(rdfNs, "multiplicity")); j.hasNext(); ) {
                     RDFNode resItemNode = j.next();
                     classProperty.add(resItemNode.toString().split("#M:", 2)[1]); //- item 5 for attribute, item 6 for association
+                    if (isAttr==1) {
+                        //TODO - need to have something more clever here. if there are different cardinalities for different profiles with same attribute/association
+                        if (model.listObjectsOfProperty(resItemDomain, model.getProperty(rdfNs, "multiplicity")).toList().size() > 1) {
+                            //GuiHelper.appendTextToOutputWindow("[Attention] The property: " + resItemDomain.getLocalName() + " has different multiplicity in different profiles.", true);
+                            break;
+                        }
+                    }
                 }
 
                 if (isAttr==1) {
@@ -246,6 +273,7 @@ public class ShaclTools {
                                 if (shaclNodataMap==0) {  // only if the user selects to create datamap when generating the shape file
                                     dataTypeMapFromShapes = DataTypeMaping.addDatatypeMapProperty(dataTypeMapFromShapes, resItemDomain.toString(), resItemNode.asResource().getLocalName());
                                 }
+                                dataTypeMapFromProfile = DataTypeMaping.addDatatypeMapProperty(dataTypeMapFromProfile, resItemDomain.toString(), resItemNode.asResource().getLocalName());
                                 classProperty.add(resItemNode.toString()); // the resource - item 9
                                 classProperty.add(resItemNode.toString().split("#", 2)[1]); //the local name of the resource e.g. "String" - item 10
                             }
@@ -258,6 +286,7 @@ public class ShaclTools {
                                     if (shaclNodataMap==0) { // only if the user selects to create datamap when generating the shape file
                                         dataTypeMapFromShapes = DataTypeMaping.addDatatypeMapProperty(dataTypeMapFromShapes, resItemDomain.toString(), resItemNodedt.asResource().getLocalName());
                                     }
+                                    dataTypeMapFromProfile = DataTypeMaping.addDatatypeMapProperty(dataTypeMapFromProfile, resItemDomain.toString(), resItemNodedt.asResource().getLocalName());
                                 }
                                 classProperty.add(resItemNode.toString()); // the resource - item 10
                                 classProperty.add(resItemNode.toString().split("#", 2)[1]); //the local name of the resource e.g. "String" - item 11
@@ -399,6 +428,7 @@ public class ShaclTools {
                                 if (shaclNodataMap==0) {  // only if the user selects to create datamap when generating the shape file
                                     dataTypeMapFromShapes = DataTypeMaping.addDatatypeMapProperty(dataTypeMapFromShapes, resItemDomain.toString(), resItemNode.asResource().getLocalName());
                                 }
+                                dataTypeMapFromProfile = DataTypeMaping.addDatatypeMapProperty(dataTypeMapFromProfile, resItemDomain.toString(), resItemNode.asResource().getLocalName());
                                 compoundProperty.add(resItemNode.toString()); // the resource - item 9
                                 compoundProperty.add(resItemNode.toString().split("#", 2)[1]); //the local name of the resource e.g. "String" - item 10
                             }
@@ -1521,51 +1551,59 @@ public class ShaclTools {
         propertyNodeFeatures.set(8, atas - 1); // this is the order
         propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
 
-        List pathCompound = (List) ((ArrayList) shapeData.get(atas)).get(11);
-        propertyNodeFeatures.set(13, pathCompound);
-
-        shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI);
-
-        //add datatypes checks depending on it is Primitive, Datatype or Enumeration
-        propertyNodeFeatures.set(2, localNameAttr + "-datatype");
-        propertyNodeFeatures.set(3, "This constraint validates the datatype of the property (attribute).");
-        propertyNodeFeatures.set(0, "datatype");
-        propertyNodeFeatures.set(8, atas - 1); // this is the order
-        propertyNodeFeatures.set(9, nsURIprofile + "DatatypesGroup"); // this is the group
-        switch (((ArrayList) shapeData.get(atas)).get(8).toString()) {
-            case "Primitive": {
-                String datatypePrimitive = ((ArrayList) shapeData.get(atas)).get(10).toString(); //this is localName e.g. String
-
-                propertyNodeFeatures.set(6, datatypePrimitive);
-                propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
-
-                break;
-            }
-            case "CIMDatatype": {
-                String datatypePrimitive = ((ArrayList) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
-
-                propertyNodeFeatures.set(6, datatypePrimitive);
-                propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
-
-                break;
-            }
-            case "Compound": {
-                String datatypeCompound = ((ArrayList) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
-
-                propertyNodeFeatures.set(6, "Compound");
-                propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");
-                propertyNodeFeatures.set(12, datatypeCompound);
-                break;
-            }
-            case "Enumeration":
-                propertyNodeFeatures.set(6, "Enumeration");
-                propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is an enumerated value which is not part of the enumeration.");
-                //this adds the structure which is a list of possible enumerated values
-                propertyNodeFeatures.set(7, ((ArrayList) shapeData.get(atas)).get(10));
-                break;
+        boolean skip=false;
+        try {
+            List pathCompound = (List) ((ArrayList) shapeData.get(atas)).get(11);
+            propertyNodeFeatures.set(13, pathCompound);
+        }catch(Exception e){
+            skip=true;
         }
-        shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI);
-        propertyNodeFeatures.set(13, ""); // in order to be empty for the next attribute
+        if (skip==false) {
+
+
+            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI);
+
+            //add datatypes checks depending on it is Primitive, Datatype or Enumeration
+            propertyNodeFeatures.set(2, localNameAttr + "-datatype");
+            propertyNodeFeatures.set(3, "This constraint validates the datatype of the property (attribute).");
+            propertyNodeFeatures.set(0, "datatype");
+            propertyNodeFeatures.set(8, atas - 1); // this is the order
+            propertyNodeFeatures.set(9, nsURIprofile + "DatatypesGroup"); // this is the group
+            switch (((ArrayList) shapeData.get(atas)).get(8).toString()) {
+                case "Primitive": {
+                    String datatypePrimitive = ((ArrayList) shapeData.get(atas)).get(10).toString(); //this is localName e.g. String
+
+                    propertyNodeFeatures.set(6, datatypePrimitive);
+                    propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
+
+                    break;
+                }
+                case "CIMDatatype": {
+                    String datatypePrimitive = ((ArrayList) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
+
+                    propertyNodeFeatures.set(6, datatypePrimitive);
+                    propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
+
+                    break;
+                }
+                case "Compound": {
+                    String datatypeCompound = ((ArrayList) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
+
+                    propertyNodeFeatures.set(6, "Compound");
+                    propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");
+                    propertyNodeFeatures.set(12, datatypeCompound);
+                    break;
+                }
+                case "Enumeration":
+                    propertyNodeFeatures.set(6, "Enumeration");
+                    propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is an enumerated value which is not part of the enumeration.");
+                    //this adds the structure which is a list of possible enumerated values
+                    propertyNodeFeatures.set(7, ((ArrayList) shapeData.get(atas)).get(10));
+                    break;
+            }
+            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI);
+            propertyNodeFeatures.set(13, ""); // in order to be empty for the next attribute
+        }
         return shapeModel;
     }
 
