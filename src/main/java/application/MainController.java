@@ -27,11 +27,9 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
-import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -58,6 +56,7 @@ import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
 import static core.ExportRDFSdescriptions.rdfsDescriptions;
+import static core.RdfConvert.modelInheritance;
 
 
 public class MainController implements Initializable {
@@ -220,9 +219,8 @@ public class MainController implements Initializable {
     private CheckBox fcbRDFConveraddowl;
     @FXML
     private CheckBox fcbRDFconvertModelUnionDetailed;
-
-
-
+    @FXML
+    private CheckBox cbRDFSSHACLoptionBaseprofiles;
 
 
 
@@ -262,6 +260,11 @@ public class MainController implements Initializable {
     public static boolean excludeMRID;
     public static List<File> inputXLS;
     public static List<File> rdfProfileFileList;
+
+    public static int baseprofilesshaclglag;
+    public static Model unionmodelbaseprofilesshacl;
+    public static Model unionmodelbaseprofilesshaclinheritance;
+    public static Model unionmodelbaseprofilesshaclinheritanceonly;
 
 
     public MainController() {
@@ -1388,6 +1391,7 @@ public class MainController implements Initializable {
         }
 //        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //        this.selectedFile = filechooser.showOpenMultipleDialog(null);
+        this.selectedFile = file;
 
 
         if (file != null) {// the file is selected
@@ -1413,6 +1417,7 @@ public class MainController implements Initializable {
             btnApply.setDisable(false);
             cbRDFSSHACLoption1.setDisable(false);
             cbRDFSSHACLoptionDescr.setDisable(false);
+            cbRDFSSHACLoptionBaseprofiles.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -2012,6 +2017,91 @@ public class MainController implements Initializable {
                                     ((ArrayList) modelsNames).set(1, "fh");
                                     ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/61970-552/ModelDescription/Constraints#");
                                     break;
+                                case "PowerSystemProjectProfile":
+                                case "DocPowerSystemProjectProfile":
+                                    ((ArrayList) modelsNames).set(1, "psp");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints#");
+                                    break;
+                                case "RemedialActionScheduleProfile":
+                                case "DocRemedialActionScheduleProfile":
+                                    ((ArrayList) modelsNames).set(1, "ras");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints#");
+                                    break;
+                                case "SecurityAnalysisResultProfile":
+                                case "DocSecurityAnalysisResultProfile":
+                                    ((ArrayList) modelsNames).set(1, "sar");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints#");
+                                    break;
+                                case "SensitivityMatrixProfile":
+                                case "DocSensitivityMatrixProfile":
+                                    ((ArrayList) modelsNames).set(1, "sm");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints#");
+                                    break;
+                                case "EquipmentReliabilityProfile":
+                                case "DocEquipmentReliabilityProfile":
+                                    ((ArrayList) modelsNames).set(1, "er");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints#");
+                                    break;
+                                case "RemedialActionProfile":
+                                case "DocRemedialActionProfile":
+                                    ((ArrayList) modelsNames).set(1, "ra");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints#");
+                                    break;
+                                case "SteadyStateInstructionProfile":
+                                case "DocSteadyStateInstructionProfile":
+                                    ((ArrayList) modelsNames).set(1, "ssi");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints#");
+                                    break;
+                                case "AvailabilityScheduleProfile":
+                                case "DocAvailabilityScheduleProfile":
+                                    ((ArrayList) modelsNames).set(1, "as");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints#");
+                                    break;
+                                case "AssessedElementProfile":
+                                case "DocAssessedElementProfile":
+                                    ((ArrayList) modelsNames).set(1, "ae");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints#");
+                                    break;
+                                case "SecurityScheduleProfile":
+                                case "DocSecurityScheduleProfile":
+                                    ((ArrayList) modelsNames).set(1, "ss");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SecuritySchedule-EU/Constraints#");
+                                    break;
+                                case "ContingencyProfile":
+                                case "DocContingencyProfile":
+                                    ((ArrayList) modelsNames).set(1, "co");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/Contingency-EU/Constraints#");
+                                    break;
+                                case "DocumentHeaderProfile":
+                                case "DocDocumentHeaderProfile":
+                                    ((ArrayList) modelsNames).set(1, "dh");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints#");
+                                    break;
+                                case "GridDisturbanceProfile":
+                                case "DocGridDisturbanceProfile":
+                                    ((ArrayList) modelsNames).set(1, "gd");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints#");
+                                    break;
+                                case "ImpactAssessmentMatrixProfile":
+                                case "DocImpactAssessmentMatrixProfile":
+                                    ((ArrayList) modelsNames).set(1, "iam");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints#");
+                                    break;
+                                case "MonitoringAreaProfile":
+                                case "DocMonitoringAreaProfile":
+                                    ((ArrayList) modelsNames).set(1, "ma");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints#");
+                                    break;
+                                case "ObjectRegistryProfile":
+                                case "DocObjectRegistryProfile":
+                                    ((ArrayList) modelsNames).set(1, "or");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints#");
+                                    break;
+                                case "PowerScheduleProfile":
+                                case "DocPowerScheduleProfile":
+                                    ((ArrayList) modelsNames).set(1, "ps");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints#");
+                                    break;
                             }
                         }
                     }
@@ -2117,6 +2207,74 @@ public class MainController implements Initializable {
                                 case "FileHeaderProfile":
                                     ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/61970-552/ModelDescription/Constraints");
                                     break;
+                                case "PowerSystemProjectProfile":
+                                case "DocPowerSystemProjectProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints");
+                                    break;
+                                case "RemedialActionScheduleProfile":
+                                case "DocRemedialActionScheduleProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints");
+                                    break;
+                                case "SecurityAnalysisResultProfile":
+                                case "DocSecurityAnalysisResultProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints");
+                                    break;
+                                case "SensitivityMatrixProfile":
+                                case "DocSensitivityMatrixProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints");
+                                    break;
+                                case "EquipmentReliabilityProfile":
+                                case "DocEquipmentReliabilityProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints");
+                                    break;
+                                case "RemedialActionProfile":
+                                case "DocRemedialActionProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints");
+                                    break;
+                                case "SteadyStateInstructionProfile":
+                                case "DocSteadyStateInstructionProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints");
+                                    break;
+                                case "AvailabilityScheduleProfile":
+                                case "DocAvailabilityScheduleProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints");
+                                    break;
+                                case "AssessedElementProfile":
+                                case "DocAssessedElementProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints");
+                                    break;
+                                case "SecurityScheduleProfile":
+                                case "DocSecurityScheduleProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SecuritySchedule-EU/Constraints");
+                                    break;
+                                case "ContingencyProfile":
+                                case "DocContingencyProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/Contingency-EU/Constraints");
+                                    break;
+                                case "DocumentHeaderProfile":
+                                case "DocDocumentHeaderProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints");
+                                    break;
+                                case "GridDisturbanceProfile":
+                                case "DocGridDisturbanceProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints");
+                                    break;
+                                case "ImpactAssessmentMatrixProfile":
+                                case "DocImpactAssessmentMatrixProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints");
+                                    break;
+                                case "MonitoringAreaProfile":
+                                case "DocMonitoringAreaProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints");
+                                    break;
+                                case "ObjectRegistryProfile":
+                                case "DocObjectRegistryProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints");
+                                    break;
+                                case "PowerScheduleProfile":
+                                case "DocPowerScheduleProfile":
+                                    ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints");
+                                    break;
                             }
                         }
                     }
@@ -2164,6 +2322,7 @@ public class MainController implements Initializable {
             associationValueTypeOption = 0;
         }
 
+
         if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size()!=0 ) {
             //depending on the value of the choice box "Save datatype map"
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
@@ -2191,13 +2350,13 @@ public class MainController implements Initializable {
             for (int sel = 0; sel < treeViewProfileConstraints.getSelectionModel().getSelectedItems().size(); sel++) {
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().get(sel).getValue();
                 for (int i = 0; i < this.modelsNames.size(); i++) {
-                    if (((ArrayList) this.modelsNames.get(i)).get(0).equals(selectedProfile)) {
+                    if (((ArrayList<?>) this.modelsNames.get(i)).get(0).equals(selectedProfile)) {
                         modelNumber.add(i);
                         profileList.add(selectedProfile);
-                        prefixes.add(((ArrayList) this.modelsNames.get(i)).get(1).toString());
-                        namespaces.add(((ArrayList) this.modelsNames.get(i)).get(2).toString());
-                        baseURIs.add(((ArrayList) this.modelsNames.get(i)).get(3).toString());
-                        owlImports.add(((ArrayList) this.modelsNames.get(i)).get(4).toString());
+                        prefixes.add(((ArrayList<?>) this.modelsNames.get(i)).get(1).toString());
+                        namespaces.add(((ArrayList<?>) this.modelsNames.get(i)).get(2).toString());
+                        baseURIs.add(((ArrayList<?>) this.modelsNames.get(i)).get(3).toString());
+                        owlImports.add(((ArrayList<?>) this.modelsNames.get(i)).get(4).toString());
                     }
                 }
             }
@@ -2225,10 +2384,18 @@ public class MainController implements Initializable {
             //alert.setContentText(profileList+"Are you ok with this?");
 
             Optional<ButtonType> result = alert.showAndWait();
-            if (result.get() == ButtonType.OK){
-                // ... user chose OK
-            } else {
+            if (result.get() != ButtonType.OK){
                 return;
+            }
+
+            baseprofilesshaclglag = 0;
+            if (cbRDFSSHACLoptionBaseprofiles.isSelected()){ // load base profiles if the checkbox is selected
+                baseprofilesshaclglag = 1;
+                //load base profiles for shacl
+                List<File> basefiles = util.ModelFactory.filechoosercustom(false,"Base profiles RDF file", List.of("*.rdf"));
+                unionmodelbaseprofilesshacl = util.ModelFactory.modelLoad(basefiles,"",Lang.RDFXML);
+                unionmodelbaseprofilesshaclinheritance = modelInheritance(unionmodelbaseprofilesshacl,true,true);
+                unionmodelbaseprofilesshaclinheritanceonly = modelInheritance; // this contains the inheritance of the classes under OWL2.members
             }
 
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -2247,8 +2414,8 @@ public class MainController implements Initializable {
                     shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
                     //here the preparation ends
 
-                    String nsPrefixprofile = ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
-                    String nsURIprofile = ((ArrayList) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+                    String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+                    String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
 
          /*           String baseURI=null;
                 if (fshapesBaseURICreateCompleteSMTab.getText().isEmpty()) {
@@ -2266,9 +2433,9 @@ public class MainController implements Initializable {
                         baseURI = nsURIprofile;
                     }
                 }else{*/
-                    String baseURI = ((ArrayList) this.modelsNames.get(m)).get(3).toString();
+                    String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
                     //}
-                    String owlImport = ((ArrayList) this.modelsNames.get(m)).get(4).toString();
+                    String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
                     //generate the shape model
                     Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
 
@@ -2281,7 +2448,7 @@ public class MainController implements Initializable {
                     //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
 
                     //open the ChoiceDialog for the save file and save the file in different formats
-                    String titleSaveAs = "Save as for shape model: " + ((ArrayList) this.modelsNames.get(m)).get(0).toString();
+                    String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
                     File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
 
                     //this is used for the printing of the complete map in option "All profiles in one map"

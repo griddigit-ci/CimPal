@@ -23,7 +23,7 @@ import java.util.*;
 
 public class RdfConvert {
 
-    private static Model modelInheritance;
+    public static Model modelInheritance;
 
     //RDF conversion
     public static void rdfConversion(File file, List<File> files, String sourceFormat, String targetFormat, String xmlBase,RDFFormat rdfFormat,
@@ -197,13 +197,13 @@ public class RdfConvert {
 
 
         //in case only inheritance related structure should be converted
-        if(inheritanceOnly==true){
+        if(inheritanceOnly){
             model = modelInheritance(model,inheritanceList,inheritanceListConcrete);
         }
 
         List<Statement> stmttoadd = new LinkedList<>();
         String rdfNs = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
-        if (addowl==true){
+        if (addowl){
             for (ResIterator i = model.listSubjectsWithProperty(RDF.type); i.hasNext(); ) {
                 Resource resItem = i.next();
                 //String className = resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName();
@@ -346,7 +346,7 @@ public class RdfConvert {
 
 
     //Creates another model that contains only inheritance related properties
-    private static Model modelInheritance(Model model, Boolean inheritanceList, Boolean inheritanceListConcrete)  {
+    public static Model modelInheritance(Model model, Boolean inheritanceList, Boolean inheritanceListConcrete)  {
         Model modelProcessed = ModelFactory.createDefaultModel();
         modelProcessed.setNsPrefixes(model.getNsPrefixMap());
         modelInheritance = ModelFactory.createDefaultModel();

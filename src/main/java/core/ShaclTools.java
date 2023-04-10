@@ -129,7 +129,7 @@ public class ShaclTools {
                                 pathComp2.add(r);
                                 pathComp2.add(r1);
                                 pathComp2.add(r2);
-                                ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(10)).get(attrComp2)).add(pathComp2); // this is adding item 11 for the compound attribute
+                                ((ArrayList) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(10)).get(attrComp2)).add(pathComp2); // this is adding item 11 for the compound attribute
                             }
                         }
                     }
@@ -1479,7 +1479,7 @@ public class ShaclTools {
                             propertyNodeFeatures.set(4, "Violation");
                             propertyNodeFeatures.set(8, atas - 1); // this is the order
                             propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
-                            List<Resource> concreteClasses = (List<Resource>) ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10);
+                            List<Resource> concreteClasses = (List<Resource>) ((ArrayList) ((ArrayList) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(10);
                             propertyNodeFeatures.set(10, concreteClasses);
                             //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
                             propertyNodeFeatures.set(11, classFullURI);

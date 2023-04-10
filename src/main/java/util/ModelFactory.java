@@ -28,12 +28,12 @@ import java.util.zip.ZipFile;
 public class ModelFactory {
 
     //Loads one or many models
-    public static Model modelLoad(List files, String xmlBase, Lang rdfSourceFormat) throws FileNotFoundException {
+    public static Model modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat) throws FileNotFoundException {
         Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-        Map prefixMap = modelUnion.getNsPrefixMap();
-        for (int i=0; i<files.size();i++) {
+        Map<String, String> prefixMap = modelUnion.getNsPrefixMap();
+        for (Object file : files) {
             Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-            InputStream inputStream = new FileInputStream(files.get(i).toString());
+            InputStream inputStream = new FileInputStream(file.toString());
             RDFDataMgr.read(model, inputStream, xmlBase, rdfSourceFormat);
             prefixMap.putAll(model.getNsPrefixMap());
             modelUnion.add(model);
