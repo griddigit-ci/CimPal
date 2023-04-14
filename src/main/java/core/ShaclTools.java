@@ -9,7 +9,7 @@ package core;
 import application.MainController;
 import javafx.scene.control.ChoiceDialog;
 import javafx.stage.DirectoryChooser;
-import javafx.stage.FileChooser;
+import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.RDFFormat;
@@ -21,7 +21,6 @@ import org.apache.jena.vocabulary.RDFS;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
-import org.apache.jena.datatypes.RDFDatatype;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -29,7 +28,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
 
-import static application.MainController.associationValueTypeOption;
+import static application.MainController.*;
+import static org.topbraid.shacl.vocabulary.SH.path;
 
 public class ShaclTools {
 
@@ -106,30 +106,30 @@ public class ShaclTools {
             }
         }
         // add the path to be used for the compound
-        for (int clas = 0; clas < rdfToShacl.size(); clas++) {
-            for (int attr = 1; attr < ((ArrayList) rdfToShacl.get(clas)).size(); attr++) {
-                if (((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(0).equals("Attribute") && ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(8).equals("Compound")){
-                    List<RDFNode> pathComp= new LinkedList<>();
-                    RDFNode r = ResourceFactory.createResource(((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(1).toString());
+        for (Object o : rdfToShacl) {
+            for (int attr = 1; attr < ((ArrayList<?>) o).size(); attr++) {
+                if (((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(0).equals("Attribute") && ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(8).equals("Compound")) {
+                    List<RDFNode> pathComp = new LinkedList<>();
+                    RDFNode r = ResourceFactory.createResource(((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(1).toString());
                     pathComp.add(r);
-                    ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).add(pathComp); // this is adding item 11 for the compound attribute
+                    ((ArrayList) ((ArrayList) o).get(attr)).add(pathComp); // this is adding item 11 for the compound attribute
                     // this value will need to be added as item 11 of all attributes of the compound
                     //then go to the next level of compound
                     //TODO: ATTENTION: only 2 levels of nested compounds supported - see how to do it in a cleaver way
-                    for (int attrComp = 0; attrComp < ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).size(); attrComp++) {
-                        List<RDFNode> pathComp1= new LinkedList<>();
-                        RDFNode r1 = ResourceFactory.createResource(((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(1).toString());
+                    for (int attrComp = 0; attrComp < ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(10)).size(); attrComp++) {
+                        List<RDFNode> pathComp1 = new LinkedList<>();
+                        RDFNode r1 = ResourceFactory.createResource(((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(10)).get(attrComp)).get(1).toString());
                         pathComp1.add(r);
                         pathComp1.add(r1);
-                        ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).add(pathComp1); // this is adding item 11 for the compound attribute
-                        if (((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(0).equals("Attribute") && ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(8).equals("Compound")) {
-                            for (int attrComp2 = 0; attrComp2 < ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(10)).size(); attrComp2++) {
+                        ((ArrayList) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(10)).get(attrComp)).add(pathComp1); // this is adding item 11 for the compound attribute
+                        if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(10)).get(attrComp)).get(0).equals("Attribute") && ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(10)).get(attrComp)).get(8).equals("Compound")) {
+                            for (int attrComp2 = 0; attrComp2 < ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(10)).get(attrComp)).get(10)).size(); attrComp2++) {
                                 List<RDFNode> pathComp2 = new LinkedList<>();
-                                RDFNode r2 = ResourceFactory.createResource(((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(10)).get(attrComp2)).get(1).toString());
+                                RDFNode r2 = ResourceFactory.createResource(((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(10)).get(attrComp)).get(10)).get(attrComp2)).get(1).toString());
                                 pathComp2.add(r);
                                 pathComp2.add(r1);
                                 pathComp2.add(r2);
-                                ((ArrayList) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList) ((ArrayList) ((ArrayList) rdfToShacl.get(clas)).get(attr)).get(10)).get(attrComp)).get(10)).get(attrComp2)).add(pathComp2); // this is adding item 11 for the compound attribute
+                                ((ArrayList) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList) ((ArrayList) ((ArrayList) o).get(attr)).get(10)).get(attrComp)).get(10)).get(attrComp2)).add(pathComp2); // this is adding item 11 for the compound attribute
                             }
                         }
                     }
@@ -155,7 +155,8 @@ public class ShaclTools {
                 7  label
                 8 domain
                 9 range
-                10 linked list of concrete classes that inherit that association
+                10 inverse role name
+                11 linked list of concrete classes that inherit that association
             If an attribute
                 0 Attribute
                 1 complete resource
@@ -313,6 +314,7 @@ public class ShaclTools {
                     classProperty.add(resItemDomain.getRequiredProperty(RDFS.label).getObject().toString().split("@", 2)[0]); // the label
                     classProperty.add(resItemDomain.getRequiredProperty(RDFS.domain).getObject().toString());
                     classProperty.add(resItemDomain.getRequiredProperty(RDFS.range).getObject().toString());
+                    classProperty.add(resItemDomain.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#inverseRoleName")).getObject().toString());
                     //get all subclasses (concrete and abstract) for the range of the association
                     Resource classRange=resItemDomain.getRequiredProperty(RDFS.range).getObject().asResource();
                     List<Resource> allSubclasses = getSubtypeClassesNlevel(classRange, model);
@@ -320,11 +322,14 @@ public class ShaclTools {
                     //TODO see if something should be done for abstract classes
                     if (allSubclasses.size()==0) {
                         Boolean concrete= classIsConcrete(classRange, model);
+                        List<Resource> concreteSubclass = new LinkedList<>();
                         if (concrete) {
-                            List<Resource> concreteSubclass = new LinkedList<>();
                             concreteSubclass.add(classRange);
                             classProperty.add(concreteSubclass);
                             //System.out.println("Association class is concrete" + classRange.toString());
+                        }else{
+                            concreteSubclass.add(ResourceFactory.createResource("http://abstract.eu"));
+                            classProperty.add(concreteSubclass);
                         }
                     }else{
                         List<Resource> allConcreteSubclasses = new LinkedList<>();
@@ -335,10 +340,9 @@ public class ShaclTools {
                         }
 
                         //this below is for the subclasses
-                        for (Iterator isub=allSubclasses.iterator(); isub.hasNext();) {
-                            Resource subclass = (Resource) isub.next();
-                            Boolean concrete= classIsConcrete(subclass, model);
-                            if (concrete){
+                        for (Resource subclass : allSubclasses) {
+                            Boolean concrete = classIsConcrete(subclass, model);
+                            if (concrete) {
                                 allConcreteSubclasses.add(subclass);
                             }
                         }
@@ -641,11 +645,11 @@ public class ShaclTools {
                         pathList.add(RDF.type.asResource());
 
                         RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                        r.addProperty(SH.path, pathRDFlist);
+                        r.addProperty(path, pathRDFlist);
                     }else{
                         //Property p5 = shapeModel.createProperty(shaclURI, "path");
 
-                        r.addProperty(SH.path, o5);
+                        r.addProperty(path, o5);
                     }
 
 
@@ -656,7 +660,7 @@ public class ShaclTools {
                         pathList.add(RDF.type.asResource());
                     }
                     RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                    r.addProperty(SH.path, pathRDFlist);
+                    r.addProperty(path, pathRDFlist);
                 }
 
                 //Property p6 = shapeModel.createProperty(shaclURI, "name");
@@ -797,7 +801,7 @@ public class ShaclTools {
                         pathList.add(RDF.type.asResource());
 
                         RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                        r.addProperty(SH.path, pathRDFlist);
+                        r.addProperty(path, pathRDFlist);
 
                         //adding a message
                         //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
@@ -814,7 +818,7 @@ public class ShaclTools {
                     }else {
                         //adding path
                         RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                        r.addProperty(SH.path, o5);
+                        r.addProperty(path, o5);
 
                         //adding the sh:class
 
@@ -878,7 +882,7 @@ public class ShaclTools {
                         pathList.add(RDF.type.asResource());
 
                         RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                        r.addProperty(SH.path, pathRDFlist);
+                        r.addProperty(path, pathRDFlist);
 
                         //adding a message
                         //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
@@ -923,7 +927,7 @@ public class ShaclTools {
 
                             //adding path
                             RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                            r.addProperty(SH.path, o5);
+                            r.addProperty(path, o5);
 
                             //adding name
                             r.addProperty(SH.name, localName + classNameRes.getLocalName() + "-valueType");//propertyNodeFeatures.get(2).toString()
@@ -1049,19 +1053,24 @@ public class ShaclTools {
             //Property p2 = shapeModel.createProperty(shaclURI, "message");
             r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
 
-            if (propertyNodeFeatures.get(13).toString().equals("")) {
+            if (propertyNodeFeatures.get(13).toString().equals("") && !propertyNodeFeatures.get(11).toString().equals("Inverse")) {
                 //Property p5 = shapeModel.createProperty(shaclURI, "path");
                 RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                r.addProperty(SH.path, o5);
-            }else { // it enters here when it is  compound and the sh:path needs to be a list
+                r.addProperty(path, o5);
+            }else if (!propertyNodeFeatures.get(13).toString().equals("")) { // it enters here when it is  compound and the sh:path needs to be a list
                 //path for the case when the attribute is a compound
                 List<RDFNode> pathList = (List<RDFNode>) propertyNodeFeatures.get(13);
                 RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                r.addProperty(SH.path, pathRDFlist);
+                r.addProperty(path, pathRDFlist);
                 //Resource nodeShapeResourcePath = shapeModel.getResource(nsURIprofile + localName+"Cardinality");
                 //if (!shapeModel.getResource(nodeShapeResourcePath.toString()).hasProperty(SH.path)) { // creates sh:path only if it is missing
                 //    nodeShapeResourcePath.addProperty(SH.path, pathRDFlist);
                 //}
+            }else if (propertyNodeFeatures.get(11).toString().equals("Inverse")){
+                Resource resbn = ResourceFactory.createResource();
+                Statement stmtbn = ResourceFactory.createStatement(resbn, SH.inversePath, ResourceFactory.createProperty(propertyNodeFeatures.get(10).toString()));
+                r.addProperty(SH.path, JenaUtil.asProperty(resbn));
+                shapeModel.add(stmtbn);
             }
 
             //Property p6 = shapeModel.createProperty(shaclURI, "name");
@@ -1352,7 +1361,7 @@ public class ShaclTools {
         shapeModel.setNsPrefix("sh", SH.NS);
         shapeModel.setNsPrefix("dash", DASH.NS);
 
-        shapeModel.setNsPrefix(MainController.prefs.get("IOprefix",""),MainController.prefs.get("IOuri","")); // the uri for the identified object related shapes
+        shapeModel.setNsPrefix(prefs.get("IOprefix",""), prefs.get("IOuri","")); // the uri for the identified object related shapes
 
         //adding the the two PropertyGroup-s
         String localNameGroup = "CardinalityGroup";
@@ -1380,7 +1389,7 @@ public class ShaclTools {
         groupFeatures.set(2, "CardinalityIO");
         groupFeatures.set(3, 0);
 
-        shapeModel = ShaclTools.addPropertyGroup(shapeModel, MainController.prefs.get("IOuri",""), localNameGroup, groupFeatures);
+        shapeModel = ShaclTools.addPropertyGroup(shapeModel, prefs.get("IOuri",""), localNameGroup, groupFeatures);
         //for Datatypes group
         localNameGroup = "DatatypesGroup";
         groupFeatures.set(0, "Datatypes");
@@ -1396,7 +1405,7 @@ public class ShaclTools {
         groupFeatures.set(2, "DatatypesIO");
         groupFeatures.set(3, 1);
 
-        shapeModel = ShaclTools.addPropertyGroup(shapeModel, MainController.prefs.get("IOuri",""), localNameGroup, groupFeatures);
+        shapeModel = ShaclTools.addPropertyGroup(shapeModel, prefs.get("IOuri",""), localNameGroup, groupFeatures);
 
         //for Associations group
         localNameGroup = "AssociationsGroup";
@@ -1438,10 +1447,11 @@ public class ShaclTools {
                  * 7 - is a list of uri of the enumeration attributes
                  * 8 - order
                  * 9 - group
-                 * 10 - the list of concrete classes for association - the value type at the used end
-                 * 11 - classFullURI for the targetClass of the NodeShape
-                 * 12 - the uri of the compound class to be used in sh:class
-                 * 13 - path for the attributes of the compound
+                 * 10 - the inverse role name in case of association - the inverse end
+                 * 11 - the list of concrete classes for association - the value type at the used end
+                 * 12 - classFullURI for the targetClass of the NodeShape
+                 * 13 - the uri of the compound class to be used in sh:class
+                 * 14 - path for the attributes of the compound
                  */
                 for (int i = 0; i < 14; i++) {
                     propertyNodeFeatures.add("");
@@ -1455,7 +1465,7 @@ public class ShaclTools {
                         String localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
                         propertyNodeFeatures.set(5, cardinality);
                         Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
-                        propertyNodeFeatures.set(1, "Missing required association.");
+                        propertyNodeFeatures.set(1, "Association with cardinality violation at the used direction.");
                         propertyNodeFeatures.set(2, localNameAssoc + "-cardinality");
                         propertyNodeFeatures.set(3, "This constraint validates the cardinality of the association at the used direction.");
                         propertyNodeFeatures.set(4, "Violation");
@@ -1466,23 +1476,78 @@ public class ShaclTools {
 
                         shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
 
-                        //Association check for target class - only for concrete classes in the profile
-                        if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).size()>10) { //TODO check if this is OK. This is to avoid crash if there are no concrete classes in the profile, but something should be done for the abstract classes which are concrete in another profile
-                            propertyNodeFeatures.set(0, "associationValueType");
-                            //String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                            //localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
-                            //propertyNodeFeatures.set(5, cardinality);
-                            //nodeShapeResource = shapeModel.getResource(nsURIprofile + localName+"ValueType");
-                            propertyNodeFeatures.set(1, "Not correct target class.");
-                            propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
-                            propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
+                        //Association check for target class
+
+                        propertyNodeFeatures.set(0, "associationValueType");
+                        //String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
+                        //localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
+                        //propertyNodeFeatures.set(5, cardinality);
+                        //nodeShapeResource = shapeModel.getResource(nsURIprofile + localName+"ValueType");
+                        propertyNodeFeatures.set(1, "Not correct target class.");
+                        propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
+                        propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
+                        propertyNodeFeatures.set(4, "Violation");
+                        propertyNodeFeatures.set(8, atas - 1); // this is the order
+                        propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
+                        List<Resource> concreteClasses = null;
+//                        if (localNameAssoc.contains("ReactiveCapabilityCurve.SynchronousMachine2")){
+//                            int k=1;
+//                        }
+//                        System.out.println(localNameAssoc);
+//                        System.out.println(((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas));
+                        if (((List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).size()==1) {
+                            if (!((LinkedList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).get(0).toString().equals("http://abstract.eu")) {
+                                concreteClasses = (List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11);
+                                //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
+                                propertyNodeFeatures.set(10, concreteClasses);
+                                propertyNodeFeatures.set(11, classFullURI);
+
+                                shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
+                            }else {
+                                concreteClasses = new LinkedList<>();
+                                String abstractclass = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(9).toString();
+                                if (baseprofilesshaclglag == 1) {
+                                    // get the class URI at position 9; then search for this class in the unionmodelbaseprofilesshaclinheritanceonly and find all OWL2 members; store these members in List<Resource> concreteClasses
+                                    for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), OWL2.members, (RDFNode) null)); i.hasNext(); ) {
+                                        Statement stmtinheritance = i.next();
+                                        concreteClasses.add(stmtinheritance.getObject().asResource());
+                                    }
+                                    if (concreteClasses.size() == 0) { //it means that there are no child classes and then it needs to be checked if the class is concrete in the base data
+                                        if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
+                                            concreteClasses.add(ResourceFactory.createResource(abstractclass));
+                                        }else{
+                                            System.out.println("WARNING: The class "+abstractclass+" is abstract and it is referenced by the association "+localNameAssoc+" for class "+classFullURI+". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                            concreteClasses.add(ResourceFactory.createResource(abstractclass));
+                                        }
+                                    }
+                                }else{
+                                    System.out.println("WARNING: The class "+abstractclass+" is abstract and it is referenced by the association "+localNameAssoc+" for class "+classFullURI+". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                    concreteClasses.add(ResourceFactory.createResource(abstractclass));
+                                }
+                                propertyNodeFeatures.set(10, concreteClasses);
+                                propertyNodeFeatures.set(11, classFullURI);
+
+                                shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
+                            }
+                        }
+
+                    }else{ // this is for cardinality of inverse associations
+                        if (shaclflaginverse==1) {
+                            propertyNodeFeatures.set(0, "cardinality");
+                            String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
+                            String localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
+                            propertyNodeFeatures.set(5, cardinality);
+                            Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
+                            propertyNodeFeatures.set(1, "Association with cardinality violation at the inverse direction.");
+                            propertyNodeFeatures.set(2, localNameAssoc + "-cardinality");
+                            propertyNodeFeatures.set(3, "This constraint validates the cardinality of the association at the inverse direction.");
                             propertyNodeFeatures.set(4, "Violation");
                             propertyNodeFeatures.set(8, atas - 1); // this is the order
-                            propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
-                            List<Resource> concreteClasses = (List<Resource>) ((ArrayList) ((ArrayList) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(10);
-                            propertyNodeFeatures.set(10, concreteClasses);
-                            //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
-                            propertyNodeFeatures.set(11, classFullURI);
+                            propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
+                            propertyNodeFeatures.set(10, ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10).toString()); // this is the inverse role name
+                            propertyNodeFeatures.set(11, "Inverse");
+
+                            String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
 
                             shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
                         }
@@ -1494,7 +1559,7 @@ public class ShaclTools {
                     String localNameAttr = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(4).toString();
                     String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(1).toString();
 
-                    if (MainController.excludeMRID) { // user selects that mRID should be skipped for description classes
+                    if (excludeMRID) { // user selects that mRID should be skipped for description classes
                         if (classDescripStereo) { //the class is stereotyped description
                             if (!localNameAttr.equals("IdentifiedObject.mRID")){ //the attribute is not mRID
                                 shapeModel = addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource, localNameAttr, propertyFullURI);

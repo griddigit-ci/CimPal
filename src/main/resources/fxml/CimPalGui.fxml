@@ -31,7 +31,7 @@
       </Menu>
    </MenuBar>
    <AnchorPane minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
-      <SplitPane dividerPositions="0.65" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+      <SplitPane dividerPositions="0.6980337078651685" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="100.0" prefWidth="160.0">
             <HBox alignment="TOP_RIGHT" layoutX="106.0" layoutY="108.0" prefHeight="460.0" prefWidth="1017.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <TabPane fx:id="tabPaneConstraintsDetails" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
@@ -131,7 +131,7 @@
                                  <padding>
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
-                                 <CheckBox fx:id="cbRDFSSHACLoption1" disable="true" mnemonicParsing="false" text="Use sh:in for association value type constraint instead of sh:class and sh:or" />
+                                 <CheckBox fx:id="cbRDFSSHACLoption1" disable="true" mnemonicParsing="false" selected="true" text="Use sh:in for association value type constraint instead of sh:class and sh:or" />
                               </HBox>
                               <HBox spacing="10.0">
                                  <padding>
@@ -144,7 +144,15 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <children>
-                                    <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles" disable="true" mnemonicParsing="false" text="Consider related profiles for cross profile value type shapes" />
+                                    <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles" disable="true" mnemonicParsing="false" selected="true" text="Consider related profiles for cross profile value type shapes" />
+                                 </children>
+                              </HBox>
+                              <HBox spacing="10.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <CheckBox fx:id="cbRDFSSHACLoptionInverse" disable="true" mnemonicParsing="false" selected="true" text="Create contstraints for checking multiplicity of inverse association's end" />
                                  </children>
                               </HBox>
                               <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
@@ -515,7 +523,7 @@
                <TabPane fx:id="tabPaneDown" prefHeight="200.0" prefWidth="200.0" side="BOTTOM" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
                   <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                        <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true" prefHeight="215.2" prefWidth="960.8" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                        <ScrollPane fitToHeight="true" fitToWidth="true" layoutY="26.0" pannable="true" prefHeight="191.0" prefWidth="1222.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                            <TextArea fx:id="foutputWindow" wrapText="true" />
                         </ScrollPane>
                      </AnchorPane>

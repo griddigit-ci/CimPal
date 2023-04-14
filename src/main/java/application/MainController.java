@@ -221,6 +221,8 @@ public class MainController implements Initializable {
     private CheckBox fcbRDFconvertModelUnionDetailed;
     @FXML
     private CheckBox cbRDFSSHACLoptionBaseprofiles;
+    @FXML
+    private CheckBox cbRDFSSHACLoptionInverse;
 
 
 
@@ -262,6 +264,7 @@ public class MainController implements Initializable {
     public static List<File> rdfProfileFileList;
 
     public static int baseprofilesshaclglag;
+    public static int shaclflaginverse;
     public static Model unionmodelbaseprofilesshacl;
     public static Model unionmodelbaseprofilesshaclinheritance;
     public static Model unionmodelbaseprofilesshaclinheritanceonly;
@@ -1418,6 +1421,7 @@ public class MainController implements Initializable {
             cbRDFSSHACLoption1.setDisable(false);
             cbRDFSSHACLoptionDescr.setDisable(false);
             cbRDFSSHACLoptionBaseprofiles.setDisable(false);
+            cbRDFSSHACLoptionInverse.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -1748,56 +1752,27 @@ public class MainController implements Initializable {
         //set package structure
         Model model = (Model) this.models.get(m);
         this.packages = new ArrayList<>();
-        int multiPackage = 0;
 
         if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019")) {
-            for (ResIterator i = model.listSubjects(); i.hasNext(); ) { //iterate on the items found in the rdf file
-                Resource resItem = i.next();
-                String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
-                String rdfType;
-                if (rdfTypeInit.length == 0) {
-                    rdfType = rdfTypeInit[0];
-                } else {
-                    rdfType = rdfTypeInit[1];
-                }
-                if (model.contains(resItem,ResourceFactory.createProperty(RDFS.label.toString()))) {
-                    String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString().split("@", 2)[0]; // the first part of the rdfs:label
-                    if (rdfType.equals("ClassCategory")) { // if it is a package
-                        this.packages.add(rdfsLabel);
-                    }
+            for (StmtIterator i = model.listStatements(new SimpleSelector(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory"))); i.hasNext(); ) {
+                Statement resItem = i.next();
+                String label = model.getRequiredProperty(resItem.getSubject(),RDFS.label).getObject().asLiteral().getString();
+                if (label.endsWith("Profile") && !label.startsWith("Doc")) {
+                    this.packages.add(label);
                 }
             }
 
-
-            if (this.packages.size() != 1) {
-                for (int pak = 0; pak < this.packages.size(); pak++) {
-                    if (this.packages.get(pak).contains("Profile")) {
-                        multiPackage = pak;
-                        break;
-                    }
-                }
-            }
         } else if (rdfFormatInput.equals("CIMTool-merged-owl")) {
             this.packages.add(this.selectedFile.get(m).getName());
         }
 
-        if (this.packages.size() == 1) {
-            ArrayList<String> mpak1 = new ArrayList<>();
-            mpak1.add(this.packages.get(0));
-            mpak1.add(""); //reserved for the prefix of the profile
-            mpak1.add(""); // reserved for the URI of the profile
-            mpak1.add(""); // reserved for the baseURI of the profile
-            mpak1.add(""); // reserved for owl:imports
-            this.modelsNames.add(mpak1);
-        } else {
-            ArrayList<String> mpak = new ArrayList<>();
-            mpak.add(this.packages.get(multiPackage));
-            mpak.add(""); //reserved for the prefix of the profile
-            mpak.add(""); // reserved for the URI of the profile
-            mpak.add(""); // reserved for the baseURI of the profile
-            mpak.add(""); // reserved for owl:imports
-            this.modelsNames.add(mpak);
-        }
+        ArrayList<String> mpak1 = new ArrayList<>();
+        mpak1.add(this.packages.get(0));
+        mpak1.add(""); //reserved for the prefix of the profile
+        mpak1.add(""); // reserved for the URI of the profile
+        mpak1.add(""); // reserved for the baseURI of the profile
+        mpak1.add(""); // reserved for owl:imports
+        this.modelsNames.add(mpak1);
     }
 
     @FXML
@@ -2396,6 +2371,11 @@ public class MainController implements Initializable {
                 unionmodelbaseprofilesshacl = util.ModelFactory.modelLoad(basefiles,"",Lang.RDFXML);
                 unionmodelbaseprofilesshaclinheritance = modelInheritance(unionmodelbaseprofilesshacl,true,true);
                 unionmodelbaseprofilesshaclinheritanceonly = modelInheritance; // this contains the inheritance of the classes under OWL2.members
+            }
+
+            shaclflaginverse = 0;
+            if (cbRDFSSHACLoptionInverse.isSelected()){
+                shaclflaginverse=1;
             }
 
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
