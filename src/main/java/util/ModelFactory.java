@@ -169,7 +169,7 @@ public class ModelFactory {
     //File(s) selection Filechooser
     public static List<File> filechoosercustom(Boolean typeSingleFile, String titleExtensionFilter , List<String> extExtensionFilter) {
 
-        List<File> fileL = null;
+        List<File> fileL = new LinkedList<>();
         File file = null;
 
         FileChooser filechooser = new FileChooser();

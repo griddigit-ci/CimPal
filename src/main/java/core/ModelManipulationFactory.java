@@ -148,6 +148,8 @@ public class ModelManipulationFactory {
                                 //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col).toString());
                                 //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col + 1).toString());
                                 String rdfid = ((LinkedList<?>) inputXLSdata.get(row)).get(col).toString();
+                                //System.out.println(row);
+                                //System.out.println(rdfid);
                                 String object = ((LinkedList<?>) inputXLSdata.get(row)).get(col + 1).toString();
 
                                 //Add triples to the model

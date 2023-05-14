@@ -29,6 +29,7 @@ import java.util.zip.ZipOutputStream;
 
 public class InstanceDataFactory {
 
+    public static LinkedList<String> zipfilesnames;
 
     //Loads one or many models
     public static Map<String,Model> modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat, boolean isSHACL) throws FileNotFoundException {
@@ -36,40 +37,103 @@ public class InstanceDataFactory {
         Map<String,Model> unionModelMap=new HashMap<>();
         Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
         Model modelUnionWithoutHeader = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-        Map prefixMap = modelUnion.getNsPrefixMap();
-        Map prefixMapWithoutHeader = modelUnionWithoutHeader.getNsPrefixMap();
-        for (Object file : files) {
-            if (rdfSourceFormat==null){
-                String extension = FilenameUtils.getExtension(file.toString());
-                if (extension.equals("rdf") || extension.equals("xml")){
-                    rdfSourceFormat=Lang.RDFXML;
-                }else if(extension.equals("ttl")){
-                    rdfSourceFormat=Lang.TURTLE;
-                }else if(extension.equals("jsonld")){
-                    rdfSourceFormat=Lang.JSONLD;
+        Map<String, String> prefixMap = modelUnion.getNsPrefixMap();
+        Map<String, String> prefixMapWithoutHeader = modelUnionWithoutHeader.getNsPrefixMap();
+
+        List<InputStream> inputStreamList = null;
+        InputStream inputStream = null;
+        boolean singlezip;
+        boolean iszip;
+
+        for (File file : files) {
+            String extension = FilenameUtils.getExtension(file.toString());
+            if (extension.equals("zip")){
+                iszip=true;
+                inputStreamList=InstanceDataFactory.unzip(file);
+                rdfSourceFormat = Lang.RDFXML;
+                if (inputStreamList.size()==1){
+                    singlezip=true;
+                    inputStream=inputStreamList.get(0);
+                }else{
+                    singlezip=false;
+                }
+            }else {
+                iszip=false;
+                switch (extension) {
+                    case "rdf":
+                    case "xml":
+                        rdfSourceFormat = Lang.RDFXML;
+                        break;
+                    case "ttl":
+                        rdfSourceFormat = Lang.TURTLE;
+                        break;
+                    case "jsonld":
+                        rdfSourceFormat = Lang.JSONLD;
+                        break;
+                }
+                inputStream = new FileInputStream(file.toString());
+                singlezip=true;
+            }
+
+            if (singlezip){
+                Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                RDFDataMgr.read(model, inputStream, xmlBase, rdfSourceFormat);
+                prefixMap.putAll(model.getNsPrefixMap());
+                prefixMapWithoutHeader.putAll(model.getNsPrefixMap());
+
+                //get profile short name for CGMES v2.4, keyword for CGMES v3
+                String keyword=getProfileKeyword(model);
+                if (FilenameUtils.getName(file.toString()).equals("FileHeader.rdf")){
+                    keyword="FH";
+                }
+                if (!keyword.equals("")) {
+                    if (MainController.treeID && iszip) {
+                        unionModelMap.put(InstanceDataFactory.zipfilesnames.get(0)+"|"+keyword, model);
+                    }else if (MainController.treeID && !iszip) {
+                        unionModelMap.put(FilenameUtils.getName(file.toString())+"|"+keyword, model);
+                    }else{
+                        unionModelMap.put(keyword, model);
+                    }
+                }else{
+                    unionModelMap.put(FilenameUtils.getName(file.toString()), model);
+                }
+
+                if (!keyword.equals("FH")) {
+                    modelUnionWithoutHeader.add(model);
+                }
+                modelUnion.add(model);
+            }else{
+                int ind=0;
+                for (InputStream inputStreamItem : inputStreamList) {
+                    Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    RDFDataMgr.read(model, inputStreamItem, xmlBase, rdfSourceFormat);
+                    prefixMap.putAll(model.getNsPrefixMap());
+                    prefixMapWithoutHeader.putAll(model.getNsPrefixMap());
+
+                    //get profile short name for CGMES v2.4, keyword for CGMES v3
+                    String keyword=getProfileKeyword(model);
+                    if (FilenameUtils.getName(file.toString()).equals("FileHeader.rdf")){
+                        keyword="FH";
+                    }
+                    if (!keyword.equals("")) {
+                        if (MainController.treeID) {
+                            unionModelMap.put(InstanceDataFactory.zipfilesnames.get(ind)+"|"+keyword, model);
+                        //}else if (MainController.treeID && !iszip) {
+                           // unionModelMap.put(FilenameUtils.getName(file.toString())+"|"+keyword, model);
+                        }else{
+                            unionModelMap.put(keyword, model);
+                        }
+                    }else{
+                        unionModelMap.put(FilenameUtils.getName(file.toString()), model);
+                    }
+
+                    if (!keyword.equals("FH")) {
+                        modelUnionWithoutHeader.add(model);
+                    }
+                    modelUnion.add(model);
+                    ind=ind+1;
                 }
             }
-            Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-            InputStream inputStream = new FileInputStream(file.toString());
-            RDFDataMgr.read(model, inputStream, xmlBase, rdfSourceFormat);
-            prefixMap.putAll(model.getNsPrefixMap());
-            prefixMapWithoutHeader.putAll(model.getNsPrefixMap());
-
-            //get profile short name for CGMES v2.4, keyword for CGMES v3
-            String keyword=getProfileKeyword(model);
-            if (FilenameUtils.getName(file.toString()).equals("FileHeader.rdf")){
-                keyword="FH";
-            }
-            if (!keyword.equals("")) {
-                unionModelMap.put(keyword, model);
-            }else{
-                unionModelMap.put(FilenameUtils.getName(file.toString()), model);
-            }
-
-            if (!keyword.equals("FH")) {
-                modelUnionWithoutHeader.add(model);
-            }
-            modelUnion.add(model);
         }
         modelUnion.setNsPrefixes(prefixMap);
         modelUnionWithoutHeader.setNsPrefixes(prefixMap);
@@ -93,6 +157,9 @@ public class InstanceDataFactory {
 
         if (model.listObjectsOfProperty(DCAT.keyword).hasNext()){
             keyword=model.listObjectsOfProperty(DCAT.keyword).next().toString();
+        }
+        if (model.listObjectsOfProperty(ResourceFactory.createProperty(DCAT.NS,"Model.keyword")).hasNext()){
+            keyword=model.listObjectsOfProperty(ResourceFactory.createProperty(DCAT.NS,"Model.keyword")).next().toString();
         }
 
         if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#EquipmentVersion.shortName"),
@@ -325,7 +392,9 @@ public class InstanceDataFactory {
         return out;
     }
 
-    public static InputStream unzip(File selectedFile) {
+    public static List<InputStream>  unzip(File selectedFile) {
+        List<InputStream> inputstreamlist = new LinkedList<>();
+        zipfilesnames = new LinkedList<>();
         InputStream inputStream = null;
         try{
             ZipFile zipFile = new ZipFile(selectedFile);
@@ -351,6 +420,8 @@ public class InstanceDataFactory {
 
                     try{
                         inputStream = zipFile.getInputStream(entry);
+                        inputstreamlist.add(inputStream);
+                        zipfilesnames.add(entry.getName());
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -359,7 +430,7 @@ public class InstanceDataFactory {
         } catch(IOException e){
             throw new RuntimeException("Error unzipping file " + selectedFile, e);
         }
-        return inputStream;
+        return inputstreamlist;
     }
 
     private static boolean isValidDestPath(String targetDir, String destPathStr) {
@@ -372,4 +443,113 @@ public class InstanceDataFactory {
         return destPathNormalized.toString().startsWith(targetDir + File.separator);
     }
 
+    public static LinkedList<String>  getClassesForTree(Model model) {
+        LinkedList<String>  classList = new LinkedList<>();
+
+        for (StmtIterator it = model.listStatements(new SimpleSelector(null, RDF.type, (RDFNode) null)); it.hasNext(); ) {
+            Statement stmt = it.next();
+            Resource obj = stmt.getObject().asResource();
+            String listItem = model.getNsURIPrefix(obj.getNameSpace())+":"+obj.getLocalName();
+            if (!classList.contains(listItem)) {
+                classList.add(listItem);
+            }
+        }
+        Collections.sort(classList);
+        return classList;
+    }
+
+
+    public static LinkedList<String>  getClassInstancesForTree(Model model, String className) {
+        LinkedList<String>  classInstList = new LinkedList<>();
+        String ns = model.getNsPrefixURI(className.split(":",2)[0]);
+        String ln = className.split(":",2)[1];
+        Property classTypeProp = ResourceFactory.createProperty(ns,ln);
+        for (StmtIterator it = model.listStatements(new SimpleSelector(null, RDF.type, classTypeProp)); it.hasNext(); ) {
+            Statement stmt = it.next();
+            Resource subj = stmt.getSubject().asResource();
+            String listItem = subj.getLocalName();
+            if (model.listStatements(new SimpleSelector(subj, ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).hasNext()){
+                Statement cNameStmt = model.listStatements(new SimpleSelector(subj, ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).next();
+                String cName = cNameStmt.getObject().toString();
+                listItem = cName + "|" + listItem;
+            }
+            //String listItem = model.getNsURIPrefix(obj.getNameSpace())+":"+obj.getLocalName();
+            if (!classInstList.contains(listItem)) {
+                classInstList.add(listItem);
+            }
+        }
+        Collections.sort(classInstList);
+        return classInstList;
+    }
+
+    public static LinkedList<String>  getClassPropertiesForTree(Model model, String className, String classInstance) {
+        LinkedList<String>  classPropList = new LinkedList<>();
+        Property classTypeProp = null;
+        try {
+            String ns = model.getNsPrefixURI(className.split(":",2)[0]);
+            String ln = className.split(":",2)[1];
+            classTypeProp = ResourceFactory.createProperty(ns,ln);
+        } catch (NullPointerException e) {
+            System.out.println("Caught NullPointerException: " + e.getMessage());
+        }
+        
+        String classInstRDFID = null;
+        if (classInstance.contains("|")){
+            classInstRDFID= classInstance.split("\\|",2)[1];
+        }else{
+            classInstRDFID=classInstance;
+        }
+        String xmlbaseURI = model.listStatements(new SimpleSelector(null, RDF.type, classTypeProp)).next().getSubject().getNameSpace();
+        Resource classInsRes = ResourceFactory.createResource(xmlbaseURI+classInstRDFID);
+
+        for (StmtIterator it = model.listStatements(new SimpleSelector(classInsRes, null, (RDFNode) null)); it.hasNext(); ) {
+            Statement stmt = it.next();
+            Property pred = stmt.getPredicate();
+            if (!pred.equals(RDF.type)) {
+                if (stmt.getObject().isResource()) {
+                    String listItem = model.getNsURIPrefix(pred.getNameSpace()) + ":" + pred.getLocalName();
+                    classPropList.add(listItem);
+                }
+            }
+        }
+        Collections.sort(classPropList);
+        return classPropList;
+    }
+
+    public static String  getPropertiesRefClassForTree(Model model, String classInstance, String classTypeProp, String classProp) {
+        String  refClass =null;
+        String classInstRDFID = null;
+        if (classInstance.contains("|")){
+            classInstRDFID= classInstance.split("\\|",2)[1];
+        }else{
+            classInstRDFID=classInstance;
+        }
+
+
+        String ns = model.getNsPrefixURI(classProp.split(":",2)[0]);
+        String ln = classProp.split(":",2)[1];
+        Property classInstProp = ResourceFactory.createProperty(ns,ln);
+        String xmlbaseURI = "http://griddigit.eu#";
+        Resource classInsRes = ResourceFactory.createResource(xmlbaseURI+classInstRDFID);
+        if (model.listStatements(new SimpleSelector(classInsRes, classInstProp, (RDFNode) null)).hasNext()){
+            refClass = model.listStatements(new SimpleSelector(classInsRes, classInstProp, (RDFNode) null)).next().getObject().asResource().getLocalName();
+            String refClassPure = refClass;
+            if (model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI+refClass), ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).hasNext()){
+                Statement cNameStmt = model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI+refClass), ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).next();
+                String cName = cNameStmt.getObject().toString();
+                refClass = cName + "|" + refClass;
+            }else{
+                refClass = "|" + refClass;
+            }
+            //System.out.println(xmlbaseURI+refClassPure);
+            if (model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI + refClassPure), RDF.type, (RDFNode) null)).hasNext()) {
+                String cTypeNameStmt = model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI + refClassPure), RDF.type, (RDFNode) null)).next().getObject().asResource().getLocalName();
+                refClass = cTypeNameStmt + ":" + refClass;
+            }else{
+
+            }refClass = ":" + refClass;
+        }
+
+        return refClass;
+    }
 }

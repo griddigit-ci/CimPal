@@ -1512,6 +1512,9 @@ public class ShaclTools {
                                         Statement stmtinheritance = i.next();
                                         concreteClasses.add(stmtinheritance.getObject().asResource());
                                     }
+                                    if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
+                                        concreteClasses.add(ResourceFactory.createResource(abstractclass));
+                                    }
                                     if (concreteClasses.size() == 0) { //it means that there are no child classes and then it needs to be checked if the class is concrete in the base data
                                         if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
                                             concreteClasses.add(ResourceFactory.createResource(abstractclass));

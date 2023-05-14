@@ -7,11 +7,9 @@ package application;
 
 import core.*;
 import customWriter.CustomRDFFormat;
-import gui.ComboBoxCell;
-import gui.GUIhelper;
-import gui.TableColumnsSetup;
-import gui.TextAreaEditTableCell;
+import gui.*;
 import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -71,6 +69,17 @@ public class MainController implements Initializable {
     public Tab tabOutputWindow;
     public Button btnResetIDComp;
     public Font x3;
+    public Button btnResetRDFComp;
+    @FXML
+    public TreeView treeViewInstanceData;
+    public TextField fPrefixGenerateTab1;
+    public TextField fshapesBaseURIDefineTab1;
+    public TextField fURIGenerateTab1;
+    public TextField fowlImportsDefineTab1;
+    @FXML
+    private TableView tableViewBrowseID;
+    public TableColumn itemColumnBrowseModifyID;
+    public TableColumn valueColumnBrowseModifyID;
     @FXML
     private TextArea foutputWindow;
     @FXML
@@ -84,6 +93,8 @@ public class MainController implements Initializable {
     @FXML
     private TabPane tabPaneDown;
     public static Preferences prefs;
+    @FXML
+    private CheckBox cbShowUnionModelOnly;
 
     @FXML
     private Button btnConstructShacl;
@@ -153,6 +164,8 @@ public class MainController implements Initializable {
     private CheckBox fcbRDFConverInheritanceListConcrete;
     @FXML
     private TreeView treeViewConstraints;
+//    @FXML
+//    private TreeView treeViewInstanceData;
     @FXML
     private  TextField fPrefixGenerateTab;
     @FXML
@@ -254,7 +267,9 @@ public class MainController implements Initializable {
     public static String rdfFormatInput;
 
     public static TreeView treeViewConstraintsStatic;
+    public static TreeView treeViewIDStatic;
     private static Map<TreeItem,String> treeMapConstraints;
+    private static Map<TreeItem,String> treeMapID;
     private static Map<String,TreeItem> treeMapConstraintsInverse;
     public static Integer associationValueTypeOption;
 
@@ -268,6 +283,9 @@ public class MainController implements Initializable {
     public static Model unionmodelbaseprofilesshacl;
     public static Model unionmodelbaseprofilesshaclinheritance;
     public static Model unionmodelbaseprofilesshaclinheritanceonly;
+
+    public static  Map<String,Model> InstanceModelMap;
+    public static boolean treeID;
 
 
     public MainController() {
@@ -284,13 +302,18 @@ public class MainController implements Initializable {
         };
         System.setOut(new PrintStream(out, true));
         System.setErr(new PrintStream(out, true));
-
+        treeID=false;
         treeViewConstraintsStatic=treeViewConstraints;
+        treeViewIDStatic=treeViewInstanceData;
         foutputWindowVar=foutputWindow;
         //initialization of the Browse and Modify table - SHACL Shapes Browse
         tableViewBrowseModify.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         tableViewBrowseModify.setEditable(false);
         tableViewBrowseModify.setPlaceholder(new Label("No shape properties present"));
+
+//        tableViewBrowseID.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+//        tableViewBrowseID.setEditable(false);
+//        tableViewBrowseID.setPlaceholder(new Label("No data present"));
 
         Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
 
@@ -1757,7 +1780,7 @@ public class MainController implements Initializable {
             for (StmtIterator i = model.listStatements(new SimpleSelector(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory"))); i.hasNext(); ) {
                 Statement resItem = i.next();
                 String label = model.getRequiredProperty(resItem.getSubject(),RDFS.label).getObject().asLiteral().getString();
-                if (label.endsWith("Profile") && !label.startsWith("Doc")) {
+                if (label.endsWith("Profile") && (!label.startsWith("Doc") || label.startsWith("Document"))) {
                     this.packages.add(label);
                 }
             }
@@ -2037,10 +2060,10 @@ public class MainController implements Initializable {
                                     ((ArrayList) modelsNames).set(1, "ae");
                                     ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints#");
                                     break;
-                                case "SecurityScheduleProfile":
-                                case "DocSecurityScheduleProfile":
+                                case "StateInstructionScheduleProfile":
+                                case "DocStateInstructionScheduleProfile":
                                     ((ArrayList) modelsNames).set(1, "ss");
-                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SecuritySchedule-EU/Constraints#");
+                                    ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/StateInstructionSchedule-EU/Constraints#");
                                     break;
                                 case "ContingencyProfile":
                                 case "DocContingencyProfile":
@@ -2543,6 +2566,40 @@ public class MainController implements Initializable {
             }
         }
 
+    @FXML
+    //Action for button "Load Data" related to tab Instance Data Browser
+    private void actionBtnLoadInstanceData(ActionEvent actionEvent) throws FileNotFoundException {
+        progressBar.setProgress(0);
+        treeID = true;
+
+        //select file
+        List<File>  fileL = util.ModelFactory.filechoosercustom(false,"Instance files", List.of("*.xml","*.zip"));
+        String xmlBase="http://griddigit.eu#";
+
+        InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null,false);
+        //int k=1;
+//        if (fileL != null) {// the file is selected
+//            for (int m = 0; m < fileL.size(); m++) {
+//                util.ModelFactory.shapeModelLoad(m,fileL); //loads shape model
+//                //ArrayList<String> mpak1 = new ArrayList<>();
+//                mpak1.add(FilenameUtils.getBaseName(((File) fileL.get(m)).getName())); // adds the name without the extension.
+//                Map prefixMap = ((Model) shapeModels.get(m)).getNsPrefixMap();
+//                for (Object o : prefixMap.values()) {
+//                    String value = o.toString();
+//                    if (value.contains(defaultShapesURI) || value.toLowerCase().contains("constraints")) {
+//                        mpak1.add(((Model) shapeModels.get(m)).getNsURIPrefix(value)); //reserved for the prefix of the profile/shapes
+//                        mpak1.add(value); // reserved for the URI of the profile/shapes
+//                        mpak1.add(value); // reserved for the baseURI of the shapes
+//                        mpak1.add("");// reserved for the owl:imports
+//                        break;
+//                    }
+//                }
+//
+//                shapeModelsNames.add(mpak1);
+            //}
+        guiTreeInstanceDataInit(); //initializes the tree
+        //}
+    }
 
     @FXML
     //Action for button "Open" related to tab SHACL Shape Browser
@@ -2583,6 +2640,21 @@ public class MainController implements Initializable {
 
     }
 
+    @FXML
+    //Action for button "Unload Shapes" related to tab SHACL Shape Browser
+    private void actionBrtUnloadInstanceData(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        MainController.InstanceModelMap = null;
+        treeViewIDStatic.setRoot(null);
+        //fPrefixGenerateTab.clear();
+        //fURIGenerateTab.clear();
+        //fshapesBaseURIDefineTab.clear();
+        //fowlImportsDefineTab.clear();
+        fsourceDefineTab.clear();
+        tableViewBrowseID.getItems().clear();
+
+
+    }
     @FXML
     //Action for button "Unload Shapes" related to tab SHACL Shape Browser
     private void actionBrtUnloadShapes(ActionEvent actionEvent) {
@@ -2682,6 +2754,419 @@ public class MainController implements Initializable {
 
     }
 
+    //initializes the TreeView in the Instance Data Browser
+    public void guiTreeInstanceDataInit() {
+
+        TreeItem<String> rootMain = treeViewIDStatic.getRoot();
+        if (rootMain == null){
+            //define the Treeview
+            //rootMain = new CheckBoxTreeItem<>("Main root");
+            rootMain = new TreeItem<>("Main root");
+            rootMain.setExpanded(true);
+            //treeViewInstanceData.setShowExpandable(true);
+            treeViewIDStatic.setRoot(rootMain); // sets the root to the gui object
+            treeViewIDStatic.setShowRoot(false);
+            treeMapID = new HashMap<>();
+            //treeMapConstraintsInverse = new HashMap<>();
+
+        }
+        LinkedList<String> tvlevel1 = new LinkedList<>();
+        for (Map.Entry<String, Model> entry : InstanceModelMap.entrySet()) {
+            String key = entry.getKey();
+            tvlevel1.add(key);
+        }
+        Collections.sort(tvlevel1);
+        TaggedTreeItem<String> tItem;
+        if (cbShowUnionModelOnly.isSelected()) {
+            tItem = new TaggedTreeItem<>("Union Model");
+            rootMain.getChildren().add(tItem);
+            treeMapID.putIfAbsent(tItem, "unionModel");
+            tItem.setTag("fileOrModel");
+
+            LinkedList<String> classList = InstanceDataFactory.getClassesForTree(InstanceModelMap.get("unionModel"));
+            for (String i : classList){
+                TaggedTreeItem<String> cItem = new TaggedTreeItem<>(i);
+                tItem.getChildren().add(cItem);
+                cItem.setTag("classType");
+            }
+        }else{
+            tItem = new TaggedTreeItem<>("Union Model");
+            rootMain.getChildren().add(tItem);
+            treeMapID.putIfAbsent(tItem, "unionModel");
+            tItem.setTag("fileOrModel");
+
+            LinkedList<String> classList = InstanceDataFactory.getClassesForTree(InstanceModelMap.get("unionModel"));
+            for (String i : classList){
+                TaggedTreeItem<String> cItem = new TaggedTreeItem<>(i);
+                tItem.getChildren().add(cItem);
+                cItem.setTag("classType");
+            }
+
+            for (String key : tvlevel1){
+                if (!treeMapID.containsValue(key) && !key.equals("modelUnionWithoutHeader") && !key.equals("unionModel")) {
+                    tItem = new TaggedTreeItem<>(key.split(".xml\\|", 2)[0]);
+                    rootMain.getChildren().add(tItem);
+                    treeMapID.putIfAbsent(tItem, key);
+                    tItem.setTag("fileOrModel");
+
+                    classList = InstanceDataFactory.getClassesForTree(InstanceModelMap.get(key));
+                    for (String i : classList){
+                        TaggedTreeItem<String> cItem = new TaggedTreeItem<>(i);
+                        tItem.getChildren().add(cItem);
+                        cItem.setTag("classType");
+                    }
+                }
+            }
+        }
+
+        //treeViewIDStatic.refresh();
+        //treeViewConstraints.setCellFactory(CheckBoxTreeCell.<String>forTreeView()); //this sets checkbox in front
+        treeViewIDStatic.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+
+    }
+    //set expand in the Instance data tree view
+    public static void treeInstanceDataExpand(TaggedTreeItem<String> expandedItem) {
+
+        String tagValue = expandedItem.getTag();
+        String modelname;
+        Model selectedModel = null;
+        switch (tagValue) {
+            case "fileOrModel":
+                modelname = expandedItem.getValue();
+                for (Map.Entry<String, Model> entry : InstanceModelMap.entrySet()) {
+                    String key = entry.getKey();
+                    Model value = entry.getValue();
+                    if (key.equals("unionModel") && modelname.equals("Union Model")){
+                        selectedModel = value;
+                        break;
+                    }else {
+                        if (key.startsWith(modelname)) {
+                            selectedModel = value;
+                            break;
+                        }
+                    }
+                }
+                for (TreeItem<String> ti : expandedItem.getChildren()) {
+                    String tiName = ti.getValue().toString();
+                    LinkedList<String> classInstance = InstanceDataFactory.getClassInstancesForTree(selectedModel, tiName);
+
+                    for (String i : classInstance) {
+                        TaggedTreeItem<String> cInstanceItem = new TaggedTreeItem<>(i);
+                        if (!containsChild(ti, i)) {
+                            ti.getChildren().add(cInstanceItem);
+                            cInstanceItem.setTag("classInstance");
+                        }
+                    }
+                }
+                break;
+            case "classType":
+                //modelname = expandedItem.getParent().getValue();
+                modelname = MainController.getParentModelInTree(expandedItem).getValue();
+                for (Map.Entry<String, Model> entry : InstanceModelMap.entrySet()) {
+                    String key = entry.getKey();
+                    Model value = entry.getValue();
+                    if (key.equals("unionModel") && modelname.equals("Union Model")){
+                        selectedModel = value;
+                        break;
+                    }else {
+                        if (key.startsWith(modelname)) {
+                            selectedModel = value;
+                            break;
+                        }
+                    }
+                }
+                for (TreeItem<String> ti : expandedItem.getChildren()) {
+                    String tiName = ti.getValue().toString();
+                    LinkedList<String> classProperty = InstanceDataFactory.getClassPropertiesForTree(selectedModel, expandedItem.getValue(),tiName);
+
+                    for (String i : classProperty) {
+                        TaggedTreeItem<String> cPropItem = new TaggedTreeItem<>(i);
+                        //if (!containsChild(ti, i)) {
+                            ti.getChildren().add(cPropItem);
+                            cPropItem.setTag("classProperty");
+                        //}
+                    }
+                }
+                break;
+            case "classInstance":
+                //modelname = expandedItem.getParent().getParent().getValue();
+                modelname = MainController.getParentModelInTree(expandedItem).getValue();
+                for (Map.Entry<String, Model> entry : InstanceModelMap.entrySet()) {
+                    String key = entry.getKey();
+                    Model value = entry.getValue();
+                    if (key.equals("unionModel") && modelname.equals("Union Model")){
+                        selectedModel = value;
+                        break;
+                    }else {
+                        if (key.startsWith(modelname)) {
+                            selectedModel = value;
+                            break;
+                        }
+                    }
+                }
+                for (TreeItem<String> ti : expandedItem.getChildren()) {
+                    String tiName = ti.getValue().toString();
+                    String classInstance = InstanceDataFactory.getPropertiesRefClassForTree(selectedModel, expandedItem.getValue(),expandedItem.getParent().getValue(),tiName);
+
+                    TaggedTreeItem<String> classItem = new TaggedTreeItem<>(classInstance);
+                    if (!containsChild(ti, classInstance)) {
+                        ti.getChildren().add(classItem);
+                        classItem.setTag("classInstance");
+                    }
+                }
+                break;
+            case "classProperty":
+                //modelname = expandedItem.getParent().getParent().getParent().getValue();
+                modelname = MainController.getParentModelInTree(expandedItem).getValue();
+                for (Map.Entry<String, Model> entry : InstanceModelMap.entrySet()) {
+                    String key = entry.getKey();
+                    Model value = entry.getValue();
+                    if (key.equals("unionModel") && modelname.equals("Union Model")){
+                        selectedModel = value;
+                        break;
+                    }else {
+                        if (key.startsWith(modelname)) {
+                            selectedModel = value;
+                            break;
+                        }
+                    }
+                }
+                for (TreeItem<String> ti : expandedItem.getChildren()) {
+                    String tiName = ti.getValue().toString();
+                    String className = null;
+                    if (selectedModel.listStatements(new SimpleSelector(ResourceFactory.createResource("http://griddigit.eu#"+tiName.split("\\|",2)[1]),RDF.type, (RDFNode) null)).hasNext()){
+                        Statement typeStmt = selectedModel.listStatements(new SimpleSelector(ResourceFactory.createResource("http://griddigit.eu#"+tiName.split("\\|",2)[1]),RDF.type, (RDFNode) null)).next();
+                        className = selectedModel.getNsURIPrefix(typeStmt.getObject().asResource().getNameSpace())+":"+typeStmt.getObject().asResource().getLocalName();
+                    }
+                    LinkedList<String> classProperty = InstanceDataFactory.getClassPropertiesForTree(selectedModel, className,tiName);
+
+                    for (String i : classProperty) {
+                        TaggedTreeItem<String> cPropItem = new TaggedTreeItem<>(i);
+                        //if (!containsChild(ti, i)) {
+                            ti.getChildren().add(cPropItem);
+                            cPropItem.setTag("classProperty");
+                        //}
+                    }
+                }
+                break;
+        }
+
+
+    }
+    public static boolean containsChild(TreeItem<String> parent, String childValue) {
+        for (TreeItem<String> child : parent.getChildren()) {
+            if (child.getValue().equals(childValue)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static TaggedTreeItem<String> getParentModelInTree(TaggedTreeItem<String> child) {
+        TaggedTreeItem currentItem = (TaggedTreeItem) child.getParent();
+        while (currentItem != null) {
+            Object tag = currentItem.getTag();
+            if (tag != null && tag.equals("fileOrModel")) {
+                break;
+            }
+            currentItem = (TaggedTreeItem) currentItem.getParent();
+        }
+        return currentItem;
+    }
+
+    @FXML
+    //select action on the tree view Instance data
+    private void selectActionTreeItemID(MouseEvent mouseEvent) throws IOException {
+        //Initialisation GUI
+        tableViewBrowseID.getItems().clear();
+
+//        fPrefixGenerateTab.setText(""); // namespace "Prefix"
+//        fURIGenerateTab.setText(""); //namespace "URI"
+//        fshapesBaseURIDefineTab.setText(""); //baseURI
+//        fowlImportsDefineTab.setText(""); // "owl:imports"
+
+        Node node = mouseEvent.getPickResult().getIntersectedNode();
+        // Accept clicks only on node cells, and not on empty spaces of the TreeView
+        if (node instanceof Text || (node instanceof TreeCell && ((TreeCell) node).getText() != null)) {
+            //String name = (String) ((TreeItem)treeViewRDFS.getSelectionModel().getSelectedItem()).getValue();
+            ArrayList<Object> parentInfo=getParent(treeViewIDStatic); //returns a structure containing the profile parent, the tree level, the selected item
+
+//            int m = 0;
+//            for (int i = 0; i < shapeModelsNames.size(); i++) {
+//                //if (((ArrayList) shapeModelsNames.get(i)).get(0).equals(parentInfo.get(0))) {
+//                if (parentInfo.get(0).equals(((ArrayList) shapeModelsNames.get(i)).get(1)+":"+((ArrayList) shapeModelsNames.get(i)).get(0))) {
+//                    m = i;
+//                }
+//            }
+//
+//            Model shapeModel = (Model) shapeModels.get(m);
+//            //selectedShapeModel=m; // used for the combobox constraints
+//
+//            String prefix=((TreeItem<String>) parentInfo.get(2)).getValue().split(":",2)[0];
+//            // set namespace "Prefix"
+//            fPrefixGenerateTab.setText(prefix);
+//            String uri=shapeModel.getNsPrefixURI(prefix);
+//            //set namespace "URI"
+//            fURIGenerateTab.setText(uri);
+//            //set baseURI
+//            String baseURI=((ArrayList) shapeModelsNames.get(m)).get(3).toString();
+//            fshapesBaseURIDefineTab.setText(baseURI);
+//            //set Owl:imports
+//            int printSource=0; //important for the printing of the source of the elements
+//            if (((TreeView<String>) treeViewConstraints).getSelectionModel().getSelectedItems().get(0).getValue().equals(parentInfo.get(0))) {
+//                //this is when the parent (the shape model/profile) is selected
+//                String owlImports = ShaclTools.getOWLimports(shapeModel, uri);
+//                fowlImportsDefineTab.setText(owlImports);
+//
+//                //set "As source code" for the whole shape model
+//                if (btnShowSourceCodeDefineTab.isSelected()) {
+//                    ByteArrayOutputStream os = new ByteArrayOutputStream();
+//
+//                    shapeModel.write(os, "TURTLE", baseURI);
+//                    String stringForGui = os.toString("UTF-8");
+//                    fsourceDefineTab.setText(stringForGui);
+//                    os.close();
+//                }
+//                //fshapeTypeDefineTab.setText("Type: Shape model");
+//                return;
+//            }else{
+//                //this is when other thing is selected is selected
+//                //set "As source code" for the whole shape model
+//                if (btnShowSourceCodeDefineTab.isSelected()) {// the button to show the source is selected
+//                    printSource = 1;
+//                }
+//            }
+
+//
+//            String name=((TreeItem<String>) parentInfo.get(2)).getValue().split(":",2)[1];
+//            // set "Shape IRI"
+//            //fShapeIRIDefineTab.setText(((TreeItem<String>) parentInfo.get(2)).getValue());
+//            Resource resItem=shapeModel.getResource(uri+name);
+//            //selectedShapeResource=resItem; // used for the combobox constraints
+//
+//            //This is used for the printing of the source code
+//            Model shapeModelPart=JenaUtil.createDefaultModel();
+//            shapeModelPart.setNsPrefixes(shapeModel.getNsPrefixMap()); // set the same prefixes like the shapeModel
+//            List<Statement> shapeModelPartStmt = new LinkedList<>();
+//
+//            //gives all statements related to the resource. 0 means that the resource trippe is not included
+//            List<Statement> statementsList = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
+//
+//            ObservableList<TableColumnsSetup> tableData= tableViewBrowseModify.getItems();
+//
+//            ArrayList shaclNodeShapeProperties =ShaclTools.getListShaclNodeShapeProperties();
+//            ArrayList shaclPropertyShapeProperties =ShaclTools.getListShaclPropertyShapeProperties();
+//            ArrayList shaclPropertyGroupProperties =ShaclTools.getListShaclPropertyGroupProperties();
+//            ArrayList shaclSPARQLConstraintProperties =ShaclTools.getListShaclSPARQLConstraintProperties();
+//            ArrayList shaclTypeProperties =ShaclTools.getListShacltypeProperties();
+//
+//
+//            String ShapeType="";
+//            for (int stmt=0; stmt < statementsList.size(); stmt++) {
+//                if (stmt==0){
+//                    ShapeType=statementsList.get(stmt).getObject().asResource().getLocalName();
+//                    String propertyValue;
+//                    String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
+//                    String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
+//                    propertyValue = propertyValuePrefix + ":" + propertyValueLN;
+//                    shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+//                    tableData.add(new TableColumnsSetup("rdf:type",
+//                            propertyValue, FXCollections.<String>observableArrayList(shaclTypeProperties)));
+//                } else {
+//                    if (!statementsList.get(stmt).getPredicate().equals(RDF.type)) {
+//                        //if (!ShapeType.equals(statementsList.get(stmt).getObject().asResource().getLocalName())) {
+//                        String propertyValue="";
+//                        String shapePropertyPrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getPredicate().getNameSpace());
+//                        String shapePropertyLN = statementsList.get(stmt).getPredicate().getLocalName();
+//
+//                        if (statementsList.get(stmt).getObject().isResource()) {
+//                            if (!statementsList.get(stmt).getObject().isAnon()) {
+//                                String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
+//                                String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
+//                                propertyValue = propertyValuePrefix + ":" + propertyValueLN;
+//                                shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+//                            }else{ //if the object is a blank node
+//                                //it is assumed that this is a list, e.g. this works for sh:in and sh:or
+//
+//                                Resource list = statementsList.get(stmt).getObject().asResource();
+//                                RDFList rdfList = list.as( RDFList.class );
+//                                ExtendedIterator<RDFNode> items = rdfList.iterator();
+//
+//                                // add in the the blank node info for the source code
+//                                Resource blankNode = shapeModelPart.getResource(statementsList.get(stmt).getSubject().getURI());
+//                                RDFList orRDFlist = shapeModelPart.createList(rdfList.iterator());
+//                                blankNode.addProperty(statementsList.get(stmt).getPredicate(), orRDFlist);
+//
+//                                int firstTime=0;
+//                                while ( items.hasNext() ) {
+//                                    Resource item = items.next().asResource();
+//
+//                                    String propertyValuePrefix = shapeModel.getNsURIPrefix(item.getNameSpace());
+//                                    String propertyValueLN = item.getLocalName();
+//                                    if (firstTime==0) {
+//                                        propertyValue=propertyValuePrefix + ":" + propertyValueLN;
+//
+//                                        firstTime=1;
+//                                    }else{
+//                                        propertyValue = propertyValue +" , "+propertyValuePrefix + ":" + propertyValueLN;
+//                                    }
+//                                }
+//                            }
+//                        }else if (statementsList.get(stmt).getObject().isLiteral()){
+//                            propertyValue = statementsList.get(stmt).getObject().asLiteral().getString();//TODO see if the datatype should be shown
+//                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+//                        }else{
+//                            propertyValue=statementsList.get(stmt).getObject().toString();
+//                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
+//                        }
+//                        switch (ShapeType) {
+//                            case "NodeShape":
+//
+//                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+//                                        propertyValue, FXCollections.<String>observableArrayList(shaclNodeShapeProperties)));
+//
+//                                break;
+//                            case "PropertyShape":
+//                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+//                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyShapeProperties)));
+//                                break;
+//                            case "PropertyGroup":
+//                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+//                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyGroupProperties)));
+//                                break;
+//                            case "SPARQLConstraint":
+//                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
+//                                        propertyValue, FXCollections.<String>observableArrayList(shaclSPARQLConstraintProperties)));
+//                                //TODO also for the rest
+//                                break;
+//                        }
+//                        //}
+//                    }
+//                }
+//            }
+            ObservableList<TableColumnsSetup> tableData= tableViewBrowseID.getItems();
+            tableViewBrowseID.setItems(tableData);
+
+
+//            // set "As source code" this is when other thing is selected is selected
+//            if (printSource==1){
+//                ByteArrayOutputStream os = new ByteArrayOutputStream();
+//                //LocationMapper.setGlobalLocationMapper(new LocationMapper());
+//
+//
+//                //TODO see how to cut prefix information not to be printed
+//
+//                //List<Statement> result = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
+//                shapeModelPart.add(shapeModelPartStmt);
+//
+//                shapeModelPart.write(os, "TURTLE", baseURI);
+//                String stringForGui = os.toString(StandardCharsets.UTF_8);
+//                fsourceDefineTab.setText(stringForGui);
+//                os.close();
+//            }
+        }
+
+    }
 
     @FXML
     //select action on the tree view SHACL Shapes

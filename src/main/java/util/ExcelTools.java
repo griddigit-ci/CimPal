@@ -23,23 +23,20 @@ import java.util.LinkedList;
 public class ExcelTools {
 
     public static ArrayList<Object> importXLSX(String fileName, int sheetnum) {
-        ArrayList<Object> dataExcel = new ArrayList();
+        ArrayList<Object> dataExcel = new ArrayList<>();
         try {
             File excel = new File(fileName);
             FileInputStream fis = new FileInputStream(excel);
             XSSFWorkbook book = new XSSFWorkbook(fis);
             XSSFSheet sheet = book.getSheetAt(sheetnum);
-            Iterator<Row> iterator = sheet.iterator();
             // Iterating over Excel file in Java
 
-            while (iterator.hasNext()) {
-                LinkedList<Object> rowItem= new LinkedList<>();
-                Row currentRow = iterator.next();
-                Iterator<Cell> cellIterator = currentRow.iterator();
+            for (Row cells : sheet) {
+                LinkedList<Object> rowItem = new LinkedList<>();
+                Row currentRow = cells;
 
-                while (cellIterator.hasNext()) {
+                for (Cell currentCell : currentRow) {
 
-                    Cell currentCell = cellIterator.next();
                     //getCellTypeEnum shown as deprecated for version 3.15
                     //getCellTypeEnum ill be renamed to getCellType starting from version 4.0
                     if (currentCell.getCellType() == CellType.STRING) {

@@ -504,6 +504,104 @@
                         </VBox>
                      </AnchorPane>
                   </Tab>
+                  <Tab disable="true" text="Instance Data Browser">
+                     <content>
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                           <children>
+                              <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                 <children>
+                                    <VBox minWidth="300.0" spacing="5.0">
+                                       <HBox.margin>
+                                          <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                       </HBox.margin>
+                                       <children>
+                                          <Label prefWidth="120.0" text="Instance data" />
+                                          <TreeView fx:id="treeViewInstanceData" minHeight="70.0" onMouseClicked="#selectActionTreeItemID" prefWidth="300.0" VBox.vgrow="ALWAYS" />
+                                       </children>
+                                    </VBox>
+                                    <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                                       <HBox.margin>
+                                          <Insets bottom="5.0" right="5.0" top="5.0" />
+                                       </HBox.margin>
+                                       <children>
+                                          <VBox prefHeight="200.0" prefWidth="100.0">
+                                             <VBox.margin>
+                                                <Insets />
+                                             </VBox.margin>
+                                             <children>
+                                                <HBox spacing="10.0">
+                                                   <padding>
+                                                      <Insets left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                   <children>
+                                                      <CheckBox fx:id="cbShowUnionModelOnly" mnemonicParsing="false" selected="true" text="Show only Union Model">
+                                                         <HBox.margin>
+                                                            <Insets right="10.0" />
+                                                         </HBox.margin>
+                                                      </CheckBox>
+                                                      <Label prefWidth="140.0" text="Shapes namespace:" />
+                                                      <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
+                                                      <TextField fx:id="fPrefixGenerateTab1" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
+                                                      <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
+                                                      <TextField fx:id="fURIGenerateTab1" editable="false" prefWidth="300.0" />
+                                                   </children>
+                                                </HBox>
+                                                <HBox spacing="10.0">
+                                                   <padding>
+                                                      <Insets left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                   <children>
+                                                      <Label prefWidth="140.0" text="Shapes base URI:" />
+                                                      <TextField fx:id="fshapesBaseURIDefineTab1" editable="false" prefWidth="530.0" />
+                                                   </children>
+                                                </HBox>
+                                                <HBox spacing="10.0">
+                                                   <padding>
+                                                      <Insets left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                   <children>
+                                                      <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
+                                                      <TextField fx:id="fowlImportsDefineTab1" editable="false" prefWidth="530.0" />
+                                                   </children>
+                                                </HBox>
+                                             </children>
+                                          </VBox>
+                                          <TableView fx:id="tableViewBrowseID">
+                                             <columns>
+                                                <TableColumn fx:id="itemColumnBrowseModifyID" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Property" />
+                                                <TableColumn fx:id="valueColumnBrowseModifyID" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
+                                             </columns>
+                                          </TableView>
+                                          <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                             <children>
+                                                <VBox minWidth="200.0" spacing="5.0">
+                                                   <children>
+                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
+                                                         <children>
+                                                            <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
+                                                         </children>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
+                                                <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
+                                                   <children>
+                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
+                                                         <children>
+                                                            <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData" text="Load Data" HBox.hgrow="ALWAYS" />
+                                                         </children>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                    </VBox>
+                                 </children>
+                              </HBox>
+                           </children>
+                        </AnchorPane>
+                     </content>
+                  </Tab>
                </TabPane>
             </HBox>
          </AnchorPane>
