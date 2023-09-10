@@ -15,6 +15,7 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.SysRIOT;
 import org.apache.jena.sparql.util.Context;
+import org.apache.jena.vocabulary.DCTerms;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
@@ -36,6 +37,7 @@ public class ShaclTools {
     private static Map<String, RDFDatatype> dataTypeMapFromProfile;
     public static Model profileDataMapAsModelTemp;
     public static Resource mainClassTemp;
+    public static List<Statement> rdfsHeaderStatements;
 
 
     //constructs the shape data necessary to create the set of shapes for the basic profile validations
@@ -44,6 +46,12 @@ public class ShaclTools {
         dataTypeMapFromProfile = new HashMap<>();
         profileDataMapAsModelTemp = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
 
+
+        //Extract RDFS header information
+        if (model.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()){
+            Resource hearerTypeRes = model.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).next();
+            rdfsHeaderStatements = model.listStatements(new SimpleSelector(hearerTypeRes, null, (Property) null)).toList();
+        }
 
         // structure for the list rdfToShacl
         // level 0: the profile, element 0 data for the profile
@@ -1356,17 +1364,19 @@ public class ShaclTools {
                 try {
                     //model.write(out, rdfFormat.getLang().getLabel().toUpperCase(),baseURI);//String.valueOf(rdfFormat)
 
-                    if (rdfFormat.getLang().getLabel().toUpperCase().equals("RDF/XML")) {
+                    if (rdfFormat.getLang().getLabel().equalsIgnoreCase("RDF/XML")) {
                         //Update - test the writer
                         //baseURI = "http://iec.ch/TC57/61970-600/CoreEquipment-European/3/0/cgmes/shapes";
 
                         Map<String, Object> properties = new HashMap<>();
                         properties.put("showXmlDeclaration", "true");
-                        properties.put("showDoctypeDeclaration", "true");
+                        properties.put("showDoctypeDeclaration", "false");
                         //properties.put("blockRules", RDFSyntax.propertyAttr.toString()); //???? not sure
                         properties.put("xmlbase", baseURI);
                         properties.put("tab", "2");
                         properties.put("relativeURIs", "same-document");
+                        properties.put("prettyTypes", new Resource[]{OWL2.Ontology});
+                        //properties.put("prettyTypes", new Resource[]{ResourceFactory.createResource(headerClassResource)});
 
 
                         // Put a properties object into the Context.
@@ -1375,11 +1385,10 @@ public class ShaclTools {
 
                         org.apache.jena.riot.RDFWriter.create()
                                 .base(baseURI)
-                                .format(RDFFormat.RDFXML_PLAIN)
+                                .format(RDFFormat.RDFXML_PRETTY) //.RDFXML_PLAIN
                                 .context(cxt)
                                 .source(model)
                                 .output(out);
-
 
                     }else{
                         model.write(out, rdfFormat.getLang().getLabel().toUpperCase(),baseURI);
@@ -1458,6 +1467,45 @@ public class ShaclTools {
         //shapeModels.set(m,shapeModel);
     }
 
+    //add header to SHACL
+    public static Model addSHACLheader(Model shapeModel, String baseURI){
+
+        Resource shaclHeaderRes = ResourceFactory.createResource(baseURI+"#Ontology");
+        shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes,RDF.type,OWL2.Ontology));
+
+        for (Statement stmt : rdfsHeaderStatements) {
+            if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#title"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#versionIRI"))) {
+                int len = Arrays.asList(stmt.getObject().toString().split("/")).size();
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createProperty(baseURI+"/"+ Arrays.asList(stmt.getObject().toString().split("/")).get(len-1))));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/ns/dcat#keyword"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/ns/dcat#theme"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createLangLiteral("constraint","en")));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#license"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#versionInfo"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#rightsHolder"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#conformsTo"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#description"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createPlainLiteral("Describing constraints extracted from RDFS.")));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#modified"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#language"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#publisher"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#identifier"))) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createPlainLiteral("urn:uuid" + UUID.randomUUID())));
+            }
+        }
+            shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, ResourceFactory.createProperty("http://purl.org/dc/terms/#issued"), ResourceFactory.createTypedLiteral(String.valueOf(java.time.LocalDateTime.now()),XSDDatatype.XSDdateTime)));
+        return shapeModel;
+    }
     //get owl:imports
     public static String getOWLimports(Model shapeModel, String baseURI){
         String owlImports="";

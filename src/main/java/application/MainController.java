@@ -369,8 +369,9 @@ public class MainController implements Initializable {
         fcbRDFSformat.getSelectionModel().selectLast();
 
         fcbRDFSformatShapes.getItems().addAll(
-                "RDFS (augmented) by CimSyntaxGen",
-                "Merged OWL CIMTool"
+                "RDFS (augmented, v2020) by CimSyntaxGen",
+                "RDFS (augmented, v2019) by CimSyntaxGen",
+                "Merged OWL CIMTool (NOT READY)"
         );
         fcbRDFSformatShapes.getSelectionModel().selectFirst();
 
@@ -1406,10 +1407,13 @@ public class MainController implements Initializable {
     private void actionOpenRDFS() {
         //FileChooser filechooser = new FileChooser();
         List<File> file = null;
-        if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen")) {
+        if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
             //filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDFS (augmented) by CimSyntaxGen files", "*.rdf"));
-            rdfFormatInput="CimSyntaxGen-RDFS-Augmented-2019";
-            file = util.ModelFactory.filechoosercustom(false,"RDFS (augmented) by CimSyntaxGen files", List.of("*.rdf"));
+            rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2019";
+            file = util.ModelFactory.filechoosercustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"));
+        }else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2020) by CimSyntaxGen")){
+            rdfFormatInput="CimSyntaxGen-RDFS-Augmented-2020";
+            file = util.ModelFactory.filechoosercustom(false,"RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"));
         }else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool")) {
             //filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Merged OWL CIMTool files", "*.owl"));
             rdfFormatInput="CIMTool-merged-owl";
@@ -1776,7 +1780,7 @@ public class MainController implements Initializable {
         Model model = (Model) this.models.get(m);
         this.packages = new ArrayList<>();
 
-        if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019")) {
+        if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019") || rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2020")) {
             for (StmtIterator i = model.listStatements(new SimpleSelector(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory"))); i.hasNext(); ) {
                 Statement resItem = i.next();
                 String label = model.getRequiredProperty(resItem.getSubject(),RDFS.label).getObject().asLiteral().getString();
@@ -2323,7 +2327,7 @@ public class MainController implements Initializable {
         }
 
 
-        if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size()!=0 ) {
+        if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
             //depending on the value of the choice box "Save datatype map"
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
                 shaclNodataMap  = 1;
@@ -2411,16 +2415,30 @@ public class MainController implements Initializable {
 
                 Model model = (Model) this.models.get(m);
                 String rdfNs = MainController.prefs.get("cimsNamespace", "");
+                String rdfCase = "";
+                if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019") && cbvalue.equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
+                    rdfCase = "RDFS2019";
+                }else if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2020") && cbvalue.equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
+                    rdfCase = "RDFS2020";
+                    //this option is adding header to the SHACL that is generated.
+                }else if (rdfFormatInput.equals("CIMTool-merged-owl") && cbvalue.equals("CIMTool-merged-owl")){
+                    rdfCase = "CIMToolOWL";
+                }
 
-                if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019")) {
-                    String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
-                    ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
-                    shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
-                    //here the preparation ends
+                switch (rdfCase) {
+                    case "RDFS2019" -> {
+                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
-                    String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
-                    String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+
+                        //here the preparation ends
+
+                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+
+                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+
 
          /*           String baseURI=null;
                 if (fshapesBaseURICreateCompleteSMTab.getText().isEmpty()) {
@@ -2438,43 +2456,43 @@ public class MainController implements Initializable {
                         baseURI = nsURIprofile;
                     }
                 }else{*/
-                    String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
-                    //}
-                    String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
-                    //generate the shape model
-                    Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
+                        //}
+                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
+                        //generate the shape model
+                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
 
-                    //add the owl:imports
-                    shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
+                        //add the owl:imports
+                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
 
-                    shapeModels.add(shapeModel);
-                    shapeModelsNames.add(this.modelsNames.get(m));
-                    //System.out.println(dataTypeMapFromShapes);
-                    //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
+                        shapeModels.add(shapeModel);
+                        shapeModelsNames.add(this.modelsNames.get(m));
+                        //System.out.println(dataTypeMapFromShapes);
+                        //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
 
-                    //open the ChoiceDialog for the save file and save the file in different formats
-                    String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
-                    File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+                        //open the ChoiceDialog for the save file and save the file in different formats
+                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
+                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
 
-                    //this is used for the printing of the complete map in option "All profiles in one map"
-                    for (Object key : dataTypeMapFromShapes.keySet()) {
-                        dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
-                    }
-                    //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
-                    if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
-                        Properties properties = new Properties();
-
+                        //this is used for the printing of the complete map in option "All profiles in one map"
                         for (Object key : dataTypeMapFromShapes.keySet()) {
-                            properties.put(key, dataTypeMapFromShapes.get(key).toString());
+                            dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
                         }
-                        String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
-                        properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
+                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
+                            Properties properties = new Properties();
 
-                    }
-                    //add the shapes in the tree view
+                            for (Object key : dataTypeMapFromShapes.keySet()) {
+                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
+                            }
+                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+
+                        }
+                        //add the shapes in the tree view
 
 
-                    //exporting the model to ttl ready function
+                        //exporting the model to ttl ready function
                 /*
                     File file = FileManager.createFile(filePathWithExtension);
                     OutputStream out = new FileOutputStream(file);
@@ -2489,48 +2507,104 @@ public class MainController implements Initializable {
                     }
 
                  */
-                } else if (rdfFormatInput.equals("CIMTool-merged-owl")) {
-                    String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
-                    ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
-                    shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
-                    //here the preparation ends
-
-                    String nsPrefixprofile = ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
-                    String nsURIprofile = ((ArrayList) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
-
-                    String baseURI = ((ArrayList) this.modelsNames.get(m)).get(3).toString();
-                    //}
-                    String owlImport = ((ArrayList) this.modelsNames.get(m)).get(4).toString();
-                    //generate the shape model
-                    Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
-
-                    //add the owl:imports
-                    shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
-
-                    shapeModels.add(shapeModel);
-                    shapeModelsNames.add(this.modelsNames.get(m));
-                    //System.out.println(dataTypeMapFromShapes);
-                    //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
-
-                    //open the ChoiceDialog for the save file and save the file in different formats
-                    String titleSaveAs = "Save as for shape model: " + ((ArrayList) this.modelsNames.get(m)).get(0).toString();
-                    File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
-
-                    //this is used for the printing of the complete map in option "All profiles in one map"
-                    for (Object key : dataTypeMapFromShapes.keySet()) {
-                        dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
                     }
-                    //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
-                    if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
-                        Properties properties = new Properties();
+                    case "RDFS2020" -> {
+                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
+                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+
+                        //here the preparation ends
+
+                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+
+                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+
+                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
+                        //}
+                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
+                        //generate the shape model
+                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+
+                        //add the owl:imports
+                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
+
+                        //add header
+                        shapeModel = ShaclTools.addSHACLheader(shapeModel,baseURI);
+
+                        shapeModels.add(shapeModel);
+                        shapeModelsNames.add(this.modelsNames.get(m));
+                        //System.out.println(dataTypeMapFromShapes);
+                        //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
+
+                        //open the ChoiceDialog for the save file and save the file in different formats
+                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
+                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+
+                        //this is used for the printing of the complete map in option "All profiles in one map"
                         for (Object key : dataTypeMapFromShapes.keySet()) {
-                            properties.put(key, dataTypeMapFromShapes.get(key).toString());
+                            dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
                         }
-                        String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
-                        properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
+                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
+                            Properties properties = new Properties();
 
+                            for (Object key : dataTypeMapFromShapes.keySet()) {
+                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
+                            }
+                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+
+                        }
+
+                    }
+                    case "CIMToolOWL" -> {
+                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
+
+                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+
+                        //here the preparation ends
+
+                        String nsPrefixprofile = ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+
+                        String nsURIprofile = ((ArrayList) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+
+
+                        String baseURI = ((ArrayList) this.modelsNames.get(m)).get(3).toString();
+                        //}
+                        String owlImport = ((ArrayList) this.modelsNames.get(m)).get(4).toString();
+                        //generate the shape model
+                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+
+                        //add the owl:imports
+                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
+
+                        shapeModels.add(shapeModel);
+                        shapeModelsNames.add(this.modelsNames.get(m));
+                        //System.out.println(dataTypeMapFromShapes);
+                        //RDFDataMgr.write(System.out, shapeModel, RDFFormat.TURTLE);
+
+                        //open the ChoiceDialog for the save file and save the file in different formats
+                        String titleSaveAs = "Save as for shape model: " + ((ArrayList) this.modelsNames.get(m)).get(0).toString();
+                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+
+                        //this is used for the printing of the complete map in option "All profiles in one map"
+                        for (Object key : dataTypeMapFromShapes.keySet()) {
+                            dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
+                        }
+                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
+                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
+                            Properties properties = new Properties();
+
+                            for (Object key : dataTypeMapFromShapes.keySet()) {
+                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
+                            }
+                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+
+                        }
                     }
                 }
             }
