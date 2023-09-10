@@ -70,8 +70,10 @@ public class RdfConvert {
 //                filechooser.setInitialDirectory(new File("C:/"));
 //                fileDet1 = filechooser.showOpenDialog(null);
 //            }
-            if (fileDet1.get(0)!=null) {
-                modelFiles.add(fileDet1.get(0));
+            if (fileDet1.size()!=0) {
+                if (fileDet1.get(0) != null) {
+                    modelFiles.add(fileDet1.get(0));
+                }
             }
 
 
@@ -86,8 +88,10 @@ public class RdfConvert {
 //                filechooser1.setInitialDirectory(new File("C:/"));
 //                fileDet2 = filechooser1.showOpenDialog(null);
 //            }
-            if (fileDet2.get(0)!=null) {
-                modelFiles.add(fileDet2.get(0));
+            if (fileDet2.size()!=0) {
+                if (fileDet2.get(0) != null) {
+                    modelFiles.add(fileDet2.get(0));
+                }
             }
 
 
@@ -102,8 +106,10 @@ public class RdfConvert {
 //                filechooser2.setInitialDirectory(new File("C:/"));
 //                fileDet3 = filechooser2.showOpenDialog(null);
 //            }
-            if (fileDet3.get(0)!=null) {
-                modelFiles.add(fileDet3.get(0));
+            if (fileDet3.size()!=0) {
+                if (fileDet3.get(0) != null) {
+                    modelFiles.add(fileDet3.get(0));
+                }
             }
 
             model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();

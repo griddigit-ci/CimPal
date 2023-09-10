@@ -9,7 +9,6 @@ import core.*;
 import customWriter.CustomRDFFormat;
 import gui.*;
 import javafx.application.Platform;
-import javafx.beans.property.BooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -350,6 +349,7 @@ public class MainController implements Initializable {
                 "IEC TS 61970-600-1&2 (CGMES 2.4.15)",
                 "IEC 61970-600-1&2 (CGMES 3.0.0)",
                 "IEC 61970-452:Ed4",
+                "Network Codes profiles",
                 "Other"
         );
 
@@ -1462,7 +1462,7 @@ public class MainController implements Initializable {
         List<File> file=null;
         List<File> fileL=null;
         if (fcbRDFconvertModelUnion.isSelected()) {
-            fileL = util.ModelFactory.filechoosercustom(false,"RDF file to convert", List.of("*.rdf","*.xml", "*.ttl"));
+            fileL = util.ModelFactory.filechoosercustom(false,"RDF file to convert", List.of("*.rdf","*.xml", "*.ttl","*.jsonld"));
 //            try {
 //                fileL = filechooser.showOpenMultipleDialog(null);
 //            }catch (Exception e){
@@ -1477,7 +1477,7 @@ public class MainController implements Initializable {
                 fsourcePathTextField.clear();
             }
         }else{
-            file = util.ModelFactory.filechoosercustom(true,"RDF file to convert", List.of("*.rdf","*.xml", "*.ttl"));
+            file = util.ModelFactory.filechoosercustom(true,"RDF file to convert", List.of("*.rdf","*.xml", "*.ttl","*.jsonld"));
 //            try {
 //                file = filechooser.showOpenDialog(null);
 //            }catch (Exception e) {
@@ -1909,6 +1909,8 @@ public class MainController implements Initializable {
                 profileVersion=2; // CGMESv2.4
             }else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("IEC 61970-452:Ed4")){
                 profileVersion=3; // IEC 61970-452:Ed4
+            }else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("IEC 61970-452:Ed4")) {
+                profileVersion = 4; // IEC NC profiles
             }
             if (cbApplyDefNsDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();

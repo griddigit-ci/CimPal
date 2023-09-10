@@ -112,7 +112,7 @@ public class ShaclTools {
                     List<RDFNode> pathComp = new LinkedList<>();
                     RDFNode r = ResourceFactory.createResource(((ArrayList<?>) ((ArrayList<?>) o).get(attr)).get(1).toString());
                     pathComp.add(r);
-                    ((ArrayList) ((ArrayList) o).get(attr)).add(pathComp); // this is adding item 11 for the compound attribute
+                    ((ArrayList) ((ArrayList<?>) o).get(attr)).add(pathComp); // this is adding item 11 for the compound attribute
                     // this value will need to be added as item 11 of all attributes of the compound
                     //then go to the next level of compound
                     //TODO: ATTENTION: only 2 levels of nested compounds supported - see how to do it in a cleaver way
@@ -320,13 +320,16 @@ public class ShaclTools {
                     List<Resource> allSubclasses = getSubtypeClassesNlevel(classRange, model);
                     //check if the class is concrete
                     //TODO see if something should be done for abstract classes
+//                    if (classRange.toString().contains("ACDCTerminal")){
+//                        int k=1;
+//                    }
                     if (allSubclasses.size()==0) {
                         Boolean concrete= classIsConcrete(classRange, model);
                         List<Resource> concreteSubclass = new LinkedList<>();
                         if (concrete) {
                             concreteSubclass.add(classRange);
                             classProperty.add(concreteSubclass);
-                            //System.out.println("Association class is concrete" + classRange.toString());
+                           //System.out.println("Association class is concrete" + classRange.toString());
                         }else{
                             concreteSubclass.add(ResourceFactory.createResource("http://abstract.eu"));
                             classProperty.add(concreteSubclass);
@@ -346,8 +349,14 @@ public class ShaclTools {
                                 allConcreteSubclasses.add(subclass);
                             }
                         }
-                        //System.out.println(allConcreteSubclasses);
-                        classProperty.add(allConcreteSubclasses);
+
+                        if (allConcreteSubclasses.size()==0 && allSubclasses.size()==1){
+                            allConcreteSubclasses.add(ResourceFactory.createResource("http://abstract.eu"));
+                            classProperty.add(allConcreteSubclasses);
+                        }else if (allConcreteSubclasses.size()!=0) {
+                            //System.out.println(allConcreteSubclasses);
+                            classProperty.add(allConcreteSubclasses);
+                        }
                     }
                 }
                 /*for (int p=0; p<classProperty.size(); p++) {// test printing
@@ -544,376 +553,348 @@ public class ShaclTools {
         String multiplicity ="";
         int lowerBound = 0;
         int upperBound =0;
-        if (checkType.equals("cardinality")){
-            String cardinality = propertyNodeFeatures.get(5).toString();
-            if (cardinality.length() == 1) {
-                //need to have sh:minCount 1 ; and sh:maxCount 1 ;
-                multiplicity="required";
-                lowerBound=1;
-                upperBound=1;
-                shapeModel= ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
+        switch (checkType) {
+            case "cardinality":
+                String cardinality = propertyNodeFeatures.get(5).toString();
+                if (cardinality.length() == 1) {
+                    //need to have sh:minCount 1 ; and sh:maxCount 1 ;
+                    multiplicity = "required";
+                    lowerBound = 1;
+                    upperBound = 1;
+                    shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
 
-            } else if (cardinality.length() == 4) {
-                multiplicity="seeBounds";
-                lowerBound=0;
-                upperBound=0;
+                } else if (cardinality.length() == 4) {
+                    multiplicity = "seeBounds";
+                    lowerBound = 0;
+                    upperBound = 0;
 
-                if (Character.isDigit(cardinality.charAt(0))){
-                    lowerBound=Character.getNumericValue(cardinality.charAt(0));
-                    //propertyNodeFeatures.set(1,"Cardinality violation. Lower bound shall be "+lowerBound);
-                }
-                if (Character.isDigit(cardinality.charAt(3))) {
-                    upperBound = Character.getNumericValue(cardinality.charAt(3));
-                    //propertyNodeFeatures.set(1,"Cardinality violation. Upper bound shall be "+upperBound);
-                }else{
-                    upperBound=999; // means that no upper bound is defined when we have upper bound "to many"
-                }
+                    if (Character.isDigit(cardinality.charAt(0))) {
+                        lowerBound = Character.getNumericValue(cardinality.charAt(0));
+                        //propertyNodeFeatures.set(1,"Cardinality violation. Lower bound shall be "+lowerBound);
+                    }
+                    if (Character.isDigit(cardinality.charAt(3))) {
+                        upperBound = Character.getNumericValue(cardinality.charAt(3));
+                        //propertyNodeFeatures.set(1,"Cardinality violation. Upper bound shall be "+upperBound);
+                    } else {
+                        upperBound = 999; // means that no upper bound is defined when we have upper bound "to many"
+                    }
              /*   if (lowerBound!=1 && upperBound!=1) {//is they are the same 1..1 "Missing required association" is used
                     propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
                 }else if (lowerBound!=1 && upperBound!=1) {
                 }else if (lowerBound!=1 && upperBound!=1) {
                 }*/
-                if (lowerBound!=0 && upperBound!=999){ // covers 1..1 x..y excludes 0..n
-                    if (lowerBound!=1 && upperBound!=1) {//is they are the same 1..1 "Missing required association" is used
-                        propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
-                    }
-                    shapeModel= ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                } else if (lowerBound==0 && upperBound!=999) {//need to cover 0..x
-                    propertyNodeFeatures.set(1,"Cardinality violation. Upper bound shall be "+upperBound);
-                    shapeModel= ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                } else if (lowerBound!=0 && upperBound==999) {//need to cover x..n
-                    propertyNodeFeatures.set(1,"Cardinality violation. Lower bound shall be "+lowerBound);
-                    shapeModel= ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                }
-
-            }
-        } else if (checkType.equals("datatype")) {
-            //the if is checking if the property shape is existing, if it is existing a new one is not added, but it is
-            //just linked with the nodeshape
-            String nsURIprofileID="";
-            if (localName.contains("IdentifiedObject")){
-                nsURIprofileID=MainController.prefs.get("IOuri","");
-            } else {
-                nsURIprofileID=nsURIprofile;
-            }
-
-            if (shapeModel.containsResource(shapeModel.getResource(nsURIprofileID + localName + "-datatype"))) {
-                //adding the reference in the NodeShape
-                //Property p = shapeModel.createProperty(shaclURI, "property");
-                //RDFNode o = shapeModel.createResource(r1); // this gives sh:property     [ a  eqbd:TestR ] ;
-                RDFNode o = shapeModel.createResource(nsURIprofileID + localName + "-datatype");
-                nodeShapeResource.addProperty(SH.property, o);
-            } else {
-                //adding the reference in the NodeShape
-                //Property p = shapeModel.createProperty(shaclURI, "property");
-                //RDFNode o = shapeModel.createResource(r1); // this gives sh:property     [ a  eqbd:TestR ] ;
-                RDFNode o = shapeModel.createResource(nsURIprofileID + localName + "-datatype");
-                nodeShapeResource.addProperty(SH.property, o);
-
-                //adding the properties for the PropertyShape
-                Resource r = shapeModel.createResource(nsURIprofileID + localName + "-datatype");
-                //Property p1 = shapeModel.createProperty(rdfURI, "type");
-                //RDFNode o1 = shapeModel.createResource(shaclURI + "PropertyShape");
-                r.addProperty(RDF.type, SH.PropertyShape);
-
-                //adding the property for the sh:group
-                //Property p1g = shapeModel.createProperty(shaclURI, "group");
-                //creates the object which is the Group
-                RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
-                if (localName.contains("IdentifiedObject")){
-                    o1g = shapeModel.createResource(MainController.prefs.get("IOuri","")+"DatatypesGroupIO");
-                }
-                r.addProperty(SH.group, o1g);
-
-                //adding a property for the order
-                //Property p1o = shapeModel.createProperty(shaclURI, "order");
-                RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
-                if (localName.contains("IdentifiedObject")){
-                    o1o = shapeModel.createTypedLiteral("0.1", "http://www.w3.org/2001/XMLSchema#decimal");
-                }
-                r.addProperty(SH.order, o1o);
-
-                //adding a message
-                //Property p2 = shapeModel.createProperty(shaclURI, "message");
-                r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-
-                if (propertyNodeFeatures.get(13).toString().equals("")) {
-                    RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                    if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
-                        List<RDFNode> pathList = new ArrayList<>();
-                        pathList.add(o5);
-                        pathList.add(RDF.type.asResource());
-
-                        RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                        r.addProperty(path, pathRDFlist);
-                    }else{
-                        //Property p5 = shapeModel.createProperty(shaclURI, "path");
-
-                        r.addProperty(path, o5);
-                    }
-
-
-                }else { // it enters here when it is  compound and the sh:path needs to be a list
-                    //path for the case when the attribute is a compound
-                    List<RDFNode> pathList = (List<RDFNode>) propertyNodeFeatures.get(13);
-                    if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
-                        pathList.add(RDF.type.asResource());
-                    }
-                    RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                    r.addProperty(path, pathRDFlist);
-                }
-
-                //Property p6 = shapeModel.createProperty(shaclURI, "name");
-                r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
-
-                //Property p7 = shapeModel.createProperty(shaclURI, "description");
-                r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
-
-                //Property p8 = shapeModel.createProperty(shaclURI, "severity");
-                RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
-                r.addProperty(SH.severity, o8);
-
-                //add specific propertues for the datatype check
-                if (propertyNodeFeatures.get(6).toString().equals("Enumeration")) {
-                    //this is the case where the datatype is enumeration
-                    if (shapeModel.getProperty(shapeModel.getResource(nsURIprofile + localName + "-datatype"), SH.in) == null) {
-                        //Property p9 = shapeModel.createProperty(shaclURI, "nodeKind");
-                        //RDFNode o9 = shapeModel.createResource(shaclURI + "IRI");
-                        r.addProperty(SH.nodeKind, SH.IRI);
-
-                        //Property p10 = shapeModel.createProperty(shaclURI, "in");
-                        List<RDFNode> enumAttributes = new ArrayList<>();
-                        for (int en = 0; en < ((ArrayList) propertyNodeFeatures.get(7)).size(); en++) {
-                            enumAttributes.add(shapeModel.createResource(((ArrayList) propertyNodeFeatures.get(7)).get(en).toString()));
+                    if (lowerBound != 0 && upperBound != 999) { // covers 1..1 x..y excludes 0..n
+                        if (lowerBound != 1 && upperBound != 1) {//is they are the same 1..1 "Missing required association" is used
+                            propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
                         }
-                        RDFList enumRDFlist = shapeModel.createList(enumAttributes.iterator());
-                        r.addProperty(SH.in, enumRDFlist);
-                    }
-                }else if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
-                    //this is the case where the datatype is compound
-
-                    r.addProperty(SH.nodeKind, SH.BlankNode);
-                    if (associationValueTypeOption==1) {// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
-                        RDFNode oC = shapeModel.createResource(propertyNodeFeatures.get(12).toString());
-                        //adding sh:in
-                        List<RDFNode> classIn = new ArrayList<>();
-                        classIn.add(oC);
-
-                        RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
-                        r.addProperty(SH.in, classInRDFlist);
-
-                    }else{
-                        RDFNode oC = shapeModel.createResource(propertyNodeFeatures.get(12).toString());
-                        r.addProperty(SH.class_, oC);
+                        shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
+                    } else if (lowerBound == 0 && upperBound != 999) {//need to cover 0..x
+                        propertyNodeFeatures.set(1, "Cardinality violation. Upper bound shall be " + upperBound);
+                        shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
+                    } else if (lowerBound != 0 && upperBound == 999) {//need to cover x..n
+                        propertyNodeFeatures.set(1, "Cardinality violation. Lower bound shall be " + lowerBound);
+                        shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
                     }
 
-                }else {
-                    //this is the case where the datatype is a primitive or it is the primitive of the .value attribute of CIMDatatype
-                    //Property p9 = shapeModel.createProperty(shaclURI, "nodeKind");
-                    //RDFNode o9 = shapeModel.createResource(shaclURI + "Literal");
-                    r.addProperty(SH.nodeKind, SH.Literal);
-
-                    //Property p10 = shapeModel.createProperty(shaclURI, "datatype");
-                    //the following are all primitives part of CIM17 domain package
-                    RDFNode o10 = shapeModel.createResource();
-                    if (propertyNodeFeatures.get(6).toString().equals("Integer")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDinteger.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("Float")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDfloat.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("String")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("Boolean")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDboolean.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("Date")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDdate.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("DateTime")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDdateTime.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("Decimal")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDdecimal.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("Duration")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDduration.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("MonthDay")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDgMonthDay.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("Time")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDtime.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("URI")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("IRI")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("StringIRI")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("StringFixedLanguage")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
-                    } else if (propertyNodeFeatures.get(6).toString().equals("URL")) {
-                        o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
-                    }
-                        r.addProperty(SH.datatype, o10);
                 }
-            }
-        }else if (checkType.equals("associationValueType")){
-            if (((LinkedList) propertyNodeFeatures.get(10)).size()==1) {
+                break;
+            case "datatype":
                 //the if is checking if the property shape is existing, if it is existing a new one is not added, but it is
                 //just linked with the nodeshape
-                //if (localName.contains("DCLine")){
-                //    System.out.println(localName);
-                //}
-                if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName+ "-valueType"))) {
+                String nsURIprofileID = "";
+                if (localName.contains("IdentifiedObject")) {
+                    nsURIprofileID = MainController.prefs.get("IOuri", "");
+                } else {
+                    nsURIprofileID = nsURIprofile;
+                }
+
+                if (shapeModel.containsResource(shapeModel.getResource(nsURIprofileID + localName + "-datatype"))) {
                     //adding the reference in the NodeShape
-                    RDFNode o = shapeModel.createResource(nsURIprofile + localName+ "-valueType");
+                    //Property p = shapeModel.createProperty(shaclURI, "property");
+                    //RDFNode o = shapeModel.createResource(r1); // this gives sh:property     [ a  eqbd:TestR ] ;
+                    RDFNode o = shapeModel.createResource(nsURIprofileID + localName + "-datatype");
                     nodeShapeResource.addProperty(SH.property, o);
                 } else {
                     //adding the reference in the NodeShape
-                    RDFNode o = shapeModel.createResource(nsURIprofile + localName+ "-valueType");
+                    //Property p = shapeModel.createProperty(shaclURI, "property");
+                    //RDFNode o = shapeModel.createResource(r1); // this gives sh:property     [ a  eqbd:TestR ] ;
+                    RDFNode o = shapeModel.createResource(nsURIprofileID + localName + "-datatype");
                     nodeShapeResource.addProperty(SH.property, o);
 
                     //adding the properties for the PropertyShape
-                    Resource r = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                    Resource r = shapeModel.createResource(nsURIprofileID + localName + "-datatype");
+                    //Property p1 = shapeModel.createProperty(rdfURI, "type");
+                    //RDFNode o1 = shapeModel.createResource(shaclURI + "PropertyShape");
                     r.addProperty(RDF.type, SH.PropertyShape);
 
                     //adding the property for the sh:group
+                    //Property p1g = shapeModel.createProperty(shaclURI, "group");
                     //creates the object which is the Group
                     RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                    if (localName.contains("IdentifiedObject")) {
+                        o1g = shapeModel.createResource(MainController.prefs.get("IOuri", "") + "DatatypesGroupIO");
+                    }
                     r.addProperty(SH.group, o1g);
 
                     //adding a property for the order
+                    //Property p1o = shapeModel.createProperty(shaclURI, "order");
                     RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                    if (localName.contains("IdentifiedObject")) {
+                        o1o = shapeModel.createTypedLiteral("0.1", "http://www.w3.org/2001/XMLSchema#decimal");
+                    }
                     r.addProperty(SH.order, o1o);
 
-                    //adding name
+                    //adding a message
+                    //Property p2 = shapeModel.createProperty(shaclURI, "message");
+                    r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+
+                    if (propertyNodeFeatures.get(13).toString().isEmpty()) {
+                        RDFNode o5 = shapeModel.createResource(propertyFullURI);
+                        if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
+                            List<RDFNode> pathList = new ArrayList<>();
+                            pathList.add(o5);
+                            pathList.add(RDF.type.asResource());
+
+                            RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                            r.addProperty(path, pathRDFlist);
+                        } else {
+                            //Property p5 = shapeModel.createProperty(shaclURI, "path");
+
+                            r.addProperty(path, o5);
+                        }
+
+
+                    } else { // it enters here when it is  compound and the sh:path needs to be a list
+                        //path for the case when the attribute is a compound
+                        List<RDFNode> pathList = (List<RDFNode>) propertyNodeFeatures.get(13);
+                        if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
+                            pathList.add(RDF.type.asResource());
+                        }
+                        RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                        r.addProperty(path, pathRDFlist);
+                    }
+
+                    //Property p6 = shapeModel.createProperty(shaclURI, "name");
                     r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
 
-                    //adding description
+                    //Property p7 = shapeModel.createProperty(shaclURI, "description");
                     r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
 
-                    //adding severity
+                    //Property p8 = shapeModel.createProperty(shaclURI, "severity");
                     RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
                     r.addProperty(SH.severity, o8);
 
-                    //the 09 is the class - value type
-                    RDFNode o9 = shapeModel.createResource(((LinkedList) propertyNodeFeatures.get(10)).get(0).toString());
+                    //add specific properties for the datatype check
+                    if (propertyNodeFeatures.get(6).toString().equals("Enumeration")) {
+                        //this is the case where the datatype is enumeration
+                        if (shapeModel.getProperty(shapeModel.getResource(nsURIprofile + localName + "-datatype"), SH.in) == null) {
+                            //Property p9 = shapeModel.createProperty(shaclURI, "nodeKind");
+                            //RDFNode o9 = shapeModel.createResource(shaclURI + "IRI");
+                            r.addProperty(SH.nodeKind, SH.IRI);
 
+                            //Property p10 = shapeModel.createProperty(shaclURI, "in");
+                            List<RDFNode> enumAttributes = new ArrayList<>();
+                            for (int en = 0; en < ((ArrayList<?>) propertyNodeFeatures.get(7)).size(); en++) {
+                                enumAttributes.add(shapeModel.createResource(((ArrayList<?>) propertyNodeFeatures.get(7)).get(en).toString()));
+                            }
+                            RDFList enumRDFlist = shapeModel.createList(enumAttributes.iterator());
+                            r.addProperty(SH.in, enumRDFlist);
+                        }
+                    } else if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
+                        //this is the case where the datatype is compound
 
-                    if (associationValueTypeOption==1){// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
+                        r.addProperty(SH.nodeKind, SH.BlankNode);
+                        RDFNode oC = shapeModel.createResource(propertyNodeFeatures.get(12).toString());
+                        if (associationValueTypeOption == 1) {// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
+                            //adding sh:in
+                            List<RDFNode> classIn = new ArrayList<>();
+                            classIn.add(oC);
 
-                        //adding path
-                        List<RDFNode> pathList = new ArrayList<>();
-                        pathList.add(shapeModel.createResource(propertyFullURI));
-                        pathList.add(RDF.type.asResource());
+                            RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
+                            r.addProperty(SH.in, classInRDFlist);
 
-                        RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                        r.addProperty(path, pathRDFlist);
-
-                        //adding a message
-                        //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                        r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
-                                +shapeModel.getNsURIPrefix(o9.asResource().getNameSpace())+":"+o9.asResource().getLocalName());
-
-                        //adding sh:in
-                        List<RDFNode> classIn = new ArrayList<>();
-                        classIn.add(o9);
-
-                        RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
-                        r.addProperty(SH.in, classInRDFlist);
-
-                    }else {
-                        //adding path
-                        RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                        r.addProperty(path, o5);
-
-                        //adding the sh:class
-
-                        r.addProperty(SH.class_, o9);
-
-                        //adding a message
-                        //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                        r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
-                                +shapeModel.getNsURIPrefix(o9.asResource().getNameSpace())+":"+o9.asResource().getLocalName());
-                    }
-
-                    //adding sh:nodeKind
-                    r.addProperty(SH.nodeKind, SH.IRI);
-
-                }
-            }else{
-                //in case there are multiple concrete classes that inherit the association
-                if (associationValueTypeOption==1) {// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
-
-                    String classFullURI = propertyNodeFeatures.get(11).toString();
-
-                    shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
-
-                    Resource nodeShapeResourceValueType = shapeModel.getResource(nsURIprofile + localName + "-valueTypeNodeShape");
-
-                    if (shapeModel.containsResource(shapeModel.createResource(nsURIprofile + localName+ "-valueType"))) {
-                        //adding the reference in the NodeShape
-                        RDFNode o = shapeModel.createResource(nsURIprofile + localName+ "-valueType");
-                        nodeShapeResourceValueType.addProperty(SH.property, o);
-                    } else {
-                        //adding the reference in the NodeShape
-                        RDFNode o = shapeModel.createResource(nsURIprofile + localName+ "-valueType");
-                        nodeShapeResourceValueType.addProperty(SH.property, o);
-
-                        //adding the properties for the PropertyShape
-                        Resource r = shapeModel.createResource(nsURIprofile + localName + "-valueType");
-                        r.addProperty(RDF.type, SH.PropertyShape);
-
-                        //adding the property for the sh:group
-                        //creates the object which is the Group
-                        RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
-                        r.addProperty(SH.group, o1g);
-
-                        //adding a property for the order
-                        RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
-                        r.addProperty(SH.order, o1o);
-
-                        //adding name
-                        r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
-
-                        //adding description
-                        r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
-
-                        //adding severity
-                        RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
-                        r.addProperty(SH.severity, o8);
-
-                        //adding path
-                        List<RDFNode> pathList = new ArrayList<>();
-                        pathList.add(shapeModel.createResource(propertyFullURI));
-                        pathList.add(RDF.type.asResource());
-
-                        RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                        r.addProperty(path, pathRDFlist);
-
-                        //adding a message
-                        //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                        r.addProperty(SH.message, "One of the following occurs: 1) The value type is not IRI; 2) The value type is not the right class.");
-
-                        //adding sh:in
-                        List<RDFNode> classNames = new ArrayList<>();
-                        for (int item = 0; item < ((LinkedList) propertyNodeFeatures.get(10)).size(); item++) {
-                            classNames.add(shapeModel.createResource(((LinkedList) propertyNodeFeatures.get(10)).get(item).toString()));
+                        } else {
+                            r.addProperty(SH.class_, oC);
                         }
 
-                        RDFList classInRDFlist = shapeModel.createList(classNames.iterator());
-                        r.addProperty(SH.in, classInRDFlist);
+                    } else {
+                        //this is the case where the datatype is a primitive or it is the primitive of the .value attribute of CIMDatatype
+                        //Property p9 = shapeModel.createProperty(shaclURI, "nodeKind");
+                        //RDFNode o9 = shapeModel.createResource(shaclURI + "Literal");
+                        r.addProperty(SH.nodeKind, SH.Literal);
 
-
-
-                        //adding sh:nodeKind
-                        r.addProperty(SH.nodeKind, SH.IRI);
-
+                        //Property p10 = shapeModel.createProperty(shaclURI, "datatype");
+                        //the following are all primitives part of CIM17 domain package
+                        RDFNode o10 = shapeModel.createResource();
+                        if (propertyNodeFeatures.get(6).toString().equals("Integer")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDinteger.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Float")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDfloat.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("String")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Boolean")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDboolean.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Date")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDdate.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("DateTime")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDdateTime.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("DateTimeStamp")) { //TODO check why dataTimeStamp is not in Jena
+                            o10 = shapeModel.createResource(XSDDatatype.XSDdateTime.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Decimal")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDdecimal.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Duration")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDduration.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("MonthDay")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDgMonthDay.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Time")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDtime.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("URI")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("IRI")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("StringIRI")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("StringFixedLanguage")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("URL")) {
+                            o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                        }
+                        r.addProperty(SH.datatype, o10);
                     }
+                }
+                break;
+            case "associationValueType":
+                if (((LinkedList<?>) propertyNodeFeatures.get(10)).size() == 1) {
+                    //the if is checking if the property shape is existing, if it is existing a new one is not added, but it is
+                    //just linked with the nodeshape
+                    //if (localName.contains("DCLine")){
+                    //    System.out.println(localName);
+                    //}
+//                    Resource r = null;
+//                    RDFNode o9 = null;
+//                    if (propertyNodeFeatures.get(2).toString().contains("PowerElectronicsUnit.PrimaryEnergySource")){
+//                        int debug=2;
+//                    }
 
-                }else { // in case the option "Use sh:in for association value type constraint instead of sh:class and sh:or" is not selected
-                    List<RDFNode> classNames = new ArrayList<>();
-                    for (int item = 0; item < ((LinkedList) propertyNodeFeatures.get(10)).size(); item++) {
-                        Resource classNameRes = (Resource) ((LinkedList) propertyNodeFeatures.get(10)).get(item);
-                        if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType"))) {
-                            classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                    if (associationValueTypeOption == 1) {// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
+
+                        if (propertyNodeFeatures.get(2).toString().endsWith("-nodeKind")){
+                            if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName + "-nodeKind"))) {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-nodeKind");
+                                nodeShapeResource.addProperty(SH.property, o);
+                            } else {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-nodeKind");
+                                nodeShapeResource.addProperty(SH.property, o);
+
+                                //adding the properties for the PropertyShape
+                                Resource r = shapeModel.createResource(nsURIprofile + localName + "-nodeKind");
+                                r.addProperty(RDF.type, SH.PropertyShape);
+
+                                //adding the property for the sh:group
+                                //creates the object which is the Group
+                                RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                                r.addProperty(SH.group, o1g);
+
+                                //adding a property for the order
+                                RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                                r.addProperty(SH.order, o1o);
+
+                                //adding name
+                                r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
+
+                                //adding description
+                                r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
+
+                                //adding severity
+                                RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
+                                r.addProperty(SH.severity, o8);
+
+                                //the 09 is the class - value type
+                                RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(0).toString());
+
+
+                                r.addProperty(SH.message, "The node kind shall be IRI (rdf:resource is expected).");
+                                RDFNode o5 = shapeModel.createResource(propertyFullURI);
+                                r.addProperty(path, o5);
+
+                                //adding sh:nodeKind
+                                r.addProperty(SH.nodeKind, SH.IRI);
+                            }
+                        }else{
+                            if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName + "-valueType"))) {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                                nodeShapeResource.addProperty(SH.property, o);
+                            } else {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                                nodeShapeResource.addProperty(SH.property, o);
+
+                                //adding the properties for the PropertyShape
+                                Resource r = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                                r.addProperty(RDF.type, SH.PropertyShape);
+
+                                //adding the property for the sh:group
+                                //creates the object which is the Group
+                                RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                                r.addProperty(SH.group, o1g);
+
+                                //adding a property for the order
+                                RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                                r.addProperty(SH.order, o1o);
+
+                                //adding name
+                                r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
+
+                                //adding description
+                                r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
+
+                                //adding severity
+                                RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
+                                r.addProperty(SH.severity, o8);
+
+                                //the 09 is the class - value type
+                                RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(0).toString());
+
+                                //adding path
+                                List<RDFNode> pathList = new ArrayList<>();
+                                pathList.add(shapeModel.createResource(propertyFullURI));
+                                pathList.add(RDF.type.asResource());
+
+                                RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                                r.addProperty(path, pathRDFlist);
+
+                                //adding a message
+                                //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString())
+                                r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                                        + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
+
+                                //adding sh:in
+                                List<RDFNode> classIn = new ArrayList<>();
+                                classIn.add(o9);
+                                RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
+                                r.addProperty(SH.in, classInRDFlist);
+
+                                //adding sh:nodeKind
+                                r.addProperty(SH.nodeKind, SH.IRI);
+                            }
+
+                        }
+
+                    } else {
+                        if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName + "-valueType"))) {
+                            //adding the reference in the NodeShape
+                            RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                            nodeShapeResource.addProperty(SH.property, o);
                         } else {
-                            classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                            //adding the reference in the NodeShape
+                            RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                            nodeShapeResource.addProperty(SH.property, o);
+
                             //adding the properties for the PropertyShape
-                            Resource r = shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType");
+                            Resource r = shapeModel.createResource(nsURIprofile + localName + "-valueType");
                             r.addProperty(RDF.type, SH.PropertyShape);
 
                             //adding the property for the sh:group
@@ -925,12 +906,8 @@ public class ShaclTools {
                             RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
                             r.addProperty(SH.order, o1o);
 
-                            //adding path
-                            RDFNode o5 = shapeModel.createResource(propertyFullURI);
-                            r.addProperty(path, o5);
-
                             //adding name
-                            r.addProperty(SH.name, localName + classNameRes.getLocalName() + "-valueType");//propertyNodeFeatures.get(2).toString()
+                            r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
 
                             //adding description
                             r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
@@ -939,32 +916,210 @@ public class ShaclTools {
                             RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
                             r.addProperty(SH.severity, o8);
 
-                            //adding the sh:class
-                            RDFNode o9 = shapeModel.createResource(((LinkedList) propertyNodeFeatures.get(10)).get(item).toString());
-                            r.addProperty(SH.class_, o9);
+                            //the 09 is the class - value type
+                            RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(0).toString());
 
-                            //adding sh:nodeKind
-                            r.addProperty(SH.nodeKind, SH.IRI);
+                            //adding path
+                            RDFNode o5 = shapeModel.createResource(propertyFullURI);
+                            r.addProperty(path, o5);
+
+                            //adding the sh:class
+
+                            r.addProperty(SH.class_, o9);
 
                             //adding a message
                             //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
                             r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
                                     + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
 
+                            //adding sh:nodeKind
+                            r.addProperty(SH.nodeKind, SH.IRI);
                         }
                     }
 
-                    String classFullURI = propertyNodeFeatures.get(11).toString();
+                } else {
+                    //in case there are multiple concrete classes that inherit the association
+                    if (associationValueTypeOption == 1) {// this is the case when the checkbox "Use sh:in for association value type constraint instead of sh:class and sh:or" is selected
 
-                    shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
-                    //RDFList orRDFlist = shapeModel.createList(classNames.iterator());
-                    Resource nodeShapeResourceOr = shapeModel.getResource(nsURIprofile + localName + "-valueType");
-                    if (!shapeModel.getResource(nodeShapeResourceOr.toString()).hasProperty(SH.or)) { // creates sh:or only if it is missing
-                        RDFList orRDFlist = shapeModel.createList(classNames.iterator());
-                        nodeShapeResourceOr.addProperty(SH.or, orRDFlist);
+                        String classFullURI = propertyNodeFeatures.get(11).toString();
+
+                        shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
+
+
+                        if (propertyNodeFeatures.get(2).toString().endsWith("-nodeKind")){
+                            Resource nodeShapeResourceValueType = shapeModel.getResource(nsURIprofile + localName + "-valueTypeNodeShape");
+
+                            if (shapeModel.containsResource(shapeModel.createResource(nsURIprofile + localName + "-nodeKind"))) {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-nodeKind");
+                                nodeShapeResourceValueType.addProperty(SH.property, o);
+                            } else {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-nodeKind");
+                                nodeShapeResourceValueType.addProperty(SH.property, o);
+
+                                //adding the properties for the PropertyShape
+                                Resource r = shapeModel.createResource(nsURIprofile + localName + "-nodeKind");
+                                r.addProperty(RDF.type, SH.PropertyShape);
+
+                                //adding the property for the sh:group
+                                //creates the object which is the Group
+                                RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                                r.addProperty(SH.group, o1g);
+
+                                //adding a property for the order
+                                RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                                r.addProperty(SH.order, o1o);
+
+                                //adding name
+                                r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
+
+                                //adding description
+                                r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
+
+                                //adding severity
+                                RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
+                                r.addProperty(SH.severity, o8);
+
+                                //adding path
+                                RDFNode o5 = shapeModel.createResource(propertyFullURI);
+                                r.addProperty(path, o5);
+
+                                //adding a message
+                                //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+                                r.addProperty(SH.message, "The node kind shall be IRI (rdf:resource is expected).");
+
+
+                                //adding sh:nodeKind
+                                r.addProperty(SH.nodeKind, SH.IRI);
+
+                            }
+                        }else{
+                            Resource nodeShapeResourceValueType = shapeModel.getResource(nsURIprofile + localName + "-valueTypeNodeShape");
+
+                            if (shapeModel.containsResource(shapeModel.createResource(nsURIprofile + localName + "-valueType"))) {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                                nodeShapeResourceValueType.addProperty(SH.property, o);
+                            } else {
+                                //adding the reference in the NodeShape
+                                RDFNode o = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                                nodeShapeResourceValueType.addProperty(SH.property, o);
+
+                                //adding the properties for the PropertyShape
+                                Resource r = shapeModel.createResource(nsURIprofile + localName + "-valueType");
+                                r.addProperty(RDF.type, SH.PropertyShape);
+
+                                //adding the property for the sh:group
+                                //creates the object which is the Group
+                                RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                                r.addProperty(SH.group, o1g);
+
+                                //adding a property for the order
+                                RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                                r.addProperty(SH.order, o1o);
+
+                                //adding name
+                                r.addProperty(SH.name, propertyNodeFeatures.get(2).toString());
+
+                                //adding description
+                                r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
+
+                                //adding severity
+                                RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
+                                r.addProperty(SH.severity, o8);
+
+                                //adding path
+                                List<RDFNode> pathList = new ArrayList<>();
+                                pathList.add(shapeModel.createResource(propertyFullURI));
+                                pathList.add(RDF.type.asResource());
+
+                                RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                                r.addProperty(path, pathRDFlist);
+
+                                //adding a message
+                                //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+                                r.addProperty(SH.message, "One of the following occurs: 1) The value type is not IRI; 2) The value type is not the right class.");
+
+                                //adding sh:in
+                                List<RDFNode> classNames = new ArrayList<>();
+                                for (int item = 0; item < ((LinkedList<?>) propertyNodeFeatures.get(10)).size(); item++) {
+                                    classNames.add(shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(item).toString()));
+                                }
+
+                                RDFList classInRDFlist = shapeModel.createList(classNames.iterator());
+                                r.addProperty(SH.in, classInRDFlist);
+
+
+                                //adding sh:nodeKind
+                                r.addProperty(SH.nodeKind, SH.IRI);
+
+                            }
+                        }
+
+
+                    } else { // in case the option "Use sh:in for association value type constraint instead of sh:class and sh:or" is not selected
+                        List<RDFNode> classNames = new ArrayList<>();
+                        for (int item = 0; item < ((LinkedList<?>) propertyNodeFeatures.get(10)).size(); item++) {
+                            Resource classNameRes = (Resource) ((LinkedList<?>) propertyNodeFeatures.get(10)).get(item);
+                            if (shapeModel.containsResource(shapeModel.getResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType"))) {
+                                classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                            } else {
+                                classNames.add(shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType")); // adds to the list to be used for sh:or
+                                //adding the properties for the PropertyShape
+                                Resource r = shapeModel.createResource(nsURIprofile + localName + classNameRes.getLocalName() + "-valueType");
+                                r.addProperty(RDF.type, SH.PropertyShape);
+
+                                //adding the property for the sh:group
+                                //creates the object which is the Group
+                                RDFNode o1g = shapeModel.createResource(propertyNodeFeatures.get(9).toString());
+                                r.addProperty(SH.group, o1g);
+
+                                //adding a property for the order
+                                RDFNode o1o = shapeModel.createTypedLiteral(propertyNodeFeatures.get(8), "http://www.w3.org/2001/XMLSchema#integer");
+                                r.addProperty(SH.order, o1o);
+
+                                //adding path
+                                RDFNode o5 = shapeModel.createResource(propertyFullURI);
+                                r.addProperty(path, o5);
+
+                                //adding name
+                                r.addProperty(SH.name, localName + classNameRes.getLocalName() + "-valueType");//propertyNodeFeatures.get(2).toString()
+
+                                //adding description
+                                r.addProperty(SH.description, propertyNodeFeatures.get(3).toString());
+
+                                //adding severity
+                                RDFNode o8 = shapeModel.createResource(SH.NS + propertyNodeFeatures.get(4).toString());
+                                r.addProperty(SH.severity, o8);
+
+                                //adding the sh:class
+                                RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(item).toString());
+                                r.addProperty(SH.class_, o9);
+
+                                //adding sh:nodeKind
+                                r.addProperty(SH.nodeKind, SH.IRI);
+
+                                //adding a message
+                                //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
+                                r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                                        + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
+
+                            }
+                        }
+
+                        String classFullURI = propertyNodeFeatures.get(11).toString();
+
+                        shapeModel = ShaclTools.addNodeShapeValueType(shapeModel, nsURIprofile, localName, classFullURI);
+                        //RDFList orRDFlist = shapeModel.createList(classNames.iterator());
+                        Resource nodeShapeResourceOr = shapeModel.getResource(nsURIprofile + localName + "-valueType");
+                        if (!shapeModel.getResource(nodeShapeResourceOr.toString()).hasProperty(SH.or)) { // creates sh:or only if it is missing
+                            RDFList orRDFlist = shapeModel.createList(classNames.iterator());
+                            nodeShapeResourceOr.addProperty(SH.or, orRDFlist);
+                        }
                     }
                 }
-            }
+                break;
         }
 
         return shapeModel;
@@ -1424,12 +1579,12 @@ public class ShaclTools {
             shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
             //check if the class is stereotyped Description
             boolean classDescripStereo=false;
-            if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(4).toString().equals("Yes")){
+            if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(0)).get(4).toString().equals("Yes")){
                 classDescripStereo=true;
             }
 
 
-            for (int atas = 1; atas < ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).size(); atas++) {
+            for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).size(); atas++) {
                 // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
                 //every time a new property is added the reference is also added to the ShapeNode of the class
                 ArrayList<Object> propertyNodeFeatures = new ArrayList<>();
@@ -1457,7 +1612,7 @@ public class ShaclTools {
                     propertyNodeFeatures.add("");
                 }
 
-                if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Association")) {//if it is an association
+                if (((ArrayList<?>) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Association")) {//if it is an association
                     if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
                         //Cardinality check
                         propertyNodeFeatures.set(0, "cardinality");
@@ -1472,7 +1627,7 @@ public class ShaclTools {
                         propertyNodeFeatures.set(8, atas - 1); // this is the order
                         propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
 
-                        String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
+                        String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
 
                         shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
 
@@ -1483,56 +1638,95 @@ public class ShaclTools {
                         //localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
                         //propertyNodeFeatures.set(5, cardinality);
                         //nodeShapeResource = shapeModel.getResource(nsURIprofile + localName+"ValueType");
-                        propertyNodeFeatures.set(1, "Not correct target class.");
-                        propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
-                        propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
+
+                        //Check if there is a self assocition on model header and if this is the case then do not include sh:in and the sh:path needs to be different
+                        String assocDomain = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(8).toString();
+                        String assocRange = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(9).toString();
+                        if (assocDomain.equals(assocRange) && assocDomain.equals("http://iec.ch/TC57/61970-552/ModelDescription/1#Model")) { // this is the case when it is a header
+                            propertyNodeFeatures.set(1, "Not correct serialisation (rdf:resource is expected).");
+                            propertyNodeFeatures.set(2, localNameAssoc + "-nodeKind");
+                            propertyNodeFeatures.set(3, "This constraint validates the node kind of the association at the used direction.");
+                        }else {//any other case
+                            propertyNodeFeatures.set(1, "Not correct target class.");
+                            propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
+                            propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
+                        }
+
                         propertyNodeFeatures.set(4, "Violation");
                         propertyNodeFeatures.set(8, atas - 1); // this is the order
                         propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
                         List<Resource> concreteClasses = null;
-//                        if (localNameAssoc.contains("ReactiveCapabilityCurve.SynchronousMachine2")){
-//                            int k=1;
-//                        }
+                        if (localNameAssoc.contains("Equipment.AggregatedEquipment")){
+                            int k=1;
+                        }
 //                        System.out.println(localNameAssoc);
 //                        System.out.println(((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas));
-                        if (((List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).size()==1) {
-                            if (!((LinkedList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).get(0).toString().equals("http://abstract.eu")) {
-                                concreteClasses = (List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11);
-                                //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
-                                propertyNodeFeatures.set(10, concreteClasses);
-                                propertyNodeFeatures.set(11, classFullURI);
+                        // TODO check if this if is necessary if (((List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).size()==1) {
+//                        if (((List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).size()==0) {
+//                            int k=1;
+//                        }
 
-                                shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
-                            }else {
-                                concreteClasses = new LinkedList<>();
-                                String abstractclass = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(9).toString();
-                                if (baseprofilesshaclglag == 1) {
-                                    // get the class URI at position 9; then search for this class in the unionmodelbaseprofilesshaclinheritanceonly and find all OWL2 members; store these members in List<Resource> concreteClasses
-                                    for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), OWL2.members, (RDFNode) null)); i.hasNext(); ) {
-                                        Statement stmtinheritance = i.next();
-                                        concreteClasses.add(stmtinheritance.getObject().asResource());
+                        if (!((LinkedList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).get(0).toString().equals("http://abstract.eu")) {
+                            concreteClasses = (List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11);
+                            //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
+
+                            //TODO check this part as assocRange was used instead of abstract class. In the ER the Equioment is concrete
+                            if (baseprofilesshaclglag == 1) {
+                                // get the class URI at position 9; then search for this class in the unionmodelbaseprofilesshaclinheritanceonly and find all OWL2 members; store these members in List<Resource> concreteClasses
+                                for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(new SimpleSelector(ResourceFactory.createResource(assocRange), OWL2.members, (RDFNode) null)); i.hasNext(); ) {
+                                    Statement stmtinheritance = i.next();
+                                    concreteClasses.add(stmtinheritance.getObject().asResource());
+                                }
+                                if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(assocRange), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
+                                    concreteClasses.add(ResourceFactory.createResource(assocRange));
+                                }
+                                if (concreteClasses.isEmpty()) { //it means that there are no child classes and then it needs to be checked if the class is concrete in the base data
+                                    if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(assocRange), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
+                                        concreteClasses.add(ResourceFactory.createResource(assocRange));
+                                    } else {
+                                        System.out.println("WARNING: The class " + assocRange + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                        concreteClasses.add(ResourceFactory.createResource(assocRange));
                                     }
-                                    if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
-                                        concreteClasses.add(ResourceFactory.createResource(abstractclass));
-                                    }
-                                    if (concreteClasses.size() == 0) { //it means that there are no child classes and then it needs to be checked if the class is concrete in the base data
-                                        if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
-                                            concreteClasses.add(ResourceFactory.createResource(abstractclass));
-                                        }else{
-                                            System.out.println("WARNING: The class "+abstractclass+" is abstract and it is referenced by the association "+localNameAssoc+" for class "+classFullURI+". ValueType SHACL constraint is set to require the type of this abstract class.");
-                                            concreteClasses.add(ResourceFactory.createResource(abstractclass));
-                                        }
-                                    }
-                                }else{
-                                    System.out.println("WARNING: The class "+abstractclass+" is abstract and it is referenced by the association "+localNameAssoc+" for class "+classFullURI+". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                }
+                            }
+
+
+
+                            propertyNodeFeatures.set(10, concreteClasses);
+                            propertyNodeFeatures.set(11, classFullURI);
+
+                            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
+                        } else {
+                            concreteClasses = new LinkedList<>();
+                            String abstractclass = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(9).toString();
+                            if (baseprofilesshaclglag == 1) {
+                                // get the class URI at position 9; then search for this class in the unionmodelbaseprofilesshaclinheritanceonly and find all OWL2 members; store these members in List<Resource> concreteClasses
+                                for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), OWL2.members, (RDFNode) null)); i.hasNext(); ) {
+                                    Statement stmtinheritance = i.next();
+                                    concreteClasses.add(stmtinheritance.getObject().asResource());
+                                }
+                                if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
                                     concreteClasses.add(ResourceFactory.createResource(abstractclass));
                                 }
-                                propertyNodeFeatures.set(10, concreteClasses);
-                                propertyNodeFeatures.set(11, classFullURI);
-
-                                shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
+                                if (concreteClasses.size() == 0) { //it means that there are no child classes and then it needs to be checked if the class is concrete in the base data
+                                    if (unionmodelbaseprofilesshacl.listStatements(new SimpleSelector(ResourceFactory.createResource(abstractclass), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
+                                        concreteClasses.add(ResourceFactory.createResource(abstractclass));
+                                    } else {
+                                        System.out.println("WARNING: The class " + abstractclass + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                        concreteClasses.add(ResourceFactory.createResource(abstractclass));
+                                    }
+                                }
+                            } else {
+                                System.out.println("WARNING: The class " + abstractclass + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                concreteClasses.add(ResourceFactory.createResource(abstractclass));
                             }
+                            propertyNodeFeatures.set(10, concreteClasses);
+                            propertyNodeFeatures.set(11, classFullURI);
+
+                            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
                         }
+
+                        // TODO check if this if is necessary}
 
                     }else{ // this is for cardinality of inverse associations
                         if (shaclflaginverse==1) {

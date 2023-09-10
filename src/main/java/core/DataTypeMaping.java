@@ -63,7 +63,9 @@ public class DataTypeMaping {
                     break;
                 case "http://www.w3.org/2001/XMLSchema#dateTimeStamp":
                 case "DateTimeStamp":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdateTimeStamp);
+                    //dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdateTimeStamp);
+                    //TODO it seems dataTimeStamp does not work
+                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdateTime);
                     break;
                 case "http://www.w3.org/2001/XMLSchema#decimal":
                 case "Decimal":
@@ -126,7 +128,9 @@ public class DataTypeMaping {
                     break;
                 case "http://www.w3.org/2001/XMLSchema#dateTimeStamp":
                 case "DateTimeStamp":
-                    dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdateTimeStamp);
+                    //dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdateTimeStamp);
+                    //TODO it seems dataTimeStamp does not work
+                    dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdateTime);
                     break;
                 case "http://www.w3.org/2001/XMLSchema#decimal":
                 case "Decimal":
@@ -354,7 +358,7 @@ public class DataTypeMaping {
         } else if (value.contains("dateTime")){
             valueRDFdatatype = XSDDatatype.XSDdateTime;
         } else if (value.contains("dateTimeStamp")){
-            valueRDFdatatype = XSDDatatype.XSDdateTimeStamp;
+            valueRDFdatatype = XSDDatatype.XSDdateTime; //TODO it seems XSDdateTimeStamp does not work
         } else if (value.contains("decimal")){
             valueRDFdatatype = XSDDatatype.XSDdecimal;
         } else if (value.contains("duration")){
