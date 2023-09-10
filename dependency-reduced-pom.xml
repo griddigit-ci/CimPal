@@ -69,6 +69,6 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jena.version>4.9.0</jena.version>
     <log4j.version>2.12.1</log4j.version>
-    <jdk.version>11</jdk.version>
+    <jdk.version>17</jdk.version>
   </properties>
 </project>
