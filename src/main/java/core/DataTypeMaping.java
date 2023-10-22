@@ -5,11 +5,11 @@
  */
 package core;
 
-import application.MainController;
 import javafx.scene.control.Alert;
-import javafx.stage.FileChooser;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.datatypes.xsd.impl.RDFLangString;
+import org.apache.jena.datatypes.xsd.impl.XSDDateTimeStampType;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
@@ -35,127 +35,69 @@ public class DataTypeMaping {
         for (int m=0; m<propertyString.size();m++) {
             //map CIM datatypes to xsd datatypes
             switch (datatype.get(m)) {
-                case "http://www.w3.org/2001/XMLSchema#integer":
-                case "http://www.w3.org/2001/XMLSchema#int":
-                case "Integer":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDinteger);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#float":
-                case "Float":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDfloat);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#string":
-                case "String":
-                case "StringFixedLanguage":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDstring);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#boolean":
-                case "Boolean":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDboolean);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#date":
-                case "Date":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdate);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#dateTime":
-                case "DateTime":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdateTime);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#dateTimeStamp":
-                case "DateTimeStamp":
-                    //dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdateTimeStamp);
-                    //TODO it seems dataTimeStamp does not work
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdateTime);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#decimal":
-                case "Decimal":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdecimal);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#duration":
-                case "Duration":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDduration);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#gMonthDay":
-                case "MonthDay":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDgMonthDay);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#time":
-                case "Time":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDtime);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#anyURI":
-                case "URI":
-                case "URL":
-                case "IRI":
-                case "StringIRI":
-                    dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDanyURI);
-                    break;
+                case "http://www.w3.org/2001/XMLSchema#integer", "http://www.w3.org/2001/XMLSchema#int", "Integer" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDinteger);
+                case "http://www.w3.org/2001/XMLSchema#float", "Float" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDfloat);
+                case "http://www.w3.org/2001/XMLSchema#string", "String", "StringFixedLanguage" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDstring);
+                case "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString", "LangString" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), RDFLangString.rdfLangString);
+                case "http://www.w3.org/2001/XMLSchema#boolean", "Boolean" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDboolean);
+                case "http://www.w3.org/2001/XMLSchema#date", "Date" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdate);
+                case "http://www.w3.org/2001/XMLSchema#dateTime", "DateTime" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdateTime);
+                case "http://www.w3.org/2001/XMLSchema#dateTimeStamp", "DateTimeStamp" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDateTimeStampType.XSDdateTimeStamp);
+                case "http://www.w3.org/2001/XMLSchema#decimal", "Decimal" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDdecimal);
+                case "http://www.w3.org/2001/XMLSchema#duration", "Duration" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDduration);
+                case "http://www.w3.org/2001/XMLSchema#gMonthDay", "MonthDay" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDgMonthDay);
+                case "http://www.w3.org/2001/XMLSchema#time", "Time" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDtime);
+                case "http://www.w3.org/2001/XMLSchema#anyURI", "URI", "URL", "IRI", "StringIRI" ->
+                        dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDanyURI);
             }
         }
         return dataTypeMap;
     }
 
     // adds a map property to an existing datatype map. Maps properties to xsd types
-    public static Map<String, RDFDatatype> addDatatypeMapProperty(Map dataTypeMap, String propertyString, String datatype) {
+    public static Map<String, RDFDatatype> addDatatypeMapProperty(Map<String, RDFDatatype> dataTypeMap, String propertyString, String datatype) {
 
             //map CIM datatypes to xsd datatypes
-            switch (datatype) {
-                case "http://www.w3.org/2001/XMLSchema#integer":
-                case "http://www.w3.org/2001/XMLSchema#int":
-                case "Integer":
+        switch (datatype) {
+            case "http://www.w3.org/2001/XMLSchema#integer", "http://www.w3.org/2001/XMLSchema#int", "Integer" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDinteger);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#float":
-                case "Float":
+            case "http://www.w3.org/2001/XMLSchema#float", "Float" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDfloat);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#string":
-                case "String":
-                case "StringFixedLanguage":
+            case "http://www.w3.org/2001/XMLSchema#string", "String", "StringFixedLanguage" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDstring);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#boolean":
-                case "Boolean":
+            case "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString", "LangString" ->
+                    dataTypeMap.putIfAbsent(propertyString, RDFLangString.rdfLangString);
+            case "http://www.w3.org/2001/XMLSchema#boolean", "Boolean" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDboolean);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#date":
-                case "Date":
+            case "http://www.w3.org/2001/XMLSchema#date", "Date" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdate);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#dateTime":
-                case "DateTime":
+            case "http://www.w3.org/2001/XMLSchema#dateTime", "DateTime" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdateTime);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#dateTimeStamp":
-                case "DateTimeStamp":
-                    //dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdateTimeStamp);
-                    //TODO it seems dataTimeStamp does not work
-                    dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdateTime);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#decimal":
-                case "Decimal":
+            case "http://www.w3.org/2001/XMLSchema#dateTimeStamp", "DateTimeStamp" ->
+                    dataTypeMap.putIfAbsent(propertyString, XSDDateTimeStampType.XSDdateTimeStamp);
+            case "http://www.w3.org/2001/XMLSchema#decimal", "Decimal" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDdecimal);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#duration":
-                case "Duration":
+            case "http://www.w3.org/2001/XMLSchema#duration", "Duration" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDduration);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#gMonthDay":
-                case "MonthDay":
+            case "http://www.w3.org/2001/XMLSchema#gMonthDay", "MonthDay" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDgMonthDay);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#time":
-                case "Time":
+            case "http://www.w3.org/2001/XMLSchema#time", "Time" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDtime);
-                    break;
-                case "http://www.w3.org/2001/XMLSchema#anyURI":
-                case "URI":
-                case "URL":
-                case "IRI":
-                case "StringIRI":
+            case "http://www.w3.org/2001/XMLSchema#anyURI", "URI", "URL", "IRI", "StringIRI" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDanyURI);
-                    break;
-            }
+        }
         return dataTypeMap;
     }
 
@@ -195,7 +137,7 @@ public class DataTypeMaping {
 //        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
 //        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //        List<File> selFile = filechooser.showOpenMultipleDialog(null);
-        List<File> selFile = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"));
+        List<File> selFile = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
 
 
         if (selFile != null) {// the file is selected
@@ -345,30 +287,32 @@ public class DataTypeMaping {
     //Support methog to identify the datatypes in cases where the mapping information comes from a saved mapping file
     public static RDFDatatype mapFromMapDefaultFile(String value){
         RDFDatatype valueRDFdatatype = null;
-        if (value.contains("integer")) {
+        if (value.equals(XSDDatatype.XSDinteger.toString())) {
             valueRDFdatatype = XSDDatatype.XSDinteger;
-        } else if (value.contains("float")){
+        } else if (value.equals(XSDDatatype.XSDfloat.toString())){
             valueRDFdatatype = XSDDatatype.XSDfloat;
-        } else if (value.contains("string")){
+        } else if (value.equals(XSDDatatype.XSDstring.toString())){
             valueRDFdatatype = XSDDatatype.XSDstring;
-        } else if (value.contains("boolean")){
+        } else if (value.equals(XSDDatatype.XSDboolean.toString())){
             valueRDFdatatype = XSDDatatype.XSDboolean;
-        } else if (value.equals("date")){
+        } else if (value.equals(XSDDatatype.XSDdate.toString())){
             valueRDFdatatype = XSDDatatype.XSDdate;
-        } else if (value.contains("dateTime")){
+        } else if (value.equals(XSDDatatype.XSDdateTime.toString())){
             valueRDFdatatype = XSDDatatype.XSDdateTime;
-        } else if (value.contains("dateTimeStamp")){
-            valueRDFdatatype = XSDDatatype.XSDdateTime; //TODO it seems XSDdateTimeStamp does not work
-        } else if (value.contains("decimal")){
+        } else if (value.equals(XSDDateTimeStampType.XSDdateTimeStamp.toString())){
+            valueRDFdatatype = XSDDateTimeStampType.XSDdateTimeStamp;
+        } else if (value.equals(XSDDatatype.XSDdecimal.toString())){
             valueRDFdatatype = XSDDatatype.XSDdecimal;
-        } else if (value.contains("duration")){
+        } else if (value.equals(XSDDatatype.XSDduration.toString())){
             valueRDFdatatype = XSDDatatype.XSDduration;
-        } else if (value.contains("gMonthDay")){
+        } else if (value.equals(XSDDatatype.XSDgMonthDay.toString())){
             valueRDFdatatype = XSDDatatype.XSDgMonthDay;
-        } else if (value.equals("time")) {
+        } else if (value.equals(XSDDatatype.XSDtime.toString())) {
             valueRDFdatatype = XSDDatatype.XSDtime;
-        } else if (value.contains("anyURI")) {
+        } else if (value.equals(XSDDatatype.XSDanyURI.toString())) {
             valueRDFdatatype = XSDDatatype.XSDanyURI;
+        } else if (value.equals(RDFLangString.rdfLangString.toString())) {
+            valueRDFdatatype = RDFLangString.rdfLangString;
         }else{
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setContentText("The following datatype is not properly mapped:"+value);
@@ -376,6 +320,40 @@ public class DataTypeMaping {
             alert.setTitle("Error - unknown datatype");
             alert.showAndWait();
         }
+
+//        if (value.contains("integer")) {
+//            valueRDFdatatype = XSDDatatype.XSDinteger;
+//        } else if (value.contains("float")){
+//            valueRDFdatatype = XSDDatatype.XSDfloat;
+//        } else if (value.contains("string")){
+//            valueRDFdatatype = XSDDatatype.XSDstring;
+//        } else if (value.contains("boolean")){
+//            valueRDFdatatype = XSDDatatype.XSDboolean;
+//        } else if (value.equals("date")){
+//            valueRDFdatatype = XSDDatatype.XSDdate;
+//        } else if (value.contains("dateTime") && !value.contains("dateTimeStamp")){
+//            valueRDFdatatype = XSDDatatype.XSDdateTime;
+//        } else if (value.contains("dateTimeStamp")){
+//            valueRDFdatatype = XSDDateTimeStampType.XSDdateTimeStamp;
+//        } else if (value.contains("decimal")){
+//            valueRDFdatatype = XSDDatatype.XSDdecimal;
+//        } else if (value.contains("duration")){
+//            valueRDFdatatype = XSDDatatype.XSDduration;
+//        } else if (value.contains("gMonthDay")){
+//            valueRDFdatatype = XSDDatatype.XSDgMonthDay;
+//        } else if (value.equals("time")) {
+//            valueRDFdatatype = XSDDatatype.XSDtime;
+//        } else if (value.contains("anyURI")) {
+//            valueRDFdatatype = XSDDatatype.XSDanyURI;
+//        } else if (value.contains("langString")) {
+//            valueRDFdatatype = RDFLangString.rdfLangString;
+//        }else{
+//            Alert alert = new Alert(Alert.AlertType.ERROR);
+//            alert.setContentText("The following datatype is not properly mapped:"+value);
+//            alert.setHeaderText(null);
+//            alert.setTitle("Error - unknown datatype");
+//            alert.showAndWait();
+//        }
 
         return valueRDFdatatype;
     }

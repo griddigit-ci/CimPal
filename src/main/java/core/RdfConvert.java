@@ -6,6 +6,7 @@
 package core;
 
 import application.MainController;
+import customWriter.CustomRDFFormat;
 import javafx.stage.FileChooser;
 import org.apache.commons.io.FileUtils;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -19,6 +20,7 @@ import org.apache.jena.vocabulary.*;
 
 import java.io.*;
 import java.util.*;
+import java.util.zip.ZipOutputStream;
 
 
 public class RdfConvert {
@@ -63,7 +65,7 @@ public class RdfConvert {
 //            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Main RDF file", "*.rdf","*.xml", "*.ttl"));
 //            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //            File fileDet1=null;
-            List<File> fileDet1 = util.ModelFactory.filechoosercustom(true,"Main RDF file", List.of("*.rdf","*.xml", "*.ttl"));
+            List<File> fileDet1 = util.ModelFactory.filechoosercustom(true,"Main RDF file", List.of("*.rdf","*.xml", "*.ttl"),"");
 //            try {
 //                fileDet1 = filechooser.showOpenDialog(null);
 //            }catch (Exception e){
@@ -81,7 +83,7 @@ public class RdfConvert {
 //            filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Deviation RDF file", "*.rdf","*.xml", "*.ttl"));
 //            filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //            File fileDet2=null;
-            List<File> fileDet2 = util.ModelFactory.filechoosercustom(true,"Deviation RDF file", List.of("*.rdf","*.xml", "*.ttl"));
+            List<File> fileDet2 = util.ModelFactory.filechoosercustom(true,"Deviation RDF file", List.of("*.rdf","*.xml", "*.ttl"),"");
 //            try {
 //                fileDet2 = filechooser1.showOpenDialog(null);
 //            }catch (Exception e){
@@ -99,7 +101,7 @@ public class RdfConvert {
 //            filechooser2.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Extended RDF file", "*.rdf","*.xml", "*.ttl"));
 //            filechooser2.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //            File fileDet3=null;
-            List<File> fileDet3 = util.ModelFactory.filechoosercustom(true,"Extended RDF file", List.of("*.rdf","*.xml", "*.ttl"));
+            List<File> fileDet3 = util.ModelFactory.filechoosercustom(true,"Extended RDF file", List.of("*.rdf","*.xml", "*.ttl"),"");
 //            try {
 //                fileDet3 = filechooser2.showOpenDialog(null);
 //            }catch (Exception e){
@@ -197,7 +199,7 @@ public class RdfConvert {
 
         }else{
             // load all models
-            model = util.ModelFactory.modelLoad(modelFiles,xmlBase,rdfSourceFormat);
+            model = util.ModelFactory.modelLoad(modelFiles,xmlBase,rdfSourceFormat,false);
         }
 
 
@@ -250,36 +252,103 @@ public class RdfConvert {
 
         switch (targetFormat) {
             case "RDF XML (.rdf or .xml)":
+
+                //register custom format
+                CustomRDFFormat.RegisterCustomFormatWriters();
+                String showXmlEncoding = "true"; //saveProperties.get("showXmlEncoding").toString();
+                boolean putHeaderOnTop = true; //(boolean) saveProperties.get("putHeaderOnTop");
+                String headerClassResource="http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"; //saveProperties.get("headerClassResource").toString();
+                boolean useAboutRules = false;//(boolean) saveProperties.get("useAboutRules");   //switch to trigger file chooser and adding the property
+                boolean useEnumRules = false;//(boolean) saveProperties.get("useEnumRules");   //switch to trigger special treatment when Enum is reference
+
+                Set<Resource> rdfAboutList = null; //(Set<Resource>) saveProperties.get("rdfAboutList");
+                Set<Resource> rdfEnumList = null;//(Set<Resource>) saveProperties.get("rdfEnumList");
+
                 OutputStream outXML = fileSaveDialog("Save RDF XML for: "+filename, "RDF XML", "*.rdf");
-                if (outXML!=null) {
+
+                if (outXML != null) {
                     try {
-                        Map<String, Object> properties = new HashMap<>();
-                        properties.put("showXmlDeclaration", showXmlDeclaration);
-                        properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
-                        //properties.put("blockRules", RDFSyntax.propertyAttr.toString()); //???? not sure
-                        properties.put("xmlbase", xmlBase);
-                        properties.put("tab", tab);
-                        //properties.put("prettyTypes",new Resource[] {ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")});
-                        properties.put("relativeURIs", relativeURIs);
+                        if (rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY || rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN) {
+                            Map<String, Object> properties = new HashMap<>();
+                            properties.put("showXmlDeclaration", showXmlDeclaration);
+                            properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
+                            properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
+                            //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
+                            //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
+                            //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
+                            if (putHeaderOnTop) {
+                                properties.put("prettyTypes", new Resource[]{ResourceFactory.createResource(headerClassResource)});
+                            }
+                            properties.put("xmlbase", xmlBase);
+                            properties.put("tab", tab);
+                            properties.put("relativeURIs", relativeURIs);
+
+                            if (useAboutRules) {
+                                properties.put("aboutRules", rdfAboutList);
+                            }
+
+                            if (useEnumRules) {
+                                properties.put("enumRules", rdfEnumList);
+                            }
+
+                            // Put a properties object into the Context.
+                            Context cxt = new Context();
+                            cxt.set(SysRIOT.sysRdfWriterProperties, properties);
+
+                            org.apache.jena.riot.RDFWriter.create()
+                                    .base(xmlBase)
+                                    .format(rdfFormat)
+                                    .context(cxt)
+                                    .source(model)
+                                    .output(outXML);
+
+                        } else {
+                            try {
+                                Map<String, Object> properties = new HashMap<>();
+                                properties.put("showXmlDeclaration", showXmlDeclaration);
+                                properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
+                                //properties.put("blockRules", RDFSyntax.propertyAttr.toString()); //???? not sure
+                                properties.put("xmlbase", xmlBase);
+                                properties.put("tab", tab);
+                                //properties.put("prettyTypes",new Resource[] {ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")});
+                                properties.put("relativeURIs", relativeURIs);
 
 
-                        // Put a properties object into the Context.
-                        Context cxt = new Context();
-                        cxt.set(SysRIOT.sysRdfWriterProperties, properties);
+                                // Put a properties object into the Context.
+                                Context cxt = new Context();
+                                cxt.set(SysRIOT.sysRdfWriterProperties, properties);
 
-                        org.apache.jena.riot.RDFWriter.create()
-                                .base(xmlBase)
-                                .format(rdfFormat)
-                                .context(cxt)
-                                .source(model)
-                                .output(outXML);
-                        if (inheritanceList) {
-                            fileSaveDialogInheritance(filename+"Inheritance",xmlBase);
+                                org.apache.jena.riot.RDFWriter.create()
+                                        .base(xmlBase)
+                                        .format(rdfFormat)
+                                        .context(cxt)
+                                        .source(model)
+                                        .output(outXML);
+                                if (inheritanceList) {
+                                    fileSaveDialogInheritance(filename + "Inheritance", xmlBase);
+                                }
+                            } finally {
+                                outXML.close();
+                            }
                         }
                     } finally {
+                        outXML.flush();
                         outXML.close();
+
+
                     }
                 }
+
+
+
+
+
+
+
+
+
+
+
                 break;
 
             case "RDF Turtle (.ttl)":

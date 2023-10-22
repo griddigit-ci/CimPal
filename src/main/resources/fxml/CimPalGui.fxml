@@ -144,6 +144,11 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles" disable="true" mnemonicParsing="false" selected="true" text="Consider related profiles for cross profile value type shapes" />
+                                 <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles2nd" disable="true" mnemonicParsing="false" text="Consider 2nd set of related profiles for cross profile value type shapes">
+                                    <HBox.margin>
+                                       <Insets left="20.0" />
+                                    </HBox.margin>
+                                 </CheckBox>
                               </HBox>
                               <HBox spacing="10.0">
                                  <padding>
@@ -622,6 +627,6 @@
             </padding>
          </ProgressBar>
       </Pane>
-      <Label font="$x3" text="Version: 2023.2" HBox.hgrow="NEVER" />
+      <Label font="$x3" text="Version: 2023.3" HBox.hgrow="NEVER" />
    </HBox>
 </VBox>

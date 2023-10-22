@@ -62,9 +62,17 @@ public class DataTypeStreamRDF implements StreamRDF {
         if (triple.getMatchObject().isLiteral()) {// only apply typing of object is literal
             /* determine datatype, use xsd:string as default */
             RDFDatatype datatype = dataTypeMap.getOrDefault(triple.getPredicate().toString(), XSDDatatype.XSDstring);
+
             /* generate typed literal */
             String literalValue = triple.getObject().getLiteralLexicalForm();
-            Literal typedLiteral = ResourceFactory.createTypedLiteral(literalValue, datatype);
+            String language = triple.getMatchObject().getLiteralLanguage();
+            Literal typedLiteral;
+            if(!language.isEmpty()) {
+                typedLiteral = ResourceFactory.createLangLiteral(literalValue,language);
+            }else {
+                typedLiteral = ResourceFactory.createTypedLiteral(literalValue, datatype);
+            }
+
             /* generate new triple */
             triple = new Triple(triple.getSubject(), triple.getPredicate(), typedLiteral.asNode());
         }

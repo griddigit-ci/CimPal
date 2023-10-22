@@ -243,7 +243,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
         if (r.isAnon()) {
             writer.print(rdfAt("nodeID") + "=" + attributeQuoted(anonId(r)));
         } else {
-            if (useEnumRules && enumRules.size()!=0){// here this part was added by Chavdar to have complete uri for enum not relative
+            if (useEnumRules && !enumRules.isEmpty()){// here this part was added by Chavdar to have complete uri for enum not relative
                 boolean isEnum = enumRules.contains(r);
 
                 if(isEnum){
@@ -252,16 +252,30 @@ public class CustomBasic extends CustomBaseXMLWriter {
                                     + "="
                                     + substitutedAttribute(r.getURI()));
                 }else{
-                    writer.print(
-                            rdfAt("resource")
-                                    + "="
-                                    + substitutedAttribute(relativize(r.getURI())));
+                    if (r.getURI().contains("delete")) {
+                        writer.print(
+                                rdfAt("resource")
+                                        + "="
+                                        + substitutedAttribute("#_"+r.getURI().split("_",2)[1]));
+                    }else {
+                        writer.print(
+                                rdfAt("resource")
+                                        + "="
+                                        + substitutedAttribute(relativize(r.getURI())));
+                    }
                 }
             }else {
+                if (r.getURI().contains("delete")) {
+                    writer.print(
+                            rdfAt("resource")
+                                    + "=#"
+                                    + substitutedAttribute("#_"+r.getURI().split("_",2)[1]));
+                }else{
                 writer.print(
                         rdfAt("resource")
                                 + "="
                                 + substitutedAttribute(relativize(r.getURI())));
+                }
             }
         }
     }

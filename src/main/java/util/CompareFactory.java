@@ -6,6 +6,8 @@ import org.apache.jena.vocabulary.RDF;
 
 import java.util.*;
 
+import static core.ComparisonSHACLshapes.modelsABPrefMap;
+
 public class CompareFactory {
 
     //compares two models
@@ -14,14 +16,11 @@ public class CompareFactory {
         for (ResIterator i = modelA.listSubjects(); i.hasNext(); ) {
             Resource resItem = i.next();
             if (!resItem.isAnon()){
-
                 String classType = resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName();
                 if (!skiplist.contains(classType)) {
                     compareResults = compareModelsDetail(compareResults, modelA, modelB, reverse, resItem);
                 }
-
             }
-
         }
         return compareResults;
     }
@@ -35,10 +34,14 @@ public class CompareFactory {
                     Statement resItemStmt = j.next();
                     if (!resItemStmt.getPredicate().equals(RDF.type)) {
                         if (!resItemStmt.getPredicate().equals(OWL2.oneOf)) {
-
+//                           if (resItemStmt.getPredicate().toString().endsWith("#path")){
+//                               int k=1;
+//                           }
                            if (resItemStmt.getObject().isAnon()) {// if it is a blank node
                                Map<String,String> resultBN=compareBlankNode(modelA, modelB, resItemStmt,reverse);
-                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resultBN.get("modelA"), resultBN.get("modelB"));
+                               if (!resultBN.isEmpty()) {
+                                   compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resultBN.get("modelA"), resultBN.get("modelB"));
+                               }
                            }else {
                                if (!modelB.contains(resItemStmt)) {// does not contain the statement, i.e. the attribute/association; then the value needs to be compared as maybe it is either missing or just the value is different
 
@@ -57,7 +60,6 @@ public class CompareFactory {
 
                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), "N/A");
                                    }
-
                                }
                            }
                         }else {
@@ -67,7 +69,6 @@ public class CompareFactory {
                                 if (compareRDFlist(modelAlist,modelBlist)){
                                     compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), modelAlist.toString(), modelBlist.toString());
                                 }
-
                             }else{
                                 compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getList().asJavaList().toString(), "N/A");
                             }
@@ -85,9 +86,7 @@ public class CompareFactory {
                             }else {
                                 if (!modelB.contains(resItemStmt)) {// does not contain the statement, i.e. the attribute/association; then the value needs to be compared as maybe it is either missing or just the value is different
                                     if (!modelB.contains(resItemStmt.getSubject(), resItemStmt.getPredicate())) {// the class does not have that attribute in modelB => this is difference
-
                                         compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A", resItemStmt.getObject().toString());
-
                                     }
                                 }
                             }
@@ -151,9 +150,7 @@ public class CompareFactory {
                 }
             }
         }
-
         return compareResults;
-
     }
 
     //adds a line to the compareResults
@@ -161,12 +158,24 @@ public class CompareFactory {
         //item; property; value in model A; value in model B
         List<String> diffItem = new LinkedList<>();
 
-        diffItem.add(item);
-        diffItem.add(property);
-        diffItem.add(valueModelA);
-        diffItem.add(valueModelB);
-        compareResults.add(diffItem);
-
+        if (valueModelA!=null && valueModelB!=null) {
+            if (!valueModelA.isEmpty() && !valueModelB.isEmpty()) {
+                // replace namespaces with prefixes
+                for (Map.Entry<String,String> entry : modelsABPrefMap.entrySet()){
+                    if (valueModelA.contains(entry.getValue())){
+                        valueModelA = valueModelA.replace(entry.getValue(), entry.getKey()+":");
+                    }
+                    if (valueModelB.contains(entry.getValue())){
+                        valueModelB = valueModelB.replace(entry.getValue(), entry.getKey()+":");
+                    }
+                }
+                diffItem.add(item);
+                diffItem.add(property);
+                diffItem.add(valueModelA);
+                diffItem.add(valueModelB);
+                compareResults.add(diffItem);
+            }
+        }
         return compareResults;
     }
 
@@ -222,6 +231,7 @@ public class CompareFactory {
             for (RDFNode resItem : list1) {
                 if (!list2.contains(resItem)) {
                     different = true;
+                    break;
                 }
 
             }
@@ -316,7 +326,7 @@ public class CompareFactory {
                     Map<Boolean, List<RDFNode>> isBNlistB = isBlankNodeAlist(modelB.listStatements(new SimpleSelector(stmt.getSubject(), stmt.getPredicate(), (RDFNode) null)).next());
 
                     List<RDFNode> listModelB = isBNlistB.get(true);
-                    if (!compareRDFlist(listModelA, listModelB)) {
+                    if (compareRDFlist(listModelA, listModelB)) {
                         // the lists are different and the result will need to be recorded
 
                         result.put("modelA",listModelA.toString());
@@ -346,11 +356,11 @@ public class CompareFactory {
             int k=1;
             //modelA.listStatements(new SimpleSelector(stmt.getObject().asResource(),(Property) null,(RDFNode) null)).toList();
 
-            if (reverse==0) {
-
-            }else{//reverse =1
-
-            }
+//            if (reverse==0) {
+//
+//            }else{//reverse =1
+//
+//            }
         }
         return result;
     }

@@ -167,9 +167,13 @@ public class ModelManipulationFactory {
 
 
                                 switch (propertyType) {
-                                    case "Attribute": //add literal
+                                    case "Attribute" -> { //add literal
                                         if (rdfid.startsWith("urn:uuid:")) {
-                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                                            if (object.contains("LangXMLTag:")) {
+                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createLangLiteral(object.split("LangXMLTag:", 2)[0], object.split("LangXMLTag:", 2)[1])));
+                                            } else {
+                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                                            }
                                         } else {
                                             if (rdfid.startsWith("http://")) {
                                                 model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
@@ -177,8 +181,8 @@ public class ModelManipulationFactory {
                                                 model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
                                             }
                                         }
-                                        break;
-                                    case "Association": //add resource
+                                    }
+                                    case "Association" -> { //add resource
                                         if (rdfid.startsWith("urn:uuid:")) {
                                             model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
                                         } else {
@@ -188,10 +192,9 @@ public class ModelManipulationFactory {
                                                 model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
                                             }
                                         }
-                                        break;
-                                    case "Enumeration": //add enum
-                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
-                                        break;
+                                    }
+                                    case "Enumeration" -> //add enum
+                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
                                 }
 
                             }

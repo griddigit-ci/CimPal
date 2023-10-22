@@ -28,7 +28,7 @@ import java.util.zip.ZipFile;
 public class ModelFactory {
 
     //Loads one or many models
-    public static Model modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat) throws FileNotFoundException {
+    public static Model modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat,Boolean considerCimDiff) throws FileNotFoundException {
         Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
         Map<String, String> prefixMap = modelUnion.getNsPrefixMap();
         for (Object file : files) {
@@ -36,6 +36,21 @@ public class ModelFactory {
             InputStream inputStream = new FileInputStream(file.toString());
             RDFDataMgr.read(model, inputStream, xmlBase, rdfSourceFormat);
             prefixMap.putAll(model.getNsPrefixMap());
+            if (considerCimDiff) {
+                String cim2URI = prefixMap.get("cim");
+                if (!cim2URI.isEmpty()) {
+                    model.removeNsPrefix("cim");
+                    prefixMap.remove("cim");
+                    String cim2Pref = switch (cim2URI) {
+                        case "http://iec.ch/TC57/2013/CIM-schema-cim16#" -> "cim16";
+                        case "http://iec.ch/TC57/CIM100#" -> "cim17";
+                        case "http://cim.ucaiug.io/ns#" -> "cim18";
+                        default -> throw new IllegalStateException("Unexpected value: " + cim2URI);
+                    };
+                    model.setNsPrefix(cim2Pref, cim2URI);
+                    prefixMap.putIfAbsent(cim2Pref, cim2URI);
+                }
+            }
             modelUnion.add(model);
         }
         modelUnion.setNsPrefixes(prefixMap);
@@ -167,7 +182,7 @@ public class ModelFactory {
 
 
     //File(s) selection Filechooser
-    public static List<File> filechoosercustom(Boolean typeSingleFile, String titleExtensionFilter , List<String> extExtensionFilter) {
+    public static List<File> filechoosercustom(Boolean typeSingleFile, String titleExtensionFilter , List<String> extExtensionFilter, String title) {
 
         List<File> fileL = new LinkedList<>();
         File file = null;
@@ -175,6 +190,7 @@ public class ModelFactory {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(titleExtensionFilter, extExtensionFilter));
         filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
+        filechooser.setTitle(title);
 
         try {
             if (typeSingleFile) {
