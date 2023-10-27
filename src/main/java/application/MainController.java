@@ -237,6 +237,12 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLoptionInverse;
     @FXML
     private CheckBox cbRDFSSHACLoptionBaseprofiles2nd;
+    @FXML
+    private CheckBox fcbSortRDF;
+    @FXML
+    private CheckBox fcbRDFconvertInstanceData;
+    @FXML
+    private ChoiceBox fcbRDFsortOptions;
 
 
 
@@ -420,8 +426,8 @@ public class MainController implements Initializable {
                 "RDFXML_PLAIN",
                 "RDFXML",
                 "RDFXML_PRETTY",
-                "RDFXML_CUSTOM_PLAIN_PRETTY",
-                "RDFXML_CUSTOM_PLAIN",
+                "CIMXML 61970-552 (RDFXML_CUSTOM_PLAIN_PRETTY)",
+                "RDFS CIMXML 61970-501 (RDFXML_CUSTOM_PLAIN)",
                 "RDFXML_ABBREV"
 
         );
@@ -982,14 +988,14 @@ public class MainController implements Initializable {
         }
 
 
-        if (compareResults.size() != 0 ) {
+        if (!compareResults.isEmpty()) {
 
             if (fcbIDcompShowDetails.isSelected()) {
                 try {
                     Stage guiRdfDiffResultsStage = new Stage();
                     //Scene for the menu RDF differences
                     //FXMLLoader fxmlLoader = new FXMLLoader();
-                    Parent rootRDFdiff = FXMLLoader.load(getClass().getResource("/fxml/rdfDiffResult.fxml"));
+                    Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
                     Scene rdfDiffscene = new Scene(rootRDFdiff);
                     guiRdfDiffResultsStage.setScene(rdfDiffscene);
                     guiRdfDiffResultsStage.setTitle("Comparison Instance data");
@@ -1134,13 +1140,13 @@ public class MainController implements Initializable {
         }
 
 
-        if (compareResults.size() != 0) {
+        if (!compareResults.isEmpty()) {
 
             try {
                 Stage guiRdfDiffResultsStage = new Stage();
                 //Scene for the menu RDF differences
                 //FXMLLoader fxmlLoader = new FXMLLoader();
-                Parent rootRDFdiff = FXMLLoader.load(getClass().getResource("/fxml/rdfDiffResult.fxml"));
+                Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
                 Scene rdfDiffscene = new Scene(rootRDFdiff);
                 guiRdfDiffResultsStage.setScene(rdfDiffscene);
                 guiRdfDiffResultsStage.setTitle("Comparison RDFS profiles");
@@ -1222,6 +1228,8 @@ public class MainController implements Initializable {
                     saveProperties.put("dozip", false);
                     saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
                     saveProperties.put("showXmlBaseDeclaration", "false");
+                    saveProperties.put("sortRDF","true");
+                    saveProperties.put("sortRDFprefix","true"); // if true the sorting is on the prefix, if false on the localName
 
                     saveProperties.put("putHeaderOnTop", true);
                     saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
@@ -1544,28 +1552,16 @@ public class MainController implements Initializable {
 
         RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
         if (!fcbRDFformat.getSelectionModel().isSelected(-1)) {
-            switch (fcbRDFformat.getSelectionModel().getSelectedItem().toString()) {
-                case "RDFXML":
-                    rdfFormat = RDFFormat.RDFXML;
-                    break;
-                case "RDFXML_ABBREV":
-                    rdfFormat = RDFFormat.RDFXML_ABBREV;
-                    break;
-                case "RDFXML_PLAIN":
-                    rdfFormat = RDFFormat.RDFXML_PLAIN;
-                    break;
-                case "RDFXML_PRETTY":
-                    rdfFormat = RDFFormat.RDFXML_PRETTY;
-                    break;
-                case "RDFXML_CUSTOM_PLAIN_PRETTY":
-                    rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-                    break;
-                case "RDFXML_CUSTOM_PLAIN":
-                    rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
-                    break;
-                default:
-                    throw new IllegalStateException("Unexpected value: " + fcbRDFformat.getSelectionModel().getSelectedItem().toString());
-            }
+            rdfFormat = switch (fcbRDFformat.getSelectionModel().getSelectedItem().toString()) {
+                case "RDFXML" -> RDFFormat.RDFXML;
+                case "RDFXML_ABBREV" -> RDFFormat.RDFXML_ABBREV;
+                case "RDFXML_PLAIN" -> RDFFormat.RDFXML_PLAIN;
+                case "RDFXML_PRETTY" -> RDFFormat.RDFXML_PRETTY;
+                case "CIMXML 61970-552 (RDFXML_CUSTOM_PLAIN_PRETTY)" -> CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
+                case "RDFS CIMXML 61970-501 (RDFXML_CUSTOM_PLAIN)" -> CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
+                default ->
+                        throw new IllegalStateException("Unexpected value: " + fcbRDFformat.getSelectionModel().getSelectedItem().toString());
+            };
         }
         String showXmlDeclaration="false";
         if (targetFormat.equals("RDF XML (.rdf or .xml)") && fcbShowXMLDeclaration.isSelected()){
@@ -1584,6 +1580,10 @@ public class MainController implements Initializable {
         if (targetFormat.equals("RDF XML (.rdf or .xml)")){
             relativeURIs=fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
         }
+        String sortRDF = "false";
+        if (fcbSortRDF.isSelected()){
+            sortRDF = "true";
+        }
 
         boolean modelUnionFlag= fcbRDFconvertModelUnion.isSelected();
 
@@ -1598,7 +1598,7 @@ public class MainController implements Initializable {
 
         RdfConvert.rdfConversion(MainController.rdfConvertFile,MainController.rdfConvertFileList,sourceFormat,
                 targetFormat,xmlBase,rdfFormat,showXmlDeclaration,showDoctypeDeclaration,tab,
-                relativeURIs,modelUnionFlag,inheritanceOnly,inheritanceList,inheritanceListConcrete,addowl,modelUnionFlagDetailed);
+                relativeURIs,modelUnionFlag,inheritanceOnly,inheritanceList,inheritanceListConcrete,addowl,modelUnionFlagDetailed,sortRDF);
 
         progressBar.setProgress(1);
     }
@@ -1659,6 +1659,7 @@ public class MainController implements Initializable {
                 fcbRelativeURIs.getSelectionModel().selectFirst();
                 fcbRDFformat.setDisable(false);
                 fcbRDFformat.getSelectionModel().selectFirst();
+                fcbSortRDF.setDisable(false);
             } else {
                 fcbShowXMLDeclaration.setDisable(true);
                 fcbShowXMLDeclaration.setSelected(true);
@@ -1670,6 +1671,7 @@ public class MainController implements Initializable {
                 fcbRelativeURIs.getSelectionModel().clearSelection();
                 fcbRDFformat.setDisable(true);
                 fcbRDFformat.getSelectionModel().clearSelection();
+                fcbSortRDF.setDisable(true);
             }
         } else {
             fcbShowXMLDeclaration.setDisable(true);
@@ -1682,6 +1684,7 @@ public class MainController implements Initializable {
             fcbRelativeURIs.getSelectionModel().clearSelection();
             fcbRDFformat.setDisable(true);
             fcbRDFformat.getSelectionModel().clearSelection();
+            fcbSortRDF.setDisable(true);
         }
 
 

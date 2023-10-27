@@ -275,6 +275,8 @@ public class InstanceDataFactory {
         boolean useEnumRules = (boolean) saveProperties.get("useEnumRules");   //switch to trigger special treatment when Enum is referenced
         boolean useFileDialog=(boolean) saveProperties.get("useFileDialog");
         String instanceData = saveProperties.get("instanceData").toString();
+        String sortRDF = saveProperties.get("sortRDF").toString();
+        String sortRDFprefix = saveProperties.get("sortRDFprefix").toString();
         String fileFolder=saveProperties.get("fileFolder").toString();
         boolean dozip=(boolean) saveProperties.get("dozip");
         String showXmlBaseDeclaration = saveProperties.get("showXmlBaseDeclaration").toString();
@@ -316,6 +318,8 @@ public class InstanceDataFactory {
                     properties.put("tab", tab);
                     properties.put("relativeURIs", relativeURIs);
                     properties.put("instanceData", instanceData);
+                    properties.put("sortRDF",sortRDF);
+                    properties.put("sortRDFprefix",sortRDFprefix);
                     properties.put("showXmlBaseDeclaration", showXmlBaseDeclaration);
 
                     if (useAboutRules) {

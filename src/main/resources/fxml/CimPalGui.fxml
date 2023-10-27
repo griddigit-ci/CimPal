@@ -241,7 +241,7 @@
                               <padding>
                                  <Insets left="5.0" right="5.0" top="5.0" />
                               </padding>
-                              <Label minWidth="90.0" text="Excel file:" wrapText="true" />
+                              <Label minWidth="90.0" text="Input - Excel file:" wrapText="true" />
                               <TextField fx:id="fPathXLSfileForShape" editable="false" HBox.hgrow="ALWAYS" />
                               <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShape" text="Browse" />
                            </HBox>
@@ -285,22 +285,32 @@
                                  <padding>
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
-                                 <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" prefWidth="200.0" text="Union model" />
-                                 <CheckBox fx:id="fcbRDFconvertModelUnionDetailed" mnemonicParsing="false" prefWidth="200.0" text="Union model detailed" />
-                                 <CheckBox fx:id="fcbRDFConvertInheritanceOnly" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceOnly" prefWidth="300.0" text="Process only inheritance related properties" />
-                                 <CheckBox fx:id="fcbRDFConverInheritanceList" disable="true" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceList" prefWidth="300.0" text="Generate inheritance list in Turtle" />
-                                 <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" prefWidth="300.0" text="Inherited members - only concrete classes" />
-                                 <CheckBox fx:id="fcbRDFConveraddowl" mnemonicParsing="false" prefHeight="17.0" prefWidth="201.0" text="Add OWL" />
-                              </HBox>
-                              <HBox spacing="10.0">
-                                 <padding>
-                                    <Insets left="5.0" right="5.0" top="5.0" />
-                                 </padding>
                                  <Label minWidth="90.0" text="Source:" wrapText="true" />
                                  <TextField fx:id="fsourcePathTextField" editable="false" HBox.hgrow="ALWAYS" />
                                  <Button mnemonicParsing="false" onAction="#actionBrowseRDFConvert" text="Browse" />
                                  <Label minWidth="70.0" text="Format:" />
                                  <ChoiceBox fx:id="fsourceFormatChoiceBox" minWidth="150.0" HBox.hgrow="ALWAYS" />
+                              </HBox>
+                              <HBox spacing="20.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <Label minWidth="90.0" text="Operations options:" wrapText="true" />
+                                 <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" text="Union model" wrapText="true" />
+                                 <CheckBox fx:id="fcbRDFconvertModelUnionDetailed" mnemonicParsing="false" text="Union model detailed" wrapText="true" />
+                                 <CheckBox fx:id="fcbRDFConvertInheritanceOnly" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceOnly" text="Process only inheritance related properties" wrapText="true" />
+                                 <CheckBox fx:id="fcbRDFConverInheritanceList" disable="true" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceList" text="Generate inheritance list in Turtle" wrapText="true" />
+                                 <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" text="Inherited members - only concrete classes" wrapText="true" />
+                                 <CheckBox fx:id="fcbRDFConveraddowl" mnemonicParsing="false" text="Add OWL" wrapText="true" />
+                              </HBox>
+                              <HBox spacing="10.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <Label minWidth="90.0" text="Source type::" wrapText="true" />
+                                    <CheckBox fx:id="fcbRDFconvertInstanceData" mnemonicParsing="false" text="Instance data (serialisation according to IEC 61970-552 and CGMES)" />
+                                 </children>
                               </HBox>
                               <HBox spacing="10.0">
                                  <padding>
@@ -337,6 +347,21 @@
                                  <ChoiceBox fx:id="fcbRelativeURIs" disable="true" prefWidth="200.0" />
                                  <Label text="RDF format: " />
                                  <ChoiceBox fx:id="fcbRDFformat" disable="true" prefWidth="200.0" />
+                              </HBox>
+                              <HBox spacing="10.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <Label minWidth="50.0" text="Sorting options:" />
+                                    <CheckBox fx:id="fcbSortRDF" disable="true" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
+                                       <HBox.margin>
+                                          <Insets left="10.0" />
+                                       </HBox.margin>
+                                    </CheckBox>
+                                    <Label text="Sorting options:" />
+                                    <ChoiceBox fx:id="fcbRDFsortOptions" disable="true" prefWidth="200.0" />
+                                 </children>
                               </HBox>
                               <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                  <VBox.margin>

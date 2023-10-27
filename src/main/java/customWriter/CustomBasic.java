@@ -27,9 +27,12 @@ public class CustomBasic extends CustomBaseXMLWriter {
     protected Set<Resource> aboutRules = new HashSet<>();
     protected boolean useAboutRules = false;
     //protected boolean instanceData = false;
+    //protected  boolean sortRDF;
 
     protected Set<Resource> enumRules = new HashSet<>();
     protected boolean useEnumRules = false;
+
+
 
     @Override
     Resource[] setTypes(Resource[] propValue) {
@@ -86,7 +89,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
     {
         String xmlns = xmlnsDecl();
         writer.print( "<" + rdfEl( "RDF" ) + xmlns );
-        if (null != xmlBase && xmlBase.length() > 0)
+        if (null != xmlBase && !xmlBase.isEmpty())
             writer.print( "\n  xml:base=" + substitutedAttribute( xmlBase ) );
         writer.println( " > " );
     }
@@ -94,8 +97,38 @@ public class CustomBasic extends CustomBaseXMLWriter {
     protected void writeRDFStatements( Model model, PrintWriter writer )
     {
         writePleasingRDFStatements(model, writer);
-        ResIterator rIter = model.listSubjects();
-        while (rIter.hasNext()) writeRDFStatements( model, rIter.nextResource(), writer );
+        if (this.sortRDF.equals("true")){
+            //get list of all triples of the rdf:type and these need to be sorted by object
+            Set<Statement> listStatements = model.listStatements(new SimpleSelector(null, RDF.type, (RDFNode) null)).toSet();
+            Map<String,RDFNode> listObjectsMap = new TreeMap<>();
+            for (Statement stmt : listStatements) {
+                if (sortRDFprefix.equals("true")) {
+                    listObjectsMap.put(model.getNsURIPrefix(stmt.getObject().asResource().getNameSpace()) + ":" +stmt.getObject().asResource().getLocalName(),stmt.getObject());
+                }else{
+                    listObjectsMap.put(stmt.getObject().asResource().getLocalName(),stmt.getObject());
+                }
+
+            }
+            Set<Map.Entry<String,RDFNode> > entries
+                    = listObjectsMap.entrySet();
+            for (Map.Entry<String, RDFNode> entry : entries) {
+
+                StmtIterator stmtIter = model.listStatements(new SimpleSelector(null, null, entry.getValue()));
+                while (stmtIter.hasNext()) {
+                    Statement nextStatement = stmtIter.nextStatement();
+                    //writePredicate(nextStatement, writer);
+                    writeRDFStatements(model, nextStatement.getSubject(), writer);
+                }
+                //writeRDFStatements(model, entry.getValue(), writer);
+
+
+
+            }
+        }else{
+            ResIterator rIter = model.listSubjects();
+            while (rIter.hasNext()) writeRDFStatements( model, rIter.nextResource(), writer );
+        }
+
     }
 
     protected void writeRDFTrailer( PrintWriter writer, String base )
@@ -120,10 +153,22 @@ public class CustomBasic extends CustomBaseXMLWriter {
     {
         if(performedPleasingObjects.contains(subject)) { return; }
 
-        StmtIterator sIter = model.listStatements( subject, null, (RDFNode) null );
-        writeDescriptionHeader( subject, writer );
-        while (sIter.hasNext()) writePredicate( sIter.nextStatement(), writer );
-        writeDescriptionTrailer( subject, writer );
+        writeDescriptionHeader(subject, writer);
+        if (this.sortRDF.equals("true")){
+            //get list of all triples of the rdf:type and these need to be sorted by object
+            Set<Map.Entry<String, Property>> entries = CustomBasicPretty.sortRDFprepare(model, subject,this.sortRDFprefix);
+            for (Map.Entry<String, Property> entry : entries) {
+                StmtIterator stmtIter = model.listStatements(new SimpleSelector(subject,entry.getValue(),(RDFNode) null));
+                while (stmtIter.hasNext()) {
+                    Statement nextStatement = stmtIter.nextStatement();
+                        writePredicate(nextStatement, writer);
+                }
+            }
+        }else {
+            StmtIterator sIter = model.listStatements(subject, null, (RDFNode) null);
+            while (sIter.hasNext()) writePredicate(sIter.nextStatement(), writer);
+        }
+        writeDescriptionTrailer(subject, writer);
     }
 
     protected void writeDescriptionHeader( Resource subject, PrintWriter writer)
@@ -353,8 +398,8 @@ public class CustomBasic extends CustomBaseXMLWriter {
 
         if(types == null || types.length == 0) { return buckets; }
 
-        for (int i = 0; i < types.length; i++) {
-            buckets.put(types[i], new HashSet<>());
+        for (Resource type : types) {
+            buckets.put(type, new HashSet<>());
         }
 
         ResIterator rs = model.listSubjects();

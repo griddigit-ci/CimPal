@@ -30,24 +30,14 @@ public class RdfConvert {
     //RDF conversion
     public static void rdfConversion(File file, List<File> files, String sourceFormat, String targetFormat, String xmlBase,RDFFormat rdfFormat,
                                      String showXmlDeclaration, String showDoctypeDeclaration, String tab,String relativeURIs, Boolean modelUnionFlag,
-                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl, Boolean modelUnionFlagDetailed) throws IOException {
+                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl, Boolean modelUnionFlagDetailed,String sortRDF) throws IOException {
 
-        Lang rdfSourceFormat;
-        switch (sourceFormat) {
-            case "RDF XML (.rdf or .xml)":
-                rdfSourceFormat=Lang.RDFXML;
-                break;
-
-            case "RDF Turtle (.ttl)":
-                rdfSourceFormat=Lang.TURTLE;
-                break;
-
-            case "JSON-LD (.jsonld)":
-                rdfSourceFormat=Lang.JSONLD;
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + sourceFormat);
-        }
+        Lang rdfSourceFormat = switch (sourceFormat) {
+            case "RDF XML (.rdf or .xml)" -> Lang.RDFXML;
+            case "RDF Turtle (.ttl)" -> Lang.TURTLE;
+            case "JSON-LD (.jsonld)" -> Lang.JSONLD;
+            default -> throw new IllegalStateException("Unexpected value: " + sourceFormat);
+        };
         List<File> modelFiles = new LinkedList<File>();
         if (!modelUnionFlagDetailed) {
             if (!modelUnionFlag && file != null) {
@@ -61,53 +51,23 @@ public class RdfConvert {
 
         if (modelUnionFlagDetailed) {
             //put first the main RDF
-//            FileChooser filechooser = new FileChooser();
-//            filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Main RDF file", "*.rdf","*.xml", "*.ttl"));
-//            filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//            File fileDet1=null;
-            List<File> fileDet1 = util.ModelFactory.filechoosercustom(true,"Main RDF file", List.of("*.rdf","*.xml", "*.ttl"),"");
-//            try {
-//                fileDet1 = filechooser.showOpenDialog(null);
-//            }catch (Exception e){
-//                filechooser.setInitialDirectory(new File("C:/"));
-//                fileDet1 = filechooser.showOpenDialog(null);
-//            }
+            List<File> fileDet1 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Main RDF file");
             if (!fileDet1.isEmpty()) {
                 if (fileDet1.get(0) != null) {
                     modelFiles.add(fileDet1.get(0));
                 }
             }
 
+            List<File> fileDet2 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Deviation RDF file");
 
-//            FileChooser filechooser1 = new FileChooser();
-//            filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Deviation RDF file", "*.rdf","*.xml", "*.ttl"));
-//            filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//            File fileDet2=null;
-            List<File> fileDet2 = util.ModelFactory.filechoosercustom(true,"Deviation RDF file", List.of("*.rdf","*.xml", "*.ttl"),"");
-//            try {
-//                fileDet2 = filechooser1.showOpenDialog(null);
-//            }catch (Exception e){
-//                filechooser1.setInitialDirectory(new File("C:/"));
-//                fileDet2 = filechooser1.showOpenDialog(null);
-//            }
             if (!fileDet2.isEmpty()) {
                 if (fileDet2.get(0) != null) {
                     modelFiles.add(fileDet2.get(0));
                 }
             }
 
+            List<File> fileDet3 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Extended RDF file");
 
-//            FileChooser filechooser2 = new FileChooser();
-//            filechooser2.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Extended RDF file", "*.rdf","*.xml", "*.ttl"));
-//            filechooser2.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//            File fileDet3=null;
-            List<File> fileDet3 = util.ModelFactory.filechoosercustom(true,"Extended RDF file", List.of("*.rdf","*.xml", "*.ttl"),"");
-//            try {
-//                fileDet3 = filechooser2.showOpenDialog(null);
-//            }catch (Exception e){
-//                filechooser2.setInitialDirectory(new File("C:/"));
-//                fileDet3 = filechooser2.showOpenDialog(null);
-//            }
             if (!fileDet3.isEmpty()) {
                 if (fileDet3.get(0) != null) {
                     modelFiles.add(fileDet3.get(0));
@@ -150,20 +110,15 @@ public class RdfConvert {
                         }
 
                         //delete all attributes and associations with range of the deleted classes
-
                         List<Statement> stdeleteProp1 = model.listStatements(new SimpleSelector(null, RDFS.range, stmpProp.getSubject())).toList();
                         stmtToDeleteClass.addAll(stdeleteProp1);
                         for (Statement stmpProp2 : stdeleteProp1) {
                             List<Statement> stdeleteProp2 = model.listStatements(new SimpleSelector(stmpProp2.getSubject(), null, (RDFNode) null)).toList();
                             stmtToDeleteClass.addAll(stdeleteProp2);
                         }
-
                     }
-
                 }
             }
-
-
 
             for (StmtIterator i = model.listStatements(new SimpleSelector(null, RDFS.label,ResourceFactory.createLangLiteral("LTDSnotDefined","en"))); i.hasNext(); ) {
                 Statement stmt = i.next();
@@ -251,21 +206,18 @@ public class RdfConvert {
         }
 
         switch (targetFormat) {
-            case "RDF XML (.rdf or .xml)":
+            case "RDF XML (.rdf or .xml)" -> {
 
                 //register custom format
                 CustomRDFFormat.RegisterCustomFormatWriters();
                 String showXmlEncoding = "true"; //saveProperties.get("showXmlEncoding").toString();
                 boolean putHeaderOnTop = true; //(boolean) saveProperties.get("putHeaderOnTop");
-                String headerClassResource="http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"; //saveProperties.get("headerClassResource").toString();
+                String headerClassResource = "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"; //saveProperties.get("headerClassResource").toString();
                 boolean useAboutRules = false;//(boolean) saveProperties.get("useAboutRules");   //switch to trigger file chooser and adding the property
                 boolean useEnumRules = false;//(boolean) saveProperties.get("useEnumRules");   //switch to trigger special treatment when Enum is reference
-
                 Set<Resource> rdfAboutList = null; //(Set<Resource>) saveProperties.get("rdfAboutList");
                 Set<Resource> rdfEnumList = null;//(Set<Resource>) saveProperties.get("rdfEnumList");
-
-                OutputStream outXML = fileSaveDialog("Save RDF XML for: "+filename, "RDF XML", "*.rdf");
-
+                OutputStream outXML = fileSaveDialog("Save RDF XML for: " + filename, "RDF XML", "*.rdf");
                 if (outXML != null) {
                     try {
                         if (rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY || rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN) {
@@ -273,6 +225,7 @@ public class RdfConvert {
                             properties.put("showXmlDeclaration", showXmlDeclaration);
                             properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
                             properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
+                            properties.put("sortRDF",sortRDF);
                             //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
                             //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
                             //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
@@ -338,46 +291,33 @@ public class RdfConvert {
 
                     }
                 }
-
-
-
-
-
-
-
-
-
-
-
-                break;
-
-            case "RDF Turtle (.ttl)":
-                OutputStream outTTL = fileSaveDialog("Save RDF Turtle for: "+filename, "RDF Turtle", "*.ttl");
-                if (outTTL!=null) {
+            }
+            case "RDF Turtle (.ttl)" -> {
+                OutputStream outTTL = fileSaveDialog("Save RDF Turtle for: " + filename, "RDF Turtle", "*.ttl");
+                if (outTTL != null) {
                     try {
                         model.write(outTTL, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
                         if (inheritanceList) {
-                            fileSaveDialogInheritance(filename+"Inheritance",xmlBase);
+                            fileSaveDialogInheritance(filename + "Inheritance", xmlBase);
                         }
                     } finally {
                         outTTL.close();
                     }
                 }
-                break;
-
-            case "JSON-LD (.jsonld)":
-                OutputStream outJsonLD = fileSaveDialog("Save JSON-LD for: "+filename, "JSON-LD", "*.jsonld");
-                if (outJsonLD!=null) {
+            }
+            case "JSON-LD (.jsonld)" -> {
+                OutputStream outJsonLD = fileSaveDialog("Save JSON-LD for: " + filename, "JSON-LD", "*.jsonld");
+                if (outJsonLD != null) {
                     try {
                         model.write(outJsonLD, RDFFormat.JSONLD.getLang().getLabel().toUpperCase(), xmlBase);
                         if (inheritanceList) {
-                            fileSaveDialogInheritance(filename+"Inheritance",xmlBase);
+                            fileSaveDialogInheritance(filename + "Inheritance", xmlBase);
                         }
                     } finally {
                         outJsonLD.close();
                     }
                 }
-                break;
+            }
         }
     }
 

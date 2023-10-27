@@ -126,6 +126,8 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
     RDFErrorHandler errorHandler = defaultErrorHandler;
 
     Boolean showXmlDeclaration = null;
+    String sortRDF = null;
+    String sortRDFprefix = null;
     Boolean showXmlEncoding = null;
 
     String instanceData = null;
@@ -654,6 +656,16 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
             return setBlockRules(propValue);
         } else if(propName.equalsIgnoreCase("showXmlEncoding")) {
             return setShowXmlEncoding(propValue);
+        } else if(propName.equalsIgnoreCase("sortRDF")) {
+            //return setsortRDF(propValue);
+            String result = sortRDF;
+            sortRDF = (String) propValue;
+            return result;
+        } else if(propName.equalsIgnoreCase("sortRDFprefix")) {
+            //return setsortRDF(propValue);
+            String result = sortRDFprefix;
+            sortRDFprefix = (String) propValue;
+            return result;
         } else if(propName.equalsIgnoreCase("instanceData")) {
             //return setinstanceData(propValue);
             String result = instanceData;
@@ -736,6 +748,12 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
         return oldValue;
     }
 
+//    private String setsortRDF(Object propValue)
+//    {
+//        String oldValue = sortRDF == null ? null : sortRDF.toString();
+//        sortRDF = getBooleanValue(propValue, null);
+//        return oldValue;
+//    }
     /**
      Answer the boolean value corresponding to o, which must either be a Boolean,
      or a String parsable as a Boolean.
