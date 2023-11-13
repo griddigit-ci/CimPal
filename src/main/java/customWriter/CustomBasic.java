@@ -31,6 +31,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
 
     protected Set<Resource> enumRules = new HashSet<>();
     protected boolean useEnumRules = false;
+    //String showXmlBaseDeclaration = null;
 
 
 
@@ -89,7 +90,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
     {
         String xmlns = xmlnsDecl();
         writer.print( "<" + rdfEl( "RDF" ) + xmlns );
-        if (null != xmlBase && !xmlBase.isEmpty())
+        if (null != xmlBase && !xmlBase.isEmpty() && this.showXmlBaseDeclaration.equals("true"))
             writer.print( "\n  xml:base=" + substitutedAttribute( xmlBase ) );
         writer.println( " > " );
     }

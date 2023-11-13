@@ -1206,8 +1206,8 @@ public class MainController implements Initializable {
                 MainController.rdfProfileFileList = file;
 
                 //String xmlBase = "http://entsoe.eu/ns/nc";
-                //String xmlBase = "http://iec.ch/TC57/CIM100";
-                String xmlBase = "";
+                String xmlBase = "http://iec.ch/TC57/CIM100";
+                //String xmlBase = "";
 
                 //set properties for the export
                 String formatGeneratedModel = "61970-552 CIM XML (.xml)"; //fcbGenDataFormat.getSelectionModel().getSelectedItem().toString();
@@ -1227,9 +1227,9 @@ public class MainController implements Initializable {
                     saveProperties.put("fileFolder", "C:");
                     saveProperties.put("dozip", false);
                     saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
-                    saveProperties.put("showXmlBaseDeclaration", "false");
+                    saveProperties.put("showXmlBaseDeclaration", "true");
                     saveProperties.put("sortRDF","true");
-                    saveProperties.put("sortRDFprefix","true"); // if true the sorting is on the prefix, if false on the localName
+                    saveProperties.put("sortRDFprefix","false"); // if true the sorting is on the prefix, if false on the localName
 
                     saveProperties.put("putHeaderOnTop", true);
                     saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");

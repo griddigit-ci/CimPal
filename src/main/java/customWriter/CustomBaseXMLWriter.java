@@ -129,6 +129,7 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
     String sortRDF = null;
     String sortRDFprefix = null;
     Boolean showXmlEncoding = null;
+    String showXmlBaseDeclaration = null;
 
     String instanceData = null;
 
@@ -325,7 +326,7 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
             String prefix = ent.getValue();
             String uri = ent.getKey();
             result.append( newline ).append( "    xmlns" );
-            if (prefix.length() > 0) result.append( ':' ).append( prefix );
+            if (!prefix.isEmpty()) result.append( ':' ).append( prefix );
             result.append( '=' ).append( substitutedAttribute( checkURI( uri ) ) );
         }
         return result.toString();
@@ -475,10 +476,10 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
 //		try {
         // errors?
         if (xmlBase == null) {
-            baseURI = (base == null || base.length() == 0) ? null : factory.create(base);
+            baseURI = (base == null || base.isEmpty()) ? null : factory.create(base);
             writeBody(model, pw, base, false);
         } else {
-            baseURI = xmlBase.length() == 0 ? null : factory.create(xmlBase);
+            baseURI = xmlBase.isEmpty() ? null : factory.create(xmlBase);
             writeBody(model, pw, xmlBase, true);
         }
 //		} catch (MalformedURIException e) {
@@ -660,6 +661,10 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI  {
             //return setsortRDF(propValue);
             String result = sortRDF;
             sortRDF = (String) propValue;
+            return result;
+        } else if(propName.equalsIgnoreCase("showXmlBaseDeclaration")) {
+            String result = showXmlBaseDeclaration;
+            showXmlBaseDeclaration = (String) propValue;
             return result;
         } else if(propName.equalsIgnoreCase("sortRDFprefix")) {
             //return setsortRDF(propValue);
