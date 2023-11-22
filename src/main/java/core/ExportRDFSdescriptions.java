@@ -9,6 +9,7 @@ package core;
 import application.MainController;
 import javafx.stage.FileChooser;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -30,6 +31,8 @@ public class ExportRDFSdescriptions {
         List<String> rdfsItemMultiplicity = new LinkedList<>(); // list for the multiplicity of the item
         List<String> rdfsItemtype = new LinkedList<>(); // list for the type of the item
         List<String> rdfsItemAssociationUsed = new LinkedList<>(); // list for the association used of the item
+        List<String> rdfsStereotype = new LinkedList<>(); // list for the stereotype of the item
+        List<String> rdfsConcreteClass = new LinkedList<>(); // list for the concrete classes
         String rdfNs = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
 
 
@@ -47,15 +50,12 @@ public class ExportRDFSdescriptions {
                 rdfsItemDescription.add("No description defined.");
             }
 
-
             for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "multiplicity")); j.hasNext(); ) {
                 RDFNode resItemNode = j.next();
                 try {
-
                     rdfsItemMultiplicity.add(resItemNode.toString().split("#M:", 2)[1]);
                     mult=1;
                 } catch (Exception e) {
-
                     mult=0;
                 }
             }
@@ -63,35 +63,70 @@ public class ExportRDFSdescriptions {
                 rdfsItemMultiplicity.add("N/A");
             }
 
-            int isAttr=0;
-            if (model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "AssociationUsed")).hasNext()) {
-                for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "AssociationUsed")); j.hasNext(); ) {
-                    RDFNode resItemNode = j.next();
-                    if (resItemNode.toString().equals("Yes")) {
-                        isAttr = 0;
-                        rdfsItemtype.add("Association"); // it is an association
-                        rdfsItemAssociationUsed.add("Yes"); // index 1 gives the direction
-                    } else if (resItemNode.toString().equals("No")) {
-                        isAttr = 0;
-                        rdfsItemtype.add("Association"); // it is an association
-                        rdfsItemAssociationUsed.add("No"); // index 1 gives the direction
-                    }
-                }
-            } else {
-                isAttr = 1;
-                rdfsItemtype.add("AttributeOrClass"); // it is an attribute
+            // add information for association used and other things
+            // is it a class
+            if (model.listStatements(new SimpleSelector(resItem,RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class"))).hasNext()){ // it is a class
+                rdfsItemtype.add("Class"); // it is a class
                 rdfsItemAssociationUsed.add("N/A");
+                if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
+                    rdfsConcreteClass.add("Yes");
+                }else if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("Primitive"))).hasNext() || model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("CIMDatatype"))).hasNext() || model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("Compound"))).hasNext()){
+                    rdfsConcreteClass.add("N/A");
+                }else{
+                    rdfsConcreteClass.add("No");
+                }
+            }else if (model.listStatements(new SimpleSelector(resItem,RDF.type, ResourceFactory.createProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"))).hasNext()){ // it is a property
+                if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "AssociationUsed"), ResourceFactory.createPlainLiteral("Yes"))).hasNext()){
+                    rdfsItemAssociationUsed.add("Yes");
+                    rdfsItemtype.add("Association"); // it is an association
+                }else if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "AssociationUsed"), ResourceFactory.createPlainLiteral("No"))).hasNext()){
+                    rdfsItemAssociationUsed.add("No");
+                    rdfsItemtype.add("Association"); // it is an association
+                }else{
+                    rdfsItemtype.add("Attribute"); // it is an attribute
+                    rdfsItemAssociationUsed.add("N/A");
+                }
+                rdfsConcreteClass.add("N/A");
+            }else{
+                if (model.listStatements(new SimpleSelector(resItem,RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory"))).hasNext()) {
+                    rdfsItemAssociationUsed.add("N/A");
+                    rdfsConcreteClass.add("N/A");
+                    rdfsItemtype.add("Package");
+                }else {
+                    rdfsItemAssociationUsed.add("N/A");
+                    rdfsConcreteClass.add("N/A");
+                    rdfsItemtype.add("Enum");
+                }
             }
 
+            //adding the stereotype
+            boolean hasStereotype=false;
+            String stereo="";
+            List<Statement> stereotypes = model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), (RDFNode) null)).toList();
+            for (Statement stmt : stereotypes){
+                if (stmt.getObject().isLiteral()){
+                    hasStereotype = true;
+                    if (stereo.isEmpty()) {
+                        stereo = stmt.getObject().toString();
+                    }else{
+                        stereo = stereo + "; " + stmt.getObject().toString();
+                    }
+                }
+            }
+            if (hasStereotype) {
+                rdfsStereotype.add(stereo);
+            }else{
+                rdfsStereotype.add("N/A");
+            }
         }
         // do the excel export
-        exportDesciption(rdfsItem,rdfsItemDescription,"RDFS descriptions","RDFSdescription","Save descriptions from RDFS", rdfsItemMultiplicity, rdfsItemtype, rdfsItemAssociationUsed);
+        exportDesciption(rdfsItem,rdfsItemDescription,"RDFS descriptions","RDFSdescription","Save descriptions from RDFS", rdfsItemMultiplicity, rdfsItemtype, rdfsItemAssociationUsed, rdfsStereotype, rdfsConcreteClass);
     }
 
 
 
 
-    private static void exportDesciption(List rdfsItem, List rdfsItemDescription, String sheetname, String initialFileName, String title, List rdfsItemMultiplicity, List rdfsItemtype, List rdfsItemAssociationUsed) throws FileNotFoundException {
+    private static void exportDesciption(List rdfsItem, List rdfsItemDescription, String sheetname, String initialFileName, String title, List rdfsItemMultiplicity, List rdfsItemtype, List rdfsItemAssociationUsed, List rdfsStereotype, List rdfsConcreteClass) throws FileNotFoundException {
 
         XSSFWorkbook workbook = new XSSFWorkbook();
         XSSFSheet sheet = workbook.createSheet(sheetname);
@@ -103,6 +138,8 @@ public class ExportRDFSdescriptions {
         firstRow.createCell(2).setCellValue("Multiplicity");
         firstRow.createCell(3).setCellValue("Type");
         firstRow.createCell(4).setCellValue("Association used");
+        firstRow.createCell(5).setCellValue("Stereotype");
+        firstRow.createCell(6).setCellValue("Concrete class");
 
         for (int row=0; row<rdfsItem.size();row++){
             XSSFRow xssfRow= sheet.createRow(row+1);
@@ -151,16 +188,28 @@ public class ExportRDFSdescriptions {
             } catch (NumberFormatException e ){
                 xssfRow.createCell(4).setCellValue(celValue4.toString());
             }
+
+            Object celValue5 = rdfsStereotype.get(row);
+            try {
+                if (celValue5 != null && Double.parseDouble(celValue5.toString()) != 0.0) {
+                    xssfRow.createCell(5).setCellValue(Double.parseDouble(celValue5.toString()));
+                }
+            } catch (NumberFormatException e ){
+                xssfRow.createCell(5).setCellValue(celValue5.toString());
+            }
+
+            Object celValue6 = rdfsConcreteClass.get(row);
+            try {
+                if (celValue6 != null && Double.parseDouble(celValue6.toString()) != 0.0) {
+                    xssfRow.createCell(6).setCellValue(Double.parseDouble(celValue6.toString()));
+                }
+            } catch (NumberFormatException e ){
+                xssfRow.createCell(6).setCellValue(celValue6.toString());
+            }
         }
-//        FileChooser filechooser = new FileChooser();
-//        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
-//        filechooser.setInitialFileName(initialFileName);
-//        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//        filechooser.setTitle(title);
-//        File saveFile = filechooser.showSaveDialog(null);
+
         File saveFile = util.ModelFactory.filesavecustom("Excel files", List.of("*.xlsx"),title,"");
         if (saveFile != null) {
-            //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);
