@@ -53,6 +53,7 @@ import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
 import static core.ExportRDFSdescriptions.rdfsDescriptions;
+import static core.RdfConvert.fileSaveDialog;
 import static core.RdfConvert.modelInheritance;
 
 
@@ -1300,7 +1301,7 @@ public class MainController implements Initializable {
     private void actionMenuDatatypeMap() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-        Map dataTypeMap = DataTypeMaping.mapDatatypesFromRDF();
+        Map<String, RDFDatatype> dataTypeMap = DataTypeMaping.mapDatatypesFromRDF();
         if (dataTypeMap!=null) {
 /*            //open a question/confirmation dialog to ask if the mapping of the datatypes should be saved
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
@@ -1329,6 +1330,28 @@ public class MainController implements Initializable {
                 //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             }
             //}
+
+            Model modeldatatype = ModelFactory.createDefaultModel();
+            modeldatatype.setNsPrefix("xsd",XSD.NS);
+            modeldatatype.setNsPrefix("rdf",RDF.uri);
+            modeldatatype.setNsPrefix("rdfs",RDFS.uri);
+
+            for (Map.Entry<String, RDFDatatype> set :
+                    dataTypeMap.entrySet()) {
+
+                modeldatatype.add(ResourceFactory.createStatement(ResourceFactory.createResource(set.getKey()),RDF.type,RDF.Property));
+                modeldatatype.add(ResourceFactory.createStatement(ResourceFactory.createResource(set.getKey()),RDF.type,RDFS.Literal));
+                modeldatatype.add(ResourceFactory.createStatement(ResourceFactory.createResource(set.getKey()),RDFS.range,ResourceFactory.createProperty(set.getValue().getURI())));
+            }
+
+            OutputStream outInt = fileSaveDialog("Save RDF for datatypes: RDFdatatypes", "RDF XML", "*.rdf");
+            try {
+                modeldatatype.write(outInt, RDFFormat.RDFXML.getLang().getLabel().toUpperCase(), "");
+            } finally {
+                outInt.close();
+            }
+
+
             progressBar.setProgress(1);
         }else {
             progressBar.setProgress(0);
@@ -1803,7 +1826,7 @@ public class MainController implements Initializable {
         this.packages = new ArrayList<>();
 
         if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019") || rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2020")) {
-            for (StmtIterator i = model.listStatements(new SimpleSelector(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory"))); i.hasNext(); ) {
+            for (StmtIterator i = model.listStatements(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory")); i.hasNext(); ) {
                 Statement resItem = i.next();
                 String label = model.getRequiredProperty(resItem.getSubject(),RDFS.label).getObject().asLiteral().getString();
                 if (label.endsWith("Profile") && (!label.startsWith("Doc") || label.startsWith("Document"))) {
@@ -3062,10 +3085,10 @@ public class MainController implements Initializable {
                     }
                 }
                 for (TreeItem<String> ti : expandedItem.getChildren()) {
-                    String tiName = ti.getValue().toString();
+                    String tiName = ti.getValue();
                     String className = null;
-                    if (selectedModel.listStatements(new SimpleSelector(ResourceFactory.createResource("http://griddigit.eu#"+tiName.split("\\|",2)[1]),RDF.type, (RDFNode) null)).hasNext()){
-                        Statement typeStmt = selectedModel.listStatements(new SimpleSelector(ResourceFactory.createResource("http://griddigit.eu#"+tiName.split("\\|",2)[1]),RDF.type, (RDFNode) null)).next();
+                    if (selectedModel.listStatements(ResourceFactory.createResource("http://griddigit.eu#"+tiName.split("\\|",2)[1]),RDF.type, (RDFNode) null).hasNext()){
+                        Statement typeStmt = selectedModel.listStatements(ResourceFactory.createResource("http://griddigit.eu#"+tiName.split("\\|",2)[1]),RDF.type, (RDFNode) null).next();
                         className = selectedModel.getNsURIPrefix(typeStmt.getObject().asResource().getNameSpace())+":"+typeStmt.getObject().asResource().getLocalName();
                     }
                     LinkedList<String> classProperty = InstanceDataFactory.getClassPropertiesForTree(selectedModel, className,tiName);

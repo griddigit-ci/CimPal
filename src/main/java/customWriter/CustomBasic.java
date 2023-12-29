@@ -100,7 +100,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
         writePleasingRDFStatements(model, writer);
         if (this.sortRDF.equals("true")){
             //get list of all triples of the rdf:type and these need to be sorted by object
-            Set<Statement> listStatements = model.listStatements(new SimpleSelector(null, RDF.type, (RDFNode) null)).toSet();
+            Set<Statement> listStatements = model.listStatements(null, RDF.type, (RDFNode) null).toSet();
             Map<String,RDFNode> listObjectsMap = new TreeMap<>();
             for (Statement stmt : listStatements) {
                 if (sortRDFprefix.equals("true")) {
@@ -114,7 +114,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                     = listObjectsMap.entrySet();
             for (Map.Entry<String, RDFNode> entry : entries) {
 
-                StmtIterator stmtIter = model.listStatements(new SimpleSelector(null, null, entry.getValue()));
+                StmtIterator stmtIter = model.listStatements(null, null, entry.getValue());
                 while (stmtIter.hasNext()) {
                     Statement nextStatement = stmtIter.nextStatement();
                     //writePredicate(nextStatement, writer);
@@ -159,7 +159,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
             //get list of all triples of the rdf:type and these need to be sorted by object
             Set<Map.Entry<String, Property>> entries = CustomBasicPretty.sortRDFprepare(model, subject,this.sortRDFprefix);
             for (Map.Entry<String, Property> entry : entries) {
-                StmtIterator stmtIter = model.listStatements(new SimpleSelector(subject,entry.getValue(),(RDFNode) null));
+                StmtIterator stmtIter = model.listStatements(subject,entry.getValue(),(RDFNode) null);
                 while (stmtIter.hasNext()) {
                     Statement nextStatement = stmtIter.nextStatement();
                         writePredicate(nextStatement, writer);

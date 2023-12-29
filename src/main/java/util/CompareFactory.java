@@ -50,7 +50,7 @@ public class CompareFactory {
                                            //if (resItemStmt.getPredicate().getLocalName().equals("UnitMultiplier.n")){
 
                                            //}
-                                           if (!modelB.listStatements(new SimpleSelector(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null)).nextStatement().getObject().asLiteral().getString().equals(modelA.listStatements(new SimpleSelector(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null)).nextStatement().getObject().asLiteral().getString())){
+                                           if (!modelB.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString().equals(modelA.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString())){
                                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
                                            }
                                        }else {
@@ -321,9 +321,9 @@ public class CompareFactory {
 
             if (reverse==0) {
                 //look at modelB
-                if (modelB.listStatements(new SimpleSelector(stmt.getSubject(), stmt.getPredicate(), (RDFNode) null)).hasNext()) {
+                if (modelB.listStatements(stmt.getSubject(), stmt.getPredicate(), (RDFNode) null).hasNext()) {
                     //it means that modelB has same attribute where the blank node is
-                    Map<Boolean, List<RDFNode>> isBNlistB = isBlankNodeAlist(modelB.listStatements(new SimpleSelector(stmt.getSubject(), stmt.getPredicate(), (RDFNode) null)).next());
+                    Map<Boolean, List<RDFNode>> isBNlistB = isBlankNodeAlist(modelB.listStatements(stmt.getSubject(), stmt.getPredicate(), (RDFNode) null).next());
 
                     List<RDFNode> listModelB = isBNlistB.get(true);
                     if (compareRDFlist(listModelA, listModelB)) {
@@ -342,7 +342,7 @@ public class CompareFactory {
                 }
             }else{ //reverse=1
                 //check only the case when the other model does not have this attribute. Other check is done in reverse=0
-                if (!modelB.listStatements(new SimpleSelector(stmt.getSubject(), stmt.getPredicate(), (RDFNode) null)).hasNext()) {
+                if (!modelB.listStatements(stmt.getSubject(), stmt.getPredicate(), (RDFNode) null).hasNext()) {
 
                     result.put("modelA","N/A");
                     result.put("modelB",listModelA.toString());

@@ -49,16 +49,20 @@ public class RdfConvert {
 
         Model model;
 
+        List<File> fileDet1;
+        List<File> fileDet2 = null;
+        List<File> fileDet3 = null;
+
         if (modelUnionFlagDetailed) {
             //put first the main RDF
-            List<File> fileDet1 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Main RDF file");
+            fileDet1 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Main RDF file");
             if (!fileDet1.isEmpty()) {
                 if (fileDet1.get(0) != null) {
                     modelFiles.add(fileDet1.get(0));
                 }
             }
 
-            List<File> fileDet2 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Deviation RDF file");
+            fileDet2 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Deviation RDF file");
 
             if (!fileDet2.isEmpty()) {
                 if (fileDet2.get(0) != null) {
@@ -66,7 +70,7 @@ public class RdfConvert {
                 }
             }
 
-            List<File> fileDet3 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Extended RDF file");
+            fileDet3 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Extended RDF file");
 
             if (!fileDet3.isEmpty()) {
                 if (fileDet3.get(0) != null) {
@@ -92,55 +96,55 @@ public class RdfConvert {
             model.setNsPrefixes(prefixMap);
 
             List<Statement> stmtToDeleteClass = new LinkedList<>();
-            for (StmtIterator i = model.listStatements(new SimpleSelector(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","belongsToCategory"),(RDFNode) null)); i.hasNext(); ) {
+            for (StmtIterator i = model.listStatements(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","belongsToCategory"),(RDFNode) null); i.hasNext(); ) {
                 Statement stmt = i.next();
                 if (stmt.getObject().asResource().getLocalName().equals("Package_LTDSnotDefined")){
                     //delete all classes
-                    List<Statement> stdelete=model.listStatements(new SimpleSelector(stmt.getSubject(), null, (RDFNode) null)).toList();
+                    List<Statement> stdelete=model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                     stmtToDeleteClass.addAll(stdelete);
                     //delete all attributes and associations with domain of the deleted classes
                     for (Statement stmpProp : stdelete) {
-                        List<Statement> stdeleteProp = model.listStatements(new SimpleSelector(null, RDFS.domain, stmpProp.getSubject())).toList();
+                        List<Statement> stdeleteProp = model.listStatements(null, RDFS.domain, stmpProp.getSubject()).toList();
                         stmtToDeleteClass.addAll(stdeleteProp);
                         for (Statement stmpProp1 : stdeleteProp) {
                             if (stmpProp1.getSubject().getLocalName().split("\\.", 2)[0].equals(stmpProp.getSubject().getLocalName())) {
-                                List<Statement> stdeleteProp1 = model.listStatements(new SimpleSelector(stmpProp1.getSubject(), null, (RDFNode) null)).toList();
+                                List<Statement> stdeleteProp1 = model.listStatements(stmpProp1.getSubject(), null, (RDFNode) null).toList();
                                 stmtToDeleteClass.addAll(stdeleteProp1);
                             }
                         }
 
                         //delete all attributes and associations with range of the deleted classes
-                        List<Statement> stdeleteProp1 = model.listStatements(new SimpleSelector(null, RDFS.range, stmpProp.getSubject())).toList();
+                        List<Statement> stdeleteProp1 = model.listStatements(null, RDFS.range, stmpProp.getSubject()).toList();
                         stmtToDeleteClass.addAll(stdeleteProp1);
                         for (Statement stmpProp2 : stdeleteProp1) {
-                            List<Statement> stdeleteProp2 = model.listStatements(new SimpleSelector(stmpProp2.getSubject(), null, (RDFNode) null)).toList();
+                            List<Statement> stdeleteProp2 = model.listStatements(stmpProp2.getSubject(), null, (RDFNode) null).toList();
                             stmtToDeleteClass.addAll(stdeleteProp2);
                         }
                     }
                 }
             }
 
-            for (StmtIterator i = model.listStatements(new SimpleSelector(null, RDFS.label,ResourceFactory.createLangLiteral("LTDSnotDefined","en"))); i.hasNext(); ) {
+            for (StmtIterator i = model.listStatements(null, RDFS.label,ResourceFactory.createLangLiteral("LTDSnotDefined","en")); i.hasNext(); ) {
                 Statement stmt = i.next();
-                List<Statement> stdelete=model.listStatements(new SimpleSelector(stmt.getSubject(), null, (RDFNode) null)).toList();
+                List<Statement> stdelete=model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                 stmtToDeleteClass.addAll(stdelete);
             }
 
             model.remove(stmtToDeleteClass);
 
             List<Statement> stmtToDeleteProperty = new LinkedList<>();
-            for (StmtIterator i = model.listStatements(new SimpleSelector(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","stereotype"),(RDFNode) null)); i.hasNext(); ) {
+            for (StmtIterator i = model.listStatements(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","stereotype"),(RDFNode) null); i.hasNext(); ) {
                 Statement stmt = i.next();
                 if (stmt.getObject().toString().equals("LTDSnotDefined")){
-                    List<Statement> stdelete=model.listStatements(new SimpleSelector(stmt.getSubject(), null, (RDFNode) null)).toList();
+                    List<Statement> stdelete=model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                     stmtToDeleteProperty.addAll(stdelete);
                 }
             }
 
             //delete double multiplicity
-            for (StmtIterator k = model.listStatements(new SimpleSelector(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity"),(RDFNode) null)); k.hasNext(); ) {
+            for (StmtIterator k = model.listStatements(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity"),(RDFNode) null); k.hasNext(); ) {
                 Statement stmt = k.next();
-                List<Statement> multi = model.listStatements(new SimpleSelector(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity"),(RDFNode) null)).toList();
+                List<Statement> multi = model.listStatements(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity"),(RDFNode) null).toList();
                 if (multi.size()>1){
                     for (Statement stmtM : multi) {
                         if (modelOrig.contains(stmtM)) {
@@ -197,6 +201,35 @@ public class RdfConvert {
         }
 
         model.add(stmttoadd);
+        
+        //ensure one ontology class
+        if (!Objects.requireNonNull(fileDet2).isEmpty() || !Objects.requireNonNull(fileDet3).isEmpty()) {
+            List<Statement> stmtToDeleteOntology = new LinkedList<>();
+            int maxstmt = 0;
+            Resource maxstmpst = null;
+            for (StmtIterator i = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")); i.hasNext(); ) {
+                Statement stmt = i.next();
+                List<Statement> stdeletep = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
+                int maxstmt0 = stdeletep.size();
+                if (maxstmt0>=maxstmt){
+                    maxstmt=maxstmt0;
+                    maxstmpst=stmt.getSubject();
+                }
+                stmtToDeleteOntology.addAll(stdeletep);
+            }
+            model.remove(stmtToDeleteOntology);
+
+
+            List<Statement> stmtToAddOntology = new LinkedList<>();
+            for (Statement stmtadd : stmtToDeleteOntology) {
+                if (stmtadd.getSubject().equals(maxstmpst)){
+                    stmtToAddOntology.add(stmtadd);
+                }
+            }
+            model.add(stmtToAddOntology);
+        }
+
+
 
         String filename="";
         if (!modelUnionFlag && file!=null) {
@@ -212,7 +245,13 @@ public class RdfConvert {
                 CustomRDFFormat.RegisterCustomFormatWriters();
                 String showXmlEncoding = "true"; //saveProperties.get("showXmlEncoding").toString();
                 boolean putHeaderOnTop = true; //(boolean) saveProperties.get("putHeaderOnTop");
-                String headerClassResource = "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"; //saveProperties.get("headerClassResource").toString();
+                String headerClassResource = null;
+                if (model.listStatements(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).hasNext()){
+                    headerClassResource = "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"; //saveProperties.get("headerClassResource").toString();
+                }else if (model.listStatements(null,RDF.type,ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()){
+                    headerClassResource = "http://www.w3.org/2002/07/owl#Ontology";
+                }
+
                 boolean useAboutRules = false;//(boolean) saveProperties.get("useAboutRules");   //switch to trigger file chooser and adding the property
                 boolean useEnumRules = false;//(boolean) saveProperties.get("useEnumRules");   //switch to trigger special treatment when Enum is reference
                 Set<Resource> rdfAboutList = null; //(Set<Resource>) saveProperties.get("rdfAboutList");
@@ -235,6 +274,10 @@ public class RdfConvert {
                             properties.put("xmlbase", xmlBase);
                             properties.put("tab", tab);
                             properties.put("relativeURIs", relativeURIs);
+                            properties.put("instanceData", "false");
+                            properties.put("sortRDF",sortRDF);
+                            properties.put("sortRDFprefix","false");
+                            properties.put("showXmlBaseDeclaration", "true");
 
                             if (useAboutRules) {
                                 properties.put("aboutRules", rdfAboutList);
@@ -333,7 +376,7 @@ public class RdfConvert {
     }
 
     //File save dialog
-    private static OutputStream fileSaveDialog(String title, String extensionName, String extension) throws FileNotFoundException {
+    public static OutputStream fileSaveDialog(String title, String extensionName, String extension) throws FileNotFoundException {
 //        File saveFile;
 //        FileChooser filechooserS = new FileChooser();
 //        filechooserS.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(extensionName, extension));
@@ -488,11 +531,11 @@ public class RdfConvert {
         modelResult.add(schemeRes,SKOS.prefLabel, ResourceFactory.createPlainLiteral("Base Voltage") );
 
 
-        for (StmtIterator i = model1.listStatements(new SimpleSelector((Resource) null , RDF.type, ResourceFactory.createProperty(xmlBase,"#BaseVoltage"))); i.hasNext(); ) {
+        for (StmtIterator i = model1.listStatements(null, RDF.type, ResourceFactory.createProperty(xmlBase,"#BaseVoltage")); i.hasNext(); ) {
             Statement stmtItem = i.next();
 
             //get the object of the BaseVoltage.nominalVoltage attribute
-            String nominalVoltage= model1.listStatements(new SimpleSelector(stmtItem.getSubject() , ResourceFactory.createProperty(xmlBase,"#BaseVoltage.nominalVoltage"), (RDFNode) null)).next().getObject().asLiteral().getString();
+            String nominalVoltage= model1.listStatements(stmtItem.getSubject() , ResourceFactory.createProperty(xmlBase,"#BaseVoltage.nominalVoltage"), (RDFNode) null).next().getObject().asLiteral().getString();
 
             // Create the concept for that base voltage
             Resource resNewStmt=ResourceFactory.createResource("http://publications.europa.eu/resource/authority/baseVoltage"+"/"+nominalVoltage+"kV");
@@ -501,7 +544,7 @@ public class RdfConvert {
             modelResult.add(resNewStmt,SKOS.inScheme, schemeRes );
 
 
-            for (StmtIterator k = model1.listStatements(new SimpleSelector(stmtItem.getSubject() , (Property) null, (RDFNode) null)); k.hasNext(); ) {
+            for (StmtIterator k = model1.listStatements(stmtItem.getSubject() , (Property) null, (RDFNode) null); k.hasNext(); ) {
                 Statement stmtItemForClass = k.next();
                 switch (stmtItemForClass.getPredicate().asResource().getLocalName()) {
                     case "IdentifiedObject.name":

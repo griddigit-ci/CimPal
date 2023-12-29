@@ -65,21 +65,21 @@ public class ExportRDFSdescriptions {
 
             // add information for association used and other things
             // is it a class
-            if (model.listStatements(new SimpleSelector(resItem,RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class"))).hasNext()){ // it is a class
+            if (model.listStatements(resItem,RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class")).hasNext()){ // it is a class
                 rdfsItemtype.add("Class"); // it is a class
                 rdfsItemAssociationUsed.add("N/A");
-                if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete"))).hasNext()) {
+                if (model.listStatements(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
                     rdfsConcreteClass.add("Yes");
-                }else if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("Primitive"))).hasNext() || model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("CIMDatatype"))).hasNext() || model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("Compound"))).hasNext()){
+                }else if (model.listStatements(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("Primitive")).hasNext() || model.listStatements(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("CIMDatatype")).hasNext() || model.listStatements(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), ResourceFactory.createPlainLiteral("Compound")).hasNext()){
                     rdfsConcreteClass.add("N/A");
                 }else{
                     rdfsConcreteClass.add("No");
                 }
-            }else if (model.listStatements(new SimpleSelector(resItem,RDF.type, ResourceFactory.createProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"))).hasNext()){ // it is a property
-                if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "AssociationUsed"), ResourceFactory.createPlainLiteral("Yes"))).hasNext()){
+            }else if (model.listStatements(resItem,RDF.type, ResourceFactory.createProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#Property")).hasNext()){ // it is a property
+                if (model.listStatements(resItem,ResourceFactory.createProperty(rdfNs, "AssociationUsed"), ResourceFactory.createPlainLiteral("Yes")).hasNext()){
                     rdfsItemAssociationUsed.add("Yes");
                     rdfsItemtype.add("Association"); // it is an association
-                }else if (model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "AssociationUsed"), ResourceFactory.createPlainLiteral("No"))).hasNext()){
+                }else if (model.listStatements(resItem,ResourceFactory.createProperty(rdfNs, "AssociationUsed"), ResourceFactory.createPlainLiteral("No")).hasNext()){
                     rdfsItemAssociationUsed.add("No");
                     rdfsItemtype.add("Association"); // it is an association
                 }else{
@@ -88,7 +88,7 @@ public class ExportRDFSdescriptions {
                 }
                 rdfsConcreteClass.add("N/A");
             }else{
-                if (model.listStatements(new SimpleSelector(resItem,RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory"))).hasNext()) {
+                if (model.listStatements(resItem,RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory")).hasNext()) {
                     rdfsItemAssociationUsed.add("N/A");
                     rdfsConcreteClass.add("N/A");
                     rdfsItemtype.add("Package");
@@ -102,7 +102,7 @@ public class ExportRDFSdescriptions {
             //adding the stereotype
             boolean hasStereotype=false;
             String stereo="";
-            List<Statement> stereotypes = model.listStatements(new SimpleSelector(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), (RDFNode) null)).toList();
+            List<Statement> stereotypes = model.listStatements(resItem,ResourceFactory.createProperty(rdfNs, "stereotype"), (RDFNode) null).toList();
             for (Statement stmt : stereotypes){
                 if (stmt.getObject().isLiteral()){
                     hasStereotype = true;

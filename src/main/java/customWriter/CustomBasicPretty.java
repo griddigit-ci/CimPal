@@ -33,7 +33,7 @@ public class CustomBasicPretty extends CustomBasic {
                 //get list of all triples of the rdf:type and these need to be sorted by object
                 Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject,this.sortRDFprefix);
                 for (Map.Entry<String, Property> entry : entries) {
-                    StmtIterator stmtIter = model.listStatements(new SimpleSelector(subject, entry.getValue(), (RDFNode) null));
+                    StmtIterator stmtIter = model.listStatements(subject, entry.getValue(), (RDFNode) null);
                     while (stmtIter.hasNext()) {
                         Statement nextStatement = stmtIter.nextStatement();
                             writePredicate(nextStatement, writer);
@@ -53,7 +53,7 @@ public class CustomBasicPretty extends CustomBasic {
                 //get list of all triples of the rdf:type and these need to be sorted by object
                 Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject,this.sortRDFprefix);
                 for (Map.Entry<String, Property> entry : entries) {
-                    StmtIterator stmtIter = model.listStatements(new SimpleSelector(subject,entry.getValue(),(RDFNode) null));
+                    StmtIterator stmtIter = model.listStatements(subject,entry.getValue(),(RDFNode) null);
                     while (stmtIter.hasNext()) {
                         Statement nextStatement = stmtIter.nextStatement();
                         if (!typeStatement.equals(nextStatement)){    //skip type statement
@@ -77,7 +77,7 @@ public class CustomBasicPretty extends CustomBasic {
     }
 
     static Set<Map.Entry<String, Property>> sortRDFprepare(Model model, Resource subject, String sortRDFprefix) {
-        Set<Statement> listStatements = model.listStatements(new SimpleSelector(subject, null, (RDFNode) null)).toSet();
+        Set<Statement> listStatements = model.listStatements(subject, null, (RDFNode) null).toSet();
 
         Map<String, Property> listPredicateMap = new TreeMap<>();
         for (Statement stmt : listStatements) {

@@ -450,7 +450,7 @@ public class InstanceDataFactory {
     public static LinkedList<String>  getClassesForTree(Model model) {
         LinkedList<String>  classList = new LinkedList<>();
 
-        for (StmtIterator it = model.listStatements(new SimpleSelector(null, RDF.type, (RDFNode) null)); it.hasNext(); ) {
+        for (StmtIterator it = model.listStatements(null, RDF.type, (RDFNode) null); it.hasNext(); ) {
             Statement stmt = it.next();
             Resource obj = stmt.getObject().asResource();
             String listItem = model.getNsURIPrefix(obj.getNameSpace())+":"+obj.getLocalName();
@@ -468,12 +468,12 @@ public class InstanceDataFactory {
         String ns = model.getNsPrefixURI(className.split(":",2)[0]);
         String ln = className.split(":",2)[1];
         Property classTypeProp = ResourceFactory.createProperty(ns,ln);
-        for (StmtIterator it = model.listStatements(new SimpleSelector(null, RDF.type, classTypeProp)); it.hasNext(); ) {
+        for (StmtIterator it = model.listStatements(null, RDF.type, classTypeProp); it.hasNext(); ) {
             Statement stmt = it.next();
             Resource subj = stmt.getSubject().asResource();
             String listItem = subj.getLocalName();
-            if (model.listStatements(new SimpleSelector(subj, ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).hasNext()){
-                Statement cNameStmt = model.listStatements(new SimpleSelector(subj, ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).next();
+            if (model.listStatements(subj, ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null).hasNext()){
+                Statement cNameStmt = model.listStatements(subj, ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null).next();
                 String cName = cNameStmt.getObject().toString();
                 listItem = cName + "|" + listItem;
             }
@@ -503,10 +503,10 @@ public class InstanceDataFactory {
         }else{
             classInstRDFID=classInstance;
         }
-        String xmlbaseURI = model.listStatements(new SimpleSelector(null, RDF.type, classTypeProp)).next().getSubject().getNameSpace();
+        String xmlbaseURI = model.listStatements(null, RDF.type, classTypeProp).next().getSubject().getNameSpace();
         Resource classInsRes = ResourceFactory.createResource(xmlbaseURI+classInstRDFID);
 
-        for (StmtIterator it = model.listStatements(new SimpleSelector(classInsRes, null, (RDFNode) null)); it.hasNext(); ) {
+        for (StmtIterator it = model.listStatements(classInsRes, null, (RDFNode) null); it.hasNext(); ) {
             Statement stmt = it.next();
             Property pred = stmt.getPredicate();
             if (!pred.equals(RDF.type)) {
@@ -535,19 +535,19 @@ public class InstanceDataFactory {
         Property classInstProp = ResourceFactory.createProperty(ns,ln);
         String xmlbaseURI = "http://griddigit.eu#";
         Resource classInsRes = ResourceFactory.createResource(xmlbaseURI+classInstRDFID);
-        if (model.listStatements(new SimpleSelector(classInsRes, classInstProp, (RDFNode) null)).hasNext()){
-            refClass = model.listStatements(new SimpleSelector(classInsRes, classInstProp, (RDFNode) null)).next().getObject().asResource().getLocalName();
+        if (model.listStatements(classInsRes, classInstProp, (RDFNode) null).hasNext()){
+            refClass = model.listStatements(classInsRes, classInstProp, (RDFNode) null).next().getObject().asResource().getLocalName();
             String refClassPure = refClass;
-            if (model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI+refClass), ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).hasNext()){
-                Statement cNameStmt = model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI+refClass), ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null)).next();
+            if (model.listStatements(ResourceFactory.createResource(xmlbaseURI+refClass), ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null).hasNext()){
+                Statement cNameStmt = model.listStatements(ResourceFactory.createResource(xmlbaseURI+refClass), ResourceFactory.createProperty(model.getNsPrefixURI("cim"),"IdentifiedObject.name"), (RDFNode) null).next();
                 String cName = cNameStmt.getObject().toString();
                 refClass = cName + "|" + refClass;
             }else{
                 refClass = "|" + refClass;
             }
             //System.out.println(xmlbaseURI+refClassPure);
-            if (model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI + refClassPure), RDF.type, (RDFNode) null)).hasNext()) {
-                String cTypeNameStmt = model.listStatements(new SimpleSelector(ResourceFactory.createResource(xmlbaseURI + refClassPure), RDF.type, (RDFNode) null)).next().getObject().asResource().getLocalName();
+            if (model.listStatements(ResourceFactory.createResource(xmlbaseURI + refClassPure), RDF.type, (RDFNode) null).hasNext()) {
+                String cTypeNameStmt = model.listStatements(ResourceFactory.createResource(xmlbaseURI + refClassPure), RDF.type, (RDFNode) null).next().getObject().asResource().getLocalName();
                 refClass = cTypeNameStmt + ":" + refClass;
             }else{
 

@@ -146,16 +146,16 @@ public class DataTypeMaping {
             //System.out.println("Selected file: " + selFile);
             Model model = ModelFactory.createDefaultModel(); // model is the rdf file
             Map<String, RDFDatatype> dataTypeMap = new HashMap<>();
-            for (int m = 0; m < selFile.size(); m++) {
+            for (File file : selFile) {
 
                 try {
-                    String rdfNs ="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
+                    String rdfNs = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
                     String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
-                    RDFDataMgr.read(model, new FileInputStream(selFile.get(m).toString()), Lang.RDFXML);
-                    ArrayList<Object> propertyStringDatatype = DataTypeMaping.mapFromRDFSfile(model, rdfNs,concreteNs);
-                    List<String> propertyString =  (ArrayList) propertyStringDatatype.get(0);
+                    RDFDataMgr.read(model, new FileInputStream(file.toString()), Lang.RDFXML);
+                    ArrayList<Object> propertyStringDatatype = DataTypeMaping.mapFromRDFSfile(model, rdfNs, concreteNs);
+                    List<String> propertyString = (ArrayList) propertyStringDatatype.get(0);
                     List<String> datatype = (ArrayList) propertyStringDatatype.get(1);
-                    dataTypeMap =DataTypeMaping.createMap(propertyString,datatype);
+                    dataTypeMap = DataTypeMaping.createMap(propertyString, datatype);
                     //System.out.println(dataTypeMap);
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
