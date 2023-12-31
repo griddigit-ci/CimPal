@@ -6,9 +6,8 @@
 package core;
 
 import application.MainController;
-import customWriter.CustomRDFFormat;
+import common.customWriter.CustomRDFFormat;
 import javafx.scene.control.Alert;
-import javafx.stage.FileChooser;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;

@@ -6,9 +6,7 @@
 package core;
 
 import application.MainController;
-import customWriter.CustomRDFFormat;
-import javafx.stage.FileChooser;
-import org.apache.commons.io.FileUtils;
+import common.customWriter.CustomRDFFormat;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
@@ -20,7 +18,6 @@ import org.apache.jena.vocabulary.*;
 
 import java.io.*;
 import java.util.*;
-import java.util.zip.ZipOutputStream;
 
 
 public class RdfConvert {

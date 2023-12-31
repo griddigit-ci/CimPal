@@ -1,10 +1,10 @@
-package customWriter.jena;
+package common.customWriter.jena;
 
 
 /**
  * unmodified copy of org.apache.jena.rdfxml.xmloutput.impl.PairEntry
  *
- * Has to be copied, because the original class is package private and {@link customWriter.CustomBaseXMLWriter} needs it.
+ * Has to be copied, because the original class is package private and {@link common.customWriter.CustomBaseXMLWriter} needs it.
  *
  */
 public class CustomPairEntry<K,V>  implements java.util.Map.Entry<K,V>  {

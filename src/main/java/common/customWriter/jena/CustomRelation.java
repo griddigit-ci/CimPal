@@ -1,4 +1,4 @@
-package customWriter.jena;
+package common.customWriter.jena;
 
 import org.apache.jena.util.iterator.Map1Iterator;
 import org.apache.jena.util.iterator.WrappedIterator;
@@ -8,7 +8,7 @@ import java.util.*;
 /**
  * unmodified copy of org.apache.jena.rdfxml.xmloutput.impl.Relation
  *
- * Has to be copied, because the original class is package private and {@link customWriter.CustomBaseXMLWriter} needs it.
+ * Has to be copied, because the original class is package private and {@link common.customWriter.CustomBaseXMLWriter} needs it.
  *
  */
 public class CustomRelation<T> {

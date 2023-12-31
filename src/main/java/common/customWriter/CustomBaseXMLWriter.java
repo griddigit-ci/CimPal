@@ -4,9 +4,9 @@
  * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
-package customWriter;
+package common.customWriter;
 
-import customWriter.jena.CustomRelation;
+import common.customWriter.jena.CustomRelation;
 import org.apache.jena.JenaRuntime;
 //import org.apache.jena.ext.xerces.util.XMLChar;
 import org.apache.jena.iri.IRI;

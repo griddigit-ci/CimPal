@@ -4,7 +4,7 @@
  * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
-package customWriter;
+package common.customWriter;
 
 import org.apache.jena.rdf.model.RDFWriterI;
 import org.apache.jena.riot.Lang;

@@ -6,7 +6,7 @@
 package application;
 
 import core.*;
-import customWriter.CustomRDFFormat;
+import common.customWriter.CustomRDFFormat;
 import gui.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;

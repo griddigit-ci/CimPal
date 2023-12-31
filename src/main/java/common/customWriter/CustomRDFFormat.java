@@ -5,7 +5,7 @@
  * @author Chavdar Ivanov
  */
 
-package customWriter;
+package common.customWriter;
 
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFFormat;
