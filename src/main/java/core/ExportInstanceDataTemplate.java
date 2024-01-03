@@ -7,21 +7,23 @@
 package core;
 
 import application.MainController;
-import javafx.stage.FileChooser;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.vocabulary.OWL2;
+import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
+import org.apache.jena.vocabulary.XSD;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import javax.swing.*;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+
+import static core.RdfConvert.fileSaveDialog;
 
 
 public class ExportInstanceDataTemplate {
@@ -29,6 +31,7 @@ public class ExportInstanceDataTemplate {
     public static void rdfsContent(Model model) throws FileNotFoundException {
         String cimsNs = MainController.prefs.get("cimsNamespace","");
         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+        Map<String,String> prefMap = model.getNsPrefixMap();
         ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
 
         List<String> rdfsClassName = new LinkedList<>(); // list for the name of the class without namespace
@@ -39,21 +42,12 @@ public class ExportInstanceDataTemplate {
         List<String> rdfsItemMultiplicity = new LinkedList<>(); // list for the multiplicity of the item
 
 
-        for (int cl = 0; cl < ((ArrayList) shapeData.get(0)).size(); cl++) { //this is to loop on the classes in the profile and record for each concrete class
+        for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and record for each concrete class
             //add the Class
-            String classLocalName = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(2).toString();
-            String classFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(0).toString();
+            String classLocalName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
+            String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
 
-            //add NodeShape for the CIM class
-            //shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
-            //check if the class is stereotyped Description
-            //boolean classDescripStereo=false;
-            //if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(4).toString().equals("Yes")){
-            //    classDescripStereo=true;
-            //}
-
-
-            for (int atas = 1; atas < ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).size(); atas++) {
+            for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size(); atas++) {
                 // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
 
                 /*
@@ -82,175 +76,79 @@ public class ExportInstanceDataTemplate {
                     propertyNodeFeatures.add("");
                 }*/
 
-                if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Association")) {//if it is an association
-                    if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
+                if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).getFirst().toString().equals("Association")) {//if it is an association
+                    if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
                         //Cardinality check
-                        //propertyNodeFeatures.set(0, "cardinality");
-                        String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                        //String localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
-                        //propertyNodeFeatures.set(5, cardinality);
-                        //Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
-                       // propertyNodeFeatures.set(1, "Missing required association.");
-                        //propertyNodeFeatures.set(2, localNameAssoc + "-cardinality");
-                        //propertyNodeFeatures.set(3, "This constraint validates the cardinality of the association at the used direction.");
-                       //propertyNodeFeatures.set(4, "Violation");
-                        //propertyNodeFeatures.set(8, atas - 1); // this is the order
-                        //propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
-
-                        String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
+                        String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(6).toString();
+                        String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
                         rdfsClassName.add(classLocalName);
                         rdfsClass.add(classFullURI);
                         rdfsAttrAssoc.add(propertyFullURI);
                         rdfsAttrOrAssocFlag.add("Association");
                         rdfsItemAttrDatatype.add("N/A");
                         rdfsItemMultiplicity.add(cardinality);
-
-
-                        //shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
-
-                        /*//Association check for target class - only for concrete classes in the profile
-                        if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).size()>10) { //TODO check if this is OK. This is to avoid crash if there are no concrete classes in the profile, but something should be done for the abstract classes which are concrete in another profile
-                            propertyNodeFeatures.set(0, "associationValueType");
-                            //String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                            //localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
-                            //propertyNodeFeatures.set(5, cardinality);
-                            //nodeShapeResource = shapeModel.getResource(nsURIprofile + localName+"ValueType");
-                            propertyNodeFeatures.set(1, "Not correct target class.");
-                            propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
-                            propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
-                            propertyNodeFeatures.set(4, "Violation");
-                            propertyNodeFeatures.set(8, atas - 1); // this is the order
-                            propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
-                            List<Resource> concreteClasses = (List<Resource>) ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10);
-                            propertyNodeFeatures.set(10, concreteClasses);
-                            //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
-                            propertyNodeFeatures.set(11, classFullURI);
-
-                            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
-                        }*/
                     }
 
-                } else if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
-
-                    //Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
-                    //String localNameAttr = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(4).toString();
-                    String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(1).toString();
-
-                    String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
+                } else if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
+                    String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString();
+                    String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
                     rdfsClassName.add(classLocalName);
                     rdfsClass.add(classFullURI);
                     rdfsAttrAssoc.add(propertyFullURI);
 
                     rdfsItemMultiplicity.add(cardinality);
                     //add datatypes checks depending on it is Primitive, Datatype or Enumeration
-                    switch (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(8).toString()) {
+                    switch (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString()) {
                         case "Primitive": {
-                            String datatypePrimitive = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
+                            String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
                             rdfsItemAttrDatatype.add(datatypePrimitive);
                             rdfsAttrOrAssocFlag.add("Attribute");
                             break;
                         }
                         case "CIMDatatype": {
-                            String datatypePrimitive = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+                            String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
                             rdfsItemAttrDatatype.add(datatypePrimitive);
                             rdfsAttrOrAssocFlag.add("Attribute");
                             break;
                         }
                         case "Compound": {
-                            String datatypeCompound = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+                            String datatypeCompound = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
                             rdfsItemAttrDatatype.add(datatypeCompound);
                             rdfsAttrOrAssocFlag.add("Compound");
                             break;
                         }
                         case "Enumeration":
-                            //propertyNodeFeatures.set(6, "Enumeration");
-                            //propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is enumerated value not part of the profile.");
-                            //this adds the structure which is a list of possible enumerated values
-                            //propertyNodeFeatures.set(7, ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10));
-                            rdfsItemAttrDatatype.add(((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10).toString());
+                            rdfsItemAttrDatatype.add(((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString());
                             rdfsAttrOrAssocFlag.add("Enumeration");
                             break;
                     }
-
-
-                    /*if (MainController.excludeMRID) { // user selects that mRID should be skipped for description classes
-                        if (classDescripStereo) { //the class is stereotyped description
-                            if (!localNameAttr.equals("IdentifiedObject.mRID")){ //the attribute is not mRID
-                                shapeModel = addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource, localNameAttr, propertyFullURI);
-                            }
-                        }else{
-                            shapeModel = addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource, localNameAttr, propertyFullURI);
-                        }
-                    }else{
-                        shapeModel = addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource, localNameAttr, propertyFullURI);
-                    }
-
-                    //check if the attribute is datatype, if yes the whole structure of the compound should be checked and property nodes should be created
-                    // for each attribute of the compound
-                    if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(8).toString().equals("Compound")) {
-                        ArrayList shapeDataCompound = ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10));
-                        shapeModel = addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompound, nsURIprofile, nodeShapeResource, localNameAttr, propertyFullURI);
-                    }*/
-
                 }
             }
         }
 
-
-
-       /* List<String> rdfsItem = new LinkedList<>(); // list for the element - item
-        List<String> rdfsItemDescription = new LinkedList<>(); // list for the description of the item
-        List<String> rdfsItemMultiplicity = new LinkedList<>(); // list for the multiplicity of the item
-        List<String> rdfsItemtype = new LinkedList<>(); // list for the type of the item
-        List<String> rdfsItemAssociationUsed = new LinkedList<>(); // list for the association used of the item
-        String rdfNs = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";*/
-
         // do the excel export
-        exportDesciption(rdfsClass,rdfsAttrAssoc,"InstanceDataTemplate","InstanceDataTemplate","Save instance data template from RDFS", rdfsAttrOrAssocFlag, rdfsItemAttrDatatype, rdfsItemMultiplicity);
+        exportDesciption(rdfsClass,rdfsAttrAssoc, rdfsAttrOrAssocFlag,rdfsItemAttrDatatype,rdfsItemMultiplicity);
+        // do the RDF export
+        exportDesciptionInRDF(rdfsClass,rdfsAttrAssoc, rdfsAttrOrAssocFlag,rdfsItemAttrDatatype,rdfsItemMultiplicity,prefMap);
     }
 
 
 
 
-    private static void exportDesciption(List rdfsItem, List rdfsItemDescription, String sheetname, String initialFileName, String title, List rdfsItemMultiplicity, List rdfsItemtype, List rdfsItemAssociationUsed) throws FileNotFoundException {
+    private static void exportDesciption(List<String> rdfsItem, List<String> rdfsItemDescription, List<String> rdfsItemAssociationUsed,List<String> rdfsItemtype,List<String> rdfsItemMultiplicity) throws FileNotFoundException {
 
         XSSFWorkbook workbook = new XSSFWorkbook();
         XSSFSheet sheet;
 
-    /*    for (int sh=0; sh<rdfsClassName.size();sh++) {
-            System.out.println(rdfsClassName.get(sh).toString());
-            System.out.println(workbook.getSheetIndex(rdfsClassName.get(sh).toString()));
-            if (sh>0) {
-                if (!rdfsClassName.get(sh).toString().equals(rdfsClassName.get(sh - 1).toString())) {
-*/
-        //if (workbook.getSheetIndex(rdfsClassName.get(sh).toString())==-1) {
-        //sheet = workbook.createSheet(String.valueOf(sh));
-        sheet = workbook.createSheet(sheetname);
+        sheet = workbook.createSheet("InstanceDataTemplate");
         XSSFRow firstRow = sheet.createRow(0);
-        //firstRow.createCell(0).setCellValue(rdfsClassName.get(sh).toString());
-        //XSSFRow secondRow = sheet.createRow(1);
         ///set titles of columns
         firstRow.createCell(0).setCellValue("Class");
         firstRow.createCell(1).setCellValue("Property-AttributeAssociation");
-        firstRow.createCell(2).setCellValue("Type");
+        firstRow.createCell(2).setCellValue("Multiplicity");
         firstRow.createCell(3).setCellValue("Datatype");
-        firstRow.createCell(4).setCellValue("Multiplicity");
-/*                } else {
-                    sheet = workbook.getSheet(rdfsClassName.get(sh).toString());
-                }
-            } else {
-                //if (workbook.getSheetIndex(rdfsClassName.get(sh).toString())==-1) {
-                sheet = workbook.createSheet(String.valueOf(sh));
-                XSSFRow firstRow = sheet.createRow(0);
-                firstRow.createCell(0).setCellValue(rdfsClassName.get(sh).toString());
-                XSSFRow secondRow = sheet.createRow(1);
-                ///set titles of columns
-                secondRow.createCell(0).setCellValue("Class");
-                secondRow.createCell(1).setCellValue("Property-AttributeAssociation");
-                secondRow.createCell(2).setCellValue("Type");
-                secondRow.createCell(3).setCellValue("Datatype");
-                secondRow.createCell(4).setCellValue("Multiplicity");
-            }*/
+        firstRow.createCell(4).setCellValue("Type");
+
         for (int row=0; row<rdfsItem.size();row++){
             XSSFRow xssfRow= sheet.createRow(row+1);
 
@@ -300,17 +198,8 @@ public class ExportInstanceDataTemplate {
             }
         }
 
-
-
-//        FileChooser filechooser = new FileChooser();
-//        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"));
-//        filechooser.setInitialFileName(initialFileName);
-//        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//        filechooser.setTitle(title);
-//        File saveFile = filechooser.showSaveDialog(null);
         File saveFile = util.ModelFactory.filesavecustom("Excel files", List.of("*.xlsx"),"","");
         if (saveFile != null) {
-            //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);
@@ -320,5 +209,49 @@ public class ExportInstanceDataTemplate {
                 e.printStackTrace();
             }
         }
+    }
+    private static void exportDesciptionInRDF(List<String> rdfsItem, List<String> rdfsItemDescription, List<String> rdfsItemKind,List<String> rdfsItemtype,List<String> rdfsItemMultiplicity,Map<String,String> prefMap) throws FileNotFoundException {
+        // rdfsItem is the class
+        // rdfsItemDescription is the property
+        // rdfsItemtype - the datatype
+        // rdfsItemKind - attribute.association, enum
+        // rdfsItemMultiplicity - multiplicity
+
+
+        Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+        model.setNsPrefixes(prefMap);
+        model.setNsPrefix("owl",OWL2.NS);
+        model.setNsPrefix("cims","http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#");
+        int listcount = 0;
+        for (String property : rdfsItemDescription){
+            Resource sub = ResourceFactory.createResource(property);
+            model.add(ResourceFactory.createStatement(sub, RDF.type,RDF.Property));
+            Resource subClass = ResourceFactory.createResource(rdfsItem.get(listcount));
+            model.add(ResourceFactory.createStatement(subClass, RDF.type, RDFS.Class));
+            model.add(ResourceFactory.createStatement(sub, RDFS.domain,subClass));
+            model.add(ResourceFactory.createStatement(subClass, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","stereotype"), ResourceFactory.createPlainLiteral("concrete")));
+            RDFNode minC;
+            RDFNode maxC;
+            if (rdfsItemMultiplicity.get(listcount).contains("..")){
+                minC = ResourceFactory.createPlainLiteral(rdfsItemMultiplicity.get(listcount).split("\\.\\.",2)[0]);
+                maxC = ResourceFactory.createPlainLiteral(rdfsItemMultiplicity.get(listcount).split("\\.\\.",2)[1]);
+            }else{
+                minC = ResourceFactory.createPlainLiteral(rdfsItemMultiplicity.get(listcount));
+                maxC = ResourceFactory.createPlainLiteral(rdfsItemMultiplicity.get(listcount));
+            }
+            model.add(ResourceFactory.createStatement(sub, OWL2.minCardinality,minC));
+            model.add(ResourceFactory.createStatement(sub, OWL2.maxCardinality,maxC));
+            switch (rdfsItemKind.get(listcount)) {
+                case "Association" -> model.add(ResourceFactory.createStatement(sub, RDFS.range, RDFS.Resource));
+                case "Enumeration" -> model.add(ResourceFactory.createStatement(sub, RDFS.range, RDF.List));
+                case "Attribute" -> {
+                    model.add(ResourceFactory.createStatement(sub, RDFS.range, RDFS.Literal));
+                    model.add(ResourceFactory.createStatement(sub, RDFS.range, ResourceFactory.createPlainLiteral(rdfsItemtype.get(listcount))));
+                }
+            }
+            listcount=listcount+1;
+        }
+        OutputStream outTTL = fileSaveDialog("Save RDF Turtle for: " + "AllProperties", "RDF Turtle", "*.ttl");
+        model.write(outTTL, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), "");
     }
 }

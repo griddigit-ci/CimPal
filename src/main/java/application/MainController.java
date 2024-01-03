@@ -512,37 +512,23 @@ public class MainController implements Initializable {
     private void actionRDFSinstanceDataTemplateMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(true,"RDF files", List.of("*.rdf"),"");
-//        FileChooser filechooser = new FileChooser();
-//        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
-//        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//        File file;
-//
-//        try {
-//            file = filechooser.showOpenDialog(null);
-//        } catch (Exception k){
-//            filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
-//            file = filechooser.showOpenDialog(null);
-//        }
-
-
-        Model model = ModelFactory.createDefaultModel(); // model is the rdf file
-        if (file.get(0) != null) {// the file is selected
-
-            //MainController.prefs.put("LastWorkingFolder", file.getParent());
-            try {
-                RDFDataMgr.read(model, new FileInputStream(file.get(0)), Lang.RDFXML);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                progressBar.setProgress(0);
+        List<File> file = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
+        if (file != null) {// the file is selected
+            for (File fil : file) {
+                Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+                try {
+                    RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                    progressBar.setProgress(0);
+                }
+                shaclNodataMap = 1; // as no mapping is to be used for this task
+                ExportInstanceDataTemplate.rdfsContent(model);
+                progressBar.setProgress(1);
             }
-            shaclNodataMap  = 1; // as no mapping is to be used for this task
-            ExportInstanceDataTemplate.rdfsContent(model);
-            progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
         }
-
     }
     
     @FXML
@@ -1181,29 +1167,15 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         shaclNodataMap  = 1; // as this mapping should not be used for this task
         //select file
-//        FileChooser filechooser = new FileChooser();
-//        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Input template instance data XLS", "*.xlsx"));
-//        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//        List<File>  fileLxml;
-//        fileLxml = filechooser.showOpenMultipleDialog(null);
         List<File> file = util.ModelFactory.filechoosercustom(false,"Input template instance data XLS", List.of("*.xlsx"),"");
 
 
         if (file != null ) {// the file is selected
-            //MainController.prefs.put("LastWorkingFolder", fileLxml.get(0).getParent());
             MainController.inputXLS = file;
-
             //select file
-//            FileChooser filechooser1 = new FileChooser();
-//            filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF profile file", "*.rdf", "*.ttl"));
-//            filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//            List<File> fileL;
-//            fileL = filechooser1.showOpenMultipleDialog(null);
             file = util.ModelFactory.filechoosercustom(false,"RDF profile file", List.of("*.rdf", "*.ttl"),"");
 
-
             if (file!=null) {// the file is selected
-                //MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
                 MainController.rdfProfileFileList = file;
 
                 //String xmlBase = "http://entsoe.eu/ns/nc";
@@ -1267,15 +1239,12 @@ public class MainController implements Initializable {
                     saveProperties.put("fileDialogTitle", "Save RDF XML for");
                 }
 
-
-
                 boolean profileModelUnionFlag = false;
                 boolean instanceModelUnionFlag = false;
                 boolean shaclModelUnionFlag = false;
                 String eqbdID = null;
                 String tpbdID = null;
                 boolean persistentEQflag = false;
-
 
                 Map<String, Boolean> inputData = new HashMap<>();
                 inputData.put("rdfs", true);

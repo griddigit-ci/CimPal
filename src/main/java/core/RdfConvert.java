@@ -306,7 +306,6 @@ public class RdfConvert {
                                 //properties.put("prettyTypes",new Resource[] {ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")});
                                 properties.put("relativeURIs", relativeURIs);
 
-
                                 // Put a properties object into the Context.
                                 Context cxt = new Context();
                                 cxt.set(SysRIOT.sysRdfWriterProperties, properties);
@@ -327,8 +326,6 @@ public class RdfConvert {
                     } finally {
                         outXML.flush();
                         outXML.close();
-
-
                     }
                 }
             }
