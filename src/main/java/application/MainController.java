@@ -477,23 +477,13 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         List<File> file = util.ModelFactory.filechoosercustom(true,"RDF files", List.of("*.rdf"),"");
-//        FileChooser filechooser = new FileChooser();
-//        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
-//        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
-//        File file;
-//        try {
-//            file = filechooser.showOpenDialog(null);
-//        }catch (Exception e){
-//            filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
-//            file = filechooser.showOpenDialog(null);
-//        }
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
-        if (file.get(0) != null) {// the file is selected
+        if (file.getFirst() != null) {// the file is selected
 
             //MainController.prefs.put("LastWorkingFolder", file.getParent());
             try {
-                RDFDataMgr.read(model, new FileInputStream(file.get(0)), Lang.RDFXML);
+                RDFDataMgr.read(model, new FileInputStream(file.getFirst()), Lang.RDFXML);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
                 progressBar.setProgress(0);
@@ -506,10 +496,43 @@ public class MainController implements Initializable {
 
     }
 
+    @FXML
+    //action menu item Tools -> Export SHACL constraints information to Excel
+    private void actionMenuExportSHACLInfo() throws FileNotFoundException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        //open SHACL files
+        List<File> file = util.ModelFactory.filechoosercustom(false,"SHACL files", List.of("*.ttl"),"");
 
+        if (file != null) {// the file is selected
+            boolean singleFile = false;
+            if (file.size()>1){
+                //open a question/confirmation dialog to ask on the export
+                Alert alert1 = new Alert(Alert.AlertType.CONFIRMATION);
+                alert1.setContentText("More than one .ttl is selected. Would you like to export the information in multiple .xlsx files or as one file with multiple tabs?.");
+                alert1.setHeaderText("Confirm the way of export.");
+                alert1.setTitle("Confirmation needed");
+
+                ButtonType btnOneFile = new ButtonType("Export in one file");
+                ButtonType btnMultiple = new ButtonType("Export in multiple files");
+                alert1.getButtonTypes().setAll(btnOneFile, btnMultiple);
+                Optional<ButtonType> result1 = alert1.showAndWait();
+                if (result1.get() == btnOneFile){
+                    singleFile = true;
+                }
+            }else if (file.size()==1){
+                singleFile = true;
+            }
+
+            ExportSHACLInformation.shaclInformationExport(singleFile,file);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+
+    }
     @FXML
     //action menu item Tools -> Instance data Excel template based on RDFS
-    private void actionRDFSinstanceDataTemplateMenu() throws FileNotFoundException {
+    private void actionRDFSInstanceDataTemplateMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         List<File> file = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
@@ -873,7 +896,7 @@ public class MainController implements Initializable {
 
         Model model1single = null;
         Model model2single = null;
-        Model model1 = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Model model1 = ModelFactory.createDefaultModel();
         Map prefixMap = model1.getNsPrefixMap();
 
         for (File item : MainController.IDModel1) {
@@ -886,7 +909,7 @@ public class MainController implements Initializable {
             } else if (item.getName().toLowerCase().endsWith(".xml")) {
                 InputStream inputStream = new FileInputStream(item);
                 if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
-                    model1single = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    model1single = ModelFactory.createDefaultModel();
                     RDFDataMgr.read(model1single, inputStream, xmlBase, Lang.RDFXML);
                 }else {
                     model1single = util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
@@ -899,7 +922,7 @@ public class MainController implements Initializable {
 
 
         // if model 2 is more than 1 zip or xml - merge
-        Model model2 = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Model model2 = ModelFactory.createDefaultModel();
         prefixMap = model2.getNsPrefixMap();
 
         for (File item : MainController.IDModel2) {
@@ -912,7 +935,7 @@ public class MainController implements Initializable {
             } else if (item.getName().toLowerCase().endsWith(".xml")) {
                 InputStream inputStream = new FileInputStream(item);
                 if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
-                    model2single = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    model2single = ModelFactory.createDefaultModel();
                     RDFDataMgr.read(model2single, inputStream, xmlBase, Lang.RDFXML);
                 }else{
                     model2single = util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
@@ -1314,12 +1337,14 @@ public class MainController implements Initializable {
             }
 
             OutputStream outInt = fileSaveDialog("Save RDF for datatypes: RDFdatatypes", "RDF XML", "*.rdf");
-            try {
+            try (outInt) {
                 modeldatatype.write(outInt, RDFFormat.RDFXML.getLang().getLabel().toUpperCase(), "");
-            } finally {
-                outInt.close();
             }
 
+            try (OutputStream outInt1 = fileSaveDialog("Save XLSX for datatypes: RDFdatatypes", "Excel", "*.xlsx")) {
+                modeldatatype.write(outInt, RDFFormat.RDFXML.getLang().getLabel().toUpperCase(), "");
+                ExcelTools.exportToExcelMap(dataTypeMap, outInt1);
+            }
 
             progressBar.setProgress(1);
         }else {
@@ -2573,7 +2598,9 @@ public class MainController implements Initializable {
                         shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
 
                         //add header
-                        shapeModel = ShaclTools.addSHACLheader(shapeModel,baseURI);
+                        if (model.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()) {
+                            shapeModel = ShaclTools.addSHACLheader(shapeModel, baseURI);
+                        }
 
                         if (baseprofilesshaclglag2nd == 1){
                             shapeModel.setNsPrefix(cim2Pref,cim2URI);

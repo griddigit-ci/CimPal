@@ -23,8 +23,9 @@
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportDescriptionMenu" text="Export RDFS descriptions" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
-         <MenuItem mnemonicParsing="false" onAction="#actionRDFSinstanceDataTemplateMenu" text="Instance data Excel template based on RDFS" />
+         <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataTemplateMenu" text="Instance data Excel template based on RDFS" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuInstanceDataGenxls" text="Generation of instance data based on xls template" />
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuExportSHACLInfo" text="Export SHACL constraints informatiion to Excel" />
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />

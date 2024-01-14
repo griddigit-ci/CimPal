@@ -8,11 +8,13 @@ package core;
 import application.MainController;
 import common.customWriter.CustomRDFFormat;
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.SysRIOT;
+import org.apache.jena.riot.writer.JsonLD11Writer;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
 
@@ -347,6 +349,7 @@ public class RdfConvert {
                 if (outJsonLD != null) {
                     try {
                         model.write(outJsonLD, RDFFormat.JSONLD.getLang().getLabel().toUpperCase(), xmlBase);
+
                         if (inheritanceList) {
                             fileSaveDialogInheritance(filename + "Inheritance", xmlBase);
                         }
