@@ -531,6 +531,26 @@ public class MainController implements Initializable {
 
     }
     @FXML
+    private void actionGenInfoFromRDFS(){
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        //open RDFS file
+        List<File> file = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
+        if (file != null) {// the file is selected
+            for (File fil : file) {
+                Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+                try {
+                    RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                    progressBar.setProgress(0);
+                }
+                progressBar.setProgress(1);
+            }
+        } else {
+            progressBar.setProgress(0);
+        }
+    }
+    @FXML
     //action menu item Tools -> Instance data Excel template based on RDFS
     private void actionRDFSInstanceDataTemplateMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
