@@ -531,21 +531,24 @@ public class MainController implements Initializable {
 
     }
     @FXML
-    private void actionGenInfoFromRDFS(){
+    private void actionGenInfoFromRDFS() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         List<File> file = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
+        List<Model> listModels = new LinkedList<>();
         if (file != null) {// the file is selected
             for (File fil : file) {
                 Model model = ModelFactory.createDefaultModel(); // model is the rdf file
                 try {
                     RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
+                    listModels.add(model);
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
                     progressBar.setProgress(0);
                 }
-                progressBar.setProgress(1);
             }
+            RdfConvert.generateRDFSserializationInfo(listModels);
+            progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
         }
