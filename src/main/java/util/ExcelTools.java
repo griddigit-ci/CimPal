@@ -157,7 +157,7 @@ public class ExcelTools {
         cell.setCellStyle(cellStyle);
     }
 
-    private static CellStyle createHeaderStyle(Workbook workbook) {
+    public static CellStyle createHeaderStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         Font font = workbook.createFont();
         font.setBold(true);
@@ -180,7 +180,7 @@ public class ExcelTools {
         return style;
     }
 
-    private static CellStyle createDataStyle(Workbook workbook) {
+    public static CellStyle createDataStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
 
         style.setAlignment(HorizontalAlignment.LEFT);
@@ -197,7 +197,7 @@ public class ExcelTools {
     }
 
     // Utility method to get Excel column name based on column index
-    private static String getColumnName(int columnIndex) {
+    public static String getColumnName(int columnIndex) {
         StringBuilder columnName = new StringBuilder();
         while (columnIndex >= 0) {
             columnName.insert(0, (char) ('A' + columnIndex % 26));
