@@ -490,85 +490,140 @@ public class RdfConvert {
         Property enumeration = ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration");
         String profileURI = null;
         String shortName = null;
+//        for (Model m : listModels) {
+//            //get metadata for CGMES v3 with Ontology header
+//            if (m.listStatements(null, RDF.type, OWL2.Ontology).hasNext()) {
+//                Statement header = m.listStatements(null, RDF.type, OWL2.Ontology).nextStatement();
+//                profileURI = m.getRequiredProperty(header.getSubject(), OWL2.versionIRI).getObject().toString();
+//                shortName = m.getRequiredProperty(header.getSubject(), DCAT.keyword).getObject().toString();
+//            } else {//get metadata for CGMES v2.4 no header
+//                if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURI")).hasNext()) {
+//                    //get the shortname and get the URI
+//                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURI")).nextStatement();
+//                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
+//                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
+//                        Statement stmt = i.next();
+//                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
+//                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                        }
+//                    }
+//                } else if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIcore")).hasNext()) {
+//                    //get the shortname and get the URI
+//                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIcore")).nextStatement();
+//                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
+//                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
+//                        Statement stmt = i.next();
+//                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
+//                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                        }
+//                    }
+//                } else if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIoperation")).hasNext()) {
+//                    //get the shortname and get the URI
+//                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIoperation")).nextStatement();
+//                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
+//                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
+//                        Statement stmt = i.next();
+//                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
+//                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                        }
+//                    }
+//                } else if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIshortCircuit")).hasNext()) {
+//                    //get the shortname and get the URI
+//                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIshortCircuit")).nextStatement();
+//                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
+//                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
+//                        Statement stmt = i.next();
+//                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
+//                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+//                        }
+//                    }
+//                }
+//            }
+//            String profileNS = profileURI + "#";
+//            mainModel.setNsPrefix(shortName.toLowerCase(), profileNS);
+//            //mainModel.setNsPrefix("ser", ser);
+//            mainModel.setNsPrefix("owl", OWL2.NS);
+//            mainModel.setNsPrefix("rdfs", RDFS.uri);
+//            mainModel.setNsPrefix("cim", m.getNsPrefixURI("cim"));
+//
+//            if (m.listSubjectsWithProperty(stereotype, "Description").hasNext()) {
+//                rdfAboutList = m.listSubjectsWithProperty(stereotype, "Description").toSet();
+//                mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfAbout"), RDF.type, RDFS.Class));
+//                for (Resource item : rdfAboutList) {
+//                    mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfAbout"), OWL2.members, item));
+//                }
+//                //plus header class
+//            }
+//
+//            for (ResIterator ii = m.listSubjectsWithProperty(stereotype,enumeration); ii.hasNext(); ) {
+//                Resource resItem = ii.next();
+//                mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfEnum"), RDF.type, RDFS.Class));
+//                for (ResIterator j = m.listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
+//                    Resource resItemProp = j.next();
+//                    mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfEnum"), OWL2.members, resItemProp));
+//                }
+//            }
+
+
         for (Model m : listModels) {
-            //get metadata for CGMES v3 with Ontology header
+            // Check for metadata related to CGMES v3 with Ontology header
             if (m.listStatements(null, RDF.type, OWL2.Ontology).hasNext()) {
                 Statement header = m.listStatements(null, RDF.type, OWL2.Ontology).nextStatement();
                 profileURI = m.getRequiredProperty(header.getSubject(), OWL2.versionIRI).getObject().toString();
                 shortName = m.getRequiredProperty(header.getSubject(), DCAT.keyword).getObject().toString();
-            } else {//get metadata for CGMES v2.4 no header
-                if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURI")).hasNext()) {
-                    //get the shortname and get the URI
-                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURI")).nextStatement();
-                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
-                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
-                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
-                        Statement stmt = i.next();
-                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
-                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+            } else {
+                // Check for different versions of metadata for CGMES v2.4 without header
+                String[] versions = {"entsoeURI", "entsoeURIcore", "entsoeURIoperation", "entsoeURIshortCircuit"};
+                for (String version : versions) {
+                    if (m.listStatements(null, RDFS.label, ResourceFactory.createLangLiteral(version, "en")).hasNext()) {
+                        Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createLangLiteral(version, "en")).nextStatement();
+                        profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+                        Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
+                        StmtIterator stmtIterator = m.listStatements(null, RDFS.label, ResourceFactory.createLangLiteral("shortName", "en"));
+                        while (stmtIterator.hasNext()) {
+                            Statement stmt = stmtIterator.next();
+                            if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
+                                shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
+                            }
                         }
-                    }
-                } else if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIcore")).hasNext()) {
-                    //get the shortname and get the URI
-                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIcore")).nextStatement();
-                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
-                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
-                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
-                        Statement stmt = i.next();
-                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
-                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
-                        }
-                    }
-                } else if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIoperation")).hasNext()) {
-                    //get the shortname and get the URI
-                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIoperation")).nextStatement();
-                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
-                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
-                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
-                        Statement stmt = i.next();
-                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
-                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
-                        }
-                    }
-                } else if (m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIshortCircuit")).hasNext()) {
-                    //get the shortname and get the URI
-                    Statement entsoeURI = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("entsoeURIshortCircuit")).nextStatement();
-                    profileURI = m.getRequiredProperty(entsoeURI.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
-                    Statement domain = m.getRequiredProperty(entsoeURI.getSubject(), RDFS.domain);
-                    for (StmtIterator i = m.listStatements(null, RDFS.label, ResourceFactory.createPlainLiteral("shortName")); i.hasNext(); ) {
-                        Statement stmt = i.next();
-                        if (m.getRequiredProperty(stmt.getSubject(), RDFS.domain).getObject().equals(domain.getObject())) {
-                            shortName = m.getRequiredProperty(stmt.getSubject(), ResourceFactory.createProperty(cims, "isFixed")).getObject().toString();
-                        }
+                        break;
                     }
                 }
             }
+
+            // Set namespace prefixes
             String profileNS = profileURI + "#";
-            mainModel.setNsPrefix(shortName.toLowerCase(), profileNS);
-            //mainModel.setNsPrefix("ser", ser);
+            if (shortName != null) {
+                mainModel.setNsPrefix(shortName.toLowerCase(), profileNS);
+            }
             mainModel.setNsPrefix("owl", OWL2.NS);
             mainModel.setNsPrefix("rdfs", RDFS.uri);
             mainModel.setNsPrefix("cim", m.getNsPrefixURI("cim"));
+            mainModel.setNsPrefix("entsoe", m.getNsPrefixURI("entsoe"));
 
+            // Process Description and Enumeration
             if (m.listSubjectsWithProperty(stereotype, "Description").hasNext()) {
                 rdfAboutList = m.listSubjectsWithProperty(stereotype, "Description").toSet();
                 mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfAbout"), RDF.type, RDFS.Class));
                 for (Resource item : rdfAboutList) {
                     mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfAbout"), OWL2.members, item));
                 }
-                //plus header class
             }
 
-            for (ResIterator ii = m.listSubjectsWithProperty(stereotype,enumeration); ii.hasNext(); ) {
+            for (ResIterator ii = m.listSubjectsWithProperty(stereotype, enumeration); ii.hasNext();) {
                 Resource resItem = ii.next();
                 mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfEnum"), RDF.type, RDFS.Class));
-                for (ResIterator j = m.listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
+                for (ResIterator j = m.listSubjectsWithProperty(RDF.type, resItem); j.hasNext();) {
                     Resource resItemProp = j.next();
                     mainModel.add(ResourceFactory.createStatement(ResourceFactory.createResource(profileNS + "RdfEnum"), OWL2.members, resItemProp));
                 }
             }
-
         }
+
 
         //we need to do ttl export of mainModel and save
         fileSaveDialogSerialization("RDFSSerialisation", "", mainModel);
