@@ -969,17 +969,18 @@ public class MainController implements Initializable {
             model2.add(model2single);
         }
         model2.setNsPrefixes(prefixMap);
+        ComparisonSHACLshapes.modelsABPrefMap = prefixMap;
 
         //proceed with the comparison
 
         rdfsCompareFiles = new LinkedList<>();
         if (MainController.IDModel1.size()==1) {
-            rdfsCompareFiles.add(MainController.IDModel1.get(0).getName());
+            rdfsCompareFiles.add(MainController.IDModel1.getFirst().getName());
         }else{
             rdfsCompareFiles.add("Model 1");
         }
         if (MainController.IDModel2.size()==1) {
-            rdfsCompareFiles.add(MainController.IDModel2.get(0).getName());
+            rdfsCompareFiles.add(MainController.IDModel2.getFirst().getName());
         }else {
             rdfsCompareFiles.add("Model 2");
         }

@@ -26,7 +26,7 @@ public class ComparisonInstanceData {
 
         LinkedList<String> skiplist = new LinkedList<>();
 
-        if ((Integer) options.get(0) == 1) { //SV
+        if (options.get(0) == 1) { //SV
             skiplist.add("SvVoltage");
             skiplist.add("SvInjection");
             skiplist.add("SvStatus");
@@ -37,7 +37,7 @@ public class ComparisonInstanceData {
             skiplist.add("SvShuntCompensatorSections");
             skiplist.add("SvTapStep");
         }
-        if ((Integer) options.get(1) == 1) { //DL
+        if (options.get(1) == 1) { //DL
             skiplist.add("DiagramObject");
             skiplist.add("DiagramObjectPoint");
             skiplist.add("DiagramObjectStyle");
@@ -47,7 +47,7 @@ public class ComparisonInstanceData {
             skiplist.add("DiagramObjectGluePoint");
             skiplist.add("TextDiagramObject");
         }
-        if ((Integer) options.get(4) == 1) { //TP
+        if (options.get(4) == 1) { //TP
             skiplist.add("DCTopologicalNode");
             skiplist.add("TopologicalNode");
         }
@@ -812,7 +812,7 @@ public class ComparisonInstanceData {
     public static HashMap<String,Object> solutionResultElements(ArrayList<Object> results, Integer arrayIndex, Integer precisionRoundScale) {
         HashMap<String,Object> resultElements = new HashMap<>();
         List<Double> values = ((List) results.get(arrayIndex));
-        if (values.size()!=0) {
+        if (!values.isEmpty()) {
             Double maxv = Collections.max(values);
             Mean mean = new Mean();
             double[] primitiveV = ArrayUtils.toPrimitive(values.toArray(new Double[0]));
@@ -821,7 +821,7 @@ public class ComparisonInstanceData {
             resultElements.put("max", Precision.round(maxv, precisionRoundScale));
             resultElements.put("mean", Precision.round(mean.evaluate(primitiveV), precisionRoundScale));
         }else{
-            resultElements.put("size", values.size());
+            resultElements.put("size", 0);
             resultElements.put("max", "N/A");
             resultElements.put("mean", "N/A");
         }
