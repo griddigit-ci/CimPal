@@ -603,7 +603,9 @@ public class RdfConvert {
             mainModel.setNsPrefix("owl", OWL2.NS);
             mainModel.setNsPrefix("rdfs", RDFS.uri);
             mainModel.setNsPrefix("cim", m.getNsPrefixURI("cim"));
-            mainModel.setNsPrefix("entsoe", m.getNsPrefixURI("entsoe"));
+            if (m.getNsPrefixURI("entsoe") != null) {
+                mainModel.setNsPrefix("entsoe", m.getNsPrefixURI("entsoe"));
+            }
 
             // Process Description and Enumeration
             if (m.listSubjectsWithProperty(stereotype, "Description").hasNext()) {
