@@ -606,6 +606,9 @@ public class RdfConvert {
             if (m.getNsPrefixURI("entsoe") != null) {
                 mainModel.setNsPrefix("entsoe", m.getNsPrefixURI("entsoe"));
             }
+            else {
+                mainModel.setNsPrefix("eu", m.getNsPrefixURI("eu"));
+            }
 
             // Process Description and Enumeration
             if (m.listSubjectsWithProperty(stereotype, "Description").hasNext()) {
