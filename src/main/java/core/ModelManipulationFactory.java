@@ -64,13 +64,13 @@ public class ModelManipulationFactory {
         return loadDataMap;
     }
 
-    public static Set<Resource> LoadRDFAbout(String xmlBase, String cgmesVersion) throws FileNotFoundException {
+    public static Set<Resource> LoadRDFAbout(String xmlBase) throws FileNotFoundException {
         Set<Resource> rdfAboutList = new HashSet<>();
         Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
         InputStream inputStream = null;
-        if (cgmesVersion.equals("CGMESv3.0")){
+        if (xmlBase.equals("http://iec.ch/TC57/CIM100")){
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
-        } else if (cgmesVersion.equals("CGMESv2.4")) {
+        } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
@@ -91,13 +91,13 @@ public class ModelManipulationFactory {
         }
         return rdfAboutList;
     }
-    public static Set<Resource> LoadRDFEnum(String xmlBase, String cgmesVersion) throws FileNotFoundException {
+    public static Set<Resource> LoadRDFEnum(String xmlBase) throws FileNotFoundException {
         Set<Resource> RdfEnumList = new HashSet<>();
         Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
         InputStream inputStream = null;
-        if (cgmesVersion.equals("CGMESv3.0")){
+        if (xmlBase.equals("http://iec.ch/TC57/CIM100")){
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
-        } else if (cgmesVersion.equals("CGMESv2.4")) {
+        } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
@@ -269,7 +269,7 @@ public class ModelManipulationFactory {
 //                            if (profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").hasNext()) {
 //                                rdfAboutList = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").toSet();
 //                            }
-                            rdfAboutList = LoadRDFAbout(xmlBase, "CGMESv3.0");
+                            rdfAboutList = LoadRDFAbout(xmlBase);
                             rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
                         }
 
@@ -282,7 +282,7 @@ public class ModelManipulationFactory {
 //                                    rdfEnumList.add(resItemProp);
 //                                }
 //                            }
-                            rdfEnumList = LoadRDFEnum(xmlBase, "CGMESv3.0");
+                            rdfEnumList = LoadRDFEnum(xmlBase);
                         }
 
                         if (saveProperties.containsKey("rdfAboutList")) {
