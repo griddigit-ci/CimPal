@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>eu.griddigit</groupId>
   <artifactId>CimPal</artifactId>
-  <version>2023.4</version>
+  <version>2024.0</version>
   <build>
     <finalName>CimPal</finalName>
     <plugins>
@@ -69,7 +69,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jena.version>4.10.0</jena.version>
     <log4j.version>2.12.1</log4j.version>
-    <javafx.version>19.0.2.1</javafx.version>
+    <javafx.version>21</javafx.version>
     <jdk.version>21</jdk.version>
   </properties>
 </project>
