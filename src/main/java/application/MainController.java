@@ -559,24 +559,32 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         List<File> file = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
+        boolean templateOnly = true;
         if (file != null) {// the file is selected
-            for (File fil : file) {
-                Model model = ModelFactory.createDefaultModel(); // model is the rdf file
-                try {
-                    RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                    progressBar.setProgress(0);
-                }
-                shaclNodataMap = 1; // as no mapping is to be used for this task
-                ExportInstanceDataTemplate.rdfsContent(model);
-                progressBar.setProgress(1);
-            }
+            shaclNodataMap = 1; // as no mapping is to be used for this task
+            ExportInstanceDataTemplate.rdfsContent(file,templateOnly);
+            progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
         }
     }
-    
+
+
+    @FXML
+    //action menu item Tools -> Generate properties info from RDFS (xls, ttl, json)
+    private void actionRDFSInstanceDataInfoMenu() throws FileNotFoundException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        //open RDFS file
+        List<File> file = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
+        boolean templateOnly = false;
+        if (file != null) {// the file is selected
+            shaclNodataMap = 1; // as no mapping is to be used for this task
+            ExportInstanceDataTemplate.rdfsContent(file,templateOnly);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+    }
     @FXML
     //Action for button "Clear" related to the output window
     private void actionBtnClear() {

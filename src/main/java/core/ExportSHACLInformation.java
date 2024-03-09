@@ -29,9 +29,9 @@ import static util.ExcelTools.saveExcelFile;
 
 public class ExportSHACLInformation {
 
-    public static void shaclInformationExport(boolean singleFile, List<File> file) throws FileNotFoundException {
+    public static void shaclInformationExport(boolean singleFile, List<File> file) {
         XSSFWorkbook workbook = new XSSFWorkbook();
-        String fileName = null;
+        String fileName;
         for (File f : file) {
             Model model = ModelFactory.createDefaultModel(); // model is the rdf file
             try {

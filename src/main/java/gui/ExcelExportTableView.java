@@ -59,13 +59,27 @@ public class ExcelExportTableView {
             for (int col=0; col<tableView.getColumns().size(); col++){
                 Object celValue = tableView.getColumns().get(col).getCellObservableValue(row).getValue();
                 XSSFCell cellD = xssfRow.createCell(col);
-                try {
-                    if (celValue != null && Double.parseDouble(celValue.toString()) != 0.0) {
-                        cellD.setCellValue(Double.parseDouble(celValue.toString()));
+//                try {
+//                    if (celValue != null && Double.parseDouble(celValue.toString()) != 0.0) {
+//                        cellD.setCellValue(Double.parseDouble(celValue.toString()));
+//                    }
+//                } catch (NumberFormatException e ){
+//                    cellD.setCellValue(celValue.toString());
+//                }
+
+                String cellContent;
+                if (celValue != null && !celValue.toString().isEmpty()) {
+                    try {
+                        cellContent = String.valueOf(Double.parseDouble(celValue.toString()));
+                    } catch (NumberFormatException e) {
+                        cellContent = celValue.toString();
                     }
-                } catch (NumberFormatException e ){
-                    cellD.setCellValue(celValue.toString());
+                } else if (celValue != null) {
+                    cellContent = celValue.toString();
+                } else {
+                    cellContent = "";
                 }
+                cellD.setCellValue(cellContent);
                 CellStyle cellStyleD = dataCellStyle;
                 cellD.setCellStyle(cellStyleD);
             }
