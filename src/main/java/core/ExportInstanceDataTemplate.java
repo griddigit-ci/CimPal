@@ -43,6 +43,8 @@ public class ExportInstanceDataTemplate {
         List<String> rdfsProfileKeyword = new LinkedList<>(); // list for the profile keyword of the item
         List<String> rdfsProfileURI = new LinkedList<>(); // list for the profile URI of the item
         List<String> rdfsXSDdatatype = new LinkedList<>(); // list for the xsd datatype of the item
+        List<String> rdfsAttrAssocUnique = new LinkedList<>(); // list for the property attribute or association
+        List<String> rdfsXSDdatatypeUnique = new LinkedList<>(); // list for the xsd datatype of the item
         rdfsClassName.add("Class Name");
         rdfsClass.add("Class");
         rdfsAttrAssoc.add("Property-AttributeAssociation");
@@ -151,6 +153,7 @@ public class ExportInstanceDataTemplate {
                         rdfsClassName.add(classLocalName);
                         rdfsClass.add(classFullURI);
                         rdfsAttrAssoc.add(propertyFullURI);
+
                         if (cgmesVersion.equals("2.4.15")){
                             List<String> keyList = new LinkedList<>();
                             List<String> keyURIList = new LinkedList<>();
@@ -196,6 +199,12 @@ public class ExportInstanceDataTemplate {
                                 rdfsItemAttrDatatype.add(datatypePrimitive);
                                 rdfsAttrOrAssocFlag.add("Attribute");
                                 rdfsXSDdatatype.add(getXSDtype(datatypePrimitive));
+
+                                if (!rdfsAttrAssocUnique.contains(propertyFullURI)) {
+                                    rdfsAttrAssocUnique.add(propertyFullURI);
+                                    rdfsXSDdatatypeUnique.add(getXSDtype(datatypePrimitive));
+                                }
+
                                 break;
                             }
                             case "CIMDatatype": {
@@ -203,6 +212,10 @@ public class ExportInstanceDataTemplate {
                                 rdfsItemAttrDatatype.add(datatypePrimitive);
                                 rdfsAttrOrAssocFlag.add("Attribute");
                                 rdfsXSDdatatype.add(getXSDtype(datatypePrimitive));
+                                if (!rdfsAttrAssocUnique.contains(propertyFullURI)) {
+                                    rdfsAttrAssocUnique.add(propertyFullURI);
+                                    rdfsXSDdatatypeUnique.add(getXSDtype(datatypePrimitive));
+                                }
                                 break;
                             }
                             case "Compound": {
@@ -272,6 +285,11 @@ public class ExportInstanceDataTemplate {
             exportDesciptionInRDF(rdfsClass, rdfsAttrAssoc, rdfsAttrOrAssocFlag, rdfsItemAttrDatatype, rdfsItemMultiplicity, prefMap);
             // do the export to JSON
             exportDesciptionToJSON(rdfsInfo);
+            // do the export to JSON - only mapping
+            Map<String, List<String>> rdfsInfoMapping = new HashMap<>();
+            rdfsInfoMapping.put("Property-AttributeAssociation", rdfsAttrAssocUnique);
+            rdfsInfoMapping.put("XSDdatatype", rdfsXSDdatatypeUnique);
+            exportDesciptionToJSON(rdfsInfoMapping);
         }
     }
 
