@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>eu.griddigit</groupId>
   <artifactId>CimPal</artifactId>
-  <version>2024.0</version>
+  <version>${cimpal.version}</version>
   <build>
     <finalName>CimPal</finalName>
     <plugins>
@@ -54,6 +54,56 @@
           </filters>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>com.akathist.maven.plugins.launch4j</groupId>
+        <artifactId>launch4j-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>l4j-clui</id>
+            <phase>package</phase>
+            <goals>
+              <goal>launch4j</goal>
+            </goals>
+            <configuration>
+              <dontWrapJar>false</dontWrapJar>
+              <headerType>gui</headerType>
+              <jar>${project.build.directory}/${project.build.finalName}.jar</jar>
+              <outfile>${project.build.directory}/${project.build.finalName}.exe</outfile>
+              <errTitle>No Java installed.</errTitle>
+              <cmdLine />
+              <chdir>.</chdir>
+              <priority>normal</priority>
+              <downloadUrl />
+              <supportUrl />
+              <stayAlive>false</stayAlive>
+              <restartOnCrash>false</restartOnCrash>
+              <manifest />
+              <icon />
+              <jre>
+                <path>%JAVA_HOME%;%PATH%</path>
+                <requiresJdk>false</requiresJdk>
+                <requires64Bit>false</requires64Bit>
+                <minVersion>21</minVersion>
+                <maxVersion>22</maxVersion>
+              </jre>
+              <versionInfo>
+                <fileVersion>${cimpal.version}</fileVersion>
+                <txtFileVersion>${cimpal.version}</txtFileVersion>
+                <fileDescription>CimPal GUI</fileDescription>
+                <copyright>gridDigIt</copyright>
+                <productVersion>${cimpal.version}</productVersion>
+                <txtProductVersion>${cimpal.version}</txtProductVersion>
+                <productName>CimPal</productName>
+                <companyName>gridDigIt</companyName>
+                <internalName>CimPal</internalName>
+                <originalFilename>CimPal.exe</originalFilename>
+                <trademarks>gridDigIt</trademarks>
+                <language>ENGLISH_US</language>
+              </versionInfo>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <dependencies>
@@ -66,8 +116,9 @@
     </dependency>
   </dependencies>
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jena.version>4.10.0</jena.version>
+    <cimpal.version>2024.0.0.0</cimpal.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <log4j.version>2.12.1</log4j.version>
     <javafx.version>21</javafx.version>
     <jdk.version>21</jdk.version>
