@@ -8,7 +8,7 @@
         <log4j.version>2.12.1</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jena.version>4.10.0</jena.version>
-        <javafx.version>21</javafx.version>
+        <javafx.version>22</javafx.version>
         <cimpal.version>2024.0.0.0</cimpal.version>
     </properties>
 
@@ -302,7 +302,7 @@
         <dependency>
             <groupId>org.topbraid</groupId>
             <artifactId>shacl</artifactId>
-            <version>1.4.2</version>
+            <version>1.4.3</version>
             <exclusions>
                 <exclusion>
                     <artifactId>jena-arq</artifactId>
