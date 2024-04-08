@@ -9,7 +9,9 @@ package common.customWriter;
 import org.apache.jena.rdf.model.*;
 
 import java.io.PrintWriter;
-import java.util.*;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * similar to {@link CustomBasic}. Prints the plain result with the rdf:Description replaced

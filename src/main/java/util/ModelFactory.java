@@ -11,6 +11,7 @@ import application.MainController;
 import javafx.scene.control.Alert;
 import javafx.stage.FileChooser;
 import org.apache.commons.io.FileUtils;
+import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.riot.Lang;
@@ -24,6 +25,14 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import org.apache.jena.riot.RDFParser;
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
 
 public class ModelFactory {
 
@@ -59,46 +68,58 @@ public class ModelFactory {
 
 
     //Loads model data with datatype mapping
-    public static Model modelLoadXMLmapping(InputStream inputStream, Map dataTypeMap, String xmlBase) {
-        //in case of xml files and if mapping should be from RDF file or saved datatype mapping file
-
+    public static Model modelLoadXMLmapping(InputStream inputStream, Map<String, RDFDatatype> dataTypeMap, String xmlBase) {
+        // Create a Graph to hold the parsed data
         Graph graph = GraphFactory.createDefaultGraph();
-        util.DataTypeStreamRDF sink = new util.DataTypeStreamRDF(graph, dataTypeMap);
 
-        RDFDataMgr.parse(sink, inputStream, xmlBase, Lang.RDFXML);
-        graph=sink.getGraph();
-        Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph); // that should be the model that includes the datatypes definitions
-        Map prefixMapping=sink.getPrefixMapping();
+        // Create a StreamRDF for handling parsed triples and datatypes
+        DataTypeStreamRDF sink = new util.DataTypeStreamRDF(graph, dataTypeMap);
+
+        // Use RDFParser to parse the input stream
+        RDFParser.create().source(inputStream).lang(Lang.RDFXML).base(xmlBase).parse(sink);
+
+        // Obtain the parsed graph and create a Model from it
+        graph = sink.getGraph();
+        Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph);
+
+        // Set namespace prefixes based on the sink's prefix mapping
+        Map<String, String> prefixMapping = sink.getPrefixMapping();
         model.setNsPrefixes(prefixMapping);
 
         return model;
-
     }
 
     //Loads model data with datatype mapping - Multiple XML selected
-    public static Model modelLoadMultipleXMLmapping(List files, Map dataTypeMap, String xmlBase,Lang rdfSourceFormat) throws FileNotFoundException {
-        //in case of xml files and if mapping should be from RDF file or saved datatype mapping file
-
+    public static Model modelLoadMultipleXMLmapping(List files, Map<String, RDFDatatype> dataTypeMap, String xmlBase, Lang rdfSourceFormat) throws FileNotFoundException {
+        // Create a Model to hold the union of parsed models
         Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-        Map prefixMap = modelUnion.getNsPrefixMap();
-        for (int i=0; i<files.size();i++) {
-            InputStream inputStream = new FileInputStream(files.get(i).toString());
+        Map<String, String> prefixMap = modelUnion.getNsPrefixMap();
 
+        for (Object file : files) {
+            // Open the input stream for each file
+            InputStream inputStream = new FileInputStream(file.toString());
+
+            // Create a Graph and StreamRDF for parsing
             Graph graph = GraphFactory.createDefaultGraph();
-            util.DataTypeStreamRDF sink = new util.DataTypeStreamRDF(graph, dataTypeMap);
+            DataTypeStreamRDF sink = new util.DataTypeStreamRDF(graph, dataTypeMap);
 
-            RDFDataMgr.parse(sink, inputStream, xmlBase, rdfSourceFormat);
-            graph=sink.getGraph();
-            Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph); // that should be the model that includes the datatypes definitions
-            Map prefixMapping=sink.getPrefixMapping();
+            // Use RDFParser to parse the file
+            RDFParser.create().source(inputStream).lang(rdfSourceFormat).base(xmlBase).parse(sink);
+
+            // Create a Model from the parsed Graph and set its prefixes
+            graph = sink.getGraph();
+            Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph);
+            Map<String, String> prefixMapping = sink.getPrefixMapping();
             model.setNsPrefixes(prefixMapping);
 
+            // Combine prefixes and add the model to the union model
             prefixMap.putAll(model.getNsPrefixMap());
             modelUnion.add(model);
         }
+
+        // Set the final prefixes for the union model
         modelUnion.setNsPrefixes(prefixMap);
         return modelUnion;
-
     }
 
     //Loads shape model data
