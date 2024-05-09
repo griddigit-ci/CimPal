@@ -81,6 +81,15 @@ public class ExportInstanceDataTemplate {
                 String classLocalName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
                 String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
 
+                //check if the class has stereotype "Description" and remove IdentifiedObject.name, .description, .mRID in case they are there
+                boolean classIsDescription = false;
+                for (StmtIterator i = model.listStatements(ResourceFactory.createResource(classFullURI),ResourceFactory.createProperty(cimsNs,"stereotype"),(RDFNode) null); i.hasNext(); ) {
+                    Statement stmt = i.next();
+                    if (stmt.getObject().toString().equals("Description")){
+                        classIsDescription = true;
+                    }
+                }
+
                 for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size(); atas++) {
                     // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
 
@@ -150,6 +159,12 @@ public class ExportInstanceDataTemplate {
                     } else if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
                         String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString();
                         String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
+
+                        String propertyLocalName = ResourceFactory.createResource(propertyFullURI).getLocalName();
+                        if (classIsDescription && (propertyLocalName.equals("IdentifiedObject.name") || propertyLocalName.equals("IdentifiedObject.description") || propertyLocalName.equals("IdentifiedObject.mRID"))){
+                            continue;
+                        }
+
                         rdfsClassName.add(classLocalName);
                         rdfsClass.add(classFullURI);
                         rdfsAttrAssoc.add(propertyFullURI);

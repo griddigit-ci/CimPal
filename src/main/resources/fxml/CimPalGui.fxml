@@ -28,13 +28,14 @@
          <MenuItem mnemonicParsing="false" onAction="#actionMenuExportSHACLInfo" text="Export SHACL constraints informatiion to Excel" />
          <MenuItem mnemonicParsing="false" onAction="#actionGenInfoFromRDFS" text="Generate information from RDFS - needed for serialisation" />
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />
       </Menu>
    </MenuBar>
    <AnchorPane minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
-      <SplitPane dividerPositions="0.6980337078651685" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+      <SplitPane dividerPositions="0.7247191011235955" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="100.0" prefWidth="160.0">
             <HBox alignment="TOP_RIGHT" layoutX="106.0" layoutY="108.0" prefHeight="460.0" prefWidth="1017.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <TabPane fx:id="tabPaneConstraintsDetails" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
@@ -147,11 +148,23 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles" disable="true" mnemonicParsing="false" selected="true" text="Consider related profiles for cross profile value type shapes" />
-                                 <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles2nd" disable="true" mnemonicParsing="false" text="Consider 2nd set of related profiles for cross profile value type shapes">
-                                    <HBox.margin>
-                                       <Insets left="20.0" />
-                                    </HBox.margin>
-                                 </CheckBox>
+                                 <CheckBox fx:id="cbRDFSSHACLoptionBaseprofilesIgnoreNS" disable="true" mnemonicParsing="false" text="Ignore namespace if class not found in base profile (i.e. search by class name only)" />
+                              </HBox>
+                              <HBox spacing="10.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles2nd" disable="true" mnemonicParsing="false" text="Consider 2nd set of related profiles for cross profile value type shapes" />
+                                    <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles3rd" disable="true" mnemonicParsing="false" text="Consider 3rd set of related profiles for cross profile value type shapes">
+                                       <HBox.margin>
+                                          <Insets left="20.0" />
+                                       </HBox.margin>
+                                    </CheckBox>
+                                 </children>
+                                 <VBox.margin>
+                                    <Insets left="30.0" />
+                                 </VBox.margin>
                               </HBox>
                               <HBox spacing="10.0">
                                  <padding>
@@ -364,6 +377,7 @@
                                     </CheckBox>
                                     <Label text="Sorting options:" />
                                     <ChoiceBox fx:id="fcbRDFsortOptions" disable="true" prefWidth="200.0" />
+                                    <CheckBox fx:id="fcbStripPrefixes" disable="true" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
                                  </children>
                               </HBox>
                               <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
@@ -622,8 +636,8 @@
                <TabPane fx:id="tabPaneDown" prefHeight="200.0" prefWidth="200.0" side="BOTTOM" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
                   <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                        <ScrollPane fitToHeight="true" fitToWidth="true" layoutY="26.0" pannable="true" prefHeight="191.0" prefWidth="1222.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                           <TextArea fx:id="foutputWindow" wrapText="true" />
+                        <ScrollPane fitToHeight="true" fitToWidth="true" layoutY="8.0" pannable="true" prefHeight="168.0" prefWidth="1222.0" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="8.0">
+                           <TextArea fx:id="foutputWindow" prefHeight="177.0" prefWidth="1220.0" wrapText="true" />
                         </ScrollPane>
                      </AnchorPane>
                   </Tab>
