@@ -55,6 +55,11 @@ public class ExportInstanceDataTemplate {
         rdfsProfileKeyword.add("ProfileKeyword");
         rdfsProfileURI.add("ProfileURI");
 
+        List<String> associationPerClassClassName = new LinkedList<>(); // the class name that has the association
+        List<String> associationPerClassUsedName = new LinkedList<>(); // the end role name for used association
+        List<String> associationPerClassInvName = new LinkedList<>(); // the end role name for inverse association
+
+
         Map<String,String> prefMap = new HashMap<>();
 
         for (File fil : file) {
@@ -131,6 +136,14 @@ public class ExportInstanceDataTemplate {
                             rdfsItemAttrDatatype.add("N/A");
                             rdfsItemMultiplicity.add(cardinality);
                             rdfsXSDdatatype.add("N/A");
+                            associationPerClassClassName.add(classLocalName);
+                            String assocName = ResourceFactory.createResource(propertyFullURI).getLocalName();
+                            associationPerClassUsedName.add(assocName.split(".",2)[1]);
+                            //find the inverse role
+                            Resource invAssocRes = model.listStatements(ResourceFactory.createResource(propertyFullURI), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#inverseRoleName"),(RDFNode) null).next().getObject().asResource();
+                            Resource invAssocResRange = model.listStatements(invAssocRes, RDFS.range,(RDFNode) null).next().getObject().asResource();
+                            associationPerClassInvName.add(invAssocResRange.getLocalName());
+
                             if (cgmesVersion.equals("2.4.15")){
                                 List<String> keyList = new LinkedList<>();
                                 List<String> keyURIList = new LinkedList<>();
@@ -305,6 +318,12 @@ public class ExportInstanceDataTemplate {
             rdfsInfoMapping.put("Property-AttributeAssociation", rdfsAttrAssocUnique);
             rdfsInfoMapping.put("XSDdatatype", rdfsXSDdatatypeUnique);
             exportDesciptionToJSON(rdfsInfoMapping);
+
+            Map<String, List<String>> assocInfo = new HashMap<>();
+            assocInfo.put("Class", associationPerClassClassName);
+            assocInfo.put("UsedAssociationEndRoleName", associationPerClassUsedName);
+            assocInfo.put("InverseAssociationRangeName", associationPerClassInvName);
+            exportDesciptionToJSON(assocInfo);
         }
     }
 
