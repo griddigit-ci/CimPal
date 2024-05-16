@@ -137,8 +137,7 @@ public class ExportInstanceDataTemplate {
                             rdfsItemMultiplicity.add(cardinality);
                             rdfsXSDdatatype.add("N/A");
                             associationPerClassClassName.add(classLocalName);
-                            String assocName = ResourceFactory.createResource(propertyFullURI).getLocalName();
-                            associationPerClassUsedName.add(assocName.split(".",2)[1]);
+                            associationPerClassUsedName.add(model.listStatements(ResourceFactory.createResource(propertyFullURI), RDFS.label,(RDFNode) null).next().getObject().asLiteral().getValue().toString());
                             //find the inverse role
                             Resource invAssocRes = model.listStatements(ResourceFactory.createResource(propertyFullURI), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#inverseRoleName"),(RDFNode) null).next().getObject().asResource();
                             Resource invAssocResRange = model.listStatements(invAssocRes, RDFS.range,(RDFNode) null).next().getObject().asResource();
