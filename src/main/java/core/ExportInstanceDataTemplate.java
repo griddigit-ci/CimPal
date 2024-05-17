@@ -143,8 +143,7 @@ public class ExportInstanceDataTemplate {
                             Resource invAssocRes = model.listStatements(ResourceFactory.createResource(propertyFullURI), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#inverseRoleName"),(RDFNode) null).next().getObject().asResource();
                             Resource invAssocResRange = model.listStatements(invAssocRes, RDFS.range,(RDFNode) null).next().getObject().asResource();
                             associationPerClassInvName.add(invAssocResRange.getLocalName());
-                            Resource invAssocResRangeLabel = model.listStatements(invAssocRes, RDFS.label,(RDFNode) null).next().getObject().asResource();
-                            associationPerClassInvRoleName.add(invAssocResRangeLabel.getLocalName());
+                            associationPerClassInvRoleName.add(model.listStatements(invAssocRes, RDFS.label,(RDFNode) null).next().getObject().asLiteral().getValue().toString());
 
                             if (cgmesVersion.equals("2.4.15")){
                                 List<String> keyList = new LinkedList<>();
