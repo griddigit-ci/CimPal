@@ -7,12 +7,9 @@ package core;
 
 import application.MainController;
 import common.customWriter.CustomRDFFormat;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
-import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
-import org.apache.jena.riot.writer.JsonLD11Writer;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
 
@@ -27,7 +24,7 @@ public class RdfConvert {
     //RDF conversion
     public static void rdfConversion(File file, List<File> files, String sourceFormat, String targetFormat, String xmlBase,RDFFormat rdfFormat,
                                      String showXmlDeclaration, String showDoctypeDeclaration, String tab,String relativeURIs, Boolean modelUnionFlag,
-                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl, Boolean modelUnionFlagDetailed,String sortRDF) throws IOException {
+                                     Boolean inheritanceOnly,Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl, Boolean modelUnionFlagDetailed,String sortRDF, String rdfSortOptions,boolean stripPrefixes) throws IOException {
 
         Lang rdfSourceFormat = switch (sourceFormat) {
             case "RDF XML (.rdf or .xml)" -> Lang.RDFXML;
@@ -54,24 +51,24 @@ public class RdfConvert {
             //put first the main RDF
             fileDet1 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Main RDF file");
             if (!fileDet1.isEmpty()) {
-                if (fileDet1.get(0) != null) {
-                    modelFiles.add(fileDet1.get(0));
+                if (fileDet1.getFirst() != null) {
+                    modelFiles.add(fileDet1.getFirst());
                 }
             }
 
             fileDet2 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Deviation RDF file");
 
             if (!fileDet2.isEmpty()) {
-                if (fileDet2.get(0) != null) {
-                    modelFiles.add(fileDet2.get(0));
+                if (fileDet2.getFirst() != null) {
+                    modelFiles.add(fileDet2.getFirst());
                 }
             }
 
             fileDet3 = util.ModelFactory.filechoosercustom(true,"RDF file", List.of("*.rdf","*.xml", "*.ttl"),"Extended RDF file");
 
             if (!fileDet3.isEmpty()) {
-                if (fileDet3.get(0) != null) {
-                    modelFiles.add(fileDet3.get(0));
+                if (fileDet3.getFirst() != null) {
+                    modelFiles.add(fileDet3.getFirst());
                 }
             }
 
@@ -198,34 +195,68 @@ public class RdfConvert {
         }
 
         model.add(stmttoadd);
-        
-        //ensure one ontology class
-        if (!Objects.requireNonNull(fileDet2).isEmpty() || !Objects.requireNonNull(fileDet3).isEmpty()) {
-            List<Statement> stmtToDeleteOntology = new LinkedList<>();
-            int maxstmt = 0;
-            Resource maxstmpst = null;
-            for (StmtIterator i = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")); i.hasNext(); ) {
-                Statement stmt = i.next();
-                List<Statement> stdeletep = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
-                int maxstmt0 = stdeletep.size();
-                if (maxstmt0>=maxstmt){
-                    maxstmt=maxstmt0;
-                    maxstmpst=stmt.getSubject();
+
+        if (modelUnionFlagDetailed) {
+            //ensure one ontology class
+            if (!Objects.requireNonNull(fileDet2).isEmpty() || !Objects.requireNonNull(fileDet3).isEmpty()) {
+                List<Statement> stmtToDeleteOntology = new LinkedList<>();
+                int maxstmt = 0;
+                Resource maxstmpst = null;
+                for (StmtIterator i = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")); i.hasNext(); ) {
+                    Statement stmt = i.next();
+                    List<Statement> stdeletep = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
+                    int maxstmt0 = stdeletep.size();
+                    if (maxstmt0 >= maxstmt) {
+                        maxstmt = maxstmt0;
+                        maxstmpst = stmt.getSubject();
+                    }
+                    stmtToDeleteOntology.addAll(stdeletep);
                 }
-                stmtToDeleteOntology.addAll(stdeletep);
-            }
-            model.remove(stmtToDeleteOntology);
+                model.remove(stmtToDeleteOntology);
 
 
-            List<Statement> stmtToAddOntology = new LinkedList<>();
-            for (Statement stmtadd : stmtToDeleteOntology) {
-                if (stmtadd.getSubject().equals(maxstmpst)){
-                    stmtToAddOntology.add(stmtadd);
+                List<Statement> stmtToAddOntology = new LinkedList<>();
+                for (Statement stmtadd : stmtToDeleteOntology) {
+                    if (stmtadd.getSubject().equals(maxstmpst)) {
+                        stmtToAddOntology.add(stmtadd);
+                    }
                 }
+                model.add(stmtToAddOntology);
             }
-            model.add(stmtToAddOntology);
         }
 
+        //optimise prefixes, strip unused prefixes
+        if (stripPrefixes){
+            Map<String, String> modelPrefMap = model.getNsPrefixMap();
+            LinkedList<String> uniqueNamespacesList = new LinkedList<>();
+            for (StmtIterator ns = model.listStatements(); ns.hasNext(); ) {
+                Statement stmtNS = ns.next();
+                if (!uniqueNamespacesList.contains(stmtNS.getSubject().getNameSpace())){
+                    uniqueNamespacesList.add(stmtNS.getSubject().getNameSpace());
+                }
+                if (!uniqueNamespacesList.contains(stmtNS.getPredicate().getNameSpace())){
+                    uniqueNamespacesList.add(stmtNS.getPredicate().getNameSpace());
+                }
+                if (stmtNS.getObject().isResource()){
+                    if (!uniqueNamespacesList.contains(stmtNS.getObject().asResource().getNameSpace())){
+                        uniqueNamespacesList.add(stmtNS.getObject().asResource().getNameSpace());
+                    }
+                }
+            }
+            LinkedList<Map.Entry<String, String>> entryToRemove = new LinkedList<>();
+            for (Map.Entry<String, String> entry : modelPrefMap.entrySet()) {
+                //String key = entry.getKey();
+                String value = entry.getValue();
+
+                // Check if either the key or value is present in uniqueNamespacesList
+                if (!uniqueNamespacesList.contains(value)) {
+                    entryToRemove.add(entry);
+                }
+            }
+            for (Map.Entry<String, String> entryTR : entryToRemove){
+                model.removeNsPrefix(entryTR.getKey());
+            }
+        }
 
 
         String filename="";
@@ -261,7 +292,6 @@ public class RdfConvert {
                             properties.put("showXmlDeclaration", showXmlDeclaration);
                             properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
                             properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
-                            properties.put("sortRDF",sortRDF);
                             //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
                             //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
                             //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
@@ -273,7 +303,7 @@ public class RdfConvert {
                             properties.put("relativeURIs", relativeURIs);
                             properties.put("instanceData", "false");
                             properties.put("sortRDF",sortRDF);
-                            properties.put("sortRDFprefix","false");
+                            properties.put("sortRDFprefix",rdfSortOptions);
                             properties.put("showXmlBaseDeclaration", "true");
 
                             if (useAboutRules) {

@@ -58,6 +58,37 @@ public class ShaclTools {
         // level 1..*: the class and then all attributes and associations including the inherited
         ArrayList<Object> rdfToShacl = new ArrayList<Object>();
         ArrayList<Object> shapeData = new ArrayList<Object>();
+
+        //start base profiles
+        //add here some logic that looks at the base profiles and
+        // -adds all concrete and abstract classes to the model for all classes that are in the model and if the classes are not in the model
+
+        if (baseprofilesshaclglag == 1) {
+            LinkedList<Statement> subclassStatements = getSubClassesInheritance(model, unionmodelbaseprofilesshacl);
+            model.add(subclassStatements);
+        }
+        if (baseprofilesshaclglag == 1) {
+            LinkedList<Statement> subclassStatements2nd = getSubClassesInheritance(model, unionmodelbaseprofilesshacl2nd);
+            model.add(subclassStatements2nd);
+        }
+        if (baseprofilesshaclglag == 1) {
+            LinkedList<Statement> subclassStatements3rd = getSubClassesInheritance(model, unionmodelbaseprofilesshacl3rd);
+            model.add(subclassStatements3rd);
+        }
+
+
+//        unionmodelbaseprofilesshacl.listStatements();
+//        unionmodelbaseprofilesshaclinheritance.listStatements();
+//        unionmodelbaseprofilesshacl2nd.listStatements();
+//        unionmodelbaseprofilesshacl3rd.listStatements();
+//        unionmodelbaseprofilesshaclinheritance2nd.listStatements();
+//        unionmodelbaseprofilesshaclinheritance3rd.listStatements();
+//        unionmodelbaseprofilesshaclinheritanceonly.listStatements();
+//        unionmodelbaseprofilesshaclinheritanceonly2nd.listStatements();
+//        unionmodelbaseprofilesshaclinheritanceonly3rd.listStatements();
+
+        //end base profiles
+
         for (ResIterator i = model.listResourcesWithProperty(model.getProperty(rdfNs, "stereotype")); i.hasNext(); ) {
             Resource resItem = i.next();
             boolean descriptionStereotype=false;
@@ -147,6 +178,50 @@ public class ShaclTools {
 
         shapeData.add(rdfToShacl); // adds the structure for one rdf file
         return shapeData;
+    }
+
+    //get subclasses for inheritance
+    public static LinkedList<Statement> getSubClassesInheritance(Model sourceModel, Model baseModel) {
+
+        LinkedList<Statement> subclassStatements = new LinkedList<>();
+
+        for (StmtIterator i = sourceModel.listStatements(null, RDF.type, RDFS.Class); i.hasNext(); ) {
+            Statement stmtM = i.next();
+            subclassStatements = getAllSubclasses(baseModel,stmtM.getSubject(), subclassStatements);
+        }
+        return subclassStatements;
+    }
+
+    //get subclasses for inheritance - next level
+    public static LinkedList<Statement> getAllSubclasses(Model model, Resource parentClassRes, LinkedList<Statement> subclassStatements) {
+
+        boolean classInBase = false;
+        List<Statement> classes = model.listStatements(null, RDF.type,RDFS.Class).toList();
+        for (Statement stmt : classes) {
+            if (stmt.getSubject().getLocalName().equals(parentClassRes.getLocalName())) {
+                classInBase = true;
+                break;
+            }
+        }
+
+        if (model.listStatements(parentClassRes, RDF.type,RDFS.Class).hasNext() || classInBase){
+            for (StmtIterator j = model.listStatements(null, RDFS.subClassOf,(RDFNode) null); j.hasNext(); ) {
+                Statement stmtB = j.next();
+                if (stmtB.getObject().asResource().getLocalName().equals(parentClassRes.getLocalName())) {
+                    subclassStatements.add(ResourceFactory.createStatement(stmtB.getSubject(), RDF.type, RDFS.Class));
+                    subclassStatements.add(ResourceFactory.createStatement(stmtB.getSubject(), RDFS.subClassOf, parentClassRes));
+                    subclassStatements.add(ResourceFactory.createStatement(stmtB.getSubject(), RDFS.label, model.getRequiredProperty(stmtB.getSubject(),RDFS.label).getObject()));
+                    Boolean concrete = classIsConcrete(stmtB.getSubject(), model);
+                    if (concrete) {
+                        Property stereotype = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype");
+                        Resource con = ResourceFactory.createResource("http://iec.ch/TC57/NonStandard/UML#concrete");
+                        subclassStatements.add(ResourceFactory.createStatement(stmtB.getSubject(), stereotype, con));
+                    }
+                    subclassStatements = getAllSubclasses(model, stmtB.getSubject(), subclassStatements);
+                }
+            }
+        }
+        return subclassStatements;
     }
 
     //gets all attributes and associations (including inherited) for a given concrete class
@@ -331,7 +406,7 @@ public class ShaclTools {
 //                    if (classRange.toString().contains("ACDCTerminal")){
 //                        int k=1;
 //                    }
-                    if (allSubclasses.size()==0) {
+                    if (allSubclasses.isEmpty()) {
                         Boolean concrete= classIsConcrete(classRange, model);
                         List<Resource> concreteSubclass = new LinkedList<>();
                         if (concrete) {
@@ -358,10 +433,10 @@ public class ShaclTools {
                             }
                         }
 
-                        if (allConcreteSubclasses.size()==0 && allSubclasses.size()==1){
+                        if (allConcreteSubclasses.isEmpty() && allSubclasses.size()==1){
                             allConcreteSubclasses.add(ResourceFactory.createResource("http://abstract.eu"));
                             classProperty.add(allConcreteSubclasses);
-                        }else if (allConcreteSubclasses.size()!=0) {
+                        }else if (!allConcreteSubclasses.isEmpty()) {
                             //System.out.println(allConcreteSubclasses);
                             classProperty.add(allConcreteSubclasses);
                         }
@@ -1551,7 +1626,7 @@ public class ShaclTools {
 
 
     //This creates a shape model from a profile
-    public static Model createShapesModelFromProfile(Model model, String nsPrefixprofile, String nsURIprofile, ArrayList shapeData){
+    public static Model createShapesModelFromProfile(Model model, String nsPrefixprofile, String nsURIprofile, ArrayList<?> shapeData){
 
         //initial setup of the shape model
         //creates shape model. This is per profile. shapeModels is for all profiles
@@ -1621,20 +1696,20 @@ public class ShaclTools {
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
 
-        for (int cl = 0; cl < ((ArrayList) shapeData.get(0)).size(); cl++) { //this is to loop on the classes in the profile and add NodeShape for each concrete class
+        for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and add NodeShape for each concrete class
             //add the ShapeNode
-            String localName = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(2).toString();
-            String classFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(0)).get(0).toString();
+            String localName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
+            String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
             //add NodeShape for the CIM class
             shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
             //check if the class is stereotyped Description
             boolean classDescripStereo=false;
-            if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(0)).get(4).toString().equals("Yes")){
+            if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(4).toString().equals("Yes")){
                 classDescripStereo=true;
             }
 
 
-            for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).size(); atas++) {
+            for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size(); atas++) {
                 // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
                 //every time a new property is added the reference is also added to the ShapeNode of the class
                 ArrayList<Object> propertyNodeFeatures = new ArrayList<>();
@@ -1662,12 +1737,12 @@ public class ShaclTools {
                     propertyNodeFeatures.add("");
                 }
 
-                if (((ArrayList<?>) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Association")) {//if it is an association
-                    if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
+                if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).getFirst().toString().equals("Association")) {//if it is an association
+                    if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
                         //Cardinality check
                         propertyNodeFeatures.set(0, "cardinality");
-                        String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                        String localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
+                        String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(6).toString();
+                        String localNameAssoc = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
                         propertyNodeFeatures.set(5, cardinality);
                         Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
                         propertyNodeFeatures.set(1, "Association with cardinality violation at the used direction.");
@@ -1677,7 +1752,7 @@ public class ShaclTools {
                         propertyNodeFeatures.set(8, atas - 1); // this is the order
                         propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
 
-                        String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
+                        String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
 
                         shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
 
@@ -1689,18 +1764,49 @@ public class ShaclTools {
                         //propertyNodeFeatures.set(5, cardinality);
                         //nodeShapeResource = shapeModel.getResource(nsURIprofile + localName+"ValueType");
 
-                        //Check if there is a self assocition on model header and if this is the case then do not include sh:in and the sh:path needs to be different
-                        String assocDomain = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(8).toString();
-                        String assocRange = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(9).toString();
+                        //Check if there is a self association on model header and if this is the case then do not include sh:in and the sh:path needs to be different
+                        String assocDomain = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString();
+                        String assocRange = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString();
                         Resource assocRangeRes = ResourceFactory.createResource(assocRange);
+                        Resource assocRangeResBase = null;
+                        if (baseprofilesshaclglag == 1) {
+
+                            if (assocRangeRes.getNameSpace().equals(cimURI)) {
+                                assocRangeResBase = ResourceFactory.createResource(cimURI + assocRangeRes.getLocalName());
+                            } else if (assocRangeRes.getNameSpace().equals(cim2URI)) {
+                                assocRangeResBase = ResourceFactory.createResource(cim2URI + assocRangeRes.getLocalName());
+                            } else if (assocRangeRes.getNameSpace().equals(cim3URI)) {
+                                assocRangeResBase = ResourceFactory.createResource(cim3URI + assocRangeRes.getLocalName());
+                            } else {
+                                assocRangeResBase = assocRangeRes;
+                            }
+
+                        }
                         Resource assocRangeRes2nd = null;
                         if (baseprofilesshaclglag2nd == 1){
                             if (assocRangeRes.getNameSpace().equals(cimURI)) {
-                                assocRangeRes2nd = ResourceFactory.createResource(cim2URI+assocRangeRes.getLocalName());
-                            }else{
+                                assocRangeRes2nd = ResourceFactory.createResource(cimURI + assocRangeRes.getLocalName());
+                            } else if (assocRangeRes.getNameSpace().equals(cim2URI)) {
+                                assocRangeRes2nd = ResourceFactory.createResource(cim2URI + assocRangeRes.getLocalName());
+                            } else if (assocRangeRes.getNameSpace().equals(cim3URI)) {
+                                assocRangeRes2nd = ResourceFactory.createResource(cim3URI + assocRangeRes.getLocalName());
+                            } else {
                                 assocRangeRes2nd = assocRangeRes;
                             }
                         }
+                        Resource assocRangeRes3rd = null;
+                        if (baseprofilesshaclglag3rd == 1){
+                            if (assocRangeRes.getNameSpace().equals(cimURI)) {
+                                assocRangeRes3rd = ResourceFactory.createResource(cimURI + assocRangeRes.getLocalName());
+                            } else if (assocRangeRes.getNameSpace().equals(cim2URI)) {
+                                assocRangeRes3rd = ResourceFactory.createResource(cim2URI + assocRangeRes.getLocalName());
+                            } else if (assocRangeRes.getNameSpace().equals(cim3URI)) {
+                                assocRangeRes3rd = ResourceFactory.createResource(cim3URI + assocRangeRes.getLocalName());
+                            } else {
+                                assocRangeRes3rd = assocRangeRes;
+                            }
+                        }
+
                         if (assocDomain.equals(assocRange) && assocDomain.equals("http://iec.ch/TC57/61970-552/ModelDescription/1#Model")) { // this is the case when it is a header
                             propertyNodeFeatures.set(1, "Not correct serialisation (rdf:resource is expected).");
                             propertyNodeFeatures.set(2, localNameAssoc + "-nodeKind");
@@ -1725,11 +1831,11 @@ public class ShaclTools {
 //                            int k=1;
 //                        }
 
-                        if (!((LinkedList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).get(0).toString().equals("http://abstract.eu")) {
+                        if (!((LinkedList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(11)).getFirst().toString().equals("http://abstract.eu")) {
                             concreteClasses = (List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11);
                             //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
 
-                            //TODO check this part as assocRange was used instead of abstract class. In the ER the Equioment is concrete
+                            //TODO check this part as assocRange was used instead of abstract class. In the ER the Equipment is concrete
                             if (baseprofilesshaclglag == 1) {
                                 // get the class URI at position 9; then search for this class in the unionmodelbaseprofilesshaclinheritanceonly and find all OWL2 members; store these members in List<Resource> concreteClasses
 
@@ -1737,12 +1843,25 @@ public class ShaclTools {
                                     Statement stmtinheritance = i.next();
                                     concreteClasses.add(stmtinheritance.getObject().asResource());
                                 }
+
+                                for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(assocRangeResBase, OWL2.members, (RDFNode) null); i.hasNext(); ) {
+                                    Statement stmtinheritanceB = i.next();
+                                    concreteClasses.add(stmtinheritanceB.getObject().asResource());
+                                }
+
                                 if (baseprofilesshaclglag2nd == 1){
                                     for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(assocRangeRes2nd, OWL2.members, (RDFNode) null); i.hasNext(); ) {
                                         Statement stmtinheritance2 = i.next();
                                         concreteClasses.add(stmtinheritance2.getObject().asResource());
                                     }
                                 }
+                                if (baseprofilesshaclglag3rd == 1){
+                                    for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(assocRangeRes3rd, OWL2.members, (RDFNode) null); i.hasNext(); ) {
+                                        Statement stmtinheritance3 = i.next();
+                                        concreteClasses.add(stmtinheritance3.getObject().asResource());
+                                    }
+                                }
+
                                 if (unionmodelbaseprofilesshacl.listStatements(assocRangeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
                                     concreteClasses.add(assocRangeRes);
                                 }
@@ -1751,6 +1870,23 @@ public class ShaclTools {
                                         concreteClasses.add(assocRangeRes2nd);
                                     }
                                 }
+                                if (baseprofilesshaclglag3rd == 1) {
+                                    if (unionmodelbaseprofilesshacl.listStatements(assocRangeRes3rd, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
+                                        concreteClasses.add(assocRangeRes3rd);
+                                    }
+                                }
+
+                                if (baseprofilesshaclignorens == 1){//check if the class exists in the base profiles
+                                    //get all classes and check their local name
+                                    for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(null, OWL2.members, (RDFNode) null); i.hasNext(); ) {
+                                        Statement stmtinheritanceign = i.next();
+                                        if (stmtinheritanceign.getSubject().getLocalName().equals(assocRangeRes.getLocalName())) {
+                                            concreteClasses.add(stmtinheritanceign.getObject().asResource());
+                                        }
+                                    }
+                                }
+
+
                                 if (concreteClasses.isEmpty()) { //it means that there are no child classes and then it needs to be checked if the class is concrete in the base data
                                     if (unionmodelbaseprofilesshacl.listStatements(assocRangeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
                                         concreteClasses.add(assocRangeRes);
@@ -1764,11 +1900,23 @@ public class ShaclTools {
                                             if (unionmodelbaseprofilesshacl.listStatements(assocRangeRes2nd, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
                                                 concreteClasses.add(assocRangeRes2nd);
                                             } else {
-                                                System.out.println("WARNING: The class " + assocRangeRes2nd.toString() + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                                System.out.println("WARNING: The class " + assocRangeRes2nd + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
                                                 concreteClasses.add(assocRangeRes2nd);
                                             }
                                         }
                                     }
+                                    if (baseprofilesshaclglag3rd == 1) {
+                                        assert assocRangeRes3rd != null;
+                                        if (assocRangeRes3rd.getNameSpace().equals(cim3URI)) {
+                                            if (unionmodelbaseprofilesshacl.listStatements(assocRangeRes3rd, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
+                                                concreteClasses.add(assocRangeRes3rd);
+                                            } else {
+                                                System.out.println("WARNING: The class " + assocRangeRes3rd + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                                concreteClasses.add(assocRangeRes3rd);
+                                            }
+                                        }
+                                    }
+
                                 }
                             }
 
@@ -1782,28 +1930,72 @@ public class ShaclTools {
                             propertyNodeFeatures.set(11, classFullURI);
 
                             shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
-                        } else {
+                        } else { // if it is abstract class
                             concreteClasses = new LinkedList<>();
-                            String abstractclass = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(9).toString();
+                            String abstractclass = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString();
                             Resource abstractclassRes = ResourceFactory.createResource(abstractclass);
+                            Resource abstractclassResBase = null;
                             Resource abstractclassRes2nd = null;
+                            Resource abstractclassRes3rd = null;
+
+                            if (baseprofilesshaclglag == 1) {
+                                if (abstractclassRes.getNameSpace().equals(cimURI)) {
+                                    abstractclassResBase = ResourceFactory.createResource(cimURI + abstractclassRes.getLocalName());
+                                } else if (abstractclassRes.getNameSpace().equals(cim2URI)) {
+                                    abstractclassResBase = ResourceFactory.createResource(cim2URI + abstractclassRes.getLocalName());
+                                } else if (abstractclassRes.getNameSpace().equals(cim3URI)) {
+                                    abstractclassResBase = ResourceFactory.createResource(cim3URI + abstractclassRes.getLocalName());
+                                } else {
+                                    abstractclassResBase = abstractclassRes;
+                                }
+                            }
+
                             if (baseprofilesshaclglag2nd == 1){
                                 if (abstractclassRes.getNameSpace().equals(cimURI)) {
+                                    abstractclassRes2nd = ResourceFactory.createResource(cimURI + abstractclassRes.getLocalName());
+                                } else if (abstractclassRes.getNameSpace().equals(cim2URI)) {
                                     abstractclassRes2nd = ResourceFactory.createResource(cim2URI + abstractclassRes.getLocalName());
-                                }else{
+                                } else if (abstractclassRes.getNameSpace().equals(cim3URI)) {
+                                    abstractclassRes2nd = ResourceFactory.createResource(cim3URI + abstractclassRes.getLocalName());
+                                } else {
                                     abstractclassRes2nd = abstractclassRes;
                                 }
                             }
+
+                            if (baseprofilesshaclglag3rd == 1){
+                                if (abstractclassRes.getNameSpace().equals(cimURI)) {
+                                    abstractclassRes3rd = ResourceFactory.createResource(cimURI + abstractclassRes.getLocalName());
+                                } else if (abstractclassRes.getNameSpace().equals(cim2URI)) {
+                                    abstractclassRes3rd = ResourceFactory.createResource(cim2URI + abstractclassRes.getLocalName());
+                                } else if (abstractclassRes.getNameSpace().equals(cim3URI)) {
+                                    abstractclassRes3rd = ResourceFactory.createResource(cim3URI + abstractclassRes.getLocalName());
+                                } else {
+                                    abstractclassRes3rd = abstractclassRes;
+                                }
+                            }
+
                             if (baseprofilesshaclglag == 1) {
                                 // get the class URI at position 9; then search for this class in the unionmodelbaseprofilesshaclinheritanceonly and find all OWL2 members; store these members in List<Resource> concreteClasses
                                 for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(abstractclassRes, OWL2.members, (RDFNode) null); i.hasNext(); ) {
                                     Statement stmtinheritance = i.next();
                                     concreteClasses.add(stmtinheritance.getObject().asResource());
                                 }
+
+                                for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(abstractclassResBase, OWL2.members, (RDFNode) null); i.hasNext(); ) {
+                                    Statement stmtinheritanceB = i.next();
+                                    concreteClasses.add(stmtinheritanceB.getObject().asResource());
+                                }
+
                                 if (baseprofilesshaclglag2nd == 1){
                                     for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(abstractclassRes2nd, OWL2.members, (RDFNode) null); i.hasNext(); ) {
                                         Statement stmtinheritance2 = i.next();
                                         concreteClasses.add(stmtinheritance2.getObject().asResource());
+                                    }
+                                }
+                                if (baseprofilesshaclglag3rd == 1){
+                                    for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(abstractclassRes3rd, OWL2.members, (RDFNode) null); i.hasNext(); ) {
+                                        Statement stmtinheritance3 = i.next();
+                                        concreteClasses.add(stmtinheritance3.getObject().asResource());
                                     }
                                 }
                                 if (unionmodelbaseprofilesshacl.listStatements(abstractclassRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
@@ -1814,6 +2006,22 @@ public class ShaclTools {
                                         concreteClasses.add(abstractclassRes2nd);
                                     }
                                 }
+                                if (baseprofilesshaclglag3rd == 1) {
+                                    if (unionmodelbaseprofilesshacl.listStatements(abstractclassRes3rd, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
+                                        concreteClasses.add(abstractclassRes3rd);
+                                    }
+                                }
+
+                                if (baseprofilesshaclignorens == 1){//check if the class exists in the base profiles
+                                    //get all classes and check their local name
+                                    for (StmtIterator i = unionmodelbaseprofilesshaclinheritanceonly.listStatements(null, OWL2.members, (RDFNode) null); i.hasNext(); ) {
+                                        Statement stmtinheritanceign = i.next();
+                                        if (stmtinheritanceign.getSubject().getLocalName().equals(abstractclassRes.getLocalName())) {
+                                            concreteClasses.add(stmtinheritanceign.getObject().asResource());
+                                        }
+                                    }
+                                }
+
                                 if (concreteClasses.isEmpty()) { //it means that there are no child classes and then it needs to be checked if the class is concrete in the base data
                                     if (unionmodelbaseprofilesshacl.listStatements(abstractclassRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
                                         concreteClasses.add(abstractclassRes);
@@ -1829,6 +2037,17 @@ public class ShaclTools {
                                             } else {
                                                 System.out.println("WARNING: The class " + cim2URI + abstractclassRes.getLocalName() + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
                                                 concreteClasses.add(abstractclassRes2nd);
+                                            }
+                                        }
+                                    }
+                                    if (baseprofilesshaclglag3rd == 1){
+                                        assert abstractclassRes3rd != null;
+                                        if (abstractclassRes3rd.getNameSpace().equals(cim2URI)) {
+                                            if (unionmodelbaseprofilesshacl.listStatements(abstractclassRes3rd, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#concrete")).hasNext()) {
+                                                concreteClasses.add(abstractclassRes3rd);
+                                            } else {
+                                                System.out.println("WARNING: The class " + cim2URI + abstractclassRes.getLocalName() + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                                concreteClasses.add(abstractclassRes3rd);
                                             }
                                         }
                                     }
@@ -1854,8 +2073,8 @@ public class ShaclTools {
                     }else{ // this is for cardinality of inverse associations
                         if (shaclflaginverse==1) {
                             propertyNodeFeatures.set(0, "cardinality");
-                            String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                            String localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
+                            String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(6).toString();
+                            String localNameAssoc = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
                             propertyNodeFeatures.set(5, cardinality);
                             Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
                             propertyNodeFeatures.set(1, "Association with cardinality violation at the inverse direction.");
@@ -1864,21 +2083,23 @@ public class ShaclTools {
                             propertyNodeFeatures.set(4, "Violation");
                             propertyNodeFeatures.set(8, atas - 1); // this is the order
                             propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
-                            propertyNodeFeatures.set(10, ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10).toString()); // this is the inverse role name
+                            propertyNodeFeatures.set(10, ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString()); // this is the inverse role name
                             propertyNodeFeatures.set(11, "Inverse");
 
-                            String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
+                            String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
 
                             shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
                         }
                     }
 
-                } else if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
+                } else if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).getFirst().toString().equals("Attribute")) {//if it is an attribute
 
                     Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
-                    String localNameAttr = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(4).toString();
-                    String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(1).toString();
+                    String localNameAttr = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(4).toString();
+                    String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString();
 
+
+                    //need to check if the class has any subclasses in the base profiles, if it has then the property shape should appear on the subclasses
                     if (excludeMRID) { // user selects that mRID should be skipped for description classes
                         if (classDescripStereo) { //the class is stereotyped description
                             if (!localNameAttr.equals("IdentifiedObject.mRID")){ //the attribute is not mRID
@@ -1893,8 +2114,8 @@ public class ShaclTools {
 
                     //check if the attribute is datatype, if yes the whole structure of the compound should be checked and property nodes should be created
                     // for each attribute of the compound
-                    if (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(8).toString().equals("Compound")) {
-                        ArrayList shapeDataCompound = ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10));
+                    if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString().equals("Compound")) {
+                        ArrayList<?> shapeDataCompound = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10));
                         shapeModel = addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompound, nsURIprofile, nodeShapeResource, localNameAttr, propertyFullURI);
                     }
 
@@ -1902,18 +2123,19 @@ public class ShaclTools {
             }
         }
 
+
         return shapeModel;
     }
 
     //adds the PropertyNode for attribute for compound.
-    public static Model addPropertyNodeForAttributeCompound(Model shapeModel, ArrayList<Object> propertyNodeFeatures, ArrayList shapeDataCompound,String nsURIprofile, Resource nodeShapeResource, String localNameAttr,String propertyFullURI){
+    public static Model addPropertyNodeForAttributeCompound(Model shapeModel, ArrayList<Object> propertyNodeFeatures, ArrayList<?> shapeDataCompound,String nsURIprofile, Resource nodeShapeResource, String localNameAttr,String propertyFullURI){
 
             for (int atasComp = 0; atasComp < shapeDataCompound.size(); atasComp++) {
-                String localNameAttrComp = ((ArrayList) shapeDataCompound.get(atasComp)).get(4).toString();
-                String propertyFullURIComp = ((ArrayList) shapeDataCompound.get(atasComp)).get(1).toString();
+                String localNameAttrComp = ((ArrayList<?>) shapeDataCompound.get(atasComp)).get(4).toString();
+                String propertyFullURIComp = ((ArrayList<?>) shapeDataCompound.get(atasComp)).get(1).toString();
                 shapeModel= addPropertyNodeForAttributeSingleCompound(shapeModel, propertyNodeFeatures, shapeDataCompound, nsURIprofile,atasComp, nodeShapeResource,localNameAttrComp,propertyFullURIComp);
-                if (((ArrayList) shapeDataCompound.get(atasComp)).get(8).toString().equals("Compound")) {
-                    ArrayList shapeDataCompoundDeep = ((ArrayList) ((ArrayList) shapeDataCompound.get(atasComp)).get(10));
+                if (((ArrayList<?>) shapeDataCompound.get(atasComp)).get(8).toString().equals("Compound")) {
+                    ArrayList<?> shapeDataCompoundDeep = ((ArrayList<?>) ((ArrayList<?>) shapeDataCompound.get(atasComp)).get(10));
                     shapeModel= addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompoundDeep, nsURIprofile, nodeShapeResource, localNameAttrComp,propertyFullURIComp);
 
                 }
@@ -1925,10 +2147,10 @@ public class ShaclTools {
     }
 
     //adds the PropertyNode for attribute. It runs one time for a regular attribute and it is reused multiple times for Compound
-    public static Model addPropertyNodeForAttributeSingleCompound(Model shapeModel, ArrayList<Object> propertyNodeFeatures, ArrayList shapeData,String nsURIprofile, Integer atas, Resource nodeShapeResource, String localNameAttr,String propertyFullURI){
+    public static Model addPropertyNodeForAttributeSingleCompound(Model shapeModel, ArrayList<Object> propertyNodeFeatures, ArrayList<?> shapeData,String nsURIprofile, Integer atas, Resource nodeShapeResource, String localNameAttr,String propertyFullURI){
         //Cardinality check
         propertyNodeFeatures.set(0, "cardinality");
-        String cardinality = ((ArrayList) shapeData.get(atas)).get(5).toString();
+        String cardinality = ((ArrayList<?>) shapeData.get(atas)).get(5).toString();
         propertyNodeFeatures.set(5, cardinality);
         propertyNodeFeatures.set(1, "Missing required attribute.");
         propertyNodeFeatures.set(2, localNameAttr + "-cardinality");
@@ -1939,7 +2161,7 @@ public class ShaclTools {
 
         boolean skip=false;
         try {
-            List pathCompound = (List) ((ArrayList) shapeData.get(atas)).get(11);
+            List pathCompound = (List) ((ArrayList<?>) shapeData.get(atas)).get(11);
             propertyNodeFeatures.set(13, pathCompound);
         }catch(Exception e){
             skip=true;
@@ -1955,9 +2177,9 @@ public class ShaclTools {
             propertyNodeFeatures.set(0, "datatype");
             propertyNodeFeatures.set(8, atas - 1); // this is the order
             propertyNodeFeatures.set(9, nsURIprofile + "DatatypesGroup"); // this is the group
-            switch (((ArrayList) shapeData.get(atas)).get(8).toString()) {
+            switch (((ArrayList<?>) shapeData.get(atas)).get(8).toString()) {
                 case "Primitive": {
-                    String datatypePrimitive = ((ArrayList) shapeData.get(atas)).get(10).toString(); //this is localName e.g. String
+                    String datatypePrimitive = ((ArrayList<?>) shapeData.get(atas)).get(10).toString(); //this is localName e.g. String
 
                     propertyNodeFeatures.set(6, datatypePrimitive);
                     propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
@@ -1965,7 +2187,7 @@ public class ShaclTools {
                     break;
                 }
                 case "CIMDatatype": {
-                    String datatypePrimitive = ((ArrayList) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
+                    String datatypePrimitive = ((ArrayList<?>) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
 
                     propertyNodeFeatures.set(6, datatypePrimitive);
                     propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
@@ -1973,7 +2195,7 @@ public class ShaclTools {
                     break;
                 }
                 case "Compound": {
-                    String datatypeCompound = ((ArrayList) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
+                    String datatypeCompound = ((ArrayList<?>) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
 
                     propertyNodeFeatures.set(6, "Compound");
                     propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");
@@ -1984,7 +2206,7 @@ public class ShaclTools {
                     propertyNodeFeatures.set(6, "Enumeration");
                     propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is an enumerated value which is not part of the enumeration.");
                     //this adds the structure which is a list of possible enumerated values
-                    propertyNodeFeatures.set(7, ((ArrayList) shapeData.get(atas)).get(10));
+                    propertyNodeFeatures.set(7, ((ArrayList<?>) shapeData.get(atas)).get(10));
                     break;
             }
             shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI);
@@ -1994,10 +2216,10 @@ public class ShaclTools {
     }
 
     //adds the PropertyNode for attribute. It runs one time for a regular attribute and it is reused multiple times for Compound
-    public static Model addPropertyNodeForAttributeSingle(Model shapeModel, ArrayList<Object> propertyNodeFeatures, ArrayList shapeData,String nsURIprofile, Integer cl, Integer atas, Resource nodeShapeResource, String localNameAttr,String propertyFullURI){
+    public static Model addPropertyNodeForAttributeSingle(Model shapeModel, ArrayList<Object> propertyNodeFeatures, ArrayList<?> shapeData,String nsURIprofile, Integer cl, Integer atas, Resource nodeShapeResource, String localNameAttr,String propertyFullURI){
         //Cardinality check
         propertyNodeFeatures.set(0, "cardinality");
-        String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
+        String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
         propertyNodeFeatures.set(5, cardinality);
         propertyNodeFeatures.set(1, "Missing required property (attribute).");
         propertyNodeFeatures.set(2, localNameAttr + "-cardinality");
@@ -2012,9 +2234,9 @@ public class ShaclTools {
         propertyNodeFeatures.set(0, "datatype");
         propertyNodeFeatures.set(8, atas - 1); // this is the order
         propertyNodeFeatures.set(9, nsURIprofile + "DatatypesGroup"); // this is the group
-        switch (((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(8).toString()) {
+        switch (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString()) {
             case "Primitive": {
-                String datatypePrimitive = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
+                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
 
                 propertyNodeFeatures.set(6, datatypePrimitive);
                 propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
@@ -2022,7 +2244,7 @@ public class ShaclTools {
                 break;
             }
             case "CIMDatatype": {
-                String datatypePrimitive = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
 
                 propertyNodeFeatures.set(6, datatypePrimitive);
                 propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
@@ -2030,7 +2252,7 @@ public class ShaclTools {
                 break;
             }
             case "Compound": {
-                String datatypeCompound = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+                String datatypeCompound = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
 
                 propertyNodeFeatures.set(6, "Compound");
                 propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");
@@ -2041,7 +2263,7 @@ public class ShaclTools {
                 propertyNodeFeatures.set(6, "Enumeration");
                 propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is enumerated value not part of the profile.");
                 //this adds the structure which is a list of possible enumerated values
-                propertyNodeFeatures.set(7, ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10));
+                propertyNodeFeatures.set(7, ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10));
                 break;
         }
         shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI);

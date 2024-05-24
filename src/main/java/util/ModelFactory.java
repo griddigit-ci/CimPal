@@ -52,8 +52,11 @@ public class ModelFactory {
                     prefixMap.remove("cim");
                     String cim2Pref = switch (cim2URI) {
                         case "http://iec.ch/TC57/2013/CIM-schema-cim16#" -> "cim16";
+                        case "https://iec.ch/TC57/2013/CIM-schema-cim16#" -> "cim16";
                         case "http://iec.ch/TC57/CIM100#" -> "cim17";
+                        case "https://iec.ch/TC57/CIM100#" -> "cim17";
                         case "http://cim.ucaiug.io/ns#" -> "cim18";
+                        case "https://cim.ucaiug.io/ns#" -> "cim18";
                         default -> throw new IllegalStateException("Unexpected value: " + cim2URI);
                     };
                     model.setNsPrefix(cim2Pref, cim2URI);
