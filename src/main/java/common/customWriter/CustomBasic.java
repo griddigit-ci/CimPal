@@ -314,7 +314,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 if (r.getURI().contains("delete")) {
                     writer.print(
                             rdfAt("resource")
-                                    + "=#"
+                                    + "="
                                     + substitutedAttribute("#_"+r.getURI().split("_",2)[1]));
                 }else{
                 writer.print(
