@@ -6,6 +6,7 @@
  */
 package common.customWriter;
 
+import org.apache.jena.base.Sys;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.rdf.model.impl.Util;
 import org.apache.jena.shared.PropertyNotFoundException;
@@ -112,13 +113,19 @@ public class CustomBasic extends CustomBaseXMLWriter {
             }
             Set<Map.Entry<String,RDFNode> > entries
                     = listObjectsMap.entrySet();
+            Set<String> writenStatements = new HashSet<>();
             for (Map.Entry<String, RDFNode> entry : entries) {
 
                 StmtIterator stmtIter = model.listStatements(null, null, entry.getValue());
                 while (stmtIter.hasNext()) {
                     Statement nextStatement = stmtIter.nextStatement();
                     //writePredicate(nextStatement, writer);
-                    writeRDFStatements(model, nextStatement.getSubject(), writer);
+                    if (!writenStatements.contains(nextStatement.getSubject().toString())){
+                        writeRDFStatements(model, nextStatement.getSubject(), writer);
+                        writenStatements.add(nextStatement.getSubject().toString());
+                    }
+                    else
+                        System.out.println(nextStatement.getSubject().toString());
                 }
                 //writeRDFStatements(model, entry.getValue(), writer);
 

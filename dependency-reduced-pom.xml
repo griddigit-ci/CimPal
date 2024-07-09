@@ -17,7 +17,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.5.1</version>
+        <version>3.5.3</version>
         <executions>
           <execution>
             <phase>package</phase>
@@ -107,6 +107,13 @@
       </plugin>
     </plugins>
   </build>
+  <repositories>
+    <repository>
+      <id>maven_central</id>
+      <name>Maven Central</name>
+      <url>https://repo.maven.apache.org/maven2/</url>
+    </repository>
+  </repositories>
   <dependencies>
     <dependency>
       <groupId>org.apache.jena</groupId>
@@ -122,7 +129,7 @@
     <launch4j.version>2.5.0</launch4j.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <log4j.version>2.12.1</log4j.version>
-    <javafx.version>22</javafx.version>
+    <javafx.version>22.0.1</javafx.version>
     <jdk.version>21</jdk.version>
   </properties>
 </project>
