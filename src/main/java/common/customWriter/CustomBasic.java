@@ -124,8 +124,6 @@ public class CustomBasic extends CustomBaseXMLWriter {
                         writeRDFStatements(model, nextStatement.getSubject(), writer);
                         writenStatements.add(nextStatement.getSubject().toString());
                     }
-                    else
-                        System.out.println(nextStatement.getSubject().toString());
                 }
                 //writeRDFStatements(model, entry.getValue(), writer);
 
