@@ -13,23 +13,22 @@ import org.apache.jena.riot.adapters.AdapterRDFWriter;
 /**
  * Custom wrapper to RDF/XML writers (preRIOT).
  */
-public class RDFXMLCustomWriter extends AdapterRDFWriter
-{
+public class RDFXMLCustomWriter extends AdapterRDFWriter {
     private final boolean isPretty;
 
-    public RDFXMLCustomWriter() { this(false); }
+    public RDFXMLCustomWriter() {
+        this(false);
+    }
 
-    public RDFXMLCustomWriter(boolean isPretty)
-    {
+    public RDFXMLCustomWriter(boolean isPretty) {
         this.isPretty = isPretty;
     }
 
     @Override
     protected RDFWriterI create() {
-        if(isPretty) {
+        if (isPretty) {
             return new CustomBasicPretty();
-        }
-        else {
+        } else {
             return new CustomBasic();
         }
 

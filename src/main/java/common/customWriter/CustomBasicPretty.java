@@ -15,66 +15,64 @@ import java.util.TreeMap;
 
 /**
  * similar to {@link CustomBasic}. Prints the plain result with the rdf:Description replaced
- *
  */
 public class CustomBasicPretty extends CustomBasic {
 
     @Override
     protected void writeRDFStatements
-            (Model model, Resource subject, PrintWriter writer )
-    {
-        if(performedPleasingObjects.contains(subject)) { return; }
+            (Model model, Resource subject, PrintWriter writer) {
+        if (performedPleasingObjects.contains(subject)) {
+            return;
+        }
 
         Statement typeStatement = getType(subject);
-        StmtIterator sIter = model.listStatements( subject, null, (RDFNode) null );
+        StmtIterator sIter = model.listStatements(subject, null, (RDFNode) null);
         boolean isDescription = typeStatement == null;
 
-        if(isDescription) {
+        if (isDescription) {
             if (this.sortRDF.equals("true")) {
                 writeDescriptionHeader(subject, writer);
                 //get list of all triples of the rdf:type and these need to be sorted by object
-                Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject,this.sortRDFprefix);
+                Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject, this.sortRDFprefix);
                 for (Map.Entry<String, Property> entry : entries) {
                     StmtIterator stmtIter = model.listStatements(subject, entry.getValue(), (RDFNode) null);
                     while (stmtIter.hasNext()) {
                         Statement nextStatement = stmtIter.nextStatement();
-                            writePredicate(nextStatement, writer);
+                        writePredicate(nextStatement, writer);
                     }
                 }
                 writeDescriptionTrailer(subject, writer);
-            }else {
+            } else {
                 writeDescriptionHeader(subject, writer);
                 while (sIter.hasNext()) writePredicate(sIter.nextStatement(), writer);
                 writeDescriptionTrailer(subject, writer);
             }
-        }
-        else {
+        } else {
 
-            if (this.sortRDF.equals("true")){
+            if (this.sortRDF.equals("true")) {
                 writePrettyDescriptionHeader(subject, typeStatement, writer);
                 //get list of all triples of the rdf:type and these need to be sorted by object
-                Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject,this.sortRDFprefix);
+                Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject, this.sortRDFprefix);
                 for (Map.Entry<String, Property> entry : entries) {
-                    StmtIterator stmtIter = model.listStatements(subject,entry.getValue(),(RDFNode) null);
+                    StmtIterator stmtIter = model.listStatements(subject, entry.getValue(), (RDFNode) null);
                     while (stmtIter.hasNext()) {
                         Statement nextStatement = stmtIter.nextStatement();
-                        if (!typeStatement.equals(nextStatement)){    //skip type statement
+                        if (!typeStatement.equals(nextStatement)) {    //skip type statement
                             writePredicate(nextStatement, writer);
                         }
                     }
                 }
-            }else {
+            } else {
                 writePrettyDescriptionHeader(subject, typeStatement, writer);
-                while (sIter.hasNext())
-                {
+                while (sIter.hasNext()) {
                     Statement nextStatement = sIter.nextStatement();
-                    if(!typeStatement.equals(nextStatement))    //skip type statement
+                    if (!typeStatement.equals(nextStatement))    //skip type statement
                     {
                         writePredicate(nextStatement, writer);
                     }
                 }
             }
-            writePrettyDescriptionTrailer( subject, typeStatement, writer );
+            writePrettyDescriptionTrailer(subject, typeStatement, writer);
         }
     }
 
@@ -85,24 +83,22 @@ public class CustomBasicPretty extends CustomBasic {
         for (Statement stmt : listStatements) {
             if (sortRDFprefix.equals("true")) {
                 listPredicateMap.put(model.getNsURIPrefix(stmt.getPredicate().getNameSpace()) + ":" + stmt.getPredicate().getLocalName(), stmt.getPredicate());
-            }else{
+            } else {
                 listPredicateMap.put(stmt.getPredicate().getLocalName(), stmt.getPredicate());
             }
         }
         return listPredicateMap.entrySet();
     }
 
-    protected void writePrettyDescriptionHeader( Resource subject, Statement stmt, PrintWriter writer)
-    {
+    protected void writePrettyDescriptionHeader(Resource subject, Statement stmt, PrintWriter writer) {
         Resource r = stmt.getResource();
-        writer.print( space + "<" + startElementTag(r.getNameSpace(), r.getLocalName()) + " " );
-        writeResourceId( subject, writer );
-        writer.println( ">" );
+        writer.print(space + "<" + startElementTag(r.getNameSpace(), r.getLocalName()) + " ");
+        writeResourceId(subject, writer);
+        writer.println(">");
     }
 
-    protected void writePrettyDescriptionTrailer( Resource subject, Statement stmt, PrintWriter writer )
-    {
+    protected void writePrettyDescriptionTrailer(Resource subject, Statement stmt, PrintWriter writer) {
         Resource r = stmt.getResource();
-        writer.println( space + "</" + endElementTag(r.getNameSpace(), r.getLocalName()) + ">" );
+        writer.println(space + "</" + endElementTag(r.getNameSpace(), r.getLocalName()) + ">");
     }
 }

@@ -14,11 +14,10 @@ import org.apache.jena.riot.RDFWriterRegistry;
 
 /**
  * extends {@link RDFFormat} by new custom formats
- *
  */
 public class CustomRDFFormat extends RDFFormat {
-    public static final RDFFormatVariant CUSTOM_PLAIN_PRETTY         = new RDFFormatVariant("custom_plain_pretty") ;
-    public static final RDFFormatVariant CUSTOM_PLAIN          = new RDFFormatVariant("custom_plain") ;
+    public static final RDFFormatVariant CUSTOM_PLAIN_PRETTY = new RDFFormatVariant("custom_plain_pretty");
+    public static final RDFFormatVariant CUSTOM_PLAIN = new RDFFormatVariant("custom_plain");
 
     public static final RDFFormat RDFXML_CUSTOM_PLAIN = new RDFFormat(Lang.RDFXML, CUSTOM_PLAIN);
     public static final RDFFormat RDFXML_CUSTOM_PLAIN_PRETTY = new RDFFormat(Lang.RDFXML, CUSTOM_PLAIN_PRETTY);
@@ -34,8 +33,7 @@ public class CustomRDFFormat extends RDFFormat {
     /**
      * registers the factories for the custom formats
      */
-    public static void RegisterCustomFormatWriters()
-    {
+    public static void RegisterCustomFormatWriters() {
         RDFWriterRegistry.register(Lang.RDFXML, CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         RDFWriterRegistry.register(CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY, new RDFXMLCustomWriterFactory());
         RDFWriterRegistry.register(Lang.RDFXML, CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
