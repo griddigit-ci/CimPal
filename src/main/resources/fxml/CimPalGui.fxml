@@ -314,6 +314,7 @@
                                  <Label minWidth="90.0" text="Operations options:" wrapText="true" />
                                  <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" text="Union model" wrapText="true" />
                                  <CheckBox fx:id="fcbRDFconvertModelUnionDetailed" mnemonicParsing="false" text="Union model detailed" wrapText="true" />
+                                 <CheckBox fx:id="fcbRDFconvertFixPackage" mnemonicParsing="false" text="Fix RDFS Package Assignment" wrapText="true" />
                                  <CheckBox fx:id="fcbRDFConvertInheritanceOnly" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceOnly" text="Process only inheritance related properties" wrapText="true" />
                                  <CheckBox fx:id="fcbRDFConverInheritanceList" disable="true" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceList" text="Generate inheritance list in Turtle" wrapText="true" />
                                  <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" text="Inherited members - only concrete classes" wrapText="true" />

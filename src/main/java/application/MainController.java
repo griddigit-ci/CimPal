@@ -250,6 +250,8 @@ public class MainController implements Initializable {
     private CheckBox fcbRDFconvertInstanceData;
     @FXML
     private ChoiceBox fcbRDFsortOptions;
+    @FXML
+    private CheckBox fcbRDFconvertFixPackage;
 
 
     public static File rdfModel1;
@@ -1500,10 +1502,11 @@ public class MainController implements Initializable {
         boolean inheritanceListConcrete = fcbRDFConverInheritanceListConcrete.isSelected();
 
         boolean addowl = fcbRDFConveraddowl.isSelected();
+        boolean modelUnionFixPackage = fcbRDFconvertFixPackage.isSelected();
 
         RdfConvert.rdfConversion(MainController.rdfConvertFile, MainController.rdfConvertFileList, sourceFormat,
                 targetFormat, xmlBase, rdfFormat, showXmlDeclaration, showDoctypeDeclaration, tab,
-                relativeURIs, modelUnionFlag, inheritanceOnly, inheritanceList, inheritanceListConcrete, addowl, modelUnionFlagDetailed, sortRDF, rdfSortOptions, stripPrefixes, convertInstanceData);
+                relativeURIs, modelUnionFlag, inheritanceOnly, inheritanceList, inheritanceListConcrete, addowl, modelUnionFlagDetailed, sortRDF, rdfSortOptions, stripPrefixes, convertInstanceData,modelUnionFixPackage);
 
         progressBar.setProgress(1);
     }

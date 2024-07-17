@@ -25,7 +25,7 @@ public class RdfConvert {
     public static void rdfConversion(File file, List<File> files, String sourceFormat, String targetFormat, String xmlBase, RDFFormat rdfFormat,
                                      String showXmlDeclaration, String showDoctypeDeclaration, String tab, String relativeURIs, Boolean modelUnionFlag,
                                      Boolean inheritanceOnly, Boolean inheritanceList, Boolean inheritanceListConcrete, Boolean addowl, Boolean modelUnionFlagDetailed,
-                                     String sortRDF, String rdfSortOptions, boolean stripPrefixes, String convertInstanceData) throws IOException {
+                                     String sortRDF, String rdfSortOptions, boolean stripPrefixes, String convertInstanceData, Boolean modelUnionFixPackage) throws IOException {
 
         Lang rdfSourceFormat = switch (sourceFormat) {
             case "RDF XML (.rdf or .xml)" -> Lang.RDFXML;
@@ -256,6 +256,38 @@ public class RdfConvert {
             for (Map.Entry<String, String> entryTR : entryToRemove) {
                 model.removeNsPrefix(entryTR.getKey());
             }
+        }
+
+        if (modelUnionFixPackage) {
+            //add package statements
+            String packageName = "";
+            String packageURI = "";
+            for (StmtIterator i = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")); i.hasNext(); ) {
+                Statement stmt = i.next();
+                for (StmtIterator k = model.listStatements(stmt.getSubject(), null, (RDFNode) null); k.hasNext(); ) {
+                    Statement stmtP = k.next();
+                    if (stmtP.getPredicate().equals(DCAT.keyword)) {
+                        packageName = stmtP.getObject().asLiteral().getString();
+                        packageURI = stmtP.getSubject().getNameSpace();
+                    }
+                }
+            }
+            Resource packageRes = ResourceFactory.createResource(packageURI+"Package_"+packageName+"Profile");
+            model.add(ResourceFactory.createStatement(packageRes, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory")));
+            model.add(ResourceFactory.createStatement(packageRes,RDFS.comment,ResourceFactory.createPlainLiteral("This is a package for the "+packageName+" profile.")));
+            model.add(ResourceFactory.createStatement(packageRes,RDFS.label,ResourceFactory.createLangLiteral(packageName+"Profile","en")));
+
+            //replace cims:belongsToCategory
+            List<Statement> stmtToAddPackage = new LinkedList<>();
+            List<Statement> stmtToDeletePackage = new LinkedList<>();
+            Property belongsToCategory = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","belongsToCategory");
+            for (StmtIterator i = model.listStatements(null, belongsToCategory, (RDFNode) null); i.hasNext(); ) {
+                Statement stmt = i.next();
+                stmtToDeletePackage.add(stmt);
+                stmtToAddPackage.add(ResourceFactory.createStatement(stmt.getSubject(),belongsToCategory,ResourceFactory.createProperty(packageRes.toString())));
+            }
+            model.remove(stmtToDeletePackage);
+            model.add(stmtToAddPackage);
         }
 
 
