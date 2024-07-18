@@ -7,6 +7,7 @@
 package common.customWriter;
 
 import org.apache.jena.base.Sys;
+import org.apache.jena.datatypes.xsd.impl.XMLLiteralType;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.rdf.model.impl.Util;
 import org.apache.jena.shared.PropertyNotFoundException;
@@ -17,11 +18,11 @@ import java.io.PrintWriter;
 import java.util.*;
 
 /**
- * This is similar to {@link org.apache.jena.rdfxml.xmloutput.impl.Basic} some parts are copied.
+ * This is similar to {@link org.apache.jena.rdfxml.xmloutput.impl.RDFXML_Basic} some parts are copied.
  */
 public class CustomBasic extends CustomBaseXMLWriter {
     protected String space;
-    protected Resource types[] = new Resource[]{};
+    protected Resource[] types = new Resource[]{};
     protected Map<Resource, Set<Resource>> pleasingTypeMap = new HashMap<>();
     protected Set<Resource> performedPleasingObjects = new HashSet<>();
     protected Set<Resource> aboutRules = new HashSet<>();
@@ -100,9 +101,9 @@ public class CustomBasic extends CustomBaseXMLWriter {
     protected void writeRDFStatements(Model model, PrintWriter writer) {
         writePleasingRDFStatements(model, writer);
         if (this.sortRDF.equals("true")) {
+            Set<Statement> listStatements = model.listStatements(null, RDF.type, (RDFNode) null).toSet();
             if (this.instanceData.equals("true")) {
                 //get list of all triples of the rdf:type and these need to be sorted by object
-                Set<Statement> listStatements = model.listStatements(null, RDF.type, (RDFNode) null).toSet();
                 Map<String, RDFNode> listObjectsMap = new TreeMap<>();
                 for (Statement stmt : listStatements) {
                     if (sortRDFprefix.equals("true")) {
@@ -114,16 +115,16 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 }
                 Set<Map.Entry<String, RDFNode>> entries
                         = listObjectsMap.entrySet();
-                Set<String> writenStatements = new HashSet<>();
+                Set<Resource> writenStatements = new HashSet<>();
                 for (Map.Entry<String, RDFNode> entry : entries) {
 
                     StmtIterator stmtIter = model.listStatements(null, null, entry.getValue());
                     while (stmtIter.hasNext()) {
                         Statement nextStatement = stmtIter.nextStatement();
                         //writePredicate(nextStatement, writer);
-                        if (!writenStatements.contains(nextStatement.getSubject().toString())) {
+                        if (!writenStatements.contains(nextStatement.getSubject())) {
                             writeRDFStatements(model, nextStatement.getSubject(), writer);
-                            writenStatements.add(nextStatement.getSubject().toString());
+                            writenStatements.add(nextStatement.getSubject());
                         }
                     }
                 }
@@ -131,28 +132,27 @@ public class CustomBasic extends CustomBaseXMLWriter {
 
             } else {
                 //get list of all triples of the rdf:type and these need to be sorted by subject
-                Set<Statement> listStatements = model.listStatements(null, RDF.type, (RDFNode) null).toSet();
-                Map<String, RDFNode> listSubjectMap = new TreeMap<>();
+                Map<String, Resource> listSubjectMap = new TreeMap<>();
                 for (Statement stmt : listStatements) {
                     if (sortRDFprefix.equals("true")) {
-                        listSubjectMap.put(model.getNsURIPrefix(stmt.getSubject().asResource().getNameSpace()) + ":" + stmt.getSubject().asResource().getLocalName(), stmt.getSubject());
+                        listSubjectMap.put(model.getNsURIPrefix(stmt.getSubject().getNameSpace()) + ":" + stmt.getSubject().getLocalName(), stmt.getSubject());
                     } else {
-                        listSubjectMap.put(stmt.getSubject().asResource().getLocalName(), stmt.getSubject());
+                        listSubjectMap.put(stmt.getSubject().getLocalName(), stmt.getSubject());
                     }
 
                 }
-                Set<Map.Entry<String, RDFNode>> entries
+                Set<Map.Entry<String, Resource>> entries
                         = listSubjectMap.entrySet();
-                Set<String> writenStatements = new HashSet<>();
-                for (Map.Entry<String, RDFNode> entry : entries) {
+                Set<Resource> writenStatements = new HashSet<>();
+                for (Map.Entry<String, Resource> entry : entries) {
 
-                    StmtIterator stmtIter = model.listStatements(null, null, entry.getValue());
+                    StmtIterator stmtIter = model.listStatements(entry.getValue(), null,(RDFNode) null);
                     while (stmtIter.hasNext()) {
                         Statement nextStatement = stmtIter.nextStatement();
                         //writePredicate(nextStatement, writer);
-                        if (!writenStatements.contains(nextStatement.getSubject().toString())) {
+                        if (!writenStatements.contains(nextStatement.getSubject())) {
                             writeRDFStatements(model, nextStatement.getSubject(), writer);
-                            writenStatements.add(nextStatement.getSubject().toString());
+                            writenStatements.add(nextStatement.getSubject());
                         }
                     }
                 }
@@ -361,32 +361,53 @@ public class CustomBasic extends CustomBaseXMLWriter {
         }
     }
 
-    private boolean isWellFormedXML(Literal literal) {
-        String lexicalForm = literal.getLexicalForm();
-        try {
-            javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new org.xml.sax.InputSource(new java.io.StringReader(lexicalForm)));
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
+//    private boolean isWellFormedXML(Literal literal) {
+//        String lexicalForm = literal.getLexicalForm();
+//        try {
+//            javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new org.xml.sax.InputSource(new java.io.StringReader(lexicalForm)));
+//            return true;
+//        } catch (Exception e) {
+//            return false;
+//        }
+//    }
 
     protected void writeLiteral(Literal l, PrintWriter writer) {
         String lang = l.getLanguage();
         String form = l.getLexicalForm();
+        boolean isXML = XMLLiteralType.theXMLLiteralType.equals(l.getDatatype()); // new
+        String var10001;
         if (Util.isLangString(l)) {
-            writer.print(" xml:lang=" + attributeQuoted(lang));
-        } else if (isWellFormedXML(l) && !blockLiterals) {
-            // RDF XML Literals inline.
-            writer.print(" " + rdfAt("parseType") + "=" + attributeQuoted("Literal") + ">");
-            writer.print(form);
-            return;
+            //writer.print(" xml:lang=" + attributeQuoted(lang));
+            var10001 = this.attributeQuoted(lang);
+            writer.print(" xml:lang=" + var10001);
+            //start new
         } else {
-            // Datatype (if not xsd:string and RDF 1.1)
+            if (isXML && !this.blockLiterals) {
+                var10001 = this.rdfAt("parseType");
+                writer.print(" " + var10001 + "=" + this.attributeQuoted("Literal") + ">");
+                writer.print(form);
+                return;
+            }
+
             String dt = l.getDatatypeURI();
-            if (!Util.isSimpleString(l))
-                writer.print(" " + rdfAt("datatype") + "=" + substitutedAttribute(dt));
+            if (!Util.isSimpleString(l)) {
+                var10001 = this.rdfAt("datatype");
+                writer.print(" " + var10001 + "=" + this.substitutedAttribute(dt));
+            }
         }
+            //end new
+
+//        } else if (isWellFormedXML(l) && !blockLiterals) {
+//            // RDF XML Literals inline.
+//            writer.print(" " + rdfAt("parseType") + "=" + attributeQuoted("Literal") + ">");
+//            writer.print(form);
+//            return;
+//        } else {
+//            // Datatype (if not xsd:string and RDF 1.1)
+//            String dt = l.getDatatypeURI();
+//            if (!Util.isSimpleString(l))
+//                writer.print(" " + rdfAt("datatype") + "=" + substitutedAttribute(dt));
+//        }
         // Content.
         writer.print(">");
         writer.print(Util.substituteEntitiesInElementContent(form));

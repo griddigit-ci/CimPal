@@ -272,6 +272,18 @@ public class RdfConvert {
                     }
                 }
             }
+            //delete existing packages
+            List<Statement> stmtToDeleteOldPackage = new LinkedList<>();
+            for (StmtIterator i = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory")); i.hasNext(); ) {
+                Statement stmt = i.next();
+                for (StmtIterator k = model.listStatements(stmt.getSubject(), null, (RDFNode) null); k.hasNext(); ) {
+                    Statement stmtP = k.next();
+                    stmtToDeleteOldPackage.add(stmtP);
+                }
+            }
+            model.remove(stmtToDeleteOldPackage);
+
+            //add the new package
             Resource packageRes = ResourceFactory.createResource(packageURI+"Package_"+packageName+"Profile");
             model.add(ResourceFactory.createStatement(packageRes, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory")));
             model.add(ResourceFactory.createStatement(packageRes,RDFS.comment,ResourceFactory.createPlainLiteral("This is a package for the "+packageName+" profile.")));
