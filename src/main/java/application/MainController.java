@@ -379,6 +379,7 @@ public class MainController implements Initializable {
                 "Network Codes profiles,releases before 2.3",
                 "Network Codes profiles, release 2.3",
                 "IEC 61970-457:Ed2",
+                "LTDS profiles, release 1.0",
                 "Other"
         );
 
@@ -1437,8 +1438,7 @@ public class MainController implements Initializable {
         String targetFormat = ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString();
         //xmlBase
         String xmlBase = null;
-        //sort options
-        String sortOptions = fcbRDFsortOptions.getSelectionModel().getSelectedItem().toString();
+
         if (!frdfConvertXmlBase.getText().isBlank()) {
             xmlBase = frdfConvertXmlBase.getText();
         }
@@ -1456,6 +1456,13 @@ public class MainController implements Initializable {
                         throw new IllegalStateException("Unexpected value: " + fcbRDFformat.getSelectionModel().getSelectedItem().toString());
             };
         }
+
+        //sort options
+        String sortOptions="";
+        if (targetFormat.equals("RDF XML (.rdf or .xml)")) {
+            sortOptions = fcbRDFsortOptions.getSelectionModel().getSelectedItem().toString();
+        }
+
         String showXmlDeclaration = "false";
         if (targetFormat.equals("RDF XML (.rdf or .xml)") && fcbShowXMLDeclaration.isSelected()) {
             showXmlDeclaration = "true";
@@ -1854,6 +1861,8 @@ public class MainController implements Initializable {
                 profileVersion = 5; // Network Codes profiles, releases before 2.3
             } else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("Network Codes profiles, release 2.3")) {
                 profileVersion = 6; // Network Codes profiles, release 2.3
+            }else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("LTDS profiles, release 1.0")) {
+                profileVersion = 7; // LTDS profiles, release 1.0
             }
             if (cbApplyDefNsDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();
@@ -2121,6 +2130,42 @@ public class MainController implements Initializable {
                                     ((ArrayList) modelsNames).set(1, "sr");
                                     ((ArrayList) modelsNames).set(2, "http://cim-profile.ucaiug.io/grid/SimulationResults/Constraints/1.0#");
                                 }
+                                case "DLProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "dl");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints#");
+                                }
+                                case "EQProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "eq");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints#");
+                                }
+                                case "GLProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "gl");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints#");
+                                }
+                                case "SCProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "sc");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints#");
+                                }
+                                case "SSHProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "ssh");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints#");
+                                }
+                                case "SVProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "sv");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints#");
+                                }
+                                case "TPProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "tp");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints#");
+                                }
+                                case "LTDSShortCircuitResultProfile", "DocLTDSShortCircuitResultProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "scr");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints#");
+                                }
+                                case "LTDSSystemCapacityProfile", "DocLTDSSystemCapacityProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "syscap");
+                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints#");
+                                }
                             }
                         }
                     }
@@ -2360,6 +2405,24 @@ public class MainController implements Initializable {
                                         ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/SimulationSettings/Constraints/1.0");
                                 case "SimulationResultsProfile", "DocSimulationResultsProfile" ->
                                         ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/SimulationResults/Constraints/1.0");
+                                case "DLProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints");
+                                case "EQProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints");
+                                case "GLProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints");
+                                case "SCProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints");
+                                case "SSHProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints");
+                                case "SVProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints");
+                                case "TPProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints");
+                                case "LTDSShortCircuitResultProfile", "DocLTDSShortCircuitResultProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints");
+                                case "LTDSSystemCapacityProfile", "DocLTDSSystemCapacityProfile" ->
+                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints");
                             }
                         }
                     }
@@ -2708,7 +2771,27 @@ public class MainController implements Initializable {
                         for (Map.Entry<String, String> entryTR : entryToRemove) {
                             shapeModel.removeNsPrefix(entryTR.getKey());
                         }
+
+
+                        // Create a new HashMap to store the unique key-value pairs
+                        HashMap<String, String> uniqueMap = new HashMap<>();
+
+                        // Create a Set to track unique values
+                        Set<String> uniqueValues = new HashSet<>();
+
+                        //Iterate through the original HashMap
+                        Map<String, String> origPrefMap = shapeModel.getNsPrefixMap();
+                        for (Map.Entry<String, String> entry : origPrefMap.entrySet()) {
+                            if (uniqueValues.add(entry.getValue())) {
+                                // If the value was added to the set, it means it's unique
+                                uniqueMap.put(entry.getKey(), entry.getValue());
+                            }
+                        }
+                        //TODO check if there is cim just to avoid that cim was deleted instead of cim16,cim17 or cim18 in cases where the namespace was the same
+                        shapeModel.clearNsPrefixMap();
+                        shapeModel.setNsPrefixes(uniqueMap);
                         //}
+
 
                         //open the ChoiceDialog for the save file and save the file in different formats
                         String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).getFirst().toString();

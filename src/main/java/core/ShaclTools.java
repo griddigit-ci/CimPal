@@ -12,13 +12,15 @@ import javafx.stage.DirectoryChooser;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.datatypes.xsd.impl.RDFLangString;
+import org.apache.jena.enhanced.EnhGraph;
+import org.apache.jena.graph.GraphMemFactory;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.rdf.model.impl.PropertyImpl;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.SysRIOT;
+import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.sparql.util.Context;
-import org.apache.jena.vocabulary.OWL2;
-import org.apache.jena.vocabulary.RDF;
-import org.apache.jena.vocabulary.RDFS;
+import org.apache.jena.vocabulary.*;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
@@ -67,11 +69,11 @@ public class ShaclTools {
             LinkedList<Statement> subclassStatements = getSubClassesInheritance(model, unionmodelbaseprofilesshacl);
             model.add(subclassStatements);
         }
-        if (baseprofilesshaclglag == 1) {
+        if (baseprofilesshaclglag2nd == 1) {
             LinkedList<Statement> subclassStatements2nd = getSubClassesInheritance(model, unionmodelbaseprofilesshacl2nd);
             model.add(subclassStatements2nd);
         }
-        if (baseprofilesshaclglag == 1) {
+        if (baseprofilesshaclglag3rd == 1) {
             LinkedList<Statement> subclassStatements3rd = getSubClassesInheritance(model, unionmodelbaseprofilesshacl3rd);
             model.add(subclassStatements3rd);
         }
@@ -897,7 +899,7 @@ public class ShaclTools {
                                 r.addProperty(SH.severity, o8);
 
                                 //the 09 is the class - value type
-                                RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(0).toString());
+                                RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).getFirst().toString());
 
 
                                 r.addProperty(SH.message, "The node kind shall be IRI (rdf:resource is expected).");
@@ -1309,7 +1311,8 @@ public class ShaclTools {
             }else if (propertyNodeFeatures.get(11).toString().equals("Inverse")){
                 Resource resbn = ResourceFactory.createResource();
                 Statement stmtbn = ResourceFactory.createStatement(resbn, SH.inversePath, ResourceFactory.createProperty(propertyNodeFeatures.get(10).toString()));
-                r.addProperty(SH.path, JenaUtil.asProperty(resbn));
+                //r.addProperty(SH.path, JenaUtil.asProperty(resbn));
+                r.addProperty(SH.path, asProperty(resbn));
                 shapeModel.add(stmtbn);
             }
 
@@ -1324,6 +1327,10 @@ public class ShaclTools {
             r.addProperty(SH.severity, o8);
         }
         return shapeModel;
+    }
+
+    public static Property asProperty(Resource resource) {
+        return (Property)(resource instanceof Property ? (Property)resource : new PropertyImpl(resource.asNode(), (EnhGraph)resource.getModel()));
     }
 
     //add a PropertyGroup to a shape model including all necessary properties
@@ -1391,32 +1398,22 @@ public class ShaclTools {
 
 
         if (choiceDialog.resultProperty().getValue() != null) { //if OK button is selected
-            switch (choiceDialog.resultProperty().getValue().toString()) {
-                case "TURTLE":
-                    savedFile=fileSave(shapeModel, "TTL files", "*.ttl", RDFFormat.TURTLE, baseURI, dirOnly, title);
-                    break;
-                case "RDFXML":
-                    savedFile=fileSave(shapeModel, "XML files", "*.xml", RDFFormat.RDFXML, baseURI, dirOnly, title);
-                    break;
-                case "RDFXML_PLAIN":
-                    savedFile=fileSave(shapeModel, "XML files", "*.xml", RDFFormat.RDFXML_PLAIN, baseURI, dirOnly, title);
-                    break;
-                case "RDFXML_ABBREV":
-                    savedFile=fileSave(shapeModel, "XML files", "*.xml", RDFFormat.RDFXML_ABBREV, baseURI, dirOnly, title);
-                    break;
-                case "NTRIPLES":
-                    savedFile=fileSave(shapeModel, "N3 files", "*.nt", RDFFormat.NTRIPLES, baseURI, dirOnly, title);
-                    break;
-                case "JSONLD":
-                    savedFile=fileSave(shapeModel, "JSON-LD files", "*.jsonld", RDFFormat.JSONLD, baseURI, dirOnly, title);
-                    break;
-                case "N3":
-                    savedFile=fileSave(shapeModel, "N3 files", "*.nt", RDFFormat.NT, baseURI, dirOnly, title);
-                    break;
-                case "RDFJSON":
-                    savedFile= fileSave(shapeModel, "RDF JSON files", "*.rj", RDFFormat.RDFJSON, baseURI, dirOnly, title);
-                    break;
-            }
+            savedFile = switch (choiceDialog.resultProperty().getValue().toString()) {
+                case "TURTLE" -> fileSave(shapeModel, "TTL files", "*.ttl", RDFFormat.TURTLE, baseURI, dirOnly, title);
+                case "RDFXML" -> fileSave(shapeModel, "XML files", "*.xml", RDFFormat.RDFXML, baseURI, dirOnly, title);
+                case "RDFXML_PLAIN" ->
+                        fileSave(shapeModel, "XML files", "*.xml", RDFFormat.RDFXML_PLAIN, baseURI, dirOnly, title);
+                case "RDFXML_ABBREV" ->
+                        fileSave(shapeModel, "XML files", "*.xml", RDFFormat.RDFXML_ABBREV, baseURI, dirOnly, title);
+                case "NTRIPLES" ->
+                        fileSave(shapeModel, "N3 files", "*.nt", RDFFormat.NTRIPLES, baseURI, dirOnly, title);
+                case "JSONLD" ->
+                        fileSave(shapeModel, "JSON-LD files", "*.jsonld", RDFFormat.JSONLD, baseURI, dirOnly, title);
+                case "N3" -> fileSave(shapeModel, "N3 files", "*.nt", RDFFormat.NT, baseURI, dirOnly, title);
+                case "RDFJSON" ->
+                        fileSave(shapeModel, "RDF JSON files", "*.rj", RDFFormat.RDFJSON, baseURI, dirOnly, title);
+                default -> savedFile;
+            };
         }
 
         return savedFile;
@@ -1469,6 +1466,7 @@ public class ShaclTools {
 
                     }else{
                         model.write(out, rdfFormat.getLang().getLabel().toUpperCase(),baseURI);
+                        //model.write(out, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), baseURI);
                         //RDFDataMgr.write(out, model, RDFFormat.JSONLD_PRETTY);
 
                         /*baseURI = "http://iec.ch/TC57/61970-600/CoreEquipment-European/3/0/cgmes/shapes";
@@ -1630,11 +1628,15 @@ public class ShaclTools {
 
         //initial setup of the shape model
         //creates shape model. This is per profile. shapeModels is for all profiles
-        Model shapeModel = JenaUtil.createDefaultModel();
+        //Model shapeModel = JenaUtil.createDefaultModel();
+        Model shapeModel = ModelFactory.createModelForGraph(GraphMemFactory.createDefaultGraph());
+        shapeModel.setNsPrefix("rdf", RDF.getURI());
+        shapeModel.setNsPrefix("rdfs", RDFS.getURI());
+        shapeModel.setNsPrefix("owl", OWL.getURI());
+        shapeModel.setNsPrefix("xsd", XSD.getURI());
         shapeModel.setNsPrefixes(model.getNsPrefixMap());
         //add the namespace of the profile
-       shapeModel.setNsPrefix(nsPrefixprofile, nsURIprofile);
-
+        shapeModel.setNsPrefix(nsPrefixprofile, nsURIprofile);
 
 
         //add the additional two namespaces
