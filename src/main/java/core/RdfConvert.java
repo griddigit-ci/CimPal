@@ -97,23 +97,31 @@ public class RdfConvert {
                     //delete all classes
                     List<Statement> stdelete = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                     stmtToDeleteClass.addAll(stdelete);
-                    //delete all attributes and associations with domain of the deleted classes
-                    for (Statement stmpProp : stdelete) {
-                        List<Statement> stdeleteProp = model.listStatements(null, RDFS.domain, stmpProp.getSubject()).toList();
-                        stmtToDeleteClass.addAll(stdeleteProp);
-                        for (Statement stmpProp1 : stdeleteProp) {
-                            if (stmpProp1.getSubject().getLocalName().split("\\.", 2)[0].equals(stmpProp.getSubject().getLocalName())) {
-                                List<Statement> stdeleteProp1 = model.listStatements(stmpProp1.getSubject(), null, (RDFNode) null).toList();
-                                stmtToDeleteClass.addAll(stdeleteProp1);
-                            }
+                    //check of the class is an enumeration
+                    if (model.listStatements(stmt.getSubject(),ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype"),ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()) {
+                        for (Statement stmpProp : stdelete) {
+                            List<Statement> stdeleteProp = model.listStatements(null, RDF.type, stmpProp.getSubject()).toList();
+                            stmtToDeleteClass.addAll(stdeleteProp);
                         }
+                    }else {
+                        //delete all attributes and associations with domain of the deleted classes
+                        for (Statement stmpProp : stdelete) {
+                            List<Statement> stdeleteProp = model.listStatements(null, RDFS.domain, stmpProp.getSubject()).toList();
+                            stmtToDeleteClass.addAll(stdeleteProp);
+                            for (Statement stmpProp1 : stdeleteProp) {
+                                if (stmpProp1.getSubject().getLocalName().split("\\.", 2)[0].equals(stmpProp.getSubject().getLocalName())) {
+                                    List<Statement> stdeleteProp1 = model.listStatements(stmpProp1.getSubject(), null, (RDFNode) null).toList();
+                                    stmtToDeleteClass.addAll(stdeleteProp1);
+                                }
+                            }
 
-                        //delete all attributes and associations with range of the deleted classes
-                        List<Statement> stdeleteProp1 = model.listStatements(null, RDFS.range, stmpProp.getSubject()).toList();
-                        stmtToDeleteClass.addAll(stdeleteProp1);
-                        for (Statement stmpProp2 : stdeleteProp1) {
-                            List<Statement> stdeleteProp2 = model.listStatements(stmpProp2.getSubject(), null, (RDFNode) null).toList();
-                            stmtToDeleteClass.addAll(stdeleteProp2);
+                            //delete all attributes and associations with range of the deleted classes
+                            List<Statement> stdeleteProp1 = model.listStatements(null, RDFS.range, stmpProp.getSubject()).toList();
+                            stmtToDeleteClass.addAll(stdeleteProp1);
+                            for (Statement stmpProp2 : stdeleteProp1) {
+                                List<Statement> stdeleteProp2 = model.listStatements(stmpProp2.getSubject(), null, (RDFNode) null).toList();
+                                stmtToDeleteClass.addAll(stdeleteProp2);
+                            }
                         }
                     }
                 }
