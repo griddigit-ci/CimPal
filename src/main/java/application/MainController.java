@@ -55,6 +55,7 @@ import java.util.prefs.Preferences;
 import static core.ExportRDFSdescriptions.rdfsDescriptions;
 import static core.RdfConvert.fileSaveDialog;
 import static core.RdfConvert.modelInheritance;
+import static core.ShaclTools.fileSave;
 
 
 public class MainController implements Initializable {
@@ -76,6 +77,15 @@ public class MainController implements Initializable {
     public TextField fshapesBaseURIDefineTab1;
     public TextField fURIGenerateTab1;
     public TextField fowlImportsDefineTab1;
+    // Shacl organizer
+    @FXML
+    public TextField fPathShaclFilesToOrganize;
+    public TextField fPathXLSfileForShacl;
+    public TextField fbaseURIShacl;
+    public Button btnRunShaclOrganizer;
+    public Button btnResetShaclOrganizer;
+    public TextField fPrefixShaclOrganizer;
+    public TextField fNSShaclOrganizer;
     @FXML
     private TableView tableViewBrowseID;
     public TableColumn itemColumnBrowseModifyID;
@@ -3751,6 +3761,47 @@ public class MainController implements Initializable {
         File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
 
         progressBar.setProgress(1);
+    }
+
+    public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
+        selectedFile = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        StringBuilder paths = new StringBuilder();
+        for (int m = 0; m < selectedFile.size(); m++){
+            paths.append(", ").append(selectedFile.get(m).toString());
+        }
+        fPathShaclFilesToOrganize.setText(paths.toString());
+    }
+
+    public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
+        List<File> file = util.ModelFactory.filechoosercustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
+
+        if (file != null) {// the file is selected
+            MainController.inputXLS = file;
+            fPathXLSfileForShacl.setText(file.getFirst().toString());
+        }
+    }
+
+    public void actionBtnRunShaclOrganizer(ActionEvent actionEvent) {
+        progressBar.setProgress(0);
+        if (selectedFile != null) {
+            for (int m = 0; m < selectedFile.size(); m++) {
+                util.ModelFactory.shapeModelLoad(m, selectedFile);
+            }
+        }
+        ArrayList<Object> inputXLSdata;
+        inputXLSdata = ExcelTools.importXLSX(inputXLS.getFirst().toString(), 0);
+
+        for (int m = 0; m < shapeModels.size(); m++){
+            // here we go through each imported models
+        }
+
+        //fileSave(shapeModel, "TTL files", "*.ttl", RDFFormat.TURTLE, baseURI, dirOnly, title);
+        progressBar.setProgress(1);
+    }
+
+    public void actionBtnResetShaclOrganizer(ActionEvent actionEvent) {
+        fPathShaclFilesToOrganize.clear();
+        fPathXLSfileForShacl.clear();
     }
 }
 

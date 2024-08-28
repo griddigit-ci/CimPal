@@ -6,12 +6,35 @@
  @author Chavdar Ivanov
  -->
 
-<?import javafx.geometry.*?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
    <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -617,6 +640,75 @@
                            </VBox>
                         </HBox>
                      </AnchorPane>
+                  </Tab>
+                  <Tab text="SHACL Organizer">
+                     <content>
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                           <children>
+                              <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                 <children>
+                                    <HBox spacing="10.0">
+                                       <padding>
+                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                       <children>
+                                          <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
+                                          <TextField fx:id="fPathShaclFilesToOrganize" editable="false" HBox.hgrow="ALWAYS" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesToOrganize" text="Browse" />
+                                       </children>
+                                    </HBox>
+                                    <HBox spacing="10.0">
+                                       <padding>
+                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                       <children>
+                                          <Label minWidth="90.0" text="Excel template file:" wrapText="true" />
+                                          <TextField fx:id="fPathXLSfileForShacl" editable="false" HBox.hgrow="ALWAYS" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShacl" text="Browse" />
+                                       </children>
+                                    </HBox>
+                                    <HBox spacing="10.0" visible="false">
+                                       <padding>
+                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                       <children>
+                                          <Label minWidth="90.0" text="Base URI - Shape graph:" wrapText="true" />
+                                          <TextField fx:id="fbaseURIShacl" HBox.hgrow="ALWAYS" />
+                                       </children>
+                                    </HBox>
+                                    <HBox spacing="10.0" visible="false">
+                                       <padding>
+                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                       <children>
+                                          <Label minWidth="90.0" text="Namespace information for the resulted Shape graph:" wrapText="true" />
+                                       </children>
+                                    </HBox>
+                                    <HBox spacing="10.0" visible="false">
+                                       <padding>
+                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                       <children>
+                                          <Label minWidth="90.0" text="Prefix:" wrapText="true" />
+                                          <TextField fx:id="fPrefixShaclOrganizer" prefWidth="70.0" />
+                                          <Label minWidth="90.0" text="Namespace:" wrapText="true" />
+                                          <TextField fx:id="fNSShaclOrganizer" HBox.hgrow="ALWAYS" />
+                                       </children>
+                                    </HBox>
+                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                                       <VBox.margin>
+                                          <Insets bottom="5.0" right="5.0" />
+                                       </VBox.margin>
+                                       <children>
+                                          <Button fx:id="btnRunShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclOrganizer" text="Run" HBox.hgrow="ALWAYS" />
+                                          <Button fx:id="btnResetShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetShaclOrganizer" text="Reset" />
+                                       </children>
+                                    </HBox>
+                                 </children>
+                              </VBox>
+                           </children>
+                        </AnchorPane>
+                     </content>
                   </Tab>
                </TabPane>
             </HBox>
