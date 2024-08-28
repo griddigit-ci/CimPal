@@ -3775,7 +3775,7 @@ public class MainController implements Initializable {
     public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
         List<File> file = util.ModelFactory.filechoosercustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
 
-        if (file != null) {// the file is selected
+        if (file != null) {
             MainController.inputXLS = file;
             fPathXLSfileForShacl.setText(file.getFirst().toString());
         }
@@ -3802,6 +3802,8 @@ public class MainController implements Initializable {
     public void actionBtnResetShaclOrganizer(ActionEvent actionEvent) {
         fPathShaclFilesToOrganize.clear();
         fPathXLSfileForShacl.clear();
+        MainController.inputXLS = null;
+        selectedFile = null;
     }
 }
 

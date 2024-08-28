@@ -132,7 +132,8 @@ public class ModelFactory {
             MainController.shapeModels = new ArrayList<>();
             MainController.shapeModelsNames = new ArrayList<>(); // this is a collection of the name of the profile packages
         }
-        Model model = JenaUtil.createDefaultModel();
+        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        // Model model = JenaUtil.createDefaultModel();
         try {
             if (file.get(m).toString().endsWith(".ttl")) {
                 RDFDataMgr.read(model, new FileInputStream(file.get(m).toString()), Lang.TURTLE);
