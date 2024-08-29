@@ -2560,4 +2560,76 @@ public class ShaclTools {
         return shaclSPARQLConstraintProperties;
     }
 
+    //List of SHACL type properties
+    public static void splitShaclPerXlsInput(ArrayList<Object> inputXLSdata){
+
+        Map<String, Model> splitShaclMap = new HashMap<>();
+        Model shaclModel;
+        //the map where we store the things before we process with the save
+        //the string can ve the path and the file name that can be used by the save
+        for (int row = 0; row < inputXLSdata.size(); row++) { // Can you check if this is the way to loop on the rows of the xls - if you have better way please do
+            String constraintName = ""; //put here the value of column A from inputXLSdata
+            String constraintFilePath = ""; //put here the value of column B from inputXLSdata
+
+            //check if the constraintFilePath is in the splitShaclMap
+            if (splitShaclMap.containsKey(constraintFilePath)){
+                shaclModel = splitShaclMap.get(constraintFilePath);
+            }else{
+                shaclModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                splitShaclMap.put(constraintFilePath, shaclModel);
+            }
+
+
+            for (Object shapeModel : shapeModels) {
+                // here we go through each imported models
+                //here we need to check if the constraintName if in some of the files and take it then put it in the model that will populate constraintFilePath
+                Model shModel = (Model) shapeModel;  // see if this works, but the idea is to get the model
+                if (shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).hasNext()) {
+                    // the sh:name is found
+                    //here we need to take the things
+                    LinkedList<Statement> stmtTosave =new LinkedList<>();
+
+                    Statement leadStmt = shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).next();
+
+                    //this below assumes that the sh:name is in the PropertyShape, but we may need to improve as I think we may have cases where we do not have PropertyShape and we have the name in the NodeShape
+                    Resource sparqlURI = ResourceFactory.createResource("https://griddigit.eu/sparql/empty");
+                    boolean hasSparql = false;
+                    for (StmtIterator i = shModel.listStatements(leadStmt.getSubject(),null,(RDFNode) null); i.hasNext(); ) {
+                        Statement stmt = i.next();
+                        stmtTosave.add(stmt);
+                        if (stmt.getPredicate().equals(SH.sparql)){
+                            sparqlURI = stmt.getSubject();
+                            hasSparql = true;
+                        }
+                    }
+                    //gather sparql
+                    if (hasSparql){
+                        for (StmtIterator i = shModel.listStatements(sparqlURI,null,(RDFNode) null); i.hasNext();) {
+                            Statement stmt = i.next();
+                            stmtTosave.add(stmt);
+                        }
+                    }
+                    //gather the NodeShape
+                    for (StmtIterator i = shModel.listStatements(null,SH.property,leadStmt.getSubject()); i.hasNext();) {
+                        Statement stmt = i.next();
+                        stmtTosave.add(stmt);
+                    }
+
+                    //save the stmtTosave to the model
+                    shaclModel.add(stmtTosave);
+                    //update the model in the map
+                    splitShaclMap.replace(constraintFilePath,shaclModel); // see if this works or we need to use put instead of replace
+                }
+
+            }
+        }
+
+        //here you itterate on the splitShaclMap
+        //and for each file path splitShaclMap the key, we save the model which is in the value
+
+        //fileSave(shapeModel, "TTL files", "*.ttl", RDFFormat.TURTLE, baseURI, dirOnly, title);
+
+
+    }
+
 }

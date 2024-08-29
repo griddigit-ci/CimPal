@@ -3791,11 +3791,8 @@ public class MainController implements Initializable {
         ArrayList<Object> inputXLSdata;
         inputXLSdata = ExcelTools.importXLSX(inputXLS.getFirst().toString(), 0);
 
-        for (int m = 0; m < shapeModels.size(); m++){
-            // here we go through each imported models
-        }
+        ShaclTools.splitShaclPerXlsInput(inputXLSdata);
 
-        //fileSave(shapeModel, "TTL files", "*.ttl", RDFFormat.TURTLE, baseURI, dirOnly, title);
         progressBar.setProgress(1);
     }
 
