@@ -3765,23 +3765,25 @@ public class MainController implements Initializable {
 
     public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
         selectedFile = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
-        StringBuilder paths = new StringBuilder();
-        for (int m = 0; m < selectedFile.size(); m++){
-            paths.append(", ").append(selectedFile.get(m).toString());
+        if (selectedFile != null){
+            StringBuilder paths = new StringBuilder();
+            for (int m = 0; m < selectedFile.size(); m++){
+                paths.append(", ").append(selectedFile.get(m).toString());
+            }
+            fPathShaclFilesToOrganize.setText(paths.toString());
         }
-        fPathShaclFilesToOrganize.setText(paths.toString());
     }
 
     public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
         List<File> file = util.ModelFactory.filechoosercustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
 
-        if (file != null) {
+        if (!file.isEmpty()) {
             MainController.inputXLS = file;
             fPathXLSfileForShacl.setText(file.getFirst().toString());
         }
     }
 
-    public void actionBtnRunShaclOrganizer(ActionEvent actionEvent) {
+    public void actionBtnRunShaclOrganizer(ActionEvent actionEvent) throws IOException {
         progressBar.setProgress(0);
         if (selectedFile != null) {
             for (int m = 0; m < selectedFile.size(); m++) {

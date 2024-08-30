@@ -2561,21 +2561,23 @@ public class ShaclTools {
     }
 
     //List of SHACL type properties
-    public static void splitShaclPerXlsInput(ArrayList<Object> inputXLSdata){
+    public static void splitShaclPerXlsInput(ArrayList<Object> inputXLSdata) throws IOException {
 
         Map<String, Model> splitShaclMap = new HashMap<>();
         Model shaclModel;
         //the map where we store the things before we process with the save
         //the string can ve the path and the file name that can be used by the save
-        for (int row = 0; row < inputXLSdata.size(); row++) { // Can you check if this is the way to loop on the rows of the xls - if you have better way please do
-            String constraintName = ""; //put here the value of column A from inputXLSdata
-            String constraintFilePath = ""; //put here the value of column B from inputXLSdata
+        for (Object inputXLSrow : inputXLSdata) {
+
+            List<String> currentRow = (List<String>) inputXLSrow;
+            String constraintName = currentRow.getFirst(); //put here the value of column A from inputXLSdata
+            String constraintFilePath = currentRow.get(1); //put here the value of column B from inputXLSdata
 
             //check if the constraintFilePath is in the splitShaclMap
-            if (splitShaclMap.containsKey(constraintFilePath)){
+            if (splitShaclMap.containsKey(constraintFilePath)) {
                 shaclModel = splitShaclMap.get(constraintFilePath);
-            }else{
-                shaclModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+            } else {
+                shaclModel = ModelFactory.createDefaultModel();
                 splitShaclMap.put(constraintFilePath, shaclModel);
             }
 
@@ -2587,30 +2589,30 @@ public class ShaclTools {
                 if (shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).hasNext()) {
                     // the sh:name is found
                     //here we need to take the things
-                    LinkedList<Statement> stmtTosave =new LinkedList<>();
+                    LinkedList<Statement> stmtTosave = new LinkedList<>();
 
                     Statement leadStmt = shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).next();
 
                     //this below assumes that the sh:name is in the PropertyShape, but we may need to improve as I think we may have cases where we do not have PropertyShape and we have the name in the NodeShape
                     Resource sparqlURI = ResourceFactory.createResource("https://griddigit.eu/sparql/empty");
                     boolean hasSparql = false;
-                    for (StmtIterator i = shModel.listStatements(leadStmt.getSubject(),null,(RDFNode) null); i.hasNext(); ) {
+                    for (StmtIterator i = shModel.listStatements(leadStmt.getSubject(), null, (RDFNode) null); i.hasNext(); ) {
                         Statement stmt = i.next();
                         stmtTosave.add(stmt);
-                        if (stmt.getPredicate().equals(SH.sparql)){
+                        if (stmt.getPredicate().equals(SH.sparql)) {
                             sparqlURI = stmt.getSubject();
                             hasSparql = true;
                         }
                     }
                     //gather sparql
-                    if (hasSparql){
-                        for (StmtIterator i = shModel.listStatements(sparqlURI,null,(RDFNode) null); i.hasNext();) {
+                    if (hasSparql) {
+                        for (StmtIterator i = shModel.listStatements(sparqlURI, null, (RDFNode) null); i.hasNext(); ) {
                             Statement stmt = i.next();
                             stmtTosave.add(stmt);
                         }
                     }
                     //gather the NodeShape
-                    for (StmtIterator i = shModel.listStatements(null,SH.property,leadStmt.getSubject()); i.hasNext();) {
+                    for (StmtIterator i = shModel.listStatements(null, SH.property, leadStmt.getSubject()); i.hasNext(); ) {
                         Statement stmt = i.next();
                         stmtTosave.add(stmt);
                     }
@@ -2618,7 +2620,7 @@ public class ShaclTools {
                     //save the stmtTosave to the model
                     shaclModel.add(stmtTosave);
                     //update the model in the map
-                    splitShaclMap.replace(constraintFilePath,shaclModel); // see if this works or we need to use put instead of replace
+                    splitShaclMap.replace(constraintFilePath, shaclModel); // see if this works or we need to use put instead of replace
                 }
 
             }
@@ -2626,8 +2628,18 @@ public class ShaclTools {
 
         //here you itterate on the splitShaclMap
         //and for each file path splitShaclMap the key, we save the model which is in the value
+        for (Map.Entry<String, Model> entry : splitShaclMap.entrySet()) {
+            String filePath = entry.getKey();
+            Model shaclModelToSave = entry.getValue();
 
-        //fileSave(shapeModel, "TTL files", "*.ttl", RDFFormat.TURTLE, baseURI, dirOnly, title);
+            try (OutputStream out = new FileOutputStream(filePath)) {
+                shaclModelToSave.write(out, RDFFormat.TURTLE.getLang().getLabel().toUpperCase());
+                System.out.println("Model saved successfully to " + filePath);
+            } catch (IOException e) {
+                System.err.println("Error saving model to file: " + e.getMessage());
+            }
+
+        }
 
 
     }
