@@ -16,8 +16,7 @@ import org.apache.jena.enhanced.EnhGraph;
 import org.apache.jena.graph.GraphMemFactory;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.rdf.model.impl.PropertyImpl;
-import org.apache.jena.riot.RDFFormat;
-import org.apache.jena.riot.SysRIOT;
+import org.apache.jena.riot.*;
 import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
@@ -33,6 +32,7 @@ import java.util.*;
 
 import static application.MainController.*;
 import static org.topbraid.shacl.vocabulary.SH.path;
+import static util.CompareFactory.isBlankNodeAlist;
 
 public class ShaclTools {
 
@@ -2596,17 +2596,53 @@ public class ShaclTools {
                     //this below assumes that the sh:name is in the PropertyShape, but we may need to improve as I think we may have cases where we do not have PropertyShape and we have the name in the NodeShape
                     Resource sparqlURI = ResourceFactory.createResource("https://griddigit.eu/sparql/empty");
                     boolean hasSparql = false;
+                    Resource groupURI = ResourceFactory.createResource("https://griddigit.eu/group/empty");
+                    boolean hasGroup = false;
                     for (StmtIterator i = shModel.listStatements(leadStmt.getSubject(), null, (RDFNode) null); i.hasNext(); ) {
                         Statement stmt = i.next();
-                        stmtTosave.add(stmt);
+
+                        if (stmt.getObject().isAnon()){
+                            shaclModel = addBlankNode(shModel,shaclModel,stmt,false,null);
+                        }else{
+                            stmtTosave.add(stmt);
+                        }
+
                         if (stmt.getPredicate().equals(SH.sparql)) {
-                            sparqlURI = stmt.getSubject();
+                            sparqlURI = stmt.getObject().asResource();
                             hasSparql = true;
+                        }
+                        if (stmt.getPredicate().equals(SH.group)) {
+                            groupURI = stmt.getObject().asResource();
+                            hasGroup = true;
                         }
                     }
                     //gather sparql
                     if (hasSparql) {
                         for (StmtIterator i = shModel.listStatements(sparqlURI, null, (RDFNode) null); i.hasNext(); ) {
+                            Statement stmt = i.next();
+                            if (stmt.getObject().isAnon()){
+                                shaclModel = addBlankNode(shModel,shaclModel,stmt,false,null);
+                            }else{
+                                if (stmt.getPredicate().equals(SH.select)){
+                                    //TODO to see how to fix the \r\n\t\t\tSELECT  $this ?value\r\n\t\t\tWHERE {\r\n way of serialising
+                                    stmtTosave.add(stmt);
+                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createStringLiteral(stmt.getObject().toString())));
+                                    //String sparqlSelect = stmt.getObject().toString();
+                                    //String sparqlSelectMod = sparqlSelect.replace("\t","\\t");
+                                    //sparqlSelectMod = sparqlSelectMod.replace("\r","\\r");
+                                    //sparqlSelectMod = sparqlSelectMod.replace("\n","\\n");
+                                    //sparqlSelectMod = "\\\"\\\""+sparqlSelectMod+"\\\"\\\"";
+                                    //String sparqlSelectMod = "'''"+sparqlSelect+"'''";
+                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createPlainLiteral(sparqlSelectMod)));
+                                }else {
+                                    stmtTosave.add(stmt);
+                                }
+                            }
+                        }
+                    }
+                    //gather group
+                    if (hasGroup) {
+                        for (StmtIterator i = shModel.listStatements(groupURI, null, (RDFNode) null); i.hasNext(); ) {
                             Statement stmt = i.next();
                             stmtTosave.add(stmt);
                         }
@@ -2614,11 +2650,47 @@ public class ShaclTools {
                     //gather the NodeShape
                     for (StmtIterator i = shModel.listStatements(null, SH.property, leadStmt.getSubject()); i.hasNext(); ) {
                         Statement stmt = i.next();
-                        stmtTosave.add(stmt);
+
+                        if (stmt.getObject().isAnon()){
+                            shaclModel = addBlankNode(shModel,shaclModel,stmt,false,null);
+                        }else{
+                            stmtTosave.add(stmt);
+                        }
+
+                        for (StmtIterator j = shModel.listStatements(stmt.getSubject(), null, (RDFNode) null); j.hasNext(); ) {
+                            Statement stmtNode = j.next();
+                            if (!stmtNode.getPredicate().equals(SH.property)) {
+                                if (stmtNode.getObject().isAnon()){
+                                    shaclModel = addBlankNode(shModel,shaclModel,stmtNode,false,null);
+                                }else{
+                                    stmtTosave.add(stmtNode);
+                                }
+                            }
+                        }
                     }
 
+                    // TODO - improve here so that we do not do this in every iteration; also if the shacl has header this is also Ontology - to be checked
+                    if (hasSparql) {
+                        for (StmtIterator i = shModel.listStatements(null, RDF.type, OWL2.Ontology); i.hasNext(); ) {
+                            Statement stmt = i.next();
+                            for (StmtIterator j = shModel.listStatements(stmt.getSubject(), null, (RDFNode) null); j.hasNext(); ) {
+                                Statement stmtOnt = j.next();
+                                if (stmtOnt.getObject().isAnon()){
+                                    //stmtTosave.add(stmtOnt);
+                                    //shaclModel.add(stmtOnt.getSubject(),stmtOnt.getPredicate(),shModel.getRDFNode(stmtOnt.getObject().asNode()));
+                                    shaclModel = addBlankNode(shModel,shaclModel,stmtOnt,false,null); //TODO
+                                }else{
+                                    stmtTosave.add(stmtOnt);
+                                }
+                            }
+                        }
+                    }
                     //save the stmtTosave to the model
                     shaclModel.add(stmtTosave);
+                    //get prefixes and add it to the model - we can do this better and not in every iteration - TODO improve
+                    Map<String,String> prefMap = shModel.getNsPrefixMap();
+                    shaclModel.setNsPrefixes(prefMap);
+
                     //update the model in the map
                     splitShaclMap.replace(constraintFilePath, shaclModel); // see if this works or we need to use put instead of replace
                 }
@@ -2626,14 +2698,22 @@ public class ShaclTools {
             }
         }
 
-        //here you itterate on the splitShaclMap
+        //here you iterate on the splitShaclMap
         //and for each file path splitShaclMap the key, we save the model which is in the value
         for (Map.Entry<String, Model> entry : splitShaclMap.entrySet()) {
             String filePath = entry.getKey();
             Model shaclModelToSave = entry.getValue();
 
             try (OutputStream out = new FileOutputStream(filePath)) {
-                shaclModelToSave.write(out, RDFFormat.TURTLE.getLang().getLabel().toUpperCase());
+                //shaclModelToSave.write(out, RDFFormat.TURTLE.getLang().getLabel().toUpperCase());
+                RDFWriter.create()
+                        .base("https://ap-con.cim4.eu/test") //TODO we need to see how to get the base, we may need to put this in the xlsx especially if we need to redefine the namespace of all constrains that are in the new ttl
+                        .set(RIOT.symTurtleOmitBase, false)
+                        .set(RIOT.symTurtleIndentStyle, "wide")
+                        .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                        .lang(Lang.TURTLE)
+                        .source(shaclModelToSave)
+                        .output(out);
                 System.out.println("Model saved successfully to " + filePath);
             } catch (IOException e) {
                 System.err.println("Error saving model to file: " + e.getMessage());
@@ -2642,6 +2722,47 @@ public class ShaclTools {
         }
 
 
+    }
+
+    //List of SHACL type properties
+    public static Model addBlankNode(Model modelOrig, Model modelTarget, Statement stmt, boolean blankInBlank, RDFNode obj) {
+
+        if (blankInBlank) {
+            //modelTarget.add(stmt);
+            for (StmtIterator i = modelOrig.listStatements(obj.asResource(), null, (RDFNode) null); i.hasNext(); ) {
+                Statement stmtB = i.next();
+                modelTarget.add(stmtB);
+                if (stmtB.getObject().isAnon()){
+                    modelTarget = addBlankNode(modelOrig,modelTarget,stmtB,false,null);
+                }
+            }
+        }else{
+            Map<Boolean, List<RDFNode>> isBNlistB = isBlankNodeAlist(stmt);
+
+            if (isBNlistB.containsKey(true)) {
+                //List<RDFNode> listModelB = isBNlistB.get(true);
+                RDFList objectlist = modelOrig.getList(stmt.getObject().asResource());
+                RDFList pathRDFlist = modelTarget.createList(objectlist.iterator());
+                //check of elements of the RDFlist are blank nodes
+                for (RDFNode objO : objectlist.asJavaList()) {
+                    if (objO.isAnon()) {
+                        blankInBlank = true;
+                        modelTarget = addBlankNode(modelOrig,modelTarget,stmt,blankInBlank,objO);
+                    }
+                }
+                Resource r = modelTarget.createResource(stmt.getSubject().toString());
+                r.addProperty(stmt.getPredicate(), pathRDFlist);
+            } else {
+                //get all statements of the blank node and put them in the model
+                modelTarget.add(stmt);
+                for (StmtIterator i = modelOrig.listStatements(stmt.getObject().asResource(), null, (RDFNode) null); i.hasNext(); ) {
+                    Statement stmtB = i.next();
+                    modelTarget.add(stmtB);
+                }
+            }
+        }
+
+        return modelTarget;
     }
 
 }
