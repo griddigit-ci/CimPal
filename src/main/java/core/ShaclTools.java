@@ -2623,20 +2623,21 @@ public class ShaclTools {
                             if (stmt.getObject().isAnon()){
                                 shaclModel = addBlankNode(shModel,shaclModel,stmt,false,null);
                             }else{
-                                if (stmt.getPredicate().equals(SH.select)){
-                                    //TODO to see how to fix the \r\n\t\t\tSELECT  $this ?value\r\n\t\t\tWHERE {\r\n way of serialising
-                                    stmtTosave.add(stmt);
-                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createStringLiteral(stmt.getObject().toString())));
-                                    //String sparqlSelect = stmt.getObject().toString();
-                                    //String sparqlSelectMod = sparqlSelect.replace("\t","\\t");
-                                    //sparqlSelectMod = sparqlSelectMod.replace("\r","\\r");
-                                    //sparqlSelectMod = sparqlSelectMod.replace("\n","\\n");
-                                    //sparqlSelectMod = "\\\"\\\""+sparqlSelectMod+"\\\"\\\"";
-                                    //String sparqlSelectMod = "'''"+sparqlSelect+"'''";
-                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createPlainLiteral(sparqlSelectMod)));
-                                }else {
-                                    stmtTosave.add(stmt);
-                                }
+                                stmtTosave.add(stmt);
+//                                if (stmt.getPredicate().equals(SH.select)){
+//                                    //- this was fixed -  to see how to fix the \r\n\t\t\tSELECT  $this ?value\r\n\t\t\tWHERE {\r\n way of serialising
+//                                    stmtTosave.add(stmt);
+//                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createStringLiteral(stmt.getObject().toString())));
+//                                    //String sparqlSelect = stmt.getObject().toString();
+//                                    //String sparqlSelectMod = sparqlSelect.replace("\t","\\t");
+//                                    //sparqlSelectMod = sparqlSelectMod.replace("\r","\\r");
+//                                    //sparqlSelectMod = sparqlSelectMod.replace("\n","\\n");
+//                                    //sparqlSelectMod = "\\\"\\\""+sparqlSelectMod+"\\\"\\\"";
+//                                    //String sparqlSelectMod = "'''"+sparqlSelect+"'''";
+//                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createPlainLiteral(sparqlSelectMod)));
+//                                }else {
+//                                    stmtTosave.add(stmt);
+//                                }
                             }
                         }
                     }
@@ -2711,6 +2712,7 @@ public class ShaclTools {
                         .set(RIOT.symTurtleOmitBase, false)
                         .set(RIOT.symTurtleIndentStyle, "wide")
                         .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                        .set(RIOT.multilineLiterals, true)
                         .lang(Lang.TURTLE)
                         .source(shaclModelToSave)
                         .output(out);
