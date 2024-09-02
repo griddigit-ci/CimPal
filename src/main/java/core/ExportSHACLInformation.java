@@ -98,7 +98,11 @@ public class ExportSHACLInformation {
                     Statement sparqlStmt = model.listStatements(stmtPS.getSubject(), SH.sparql, (RDFNode) null).next();
                     propertyShapeType.add("SPARQL");
                     sparqlConstraintID.add(model.getNsURIPrefix(sparqlStmt.getObject().asResource().getNameSpace()) + ":" + sparqlStmt.getObject().asResource().getLocalName());
-                    String message = model.listStatements(sparqlStmt.getObject().asResource(), SH.message, (RDFNode) null).next().getObject().toString();
+                    String message = "N/A";
+                    if (model.listStatements(sparqlStmt.getObject().asResource(), SH.message, (RDFNode) null).hasNext()){
+                        message = model.listStatements(sparqlStmt.getObject().asResource(), SH.message, (RDFNode) null).next().getObject().toString();
+                    }
+
                     constraintMessage.add(message);
                 } else {
                     propertyShapeType.add("Regular SHACL");
