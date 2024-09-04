@@ -9,6 +9,7 @@ package util;
 
 import application.MainController;
 import javafx.scene.control.Alert;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import org.apache.commons.io.FileUtils;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -240,10 +241,39 @@ public class ModelFactory {
             }
         }else{
             if (fileL != null) {// the file is selected
-                MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
+                MainController.prefs.put("LastWorkingFolder", fileL.getFirst().getParent());
             }
         }
         return fileL;
+    }
+
+    //Folder selection
+    public static File folderchoosercustom() {
+
+
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        File selectedDirectory = null;
+
+        // Set the initial directory
+        directoryChooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
+
+        // Set the title of the dialog
+        directoryChooser.setTitle("Select Output Folder");
+
+        try {
+            // Show the directory chooser dialog
+            selectedDirectory = directoryChooser.showDialog(null);
+        } catch (Exception e) {
+            directoryChooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+            selectedDirectory = directoryChooser.showDialog(null);
+
+        }
+
+        if (selectedDirectory != null) {// the file is selected
+            MainController.prefs.put("LastWorkingFolder", selectedDirectory.getAbsolutePath());
+        }
+
+        return selectedDirectory;
     }
 
     //File(s) selection Filechooser

@@ -23,6 +23,7 @@ import org.apache.jena.vocabulary.*;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
+import util.PropertyHolder;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -2564,14 +2565,28 @@ public class ShaclTools {
     public static void splitShaclPerXlsInput(ArrayList<Object> inputXLSdata) throws IOException {
 
         Map<String, Model> splitShaclMap = new HashMap<>();
+        Map<String, PropertyHolder> constraintPropertiesMap = new HashMap<>();
+        Map<String, String> baseMap = new HashMap<>();
         Model shaclModel;
+        File folder = util.ModelFactory.folderchoosercustom();
         //the map where we store the things before we process with the save
         //the string can ve the path and the file name that can be used by the save
         for (Object inputXLSrow : inputXLSdata) {
 
             List<String> currentRow = (List<String>) inputXLSrow;
             String constraintName = currentRow.getFirst(); //put here the value of column A from inputXLSdata
-            String constraintFilePath = currentRow.get(1); //put here the value of column B from inputXLSdata
+            String constraintFilePath = folder+"\\"+currentRow.get(1)+"\\"+currentRow.get(2); //put here the value of column B from inputXLSdata
+            String newPrefix = currentRow.get(3); // this is the prefix //TODO implement what happens if it is not "keep"
+            String newPrefixNS = currentRow.get(4); // this is the prefix namespace
+            String newBaseURI = currentRow.get(5); // this is the base URI
+            String newGroupURI = currentRow.get(6); // this is the group URI //TODO implement what happens if it is not "keep"
+            String newGroupName = currentRow.get(7); // this is the group Name
+            PropertyHolder properties = new PropertyHolder(constraintFilePath, newPrefix, newPrefixNS, newBaseURI, newGroupURI, newGroupName);
+            constraintPropertiesMap.put(constraintName,properties);
+
+            if (newPrefixNS.equals("skip")){ // of that column is "skip" we do not process that constraint// TODO see if we want to create another column for this or we use this one
+                continue;
+            }
 
             //check if the constraintFilePath is in the splitShaclMap
             if (splitShaclMap.containsKey(constraintFilePath)) {
@@ -2579,6 +2594,7 @@ public class ShaclTools {
             } else {
                 shaclModel = ModelFactory.createDefaultModel();
                 splitShaclMap.put(constraintFilePath, shaclModel);
+                baseMap.put(constraintFilePath,newBaseURI);
             }
 
 
@@ -2602,9 +2618,13 @@ public class ShaclTools {
                         Statement stmt = i.next();
 
                         if (stmt.getObject().isAnon()){
-                            shaclModel = addBlankNode(shModel,shaclModel,stmt,false,null);
+                            if (newPrefix.equals("keep")) {
+                                shaclModel = addBlankNode(shModel, shaclModel, stmt, false, null);
+                            }
                         }else{
-                            stmtTosave.add(stmt);
+                            if (newPrefix.equals("keep")) {
+                                stmtTosave.add(stmt);
+                            }
                         }
 
                         if (stmt.getPredicate().equals(SH.sparql)) {
@@ -2621,23 +2641,13 @@ public class ShaclTools {
                         for (StmtIterator i = shModel.listStatements(sparqlURI, null, (RDFNode) null); i.hasNext(); ) {
                             Statement stmt = i.next();
                             if (stmt.getObject().isAnon()){
-                                shaclModel = addBlankNode(shModel,shaclModel,stmt,false,null);
+                                if (newPrefix.equals("keep")) {
+                                    shaclModel = addBlankNode(shModel, shaclModel, stmt, false, null);
+                                }
                             }else{
-                                stmtTosave.add(stmt);
-//                                if (stmt.getPredicate().equals(SH.select)){
-//                                    //- this was fixed -  to see how to fix the \r\n\t\t\tSELECT  $this ?value\r\n\t\t\tWHERE {\r\n way of serialising
-//                                    stmtTosave.add(stmt);
-//                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createStringLiteral(stmt.getObject().toString())));
-//                                    //String sparqlSelect = stmt.getObject().toString();
-//                                    //String sparqlSelectMod = sparqlSelect.replace("\t","\\t");
-//                                    //sparqlSelectMod = sparqlSelectMod.replace("\r","\\r");
-//                                    //sparqlSelectMod = sparqlSelectMod.replace("\n","\\n");
-//                                    //sparqlSelectMod = "\\\"\\\""+sparqlSelectMod+"\\\"\\\"";
-//                                    //String sparqlSelectMod = "'''"+sparqlSelect+"'''";
-//                                    //stmtTosave.add(ResourceFactory.createStatement(stmt.getSubject(),stmt.getPredicate(),ResourceFactory.createPlainLiteral(sparqlSelectMod)));
-//                                }else {
-//                                    stmtTosave.add(stmt);
-//                                }
+                                if (newPrefix.equals("keep")) {
+                                    stmtTosave.add(stmt);
+                                }
                             }
                         }
                     }
@@ -2645,7 +2655,9 @@ public class ShaclTools {
                     if (hasGroup) {
                         for (StmtIterator i = shModel.listStatements(groupURI, null, (RDFNode) null); i.hasNext(); ) {
                             Statement stmt = i.next();
-                            stmtTosave.add(stmt);
+                            if (newPrefix.equals("keep")) {
+                                stmtTosave.add(stmt);
+                            }
                         }
                     }
                     //gather the NodeShape
@@ -2653,18 +2665,26 @@ public class ShaclTools {
                         Statement stmt = i.next();
 
                         if (stmt.getObject().isAnon()){
-                            shaclModel = addBlankNode(shModel,shaclModel,stmt,false,null);
+                            if (newPrefix.equals("keep")) {
+                                shaclModel = addBlankNode(shModel, shaclModel, stmt, false, null);
+                            }
                         }else{
-                            stmtTosave.add(stmt);
+                            if (newPrefix.equals("keep")) {
+                                stmtTosave.add(stmt);
+                            }
                         }
 
                         for (StmtIterator j = shModel.listStatements(stmt.getSubject(), null, (RDFNode) null); j.hasNext(); ) {
                             Statement stmtNode = j.next();
                             if (!stmtNode.getPredicate().equals(SH.property)) {
                                 if (stmtNode.getObject().isAnon()){
-                                    shaclModel = addBlankNode(shModel,shaclModel,stmtNode,false,null);
+                                    if (newPrefix.equals("keep")) {
+                                        shaclModel = addBlankNode(shModel, shaclModel, stmtNode, false, null);
+                                    }
                                 }else{
-                                    stmtTosave.add(stmtNode);
+                                    if (newPrefix.equals("keep")) {
+                                        stmtTosave.add(stmtNode);
+                                    }
                                 }
                             }
                         }
@@ -2679,17 +2699,22 @@ public class ShaclTools {
                                 if (stmtOnt.getObject().isAnon()){
                                     //stmtTosave.add(stmtOnt);
                                     //shaclModel.add(stmtOnt.getSubject(),stmtOnt.getPredicate(),shModel.getRDFNode(stmtOnt.getObject().asNode()));
-                                    shaclModel = addBlankNode(shModel,shaclModel,stmtOnt,false,null); //TODO
+                                    if (newPrefix.equals("keep")) {
+                                        shaclModel = addBlankNode(shModel, shaclModel, stmtOnt, false, null); //TODO
+                                    }
                                 }else{
-                                    stmtTosave.add(stmtOnt);
+                                    if (newPrefix.equals("keep")) {
+                                        stmtTosave.add(stmtOnt);
+                                    }
                                 }
                             }
                         }
                     }
+
                     //save the stmtTosave to the model
                     shaclModel.add(stmtTosave);
                     //get prefixes and add it to the model - we can do this better and not in every iteration - TODO improve
-                    Map<String,String> prefMap = shModel.getNsPrefixMap();
+                    Map<String, String> prefMap = shModel.getNsPrefixMap();
                     shaclModel.setNsPrefixes(prefMap);
 
                     //update the model in the map
@@ -2704,26 +2729,38 @@ public class ShaclTools {
         for (Map.Entry<String, Model> entry : splitShaclMap.entrySet()) {
             String filePath = entry.getKey();
             Model shaclModelToSave = entry.getValue();
+            if (!shaclModelToSave.isEmpty()) {
+                String saveBaseURI = baseMap.get(filePath);
 
-            try (OutputStream out = new FileOutputStream(filePath)) {
-                //shaclModelToSave.write(out, RDFFormat.TURTLE.getLang().getLabel().toUpperCase());
-                RDFWriter.create()
-                        .base("https://ap-con.cim4.eu/test") //TODO we need to see how to get the base, we may need to put this in the xlsx especially if we need to redefine the namespace of all constrains that are in the new ttl
-                        .set(RIOT.symTurtleOmitBase, false)
-                        .set(RIOT.symTurtleIndentStyle, "wide")
-                        .set(RIOT.symTurtleDirectiveStyle, "rdf10")
-                        .set(RIOT.multilineLiterals, true)
-                        .lang(Lang.TURTLE)
-                        .source(shaclModelToSave)
-                        .output(out);
-                System.out.println("Model saved successfully to " + filePath);
-            } catch (IOException e) {
-                System.err.println("Error saving model to file: " + e.getMessage());
+                File directory = new File(filePath);
+
+                if (!directory.getParentFile().exists()) {
+                    if (directory.getParentFile().mkdir()) {
+                        System.out.println("Folder created successfully: [" + directory.getParentFile() + "]");
+                    } else {
+                        System.out.println("Failed to create the folder: [" + directory.getParentFile() + "]");
+                    }
+                } else {
+                    System.out.println("Folder already exists and will be used: [" + directory.getParentFile() + "]");
+                }
+
+                try (OutputStream out = new FileOutputStream(filePath)) {
+                    //shaclModelToSave.write(out, RDFFormat.TURTLE.getLang().getLabel().toUpperCase());
+                    RDFWriter.create()
+                            .base(saveBaseURI)
+                            .set(RIOT.symTurtleOmitBase, false)
+                            .set(RIOT.symTurtleIndentStyle, "wide")
+                            .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                            .set(RIOT.multilineLiterals, true)
+                            .lang(Lang.TURTLE)
+                            .source(shaclModelToSave)
+                            .output(out);
+                    System.out.println("Model saved successfully to " + filePath);
+                } catch (IOException e) {
+                    System.err.println("Error saving model to file: " + e.getMessage());
+                }
             }
-
         }
-
-
     }
 
     //List of SHACL type properties
@@ -2765,6 +2802,46 @@ public class ShaclTools {
         }
 
         return modelTarget;
+    }
+    //Changes the Namespaces for either subject, predicate, object or all
+    public static Statement statementNewNS(Statement stmt, boolean subject, String subjectNSold, String subjectNSnew,boolean predicate, String predicateNSold, String predicateNSnew,boolean object, String objectNSold, String objectNSnew ) {
+        Resource subjRes;
+        Property pred;
+        RDFNode obj;
+
+        if (subject) {
+            if (stmt.getSubject().getNameSpace().equals(subjectNSold)){
+                subjRes = ResourceFactory.createResource(subjectNSnew+stmt.getSubject().getLocalName());
+            }else{
+                subjRes = stmt.getSubject();
+            }
+        }else{
+            subjRes = stmt.getSubject();
+        }
+        if (predicate) {
+            if (stmt.getPredicate().getNameSpace().equals(predicateNSold)){
+                pred = ResourceFactory.createProperty(predicateNSnew,stmt.getPredicate().getLocalName());
+            }else{
+                pred = stmt.getPredicate();
+            }
+        }else{
+            pred = stmt.getPredicate();
+        }
+        if (object) {
+            if (stmt.getObject().isResource()) {
+                if (stmt.getObject().asResource().getNameSpace().equals(subjectNSold)){
+                    obj = ResourceFactory.createProperty(objectNSnew+stmt.getObject().asResource().getLocalName());
+                }else{
+                    obj = stmt.getObject();
+                }
+            }else{
+                obj = stmt.getObject();
+            }
+        }else{
+            obj = stmt.getObject();
+        }
+
+        return ResourceFactory.createStatement(subjRes,pred,obj);
     }
 
 }
