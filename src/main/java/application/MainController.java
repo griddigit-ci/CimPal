@@ -1985,7 +1985,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/PowerSystemProject-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/PowerSystemProject-Simple/2.3#");
                                     }
                                 }
                                 case "RemedialActionScheduleProfile", "DocRemedialActionScheduleProfile" -> {
@@ -1993,7 +1993,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/RemedialActionSchedule-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/RemedialActionSchedule-Simple/2.3#");
                                     }
                                 }
                                 case "SecurityAnalysisResultProfile", "DocSecurityAnalysisResultProfile" -> {
@@ -2001,7 +2001,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SecurityAnalysisResult-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.3#");
                                     }
                                 }
                                 case "SensitivityMatrixProfile", "DocSensitivityMatrixProfile" -> {
@@ -2009,7 +2009,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SensitivityMatrix-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SensitivityMatrix-Simple/2.3#");
                                     }
                                 }
                                 case "EquipmentReliabilityProfile", "DocEquipmentReliabilityProfile" -> {
@@ -2017,7 +2017,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/EquipmentReliability-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/EquipmentReliability-Simple/2.3#");
                                     }
                                 }
                                 case "RemedialActionProfile", "DocRemedialActionProfile" -> {
@@ -2025,7 +2025,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/RemedialAction-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/RemedialAction-Simple/2.3#");
                                     }
                                 }
                                 case "SteadyStateInstructionProfile", "DocSteadyStateInstructionProfile" -> {
@@ -2033,7 +2033,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SteadyStateInstruction-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SteadyStateInstruction-Simple/2.3#");
                                     }
                                 }
                                 case "AvailabilityScheduleProfile", "DocAvailabilityScheduleProfile" -> {
@@ -2041,7 +2041,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/AvailabilitySchedule-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/AvailabilitySchedule-Simple/2.3#");
                                     }
                                 }
                                 case "AssessedElementProfile", "DocAssessedElementProfile" -> {
@@ -2049,7 +2049,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/AssessedElement-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/AssessedElement-Simple/2.3#");
                                     }
                                 }
                                 case "StateInstructionScheduleProfile", "DocStateInstructionScheduleProfile" -> {
@@ -2057,7 +2057,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/StateInstructionSchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/StateInstructionSchedule-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/StateInstructionSchedule-Simple/2.3#");
                                     }
                                 }
                                 case "ContingencyProfile", "DocContingencyProfile" -> {
@@ -2065,7 +2065,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/Contingency-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/Contingency-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/Contingency-Simple/2.3#");
                                     }
                                 }
                                 case "DocumentHeaderProfile", "DocDocumentHeaderProfile" -> {
@@ -2073,7 +2073,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/DocumentHeader-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/DocumentHeader-Simple/2.3#");
                                     }
                                 }
                                 case "GridDisturbanceProfile", "DocGridDisturbanceProfile" -> {
@@ -2081,7 +2081,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/GridDisturbance-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/GridDisturbance-Simple/2.3#");
                                     }
                                 }
                                 case "ImpactAssessmentMatrixProfile", "DocImpactAssessmentMatrixProfile" -> {
@@ -2089,7 +2089,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/ImpactAssessmentMatrix-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/ImpactAssessmentMatrix-Simple/2.3#");
                                     }
                                 }
                                 case "MonitoringAreaProfile", "DocMonitoringAreaProfile" -> {
@@ -2097,7 +2097,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/MonitoringArea-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/MonitoringArea-Simple/2.3#");
                                     }
                                 }
                                 case "ObjectRegistryProfile", "DocObjectRegistryProfile" -> {
@@ -2105,7 +2105,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/ObjectRegistry-Schema/2.2#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/ObjectRegistry-Simple/2.2#");
                                     }
                                 }
                                 case "PowerScheduleProfile", "DocPowerScheduleProfile" -> {
@@ -2113,14 +2113,14 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/PowerSchedule-Schema/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/PowerSchedule-Simple/2.3#");
                                     }
                                 }
                                 case "SteadyStateHypothesisScheduleProfile",
                                      "DocSteadyStateHypothesisScheduleProfile" -> {
                                     ((ArrayList) modelsNames).set(1, "shs");
                                     if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Schema/1.0#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Simple/1.0#");
                                     }
                                 }
                                 case "DetailedModelConfigurationProfile", "DocDetailedModelConfigurationProfile" -> {
@@ -2278,132 +2278,132 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/PowerSystemProject-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/PowerSystemProject-Simple/2.3");
                                     }
                                 }
                                 case "RemedialActionScheduleProfile", "DocRemedialActionScheduleProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/RemedialActionSchedule-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/RemedialActionSchedule-Simple/2.3");
                                     }
                                 }
                                 case "SecurityAnalysisResultProfile", "DocSecurityAnalysisResultProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecurityAnalysisResult-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.3");
                                     }
                                 }
                                 case "SensitivityMatrixProfile", "DocSensitivityMatrixProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SensitivityMatrix-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SensitivityMatrix-Simple/2.3");
                                     }
                                 }
                                 case "EquipmentReliabilityProfile", "DocEquipmentReliabilityProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/EquipmentReliability-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/EquipmentReliability-Simple/2.3");
                                     }
                                 }
                                 case "RemedialActionProfile", "DocRemedialActionProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/RemedialAction-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/RemedialAction-Simple/2.3");
                                     }
                                 }
                                 case "SteadyStateInstructionProfile", "DocSteadyStateInstructionProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SteadyStateInstruction-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SteadyStateInstruction-Simple/2.3");
                                     }
                                 }
                                 case "AvailabilityScheduleProfile", "DocAvailabilityScheduleProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/AvailabilitySchedule-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/AvailabilitySchedule-Simple/2.3");
                                     }
                                 }
                                 case "AssessedElementProfile", "DocAssessedElementProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/AssessedElement-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/AssessedElement-Simple/2.3");
                                     }
                                 }
                                 case "SecurityScheduleProfile", "DocSecurityScheduleProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SecuritySchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecuritySchedule-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecuritySchedule-Simple/2.3");
                                     }
                                 }
                                 case "ContingencyProfile", "DocContingencyProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/Contingency-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/Contingency-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/Contingency-Simple/2.3");
                                     }
                                 }
                                 case "DocumentHeaderProfile", "DocDocumentHeaderProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/DocumentHeader-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/DocumentHeader-Simple/2.3");
                                     }
                                 }
                                 case "GridDisturbanceProfile", "DocGridDisturbanceProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/GridDisturbance-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/GridDisturbance-Simple/2.3");
                                     }
                                 }
                                 case "ImpactAssessmentMatrixProfile", "DocImpactAssessmentMatrixProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/ImpactAssessmentMatrix-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/ImpactAssessmentMatrix-Simple/2.3");
                                     }
                                 }
                                 case "MonitoringAreaProfile", "DocMonitoringAreaProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/MonitoringArea-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/MonitoringArea-Simple/2.3");
                                     }
                                 }
                                 case "ObjectRegistryProfile", "DocObjectRegistryProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/ObjectRegistry-Schema/2.2");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/ObjectRegistry-Simple/2.2");
                                     }
                                 }
                                 case "PowerScheduleProfile", "DocPowerScheduleProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/PowerSchedule-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/PowerSchedule-Simple/2.3");
                                     }
                                 }
                                 case "StateInstructionScheduleProfile", "DocStateInstructionScheduleProfile" -> {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/StateInstructionSchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/StateInstructionSchedule-Schema/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/StateInstructionSchedule-Simple/2.3");
                                     }
                                 }
                                 case "SteadyStateHypothesisScheduleProfile",
                                      "DocSteadyStateHypothesisScheduleProfile" -> {
                                     if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Schema/1.0");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Simple/1.0");
                                     }
                                 }
                                 case "DetailedModelConfigurationProfile", "DocDetailedModelConfigurationProfile" ->
