@@ -2001,7 +2001,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.3#");
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.4#");
                                     }
                                 }
                                 case "SensitivityMatrixProfile", "DocSensitivityMatrixProfile" -> {
@@ -2074,6 +2074,12 @@ public class MainController implements Initializable {
                                         ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints#");
                                     } else if (profileVersion == 6) {
                                         ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/DocumentHeader-Simple/2.3#");
+                                    }
+                                }
+                                case "DatasetMetadataProfile", "DocDatasetMetadataProfile" -> {
+                                    ((ArrayList) modelsNames).set(1, "dm");
+                                    if (profileVersion == 6) {
+                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/DatasetMetadata-Simple/2.4#");
                                     }
                                 }
                                 case "GridDisturbanceProfile", "DocGridDisturbanceProfile" -> {
@@ -2292,7 +2298,7 @@ public class MainController implements Initializable {
                                     if (profileVersion == 5) {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.3");
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.4");
                                     }
                                 }
                                 case "SensitivityMatrixProfile", "DocSensitivityMatrixProfile" -> {
@@ -2356,6 +2362,11 @@ public class MainController implements Initializable {
                                         ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints");
                                     } else if (profileVersion == 6) {
                                         ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/DocumentHeader-Simple/2.3");
+                                    }
+                                }
+                                case "DatasetMetadataProfile", "DocDatasetMetadataProfile" -> {
+                                    if (profileVersion == 6) {
+                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/DatasetMetadata-Simple/2.4");
                                     }
                                 }
                                 case "GridDisturbanceProfile", "DocGridDisturbanceProfile" -> {
