@@ -1,8 +1,10 @@
 package util;
 
+import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
+import org.apache.jena.vocabulary.XSD;
 
 import java.util.*;
 
@@ -54,7 +56,20 @@ public class CompareFactory {
                                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
                                            }
                                        }else {
-                                           compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                           // need to check if this is literal and then compare the literal value if it is xsd float, integer or decimal
+                                           if (resItemStmt.getObject().isLiteral()) {
+                                                Literal objectLit = resItemStmt.getObject().asLiteral();
+                                               Object litValue = objectLit.getValue();
+                                                if (objectLit.getDatatype().getURI().equals(XSDDatatype.XSDdecimal.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDinteger.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDfloat.getURI())){
+                                                    if (!litValue.equals(modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().asLiteral().getValue())){
+                                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                                    }
+                                                }else {//when it is not having datatype or if the datatype is not xsd float, integer or decimal
+                                                    compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                                }
+                                           } else {// when it is not literal
+                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                           }
                                        }
                                    } else {//the class in model B does not contain that attribute => this attribute/association is a difference
 

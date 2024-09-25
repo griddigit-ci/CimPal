@@ -9,7 +9,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jena.version>5.1.0</jena.version>
         <launch4j.version>2.5.0</launch4j.version>
-        <javafx.version>22.0.2</javafx.version>
+        <javafx.version>23</javafx.version>
         <cimpal.version>2024.0.0.0</cimpal.version>
     </properties>
 
@@ -147,17 +147,17 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>5.2.5</version>
+            <version>5.3.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
-            <artifactId>commons-math3</artifactId>
-            <version>3.6.1</version>
+            <artifactId>commons-math4-core</artifactId>
+            <version>4.0-beta1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.14.0</version>
+            <version>3.15.0</version>
         </dependency>
 
         <dependency>
@@ -291,9 +291,9 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.14</version>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5</artifactId>
+            <version>5.3</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-codec</artifactId>
