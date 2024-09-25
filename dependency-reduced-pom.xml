@@ -129,7 +129,7 @@
     <launch4j.version>2.5.0</launch4j.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <log4j.version>2.12.1</log4j.version>
-    <javafx.version>22.0.2</javafx.version>
+    <javafx.version>23</javafx.version>
     <jdk.version>21</jdk.version>
   </properties>
 </project>
