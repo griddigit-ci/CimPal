@@ -321,6 +321,13 @@
             <artifactId>commons-codec</artifactId>
             <version>1.17.0</version>
         </dependency>
+        
+        <dependency>
+            <groupId>net.sourceforge.plantuml</groupId>
+            <artifactId>plantuml-mit</artifactId>
+            <version>1.2024.7</version>
+        </dependency>
+
     </dependencies>
     <repositories>
         <repository>

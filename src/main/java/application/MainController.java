@@ -44,6 +44,7 @@ import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import util.CompareFactory;
 import util.ExcelTools;
+import util.PlantUMLGenerator;
 
 import java.io.*;
 import java.net.URL;
@@ -2980,6 +2981,25 @@ public class MainController implements Initializable {
         fsourceDefineTab.clear();
         tableViewBrowseModify.getItems().clear();
     }
+
+//    @FXML
+//    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
+//
+//        String uml = "@startuml\nAlice -> Bob: Hello\n@enduml";
+//        byte[] diagram = PlantUMLGenerator.generateDiagram(uml);
+//        Image image = new Image(new ByteArrayInputStream(diagram));
+//
+//        ImageView imageView = new ImageView(image);
+//        StackPane root = new StackPane(imageView);
+//        Scene scene = new Scene(root, 800, 600);
+//
+//        primaryStage.setTitle("PlantUML in JavaFX");
+//        primaryStage.setScene(scene);
+//        primaryStage.show()
+//
+//    }
+
+
 
     @FXML
     // action on button "Show/Hide source code" in the SHACL Shapes Browser
