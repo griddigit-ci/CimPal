@@ -9,13 +9,15 @@ import javafx.beans.property.SimpleStringProperty;
 
 public class RDFcomparisonResultModel {
     private final SimpleStringProperty item;
+    private final SimpleStringProperty rdfType;
     private final SimpleStringProperty property;
     private final SimpleStringProperty valueModelA;
     private final SimpleStringProperty valueModelB;
 
 
-    public RDFcomparisonResultModel(String iitem, String iproperty, String ivalueModelA, String ivalueModelB) {
+    public RDFcomparisonResultModel(String iitem, String irdfType, String iproperty, String ivalueModelA, String ivalueModelB) {
         this.item = new SimpleStringProperty(iitem);
+        this.rdfType = new SimpleStringProperty(irdfType);
         this.property = new SimpleStringProperty(iproperty);
         this.valueModelA = new SimpleStringProperty(ivalueModelA);
         this.valueModelB = new SimpleStringProperty(ivalueModelB);
@@ -26,6 +28,13 @@ public class RDFcomparisonResultModel {
     }
     public void setItem(String iitem) {
         item.set(iitem);
+    }
+
+    public String getRdfType() {
+        return rdfType.get();
+    }
+    public void setRdfType(String irdfType) {
+        rdfType.set(irdfType);
     }
 
     public String getProperty() {

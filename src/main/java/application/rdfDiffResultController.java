@@ -31,6 +31,8 @@ public class rdfDiffResultController implements Initializable {
     @FXML
     private TableColumn cItem;
     @FXML
+    private TableColumn cClass;
+    @FXML
     private TableColumn cProperty;
     @FXML
     private TableColumn cValueModelA;
@@ -59,6 +61,8 @@ public class rdfDiffResultController implements Initializable {
 
         cItem.setCellValueFactory( new PropertyValueFactory<RDFcomparisonResultModel, String>( "item" ) );
         cItem.setCellFactory(cellFactory);
+        cClass.setCellValueFactory( new PropertyValueFactory<RDFcomparisonResultModel, String>( "rdfType" ) );
+        cClass.setCellFactory(cellFactory);
         cProperty.setCellValueFactory( new PropertyValueFactory<RDFcomparisonResultModel, String>( "property" ) );
         cProperty.setCellFactory(cellFactory);
         cValueModelA.setCellValueFactory( new PropertyValueFactory<RDFcomparisonResultModel, String>( "valueModelA" ) );
@@ -70,7 +74,7 @@ public class rdfDiffResultController implements Initializable {
 
         for (int row=0; row<MainController.compareResults.size(); row++) {
             List<String> line = (List<String>) MainController.compareResults.get(row);
-            tableResultsData.add(new RDFcomparisonResultModel(line.get(0), line.get(1), line.get(2), line.get(3)));
+            tableResultsData.add(new RDFcomparisonResultModel(line.get(0), line.get(1), line.get(2), line.get(3), line.get(4)));
         }
 
         labelModelA.setText(MainController.rdfsCompareFiles.get(0));

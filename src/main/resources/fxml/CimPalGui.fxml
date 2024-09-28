@@ -6,35 +6,13 @@
  @author Chavdar Ivanov
  -->
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.ChoiceBox?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Menu?>
-<?import javafx.scene.control.MenuBar?>
-<?import javafx.scene.control.MenuItem?>
-<?import javafx.scene.control.ProgressBar?>
-<?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.control.Separator?>
-<?import javafx.scene.control.SeparatorMenuItem?>
-<?import javafx.scene.control.SplitPane?>
-<?import javafx.scene.control.Tab?>
-<?import javafx.scene.control.TabPane?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.ToggleButton?>
-<?import javafx.scene.control.Tooltip?>
-<?import javafx.scene.control.TreeView?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Pane?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
    <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -618,13 +596,8 @@
                                     <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
                                     <TextField fx:id="fowlImportsDefineTab1" editable="false" prefWidth="530.0" />
                                  </HBox>
+                                 <ImageView fx:id="IDgraph" fitHeight="346.0" fitWidth="960.0" pickOnBounds="true" preserveRatio="true" VBox.vgrow="ALWAYS" />
                               </VBox>
-                              <TableView fx:id="tableViewBrowseID">
-                                 <columns>
-                                    <TableColumn fx:id="itemColumnBrowseModifyID" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Property" />
-                                    <TableColumn fx:id="valueColumnBrowseModifyID" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
-                                 </columns>
-                              </TableView>
                               <HBox alignment="BOTTOM_LEFT" spacing="10.0">
                                  <VBox minWidth="200.0" spacing="5.0">
                                     <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
@@ -642,70 +615,173 @@
                      </AnchorPane>
                   </Tab>
                   <Tab text="SHACL Organizer">
+                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                           <HBox spacing="10.0">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="5.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
+                              <TextField fx:id="fPathShaclFilesToOrganize" editable="false" HBox.hgrow="ALWAYS" />
+                              <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesToOrganize" text="Browse" />
+                           </HBox>
+                           <HBox spacing="10.0">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="5.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="Excel template file:" wrapText="true" />
+                              <TextField fx:id="fPathXLSfileForShacl" editable="false" HBox.hgrow="ALWAYS" />
+                              <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShacl" text="Browse" />
+                           </HBox>
+                           <HBox spacing="10.0" visible="false">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="5.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="Base URI - Shape graph:" wrapText="true" />
+                              <TextField fx:id="fbaseURIShacl" HBox.hgrow="ALWAYS" />
+                           </HBox>
+                           <HBox spacing="10.0" visible="false">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="5.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="Namespace information for the resulted Shape graph:" wrapText="true" />
+                           </HBox>
+                           <HBox spacing="10.0" visible="false">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="5.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="Prefix:" wrapText="true" />
+                              <TextField fx:id="fPrefixShaclOrganizer" prefWidth="70.0" />
+                              <Label minWidth="90.0" text="Namespace:" wrapText="true" />
+                              <TextField fx:id="fNSShaclOrganizer" HBox.hgrow="ALWAYS" />
+                           </HBox>
+                           <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                              <VBox.margin>
+                                 <Insets bottom="5.0" right="5.0" />
+                              </VBox.margin>
+                              <Button fx:id="btnRunShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclOrganizer" text="Run" HBox.hgrow="ALWAYS" />
+                              <Button fx:id="btnResetShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetShaclOrganizer" text="Reset" />
+                           </HBox>
+                        </VBox>
+                     </AnchorPane>
+                  </Tab>
+                  <Tab fx:id="IDpane" disable="true" text="Instance Data Browser Pane">
                      <content>
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <AnchorPane fx:id="IDpane" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                            <children>
-                              <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                              <VBox layoutX="27.0" layoutY="17.0" minWidth="200.0" prefHeight="451.0" prefWidth="1228.0" spacing="5.0">
                                  <children>
-                                    <HBox spacing="10.0">
-                                       <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
-                                       </padding>
+                                    <HBox fx:id="IDhbox" alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" prefHeight="411.0" prefWidth="1228.0" spacing="10.0">
                                        <children>
-                                          <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
-                                          <TextField fx:id="fPathShaclFilesToOrganize" editable="false" HBox.hgrow="ALWAYS" />
-                                          <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesToOrganize" text="Browse" />
+                                          <ImageView fx:id="IDImageView" fitHeight="411.0" fitWidth="1236.0" pickOnBounds="true" preserveRatio="true" />
                                        </children>
                                     </HBox>
-                                    <HBox spacing="10.0">
-                                       <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
-                                       </padding>
+                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
                                        <children>
-                                          <Label minWidth="90.0" text="Excel template file:" wrapText="true" />
-                                          <TextField fx:id="fPathXLSfileForShacl" editable="false" HBox.hgrow="ALWAYS" />
-                                          <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShacl" text="Browse" />
-                                       </children>
-                                    </HBox>
-                                    <HBox spacing="10.0" visible="false">
-                                       <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
-                                       </padding>
-                                       <children>
-                                          <Label minWidth="90.0" text="Base URI - Shape graph:" wrapText="true" />
-                                          <TextField fx:id="fbaseURIShacl" HBox.hgrow="ALWAYS" />
-                                       </children>
-                                    </HBox>
-                                    <HBox spacing="10.0" visible="false">
-                                       <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
-                                       </padding>
-                                       <children>
-                                          <Label minWidth="90.0" text="Namespace information for the resulted Shape graph:" wrapText="true" />
-                                       </children>
-                                    </HBox>
-                                    <HBox spacing="10.0" visible="false">
-                                       <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
-                                       </padding>
-                                       <children>
-                                          <Label minWidth="90.0" text="Prefix:" wrapText="true" />
-                                          <TextField fx:id="fPrefixShaclOrganizer" prefWidth="70.0" />
-                                          <Label minWidth="90.0" text="Namespace:" wrapText="true" />
-                                          <TextField fx:id="fNSShaclOrganizer" HBox.hgrow="ALWAYS" />
-                                       </children>
-                                    </HBox>
-                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
-                                       <VBox.margin>
-                                          <Insets bottom="5.0" right="5.0" />
-                                       </VBox.margin>
-                                       <children>
-                                          <Button fx:id="btnRunShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclOrganizer" text="Run" HBox.hgrow="ALWAYS" />
-                                          <Button fx:id="btnResetShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetShaclOrganizer" text="Reset" />
+                                          <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData1" text="Load Data" />
+                                          <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
                                        </children>
                                     </HBox>
                                  </children>
                               </VBox>
+                           </children>
+                        </AnchorPane>
+                     </content>
+                  </Tab>
+                  <Tab disable="true" text="Instance Data Browser">
+                     <content>
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                           <children>
+                              <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                 <children>
+                                    <VBox minWidth="300.0" spacing="5.0">
+                                       <HBox.margin>
+                                          <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                       </HBox.margin>
+                                       <children>
+                                          <Label prefWidth="120.0" text="Instance data" />
+                                          <TreeView fx:id="treeViewInstanceData11" minHeight="70.0" onMouseClicked="#selectActionTreeItemID" prefWidth="300.0" VBox.vgrow="ALWAYS" />
+                                       </children>
+                                    </VBox>
+                                    <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                                       <HBox.margin>
+                                          <Insets bottom="5.0" right="5.0" top="5.0" />
+                                       </HBox.margin>
+                                       <children>
+                                          <VBox prefHeight="200.0" prefWidth="100.0">
+                                             <VBox.margin>
+                                                <Insets />
+                                             </VBox.margin>
+                                             <children>
+                                                <HBox spacing="10.0">
+                                                   <padding>
+                                                      <Insets left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                   <children>
+                                                      <CheckBox fx:id="cbShowUnionModelOnly11" mnemonicParsing="false" selected="true" text="Show only Union Model">
+                                                         <HBox.margin>
+                                                            <Insets right="10.0" />
+                                                         </HBox.margin>
+                                                      </CheckBox>
+                                                      <Label prefWidth="140.0" text="Shapes namespace:" />
+                                                      <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
+                                                      <TextField fx:id="fPrefixGenerateTab111" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
+                                                      <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
+                                                      <TextField fx:id="fURIGenerateTab111" editable="false" prefWidth="300.0" />
+                                                   </children>
+                                                </HBox>
+                                                <HBox spacing="10.0">
+                                                   <padding>
+                                                      <Insets left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                   <children>
+                                                      <Label prefWidth="140.0" text="Shapes base URI:" />
+                                                      <TextField fx:id="fshapesBaseURIDefineTab111" editable="false" prefWidth="530.0" />
+                                                   </children>
+                                                </HBox>
+                                                <HBox spacing="10.0">
+                                                   <padding>
+                                                      <Insets left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                   <children>
+                                                      <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
+                                                      <TextField fx:id="fowlImportsDefineTab111" editable="false" prefWidth="530.0" />
+                                                   </children>
+                                                </HBox>
+                                             </children>
+                                          </VBox>
+                                          <TableView fx:id="tableViewBrowseID11">
+                                             <columns>
+                                                <TableColumn fx:id="itemColumnBrowseModifyID11" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Property" />
+                                                <TableColumn fx:id="valueColumnBrowseModifyID11" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
+                                             </columns>
+                                          </TableView>
+                                          <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                             <children>
+                                                <VBox minWidth="200.0" spacing="5.0">
+                                                   <children>
+                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
+                                                         <children>
+                                                            <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
+                                                         </children>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
+                                                <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
+                                                   <children>
+                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
+                                                         <children>
+                                                            <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData" text="Load Data" HBox.hgrow="ALWAYS" />
+                                                         </children>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                    </VBox>
+                                 </children>
+                              </HBox>
                            </children>
                         </AnchorPane>
                      </content>

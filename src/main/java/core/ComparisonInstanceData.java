@@ -228,12 +228,12 @@ public class ComparisonInstanceData {
 
                             if (options.get(5).equals(1)) {//ConnectivityNodes are used for the comparison. This is for CGMES v3 where the models are build with ConnectivityNodes
 
-                                ArrayList cnListModelA = (ArrayList) modelA.listResourcesWithProperty(propertyCNTN, assocObject).toList();
+                                ArrayList<?> cnListModelA = (ArrayList<?>) modelA.listResourcesWithProperty(propertyCNTN, assocObject).toList();
 
                                 for (ResIterator subIt = modelB.listResourcesWithProperty(propertySvVTN); subIt.hasNext(); ) { //resource iterator on the subjects that have that association; then that subject would have an object that is equal to modelA and then compare .angle and .v
                                     Resource resItemSubItSv = subIt.next();
                                     RDFNode assocObjectTN = modelB.getRequiredProperty(resItemSubItSv, propertySvVTN).getObject();
-                                    ArrayList cnListModelB = (ArrayList) modelB.listResourcesWithProperty(propertyCNTN, assocObjectTN).toList();
+                                    ArrayList<?> cnListModelB = (ArrayList<?>) modelB.listResourcesWithProperty(propertyCNTN, assocObjectTN).toList();
                                     int foundCN = 0;
                                     for (Object listItem : cnListModelA) {
                                         if (cnListModelB.contains(listItem)) {
@@ -247,14 +247,16 @@ public class ComparisonInstanceData {
                                         Double vObjectModelBCN = modelB.getRequiredProperty(resItemSubItSv, propertySvVv).getObject().asLiteral().getDouble();
                                         Double angleObjectModelBCN = modelB.getRequiredProperty(resItemSubItSv, propertySvVangle).getObject().asLiteral().getDouble();
                                         if (!vObject.equals(vObjectModelBCN)) {
-                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.v", vObject.toString(), vObjectModelBCN.toString());
+                                            String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.v", vObject.toString(), vObjectModelBCN.toString(),rdfType);
                                             svVoltageVA.add(vObject);
                                             svVoltageVB.add(vObjectModelBCN);
                                             svVoltageVdiff.add(Math.abs(vObject - vObjectModelBCN));
                                             //System.out.println(vObject.asLiteral().getFloat() - vObjectModelB.asLiteral().getFloat());
                                         }
                                         if (!angleObject.equals(angleObjectModelBCN)) {
-                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.angle", angleObject.toString(), angleObjectModelBCN.toString());
+                                            String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.angle", angleObject.toString(), angleObjectModelBCN.toString(),rdfType);
                                             svVoltageAngleA.add(angleObject);
                                             svVoltageAngleB.add(angleObjectModelBCN);
                                             svVoltageAnglediff.add(Math.sqrt((angleObject - angleObjectModelBCN) * (angleObject - angleObjectModelBCN)));
@@ -273,14 +275,16 @@ public class ComparisonInstanceData {
                                     Double vObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvVv).getObject().asLiteral().getDouble();
                                     Double angleObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvVangle).getObject().asLiteral().getDouble();
                                     if (!vObject.equals(vObjectModelB)) {
-                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.v", vObject.toString(), vObjectModelB.toString());
+                                        String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.v", vObject.toString(), vObjectModelB.toString(),rdfType);
                                         svVoltageVA.add(vObject);
                                         svVoltageVB.add(vObjectModelB);
                                         svVoltageVdiff.add(Math.abs(vObject - vObjectModelB));
                                         //System.out.println(vObject.asLiteral().getFloat() - vObjectModelB.asLiteral().getFloat());
                                     }
                                     if (!angleObject.equals(angleObjectModelB)) {
-                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.angle", angleObject.toString(), angleObjectModelB.toString());
+                                        String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvVoltage.angle", angleObject.toString(), angleObjectModelB.toString(),rdfType);
                                         svVoltageAngleA.add(angleObject);
                                         svVoltageAngleB.add(angleObjectModelB);
                                         svVoltageAnglediff.add(Math.sqrt((angleObject - angleObjectModelB) * (angleObject - angleObjectModelB)));
@@ -321,14 +325,16 @@ public class ComparisonInstanceData {
                                 Double pObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvPFp).getObject().asLiteral().getDouble();
                                 Double qObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvPFq).getObject().asLiteral().getDouble();
                                 if (!pObject.equals(pObjectModelB)) {
-                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName()+" | "+condEQtype, "cim:SvPowerFlow.p", pObject.toString(), pObjectModelB.toString());
+                                    String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName()+" | "+condEQtype, "cim:SvPowerFlow.p", pObject.toString(), pObjectModelB.toString(),rdfType);
                                     svPowerFlowPA.add(pObject);
                                     svPowerFlowPB.add(pObjectModelB);
                                     svPowerFlowPdiff.add(Math.sqrt((pObject - pObjectModelB) * (pObject - pObjectModelB)));
                                     //System.out.println(vObject.asLiteral().getFloat() - vObjectModelB.asLiteral().getFloat());
                                 }
                                 if (!qObject.equals(qObjectModelB)) {
-                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName()+" | "+condEQtype, "cim:SvPowerFlow.q", qObject.toString(), qObjectModelB.toString());
+                                    String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName()+" | "+condEQtype, "cim:SvPowerFlow.q", qObject.toString(), qObjectModelB.toString(),rdfType);
                                     svPowerFlowQA.add(qObject);
                                     svPowerFlowQB.add(qObjectModelB);
                                     svPowerFlowQdiff.add(Math.sqrt((qObject - qObjectModelB) * (qObject - qObjectModelB)));
@@ -370,14 +376,16 @@ public class ComparisonInstanceData {
                                         Double pInjectionObjectModelBCN = modelB.getRequiredProperty(resItemSubItSv, propertySvInp).getObject().asLiteral().getDouble();
                                         Double qInjectionObjectModelBCN = modelB.getRequiredProperty(resItemSubItSv, propertySvInq).getObject().asLiteral().getDouble();
                                         if (!pInjectionObject.equals(pInjectionObjectModelBCN)) {
-                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.pInjection", pInjectionObject.toString(), pInjectionObjectModelBCN.toString());
+                                            String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.pInjection", pInjectionObject.toString(), pInjectionObjectModelBCN.toString(),rdfType);
                                             SvInjectionPA.add(pInjectionObject);
                                             SvInjectionPB.add(pInjectionObjectModelBCN);
                                             SvInjectionPdiff.add(Math.sqrt((pInjectionObject - pInjectionObjectModelBCN) * (pInjectionObject - pInjectionObjectModelBCN)));
                                             //System.out.println(vObject.asLiteral().getFloat() - vObjectModelB.asLiteral().getFloat());
                                         }
                                         if (!qInjectionObject.equals(qInjectionObjectModelBCN)) {
-                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.qInjection", qInjectionObject.toString(), qInjectionObjectModelBCN.toString());
+                                            String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                            compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.qInjection", qInjectionObject.toString(), qInjectionObjectModelBCN.toString(),rdfType);
                                             SvInjectionQA.add(qInjectionObject);
                                             SvInjectionQB.add(qInjectionObjectModelBCN);
                                             SvInjectionQdiff.add(Math.sqrt((qInjectionObject - qInjectionObjectModelBCN) * (qInjectionObject - qInjectionObjectModelBCN)));
@@ -396,14 +404,16 @@ public class ComparisonInstanceData {
                                     Double pInjectionObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvInp).getObject().asLiteral().getDouble();
                                     Double qInjectionObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvInq).getObject().asLiteral().getDouble();
                                     if (!pInjectionObject.equals(pInjectionObjectModelB)) {
-                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.pInjection", pInjectionObject.toString(), pInjectionObjectModelB.toString());
+                                        String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.pInjection", pInjectionObject.toString(), pInjectionObjectModelB.toString(),rdfType);
                                         SvInjectionPA.add(pInjectionObject);
                                         SvInjectionPB.add(pInjectionObjectModelB);
                                         SvInjectionPdiff.add(Math.sqrt((pInjectionObject - pInjectionObjectModelB) * (pInjectionObject - pInjectionObjectModelB)));
                                         //System.out.println(vObject.asLiteral().getFloat() - vObjectModelB.asLiteral().getFloat());
                                     }
                                     if (!qInjectionObject.equals(qInjectionObjectModelB)) {
-                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.qInjection", qInjectionObject.toString(), qInjectionObjectModelB.toString());
+                                        String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                        compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvInjection.qInjection", qInjectionObject.toString(), qInjectionObjectModelB.toString(),rdfType);
                                         SvInjectionQA.add(qInjectionObject);
                                         SvInjectionQB.add(qInjectionObjectModelB);
                                         SvInjectionQdiff.add(Math.sqrt((qInjectionObject - qInjectionObjectModelB) * (qInjectionObject - qInjectionObjectModelB)));
@@ -429,7 +439,8 @@ public class ComparisonInstanceData {
 
                                 Boolean openObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvSwo).getObject().asLiteral().getBoolean();
                                 if (!openObject.equals(openObjectModelB)) {
-                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvSwitch.open", openObject.toString(), openObjectModelB.toString());
+                                    String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvSwitch.open", openObject.toString(), openObjectModelB.toString(),rdfType);
                                     SvSwitchOpenA.add(openObject);
                                     SvSwitchOpenB.add(openObjectModelB);
                                     SvSwitchOpendiff.add(1);
@@ -451,7 +462,8 @@ public class ComparisonInstanceData {
 
                                 Boolean inServiceObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvStInS).getObject().asLiteral().getBoolean();
                                 if (!inServiceObject.equals(inServiceObjectModelB)) {
-                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvStatus.inService", inServiceObject.toString(), inServiceObjectModelB.toString());
+                                    String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvStatus.inService", inServiceObject.toString(), inServiceObjectModelB.toString(),rdfType);
                                     SvStatusInServiceA.add(inServiceObject);
                                     SvStatusInServiceB.add(inServiceObjectModelB);
                                     SvStatusInServiceDiff.add(1);
@@ -474,7 +486,8 @@ public class ComparisonInstanceData {
 
                                 Double sectionsObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvShS).getObject().asLiteral().getDouble();
                                 if (!sectionsObject.equals(sectionsObjectModelB)) {
-                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvShuntCompensatorSections.sections", sectionsObject.toString(), sectionsObjectModelB.toString());
+                                    String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvShuntCompensatorSections.sections", sectionsObject.toString(), sectionsObjectModelB.toString(),rdfType);
 
                                     SvShuntCompensatorSectionsSectionsA.add(sectionsObject);
                                     SvShuntCompensatorSectionsSectionsB.add(sectionsObjectModelB);
@@ -498,7 +511,8 @@ public class ComparisonInstanceData {
 
                                 Double positionObjectModelB = modelB.getRequiredProperty(resItemSubIt, propertySvTsP).getObject().asLiteral().getDouble();
                                 if (!positionObject.equals(positionObjectModelB)) {
-                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvTapStep.position", positionObject.toString(), positionObjectModelB.toString());
+                                    String rdfType = getRDFtype(modelA,assocObject.asResource());
+                                    compareResults = CompareFactory.addResult(compareResults, assocObject.asResource().getLocalName(), "cim:SvTapStep.position", positionObject.toString(), positionObjectModelB.toString(),rdfType);
                                     SvTapStepPositionA.add(positionObject);
                                     SvTapStepPositionB.add(positionObjectModelB);
                                     SvTapStepPositionDiff.add(Math.sqrt((positionObject - positionObjectModelB) * (positionObject - positionObjectModelB)));
@@ -562,7 +576,8 @@ public class ComparisonInstanceData {
                                     if (modelB.contains(resItemStmt.getSubject(), resItemStmt.getPredicate())) {// the class has same attribute in modelB, but the object is different as does not contain the complete statement
                                         Double objectModelB = modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().asLiteral().getDouble();
                                         if (!objectModelA.equals(objectModelB)) {
-                                            compareResults = CompareFactory.addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + propertyName, objectModelA.toString(), objectModelB.toString());
+                                            String rdfType = getRDFtype(modelA,resItem);
+                                            compareResults = CompareFactory.addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + propertyName, objectModelA.toString(), objectModelB.toString(),rdfType);
 
                                             Double diff = Math.sqrt((objectModelA - objectModelB) * (objectModelA - objectModelB));
                                             // here fill in the lists
@@ -809,25 +824,46 @@ public class ComparisonInstanceData {
     }
 
     //Give size, max and mean for the List
-    public static HashMap<String,Object> solutionResultElements(ArrayList<Object> results, Integer arrayIndex, Integer precisionRoundScale) {
-        HashMap<String,Object> resultElements = new HashMap<>();
-        List<Double> values = ((List) results.get(arrayIndex));
+    public static HashMap<String, Object> solutionResultElements(ArrayList<Object> results, int arrayIndex, int precisionRoundScale) {
+        HashMap<String, Object> resultElements = new HashMap<>();
+
+        if (results == null || results.isEmpty() || arrayIndex < 0 || arrayIndex >= results.size()) {
+            resultElements.put("size", 0);
+            resultElements.put("max", "N/A");
+            resultElements.put("mean", "N/A");
+            return resultElements;
+        }
+
+        List<Double> valuesT = ((List) results.get(arrayIndex));
+        List<Double> values = new LinkedList<>();
+        for (Double val : valuesT){
+            values.add(val.doubleValue());
+        }
         if (!values.isEmpty()) {
-            Double maxv = Collections.max(values);
+            Double maxValue = Collections.max(values);
             Mean mean = new Mean();
-            double[] primitiveV = ArrayUtils.toPrimitive(values.toArray(new Double[0]));
+            double[] primitiveValues = ArrayUtils.toPrimitive(values.toArray(new Double[0]));
 
             resultElements.put("size", values.size());
-            resultElements.put("max", Precision.round(maxv, precisionRoundScale));
-            resultElements.put("mean", Precision.round(mean.evaluate(primitiveV), precisionRoundScale));
-        }else{
+            resultElements.put("max", Precision.round(maxValue, precisionRoundScale));
+            resultElements.put("mean", Precision.round(mean.evaluate(primitiveValues), precisionRoundScale));
+        } else {
             resultElements.put("size", 0);
             resultElements.put("max", "N/A");
             resultElements.put("mean", "N/A");
         }
 
-
         return resultElements;
+    }
+
+    //Give size, max and mean for the List
+    public static String getRDFtype(Model model, Resource resource) {
+        Statement rdfType = model.getRequiredProperty(resource,RDF.type);
+        Resource rdfTypeRes = rdfType.getObject().asResource();
+        String rdfTypeNS = rdfTypeRes.getNameSpace();
+        String rdfTypeLN = rdfTypeRes.getLocalName();
+
+        return model.getNsURIPrefix(rdfTypeNS)+":"+rdfTypeLN;
     }
 
 }

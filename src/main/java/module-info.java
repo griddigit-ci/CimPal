@@ -40,4 +40,6 @@ module CimPal {
     requires com.fasterxml.jackson.databind;
     requires org.apache.jena.iri;
     requires net.sourceforge.plantuml;
+    requires guru.nidi.graphviz;
+    //requires smartgraph;
 }

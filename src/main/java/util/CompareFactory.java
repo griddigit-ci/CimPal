@@ -4,10 +4,10 @@ import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
-import org.apache.jena.vocabulary.XSD;
 
 import java.util.*;
 
+import static core.ComparisonInstanceData.getRDFtype;
 import static core.ComparisonSHACLshapes.modelsABPrefMap;
 
 public class CompareFactory {
@@ -29,6 +29,7 @@ public class CompareFactory {
 
     private static ArrayList<Object> compareModelsDetail(ArrayList<Object> compareResults, Model modelA, Model modelB, int reverse, Resource resItem){
         //compareResults= compareClass(compareResults, modelA, modelB, resItem, reverse);
+        String rdfType = getRDFtype(modelA,resItem);
         if (modelB.contains(resItem.getRequiredProperty(RDF.type))) {// the statement is in the other model which means that the class is there. Then need to compare the properties of the class
 
             if (reverse == 0) {// only in the first run as same classes need to be checked once
@@ -42,7 +43,7 @@ public class CompareFactory {
                            if (resItemStmt.getObject().isAnon()) {// if it is a blank node
                                Map<String,String> resultBN=compareBlankNode(modelA, modelB, resItemStmt,reverse);
                                if (!resultBN.isEmpty()) {
-                                   compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resultBN.get("modelA"), resultBN.get("modelB"));
+                                   compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resultBN.get("modelA"), resultBN.get("modelB"),rdfType);
                                }
                            }else {
                                if (!modelB.contains(resItemStmt)) {// does not contain the statement, i.e. the attribute/association; then the value needs to be compared as maybe it is either missing or just the value is different
@@ -53,7 +54,7 @@ public class CompareFactory {
 
                                            //}
                                            if (!modelB.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString().equals(modelA.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString())){
-                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
                                            }
                                        }else {
                                            // need to check if this is literal and then compare the literal value if it is xsd float, integer or decimal
@@ -62,18 +63,17 @@ public class CompareFactory {
                                                Object litValue = objectLit.getValue();
                                                 if (objectLit.getDatatype().getURI().equals(XSDDatatype.XSDdecimal.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDinteger.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDfloat.getURI())){
                                                     if (!litValue.equals(modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().asLiteral().getValue())){
-                                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
                                                     }
                                                 }else {//when it is not having datatype or if the datatype is not xsd float, integer or decimal
-                                                    compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                                    compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
                                                 }
                                            } else {// when it is not literal
-                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString());
+                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
                                            }
                                        }
                                    } else {//the class in model B does not contain that attribute => this attribute/association is a difference
-
-                                       compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), "N/A");
+                                       compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), "N/A",rdfType);
                                    }
                                }
                            }
@@ -82,10 +82,10 @@ public class CompareFactory {
                                 List<RDFNode> modelAlist= resItemStmt.getList().asJavaList();
                                 List<RDFNode> modelBlist = modelB.getRequiredProperty(resItem,OWL2.oneOf).getList().asJavaList();
                                 if (compareRDFlist(modelAlist,modelBlist)){
-                                    compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), modelAlist.toString(), modelBlist.toString());
+                                    compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), modelAlist.toString(), modelBlist.toString(),rdfType);
                                 }
                             }else{
-                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getList().asJavaList().toString(), "N/A");
+                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getList().asJavaList().toString(), "N/A",rdfType);
                             }
                         }
                     }
@@ -97,17 +97,17 @@ public class CompareFactory {
                         if (!resItemStmt.getPredicate().equals(OWL2.oneOf)) {
                             if (resItemStmt.getObject().isAnon()) {//if it is a blank node
                                 Map<String, String> resultBN = compareBlankNode(modelA, modelB, resItemStmt, reverse);
-                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resultBN.get("modelA"), resultBN.get("modelB"));
+                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resultBN.get("modelA"), resultBN.get("modelB"),rdfType);
                             }else {
                                 if (!modelB.contains(resItemStmt)) {// does not contain the statement, i.e. the attribute/association; then the value needs to be compared as maybe it is either missing or just the value is different
                                     if (!modelB.contains(resItemStmt.getSubject(), resItemStmt.getPredicate())) {// the class does not have that attribute in modelB => this is difference
-                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A", resItemStmt.getObject().toString());
+                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A", resItemStmt.getObject().toString(),rdfType);
                                     }
                                 }
                             }
                         }else { //if the predicate is owl:oneOf
                             if (!modelB.contains(resItem, OWL2.oneOf)) {
-                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A", resItemStmt.getList().asJavaList().toString());
+                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A", resItemStmt.getList().asJavaList().toString(),rdfType);
                             }
                         }
                     }
@@ -119,33 +119,33 @@ public class CompareFactory {
                 if (resItem.getNameSpace().equals("urn:uuid:")) {// the case where there is a diff on the FullModel class
                     if (reverse==0) {
                         compareResults = addResult(compareResults, resItem.getLocalName(), "md:" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                "diff/new " + "md:" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A");
+                                "diff/new " + "md:" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A",rdfType);
                     }else{
                         compareResults = addResult(compareResults, resItem.getLocalName(), "md:" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                "N/A", "diff/new " + "md:" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName());
+                                "N/A", "diff/new " + "md:" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),rdfType);
                     }
                 } else {
                     if (reverse==0) {
                         //TODO check this; added for the property instead of class
                         if (resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Property") || resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Class")) {
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "New class: " , "N/A");
+                                    "New class: " , "N/A",rdfType);
                         }else {
                             //compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
                             //        "new class " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A");
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "New property: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getLocalName() + " in class: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A");
+                                    "New property: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getLocalName() + " in class: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(), "N/A",rdfType);
                         }
                     }else{
 //TODO check this; added for the property instead of class
                         if (resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Property") || resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName().equals("Class")) {
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "N/A","New class: " );
+                                    "N/A","New class: ",rdfType);
                         }else {
                             //compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
                             //        "N/A","new class " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName());
                             compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),
-                                    "N/A","New property: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getLocalName() + " in class: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName());
+                                    "N/A","New property: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getLocalName() + " in class: " + modelA.getNsURIPrefix(resItem.getNameSpace()) + ":" + resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName(),rdfType);
                         }
                     }
                 }
@@ -155,9 +155,9 @@ public class CompareFactory {
                     if (!resItemStmt.getPredicate().equals(RDF.type)) {
                         if (!resItemStmt.getPredicate().equals(OWL2.oneOf)) {
                             if (reverse==0) {
-                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), "N/A");
+                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), "N/A",rdfType);
                             }else{
-                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A",  resItemStmt.getObject().toString());
+                                compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A",  resItemStmt.getObject().toString(),rdfType);
                             }
                         }
                         //TODO something should be added for the attributes that are blank nodes. Write a method to have the content of the blank node as string
@@ -169,7 +169,7 @@ public class CompareFactory {
     }
 
     //adds a line to the compareResults
-    public static ArrayList<Object> addResult(ArrayList<Object> compareResults, String item, String property, String valueModelA, String valueModelB) {
+    public static ArrayList<Object> addResult(ArrayList<Object> compareResults, String item, String property, String valueModelA, String valueModelB, String rdfType) {
         //item; property; value in model A; value in model B
         List<String> diffItem = new LinkedList<>();
 
@@ -184,7 +184,40 @@ public class CompareFactory {
                         valueModelB = valueModelB.replace(entry.getValue(), entry.getKey()+":");
                     }
                 }
+
+//                // add the type if not there
+//                String newItem = "";
+//                if (MainController.compareIDmodel1 == null) {
+//                    if (!item.contains("|")) {
+//                        //look in model 1 and model 2
+//                        // get the type
+//                        boolean foundModel1 = false;
+//                        List<Statement> model1Types = MainController.compareIDmodel1.listStatements(null, RDF.type, (RDFNode) null).toList();
+//                        for (Statement stmt : model1Types) {
+//                            String res = stmt.getSubject().getLocalName();
+//                            if (item.equals(res)) {
+//                                newItem = res + " | " + stmt.getObject().asResource().getLocalName();
+//                                foundModel1 = true;
+//                                break;
+//                            }
+//                        }
+//                        if (!foundModel1) {
+//                            List<Statement> model2Types = MainController.compareIDmodel2.listStatements(null, RDF.type, (RDFNode) null).toList();
+//                            for (Statement stmt : model2Types) {
+//                                String res = stmt.getSubject().getLocalName();
+//                                if (item.equals(res)) {
+//                                    newItem = res + " | " + stmt.getObject().asResource().getLocalName();
+//                                    break;
+//                                }
+//                            }
+//                        }
+//                    }
+//                }else{
+//                    newItem = item;
+//                }
+
                 diffItem.add(item);
+                diffItem.add(rdfType);
                 diffItem.add(property);
                 diffItem.add(valueModelA);
                 diffItem.add(valueModelB);
@@ -198,28 +231,28 @@ public class CompareFactory {
     public static ArrayList<Object> compareCountClasses(ArrayList<Object> compareResults, Model model1, Model model2) {
 
 
-        Map<String, Integer> mapClassesModel1= countClasses(model1);
-        Map<String, Integer> mapClassesModel2=countClasses(model2);
+        Map<String, Integer> mapClassesModel1 = countClasses(model1);
+        Map<String, Integer> mapClassesModel2 = countClasses(model2);
 
         String compRes;
 
-        for (Map.Entry<String, Integer> entry : mapClassesModel1.entrySet())
+        for (Map.Entry<String, Integer> entry : mapClassesModel1.entrySet()) {
             if (mapClassesModel2.containsKey(entry.getKey())) {
-                if (entry.getValue().toString().equals(mapClassesModel2.get(entry.getKey()).toString())){
-                    compRes="Same - Compare class count";
-                }else{
-                    compRes="Different - Compare class count";
+                if (entry.getValue().toString().equals(mapClassesModel2.get(entry.getKey()).toString())) {
+                    compRes = "Same - Compare class count";
+                } else {
+                    compRes = "Different - Compare class count";
                 }
-                compareResults = addResult(compareResults, compRes, entry.getKey(), entry.getValue().toString(), mapClassesModel2.get(entry.getKey()).toString());
-            }else{
-                compareResults = addResult(compareResults, "Different - Compare class count", entry.getKey(), entry.getValue().toString(), "0");
+                compareResults = addResult(compareResults, compRes, entry.getKey(), entry.getValue().toString(), mapClassesModel2.get(entry.getKey()).toString(), entry.getKey());
+            } else {
+                compareResults = addResult(compareResults, "Different - Compare class count", entry.getKey(), entry.getValue().toString(), "0", entry.getKey());
             }
-
-        for (Map.Entry<String, Integer> entry : mapClassesModel2.entrySet())
+        }
+        for (Map.Entry<String, Integer> entry : mapClassesModel2.entrySet()){
             if (!mapClassesModel1.containsKey(entry.getKey())) {
-                compareResults = addResult(compareResults, "Different - Compare class count", entry.getKey(), "0", entry.getValue().toString());
+                compareResults = addResult(compareResults, "Different - Compare class count", entry.getKey(), "0", entry.getValue().toString(),entry.getKey());
             }
-
+        }
 
         return compareResults;
     }

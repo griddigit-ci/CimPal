@@ -7,6 +7,12 @@ package application;
 
 import core.*;
 import common.customWriter.CustomRDFFormat;
+
+import java.io.InputStream;
+import guru.nidi.graphviz.engine.Graphviz;
+import guru.nidi.graphviz.engine.Format;
+
+import java.io.ByteArrayInputStream;
 import gui.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -21,7 +27,11 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
@@ -56,7 +66,6 @@ import java.util.prefs.Preferences;
 import static core.ExportRDFSdescriptions.rdfsDescriptions;
 import static core.RdfConvert.fileSaveDialog;
 import static core.RdfConvert.modelInheritance;
-import static core.ShaclTools.fileSave;
 
 
 public class MainController implements Initializable {
@@ -263,6 +272,14 @@ public class MainController implements Initializable {
     private ChoiceBox fcbRDFsortOptions;
     @FXML
     private CheckBox fcbRDFconvertFixPackage;
+    @FXML
+    private TreeView InstanceDataBrowser;
+    @FXML
+    private ImageView IDgraph;
+    @FXML
+    private HBox IDhbox;
+    @FXML
+    private ImageView IDImageView;
 
 
     public static File rdfModel1;
@@ -324,9 +341,15 @@ public class MainController implements Initializable {
     public static String cimPref;
     public static String cim2Pref;
     public static String cim3Pref;
+    public static Model compareIDmodel1;
+    public static Model compareIDmodel2;
+
 
     public static Map<String, Model> InstanceModelMap;
     public static boolean treeID;
+    //for the
+    private double initialX;
+    private double initialY;
 
 
     public MainController() {
@@ -862,7 +885,7 @@ public class MainController implements Initializable {
         Model model1single = null;
         Model model2single = null;
         Model model1 = ModelFactory.createDefaultModel();
-        Map prefixMap = model1.getNsPrefixMap();
+        Map<String, String> prefixMap = model1.getNsPrefixMap();
 
         for (File item : MainController.IDModel1) {
             if (item.getName().toLowerCase().endsWith(".zip")) {
@@ -926,6 +949,9 @@ public class MainController implements Initializable {
         } else {
             rdfsCompareFiles.add("Model 2");
         }
+
+        compareIDmodel1 = model1;
+        compareIDmodel2 = model2;
 
         LinkedList<Integer> options = new LinkedList<>();
         options.add(0); //1 is ignore sv classes
@@ -2924,6 +2950,204 @@ public class MainController implements Initializable {
     }
 
     @FXML
+    //Action for button "Load Data" related to tab Instance Data Browser
+    private void actionBtnLoadInstanceData1(ActionEvent actionEvent) throws IOException {
+        progressBar.setProgress(0);
+        treeID = true;
+
+        //select file
+        List<File> fileL = util.ModelFactory.filechoosercustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        String xmlBase = "http://griddigit.eu#";
+
+        InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null, false);
+
+        //guiTreeInstanceDataInit(); //initializes the tree
+//        Pane root = new Pane();
+//        Scene scene = new Scene(root, 800, 600);
+//
+//        Model model = ModelFactory.createDefaultModel();
+//        InputStream in = FileManager.get().open(RDF_FILE);
+//        if (in == null) {
+//            throw new IllegalArgumentException("File: " + RDF_FILE + " not found");
+//        }
+//        model.read(in, null);
+
+        Model model = InstanceModelMap.get("unionModel");
+        //String dot = convertModelToDOT(model);
+
+
+        String dot = convertModelToDOT(model);
+
+        // Render DOT string to a byte array
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // Load the image from the byte array
+        ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
+        Image image = new Image(in);
+//        ImageView imageView = new ImageView(image);
+//        IDhbox.getChildren().add(imageView);
+
+        // Update the existing ImageView with the new image
+        IDImageView.setImage(image);
+
+        // Zoom functionality
+        IDImageView.setOnScroll((ScrollEvent event) -> {
+            double delta = event.getDeltaY();
+            double scale = IDImageView.getScaleX() + delta / 100;
+            scale = Math.max(scale, 0.1); // Prevent scaling to zero or negative
+            IDImageView.setScaleX(scale);
+            IDImageView.setScaleY(scale);
+        });
+//
+        // Drag functionality
+        IDImageView.setOnMousePressed(event -> {
+            initialX = event.getSceneX() - IDImageView.getTranslateX();
+            initialY = event.getSceneY() - IDImageView.getTranslateY();
+        });
+
+        IDImageView.setOnMouseDragged(event -> {
+            IDImageView.setTranslateX(event.getSceneX() - initialX);
+            IDImageView.setTranslateY(event.getSceneY() - initialY);
+        });
+
+
+
+
+
+
+//
+//        // Render DOT string to a temporary file
+//        File tempFile = File.createTempFile("graph", ".png");
+//        try (OutputStream out = new FileOutputStream(tempFile)) {
+//            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+//        // Load the image from the temporary file
+//        Image image = new Image(tempFile.toURI().toString());
+//        ImageView imageView = new ImageView(image);
+//        IDhbox.getChildren().add(imageView);
+//        StmtIterator iter = model.listStatements();
+//
+//        while (iter.hasNext()) {
+//            Statement stmt = iter.nextStatement();
+//            Resource subject = stmt.getSubject();
+//            Property predicate = stmt.getPredicate();
+//            RDFNode object = stmt.getObject();
+//
+//            graph.addVertex(subject.toString());
+//            graph.addVertex(object.toString());
+//            graph.addEdge(subject.toString(), object.toString());
+//        }
+//
+//        mxGraph.getModel().beginUpdate();
+//        try {
+//            for (String vertex : graph.vertexSet()) {
+//                mxGraph.insertVertex(parent, null, vertex, 0, 0, 80, 30);
+//            }
+//            for (DefaultEdge edge : graph.edgeSet()) {
+//                mxGraph.insertEdge(parent, null, "", graph.getEdgeSource(edge), graph.getEdgeTarget(edge));
+//            }
+//        } finally {
+//            mxGraph.getModel().endUpdate();
+//        }
+//
+//        mxCircleLayout layout = new mxCircleLayout(mxGraph);
+//        layout.execute(mxGraph.getDefaultParent());
+//
+//        mxGraphComponent graphComponent = new mxGraphComponent(mxGraph);
+//        hbox.getChildren().add(graphComponent);
+//
+
+
+
+
+
+//        Map<Resource, Rectangle> nodeMap = new HashMap<>();
+//        double x = 0.1; // Relative x position (10% of the width)
+//        double y = 0.1; // Relative y position (10% of the height)
+//
+//        // Create rectangles for each RDF subject
+//        for (Resource resource : model.listSubjects().toList()) {
+//            StringBuilder attributes = new StringBuilder(resource.getLocalName() + "\n");
+//
+//            StmtIterator iter = resource.listProperties();
+//            while (iter.hasNext()) {
+//                Statement stmt = iter.nextStatement();
+//                Property predicate = stmt.getPredicate();
+//                RDFNode object = stmt.getObject();
+//                attributes.append(predicate.getLocalName()).append(": ").append(object.toString()).append("\n");
+//            }
+//
+//            Rectangle rect = new Rectangle();
+//            rect.setFill(Color.LIGHTBLUE);
+//            Text text = new Text(attributes.toString());
+//            IDhbox.getChildren().addAll(rect, text);
+//            nodeMap.put(resource, rect);
+//
+//            // Set layout bounds after adding to the scene
+//            double finalY = y;
+//            rect.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+//                rect.setX(IDhbox.getWidth() * x);
+//                rect.setY(IDhbox.getHeight() * finalY);
+//                rect.setWidth(IDhbox.getWidth() * 0.2); // 20% of the width
+//                rect.setHeight(IDhbox.getHeight() * 0.1); // 10% of the height
+//                text.setX(rect.getX() + 10);
+//                text.setY(rect.getY() + 25);
+//            });
+//
+//            y += 0.15; // Move down by 15% of the height for the next rectangle
+//        }
+//
+//        // Create lines for relationships
+//        for (Statement stmt : model.listStatements().toList()) {
+//            Resource subject = stmt.getSubject();
+//            RDFNode object = stmt.getObject();
+//            if (object.isResource() && nodeMap.containsKey(subject) && nodeMap.containsKey(object.asResource())) {
+//                Rectangle subjectRect = nodeMap.get(subject);
+//                Rectangle objectRect = nodeMap.get(object.asResource());
+//                Line line = new Line();
+//                IDhbox.getChildren().add(line);
+//
+//                // Set line positions after layout bounds are known
+//                subjectRect.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+//                    Bounds subjectBounds = subjectRect.getBoundsInParent();
+//                    Bounds objectBounds = objectRect.getBoundsInParent();
+//                    line.setStartX(subjectBounds.getMinX() + subjectBounds.getWidth() / 2);
+//                    line.setStartY(subjectBounds.getMinY() + subjectBounds.getHeight() / 2);
+//                    line.setEndX(objectBounds.getMinX() + objectBounds.getWidth() / 2);
+//                    line.setEndY(objectBounds.getMinY() + objectBounds.getHeight() / 2);
+//                });
+//            }
+//        }
+//
+//
+//
+
+////        primaryStage.setTitle("RDF Visualizer");
+////        primaryStage.setScene(scene);
+////        primaryStage.show();
+
+    }
+
+    public static String convertModelToDOT(Model model) {
+        StringBuilder dot = new StringBuilder("digraph G {\n");
+        model.listStatements().forEachRemaining(statement -> {
+            String subject = statement.getSubject().toString();
+            String predicate = statement.getPredicate().toString();
+            String object = statement.getObject().toString();
+            dot.append(String.format("\"%s\" -> \"%s\" [label=\"%s\"];\n", subject, object, predicate));
+        });
+        dot.append("}");
+        return dot.toString();
+    }
+
+    @FXML
     //Action for button "Open" related to tab SHACL Shape Browser
     private void actionBtnOpenShapeBrowser(ActionEvent actionEvent) {
         progressBar.setProgress(0);
@@ -2982,22 +3206,7 @@ public class MainController implements Initializable {
         tableViewBrowseModify.getItems().clear();
     }
 
-//    @FXML
-//    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
-//
-//        String uml = "@startuml\nAlice -> Bob: Hello\n@enduml";
-//        byte[] diagram = PlantUMLGenerator.generateDiagram(uml);
-//        Image image = new Image(new ByteArrayInputStream(diagram));
-//
-//        ImageView imageView = new ImageView(image);
-//        StackPane root = new StackPane(imageView);
-//        Scene scene = new Scene(root, 800, 600);
-//
-//        primaryStage.setTitle("PlantUML in JavaFX");
-//        primaryStage.setScene(scene);
-//        primaryStage.show()
-//
-//    }
+
 
 
 
@@ -3303,21 +3512,125 @@ public class MainController implements Initializable {
 
     @FXML
     //select action on the tree view Instance data
-    private void selectActionTreeItemID(MouseEvent mouseEvent) throws IOException {
+    private void selectActionTreeItemID(MouseEvent mouseEvent) throws Exception {
         //Initialisation GUI
-        tableViewBrowseID.getItems().clear();
-
+//        tableViewBrowseID.getItems().clear();
+//
         Node node = mouseEvent.getPickResult().getIntersectedNode();
         // Accept clicks only on node cells, and not on empty spaces of the TreeView
         if (node instanceof Text || (node instanceof TreeCell && ((TreeCell) node).getText() != null)) {
             ArrayList<Object> parentInfo = getParent(treeViewIDStatic); //returns a structure containing the profile parent, the tree level, the selected item
 
-            ObservableList<TableColumnsSetup> tableData = tableViewBrowseID.getItems();
-            tableViewBrowseID.setItems(tableData);
+//            ObservableList<TableColumnsSetup> tableData = tableViewBrowseID.getItems();
+//            tableViewBrowseID.setItems(tableData);
 
         }
 
+        //    @FXML
+//    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
+//
+        //String uml = "@startuml\nAlice -> Bob: Hello\n@enduml";
+//        String uml = """
+//@startuml
+//!theme cerulean
+//skinparam class {
+//    BackgroundColor LightBlue
+//    ArrowColor DarkBlue
+//    BorderColor Black
+//}
+//class User {
+//    +String name
+//    +String email
+//}
+//class Order {
+//    +int id
+//    +Date date
+//}
+//User --> Order : places
+//@enduml
+//""";
+
+
+        String uml = """
+@startuml
+left to right direction
+skinparam class {
+    BackgroundColor LightBlue
+    ArrowColor DarkBlue
+    BorderColor Black
+}
+class User {
+    +String name
+    +String email
+}
+class Order {
+    +int id
+    +Date date
+}
+User --> Order : places
+@enduml
+""";
+//
+//        String uml = """
+//        @startuml
+//        !pragma svginteractive true
+//        actor User
+//        User -> (Login)
+//        @enduml
+//        """;
+//
+//        String svg = PlantUMLGenerator.generateDiagram(uml);
+//
+//        // Create a WebView to display the SVG
+//        //WebView webView = new WebView();
+//        IDgraph.getEngine().loadContent(svg, "text/html");
+
+
+       byte[] diagram = PlantUMLGenerator.generateDiagram(uml);
+
+        //Image image = new Image(new ByteArrayInputStream(diagram));
+        //IDgraph.setImage(diagram);
+
+        // Convert byte array to InputStream
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(diagram);
+
+// Create an Image from the InputStream
+        Image image = new Image(inputStream);
+
+// Set the Image to the ImageView
+        IDgraph.setImage(image);
+//        ImageView imageView = new ImageView(image);
+//        StackPane root = new StackPane(imageView);
+//        Scene scene = new Scene(root, 800, 600);
+//
+//        primaryStage.setTitle("PlantUML in JavaFX");
+//        primaryStage.setScene(scene);
+//        primaryStage.show()
+//
+//    }
+
+        // Zoom functionality
+        IDgraph.setOnScroll((ScrollEvent event) -> {
+            double delta = event.getDeltaY();
+            double scale = IDgraph.getScaleX() + delta / 100;
+            scale = Math.max(scale, 0.1); // Prevent scaling to zero or negative
+            IDgraph.setScaleX(scale);
+            IDgraph.setScaleY(scale);
+        });
+
+        // Drag functionality
+        IDgraph.setOnMousePressed(event -> {
+            initialX = event.getSceneX() - IDgraph.getTranslateX();
+            initialY = event.getSceneY() - IDgraph.getTranslateY();
+        });
+
+        IDgraph.setOnMouseDragged(event -> {
+            IDgraph.setTranslateX(event.getSceneX() - initialX);
+            IDgraph.setTranslateY(event.getSceneY() - initialY);
+        });
+
     }
+
 
     @FXML
     //select action on the tree view SHACL Shapes
