@@ -41,5 +41,7 @@ module CimPal {
     requires org.apache.jena.iri;
     requires net.sourceforge.plantuml;
     requires guru.nidi.graphviz;
+    requires com.fasterxml.jackson.dataformat.xml;
+
     //requires smartgraph;
 }

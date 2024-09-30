@@ -30,6 +30,7 @@
          <MenuItem mnemonicParsing="false" onAction="#actionGenInfoFromRDFS" text="Generate information from RDFS - needed for serialisation" />
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
+         <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />
