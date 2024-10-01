@@ -1515,15 +1515,16 @@ public class MainController implements Initializable {
 
 
 
-                                File xmlFile = null;
-                                if (tso.equals("RTEFRANCE")) {
-                                    xmlFile = new File("GLOBAL_" + timestamp+process+"FR_IGM"+version + ".xml");
-                                }else if (tso.equals("REE")){
-                                    xmlFile = new File("GLOBAL_" + timestamp+process+"ES_IGM"+version + ".xml");
-                                }else if (tso.equals("REN")){
-                                    xmlFile = new File("GLOBAL_" + timestamp+process+"PT_IGM"+version + ".xml");
-                                }
-//                                XMLOutputFactory factory = XMLOutputFactory.newInstance();
+                                File xmlFile = switch (tso) {
+                                    case "RTEFRANCE" ->
+                                            new File("GLOBAL_" + timestamp + "_" + process + "_" + "FR_IGM" + "_" + version + ".xml");
+                                    case "REE" ->
+                                            new File("GLOBAL_" + timestamp + "_" + process + "_" + "ES_IGM" + "_" + version + ".xml");
+                                    case "REN" ->
+                                            new File("GLOBAL_" + timestamp + "_" + process + "_" + "PT_IGM" + "_" + version + ".xml");
+                                    default -> null;
+                                };
+                                //                                XMLOutputFactory factory = XMLOutputFactory.newInstance();
 //                                try (FileWriter fileWriter = new FileWriter("output.xml");
 //                                     XMLStreamWriter writer = factory.createXMLStreamWriter(fileWriter)) {
 //                                    writer.writeStartDocument();
