@@ -42,6 +42,7 @@ module CimPal {
     requires net.sourceforge.plantuml;
     requires guru.nidi.graphviz;
     requires com.fasterxml.jackson.dataformat.xml;
+    requires velocity.engine.core;
 
     //requires smartgraph;
 }

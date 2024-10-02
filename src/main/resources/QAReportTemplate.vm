@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<QAReport xmlns="http://entsoe.eu/checks" created="$created" schemeVersion="$schemeVersion" serviceProvider="$serviceProvider" rslVersion="$rslVersion">
+    <IGM created="$igmCreated" scenarioTime="$igmScenarioTime" tso="$tso" version="$version" processType="$processType" qualityIndicator="$qualityIndicator">
+        #foreach($resource in $resources)
+            <resource>$resource</resource>
+        #end
+    </IGM>
+</QAReport>

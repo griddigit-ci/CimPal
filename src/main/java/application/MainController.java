@@ -49,7 +49,6 @@ import org.apache.jena.vocabulary.OWL;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.apache.jena.vocabulary.XSD;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
@@ -57,11 +56,8 @@ import org.topbraid.shacl.vocabulary.SH;
 import util.CompareFactory;
 import util.ExcelTools;
 import util.PlantUMLGenerator;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
-import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -76,6 +72,17 @@ import java.util.prefs.Preferences;
 import static core.ExportRDFSdescriptions.rdfsDescriptions;
 import static core.RdfConvert.fileSaveDialog;
 import static core.RdfConvert.modelInheritance;
+
+import org.apache.velocity.Template;
+import org.apache.velocity.VelocityContext;
+import org.apache.velocity.app.VelocityEngine;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 
 
 public class MainController implements Initializable {
@@ -1403,12 +1410,6 @@ public class MainController implements Initializable {
         List<File> fileL = util.ModelFactory.filechoosercustom(true, "Excel file with IDs", List.of("*.xlsx"), "Select input data: ");
 
         if (fileL != null) {// the file is selected
-//            fPathIDfile1.setText(fileL.toString());
-//            MainController.IDModel1 = fileL;
-
-
-
-            //int firstfile = 1;
             for (File xmlfile : fileL) {
                 // load input data xls
                 ArrayList<Object> inputXLSdata;
@@ -1416,210 +1417,106 @@ public class MainController implements Initializable {
                 FileInputStream fis = new FileInputStream(excel);
                 XSSFWorkbook book = new XSSFWorkbook(fis);
                 int Num = book.getNumberOfSheets();
-//
-//                String[] originalNameInParts = new String[0];
-//                Map<String,String> prefmap = new HashMap<>();
 
                 for (int sheetnum = 0; sheetnum < Num; sheetnum++) {
-                    XSSFSheet sheet = book.getSheetAt(sheetnum);
-                    String sheetname = sheet.getSheetName();
-//                    if (sheetname.equals("Config")){
-//                        ArrayList<Object> inputXLSdataConfig = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
-//                        for (Object o : inputXLSdataConfig) {
-//                            String yesno = ((LinkedList<?>) o).get(2).toString();
-//                            if (yesno.equals("Yes")) {
-//                                String pref = ((LinkedList<?>) o).get(0).toString();
-//                                String ns = ((LinkedList<?>) o).get(1).toString();
-//                                prefmap.putIfAbsent(pref, ns);
-//                            }
-//                        }
-//                        break;
-//                    }
+                    //XSSFSheet sheet = book.getSheetAt(sheetnum);
+                    //String sheetname = sheet.getSheetName();
+                    inputXLSdata = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
 
-                }
-
-                for (int sheetnum = 0; sheetnum < Num; sheetnum++) {
-                    XSSFSheet sheet = book.getSheetAt(sheetnum);
-                    String sheetname = sheet.getSheetName();
-//                    if (!sheetname.equals("Config")) {
-//                        saveProperties.put("filename", sheetname + ".xml");
-//                        if (sheetnum == 0 && firstfile == 1) {
-//                            saveProperties.put("useFileDialog", true);
-//                        } else {
-//                            saveProperties.put("useFileDialog", false);
-//                            saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
-//                        }
-                        inputXLSdata = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
-//
-//
-//                        Model model = ModelFactory.createDefaultModel();
-//                        model.setNsPrefixes(prefmap);
-//
-//
-//
                     List<String> processed = new LinkedList<>();
-                        for (int row = 1; row < inputXLSdata.size(); row+=4) {
+                    for (int row = 1; row < inputXLSdata.size(); row+=4) {
+                        String fileName = ((LinkedList<?>) inputXLSdata.get(row)).getFirst().toString();
+                        String fileNameNoExt = fileName.substring(0,fileName.length()-4);
+                        String [] fileNameParts = fileNameNoExt.split("_",5);
+                        String timestamp = fileNameParts[0];
+                        String process = fileNameParts[1];
+                        String tso = fileNameParts[2];
+                        String profile = fileNameParts[3];
+                        String version = fileNameParts[4];
+                        String fileProfile = ((LinkedList<?>) inputXLSdata.get(row)).get(1).toString();
+                        String mas = ((LinkedList<?>) inputXLSdata.get(row)).get(2).toString();
+                        String fileID_0 = ((LinkedList<?>) inputXLSdata.get(row)).get(3).toString();
+                        String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row+1)).get(3).toString();
+                        String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row+2)).get(3).toString();
+                        String fileID_3 = ((LinkedList<?>) inputXLSdata.get(row+3)).get(3).toString();
+                        String fileID_EQBD = "urn:uuid:60076a01-df7a-0083-be02-d69cc8c050f6";
+                        String fileID_TPBD = "urn:uuid:3a558800-363d-4c12-9f73-f07142100d5e";
+                        if (!processed.contains(timestamp+process+tso+version)){
+                            // Initialize Velocity engine
+                            Properties properties = new Properties();
+                            properties.setProperty("resource.loader", "file");
+                            properties.setProperty("file.resource.loader.class", "org.apache.velocity.runtime.resource.loader.FileResourceLoader");
+                            properties.setProperty("file.resource.loader.path", "src/main/resources");
 
-                            String fileName = ((LinkedList<?>) inputXLSdata.get(row)).getFirst().toString();
-                            String fileNameNoExt = fileName.substring(0,fileName.length()-4);
-                            String [] fileNameParts = fileNameNoExt.split("_",5);
-                            String timestamp = fileNameParts[0];
-                            String process = fileNameParts[1];
-                            String tso = fileNameParts[2];
-                            String profile = fileNameParts[3];
-                            String version = fileNameParts[4];
-                            String fileProfile = ((LinkedList<?>) inputXLSdata.get(row)).get(1).toString();
-                            String mas = ((LinkedList<?>) inputXLSdata.get(row)).get(2).toString();
-                            String fileID_0 = ((LinkedList<?>) inputXLSdata.get(row)).get(3).toString();
-                            String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row+1)).get(3).toString();
-                            String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row+2)).get(3).toString();
-                            String fileID_3 = ((LinkedList<?>) inputXLSdata.get(row+3)).get(3).toString();
-                            String fileID_EQBD = "";
-                            String fileID_TPBD = "";
-                            if (!processed.contains(timestamp+process+tso+version)){
-                                QAReport qaReport = new QAReport();
-                                ZonedDateTime now = ZonedDateTime.now();
-                                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX");
-                                String formattedNow = now.format(formatter);
-                                qaReport.setCreated(formattedNow);
-                                qaReport.setSchemeVersion("2.0");
-                                qaReport.setServiceProvider("Global");
-                                qaReport.setRslVersion("5.4.102");
+                            VelocityEngine velocityEngine = new VelocityEngine(properties);
+                            velocityEngine.init();
 
-                                IGM igm = new IGM();
-                                igm.setCreated("2023-09-12T15:52:00Z");
-                                DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm'Z'");
-                                LocalDateTime localDateTime = LocalDateTime.parse(timestamp, inputFormatter);
-                                ZonedDateTime zonedDateTime = localDateTime.atZone(ZoneOffset.UTC);
-                                DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssX");
-                                String output = zonedDateTime.format(outputFormatter);
-                                igm.setScenarioTime(output);
-                                igm.setTso(tso);
-                                igm.setVersion(version.replaceFirst("^0+(?!$)", ""));
-                                igm.setProcessType(process);
-                                igm.setQualityIndicator("Valid");
+                            // Create Velocity template from the file
+                            Template template = velocityEngine.getTemplate("QAReportTemplate.vm");
 
-                                List<String> resources = new ArrayList<>();
+                            // Prepare data for the template
+                            List<String> resources = Arrays.asList(
+                                    fileID_0,
+                                    fileID_1,
+                                    fileID_2,
+                                    fileID_3,
+                                    fileID_EQBD,
+                                    fileID_TPBD
+                            );
 
-                                resources.add(fileID_0);
-                                resources.add(fileID_1);
-                                resources.add(fileID_2);
-                                resources.add(fileID_3);
-                                resources.add(fileID_EQBD);
-                                resources.add(fileID_TPBD);
+                            // Create context and add data
+                            VelocityContext context = new VelocityContext();
+                            ZonedDateTime now = ZonedDateTime.now();
+                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX");
+                            String formattedNow = now.format(formatter);
+                            context.put("created", formattedNow);
+                            context.put("schemeVersion", "2.0");
+                            context.put("serviceProvider", "Global");
+                            context.put("rslVersion", "5.4.102");
+                            context.put("igmCreated", "2023-09-12T15:52:00Z");
+                            DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm'Z'");
+                            LocalDateTime localDateTime = LocalDateTime.parse(timestamp, inputFormatter);
+                            ZonedDateTime zonedDateTime = localDateTime.atZone(ZoneOffset.UTC);
+                            DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssX");
+                            String output = zonedDateTime.format(outputFormatter);
+                            context.put("igmScenarioTime", output);
+                            context.put("tso", tso);
+                            context.put("version", version.replaceFirst("^0+(?!$)", ""));
+                            context.put("processType", process);
+                            context.put("qualityIndicator", "Valid");
+                            context.put("resources", resources);
 
-                                igm.setResources(resources);
-                                qaReport.setIgm(igm);
+                            // Merge data and template
+                            StringWriter stringWriter = new StringWriter();
+                            template.merge(context, stringWriter);
 
-                                XmlMapper xmlMapper = new XmlMapper();
+                            // Get the generated XML content
+                            String xmlContent = stringWriter.toString();
 
+                            File xmlFileNew = switch (tso) {
+                                case "RTEFRANCE" ->
+                                        new File("GLOBAL_" + timestamp + "_" + process + "_" + "FR_IGM" + "_" + version + ".xml");
+                                case "REE" ->
+                                        new File("GLOBAL_" + timestamp + "_" + process + "_" + "ES_IGM" + "_" + version + ".xml");
+                                case "REN" ->
+                                        new File("GLOBAL_" + timestamp + "_" + process + "_" + "PT_IGM" + "_" + version + ".xml");
+                                default -> null;
+                            };
 
-
-                                File xmlFile = switch (tso) {
-                                    case "RTEFRANCE" ->
-                                            new File("GLOBAL_" + timestamp + "_" + process + "_" + "FR_IGM" + "_" + version + ".xml");
-                                    case "REE" ->
-                                            new File("GLOBAL_" + timestamp + "_" + process + "_" + "ES_IGM" + "_" + version + ".xml");
-                                    case "REN" ->
-                                            new File("GLOBAL_" + timestamp + "_" + process + "_" + "PT_IGM" + "_" + version + ".xml");
-                                    default -> null;
-                                };
-                                //                                XMLOutputFactory factory = XMLOutputFactory.newInstance();
-//                                try (FileWriter fileWriter = new FileWriter("output.xml");
-//                                     XMLStreamWriter writer = factory.createXMLStreamWriter(fileWriter)) {
-//                                    writer.writeStartDocument();
-//                                    writer.writeStartElement("root");
-//                                    // Assuming xmlMapper is an instance of a class that can write the qaReport object to XML
-//                                    xmlMapper.writeValue(writer, qaReport);
-//                                    writer.writeEndElement();
-//                                    writer.writeEndDocument();
-//                                } catch (IOException | XMLStreamException e) {
-//                                    e.printStackTrace();
-//                                }
-
+                            // Write to file
+                            try (FileWriter writer = new FileWriter(xmlfile.getParent()+"\\Output\\"+ xmlFileNew)) {
+                                writer.write(xmlContent);
+                                //System.out.println("XML file saved successfully!");
+                            } catch (IOException e) {
+                                e.printStackTrace();
                             }
-
-                            processed.add(timestamp+process+tso+version);
-
-
-
-
-
-//                            //String classURI = "";
-//                            if (!((LinkedList<?>) inputXLSdata.get(row)).isEmpty()) {
-//                                String classURI = ((LinkedList<?>) inputXLSdata.get(row)).getFirst().toString();
-//                                String classNS = ResourceFactory.createResource(classURI).asResource().getNameSpace();
-//                                String propertyURI = ((LinkedList<?>) inputXLSdata.get(row)).get(1).toString();
-//                                String propertyType = ((LinkedList<?>) inputXLSdata.get(row)).get(2).toString();
-//                                String datatype = ((LinkedList<?>) inputXLSdata.get(row)).get(3).toString();
-//                                String multiplicity = ((LinkedList<?>) inputXLSdata.get(row)).get(4).toString();
-//                                if (((LinkedList<?>) inputXLSdata.get(row)).size() > 5) {
-//                                    for (int col = 5; col < ((LinkedList<?>) inputXLSdata.get(row)).size(); col += 2) {
-//                                        //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col).toString());
-//                                        //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col + 1).toString());
-//                                        String rdfid = ((LinkedList<?>) inputXLSdata.get(row)).get(col).toString();
-//                                        //System.out.println(row);
-//                                        //System.out.println(rdfid);
-//                                        String object = ((LinkedList<?>) inputXLSdata.get(row)).get(col + 1).toString();
-//
-//                                        //Add triples to the model
-//
-//                                        //Add the Class type
-//                                        if (rdfid.startsWith("urn:uuid:")) {
-//                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-//                                        } else {
-//                                            if (rdfid.startsWith("http://")) {
-//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-//                                            } else {
-//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-//                                            }
-//                                        }
-//
-//
-//                                        switch (propertyType) {
-//                                            case "Attribute" -> { //add literal
-//                                                if (rdfid.startsWith("urn:uuid:")) {
-//                                                    if (object.contains("LangXMLTag:")) {
-//                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createLangLiteral(object.split("LangXMLTag:", 2)[0], object.split("LangXMLTag:", 2)[1])));
-//                                                    } else {
-//                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-//                                                    }
-//                                                } else {
-//                                                    if (rdfid.startsWith("http://")) {
-//                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-//                                                    } else {
-//                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-//                                                    }
-//                                                }
-//                                            }
-//                                            case "Association" -> { //add resource
-//                                                if (rdfid.startsWith("urn:uuid:")) {
-//                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
-//                                                } else {
-//                                                    if (rdfid.startsWith("http://")) {
-//                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
-//                                                    } else {
-//                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
-//                                                    }
-//                                                }
-//                                            }
-//                                            case "Enumeration" -> //add enum
-//                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
-//                                        }
-//
-//                                    }
-//                                }
-//                            }
                         }
+                        processed.add(timestamp+process+tso+version);
+                    }
                 }
             }
-        } else {
-            //fPathIDfile1.clear();
         }
 
-
-//
-//        RdfConvert.refDataConvert();
         progressBar.setProgress(1);
 
     }

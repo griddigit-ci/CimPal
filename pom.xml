@@ -333,27 +333,6 @@
             <artifactId>plantuml-mit</artifactId>
             <version>1.2024.7</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>com.brunomnsilva</groupId>-->
-<!--            <artifactId>smartgraph</artifactId>-->
-<!--            <version>2.0.0</version>-->
-<!--        </dependency>-->
-
-<!--        <dependency>-->
-<!--            <groupId>org.jgrapht</groupId>-->
-<!--            <artifactId>jgrapht-core</artifactId>-->
-<!--            <version>1.5.2</version>-->
-<!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>org.jgrapht</groupId>-->
-<!--            <artifactId>jgrapht-ext</artifactId>-->
-<!--            <version>1.5.2</version>-->
-<!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>com.mxgraph</groupId>-->
-<!--            <artifactId>jgraphx</artifactId>-->
-<!--            <version>4.0.6.0</version>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>guru.nidi</groupId>
             <artifactId>graphviz-java</artifactId>
@@ -369,7 +348,11 @@
             <artifactId>jackson-dataformat-xml</artifactId>
             <version>2.17.1</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.apache.velocity</groupId>
+            <artifactId>velocity-engine-core</artifactId>
+            <version>2.4</version>
+        </dependency>
     </dependencies>
     <repositories>
         <repository>
