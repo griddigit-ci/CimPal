@@ -385,28 +385,30 @@ public class ModelManipulationFactory {
             throw new Exception("Header rdf:id missing from xls.");
 
         String headRdfid = xmlBase + ((LinkedList<?>) headerXlsData.get(2)).get(rdfidCol).toString();
+        Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
 
         // put header data into the model
         // add header class
         String[] splitClassName = headerClassName.split("\\|");
         String headerClassWNS = prefMap.get(splitClassName[0])+":"+splitClassName[1];
-        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), RDF.type, ResourceFactory.createProperty(headerClassWNS)));
+        model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
         saveProperties.put("headerClassResource", prefMap.get(splitClassName[0])+splitClassName[1]);
         for (int i = 0; i < headerCols; i++){
             if (i != rdfidCol){
-                String[] splitPropUri = ((LinkedList<?>) headerXlsData.get(0)).get(i).toString().split(":");
+                String[] splitPropUri = ((LinkedList<?>) headerXlsData.getFirst()).get(i).toString().split(":");
                 String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
+                Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                 String propertyType = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString();
                 String object = ((LinkedList<?>) headerXlsData.get(3)).get(i).toString();
                 switch (propertyType) {
                     case "Literal" -> { //add literal
-                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                     }
                     case "Resource" -> { //add resource
-                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(xmlBase+object)));
+                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase+object)));
                     }
                     case "Enumeration" -> { //add enum
-                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
+                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
                     }
                 }
             }
@@ -434,25 +436,27 @@ public class ModelManipulationFactory {
             for (int i = 2; i < classXlsData.size(); i++) { // loop on the rows/class instance
 
                 String rdfid = xmlBase + ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
+                Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
-                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classWNS)));
+                model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
 
                 for (int j = 0; j < cols; j++){
                     if (i != rdfidCol) {
                         String[] splitPropUri = ((LinkedList<?>) classXlsData.get(i)).get(j).toString().split(":");
                         String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
+                        Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                         String propertyType = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
                         String object = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
 
                         switch (propertyType) {
                             case "Literal" -> { //add literal
-                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                                model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                             }
                             case "Resource" -> { //add resource
-                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(xmlBase+object)));
+                                model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase+object)));
                             }
                             case "Enumeration" -> { //add enum
-                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
+                                model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
                             }
                         }
                     }
