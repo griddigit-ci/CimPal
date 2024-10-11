@@ -16,6 +16,7 @@ import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import smetana.core.__struct__;
 import util.ExcelTools;
 
 import java.io.*;
@@ -314,196 +315,372 @@ public class ModelManipulationFactory {
         }
     }
 
+    public static void generateDataFromXlsV2(String xmlBase, File xmlfile, Map<String,Object> saveProperties) throws Exception {
+        ArrayList<Object> headerXlsData = null;
+        String headerClassName = "";
+        Map<String, ArrayList<Object>> classesXlsData = new HashMap<>();
+        Map<String,String> prefMap = new HashMap<>();
 
-    public static void generateDataFromXlsColumns(String xmlBase, Boolean profileModelUnionFlag, Boolean instanceModelUnionFlag,
-                                           Map<String,Boolean> inputData, Boolean shaclModelUnionFlag, String eqbdID, String tpbdID,Map<String,Object> saveProperties,
-                                           boolean persistentEQflag) throws IOException {
+        FileInputStream fis = new FileInputStream(xmlfile);
+        XSSFWorkbook book = new XSSFWorkbook(fis);
 
-        //this is to load profile data - this is needed for the export
-        Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
-
-        int firstfile = 1;
-        for (File xmlfile : MainController.inputXLS) {
-            // load input data xls
-            ArrayList<Object> inputXLSdata;
-            File excel = new File(xmlfile.toString());
-            FileInputStream fis = new FileInputStream(excel);
-            XSSFWorkbook book = new XSSFWorkbook(fis);
-            int Num = book.getNumberOfSheets();
-
-            String[] originalNameInParts = new String[0];
-            Map<String,String> prefmap = new HashMap<>();
-
-            for (int sheetnum = 0; sheetnum < Num; sheetnum++) {
-                XSSFSheet sheet = book.getSheetAt(sheetnum);
-                String sheetname = sheet.getSheetName();
-                if (sheetname.equals("Config")){
-                    ArrayList<Object> inputXLSdataConfig = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
-                    for (Object o : inputXLSdataConfig) {
-                        String yesno = ((LinkedList<?>) o).get(2).toString();
-                        if (yesno.equals("Yes")) {
-                            String pref = ((LinkedList<?>) o).get(0).toString();
-                            String ns = ((LinkedList<?>) o).get(1).toString();
-                            prefmap.putIfAbsent(pref, ns);
-                        }
-                    }
-                    break;
+        // getting the data from the config sheet
+        XSSFSheet configSheet = book.getSheet("Config");
+        if (configSheet != null) {
+            ArrayList<Object> inputXLSDataConfig = ExcelTools.importXLSX(xmlfile.toString(), book.getSheetIndex(configSheet));
+            inputXLSDataConfig.removeFirst();
+            for (Object o : inputXLSDataConfig) {
+                // getting namespaces
+                String yesno = ((LinkedList<?>) o).get(2).toString();
+                if (yesno.equals("Yes")) {
+                    String pref = ((LinkedList<?>) o).get(0).toString();
+                    String ns = ((LinkedList<?>) o).get(1).toString();
+                    prefMap.putIfAbsent(pref, ns);
                 }
+                // getting classes to print
+                String className = ((LinkedList<?>) o).get(3).toString();
+                if (!className.isEmpty()){
+                    int classSheetIdx = book.getSheetIndex(className);
+                    if (classSheetIdx != -1){
+                        className = className.replace("|",":");
+                        classesXlsData.putIfAbsent(className, ExcelTools.importXLSX(xmlfile.toString(), classSheetIdx));
+                    }
+                    else
+                        throw new Exception("Couldn't find the sheet for class: " + className);
+                }
+                // getting header class
 
+                if (headerClassName.isEmpty()){
+                    headerClassName = ((LinkedList<?>) o).get(4).toString();
+                    if (!headerClassName.isEmpty()) {
+                        int headerSheetIdx = book.getSheetIndex(headerClassName);
+                        if (headerSheetIdx != -1)
+                            headerXlsData = ExcelTools.importXLSX(xmlfile.toString(), headerSheetIdx);
+                        else
+                            throw new Exception("Couldn't find header class sheet.");
+                    }
+                }
             }
+            if (headerXlsData == null)
+                throw new Exception("Missing header class from config");
+        }
+        else {
+            throw new Exception("Config sheet is missing from the xls data.");
+        }
 
-            for (int sheetnum = 0; sheetnum < Num; sheetnum++) {
-                XSSFSheet sheet = book.getSheetAt(sheetnum);
-                String sheetname = sheet.getSheetName();
-                if (!sheetname.equals("Config")) {
-                    saveProperties.put("filename", sheetname + ".xml");
-                    if (sheetnum == 0 && firstfile == 1) {
-                        saveProperties.put("useFileDialog", true);
-                    } else {
-                        saveProperties.put("useFileDialog", false);
-                        saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
+        Model model = ModelFactory.createDefaultModel();
+        model.setNsPrefixes(prefMap);
+
+        // Add header class
+        int headerCols = ((LinkedList<?>)headerXlsData.getFirst()).size();
+        // getting rdfid column
+        int rdfidCol = -1;
+        for (int i = 0; i < headerCols; i++){
+            if (((LinkedList<?>)headerXlsData.getFirst()).get(i).equals("rdf:id")){
+                rdfidCol = i;
+                break;
+            }
+        }
+        if (rdfidCol == -1)
+            throw new Exception("Header rdf:id missing from xls.");
+
+        String headRdfid = xmlBase + ((LinkedList<?>) headerXlsData.get(2)).get(rdfidCol).toString();
+
+        // put header data into the model
+        // add header class
+        String[] splitClassName = headerClassName.split("\\|");
+        String headerClassWNS = prefMap.get(splitClassName[0])+":"+splitClassName[1];
+        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), RDF.type, ResourceFactory.createProperty(headerClassWNS)));
+        saveProperties.put("headerClassResource", prefMap.get(splitClassName[0])+splitClassName[1]);
+        for (int i = 0; i < headerCols; i++){
+            if (i != rdfidCol){
+                String[] splitPropUri = ((LinkedList<?>) headerXlsData.get(0)).get(i).toString().split(":");
+                String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
+                String propertyType = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString();
+                String object = ((LinkedList<?>) headerXlsData.get(3)).get(i).toString();
+                switch (propertyType) {
+                    case "Literal" -> { //add literal
+                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
                     }
-                    inputXLSdata = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
-
-
-                    Model model = ModelFactory.createDefaultModel();
-                    model.setNsPrefixes(prefmap);
-//                model.setNsPrefix("eu", "http://iec.ch/TC57/CIM100-European#");
-//                model.setNsPrefix("nc", "http://entsoe.eu/ns/nc#");
-//                //model.setNsPrefix("cims", MainController.prefs.get("cimsNamespace",""));
-//                model.setNsPrefix("rdf", RDF.uri);
-//                //model.setNsPrefix("owl", OWL.NS);
-//                model.setNsPrefix("cim", "http://iec.ch/TC57/CIM100#");
-//                //model.setNsPrefix("xsd", XSD.NS);
-//                model.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
-//                model.setNsPrefix("dcat", "http://www.w3.org/ns/dcat#");
-//                model.setNsPrefix("dcterms", "http://purl.org/dc/terms/#");
-//                model.setNsPrefix("eumd", "http://entsoe.eu/ns/Metadata-European#");
-//                model.setNsPrefix("prov", "http://www.w3.org/ns/prov#");
-//                model.setNsPrefix("time", "http://www.w3.org/2006/time#");
-//                model.setNsPrefix("skos", "http://www.w3.org/2004/02/skos/core#");
-
-                    //here the new way of template TODO finish it, but make the template first
-                    for (int col = 0; col < inputXLSdata.size(); col++) {
-                        String classURI = ((LinkedList<?>) inputXLSdata.get(col)).getFirst().toString();
-                        String classNS = ResourceFactory.createResource(classURI).asResource().getNameSpace();
-                        String propertyURI = ((LinkedList<?>) inputXLSdata.get(col)).get(1).toString();
-                        String propertyType = ((LinkedList<?>) inputXLSdata.get(col)).get(2).toString();
-                        String datatype = ((LinkedList<?>) inputXLSdata.get(col)).get(3).toString();
-                        String multiplicity = ((LinkedList<?>) inputXLSdata.get(col)).get(4).toString();
-                        if (((LinkedList<?>) inputXLSdata.get(col)).size() > 5) {
-                            for (int row = 5; row < ((LinkedList<?>) inputXLSdata.get(col)).size(); col += 2) { //TODO below to be revised
-                                //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col).toString());
-                                //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col + 1).toString());
-                                String rdfid = ((LinkedList<?>) inputXLSdata.get(row)).get(col).toString();
-                                //System.out.println(row);
-                                //System.out.println(rdfid);
-                                String object = ((LinkedList<?>) inputXLSdata.get(row)).get(col + 1).toString();
-
-                                //Add triples to the model
-
-                                //Add the Class type
-                                if (rdfid.startsWith("urn:uuid:")) {
-                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-                                } else {
-                                    if (rdfid.startsWith("http://")) {
-                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-                                    } else {
-                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-                                    }
-                                }
-
-
-                                switch (propertyType) {
-                                    case "Attribute" -> { //add literal
-                                        if (rdfid.startsWith("urn:uuid:")) {
-                                            if (object.contains("LangXMLTag:")) {
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createLangLiteral(object.split("LangXMLTag:", 2)[0], object.split("LangXMLTag:", 2)[1])));
-                                            } else {
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-                                            }
-                                        } else {
-                                            if (rdfid.startsWith("http://")) {
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-                                            } else {
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-                                            }
-                                        }
-                                    }
-                                    case "Association" -> { //add resource
-                                        if (rdfid.startsWith("urn:uuid:")) {
-                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
-                                        } else {
-                                            if (rdfid.startsWith("http://")) {
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
-                                            } else {
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
-                                            }
-                                        }
-                                    }
-                                    case "Enumeration" -> //add enum
-                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
-                                }
-
-                            }
-                        }
-
+                    case "Resource" -> { //add resource
+                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(xmlBase+object)));
                     }
-                    //end new way of template
-
-                    //save xml
-
-                    if (sheetnum == 0) {
-                        Map<String, Model> profileModelMap = loadDataMap.get("profileModelMap");
-                        //this is related to the save of the data
-                        Set<Resource> rdfAboutList = new HashSet<>();
-                        Set<Resource> rdfEnumList = new HashSet<>();
-                        originalNameInParts = FilenameUtils.getName(xmlfile.toString()).split("_", 2)[1].split(".xlsx", 2);
-
-
-                        if ((boolean) saveProperties.get("useAboutRules")) {
-//                            if (profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").hasNext()) {
-//                                rdfAboutList = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").toSet();
-//                            }
-                            rdfAboutList = LoadRDFAbout(xmlBase);
-                            rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
-                        }
-
-                        if ((boolean) saveProperties.get("useEnumRules")) {
-//                            for (ResIterator ii = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),
-//                                    ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")); ii.hasNext(); ) {
-//                                Resource resItem = ii.next();
-//                                for (ResIterator j = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
-//                                    Resource resItemProp = j.next();
-//                                    rdfEnumList.add(resItemProp);
-//                                }
-//                            }
-                            rdfEnumList = LoadRDFEnum(xmlBase);
-                        }
-
-                        if (saveProperties.containsKey("rdfAboutList")) {
-                            saveProperties.replace("rdfAboutList", rdfAboutList);
-                        } else {
-                            saveProperties.put("rdfAboutList", rdfAboutList);
-                        }
-                        if (saveProperties.containsKey("rdfEnumList")) {
-                            saveProperties.replace("rdfEnumList", rdfEnumList);
-                        } else {
-                            saveProperties.put("rdfEnumList", rdfEnumList);
-                        }
-
-                        //if (extension.equals("zip")) {
-                        //    fileName = fileName.replace(".zip", ".xml");
-                        // }
-
+                    case "Enumeration" -> { //add enum
+                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(headRdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
                     }
-                    saveProperties.replace("filename", saveProperties.get("filename").toString().split(".xml", 2)[0] + "_" + originalNameInParts[0] + ".xml");
-                    InstanceDataFactory.saveInstanceData(model, saveProperties);
-                    firstfile = 0;
                 }
             }
         }
+
+        // put other classes into the model
+        for (Map.Entry<String, ArrayList<Object>> entry : classesXlsData.entrySet()){
+            String className = entry.getKey();
+            ArrayList<Object> classXlsData = entry.getValue();
+            int cols = ((LinkedList<?>)classXlsData.getFirst()).size();
+            rdfidCol = -1;
+            for (int i = 0; i < headerCols; i++){
+                if (((LinkedList<?>)headerXlsData.getFirst()).get(i).equals("rdf:id")){
+                    rdfidCol = i;
+                    break;
+                }
+            }
+            if (rdfidCol == -1)
+                throw new Exception("rdf:id missing at class sheet: " + className);
+
+            splitClassName = className.split(":");
+            String classWNS = prefMap.get(splitClassName[0])+":"+splitClassName[1];
+
+
+            for (int i = 2; i < classXlsData.size(); i++) { // loop on the rows/class instance
+
+                String rdfid = xmlBase + ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
+
+                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classWNS)));
+
+                for (int j = 0; j < cols; j++){
+                    if (i != rdfidCol) {
+                        String[] splitPropUri = ((LinkedList<?>) classXlsData.get(i)).get(j).toString().split(":");
+                        String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
+                        String propertyType = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
+                        String object = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
+
+                        switch (propertyType) {
+                            case "Literal" -> { //add literal
+                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                            }
+                            case "Resource" -> { //add resource
+                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(xmlBase+object)));
+                            }
+                            case "Enumeration" -> { //add enum
+                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // save file
+            Set<Resource> rdfAboutList = new HashSet<>();
+            Set<Resource> rdfEnumList = new HashSet<>();
+
+
+            if ((boolean) saveProperties.get("useAboutRules")) {
+                rdfAboutList = LoadRDFAbout(xmlBase);
+                rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
+            }
+
+            if ((boolean) saveProperties.get("useEnumRules")) {
+                rdfEnumList = LoadRDFEnum(xmlBase);
+            }
+
+            if (saveProperties.containsKey("rdfAboutList")) {
+                saveProperties.replace("rdfAboutList", rdfAboutList);
+            } else {
+                saveProperties.put("rdfAboutList", rdfAboutList);
+            }
+            if (saveProperties.containsKey("rdfEnumList")) {
+                saveProperties.replace("rdfEnumList", rdfEnumList);
+            } else {
+                saveProperties.put("rdfEnumList", rdfEnumList);
+            }
+
+            saveProperties.replace("filename", saveProperties.get("filename").toString());
+            InstanceDataFactory.saveInstanceData(model, saveProperties);
+
+        }
+
+        fis.close();
     }
+
+//    public static void generateDataFromXlsColumns(String xmlBase, Boolean profileModelUnionFlag, Boolean instanceModelUnionFlag,
+//                                           Map<String,Boolean> inputData, Boolean shaclModelUnionFlag, String eqbdID, String tpbdID,Map<String,Object> saveProperties,
+//                                           boolean persistentEQflag) throws IOException {
+//
+//        //this is to load profile data - this is needed for the export
+//        Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
+//
+//        int firstfile = 1;
+//        for (File xmlfile : MainController.inputXLS) {
+//            // load input data xls
+//            ArrayList<Object> inputXLSdata;
+//            File excel = new File(xmlfile.toString());
+//            FileInputStream fis = new FileInputStream(excel);
+//            XSSFWorkbook book = new XSSFWorkbook(fis);
+//            int Num = book.getNumberOfSheets();
+//
+//            String[] originalNameInParts = new String[0];
+//            Map<String,String> prefmap = new HashMap<>();
+//
+//            for (int sheetnum = 0; sheetnum < Num; sheetnum++) {
+//                XSSFSheet sheet = book.getSheetAt(sheetnum);
+//                String sheetname = sheet.getSheetName();
+//                if (sheetname.equals("Config")){
+//                    ArrayList<Object> inputXLSdataConfig = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
+//                    for (Object o : inputXLSdataConfig) {
+//                        String yesno = ((LinkedList<?>) o).get(2).toString();
+//                        if (yesno.equals("Yes")) {
+//                            String pref = ((LinkedList<?>) o).get(0).toString();
+//                            String ns = ((LinkedList<?>) o).get(1).toString();
+//                            prefmap.putIfAbsent(pref, ns);
+//                        }
+//                    }
+//                    break;
+//                }
+//
+//            }
+//
+//            for (int sheetnum = 0; sheetnum < Num; sheetnum++) {
+//                XSSFSheet sheet = book.getSheetAt(sheetnum);
+//                String sheetname = sheet.getSheetName();
+//                if (!sheetname.equals("Config")) {
+//                    saveProperties.put("filename", sheetname + ".xml");
+//                    if (sheetnum == 0 && firstfile == 1) {
+//                        saveProperties.put("useFileDialog", true);
+//                    } else {
+//                        saveProperties.put("useFileDialog", false);
+//                        saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
+//                    }
+//                    inputXLSdata = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
+//
+//
+//                    Model model = ModelFactory.createDefaultModel();
+//                    model.setNsPrefixes(prefmap);
+////                model.setNsPrefix("eu", "http://iec.ch/TC57/CIM100-European#");
+////                model.setNsPrefix("nc", "http://entsoe.eu/ns/nc#");
+////                //model.setNsPrefix("cims", MainController.prefs.get("cimsNamespace",""));
+////                model.setNsPrefix("rdf", RDF.uri);
+////                //model.setNsPrefix("owl", OWL.NS);
+////                model.setNsPrefix("cim", "http://iec.ch/TC57/CIM100#");
+////                //model.setNsPrefix("xsd", XSD.NS);
+////                model.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
+////                model.setNsPrefix("dcat", "http://www.w3.org/ns/dcat#");
+////                model.setNsPrefix("dcterms", "http://purl.org/dc/terms/#");
+////                model.setNsPrefix("eumd", "http://entsoe.eu/ns/Metadata-European#");
+////                model.setNsPrefix("prov", "http://www.w3.org/ns/prov#");
+////                model.setNsPrefix("time", "http://www.w3.org/2006/time#");
+////                model.setNsPrefix("skos", "http://www.w3.org/2004/02/skos/core#");
+//
+//                    //here the new way of template TODO finish it, but make the template first
+//                    for (int col = 0; col < inputXLSdata.size(); col++) {
+//                        String classURI = ((LinkedList<?>) inputXLSdata.get(col)).getFirst().toString();
+//                        String classNS = ResourceFactory.createResource(classURI).asResource().getNameSpace();
+//                        String propertyURI = ((LinkedList<?>) inputXLSdata.get(col)).get(1).toString();
+//                        String propertyType = ((LinkedList<?>) inputXLSdata.get(col)).get(2).toString();
+//                        String datatype = ((LinkedList<?>) inputXLSdata.get(col)).get(3).toString();
+//                        String multiplicity = ((LinkedList<?>) inputXLSdata.get(col)).get(4).toString();
+//                        if (((LinkedList<?>) inputXLSdata.get(col)).size() > 5) {
+//                            for (int row = 5; row < ((LinkedList<?>) inputXLSdata.get(col)).size(); col += 2) { //TODO below to be revised
+//                                //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col).toString());
+//                                //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col + 1).toString());
+//                                String rdfid = ((LinkedList<?>) inputXLSdata.get(row)).get(col).toString();
+//                                //System.out.println(row);
+//                                //System.out.println(rdfid);
+//                                String object = ((LinkedList<?>) inputXLSdata.get(row)).get(col + 1).toString();
+//
+//                                //Add triples to the model
+//
+//                                //Add the Class type
+//                                if (rdfid.startsWith("urn:uuid:")) {
+//                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
+//                                } else {
+//                                    if (rdfid.startsWith("http://")) {
+//                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
+//                                    } else {
+//                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
+//                                    }
+//                                }
+//
+//
+//                                switch (propertyType) {
+//                                    case "Attribute" -> { //add literal
+//                                        if (rdfid.startsWith("urn:uuid:")) {
+//                                            if (object.contains("LangXMLTag:")) {
+//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createLangLiteral(object.split("LangXMLTag:", 2)[0], object.split("LangXMLTag:", 2)[1])));
+//                                            } else {
+//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+//                                            }
+//                                        } else {
+//                                            if (rdfid.startsWith("http://")) {
+//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+//                                            } else {
+//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+//                                            }
+//                                        }
+//                                    }
+//                                    case "Association" -> { //add resource
+//                                        if (rdfid.startsWith("urn:uuid:")) {
+//                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
+//                                        } else {
+//                                            if (rdfid.startsWith("http://")) {
+//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
+//                                            } else {
+//                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
+//                                            }
+//                                        }
+//                                    }
+//                                    case "Enumeration" -> //add enum
+//                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
+//                                }
+//
+//                            }
+//                        }
+//
+//                    }
+//                    //end new way of template
+//
+//                    //save xml
+//
+//                    if (sheetnum == 0) {
+//                        Map<String, Model> profileModelMap = loadDataMap.get("profileModelMap");
+//                        //this is related to the save of the data
+//                        Set<Resource> rdfAboutList = new HashSet<>();
+//                        Set<Resource> rdfEnumList = new HashSet<>();
+//                        originalNameInParts = FilenameUtils.getName(xmlfile.toString()).split("_", 2)[1].split(".xlsx", 2);
+//
+//
+//                        if ((boolean) saveProperties.get("useAboutRules")) {
+////                            if (profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").hasNext()) {
+////                                rdfAboutList = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").toSet();
+////                            }
+//                            rdfAboutList = LoadRDFAbout(xmlBase);
+//                            rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
+//                        }
+//
+//                        if ((boolean) saveProperties.get("useEnumRules")) {
+////                            for (ResIterator ii = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),
+////                                    ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")); ii.hasNext(); ) {
+////                                Resource resItem = ii.next();
+////                                for (ResIterator j = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
+////                                    Resource resItemProp = j.next();
+////                                    rdfEnumList.add(resItemProp);
+////                                }
+////                            }
+//                            rdfEnumList = LoadRDFEnum(xmlBase);
+//                        }
+//
+//                        if (saveProperties.containsKey("rdfAboutList")) {
+//                            saveProperties.replace("rdfAboutList", rdfAboutList);
+//                        } else {
+//                            saveProperties.put("rdfAboutList", rdfAboutList);
+//                        }
+//                        if (saveProperties.containsKey("rdfEnumList")) {
+//                            saveProperties.replace("rdfEnumList", rdfEnumList);
+//                        } else {
+//                            saveProperties.put("rdfEnumList", rdfEnumList);
+//                        }
+//
+//                        //if (extension.equals("zip")) {
+//                        //    fileName = fileName.replace(".zip", ".xml");
+//                        // }
+//
+//                    }
+//                    saveProperties.replace("filename", saveProperties.get("filename").toString().split(".xml", 2)[0] + "_" + originalNameInParts[0] + ".xml");
+//                    InstanceDataFactory.saveInstanceData(model, saveProperties);
+//                    firstfile = 0;
+//                }
+//            }
+//        }
+//    }
 
 
     public static void generateCommonData(List<File> file) throws IOException {
