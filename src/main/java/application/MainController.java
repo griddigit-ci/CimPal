@@ -297,6 +297,20 @@ public class MainController implements Initializable {
     private HBox IDhbox;
     @FXML
     private ImageView IDImageView;
+    @FXML
+    private TextField fsXlsTemplatePath;
+    @FXML
+    private TextField fXmlBaseGen;
+    @FXML
+    private ChoiceBox fcbGenMethodOptions;
+    @FXML
+    private Button fbtnRunGenerateInstance;
+    @FXML
+    private CheckBox fcbSortRDFGen;
+    @FXML
+    private ChoiceBox fcbRDFsortOptionsGen;
+
+
 
 
     public static File rdfModel1;
@@ -519,6 +533,19 @@ public class MainController implements Initializable {
                 "Sorting by prefix"
         );
 
+        fcbRDFsortOptionsGen.getItems().addAll(
+                "Sorting by local name",
+                "Sorting by prefix"
+        );
+        fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
+
+        fcbGenMethodOptions.getItems().addAll(
+                "Option 1 (Old)",
+                "Option 2 (New)",
+                "Option 3 (TBD)"
+        );
+        fcbGenMethodOptions.getSelectionModel().selectFirst();
+
         //Adding action to the choice box
         ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBRDFconvertTarget());
 
@@ -533,6 +560,8 @@ public class MainController implements Initializable {
 
         //TODO: see how to have this default on the screen
         defaultShapesURI = "/Constraints";
+
+        fXmlBaseGen.setText("http://iec.ch/TC57/CIM100");
     }
 
 
@@ -1281,7 +1310,7 @@ public class MainController implements Initializable {
 
                 progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-                ModelManipulationFactory.generateDataFromXls(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag, eqbdID, tpbdID, saveProperties, persistentEQflag);
+                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties);
 
                 progressBar.setProgress(1);
                 System.out.print("Conversion finished.\n");
@@ -4282,6 +4311,69 @@ User --> Order : places
         fPathXLSfileForShacl.clear();
         MainController.inputXLS = null;
         selectedFile = null;
+    }
+
+    @FXML
+    //action button Browse for Xls template for instance data generation
+    private void actionBrowseXlsTemplate() {
+        progressBar.setProgress(0);
+        //select xls file
+        List<File> file = util.ModelFactory.filechoosercustom(true, "Xls template", List.of("*.xlsx"), "Browse for xls template");
+
+        if (file != null) {// the file is selected
+
+            //MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
+            fsXlsTemplatePath.setText(file.getFirst().toString());
+            MainController.inputXLS = file;
+        }
+    }
+
+    @FXML
+    private void actionBtnRunGenerateInstance() throws Exception {
+        progressBar.setProgress(0);
+
+        String xmlBase = fXmlBaseGen.getText();
+        Map<String, Object> saveProperties = new HashMap<>();
+        boolean sortRDF = fcbSortRDFGen.isSelected();
+        boolean sortPrefix = fcbRDFsortOptionsGen.getSelectionModel().getSelectedItem().toString().equals("Sorting by prefix");
+
+        saveProperties.put("filename", "test");
+        saveProperties.put("showXmlDeclaration", "true");
+        saveProperties.put("showDoctypeDeclaration", "false");
+        saveProperties.put("tab", "2");
+        saveProperties.put("relativeURIs", "same-document");
+        saveProperties.put("showXmlEncoding", "true");
+        saveProperties.put("xmlBase", xmlBase);
+        saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
+        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
+        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
+        saveProperties.put("useFileDialog", true);
+        saveProperties.put("fileFolder", "C:");
+        saveProperties.put("dozip", false);
+        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("showXmlBaseDeclaration", "true");
+        saveProperties.put("sortRDF", sortRDF);
+        saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localName
+
+        saveProperties.put("putHeaderOnTop", true);
+        saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+        saveProperties.put("extensionName", "RDF XML");
+        saveProperties.put("fileExtension", "*.xml");
+        saveProperties.put("fileDialogTitle", "Save RDF XML for");
+
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
+        switch (selectedMethod){
+            case "Option 1 (Old)":
+                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties);
+            case "Option 2 (New)":
+                ModelManipulationFactory.generateDataFromXlsV2(xmlBase, inputXLS.getFirst(), saveProperties);
+            case "Option 3 (TBD)":
+                break;
+        }
+
+        progressBar.setProgress(1);
     }
 }
 
