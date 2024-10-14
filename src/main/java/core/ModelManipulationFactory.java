@@ -123,12 +123,10 @@ public class ModelManipulationFactory {
         return RdfEnumList;
     }
 
-    public static void generateDataFromXls(String xmlBase, Boolean profileModelUnionFlag, Boolean instanceModelUnionFlag,
-                                           Map<String,Boolean> inputData, Boolean shaclModelUnionFlag, String eqbdID, String tpbdID,Map<String,Object> saveProperties,
-                                           boolean persistentEQflag) throws IOException {
+    public static void generateDataFromXls(String xmlBase, Map<String,Object> saveProperties) throws IOException {
 
         //this is to load profile data - this is needed for the export
-        Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
+        //Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
 
         int firstfile = 1;
         for (File xmlfile : MainController.inputXLS) {
@@ -264,7 +262,7 @@ public class ModelManipulationFactory {
                     //save xml
 
                     if (sheetnum == 0) {
-                        Map<String, Model> profileModelMap = loadDataMap.get("profileModelMap");
+                        //Map<String, Model> profileModelMap = loadDataMap.get("profileModelMap");
                         //this is related to the save of the data
                         Set<Resource> rdfAboutList = new HashSet<>();
                         Set<Resource> rdfEnumList = new HashSet<>();
@@ -338,6 +336,8 @@ public class ModelManipulationFactory {
                     prefMap.putIfAbsent(pref, ns);
                 }
                 // getting classes to print
+                if (((LinkedList<?>) o).size() < 4)
+                    continue;
                 String className = ((LinkedList<?>) o).get(3).toString();
                 if (!className.isEmpty()){
                     int classSheetIdx = book.getSheetIndex(className);
@@ -399,7 +399,7 @@ public class ModelManipulationFactory {
                 String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
                 Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                 String propertyType = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString();
-                String object = ((LinkedList<?>) headerXlsData.get(3)).get(i).toString();
+                String object = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
                 switch (propertyType) {
                     case "Literal" -> { //add literal
                         model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
@@ -442,10 +442,10 @@ public class ModelManipulationFactory {
 
                 for (int j = 0; j < cols; j++){
                     if (i != rdfidCol) {
-                        String[] splitPropUri = ((LinkedList<?>) classXlsData.get(i)).get(j).toString().split(":");
+                        String[] splitPropUri = ((LinkedList<?>) classXlsData.getFirst()).get(j).toString().split(":");
                         String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
                         Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
-                        String propertyType = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
+                        String propertyType = ((LinkedList<?>) classXlsData.get(1)).get(j).toString();
                         String object = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
 
                         switch (propertyType) {
@@ -460,6 +460,8 @@ public class ModelManipulationFactory {
                             }
                         }
                     }
+                    else
+                        break;
                 }
             }
 
@@ -488,7 +490,8 @@ public class ModelManipulationFactory {
                 saveProperties.put("rdfEnumList", rdfEnumList);
             }
 
-            saveProperties.replace("filename", saveProperties.get("filename").toString());
+            saveProperties.replace("filename", saveProperties.get("filename").toString()+ ".xml");
+            saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
             InstanceDataFactory.saveInstanceData(model, saveProperties);
 
         }
