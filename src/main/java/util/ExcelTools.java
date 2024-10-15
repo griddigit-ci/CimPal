@@ -59,6 +59,64 @@ public class ExcelTools {
         return dataExcel;
     }
 
+    public static ArrayList<Object> importXLSXnullSupport(String fileName, int sheetNum) {
+        ArrayList<Object> dataExcel = new ArrayList<>();
+        try {
+            File excel = new File(fileName);
+            FileInputStream fis = new FileInputStream(excel);
+            XSSFWorkbook book = new XSSFWorkbook(fis);
+            XSSFSheet sheet = book.getSheetAt(sheetNum);
+            FormulaEvaluator evaluator = book.getCreationHelper().createFormulaEvaluator();
+            // Iterating over Excel file in Java
+
+            // Get the number of columns from the first row
+            Row firstRow = sheet.getRow(0);
+            int numColumns = firstRow.getLastCellNum();
+
+            for (Row currentRow : sheet) {
+                Cell firstCell = currentRow.getCell(0, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                if (firstCell == null || firstCell.getCellType() == CellType.BLANK) {
+                    break; // Stop processing if column 0 is empty
+                }
+
+                LinkedList<Object> rowItem = new LinkedList<>();
+                for (int i = 0; i < numColumns; i++) {
+                    Cell currentCell = currentRow.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+
+                    if (currentCell == null) {
+                        rowItem.add(null);
+                    } else if (currentCell.getCellType() == CellType.FORMULA) {
+                        CellValue cellValue = evaluator.evaluate(currentCell);
+                        switch (cellValue.getCellType()) {
+                            case BOOLEAN:
+                                rowItem.add(cellValue.getBooleanValue());
+                                break;
+                            case NUMERIC:
+                                rowItem.add(cellValue.getNumberValue());
+                                break;
+                            case STRING:
+                                rowItem.add(cellValue.getStringValue());
+                                break;
+                            default:
+                                rowItem.add(null); // Handle other cell types as null
+                        }
+                    } else if (currentCell.getCellType() == CellType.STRING) {
+                        rowItem.add(currentCell.getStringCellValue());
+                    } else if (currentCell.getCellType() == CellType.NUMERIC) {
+                        rowItem.add(currentCell.getNumericCellValue());
+                    } else {
+                        rowItem.add(null); // Handle other cell types as null
+                    }
+                }
+                dataExcel.add(rowItem);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return dataExcel;
+    }
+
     //TODO delete this method and use the exportMapToExcel
     public static void exportToExcelMap(Map<String, RDFDatatype> dataTypeMap, OutputStream outputStream) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {

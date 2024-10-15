@@ -343,7 +343,7 @@ public class ModelManipulationFactory {
                     int classSheetIdx = book.getSheetIndex(className);
                     if (classSheetIdx != -1){
                         className = className.replace("|",":");
-                        classesXlsData.putIfAbsent(className, ExcelTools.importXLSX(xmlfile.toString(), classSheetIdx));
+                        classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
                     }
                     else
                         throw new Exception("Couldn't find the sheet for class: " + className);
@@ -355,7 +355,7 @@ public class ModelManipulationFactory {
                     if (!headerClassName.isEmpty()) {
                         int headerSheetIdx = book.getSheetIndex(headerClassName);
                         if (headerSheetIdx != -1)
-                            headerXlsData = ExcelTools.importXLSX(xmlfile.toString(), headerSheetIdx);
+                            headerXlsData = ExcelTools.importXLSXnullSupport(xmlfile.toString(), headerSheetIdx);
                         else
                             throw new Exception("Couldn't find header class sheet.");
                     }
@@ -384,44 +384,46 @@ public class ModelManipulationFactory {
         if (rdfidCol == -1)
             throw new Exception("Header rdf:id missing from xls.");
 
-        String headRdfid = xmlBase + ((LinkedList<?>) headerXlsData.get(2)).get(rdfidCol).toString();
+        String headRdfid = ((LinkedList<?>) headerXlsData.get(2)).get(rdfidCol).toString();
         Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
 
         // put header data into the model
         // add header class
         String[] splitClassName = headerClassName.split("\\|");
-        String headerClassWNS = prefMap.get(splitClassName[0])+":"+splitClassName[1];
+        String headerClassWNS = prefMap.get(splitClassName[0])+splitClassName[1];
         model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
         saveProperties.put("headerClassResource", prefMap.get(splitClassName[0])+splitClassName[1]);
         for (int i = 0; i < headerCols; i++){
             if (i != rdfidCol){
-                String[] splitPropUri = ((LinkedList<?>) headerXlsData.getFirst()).get(i).toString().split(":");
-                String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
-                Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
-                String propertyType = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString();
-                String object = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
-                switch (propertyType) {
-                    case "Literal" -> { //add literal
-                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
-                    }
-                    case "Resource" -> { //add resource
-                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase+object)));
-                    }
-                    case "Enumeration" -> { //add enum
-                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                if (((LinkedList<?>) headerXlsData.get(2)).get(i) != null) {
+                    String[] splitPropUri = ((LinkedList<?>) headerXlsData.getFirst()).get(i).toString().split(":");
+                    String propertyURI = prefMap.get(splitPropUri[0]) + splitPropUri[1];
+                    Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
+                    String propertyType = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString();
+                    String object = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
+                    switch (propertyType) {
+                        case "Literal" -> { //add literal
+                            model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                        }
+                        case "Resource" -> { //add resource
+                            model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
+                        }
+                        case "Enumeration" -> { //add enum
+                            model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                        }
                     }
                 }
             }
         }
 
         // put other classes into the model
-        for (Map.Entry<String, ArrayList<Object>> entry : classesXlsData.entrySet()){
+        for (Map.Entry<String, ArrayList<Object>> entry : classesXlsData.entrySet()) {
             String className = entry.getKey();
             ArrayList<Object> classXlsData = entry.getValue();
-            int cols = ((LinkedList<?>)classXlsData.getFirst()).size();
+            int cols = ((LinkedList<?>) classXlsData.getFirst()).size();
             rdfidCol = -1;
-            for (int i = 0; i < headerCols; i++){
-                if (((LinkedList<?>)headerXlsData.getFirst()).get(i).equals("rdf:id")){
+            for (int i = 0; i < cols; i++) {
+                if (((LinkedList<?>) classXlsData.getFirst()).get(i).equals("rdf:id")) {
                     rdfidCol = i;
                     break;
                 }
@@ -430,71 +432,71 @@ public class ModelManipulationFactory {
                 throw new Exception("rdf:id missing at class sheet: " + className);
 
             splitClassName = className.split(":");
-            String classWNS = prefMap.get(splitClassName[0])+":"+splitClassName[1];
+            String classWNS = prefMap.get(splitClassName[0]) + splitClassName[1];
 
 
             for (int i = 2; i < classXlsData.size(); i++) { // loop on the rows/class instance
+                if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
+                    String rdfid = xmlBase + "#" + ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
+                    Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
-                String rdfid = xmlBase + ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
-                Resource rdfidRes = ResourceFactory.createResource(rdfid);
+                    model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
 
-                model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
+                    for (int j = 0; j < cols; j++) {
+                        if (j != rdfidCol) {
+                            if (((LinkedList<?>) classXlsData.get(i)).get(j) != null) {
+                                String[] splitPropUri = ((LinkedList<?>) classXlsData.getFirst()).get(j).toString().split(":");
+                                String propertyURI = prefMap.get(splitPropUri[0]) + splitPropUri[1]; //TODO check if splitPropUri[0] is in the prefix map as if not this gives null. If null we need to stop and ask the user to fix teh config. Do this in the other places where we have the same thing
+                                Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
+                                String propertyType = ((LinkedList<?>) classXlsData.get(1)).get(j).toString();
+                                String object = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
 
-                for (int j = 0; j < cols; j++){
-                    if (i != rdfidCol) {
-                        String[] splitPropUri = ((LinkedList<?>) classXlsData.getFirst()).get(j).toString().split(":");
-                        String propertyURI = prefMap.get(splitPropUri[0]) + ":" + splitPropUri[1];
-                        Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
-                        String propertyType = ((LinkedList<?>) classXlsData.get(1)).get(j).toString();
-                        String object = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
-
-                        switch (propertyType) {
-                            case "Literal" -> { //add literal
-                                model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
-                            }
-                            case "Resource" -> { //add resource
-                                model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase+object)));
-                            }
-                            case "Enumeration" -> { //add enum
-                                model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                switch (propertyType) {
+                                    case "Literal" -> { //add literal
+                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                                    }
+                                    case "Resource" -> { //add resource
+                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase + "#" + object)));
+                                    }
+                                    case "Enumeration" -> { //add enum
+                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                    }
+                                }
                             }
                         }
                     }
-                    else
-                        break;
                 }
             }
-
-            // save file
-            Set<Resource> rdfAboutList = new HashSet<>();
-            Set<Resource> rdfEnumList = new HashSet<>();
-
-
-            if ((boolean) saveProperties.get("useAboutRules")) {
-                rdfAboutList = LoadRDFAbout(xmlBase);
-                rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
-            }
-
-            if ((boolean) saveProperties.get("useEnumRules")) {
-                rdfEnumList = LoadRDFEnum(xmlBase);
-            }
-
-            if (saveProperties.containsKey("rdfAboutList")) {
-                saveProperties.replace("rdfAboutList", rdfAboutList);
-            } else {
-                saveProperties.put("rdfAboutList", rdfAboutList);
-            }
-            if (saveProperties.containsKey("rdfEnumList")) {
-                saveProperties.replace("rdfEnumList", rdfEnumList);
-            } else {
-                saveProperties.put("rdfEnumList", rdfEnumList);
-            }
-
-            saveProperties.replace("filename", saveProperties.get("filename").toString()+ ".xml");
-            saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
-            InstanceDataFactory.saveInstanceData(model, saveProperties);
-
         }
+
+        // save file
+        Set<Resource> rdfAboutList = new HashSet<>();
+        Set<Resource> rdfEnumList = new HashSet<>();
+
+
+        if ((boolean) saveProperties.get("useAboutRules")) {
+            rdfAboutList = LoadRDFAbout(xmlBase);
+            rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
+        }
+
+        if ((boolean) saveProperties.get("useEnumRules")) {
+            rdfEnumList = LoadRDFEnum(xmlBase);
+        }
+
+        if (saveProperties.containsKey("rdfAboutList")) {
+            saveProperties.replace("rdfAboutList", rdfAboutList);
+        } else {
+            saveProperties.put("rdfAboutList", rdfAboutList);
+        }
+        if (saveProperties.containsKey("rdfEnumList")) {
+            saveProperties.replace("rdfEnumList", rdfEnumList);
+        } else {
+            saveProperties.put("rdfEnumList", rdfEnumList);
+        }
+
+        saveProperties.replace("filename", saveProperties.get("filename").toString()+ ".xml");
+        saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
+        InstanceDataFactory.saveInstanceData(model, saveProperties);
 
         fis.close();
     }
