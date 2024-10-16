@@ -390,14 +390,30 @@ public class ModelManipulationFactory {
         // put header data into the model
         // add header class
         String[] splitClassName = headerClassName.split("\\|");
-        String headerClassWNS = prefMap.get(splitClassName[0])+splitClassName[1];
+        String headerClassWNS;
+        try {
+            String namePref = prefMap.get(splitClassName[0]);
+            headerClassWNS = namePref + splitClassName[1];
+
+            saveProperties.put("headerClassResource", namePref + splitClassName[1]);
+        }
+        catch (NullPointerException e){
+            throw new Exception("Missing prefix in config for class: "+ headerClassName + "\nMissing prefix: " + splitClassName[0]);
+        }
         model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
-        saveProperties.put("headerClassResource", prefMap.get(splitClassName[0])+splitClassName[1]);
+
         for (int i = 0; i < headerCols; i++){
             if (i != rdfidCol){
                 if (((LinkedList<?>) headerXlsData.get(2)).get(i) != null) {
                     String[] splitPropUri = ((LinkedList<?>) headerXlsData.getFirst()).get(i).toString().split(":");
-                    String propertyURI = prefMap.get(splitPropUri[0]) + splitPropUri[1];
+                    String propertyURI;
+                    try {
+                        String propPref = prefMap.get(splitPropUri[0]);
+                        propertyURI = propPref + splitPropUri[1];
+                    }
+                    catch (NullPointerException e){
+                        throw new Exception("Missing prefix in config for property: "+ splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
+                    }
                     Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                     String propertyType = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString();
                     String object = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
@@ -432,8 +448,14 @@ public class ModelManipulationFactory {
                 throw new Exception("rdf:id missing at class sheet: " + className);
 
             splitClassName = className.split(":");
-            String classWNS = prefMap.get(splitClassName[0]) + splitClassName[1];
-
+            String classWNS;
+            try {
+                String propPref = prefMap.get(splitClassName[0]);
+                classWNS = propPref + splitClassName[1];
+            }
+            catch (NullPointerException e){
+                throw new Exception("Missing prefix in config for class: "+ className + "\nMissing prefix: " + splitClassName[0]);
+            }
 
             for (int i = 2; i < classXlsData.size(); i++) { // loop on the rows/class instance
                 if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
@@ -446,7 +468,14 @@ public class ModelManipulationFactory {
                         if (j != rdfidCol) {
                             if (((LinkedList<?>) classXlsData.get(i)).get(j) != null) {
                                 String[] splitPropUri = ((LinkedList<?>) classXlsData.getFirst()).get(j).toString().split(":");
-                                String propertyURI = prefMap.get(splitPropUri[0]) + splitPropUri[1]; //TODO check if splitPropUri[0] is in the prefix map as if not this gives null. If null we need to stop and ask the user to fix teh config. Do this in the other places where we have the same thing
+                                String propertyURI;
+                                try {
+                                    String propPref = prefMap.get(splitPropUri[0]);
+                                    propertyURI = propPref + splitPropUri[1];
+                                }
+                                catch (NullPointerException e){
+                                    throw new Exception("Missing prefix in config for property: "+ splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
+                                }
                                 Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                                 String propertyType = ((LinkedList<?>) classXlsData.get(1)).get(j).toString();
                                 String object = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
