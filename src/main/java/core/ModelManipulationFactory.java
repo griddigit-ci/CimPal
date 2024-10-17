@@ -33,8 +33,8 @@ public class ModelManipulationFactory {
 
         List<File> modelFiles = new LinkedList<>();
         //if (!profileModelUnionFlag && MainController.rdfProfileFile!=null) {
-           // modelFiles.add(MainController.rdfProfileFile);
-       // }else{
+        // modelFiles.add(MainController.rdfProfileFile);
+        // }else{
         modelFiles=MainController.rdfProfileFileList;
         //}
         ArrayList<Object> profileData=null;
@@ -342,7 +342,7 @@ public class ModelManipulationFactory {
                 if (!className.isEmpty()){
                     int classSheetIdx = book.getSheetIndex(className);
                     if (classSheetIdx != -1){
-                        className = className.replace("|",":");
+                        // className = className.replace("|",":");
                         classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
                     }
                     else
@@ -373,10 +373,11 @@ public class ModelManipulationFactory {
 
         // Add header class
         int headerCols = ((LinkedList<?>)headerXlsData.getFirst()).size();
+        headerClassName = ((LinkedList<?>) headerXlsData.getFirst()).get(1).toString();
         // getting rdfid column
         int rdfidCol = -1;
         for (int i = 0; i < headerCols; i++){
-            if (((LinkedList<?>)headerXlsData.getFirst()).get(i).equals("rdf:id")){
+            if (((LinkedList<?>)headerXlsData.get(1)).get(i).equals("rdf:id")){
                 rdfidCol = i;
                 break;
             }
@@ -384,12 +385,12 @@ public class ModelManipulationFactory {
         if (rdfidCol == -1)
             throw new Exception("Header rdf:id missing from xls.");
 
-        String headRdfid = ((LinkedList<?>) headerXlsData.get(2)).get(rdfidCol).toString();
+        String headRdfid = ((LinkedList<?>) headerXlsData.get(5)).get(rdfidCol).toString();
         Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
 
         // put header data into the model
         // add header class
-        String[] splitClassName = headerClassName.split("\\|");
+        String[] splitClassName = headerClassName.split(":");
         String headerClassWNS;
         try {
             String namePref = prefMap.get(splitClassName[0]);
@@ -404,8 +405,9 @@ public class ModelManipulationFactory {
 
         for (int i = 0; i < headerCols; i++){
             if (i != rdfidCol){
-                if (((LinkedList<?>) headerXlsData.get(2)).get(i) != null) {
-                    String[] splitPropUri = ((LinkedList<?>) headerXlsData.getFirst()).get(i).toString().split(":");
+                Object value = ((LinkedList<?>) headerXlsData.get(5)).get(i);
+                if (value != null) {
+                    String[] splitPropUri = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString().split(":");
                     String propertyURI;
                     try {
                         String propPref = prefMap.get(splitPropUri[0]);
@@ -415,8 +417,8 @@ public class ModelManipulationFactory {
                         throw new Exception("Missing prefix in config for property: "+ splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
                     }
                     Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
-                    String propertyType = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString();
-                    String object = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
+                    String propertyType = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
+                    String object = value.toString();
                     switch (propertyType) {
                         case "Literal" -> { //add literal
                             model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
@@ -434,12 +436,12 @@ public class ModelManipulationFactory {
 
         // put other classes into the model
         for (Map.Entry<String, ArrayList<Object>> entry : classesXlsData.entrySet()) {
-            String className = entry.getKey();
             ArrayList<Object> classXlsData = entry.getValue();
+            String className = ((LinkedList<?>) classXlsData.getFirst()).get(1).toString();
             int cols = ((LinkedList<?>) classXlsData.getFirst()).size();
             rdfidCol = -1;
             for (int i = 0; i < cols; i++) {
-                if (((LinkedList<?>) classXlsData.getFirst()).get(i).equals("rdf:id")) {
+                if (((LinkedList<?>) classXlsData.get(1)).get(i).equals("rdf:id")) {
                     rdfidCol = i;
                     break;
                 }
@@ -457,7 +459,7 @@ public class ModelManipulationFactory {
                 throw new Exception("Missing prefix in config for class: "+ className + "\nMissing prefix: " + splitClassName[0]);
             }
 
-            for (int i = 2; i < classXlsData.size(); i++) { // loop on the rows/class instance
+            for (int i = 5; i < classXlsData.size(); i++) { // loop on the rows/class instance
                 if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
                     String rdfid = xmlBase + "#" + ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
@@ -466,19 +468,20 @@ public class ModelManipulationFactory {
 
                     for (int j = 0; j < cols; j++) {
                         if (j != rdfidCol) {
-                            if (((LinkedList<?>) classXlsData.get(i)).get(j) != null) {
-                                String[] splitPropUri = ((LinkedList<?>) classXlsData.getFirst()).get(j).toString().split(":");
+                            Object value = ((LinkedList<?>) classXlsData.get(i)).get(j);
+                            if (value != null) {
+                                String[] splitPropUri = ((LinkedList<?>) classXlsData.get(1)).get(j).toString().split(":");
                                 String propertyURI;
                                 try {
                                     String propPref = prefMap.get(splitPropUri[0]);
                                     propertyURI = propPref + splitPropUri[1];
                                 }
-                                catch (NullPointerException e){
+                                catch (NullPointerException e) {
                                     throw new Exception("Missing prefix in config for property: "+ splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
                                 }
                                 Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
-                                String propertyType = ((LinkedList<?>) classXlsData.get(1)).get(j).toString();
-                                String object = ((LinkedList<?>) classXlsData.get(i)).get(j).toString();
+                                String propertyType = ((LinkedList<?>) classXlsData.get(2)).get(j).toString();
+                                String object = value.toString();
 
                                 switch (propertyType) {
                                     case "Literal" -> { //add literal
