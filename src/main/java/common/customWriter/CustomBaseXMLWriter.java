@@ -7,7 +7,6 @@
 package common.customWriter;
 
 import common.customWriter.jena.CustomRelation;
-import org.apache.jena.JenaRuntime;
 import org.apache.jena.iri.IRI;
 import org.apache.jena.iri.IRIFactory;
 import org.apache.jena.rdf.model.*;
@@ -20,6 +19,7 @@ import org.apache.jena.rdfxml.xmloutput.impl.SimpleLogger;
 import org.apache.jena.shared.*;
 import org.apache.jena.util.CharEncoding;
 import org.apache.jena.util.FileUtils;
+import org.apache.jena.util.SystemUtils;
 import org.apache.jena.util.XMLChar;
 import org.apache.jena.vocabulary.*;
 import org.slf4j.Logger;
@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
  */
 public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
     private static final String newline =
-            JenaRuntime.getSystemProperty("line.separator");
+            SystemUtils.getSystemProperty("line.separator");
     static private final String DEFAULT_NS_ENTITY_NAME = "this";
     static private final String DEFAULT_NS_ENTITY_NAME_ALT = "here";
     private String defaultNSEntityName = "UNSET";
@@ -248,7 +248,7 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
 
     private void setFromWriterSystemProperties(Map<String, String> ns, Set<String> prefixesUsed) {
         for (String uri : namespacesNeeded) {
-            String val = JenaRuntime.getSystemProperty(RDFWriterI.NSPREFIXPROPBASE + uri);
+            String val = SystemUtils.getSystemProperty(RDFWriterI.NSPREFIXPROPBASE + uri);
             if (val != null && checkLegalPrefix(val) && !prefixesUsed.contains(val)) {
                 ns.put(uri, val);
                 prefixesUsed.add(val);

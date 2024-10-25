@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <jdk.version>21</jdk.version>
-        <log4j.version>2.12.1</log4j.version>
+        <cimpal.version>2023.2.0.0</cimpal.version>
+        <log4j.version>2.24.1</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jena.version>5.1.0</jena.version>
-        <launch4j.version>2.5.0</launch4j.version>
-        <javafx.version>23</javafx.version>
-        <cimpal.version>2024.0.0.0</cimpal.version>
+        <jena.version>5.2.0</jena.version>
+        <launch4j.version>2.5.2</launch4j.version>
+        <javafx.version>23.0.1</javafx.version>
     </properties>
 
     <groupId>eu.griddigit</groupId>
@@ -24,7 +24,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.12.1</version>
+                <version>3.13.0</version>
                 <configuration>
                     <source>${jdk.version}</source>
                     <target>${jdk.version}</target>
@@ -34,7 +34,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.3</version>
+                <version>3.6.0</version>
                 <configuration>
                     <shadedArtifactAttached>false</shadedArtifactAttached>
                     <transformers>
@@ -163,7 +163,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.15.0</version>
+            <version>3.17.0</version>
         </dependency>
 
         <dependency>
@@ -243,7 +243,7 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-to-slf4j</artifactId>
-            <version>2.23.1</version>
+            <version>2.24.1</version>
         </dependency>
 
         <dependency>
@@ -271,35 +271,35 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.17.0</version>
+            <version>2.18.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.17.2</version>
+            <version>2.18.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.17.2</version>
+            <version>2.18.0</version>
         </dependency>
 
 
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>2.0.12</version>
+            <version>2.0.16</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-nop</artifactId>
-            <version>2.0.13</version>
+            <version>2.0.16</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents.core5</groupId>
             <artifactId>httpcore5</artifactId>
-            <version>5.3</version>
+            <version>5.3.1</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-codec</artifactId>
@@ -325,7 +325,7 @@
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
-            <version>1.17.0</version>
+            <version>1.17.1</version>
         </dependency>
         
         <dependency>
@@ -341,17 +341,17 @@
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-json-org</artifactId>
-            <version>2.17.2</version>
+            <version>2.18.0</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-xml</artifactId>
-            <version>2.17.1</version>
+            <version>2.18.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.velocity</groupId>
             <artifactId>velocity-engine-core</artifactId>
-            <version>2.4</version>
+            <version>2.4.1</version>
         </dependency>
     </dependencies>
     <repositories>
