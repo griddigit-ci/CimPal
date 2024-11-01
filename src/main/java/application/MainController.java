@@ -9,10 +9,12 @@ import core.*;
 import common.customWriter.CustomRDFFormat;
 
 import java.io.InputStream;
+
 import guru.nidi.graphviz.engine.Graphviz;
 import guru.nidi.graphviz.engine.Format;
 
 import java.io.ByteArrayInputStream;
+
 import gui.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -309,8 +311,8 @@ public class MainController implements Initializable {
     private CheckBox fcbSortRDFGen;
     @FXML
     private ChoiceBox fcbRDFsortOptionsGen;
-
-
+    @FXML
+    private ToggleGroup giDataLine;
 
 
     public static File rdfModel1;
@@ -1453,10 +1455,10 @@ public class MainController implements Initializable {
                     inputXLSdata = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
 
                     List<String> processed = new LinkedList<>();
-                    for (int row = 1; row < inputXLSdata.size(); row+=4) {
+                    for (int row = 1; row < inputXLSdata.size(); row += 4) {
                         String fileName = ((LinkedList<?>) inputXLSdata.get(row)).getFirst().toString();
-                        String fileNameNoExt = fileName.substring(0,fileName.length()-4);
-                        String [] fileNameParts = fileNameNoExt.split("_",5);
+                        String fileNameNoExt = fileName.substring(0, fileName.length() - 4);
+                        String[] fileNameParts = fileNameNoExt.split("_", 5);
                         String timestamp = fileNameParts[0];
                         String process = fileNameParts[1];
                         String tso = fileNameParts[2];
@@ -1465,12 +1467,12 @@ public class MainController implements Initializable {
                         String fileProfile = ((LinkedList<?>) inputXLSdata.get(row)).get(1).toString();
                         String mas = ((LinkedList<?>) inputXLSdata.get(row)).get(2).toString();
                         String fileID_0 = ((LinkedList<?>) inputXLSdata.get(row)).get(3).toString();
-                        String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row+1)).get(3).toString();
-                        String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row+2)).get(3).toString();
-                        String fileID_3 = ((LinkedList<?>) inputXLSdata.get(row+3)).get(3).toString();
+                        String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row + 1)).get(3).toString();
+                        String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row + 2)).get(3).toString();
+                        String fileID_3 = ((LinkedList<?>) inputXLSdata.get(row + 3)).get(3).toString();
                         String fileID_EQBD = "urn:uuid:60076a01-df7a-0083-be02-d69cc8c050f6";
                         String fileID_TPBD = "urn:uuid:3a558800-363d-4c12-9f73-f07142100d5e";
-                        if (!processed.contains(timestamp+process+tso+version)){
+                        if (!processed.contains(timestamp + process + tso + version)) {
                             // Initialize Velocity engine
                             Properties properties = new Properties();
                             properties.setProperty("resource.loader", "file");
@@ -1533,14 +1535,14 @@ public class MainController implements Initializable {
                             };
 
                             // Write to file
-                            try (FileWriter writer = new FileWriter(xmlfile.getParent()+"\\Output\\"+ xmlFileNew)) {
+                            try (FileWriter writer = new FileWriter(xmlfile.getParent() + "\\Output\\" + xmlFileNew)) {
                                 writer.write(xmlContent);
                                 //System.out.println("XML file saved successfully!");
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
                         }
-                        processed.add(timestamp+process+tso+version);
+                        processed.add(timestamp + process + tso + version);
                     }
                 }
             }
@@ -1659,7 +1661,7 @@ public class MainController implements Initializable {
         }
 
         //sort options
-        String sortOptions="";
+        String sortOptions = "";
         if (targetFormat.equals("RDF XML (.rdf or .xml)")) {
             sortOptions = fcbRDFsortOptions.getSelectionModel().getSelectedItem().toString();
         }
@@ -1714,7 +1716,7 @@ public class MainController implements Initializable {
 
         RdfConvert.rdfConversion(MainController.rdfConvertFile, MainController.rdfConvertFileList, sourceFormat,
                 targetFormat, xmlBase, rdfFormat, showXmlDeclaration, showDoctypeDeclaration, tab,
-                relativeURIs, modelUnionFlag, inheritanceOnly, inheritanceList, inheritanceListConcrete, addowl, modelUnionFlagDetailed, sortRDF, rdfSortOptions, stripPrefixes, convertInstanceData,modelUnionFixPackage);
+                relativeURIs, modelUnionFlag, inheritanceOnly, inheritanceList, inheritanceListConcrete, addowl, modelUnionFlagDetailed, sortRDF, rdfSortOptions, stripPrefixes, convertInstanceData, modelUnionFixPackage);
 
         progressBar.setProgress(1);
     }
@@ -2062,7 +2064,7 @@ public class MainController implements Initializable {
                 profileVersion = 5; // Network Codes profiles, releases before 2.3
             } else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("Network Codes profiles, release 2.3")) {
                 profileVersion = 6; // Network Codes profiles, release 2.3
-            }else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("LTDS profiles, release 1.0")) {
+            } else if (cbProfilesVersionCreateCompleteSMTab.getSelectionModel().getSelectedItem().toString().equals("LTDS profiles, release 1.0")) {
                 profileVersion = 7; // LTDS profiles, release 1.0
             }
             if (cbApplyDefNsDesignTab.isSelected()) {
@@ -2618,23 +2620,23 @@ public class MainController implements Initializable {
                                 case "SimulationResultsProfile", "DocSimulationResultsProfile" ->
                                         ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/SimulationResults/Constraints/1.0");
                                 case "DLProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints");
                                 case "EQProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints");
                                 case "GLProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints");
                                 case "SCProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints");
                                 case "SSHProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints");
                                 case "SVProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints");
                                 case "TPProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints");
                                 case "LTDSShortCircuitResultProfile", "DocLTDSShortCircuitResultProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints");
                                 case "LTDSSystemCapacityProfile", "DocLTDSSystemCapacityProfile" ->
-                                    ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints");
+                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints");
                             }
                         }
                     }
@@ -3180,10 +3182,6 @@ public class MainController implements Initializable {
         });
 
 
-
-
-
-
 //
 //        // Render DOT string to a temporary file
 //        File tempFile = File.createTempFile("graph", ".png");
@@ -3227,9 +3225,6 @@ public class MainController implements Initializable {
 //        mxGraphComponent graphComponent = new mxGraphComponent(mxGraph);
 //        hbox.getChildren().add(graphComponent);
 //
-
-
-
 
 
 //        Map<Resource, Rectangle> nodeMap = new HashMap<>();
@@ -3369,9 +3364,6 @@ public class MainController implements Initializable {
         fsourceDefineTab.clear();
         tableViewBrowseModify.getItems().clear();
     }
-
-
-
 
 
     @FXML
@@ -3716,24 +3708,24 @@ public class MainController implements Initializable {
 
 
         String uml = """
-@startuml
-left to right direction
-skinparam class {
-    BackgroundColor LightBlue
-    ArrowColor DarkBlue
-    BorderColor Black
-}
-class User {
-    +String name
-    +String email
-}
-class Order {
-    +int id
-    +Date date
-}
-User --> Order : places
-@enduml
-""";
+                @startuml
+                left to right direction
+                skinparam class {
+                    BackgroundColor LightBlue
+                    ArrowColor DarkBlue
+                    BorderColor Black
+                }
+                class User {
+                    +String name
+                    +String email
+                }
+                class Order {
+                    +int id
+                    +Date date
+                }
+                User --> Order : places
+                @enduml
+                """;
 //
 //        String uml = """
 //        @startuml
@@ -3750,7 +3742,7 @@ User --> Order : places
 //        IDgraph.getEngine().loadContent(svg, "text/html");
 
 
-       byte[] diagram = PlantUMLGenerator.generateDiagram(uml);
+        byte[] diagram = PlantUMLGenerator.generateDiagram(uml);
 
         //Image image = new Image(new ByteArrayInputStream(diagram));
         //IDgraph.setImage(diagram);
@@ -4273,9 +4265,9 @@ User --> Order : places
 
     public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
         selectedFile = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
-        if (selectedFile != null){
+        if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
-            for (int m = 0; m < selectedFile.size(); m++){
+            for (int m = 0; m < selectedFile.size(); m++) {
                 paths.append(", ").append(selectedFile.get(m).toString());
             }
             fPathShaclFilesToOrganize.setText(paths.toString());
@@ -4336,6 +4328,11 @@ User --> Order : places
         Map<String, Object> saveProperties = new HashMap<>();
         boolean sortRDF = fcbSortRDFGen.isSelected();
         boolean sortPrefix = fcbRDFsortOptionsGen.getSelectionModel().getSelectedItem().toString().equals("Sorting by prefix");
+        int dataStartsFrom = 5;
+        RadioButton selected = (RadioButton) giDataLine.getSelectedToggle();
+        String selectedRB = selected.getText();
+        if (selectedRB.equals("Line 7"))
+            dataStartsFrom = 6;
 
         saveProperties.put("filename", "test");
         saveProperties.put("showXmlDeclaration", "true");
@@ -4354,6 +4351,7 @@ User --> Order : places
         saveProperties.put("showXmlBaseDeclaration", "false");
         saveProperties.put("sortRDF", sortRDF);
         saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localName
+        saveProperties.put("dataStartsFrom", dataStartsFrom);
 
         saveProperties.put("putHeaderOnTop", true);
         saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
@@ -4364,7 +4362,7 @@ User --> Order : places
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
-        switch (selectedMethod){
+        switch (selectedMethod) {
             case "Option 1 (Old)":
                 ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties);
             case "Option 2 (New)":

@@ -26,25 +26,25 @@ import static application.MainController.unionmodelbaseprofilesshaclinheritanceo
 
 public class ModelManipulationFactory {
 
-    public static Map<String, Map> loadDataForIGMMulDateTime(String xmlBase, Boolean profileModelUnionFlag, Boolean instanceModelUnionFlag, Map<String,Boolean> inputData, Boolean shaclModelUnionFlag) throws FileNotFoundException {
+    public static Map<String, Map> loadDataForIGMMulDateTime(String xmlBase, Boolean profileModelUnionFlag, Boolean instanceModelUnionFlag, Map<String, Boolean> inputData, Boolean shaclModelUnionFlag) throws FileNotFoundException {
 
-        Map<String, Map> loadDataMap= new HashMap<>();
-        Lang rdfProfileFormat=null;
+        Map<String, Map> loadDataMap = new HashMap<>();
+        Lang rdfProfileFormat = null;
 
         List<File> modelFiles = new LinkedList<>();
         //if (!profileModelUnionFlag && MainController.rdfProfileFile!=null) {
         // modelFiles.add(MainController.rdfProfileFile);
         // }else{
-        modelFiles=MainController.rdfProfileFileList;
+        modelFiles = MainController.rdfProfileFileList;
         //}
-        ArrayList<Object> profileData=null;
+        ArrayList<Object> profileData = null;
         Model baseInstanceModel;
 
-        Map<String,ArrayList<Object>> profileDataMap=new HashMap<>();
-        Map<String,Model> profileDataMapAsModel=new HashMap<>();
+        Map<String, ArrayList<Object>> profileDataMap = new HashMap<>();
+        Map<String, Model> profileDataMapAsModel = new HashMap<>();
 
         // load all profile models
-        Map<String,Model> profileModelMap = null;
+        Map<String, Model> profileModelMap = null;
         if (inputData.get("rdfs")) {
             profileModelMap = InstanceDataFactory.modelLoad(modelFiles, xmlBase, rdfProfileFormat, false);
 
@@ -61,9 +61,9 @@ public class ModelManipulationFactory {
             }
         }
 
-        loadDataMap.put("profileDataMap",profileDataMap);
-        loadDataMap.put("profileDataMapAsModel",profileDataMapAsModel);
-        loadDataMap.put("profileModelMap",profileModelMap);
+        loadDataMap.put("profileDataMap", profileDataMap);
+        loadDataMap.put("profileDataMapAsModel", profileDataMapAsModel);
+        loadDataMap.put("profileModelMap", profileModelMap);
 
         return loadDataMap;
     }
@@ -72,20 +72,19 @@ public class ModelManipulationFactory {
         Set<Resource> rdfAboutList = new HashSet<>();
         Model model = ModelFactory.createDefaultModel();
         InputStream inputStream = null;
-        if (xmlBase.equals("http://iec.ch/TC57/CIM100")){
+        if (xmlBase.equals("http://iec.ch/TC57/CIM100")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
             RDFDataMgr.read(model, inputStream, xmlBase, Lang.TURTLE);
-        }
-        else {
+        } else {
             throw new FileNotFoundException("File not found for serialization.");
         }
-        for (StmtIterator it = model.listStatements(null,RDF.type, RDFS.Class); it.hasNext(); ) {
+        for (StmtIterator it = model.listStatements(null, RDF.type, RDFS.Class); it.hasNext(); ) {
             Statement stmt = it.next();
-            if (stmt.getSubject() == ResourceFactory.createResource(xmlBase+"RdfAbout")){
+            if (stmt.getSubject() == ResourceFactory.createResource(xmlBase + "RdfAbout")) {
                 for (NodeIterator iter = model.listObjectsOfProperty(stmt.getSubject(), OWL2.members); iter.hasNext(); ) {
                     RDFNode o_i = iter.next();
                     rdfAboutList.add(ResourceFactory.createResource(o_i.toString()));
@@ -95,25 +94,25 @@ public class ModelManipulationFactory {
         }
         return rdfAboutList;
     }
+
     public static Set<Resource> LoadRDFEnum(String xmlBase) throws FileNotFoundException {
         Set<Resource> RdfEnumList = new HashSet<>();
         Model model = ModelFactory.createDefaultModel();
         InputStream inputStream = null;
-        if (xmlBase.equals("http://iec.ch/TC57/CIM100")){
+        if (xmlBase.equals("http://iec.ch/TC57/CIM100")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
             RDFDataMgr.read(model, inputStream, xmlBase, Lang.TURTLE);
-        }
-        else {
+        } else {
             throw new FileNotFoundException("File not found for serialization.");
         }
 
-        for (StmtIterator it = model.listStatements(null,RDF.type, RDFS.Class); it.hasNext(); ) {
+        for (StmtIterator it = model.listStatements(null, RDF.type, RDFS.Class); it.hasNext(); ) {
             Statement stmt = it.next();
-            if (stmt.getSubject() == ResourceFactory.createResource(xmlBase+"RdfEnum")){
+            if (stmt.getSubject() == ResourceFactory.createResource(xmlBase + "RdfEnum")) {
                 for (NodeIterator iter = model.listObjectsOfProperty(stmt.getSubject(), OWL2.members); iter.hasNext(); ) {
                     RDFNode o_i = iter.next();
                     RdfEnumList.add(ResourceFactory.createResource(o_i.toString()));
@@ -123,7 +122,7 @@ public class ModelManipulationFactory {
         return RdfEnumList;
     }
 
-    public static void generateDataFromXls(String xmlBase, Map<String,Object> saveProperties) throws IOException {
+    public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties) throws IOException {
 
         //this is to load profile data - this is needed for the export
         //Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
@@ -138,12 +137,12 @@ public class ModelManipulationFactory {
             int Num = book.getNumberOfSheets();
 
             String[] originalNameInParts = new String[0];
-            Map<String,String> prefmap = new HashMap<>();
+            Map<String, String> prefmap = new HashMap<>();
 
             for (int sheetnum = 0; sheetnum < Num; sheetnum++) {
                 XSSFSheet sheet = book.getSheetAt(sheetnum);
                 String sheetname = sheet.getSheetName();
-                if (sheetname.equals("Config")){
+                if (sheetname.equals("Config")) {
                     ArrayList<Object> inputXLSdataConfig = ExcelTools.importXLSX(xmlfile.toString(), sheetnum);
                     for (Object o : inputXLSdataConfig) {
                         String yesno = ((LinkedList<?>) o).get(2).toString();
@@ -313,11 +312,12 @@ public class ModelManipulationFactory {
         }
     }
 
-    public static void generateDataFromXlsV2(String xmlBase, File xmlfile, Map<String,Object> saveProperties) throws Exception {
+    public static void generateDataFromXlsV2(String xmlBase, File xmlfile, Map<String, Object> saveProperties) throws Exception {
         ArrayList<Object> headerXlsData = null;
         String headerClassName = "";
         Map<String, ArrayList<Object>> classesXlsData = new HashMap<>();
-        Map<String,String> prefMap = new HashMap<>();
+        Map<String, String> prefMap = new HashMap<>();
+        int dataStartFrom = (int) saveProperties.get("dataStartsFrom");
 
         FileInputStream fis = new FileInputStream(xmlfile);
         XSSFWorkbook book = new XSSFWorkbook(fis);
@@ -339,18 +339,17 @@ public class ModelManipulationFactory {
                 if (((LinkedList<?>) o).size() < 4)
                     continue;
                 String className = ((LinkedList<?>) o).get(3).toString();
-                if (!className.isEmpty()){
+                if (!className.isEmpty()) {
                     int classSheetIdx = book.getSheetIndex(className);
-                    if (classSheetIdx != -1){
+                    if (classSheetIdx != -1) {
                         // className = className.replace("|",":");
                         classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
-                    }
-                    else
+                    } else
                         throw new Exception("Couldn't find the sheet for class: " + className);
                 }
                 // getting header class
 
-                if (headerClassName.isEmpty()){
+                if (headerClassName.isEmpty()) {
                     headerClassName = ((LinkedList<?>) o).get(4).toString();
                     if (!headerClassName.isEmpty()) {
                         int headerSheetIdx = book.getSheetIndex(headerClassName);
@@ -363,8 +362,7 @@ public class ModelManipulationFactory {
             }
             if (headerXlsData == null)
                 throw new Exception("Missing header class from config");
-        }
-        else {
+        } else {
             throw new Exception("Config sheet is missing from the xls data.");
         }
 
@@ -372,12 +370,12 @@ public class ModelManipulationFactory {
         model.setNsPrefixes(prefMap);
 
         // Add header class
-        int headerCols = ((LinkedList<?>)headerXlsData.getFirst()).size();
+        int headerCols = ((LinkedList<?>) headerXlsData.getFirst()).size();
         headerClassName = ((LinkedList<?>) headerXlsData.getFirst()).get(1).toString();
         // getting rdfid column
         int rdfidCol = -1;
-        for (int i = 0; i < headerCols; i++){
-            if (((LinkedList<?>)headerXlsData.get(1)).get(i).equals("rdf:id")){
+        for (int i = 0; i < headerCols; i++) {
+            if (((LinkedList<?>) headerXlsData.get(1)).get(i).equals("rdf:id")) {
                 rdfidCol = i;
                 break;
             }
@@ -385,7 +383,7 @@ public class ModelManipulationFactory {
         if (rdfidCol == -1)
             throw new Exception("Header rdf:id missing from xls.");
 
-        String headRdfid = ((LinkedList<?>) headerXlsData.get(5)).get(rdfidCol).toString();
+        String headRdfid = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(rdfidCol).toString();
         Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
 
         // put header data into the model
@@ -397,24 +395,22 @@ public class ModelManipulationFactory {
             headerClassWNS = namePref + splitClassName[1];
 
             saveProperties.put("headerClassResource", namePref + splitClassName[1]);
-        }
-        catch (NullPointerException e){
-            throw new Exception("Missing prefix in config for class: "+ headerClassName + "\nMissing prefix: " + splitClassName[0]);
+        } catch (NullPointerException e) {
+            throw new Exception("Missing prefix in config for class: " + headerClassName + "\nMissing prefix: " + splitClassName[0]);
         }
         model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
 
-        for (int i = 0; i < headerCols; i++){
-            if (i != rdfidCol){
-                Object value = ((LinkedList<?>) headerXlsData.get(5)).get(i);
+        for (int i = 0; i < headerCols; i++) {
+            if (i != rdfidCol) {
+                Object value = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(i);
                 if (value != null) {
                     String[] splitPropUri = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString().split(":");
                     String propertyURI;
                     try {
                         String propPref = prefMap.get(splitPropUri[0]);
                         propertyURI = propPref + splitPropUri[1];
-                    }
-                    catch (NullPointerException e){
-                        throw new Exception("Missing prefix in config for property: "+ splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
+                    } catch (NullPointerException e) {
+                        throw new Exception("Missing prefix in config for property: " + splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
                     }
                     Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                     String propertyType = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
@@ -427,7 +423,15 @@ public class ModelManipulationFactory {
                             model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
                         }
                         case "Enumeration" -> { //add enum
-                            model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                            if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
+                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                            } else if (object.split("#").length > 1) { // if it doesn't have http://
+                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
+                            } else { // if there is the prefix with ':'
+                                String[] objSplit = object.split(":", 2);
+                                String prefixUri = prefMap.get(objSplit[0]);
+                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                            }
                         }
                     }
                 }
@@ -454,12 +458,11 @@ public class ModelManipulationFactory {
             try {
                 String propPref = prefMap.get(splitClassName[0]);
                 classWNS = propPref + splitClassName[1];
-            }
-            catch (NullPointerException e){
-                throw new Exception("Missing prefix in config for class: "+ className + "\nMissing prefix: " + splitClassName[0]);
+            } catch (NullPointerException e) {
+                throw new Exception("Missing prefix in config for class: " + className + "\nMissing prefix: " + splitClassName[0]);
             }
 
-            for (int i = 5; i < classXlsData.size(); i++) { // loop on the rows/class instance
+            for (int i = dataStartFrom; i < classXlsData.size(); i++) { // loop on the rows/class instance
                 if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
                     String rdfid = xmlBase + "#" + ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
@@ -475,9 +478,8 @@ public class ModelManipulationFactory {
                                 try {
                                     String propPref = prefMap.get(splitPropUri[0]);
                                     propertyURI = propPref + splitPropUri[1];
-                                }
-                                catch (NullPointerException e) {
-                                    throw new Exception("Missing prefix in config for property: "+ splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
+                                } catch (NullPointerException e) {
+                                    throw new Exception("Missing prefix in config for property: " + splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
                                 }
                                 Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                                 String propertyType = ((LinkedList<?>) classXlsData.get(2)).get(j).toString();
@@ -491,7 +493,15 @@ public class ModelManipulationFactory {
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase + "#" + object)));
                                     }
                                     case "Enumeration" -> { //add enum
-                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                        if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                        } else if (object.split("#").length > 1) { // if it doesn't have http://
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
+                                        } else { // if there is the prefix with ':'
+                                            String[] objSplit = object.split(":", 2);
+                                            String prefixUri = prefMap.get(objSplit[0]);
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                                        }
                                     }
                                 }
                             }
@@ -526,7 +536,7 @@ public class ModelManipulationFactory {
             saveProperties.put("rdfEnumList", rdfEnumList);
         }
 
-        saveProperties.replace("filename", saveProperties.get("filename").toString()+ ".xml");
+        saveProperties.replace("filename", saveProperties.get("filename").toString() + ".xml");
         saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
         InstanceDataFactory.saveInstanceData(model, saveProperties);
 
@@ -725,7 +735,7 @@ public class ModelManipulationFactory {
 
 
     public static void generateCommonData(List<File> file) throws IOException {
-        Model model = util.ModelFactory.modelLoad(file, "", Lang.RDFXML,false);
+        Model model = util.ModelFactory.modelLoad(file, "", Lang.RDFXML, false);
         Map<String, String> prefixMap = model.getNsPrefixMap();
         String cimURI = prefixMap.get("cim");
         String nc = prefixMap.get("nc");
@@ -743,13 +753,13 @@ public class ModelManipulationFactory {
                 //get the rdfid
                 String rdfid = "http://delete.eu#_" + stmt.getSubject().getLocalName();
                 Resource cimres = stmt.getObject().asResource();
-                modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid),RDF.type,cimres));
+                modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, cimres));
                 for (StmtIterator j = model.listStatements(stmt.getSubject(), null, (RDFNode) null); j.hasNext(); ) {
                     Statement stmtProp = j.next();
-                    if ((!stmtProp.getPredicate().getNameSpace().equals(dcat) && !stmtProp.getPredicate().getNameSpace().equals(dcterms) && !stmtProp.getPredicate().getNameSpace().equals(skos)) && !stmtProp.getPredicate().equals(RDF.type)){
+                    if ((!stmtProp.getPredicate().getNameSpace().equals(dcat) && !stmtProp.getPredicate().getNameSpace().equals(dcterms) && !stmtProp.getPredicate().getNameSpace().equals(skos)) && !stmtProp.getPredicate().equals(RDF.type)) {
                         if (stmtProp.getObject().isResource()) {
-                            modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), stmtProp.getPredicate(), ResourceFactory.createResource("http://delete.eu#_" +stmtProp.getObject().asResource().getLocalName())));
-                        }else{
+                            modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), stmtProp.getPredicate(), ResourceFactory.createResource("http://delete.eu#_" + stmtProp.getObject().asResource().getLocalName())));
+                        } else {
                             modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), stmtProp.getPredicate(), stmtProp.getObject()));
                         }
                     }
@@ -757,7 +767,6 @@ public class ModelManipulationFactory {
             }
 
         }
-
 
 
         Map<String, Object> saveProperties = new HashMap<>();
@@ -768,7 +777,7 @@ public class ModelManipulationFactory {
         saveProperties.put("tab", "2");
         saveProperties.put("relativeURIs", "same-document");
         saveProperties.put("showXmlEncoding", "true");
-        saveProperties.put("xmlBase","http://delete.eu#");
+        saveProperties.put("xmlBase", "http://delete.eu#");
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
         saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
@@ -777,8 +786,8 @@ public class ModelManipulationFactory {
         saveProperties.put("dozip", false);
         saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
         saveProperties.put("showXmlBaseDeclaration", "false");
-        saveProperties.put("sortRDF","true");
-        saveProperties.put("sortRDFprefix","false"); // if true the sorting is on the prefix, if false on the localName
+        saveProperties.put("sortRDF", "true");
+        saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
 
         saveProperties.put("putHeaderOnTop", true);
         saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");

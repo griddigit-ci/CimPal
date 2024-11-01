@@ -15,6 +15,7 @@
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.RadioButton?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SeparatorMenuItem?>
@@ -26,6 +27,7 @@
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.control.TreeView?>
 <?import javafx.scene.image.ImageView?>
@@ -35,7 +37,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
    <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -836,11 +838,21 @@
                                                 <Label minWidth="90.0" text="Generation options:" />
                                                 <VBox spacing="10.0" HBox.hgrow="ALWAYS">
                                                    <children>
-                                                      <HBox>
+                                                      <HBox spacing="10.0">
                                                          <children>
                                                             <Label minWidth="78.0" prefHeight="17.0" prefWidth="78.0" text="Use method:" wrapText="true" />
                                                             <ChoiceBox fx:id="fcbGenMethodOptions" minWidth="400.0" />
+                                                            <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
+                                                            <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
+                                                               <toggleGroup>
+                                                                  <ToggleGroup fx:id="giDataLine" />
+                                                               </toggleGroup>
+                                                            </RadioButton>
+                                                            <RadioButton layoutX="488.0" layoutY="10.0" mnemonicParsing="false" text="Line 7" toggleGroup="$giDataLine" />
                                                          </children>
+                                                         <VBox.margin>
+                                                            <Insets />
+                                                         </VBox.margin>
                                                       </HBox>
                                                    </children>
                                                 </VBox>
