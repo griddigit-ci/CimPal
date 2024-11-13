@@ -69,15 +69,14 @@ public class ExcelTools {
             FormulaEvaluator evaluator = book.getCreationHelper().createFormulaEvaluator();
             // Iterating over Excel file in Java
 
-            // Get the number of columns from the first row
-            Row firstRow = sheet.getRow(0);
-            int numColumns = firstRow.getLastCellNum();
+            int numColumns;
 
             for (Row currentRow : sheet) {
                 Cell firstCell = currentRow.getCell(0, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
                 if (firstCell == null || firstCell.getCellType() == CellType.BLANK) {
                     break; // Stop processing if column 0 is empty
                 }
+                numColumns = currentRow.getLastCellNum();
 
                 LinkedList<Object> rowItem = new LinkedList<>();
                 for (int i = 0; i < numColumns; i++) {

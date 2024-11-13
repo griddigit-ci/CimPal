@@ -370,7 +370,7 @@ public class ModelManipulationFactory {
         model.setNsPrefixes(prefMap);
 
         // Add header class
-        int headerCols = ((LinkedList<?>) headerXlsData.getFirst()).size();
+        int headerCols = ((LinkedList<?>) headerXlsData.get(1)).size();
         headerClassName = ((LinkedList<?>) headerXlsData.getFirst()).get(1).toString();
         // getting rdfid column
         int rdfidCol = -1;
@@ -442,7 +442,7 @@ public class ModelManipulationFactory {
         for (Map.Entry<String, ArrayList<Object>> entry : classesXlsData.entrySet()) {
             ArrayList<Object> classXlsData = entry.getValue();
             String className = ((LinkedList<?>) classXlsData.getFirst()).get(1).toString();
-            int cols = ((LinkedList<?>) classXlsData.getFirst()).size();
+            int cols = ((LinkedList<?>) classXlsData.get(1)).size();
             rdfidCol = -1;
             for (int i = 0; i < cols; i++) {
                 if (((LinkedList<?>) classXlsData.get(1)).get(i).equals("rdf:id")) {
@@ -472,9 +472,10 @@ public class ModelManipulationFactory {
                     for (int j = 0; j < cols; j++) {
                         if (j != rdfidCol) {
                             Object value = ((LinkedList<?>) classXlsData.get(i)).get(j);
-                            if (value != null) {
-                                String[] splitPropUri = ((LinkedList<?>) classXlsData.get(1)).get(j).toString().split(":");
-                                String propertyURI;
+                            String propertyURI = ((LinkedList<?>) classXlsData.get(1)).get(j).toString();
+                            if (value != null && !propertyURI.isEmpty()) {
+                                String[] splitPropUri = propertyURI.split(":");
+
                                 try {
                                     String propPref = prefMap.get(splitPropUri[0]);
                                     propertyURI = propPref + splitPropUri[1];
