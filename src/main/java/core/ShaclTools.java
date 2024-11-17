@@ -596,6 +596,34 @@ public class ShaclTools {
         return shapeModel;
     }
 
+    //add a NodeShape to a shape model including all necessary properties for Class check
+    public static Model addNodeShapeProfileClass(Model shapeModel, String nsURIprofile, String localName, String classFullURI){
+        /*shapeModel - is the shape model
+         * nsURIprofile - is the namespace of the NodeShape
+         * localName - is the name of the NodeShape
+         * classFullURI - is the full URI of the CIM class
+         */
+
+        //creates the resource
+        Resource r = shapeModel.createResource(nsURIprofile + localName);
+        //creates the property
+        //Property p = shapeModel.createProperty(rdfURI, "type");
+        //creates the object
+        //RDFNode o = shapeModel.createResource(shaclURI + "NodeShape");
+        //adds the property
+        r.addProperty(RDF.type, SH.NodeShape);
+        //up to here this defines e.g. eqbd:GeographicalRegion a sh:NodeShape ;
+
+        //creates property sh:targetClass
+        //Property p1 = shapeModel.createProperty(shaclURI, "targetClass");
+        //creates the object which is the CIM class
+        RDFNode o1 = shapeModel.createResource(classFullURI);
+        r.addProperty(SH.targetSubjectsOf, o1);
+        //up to here this defines e.g. sh:targetClass cim:GeographicalRegion ;
+
+        return shapeModel;
+    }
+
     //add a NodeShape to a shape model including all necessary properties
     public static Model addNodeShapeValueType(Model shapeModel, String nsURIprofile, String localName, String classFullURI){
         /*shapeModel - is the shape model
@@ -1674,6 +1702,8 @@ public class ShaclTools {
         shapeModel.setNsPrefix("rdfs", RDFS.getURI());
         shapeModel.setNsPrefix("owl", OWL.getURI());
         shapeModel.setNsPrefix("xsd", XSD.getURI());
+        shapeModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
+        shapeModel.setNsPrefix("dm", "http://iec.ch/TC57/61970-552/DifferenceModel/1#");
         shapeModel.setNsPrefixes(model.getNsPrefixMap());
         if (baseprofilesshaclglag==1) {
             shapeModel.setNsPrefixes(unionmodelbaseprofilesshacl.getNsPrefixMap());
@@ -1723,6 +1753,25 @@ public class ShaclTools {
         groupFeatures.set(3, 1);
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
+
+        //for Inverse associations group
+        localNameGroup = "InverseAssociationsGroup";
+        groupFeatures.set(0, "InverseAssociations");
+        groupFeatures.set(1, "This group of validation rules relate to validation of inverse associations presence.");
+        groupFeatures.set(2, "InverseAssociations");
+        groupFeatures.set(3, 1);
+
+        shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
+
+        //for Profile Classes group
+        localNameGroup = "ProfileClassesGroup";
+        groupFeatures.set(0, "ProfileClasses");
+        groupFeatures.set(1, "This group of validation rules relate to validation of Profile Classes.");
+        groupFeatures.set(2, "ProfileClasses");
+        groupFeatures.set(3, 1);
+
+        shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
+
         //for IdentifiedObject
         localNameGroup = "DatatypesGroupIO";
         groupFeatures.set(0, "DatatypesIO");
@@ -1740,6 +1789,48 @@ public class ShaclTools {
         groupFeatures.set(3, 2);
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
+
+        // Adding node shape and properti shape to check if we have additional classes that are not defined in the profile
+        shapeModel = ShaclTools.addNodeShapeProfileClass(shapeModel, nsURIprofile, "AllowedClasses-node", RDF.type.getURI());
+
+        //create the property shape
+        RDFNode o = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
+        Resource nodeShapeResourceClass = shapeModel.getResource(nsURIprofile + "AllowedClasses-node");
+        nodeShapeResourceClass.addProperty(SH.property, o);
+
+        //adding the properties for the PropertyShape
+        Resource r = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
+        r.addProperty(RDF.type, SH.PropertyShape);
+        r.addProperty(SH.name, "ClassNotInProfile");
+        r.addProperty(SH.description, "Checks if the dataset contains classes which are not defined in the profile to which this dataset conforms to.");
+        RDFNode o8 = shapeModel.createResource(SH.NS + "Info");
+        r.addProperty(SH.severity, o8);
+        r.addProperty(SH.message, "This class is not part of the profile to which this dataset conforms to.");
+        RDFNode o5 = shapeModel.createResource(RDF.type.getURI());
+        r.addProperty(path, o5);
+        RDFNode o1o = shapeModel.createTypedLiteral(1, "http://www.w3.org/2001/XMLSchema#integer");
+        r.addProperty(SH.order, o1o);
+        RDFNode o1g = shapeModel.createResource(nsURIprofile+"ProfileClassesGroup");
+        r.addProperty(SH.group, o1g);
+
+        //sh.in
+        List<RDFNode> enumClass = new ArrayList<>();
+        for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and add NodeShape for each concrete class
+            //String localName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
+            String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
+            if (originalModel.contains(ResourceFactory.createStatement(ResourceFactory.createResource(classFullURI), RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class")))) {
+                enumClass.add(shapeModel.createResource(classFullURI));
+            }
+            //TODO see how to do for description classes
+        }
+        // add FullModel, DifferenceModel and Dataset
+        enumClass.add(shapeModel.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"));
+        enumClass.add(shapeModel.createResource("http://iec.ch/TC57/61970-552/DifferenceModel/1#DifferenceModel"));
+        enumClass.add(shapeModel.createResource(DCAT.Dataset.toString()));
+
+        RDFList enumRDFlist = shapeModel.createList(enumClass.iterator());
+        r.addProperty(SH.in, enumRDFlist);
+
 
         for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and add NodeShape for each concrete class
             //add the ShapeNode
@@ -2117,6 +2208,36 @@ public class ShaclTools {
                             // TODO check if this if is necessary}
 
                         } else { // this is for cardinality of inverse associations
+                            //Add node shape and property chape for the presence of the inverse association
+                            String invAssocURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
+                            String localNameInvAssoc = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
+                            shapeModel = ShaclTools.addNodeShapeProfileClass(shapeModel, nsURIprofile, localNameInvAssoc+"-inverseNodePresent", invAssocURI);
+                            //create the property shape
+                            RDFNode oi = shapeModel.createResource(nsURIprofile + localNameInvAssoc+"-propertyInverse");
+                            Resource nodeShapeResourceClassInv = shapeModel.getResource(nsURIprofile + localNameInvAssoc+"-inverseNodePresent");
+                            nodeShapeResourceClassInv.addProperty(SH.property, oi);
+
+                            //adding the properties for the PropertyShape
+                            Resource ri = shapeModel.createResource(nsURIprofile +localNameInvAssoc+"-propertyInverse");
+                            ri.addProperty(RDF.type, SH.PropertyShape);
+                            ri.addProperty(SH.name, "InverseAssociationPresent");
+                            ri.addProperty(SH.description, "Inverse associations shall not be instantiated.");
+                            RDFNode o8i = shapeModel.createResource(SH.NS + "Violation");
+                            ri.addProperty(SH.severity, o8i);
+                            ri.addProperty(SH.message, "Inverse association is present.");
+                            RDFNode o5i = shapeModel.createResource(invAssocURI);
+                            ri.addProperty(path, o5i);
+                            RDFNode o1oi = shapeModel.createTypedLiteral(atas - 1, "http://www.w3.org/2001/XMLSchema#integer");
+                            ri.addProperty(SH.order, o1oi);
+                            RDFNode o1gi = shapeModel.createResource(nsURIprofile+"InverseAssociationsGroup");
+                            ri.addProperty(SH.group, o1gi);
+                            RDFNode o4i = shapeModel.createTypedLiteral(0, "http://www.w3.org/2001/XMLSchema#integer");
+                            ri.addProperty(SH.maxCount, o4i);
+
+
+
+
+
                             if (shaclflaginverse == 1) {
                                 propertyNodeFeatures.set(0, "cardinality");
                                 String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(6).toString();
