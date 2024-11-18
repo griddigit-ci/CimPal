@@ -2208,7 +2208,7 @@ public class ShaclTools {
                             // TODO check if this if is necessary}
 
                         } else { // this is for cardinality of inverse associations
-                            //Add node shape and property chape for the presence of the inverse association
+                            //Add node shape and property shape for the presence of the inverse association
                             String invAssocURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
                             String localNameInvAssoc = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
                             shapeModel = ShaclTools.addNodeShapeProfileClass(shapeModel, nsURIprofile, localNameInvAssoc+"-inverseNodePresent", invAssocURI);
