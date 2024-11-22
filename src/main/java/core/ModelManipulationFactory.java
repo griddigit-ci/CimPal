@@ -8,6 +8,8 @@ package core;
 import application.MainController;
 import common.customWriter.CustomRDFFormat;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.jena.base.Sys;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
@@ -328,6 +330,8 @@ public class ModelManipulationFactory {
             ArrayList<Object> inputXLSDataConfig = ExcelTools.importXLSX(xmlfile.toString(), book.getSheetIndex(configSheet));
             inputXLSDataConfig.removeFirst();
             for (Object o : inputXLSDataConfig) {
+                if (((LinkedList<?>) o).size() < 4)
+                    continue;
                 // getting namespaces
                 String yesno = ((LinkedList<?>) o).get(2).toString();
                 if (yesno.equals("Yes")) {
@@ -336,8 +340,7 @@ public class ModelManipulationFactory {
                     prefMap.putIfAbsent(pref, ns);
                 }
                 // getting classes to print
-                if (((LinkedList<?>) o).size() < 4)
-                    continue;
+
                 String className = ((LinkedList<?>) o).get(3).toString();
                 if (!className.isEmpty()) {
                     int classSheetIdx = book.getSheetIndex(className);
@@ -371,7 +374,12 @@ public class ModelManipulationFactory {
 
         // Add header class
         int headerCols = ((LinkedList<?>) headerXlsData.get(1)).size();
-        headerClassName = ((LinkedList<?>) headerXlsData.getFirst()).get(1).toString();
+        try {
+            headerClassName = ((LinkedList<?>) headerXlsData.getFirst()).get(1).toString();
+        } catch (NullPointerException e) {
+            System.out.println("Missing header class name.");
+            return;
+        }
         // getting rdfid column
         int rdfidCol = -1;
         for (int i = 0; i < headerCols; i++) {
@@ -383,65 +391,87 @@ public class ModelManipulationFactory {
         if (rdfidCol == -1)
             throw new Exception("Header rdf:id missing from xls.");
 
-        String headRdfid = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(rdfidCol).toString();
-        Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
+        if (headerXlsData.size() > dataStartFrom) {
 
-        // put header data into the model
-        // add header class
-        String[] splitClassName = headerClassName.split(":");
-        String headerClassWNS;
-        try {
-            String namePref = prefMap.get(splitClassName[0]);
-            headerClassWNS = namePref + splitClassName[1];
+            String headRdfid = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(rdfidCol).toString();
+            Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
 
-            saveProperties.put("headerClassResource", namePref + splitClassName[1]);
-        } catch (NullPointerException e) {
-            throw new Exception("Missing prefix in config for class: " + headerClassName + "\nMissing prefix: " + splitClassName[0]);
-        }
-        model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
+            // put header data into the model
+            // add header class
+            String[] splitClassName = headerClassName.split(":");
+            String headerClassWNS;
+            try {
+                String namePref = prefMap.get(splitClassName[0]);
+                headerClassWNS = namePref + splitClassName[1];
 
-        for (int i = 0; i < headerCols; i++) {
-            if (i != rdfidCol) {
-                Object value = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(i);
-                if (value != null) {
-                    String[] splitPropUri = ((LinkedList<?>) headerXlsData.get(1)).get(i).toString().split(":");
-                    String propertyURI;
-                    try {
-                        String propPref = prefMap.get(splitPropUri[0]);
-                        propertyURI = propPref + splitPropUri[1];
-                    } catch (NullPointerException e) {
-                        throw new Exception("Missing prefix in config for property: " + splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
-                    }
-                    Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
-                    String propertyType = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
-                    String object = value.toString();
-                    switch (propertyType) {
-                        case "Literal" -> { //add literal
-                            model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                saveProperties.put("headerClassResource", namePref + splitClassName[1]);
+            } catch (NullPointerException e) {
+                throw new Exception("Missing prefix in config for class: " + headerClassName + "\nMissing prefix: " + splitClassName[0]);
+            }
+            model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
+
+            for (int i = 0; i < headerCols; i++) {
+                if (i != rdfidCol && i < ((LinkedList<?>) headerXlsData.get(dataStartFrom)).size()) {
+                    Object value = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(i);
+                    Object propertyURI_obj = ((LinkedList<?>) headerXlsData.get(1)).get(i);
+                    if (value != null && propertyURI_obj != null) {
+                        String propertyURI = propertyURI_obj.toString();
+                        try {
+                            String[] splitPropUri;
+                            String propPref;
+                            if (propertyURI.startsWith("http")) {
+                                splitPropUri = propertyURI.split("#");
+                                propPref = splitPropUri[0] + "#";
+                            } else {
+                                splitPropUri = propertyURI.split(":");
+                                propPref = prefMap.get(splitPropUri[0]);
+                            }
+
+                            if (propPref == null || !prefMap.containsValue(propPref))
+                                throw new Exception("Property URI not found: " + splitPropUri[0] + " in class: " + headerClassName);
+                            propertyURI = propPref + splitPropUri[1];
+                        } catch (NullPointerException e) {
+                            throw new Exception("Missing prefix in config for property: " + propertyURI);
                         }
-                        case "Resource" -> { //add resource
-                            model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
-                        }
-                        case "Enumeration" -> { //add enum
-                            if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
-                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
-                            } else if (object.split("#").length > 1) { // if it doesn't have http://
-                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
-                            } else { // if there is the prefix with ':'
-                                String[] objSplit = object.split(":", 2);
-                                String prefixUri = prefMap.get(objSplit[0]);
-                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                        Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
+                        String propertyType = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
+                        String object = value.toString();
+                        switch (propertyType) {
+                            case "Literal" -> { //add literal
+                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                            }
+                            case "Resource" -> { //add resource
+                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
+                            }
+                            case "Enumeration" -> { //add enum
+                                if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                } else if (object.split("#").length > 1) { // if it doesn't have http://
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
+                                } else { // if there is the prefix with ':'
+                                    String[] objSplit = object.split(":", 2);
+                                    String prefixUri = prefMap.get(objSplit[0]);
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                                }
                             }
                         }
                     }
                 }
             }
+        } else {
+            System.out.println("Header Class is empty!");
         }
 
         // put other classes into the model
         for (Map.Entry<String, ArrayList<Object>> entry : classesXlsData.entrySet()) {
             ArrayList<Object> classXlsData = entry.getValue();
-            String className = ((LinkedList<?>) classXlsData.getFirst()).get(1).toString();
+            String className;
+            try {
+                className = ((LinkedList<?>) classXlsData.getFirst()).get(1).toString();
+            } catch (NullPointerException e) {
+                continue;
+            }
+
             int cols = ((LinkedList<?>) classXlsData.get(1)).size();
             rdfidCol = -1;
             for (int i = 0; i < cols; i++) {
@@ -453,7 +483,7 @@ public class ModelManipulationFactory {
             if (rdfidCol == -1)
                 throw new Exception("rdf:id missing at class sheet: " + className);
 
-            splitClassName = className.split(":");
+            String[] splitClassName = className.split(":");
             String classWNS;
             try {
                 String propPref = prefMap.get(splitClassName[0]);
@@ -470,17 +500,31 @@ public class ModelManipulationFactory {
                     model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
 
                     for (int j = 0; j < cols; j++) {
-                        if (j != rdfidCol) {
+                        if (j != rdfidCol && j < ((LinkedList<?>) classXlsData.get(i)).size()) {
                             Object value = ((LinkedList<?>) classXlsData.get(i)).get(j);
-                            String propertyURI = ((LinkedList<?>) classXlsData.get(1)).get(j).toString();
-                            if (value != null && !propertyURI.isEmpty()) {
-                                String[] splitPropUri = propertyURI.split(":");
+                            Object propertyURI_obj = ((LinkedList<?>) classXlsData.get(1)).get(j);
+                            if (value != null && propertyURI_obj != null) {
+                                String propertyURI = propertyURI_obj.toString();
+
 
                                 try {
-                                    String propPref = prefMap.get(splitPropUri[0]);
+                                    String[] splitPropUri;
+                                    String propPref;
+                                    if (propertyURI.startsWith("http")) {
+                                        splitPropUri = propertyURI.split("#");
+                                        propPref = splitPropUri[0] + "#";
+                                    } else {
+                                        splitPropUri = propertyURI.split(":");
+                                        propPref = prefMap.get(splitPropUri[0]);
+                                    }
+
+                                    if (propPref == null || !prefMap.containsValue(propPref))
+                                        throw new Exception("Property URI not found: " + splitPropUri[0] + " in class: " + className);
                                     propertyURI = propPref + splitPropUri[1];
+                                } catch (ArrayIndexOutOfBoundsException e) {
+                                    throw new Exception("Invalid property URI format (namespace:property) at class: " + className + " property: " + propertyURI);
                                 } catch (NullPointerException e) {
-                                    throw new Exception("Missing prefix in config for property: " + splitPropUri[1] + "\nMissing prefix: " + splitPropUri[0]);
+                                    throw new Exception("Missing prefix in config for property: " + propertyURI);
                                 }
                                 Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
                                 String propertyType = ((LinkedList<?>) classXlsData.get(2)).get(j).toString();
@@ -699,14 +743,15 @@ public class ModelManipulationFactory {
 //                        }
 //
 //                        if ((boolean) saveProperties.get("useEnumRules")) {
-////                            for (ResIterator ii = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),
-////                                    ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")); ii.hasNext(); ) {
-////                                Resource resItem = ii.next();
-////                                for (ResIterator j = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
-////                                    Resource resItemProp = j.next();
-////                                    rdfEnumList.add(resItemProp);
-////                                }
-////                            }
+
+    /// /                            for (ResIterator ii = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),
+    /// /                                    ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")); ii.hasNext(); ) {
+    /// /                                Resource resItem = ii.next();
+    /// /                                for (ResIterator j = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
+    /// /                                    Resource resItemProp = j.next();
+    /// /                                    rdfEnumList.add(resItemProp);
+    /// /                                }
+    /// /                            }
 //                            rdfEnumList = LoadRDFEnum(xmlBase);
 //                        }
 //
@@ -733,8 +778,6 @@ public class ModelManipulationFactory {
 //            }
 //        }
 //    }
-
-
     public static void generateCommonData(List<File> file) throws IOException {
         Model model = util.ModelFactory.modelLoad(file, "", Lang.RDFXML, false);
         Map<String, String> prefixMap = model.getNsPrefixMap();
