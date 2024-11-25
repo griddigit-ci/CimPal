@@ -330,7 +330,20 @@ public class ModelManipulationFactory {
             ArrayList<Object> inputXLSDataConfig = ExcelTools.importXLSX(xmlfile.toString(), book.getSheetIndex(configSheet));
             inputXLSDataConfig.removeFirst();
             for (Object o : inputXLSDataConfig) {
-                if (((LinkedList<?>) o).size() < 4)
+                if (((LinkedList<?>) o).size() == 1){
+                    // getting classes to print when exceeding namespace rows
+                    String className = ((LinkedList<?>) o).getFirst().toString();
+                    if (!className.isEmpty()) {
+                        int classSheetIdx = book.getSheetIndex(className);
+                        if (classSheetIdx != -1) {
+                            // className = className.replace("|",":");
+                            classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
+                        } else
+                            throw new Exception("Couldn't find the sheet for class: " + className);
+                    }
+                    continue;
+                }
+                else if (((LinkedList<?>) o).size() < 4)
                     continue;
                 // getting namespaces
                 String yesno = ((LinkedList<?>) o).get(2).toString();
@@ -468,7 +481,8 @@ public class ModelManipulationFactory {
             String className;
             try {
                 className = ((LinkedList<?>) classXlsData.getFirst()).get(1).toString();
-            } catch (NullPointerException e) {
+            } catch (IndexOutOfBoundsException | NullPointerException e) {
+                System.out.println("Missing class name at sheet: " + entry.getKey());
                 continue;
             }
 
