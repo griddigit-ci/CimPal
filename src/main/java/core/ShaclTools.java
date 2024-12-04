@@ -1836,6 +1836,7 @@ public class ShaclTools {
             //add the ShapeNode
             String localName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
             String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
+            //RDFNode classRes = ResourceFactory.createResource(classFullURI);
             if (originalModel.contains(ResourceFactory.createStatement(ResourceFactory.createResource(classFullURI), RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class")))) {
                 //add NodeShape for the CIM class
                 shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
@@ -1874,6 +1875,10 @@ public class ShaclTools {
                         propertyNodeFeatures.add("");
                     }
 
+                    //Resource nodeObject = ResourceFactory.createResource(((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString());
+                    //if (originalModel.listStatements(nodeObject, RDFS.domain, classRes).toList().isEmpty()){
+                    //    continue;
+                    //}
                     if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).getFirst().toString().equals("Association")) {//if it is an association
                         if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
                             //Cardinality check

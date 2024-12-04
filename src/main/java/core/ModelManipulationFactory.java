@@ -330,6 +330,13 @@ public class ModelManipulationFactory {
             ArrayList<Object> inputXLSDataConfig = ExcelTools.importXLSX(xmlfile.toString(), book.getSheetIndex(configSheet));
             inputXLSDataConfig.removeFirst();
             for (Object o : inputXLSDataConfig) {
+                // getting namespaces
+                String yesno = ((LinkedList<?>) o).get(2).toString();
+                if (yesno.equals("Yes")) {
+                    String pref = ((LinkedList<?>) o).get(0).toString();
+                    String ns = ((LinkedList<?>) o).get(1).toString();
+                    prefMap.putIfAbsent(pref, ns);
+                }
                 if (((LinkedList<?>) o).size() == 1){
                     // getting classes to print when exceeding namespace rows
                     String className = ((LinkedList<?>) o).getFirst().toString();
@@ -345,13 +352,7 @@ public class ModelManipulationFactory {
                 }
                 else if (((LinkedList<?>) o).size() < 4)
                     continue;
-                // getting namespaces
-                String yesno = ((LinkedList<?>) o).get(2).toString();
-                if (yesno.equals("Yes")) {
-                    String pref = ((LinkedList<?>) o).get(0).toString();
-                    String ns = ((LinkedList<?>) o).get(1).toString();
-                    prefMap.putIfAbsent(pref, ns);
-                }
+
                 // getting classes to print
 
                 String className = ((LinkedList<?>) o).get(3).toString();
