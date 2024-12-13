@@ -455,7 +455,12 @@ public class ModelManipulationFactory {
                                 model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                             }
                             case "Resource" -> { //add resource
-                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
+                                if(object.startsWith("http")){
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                }
+                                else {
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
+                                }
                             }
                             case "Enumeration" -> { //add enum
                                 if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
@@ -550,7 +555,12 @@ public class ModelManipulationFactory {
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                                     }
                                     case "Resource" -> { //add resource
-                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase + "#" + object)));
+                                        if(object.startsWith("http")){
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(object)));
+                                        }
+                                        else {
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase + "#" + object)));
+                                        }
                                     }
                                     case "Enumeration" -> { //add enum
                                         if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
