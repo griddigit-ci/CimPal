@@ -270,6 +270,7 @@ public class ExcelTools {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);
                 workbook.close();
+                outputStream.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
