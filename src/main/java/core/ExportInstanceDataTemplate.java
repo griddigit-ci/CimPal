@@ -24,8 +24,7 @@ import java.io.*;
 import java.util.*;
 
 import static core.RdfConvert.fileSaveDialog;
-import static util.ExcelTools.exportMapToExcel;
-import static util.ExcelTools.saveExcelFile;
+import static util.ExcelTools.*;
 
 
 public class ExportInstanceDataTemplate {
@@ -470,5 +469,163 @@ public class ExportInstanceDataTemplate {
         }
         OutputStream outTTL = fileSaveDialog("Save RDF Turtle for: " + "AllProperties", "RDF Turtle", "*.ttl");
         model.write(outTTL, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), "");
+    }
+
+    public static void CreateTemplateFromRDF(List<File> file, String selectedMethod)
+    {
+        String cimsNs = MainController.prefs.get("cimsNamespace","");
+        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+
+        List<String> rdfsClassName = new LinkedList<>(); // list for the name of the class without namespace
+        List<String> rdfsClass = new LinkedList<>(); // list for the classes
+        List<String> rdfsAttrAssoc = new LinkedList<>(); // list for the property attribute or association
+        List<String> rdfsAttrOrAssocFlag = new LinkedList<>(); // list for the identification if is attribute or association
+        List<String> rdfsItemAttrDatatype = new LinkedList<>(); // list for the datatype in case of attribute
+        List<String> rdfsItemMultiplicity = new LinkedList<>(); // list for the multiplicity of the item
+
+        Map<String,String> prefMap = new HashMap<>();
+
+        for (File fil : file) {
+            Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+            try {
+                RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+
+            Map<String,String> prefMapTemp = model.getNsPrefixMap();
+            prefMap.putAll(prefMapTemp);
+
+
+            ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
+
+            for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and record for each concrete class
+                //add the Class
+                String classLocalName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
+                String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
+
+                //check if the class has stereotype "Description" and remove IdentifiedObject.name, .description, .mRID in case they are there
+                boolean classIsDescription = false;
+                for (StmtIterator i = model.listStatements(ResourceFactory.createResource(classFullURI),ResourceFactory.createProperty(cimsNs,"stereotype"),(RDFNode) null); i.hasNext(); ) {
+                    Statement stmt = i.next();
+                    if (stmt.getObject().toString().equals("Description")){
+                        classIsDescription = true;
+                    }
+                }
+
+                for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size(); atas++) {
+                    // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
+
+                /*
+                //every time a new property is added the reference is also added to the ShapeNode of the class
+                ArrayList<Object> propertyNodeFeatures = new ArrayList<>();
+                *//*
+                     * propertyNodeFeatures structure
+                     * 0 - type of check: cardinality, datatype, associationValueType
+                     * 1 - message
+                     * 2 - name
+                     * 3 - description
+                     * 4 - severity
+                     * 5 - cardinality
+                     * 6 - the primitive either it is directly a primitive or it is the primitive of the .value attribute of a CIMdatatype
+                     * in case of enumeration 6 is set to Enumeration
+                     * in case of compound 6 is set to Compound
+                     * 7 - is a list of uri of the enumeration attributes
+                     * 8 - order
+                     * 9 - group
+                     * 10 - the list of concrete classes for association - the value type at the used end
+                     * 11 - classFullURI for the targetClass of the NodeShape
+                     * 12 - the uri of the compound class to be used in sh:class
+                     * 13 - path for the attributes of the compound
+                     *//*
+                for (int i = 0; i < 14; i++) {
+                    propertyNodeFeatures.add("");
+                }*/
+
+                    if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).getFirst().toString().equals("Association")) {//if it is an association
+                        if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
+                            String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
+                            //Cardinality check
+                            String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(6).toString();
+                            rdfsClassName.add(classLocalName);
+                            rdfsClass.add(classFullURI);
+                            rdfsAttrAssoc.add(propertyFullURI);
+                            rdfsAttrOrAssocFlag.add("Association");
+                            rdfsItemAttrDatatype.add("N/A");
+                            rdfsItemMultiplicity.add(cardinality);
+                        }
+
+                    } else if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
+                        String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString();
+                        String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
+
+                        String propertyLocalName = ResourceFactory.createResource(propertyFullURI).getLocalName();
+                        if (classIsDescription && (propertyLocalName.equals("IdentifiedObject.name") || propertyLocalName.equals("IdentifiedObject.description") || propertyLocalName.equals("IdentifiedObject.mRID"))){
+                            continue;
+                        }
+
+                        rdfsClassName.add(classLocalName);
+                        rdfsClass.add(classFullURI);
+                        rdfsAttrAssoc.add(propertyFullURI);
+
+                        rdfsItemMultiplicity.add(cardinality);
+                        //add datatypes checks depending on it is Primitive, Datatype or Enumeration
+                        switch (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString()) {
+                            case "Primitive": {
+                                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
+                                rdfsItemAttrDatatype.add(datatypePrimitive);
+                                rdfsAttrOrAssocFlag.add("Attribute");
+                                break;
+                            }
+                            case "CIMDatatype": {
+                                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+                                rdfsItemAttrDatatype.add(datatypePrimitive);
+                                rdfsAttrOrAssocFlag.add("Attribute");
+                                break;
+                            }
+                            case "Compound": {
+                                String datatypeCompound = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+                                rdfsItemAttrDatatype.add(datatypeCompound);
+                                rdfsAttrOrAssocFlag.add("Compound");
+                                break;
+                            }
+                            case "Enumeration":
+                                rdfsItemAttrDatatype.add(((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString());
+                                rdfsAttrOrAssocFlag.add("Enumeration");
+                                break;
+                        }
+                    }
+                }
+            }
+
+        }
+
+        Map<String, List<String>> rdfsInfo = new HashMap<>();
+        List<String> orderList = new LinkedList<>(); // list of order
+
+        orderList.add("Class");
+        orderList.add("Property-AttributeAssociation");
+        orderList.add("Type");
+        orderList.add("Datatype");
+        orderList.add("Multiplicity");
+
+        rdfsInfo.put("Class", rdfsClass);
+        rdfsInfo.put("ClassName", rdfsClassName);
+        rdfsInfo.put("Property-AttributeAssociation", rdfsAttrAssoc);
+        rdfsInfo.put("Multiplicity", rdfsItemMultiplicity);
+        rdfsInfo.put("Datatype", rdfsItemAttrDatatype);
+        rdfsInfo.put("Type", rdfsAttrOrAssocFlag);
+
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        switch (selectedMethod) {
+            case "Option 1 (Old)":
+                exportMapToExcel("Template", rdfsInfo, orderList, workbook);
+            case "Option 2 (New)":
+                exportMapToExcelv2(rdfsInfo, prefMap, workbook);
+                break;
+            case "Option 3 (TBD)":
+                break;
+        }
+        saveExcelFile(workbook, "Save Instance Data Template", "Template");
     }
 }

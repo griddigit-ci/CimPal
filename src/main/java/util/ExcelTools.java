@@ -15,10 +15,7 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ExcelTools {
 
@@ -275,5 +272,138 @@ public class ExcelTools {
                 e.printStackTrace();
             }
         }
+    }
+
+    public static void exportMapToExcelv2(Map<String, List<String>> mapInfo, Map<String,String> prefMap, XSSFWorkbook workbook) {
+
+        // Create cell style for header row
+        CellStyle headerCellStyle = createHeaderStyle(workbook);
+
+        List<String> classNames = mapInfo.get("ClassName");
+        List<String> classes = mapInfo.get("Class");
+        List<String> props = mapInfo.get("Property-AttributeAssociation");
+        List<String> multiplicities = mapInfo.get("Multiplicity");
+        List<String> datatypes = mapInfo.get("Datatype");
+        List<String> types = mapInfo.get("Type");
+
+        AddConfigSheet(mapInfo, prefMap, headerCellStyle, workbook);
+
+        // make first class sheet
+        XSSFSheet classSheet = CreateTemplateSheetBase(classNames.getFirst(),classes.getFirst(),headerCellStyle,workbook);
+
+        int sColN = 1;
+        for (int i = 0; i < classes.size(); i++) {
+            if (!classSheet.getSheetName().equals(classNames.get(i))){ // move to the other sheet if new class comes in the list
+                classSheet = CreateTemplateSheetBase(classNames.get(i), classes.get(i),headerCellStyle, workbook);
+                sColN = 1;
+            }
+            XSSFRow attrRow = classSheet.getRow(1);
+            XSSFRow typeRow = classSheet.getRow(2);
+            XSSFRow multiRow = classSheet.getRow(3);
+
+            XSSFCell attrCell = attrRow.createCell(sColN);
+            XSSFCell typeCell = typeRow.createCell(sColN);
+            XSSFCell multiCell = multiRow.createCell(sColN);
+
+            attrCell.setCellValue(props.get(i));
+            String typeValue = types.get(i);
+            if (typeValue.equals("Attribute"))
+                typeCell.setCellValue("Literal");
+            else if (typeValue.equals("Association"))
+                typeCell.setCellValue("Resource");
+            else
+                typeCell.setCellValue(typeValue);
+            multiCell.setCellValue(multiplicities.get(i));
+
+            sColN++;
+        }
+
+
+    }
+
+    private static void AddConfigSheet(Map<String, List<String>> mapInfo, Map<String,String> prefMap,CellStyle headerCellStyle, XSSFWorkbook workbook) {
+        XSSFSheet configSheet = workbook.createSheet("Config");
+        // Write header row
+        XSSFRow headerRow = configSheet.createRow(0);
+        XSSFCell hCell1 = headerRow.createCell(0);
+        XSSFCell hCell2 = headerRow.createCell(1);
+        XSSFCell hCell3 = headerRow.createCell(2);
+        XSSFCell hCell4 = headerRow.createCell(3);
+        XSSFCell hCell5 = headerRow.createCell(4);
+
+        hCell1.setCellStyle(headerCellStyle);
+        hCell2.setCellStyle(headerCellStyle);
+        hCell3.setCellStyle(headerCellStyle);
+        hCell4.setCellStyle(headerCellStyle);
+        hCell5.setCellStyle(headerCellStyle);
+
+        hCell1.setCellValue("Namespace prefix");
+        hCell2.setCellValue("Namespace URI");
+        hCell3.setCellValue("Include Namespace [Yes,No]");
+        hCell4.setCellValue("Classes to print [Refer to the name of the tab]");
+        hCell5.setCellValue("Header class");
+
+        Set<String> classNameSet = new HashSet<>(mapInfo.get("ClassName"));
+        List<String> classNames = new ArrayList<>(classNameSet);
+
+        // Create rows
+        List<XSSFRow> dataRows = new ArrayList<>();
+        int maxRowNumber = Math.max(classNames.size(), prefMap.size());
+
+        for (int i = 1; i < maxRowNumber+1; i++){
+            dataRows.add(configSheet.createRow(i));
+        }
+
+        int rowN = 0;
+        var prefKeys = prefMap.keySet().toArray();
+
+        for (XSSFRow row : dataRows){
+            // add namespaces
+            if (prefKeys.length > rowN) {
+                row.createCell(0).setCellValue((String) prefKeys[rowN]); // Namespace prefix
+                row.createCell(1).setCellValue(prefMap.get((String) prefKeys[rowN])); // Namespace URI
+                row.createCell(2).setCellValue("Yes"); // Include Namespace [Yes,No]
+            }
+
+            // add classes to print
+            if (classNames.size() > rowN){
+                row.createCell(3).setCellValue(classNames.get(rowN));
+            }
+            rowN++;
+        }
+    }
+
+    private static XSSFSheet CreateTemplateSheetBase(String sheetName,String className, CellStyle headerCellStyle,XSSFWorkbook workbook){
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+
+        // Class row
+        XSSFRow firstRow = sheet.createRow(0);
+        XSSFCell firstCell = firstRow.createCell(0);
+        firstCell.setCellValue("Class");
+        firstCell.setCellStyle(headerCellStyle);
+        firstRow.createCell(1).setCellValue(className);
+
+        // Attribute row
+        XSSFRow row = sheet.createRow(1);
+        XSSFCell cell = row.createCell(0);
+        cell.setCellValue("rdf:id"); // setting rdf:id in the first column
+        cell.setCellStyle(headerCellStyle);
+        // Property type row
+        row = sheet.createRow(2);
+        cell = row.createCell(0);
+        cell.setCellValue("Resource");
+        cell.setCellStyle(headerCellStyle);
+        // Multiplicity row
+        row = sheet.createRow(3);
+        cell = row.createCell(0);
+        cell.setCellValue("1..1");
+        cell.setCellStyle(headerCellStyle);
+        // Mapping row
+        row = sheet.createRow(4);
+        cell = row.createCell(0);
+        cell.setCellValue("Mapping");
+        cell.setCellStyle(headerCellStyle);
+
+        return sheet;
     }
 }

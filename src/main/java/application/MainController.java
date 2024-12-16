@@ -71,6 +71,7 @@ import java.util.*;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
+import static core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
 import static core.ExportRDFSdescriptions.rdfsDescriptions;
 import static core.RdfConvert.fileSaveDialog;
 import static core.RdfConvert.modelInheritance;
@@ -4372,6 +4373,34 @@ public class MainController implements Initializable {
         }
 
         progressBar.setProgress(1);
+    }
+
+    @FXML
+    private void actionBtnResetGenerateInstance() {
+        progressBar.setProgress(0);
+        MainController.inputXLS = null;
+        fsXlsTemplatePath.clear();
+        fXmlBaseGen.setText("http://iec.ch/TC57/CIM100");
+        fcbSortRDFGen.setSelected(true);
+        fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
+        fcbGenMethodOptions.getSelectionModel().selectFirst();
+    }
+
+    @FXML
+    private void actionCreateXlsTemplate() throws FileNotFoundException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
+        //open RDFS file
+        List<File> file = util.ModelFactory.filechoosercustom(false, "RDF files", List.of("*.rdf"), "");
+
+        if (file != null) {// the file is selected
+            shaclNodataMap = 1; // as no mapping is to be used for this task
+            CreateTemplateFromRDF(file, selectedMethod);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
     }
 }
 
