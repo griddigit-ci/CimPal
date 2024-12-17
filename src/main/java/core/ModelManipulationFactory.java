@@ -514,7 +514,14 @@ public class ModelManipulationFactory {
 
             for (int i = dataStartFrom; i < classXlsData.size(); i++) { // loop on the rows/class instance
                 if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
-                    String rdfid = xmlBase + "#" + ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
+                    String idxls = ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
+                    String rdfid;
+                    if (idxls.startsWith("http") || idxls.startsWith("urn:uuid")) {
+                        rdfid = idxls;
+                    }else {
+                        rdfid = xmlBase + "#" + idxls;
+                    }
+
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
                     model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
