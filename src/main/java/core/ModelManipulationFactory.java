@@ -331,11 +331,13 @@ public class ModelManipulationFactory {
             inputXLSDataConfig.removeFirst();
             for (Object o : inputXLSDataConfig) {
                 // getting namespaces
-                String yesno = ((LinkedList<?>) o).get(2).toString();
-                if (yesno.equals("Yes")) {
-                    String pref = ((LinkedList<?>) o).get(0).toString();
-                    String ns = ((LinkedList<?>) o).get(1).toString();
-                    prefMap.putIfAbsent(pref, ns);
+                if (((LinkedList<?>) o).size() >= 3) {
+                    String yesno = ((LinkedList<?>) o).get(2).toString();
+                    if (yesno.equals("Yes")) {
+                        String pref = ((LinkedList<?>) o).get(0).toString();
+                        String ns = ((LinkedList<?>) o).get(1).toString();
+                        prefMap.putIfAbsent(pref, ns);
+                    }
                 }
                 if (((LinkedList<?>) o).size() == 1){
                     // getting classes to print when exceeding namespace rows
