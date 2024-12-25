@@ -831,7 +831,7 @@
                                                                   <ToggleGroup fx:id="giDataLine" />
                                                                </toggleGroup>
                                                             </RadioButton>
-                                                            <RadioButton layoutX="488.0" layoutY="10.0" mnemonicParsing="false" text="Line 7" toggleGroup="$giDataLine" />
+                                                            <RadioButton layoutX="488.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
                                                             <Region minWidth="100.0" HBox.hgrow="ALWAYS" />
                                                             <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create Xls template from RDF" />
                                                          </children>

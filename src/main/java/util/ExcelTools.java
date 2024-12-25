@@ -292,6 +292,8 @@ public class ExcelTools {
         XSSFSheet classSheet = CreateTemplateSheetBase(classNames.getFirst(),classes.getFirst(),headerCellStyle,workbook);
 
         int sColN = 1;
+        int maxWidthInCharacters = 120; // Maximum desired width in characters
+        int defaultCharacterWidth = 256; // Default width of one character
         for (int i = 0; i < classes.size(); i++) {
             if (!classSheet.getSheetName().equals(classNames.get(i))){ // move to the other sheet if new class comes in the list
                 classSheet = CreateTemplateSheetBase(classNames.get(i), classes.get(i),headerCellStyle, workbook);
@@ -299,11 +301,17 @@ public class ExcelTools {
             }
             XSSFRow attrRow = classSheet.getRow(1);
             XSSFRow typeRow = classSheet.getRow(2);
-            XSSFRow multiRow = classSheet.getRow(3);
+            XSSFRow datatypeRow = classSheet.getRow(3);
+            XSSFRow multiRow = classSheet.getRow(4);
 
             XSSFCell attrCell = attrRow.createCell(sColN);
+            attrCell.setCellStyle(headerCellStyle);
             XSSFCell typeCell = typeRow.createCell(sColN);
+            typeCell.setCellStyle(headerCellStyle);
+            XSSFCell datatypeCell = datatypeRow.createCell(sColN);
+            datatypeCell.setCellStyle(headerCellStyle);
             XSSFCell multiCell = multiRow.createCell(sColN);
+            multiCell.setCellStyle(headerCellStyle);
 
             attrCell.setCellValue(props.get(i));
             String typeValue = types.get(i);
@@ -313,10 +321,41 @@ public class ExcelTools {
                 typeCell.setCellValue("Resource");
             else
                 typeCell.setCellValue(typeValue);
+            datatypeCell.setCellValue(datatypes.get(i));
             multiCell.setCellValue(multiplicities.get(i));
+
+            classSheet.autoSizeColumn(sColN);
+
+            // Check the column width and adjust if needed
+            int currentWidthInUnits = classSheet.getColumnWidth(sColN);
+            int currentWidthInCharacters = currentWidthInUnits / defaultCharacterWidth;
+
+            if (currentWidthInCharacters > maxWidthInCharacters) {
+                classSheet.setColumnWidth(sColN, maxWidthInCharacters * defaultCharacterWidth);
+            }
+            // Freeze when data starts
+            classSheet.createFreezePane(0, 6); // Freeze when data starts
 
             sColN++;
         }
+
+//
+//        // Auto-size columns after populating the data
+//
+//        for (int i = 0; i < orderList.size(); i++) {
+//            sheet.autoSizeColumn(i);
+//
+//            // Check the column width and adjust if needed
+//            int currentWidthInUnits = sheet.getColumnWidth(i);
+//            int currentWidthInCharacters = currentWidthInUnits / defaultCharacterWidth;
+//
+//            if (currentWidthInCharacters > maxWidthInCharacters) {
+//                sheet.setColumnWidth(i, maxWidthInCharacters * defaultCharacterWidth);
+//            }
+//        }
+//
+//        // Freeze the top row
+//        sheet.createFreezePane(0, 1); // Freeze the top row
 
 
     }
@@ -381,7 +420,9 @@ public class ExcelTools {
         XSSFCell firstCell = firstRow.createCell(0);
         firstCell.setCellValue("Class");
         firstCell.setCellStyle(headerCellStyle);
-        firstRow.createCell(1).setCellValue(className);
+        XSSFCell cellClass = firstRow.createCell(1);
+        cellClass.setCellValue(className);
+        cellClass.setCellStyle(headerCellStyle);
 
         // Attribute row
         XSSFRow row = sheet.createRow(1);
@@ -393,13 +434,18 @@ public class ExcelTools {
         cell = row.createCell(0);
         cell.setCellValue("Resource");
         cell.setCellStyle(headerCellStyle);
-        // Multiplicity row
+        // Datatype row
         row = sheet.createRow(3);
+        cell = row.createCell(0);
+        cell.setCellValue("Datatype");
+        cell.setCellStyle(headerCellStyle);
+        // Multiplicity row
+        row = sheet.createRow(4);
         cell = row.createCell(0);
         cell.setCellValue("1..1");
         cell.setCellStyle(headerCellStyle);
         // Mapping row
-        row = sheet.createRow(4);
+        row = sheet.createRow(5);
         cell = row.createCell(0);
         cell.setCellValue("Mapping");
         cell.setCellStyle(headerCellStyle);

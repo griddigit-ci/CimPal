@@ -550,7 +550,7 @@ public class MainController implements Initializable {
                 "Option 2 (New)",
                 "Option 3 (TBD)"
         );
-        fcbGenMethodOptions.getSelectionModel().selectFirst();
+        fcbGenMethodOptions.getSelectionModel().select(1);
 
         //Adding action to the choice box
         ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBRDFconvertTarget());
@@ -4066,6 +4066,7 @@ public class MainController implements Initializable {
         shaclNodataMap = 1; // as no mapping is to be used for this task
         String cimsNs = MainController.prefs.get("cimsNamespace", "");
         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+        shapesOnAbstractOption = 0;
         ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
 
         //select the xlsx file and read it

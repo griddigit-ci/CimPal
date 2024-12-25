@@ -78,7 +78,7 @@ public class ExportInstanceDataTemplate {
             String profileURI = profileKeywordURI.get(1);
             String cgmesVersion = profileKeywordURI.get(2);
 
-
+            MainController.shapesOnAbstractOption = 0;
             ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
 
             for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and record for each concrete class
@@ -495,7 +495,7 @@ public class ExportInstanceDataTemplate {
             Map<String, String> prefMapTemp = model.getNsPrefixMap();
             prefMap.putAll(prefMapTemp);
 
-
+            MainController.shapesOnAbstractOption = 0;
             ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
 
             for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and record for each concrete class

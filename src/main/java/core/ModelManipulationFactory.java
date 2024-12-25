@@ -57,6 +57,7 @@ public class ModelManipulationFactory {
             //make the profile data per profile
 
             for (Map.Entry<String, Model> entry : profileModelMap.entrySet()) {
+                MainController.shapesOnAbstractOption = 0;
                 profileData = ShaclTools.constructShapeData(entry.getValue(), rdfNs, concreteNs);
                 profileDataMap.put(entry.getKey(), profileData);
                 profileDataMapAsModel.put(entry.getKey(), ShaclTools.profileDataMapAsModelTemp);
