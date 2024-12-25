@@ -34,6 +34,7 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
@@ -849,6 +850,8 @@
                                                                </toggleGroup>
                                                             </RadioButton>
                                                             <RadioButton layoutX="488.0" layoutY="10.0" mnemonicParsing="false" text="Line 7" toggleGroup="$giDataLine" />
+                                                            <Region minWidth="100.0" HBox.hgrow="ALWAYS" />
+                                                            <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create Xls template from RDF" />
                                                          </children>
                                                          <VBox.margin>
                                                             <Insets />
@@ -888,7 +891,7 @@
                                              </VBox.margin>
                                              <children>
                                                 <Button fx:id="fbtnRunGenerateInstance" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunGenerateInstance" text="Run" HBox.hgrow="ALWAYS" />
-                                                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtResetRDFConvert" text="Reset" />
+                                                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetGenerateInstance" text="Reset" />
                                              </children>
                                           </HBox>
                                        </children>
