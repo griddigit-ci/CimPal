@@ -7,6 +7,8 @@
 package util;
 
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCell;
@@ -288,15 +290,23 @@ public class ExcelTools {
 
         AddConfigSheet(mapInfo, prefMap, headerCellStyle, workbook);
 
+        // Inverted HashMap
+        HashMap<String, String> invertedPrefMap = new HashMap<>();
+
+        // Invert the HashMap
+        for (Map.Entry<String, String> entry : prefMap.entrySet()) {
+            invertedPrefMap.put(entry.getValue(), entry.getKey());
+        }
+
         // make first class sheet
-        XSSFSheet classSheet = CreateTemplateSheetBase(classNames.getFirst(),classes.getFirst(),headerCellStyle,workbook);
+        XSSFSheet classSheet = CreateTemplateSheetBase(classNames.getFirst(),classes.getFirst(),headerCellStyle,workbook,invertedPrefMap);
 
         int sColN = 1;
-        int maxWidthInCharacters = 120; // Maximum desired width in characters
+        int maxWidthInCharacters = 150; // Maximum desired width in characters
         int defaultCharacterWidth = 256; // Default width of one character
         for (int i = 0; i < classes.size(); i++) {
             if (!classSheet.getSheetName().equals(classNames.get(i))){ // move to the other sheet if new class comes in the list
-                classSheet = CreateTemplateSheetBase(classNames.get(i), classes.get(i),headerCellStyle, workbook);
+                classSheet = CreateTemplateSheetBase(classNames.get(i), classes.get(i),headerCellStyle, workbook,invertedPrefMap);
                 sColN = 1;
             }
             XSSFRow attrRow = classSheet.getRow(1);
@@ -313,7 +323,12 @@ public class ExcelTools {
             XSSFCell multiCell = multiRow.createCell(sColN);
             multiCell.setCellStyle(headerCellStyle);
 
-            attrCell.setCellValue(props.get(i));
+            Resource propRes = ResourceFactory.createResource(props.get(i));
+            String propNameShort = props.get(i);
+            if (invertedPrefMap.containsKey(propRes.getNameSpace())) {
+                propNameShort = invertedPrefMap.get(propRes.getNameSpace()) + ":" + propRes.getLocalName();
+            }
+            attrCell.setCellValue(propNameShort);
             String typeValue = types.get(i);
             if (typeValue.equals("Attribute"))
                 typeCell.setCellValue("Literal");
@@ -321,7 +336,33 @@ public class ExcelTools {
                 typeCell.setCellValue("Resource");
             else
                 typeCell.setCellValue(typeValue);
-            datatypeCell.setCellValue(datatypes.get(i));
+            String enumValuesFull = datatypes.get(i);
+            if (typeValue.equals("Enumeration")){
+                String cleanEnumInput = enumValuesFull.replaceAll("[\\[\\]]", "");
+
+                String enumNameShort = "[";
+                for (String value : cleanEnumInput.split(",")) {
+                    String singleValue = value.trim();
+                    Resource datatypeRes = ResourceFactory.createResource(singleValue);
+                    if (invertedPrefMap.containsKey(datatypeRes.getNameSpace())) {
+                        if (enumNameShort.length()>3) {
+                            enumNameShort = enumNameShort + "; " + invertedPrefMap.get(datatypeRes.getNameSpace()) + ":" + datatypeRes.getLocalName();
+                        }else{
+                            enumNameShort = enumNameShort + invertedPrefMap.get(datatypeRes.getNameSpace()) + ":" + datatypeRes.getLocalName();
+                        }
+                    }else{
+                        if (enumNameShort.length()>3) {
+                            enumNameShort = enumNameShort + "; " + singleValue;
+                        }else{
+                            enumNameShort = enumNameShort + singleValue;
+                        }
+                    }
+                }
+                datatypeCell.setCellValue(enumNameShort+"]");
+
+            }else {
+                datatypeCell.setCellValue(enumValuesFull);
+            }
             multiCell.setCellValue(multiplicities.get(i));
 
             classSheet.autoSizeColumn(sColN);
@@ -338,25 +379,6 @@ public class ExcelTools {
 
             sColN++;
         }
-
-//
-//        // Auto-size columns after populating the data
-//
-//        for (int i = 0; i < orderList.size(); i++) {
-//            sheet.autoSizeColumn(i);
-//
-//            // Check the column width and adjust if needed
-//            int currentWidthInUnits = sheet.getColumnWidth(i);
-//            int currentWidthInCharacters = currentWidthInUnits / defaultCharacterWidth;
-//
-//            if (currentWidthInCharacters > maxWidthInCharacters) {
-//                sheet.setColumnWidth(i, maxWidthInCharacters * defaultCharacterWidth);
-//            }
-//        }
-//
-//        // Freeze the top row
-//        sheet.createFreezePane(0, 1); // Freeze the top row
-
 
     }
 
@@ -410,9 +432,10 @@ public class ExcelTools {
             }
             rowN++;
         }
+
     }
 
-    private static XSSFSheet CreateTemplateSheetBase(String sheetName,String className, CellStyle headerCellStyle,XSSFWorkbook workbook){
+    private static XSSFSheet CreateTemplateSheetBase(String sheetName,String className, CellStyle headerCellStyle,XSSFWorkbook workbook,Map<String,String> invertedPrefMap){
         XSSFSheet sheet = workbook.createSheet(sheetName);
 
         // Class row
@@ -421,7 +444,12 @@ public class ExcelTools {
         firstCell.setCellValue("Class");
         firstCell.setCellStyle(headerCellStyle);
         XSSFCell cellClass = firstRow.createCell(1);
-        cellClass.setCellValue(className);
+        Resource classNameRes = ResourceFactory.createResource(className);
+        String classNameShort = className;
+        if (invertedPrefMap.containsKey(classNameRes.getNameSpace())) {
+            classNameShort = invertedPrefMap.get(classNameRes.getNameSpace()) + ":" + classNameRes.getLocalName();
+        }
+        cellClass.setCellValue(classNameShort);
         cellClass.setCellStyle(headerCellStyle);
 
         // Attribute row
