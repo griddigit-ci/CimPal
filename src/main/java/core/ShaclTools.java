@@ -53,6 +53,8 @@ public class ShaclTools {
         originalModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
         originalModel.add(model.listStatements());
 
+        String enumNS = "http://iec.ch/TC57/NonStandard/UML#enumeration";
+
 
         //Extract RDFS header information
         if (model.listSubjectsWithProperty(RDF.type,ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()){
@@ -69,7 +71,6 @@ public class ShaclTools {
         //start base profiles
         //add here some logic that looks at the base profiles and
         // -adds all concrete and abstract classes to the model for all classes that are in the model and if the classes are not in the model
-
         if (baseprofilesshaclglag == 1) {
             LinkedList<Statement> subclassStatements = getSubClassesInheritance(model, unionmodelbaseprofilesshacl);
             model.add(subclassStatements);
@@ -82,21 +83,9 @@ public class ShaclTools {
             LinkedList<Statement> subclassStatements3rd = getSubClassesInheritance(model, unionmodelbaseprofilesshacl3rd);
             model.add(subclassStatements3rd);
         }
-
-
-//        unionmodelbaseprofilesshacl.listStatements();
-//        unionmodelbaseprofilesshaclinheritance.listStatements();
-//        unionmodelbaseprofilesshacl2nd.listStatements();
-//        unionmodelbaseprofilesshacl3rd.listStatements();
-//        unionmodelbaseprofilesshaclinheritance2nd.listStatements();
-//        unionmodelbaseprofilesshaclinheritance3rd.listStatements();
-//        unionmodelbaseprofilesshaclinheritanceonly.listStatements();
-//        unionmodelbaseprofilesshaclinheritanceonly2nd.listStatements();
-//        unionmodelbaseprofilesshaclinheritanceonly3rd.listStatements();
-
         //end base profiles
 
-        for (ResIterator i = model.listResourcesWithProperty(model.getProperty(rdfNs, "stereotype")); i.hasNext(); ) {
+        for (ResIterator i = model.listResourcesWithProperty(RDF.type,RDFS.Class); i.hasNext(); ) {
             Resource resItem = i.next();
             boolean descriptionStereotype=false;
             //check if there is Description stereotype
@@ -108,47 +97,86 @@ public class ShaclTools {
                 }
             }
 
-            for (NodeIterator j = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "stereotype")); j.hasNext(); ) {
-                RDFNode resItemNode = j.next();
+            //check if the class is concrete
+            boolean classConcrete=false;
+            for (NodeIterator k = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "stereotype")); k.hasNext(); ) {
+                RDFNode resItemNodeConcrete = k.next();
+                if (resItemNodeConcrete.toString().equals(concreteNs)) {
+                    classConcrete=true; // the class is concrete
+                    break;
+                }
+            }
 
-                if (resItemNode.toString().equals(concreteNs)) {// the resource is concrete - it is a concrete class
-                    int root = 0;
-                    Resource classItem = resItem;
-                    ArrayList<Object> classData = new ArrayList<Object>(); // this collects the basic data for the class and then the attributes and associations
-                    ArrayList<String> classMyData = new ArrayList<String>(); // basic data for the class
-                    classMyData.add(resItem.toString()); // the complete resource of the class
-                    classMyData.add(resItem.getNameSpace()); // the namespace of the resource of the class
-                    classMyData.add(resItem.getLocalName()); // the local name i.e. identifiedObject
-                    classMyData.add(resItem.getRequiredProperty(RDFS.label).getObject().toString()); // the label
-                    if (descriptionStereotype){
-                        classMyData.add("Yes"); // there is description stereotype
-                    }else{
-                        classMyData.add("No");
-                    }
+            //check if the class is enum
+            boolean classIsEnum=false;
+            for (NodeIterator k = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "stereotype")); k.hasNext(); ) {
+                RDFNode resItemNodeEnum = k.next();
+                if (resItemNodeEnum.toString().equals(enumNS)) {
+                    classIsEnum=true; // the class is concrete
+                    break;
+                }
+            }
 
+            //check if the class is datatype
+            boolean classIsDatatype=false;
+            for (NodeIterator k = model.listObjectsOfProperty(resItem, model.getProperty(rdfNs, "stereotype")); k.hasNext(); ) {
+                RDFNode resItemNodeDatatype = k.next();
+                if (resItemNodeDatatype.toString().equals("Primitive") || resItemNodeDatatype.toString().equals("CIMDatatype") || resItemNodeDatatype.toString().equals("Compound")) {
+                    classIsDatatype=true; // the class is concrete
+                    break;
+                }
+            }
 
-                    classData.add(classMyData); // adds the 0 element for the class where
-                    //add the class data to the temp model
-                    profileDataMapAsModelTemp.add(resItem,RDF.type,RDFS.Class);
-                    /*
-                     * 0 is the complete resource of the class
-                     * 1 is the namespace of the resource of the class
-                     * 2 is the local name i.e. identifiedObject
-                     * 3 is the label - RDFS label
-                     * 4 has "DescriptionStereotype" is the class is stereotyped description
-                     */
-                    mainClassTemp=classItem;
-                    while (root == 0) {
-                        classData = ShaclTools.getLocalAttributesAssociations(classItem, model, classData, rdfNs);
-                        if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
-                            classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
-                        } else {
-                            root = 1;
+            if (!classIsEnum && !classIsDatatype) {
+
+                Resource classItem = resItem;
+                ArrayList<Object> classData = new ArrayList<>(); // this collects the basic data for the class and then the attributes and associations
+                ArrayList<String> classMyData = new ArrayList<>(); // basic data for the class
+                classMyData.add(resItem.toString()); // the complete resource of the class
+                classMyData.add(resItem.getNameSpace()); // the namespace of the resource of the class
+                classMyData.add(resItem.getLocalName()); // the local name i.e. identifiedObject
+                classMyData.add(resItem.getRequiredProperty(RDFS.label).getObject().toString()); // the label
+                if (descriptionStereotype) {
+                    classMyData.add("Yes"); // there is description stereotype
+                } else {
+                    classMyData.add("No");
+                }
+
+                if (classConcrete) {
+                    classMyData.add("Yes"); // the class is concrete
+                } else {
+                    classMyData.add("No");
+                }
+
+                classData.add(classMyData); // adds the 0 element for the class where
+                //add the class data to the temp model
+                profileDataMapAsModelTemp.add(resItem, RDF.type, RDFS.Class);
+                /*
+                 * 0 is the complete resource of the class
+                 * 1 is the namespace of the resource of the class
+                 * 2 is the local name i.e. identifiedObject
+                 * 3 is the label - RDFS label
+                 * 4 has "DescriptionStereotype" is the indication if the class is stereotyped description
+                 * 5 has "classConcrete" is the indication if the class is concrete
+                 */
+                mainClassTemp = classItem;
+
+                if (shapesOnAbstractOption == 0) {
+                    if (classConcrete) {// the resource is concrete - it is a concrete class
+                        int root = 0;
+                        while (root == 0) {
+                            classData = ShaclTools.getLocalAttributesAssociations(classItem, model, classData, rdfNs);
+                            if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                                classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
+                            } else {
+                                root = 1;
+                            }
                         }
                     }
-                    rdfToShacl.add(classData);
-                    //System.out.println(classData);
+                } else {
+                    classData = ShaclTools.getLocalAttributesAssociations(classItem, model, classData, rdfNs);
                 }
+                rdfToShacl.add(classData);
             }
         }
         // add the path to be used for the compound

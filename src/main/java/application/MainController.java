@@ -314,6 +314,8 @@ public class MainController implements Initializable {
     private ChoiceBox fcbRDFsortOptionsGen;
     @FXML
     private ToggleGroup giDataLine;
+    @FXML
+    private CheckBox cbRDFSSHACLabstract;
 
 
     public static File rdfModel1;
@@ -349,6 +351,7 @@ public class MainController implements Initializable {
     private static Map<TreeItem, String> treeMapID;
     private static Map<String, TreeItem> treeMapConstraintsInverse;
     public static Integer associationValueTypeOption;
+    public static Integer shapesOnAbstractOption;
 
     public static TextArea foutputWindowVar;
     public static boolean excludeMRID;
@@ -1590,6 +1593,7 @@ public class MainController implements Initializable {
             cbApplyDefBaseURIDesignTab.setDisable(false);
             btnApply.setDisable(false);
             cbRDFSSHACLoption1.setDisable(false);
+            cbRDFSSHACLabstract.setDisable(false);
             cbRDFSSHACLoptionDescr.setDisable(false);
             cbRDFSSHACLoptionBaseprofiles.setDisable(false);
             cbRDFSSHACLoptionBaseprofiles2nd.setDisable(false);
@@ -2679,6 +2683,12 @@ public class MainController implements Initializable {
             associationValueTypeOption = 0;
         }
 
+        if (cbRDFSSHACLabstract.isSelected()) {
+            shapesOnAbstractOption = 1;
+        } else {
+            shapesOnAbstractOption = 0;
+        }
+
 
         if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
             //depending on the value of the choice box "Save datatype map"
@@ -2917,6 +2927,7 @@ public class MainController implements Initializable {
                     }
                     case "RDFS2020" -> {
                         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+
                         ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
 
                         shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
