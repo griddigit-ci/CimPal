@@ -1215,8 +1215,6 @@ public class ShaclTools {
                                 //adding sh:nodeKind
                                 r.addProperty(SH.nodeKind, SH.IRI);
 
-                                //TODO add here
-
                             }
                         }
 
