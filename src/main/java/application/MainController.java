@@ -50,10 +50,7 @@ import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.shacl.vocabulary.SHACL;
 import org.apache.jena.util.iterator.ExtendedIterator;
-import org.apache.jena.vocabulary.OWL;
-import org.apache.jena.vocabulary.RDF;
-import org.apache.jena.vocabulary.RDFS;
-import org.apache.jena.vocabulary.XSD;
+import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
@@ -3173,6 +3170,13 @@ public class MainController implements Initializable {
                     properties.store(new FileOutputStream(saveFile.toString()), null);
                 }
             }
+
+            if (cbRDFSSHACLinheritTree.isSelected()){
+                //open the ChoiceDialog for the save file and save the file in different formats
+                String titleSaveAs = "Save as for inheritance model: InheritanceStructure";
+                ShaclTools.saveShapesFile(unionmodelbaseprofilesshaclinheritance, "", 0, titleSaveAs);
+            }
+
             progressBar.setProgress(1);
             System.out.print("Generation of SHACL shapes is completed.\n");
 
