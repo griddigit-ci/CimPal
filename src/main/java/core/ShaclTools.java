@@ -1010,7 +1010,7 @@ public class ShaclTools {
 
                                 //adding a message
                                 //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString())
-                                r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                                r.addProperty(SH.message, "One of the following does not conform: 1) The value shall be IRI; 2) The value shall be an instance of the class: "
                                         + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
 
                                 if (associationValueTypeOptionSingle == 1 ){
@@ -1090,7 +1090,7 @@ public class ShaclTools {
 
                             //adding a message
                             //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                            r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                            r.addProperty(SH.message, "One of the following does not conform: 1) The value shall be IRI; 2) The value shall be an instance of the class: "
                                     + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
 
                             //adding sh:nodeKind
@@ -1200,7 +1200,7 @@ public class ShaclTools {
 
                                 //adding a message
                                 //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                                r.addProperty(SH.message, "One of the following occurs: 1) The value type is not IRI; 2) The value type is not the right class.");
+                                r.addProperty(SH.message, "One of the following occurs: 1) The value is not IRI; 2) The value is not the right class.");
 
                                 //adding sh:in
                                 List<RDFNode> classNames = new ArrayList<>();
@@ -1262,7 +1262,7 @@ public class ShaclTools {
 
                                 //adding a message
                                 //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString());
-                                r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
+                                r.addProperty(SH.message, "One of the following does not conform: 1) The value shall be IRI; 2) The value shall be an instance of the class: "
                                         + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
 
                             }
@@ -2040,7 +2040,7 @@ public class ShaclTools {
                             } else {//any other case
                                 propertyNodeFeatures.set(1, "Not correct target class.");
                                 propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
-                                propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
+                                propertyNodeFeatures.set(3, "This constraint validates the value of the association at the used direction.");
                             }
 
                             propertyNodeFeatures.set(4, "Violation");
