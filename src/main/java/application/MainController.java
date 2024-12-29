@@ -46,6 +46,9 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.shacl.ShaclValidator;
+import org.apache.jena.shacl.ValidationReport;
+import org.apache.jena.shacl.vocabulary.SHACL;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.OWL;
 import org.apache.jena.vocabulary.RDF;
@@ -316,6 +319,12 @@ public class MainController implements Initializable {
     private ToggleGroup giDataLine;
     @FXML
     private CheckBox cbRDFSSHACLabstract;
+    @FXML
+    private  CheckBox cbRDFSSHACLoptionTypeWithOne;
+    @FXML
+    private CheckBox cbRDFSSHACLinheritTree;
+    @FXML
+    private CheckBox cbRDFSSHACLvalidate;
 
 
     public static File rdfModel1;
@@ -351,7 +360,9 @@ public class MainController implements Initializable {
     private static Map<TreeItem, String> treeMapID;
     private static Map<String, TreeItem> treeMapConstraintsInverse;
     public static Integer associationValueTypeOption;
+    public static Integer associationValueTypeOptionSingle;
     public static Integer shapesOnAbstractOption;
+    public static Integer exportInheritTree;
 
     public static TextArea foutputWindowVar;
     public static boolean excludeMRID;
@@ -1222,6 +1233,41 @@ public class MainController implements Initializable {
         }
     }
 
+    @FXML
+    // action on menu Validate SHACL shapes
+    private void actionSHACLSHACL() {
+
+        progressBar.setProgress(0);
+        Model shaclRefModel = null;
+        shapeModels = null;
+
+        //select file
+        List<File> fileL = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+
+        if (fileL != null) {// the file is selected
+            for (int m = 0; m < fileL.size(); m++) {
+                util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
+
+                if (shaclRefModel == null){
+                    shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
+                }
+                ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), ((Model) shapeModels.get(m)).getGraph());
+
+                if (report.conforms()) {
+                    System.out.printf("SHACL shapes: %s conform to SHACL-SHACL validation.\n",fileL.get(m).getName());
+                }else{
+                    System.out.printf("Validation failed. SHACL shapes: %s does not conform to the SHACL-SHACL shapes.\n", fileL.get(m).getName());
+                    System.out.println("Validation problems:");
+                    ShaclTools.printSHACLreport(report);
+                }
+            }
+
+
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+    }
 
     @FXML
     // action on menu Generation of instance data based on xls template
@@ -1593,6 +1639,9 @@ public class MainController implements Initializable {
             cbApplyDefBaseURIDesignTab.setDisable(false);
             btnApply.setDisable(false);
             cbRDFSSHACLoption1.setDisable(false);
+            cbRDFSSHACLoptionTypeWithOne.setDisable(false);
+            cbRDFSSHACLinheritTree.setDisable(false);
+            cbRDFSSHACLvalidate.setDisable(false);
             cbRDFSSHACLabstract.setDisable(false);
             cbRDFSSHACLoptionDescr.setDisable(false);
             cbRDFSSHACLoptionBaseprofiles.setDisable(false);
@@ -2672,6 +2721,7 @@ public class MainController implements Initializable {
         excludeMRID = cbRDFSSHACLoptionDescr.isSelected();
 
         String cbvalue;
+        Model shaclRefModel = null;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem() == null) {
             cbvalue = "";
         } else {
@@ -2682,13 +2732,21 @@ public class MainController implements Initializable {
         } else {
             associationValueTypeOption = 0;
         }
-
+        if (cbRDFSSHACLoptionTypeWithOne.isSelected()) {
+            associationValueTypeOptionSingle = 1;
+        } else {
+            associationValueTypeOptionSingle = 0;
+        }
         if (cbRDFSSHACLabstract.isSelected()) {
             shapesOnAbstractOption = 1;
         } else {
             shapesOnAbstractOption = 0;
         }
-
+        if (cbRDFSSHACLinheritTree.isSelected()) {
+            exportInheritTree = 1;
+        } else {
+            exportInheritTree = 0;
+        }
 
         if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
             //depending on the value of the choice box "Save datatype map"
@@ -3018,20 +3076,34 @@ public class MainController implements Initializable {
                         shapeModel.setNsPrefixes(uniqueMap);
                         //}
 
+                        if (cbRDFSSHACLvalidate.isSelected()) { //do validation
+                            if (shaclRefModel == null){
+                                shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
+                            }
+                            ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModel.getGraph());
+
+                            if (report.conforms()) {
+                                System.out.print("Generated SHACL shapes conform to SHACL-SHACL validation.\n");
+                            }else{
+                                System.out.println("Validation failed. Data does not conform to the SHACL-SHACL shapes.\n");
+                                System.out.println("Validation problems:");
+                                ShaclTools.printSHACLreport(report);
+                            }
+                        }
 
                         //open the ChoiceDialog for the save file and save the file in different formats
                         String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).getFirst().toString();
                         File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
 
                         //this is used for the printing of the complete map in option "All profiles in one map"
-                        for (Object key : dataTypeMapFromShapes.keySet()) {
-                            dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
+                        for (String key : dataTypeMapFromShapes.keySet()) {
+                            dataTypeMapFromShapesComplete.putIfAbsent(key, dataTypeMapFromShapes.get(key));
                         }
                         //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
                         if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
                             Properties properties = new Properties();
 
-                            for (Object key : dataTypeMapFromShapes.keySet()) {
+                            for (String key : dataTypeMapFromShapes.keySet()) {
                                 properties.put(key, dataTypeMapFromShapes.get(key).toString());
                             }
                             String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
@@ -3048,14 +3120,14 @@ public class MainController implements Initializable {
 
                         //here the preparation ends
 
-                        String nsPrefixprofile = ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
 
-                        String nsURIprofile = ((ArrayList) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
 
 
-                        String baseURI = ((ArrayList) this.modelsNames.get(m)).get(3).toString();
+                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
                         //}
-                        String owlImport = ((ArrayList) this.modelsNames.get(m)).get(4).toString();
+                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
                         //generate the shape model
                         Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
 
@@ -3066,18 +3138,18 @@ public class MainController implements Initializable {
                         shapeModelsNames.add(this.modelsNames.get(m));
 
                         //open the ChoiceDialog for the save file and save the file in different formats
-                        String titleSaveAs = "Save as for shape model: " + ((ArrayList) this.modelsNames.get(m)).get(0).toString();
+                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
                         File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
 
                         //this is used for the printing of the complete map in option "All profiles in one map"
-                        for (Object key : dataTypeMapFromShapes.keySet()) {
-                            dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
+                        for (String key : dataTypeMapFromShapes.keySet()) {
+                            dataTypeMapFromShapesComplete.putIfAbsent(key, dataTypeMapFromShapes.get(key));
                         }
                         //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
                         if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
                             Properties properties = new Properties();
 
-                            for (Object key : dataTypeMapFromShapes.keySet()) {
+                            for (String key : dataTypeMapFromShapes.keySet()) {
                                 properties.put(key, dataTypeMapFromShapes.get(key).toString());
                             }
                             String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
@@ -3095,13 +3167,14 @@ public class MainController implements Initializable {
                     //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
                     Properties properties = new Properties();
 
-                    for (Object key : dataTypeMapFromShapesComplete.keySet()) {
+                    for (String key : dataTypeMapFromShapesComplete.keySet()) {
                         properties.put(key, dataTypeMapFromShapesComplete.get(key).toString());
                     }
                     properties.store(new FileOutputStream(saveFile.toString()), null);
                 }
             }
             progressBar.setProgress(1);
+            System.out.print("Generation of SHACL shapes is completed.\n");
 
         } else {
             Alert alert = new Alert(Alert.AlertType.ERROR);

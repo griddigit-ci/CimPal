@@ -31,19 +31,20 @@
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
          <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
+         <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />
       </Menu>
    </MenuBar>
    <AnchorPane minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
-      <SplitPane dividerPositions="0.7668539325842697" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="100.0" prefWidth="160.0">
-            <HBox alignment="TOP_RIGHT" layoutX="106.0" layoutY="108.0" prefHeight="460.0" prefWidth="1017.6" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-               <TabPane fx:id="tabPaneConstraintsDetails" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
+      <SplitPane dividerPositions="0.8146067415730337" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="579.0" prefWidth="1278.0">
+            <HBox alignment="TOP_RIGHT" layoutX="106.0" layoutY="108.0" prefHeight="569.0" prefWidth="1278.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+               <TabPane fx:id="tabPaneConstraintsDetails" prefHeight="595.0" prefWidth="1278.0" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
                   <Tab fx:id="tabCreateCompleteSM" text="RDFS to SHACL">
-                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                        <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="511.0" prefWidth="1278.0">
+                        <HBox prefHeight="543.0" prefWidth="1278.0" AnchorPane.bottomAnchor="-3.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                            <VBox minWidth="200.0" spacing="5.0">
                               <HBox.margin>
                                  <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
@@ -59,7 +60,7 @@
                                  </tooltip>
                               </TreeView>
                            </VBox>
-                           <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                           <VBox prefHeight="513.0" prefWidth="1018.0" spacing="10.0" HBox.hgrow="ALWAYS">
                               <HBox spacing="10.0">
                                  <padding>
                                     <Insets left="5.0" right="5.0" top="5.0" />
@@ -139,6 +140,7 @@
                                  </padding>
                                  <children>
                                     <CheckBox fx:id="cbRDFSSHACLabstract" disable="true" mnemonicParsing="false" text="Generate shapes for local properties of concrete and abstract classes, i.e. do not trace inferitance when generating" />
+                                    <CheckBox fx:id="cbRDFSSHACLinheritTree" disable="true" mnemonicParsing="false" text="Export inheritance tree" />
                                  </children>
                               </HBox>
                               <HBox spacing="10.0">
@@ -146,6 +148,7 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <CheckBox fx:id="cbRDFSSHACLoption1" disable="true" mnemonicParsing="false" selected="true" text="Use sh:in for association value type constraint instead of sh:class and sh:or" />
+                                 <CheckBox fx:id="cbRDFSSHACLoptionTypeWithOne" disable="true" mnemonicParsing="false" selected="true" text="Use sh:class for association value type constraint instead of sh:in in case value type is one class only" />
                               </HBox>
                               <HBox spacing="10.0">
                                  <padding>
@@ -181,6 +184,14 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <CheckBox fx:id="cbRDFSSHACLoptionInverse" disable="true" mnemonicParsing="false" selected="true" text="Create contstraints for checking multiplicity of inverse association's end" />
+                              </HBox>
+                              <HBox spacing="10.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <CheckBox fx:id="cbRDFSSHACLvalidate" disable="true" mnemonicParsing="false" selected="true" text="Validate generated SHACL shapes" />
+                                 </children>
                               </HBox>
                               <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                  <VBox.margin>
@@ -887,8 +898,8 @@
                </TabPane>
             </HBox>
          </AnchorPane>
-         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="100.0" prefWidth="160.0">
-            <HBox layoutX="130.0" layoutY="127.0" prefHeight="352.8" prefWidth="1014.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="137.0" prefWidth="1278.0">
+            <HBox layoutX="130.0" prefHeight="137.0" prefWidth="1278.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <VBox alignment="TOP_CENTER" prefWidth="50.0" spacing="10.0" HBox.hgrow="NEVER">
                   <HBox.margin>
                      <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
@@ -900,11 +911,11 @@
                      </tooltip>
                   </ToggleButton>
                </VBox>
-               <TabPane fx:id="tabPaneDown" prefHeight="200.0" prefWidth="200.0" side="BOTTOM" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
+               <TabPane fx:id="tabPaneDown" prefHeight="128.0" prefWidth="1222.0" side="BOTTOM" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
                   <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
-                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="104.0" prefWidth="1222.0">
                         <ScrollPane fitToHeight="true" fitToWidth="true" layoutY="8.0" pannable="true" prefHeight="168.0" prefWidth="1222.0" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="8.0">
-                           <TextArea fx:id="foutputWindow" prefHeight="177.0" prefWidth="1220.0" wrapText="true" />
+                           <TextArea fx:id="foutputWindow" prefHeight="83.0" prefWidth="1220.0" wrapText="true" />
                         </ScrollPane>
                      </AnchorPane>
                   </Tab>

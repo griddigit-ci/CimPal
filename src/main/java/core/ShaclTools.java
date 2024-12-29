@@ -17,6 +17,8 @@ import org.apache.jena.graph.GraphMemFactory;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.rdf.model.impl.PropertyImpl;
 import org.apache.jena.riot.*;
+import org.apache.jena.shacl.ValidationReport;
+import org.apache.jena.shacl.vocabulary.SHACL;
 import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
@@ -1004,26 +1006,37 @@ public class ShaclTools {
                                 r.addProperty(SH.severity, o8);
 
                                 //the 09 is the class - value type
-                                RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(0).toString());
-
-                                //adding path
-                                List<RDFNode> pathList = new ArrayList<>();
-                                pathList.add(shapeModel.createResource(propertyFullURI));
-                                pathList.add(RDF.type.asResource());
-
-                                RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
-                                r.addProperty(path, pathRDFlist);
+                                RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).getFirst().toString());
 
                                 //adding a message
                                 //r.addProperty(SH.message, propertyNodeFeatures.get(1).toString())
                                 r.addProperty(SH.message, "One of the following does not conform: 1) The value type shall be IRI; 2) The value type shall be an instance of the class: "
                                         + shapeModel.getNsURIPrefix(o9.asResource().getNameSpace()) + ":" + o9.asResource().getLocalName());
 
-                                //adding sh:in
-                                List<RDFNode> classIn = new ArrayList<>();
-                                classIn.add(o9);
-                                RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
-                                r.addProperty(SH.in, classInRDFlist);
+                                if (associationValueTypeOptionSingle == 1 ){
+                                    //adding path
+                                    RDFNode o5path = shapeModel.createResource(propertyFullURI);
+                                    r.addProperty(path, o5path);
+
+
+                                    //adding the sh:class
+
+                                    r.addProperty(SH.class_, o9);
+
+                                }else {
+                                    //adding path
+                                    List<RDFNode> pathList = new ArrayList<>();
+                                    pathList.add(shapeModel.createResource(propertyFullURI));
+                                    pathList.add(RDF.type.asResource());
+
+                                    RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
+                                    r.addProperty(path, pathRDFlist);
+                                    //adding sh:in
+                                    List<RDFNode> classIn = new ArrayList<>();
+                                    classIn.add(o9);
+                                    RDFList classInRDFlist = shapeModel.createList(classIn.iterator());
+                                    r.addProperty(SH.in, classInRDFlist);
+                                }
 
                                 //adding sh:nodeKind
                                 r.addProperty(SH.nodeKind, SH.IRI);
@@ -1065,7 +1078,7 @@ public class ShaclTools {
                             r.addProperty(SH.severity, o8);
 
                             //the 09 is the class - value type
-                            RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).get(0).toString());
+                            RDFNode o9 = shapeModel.createResource(((LinkedList<?>) propertyNodeFeatures.get(10)).getFirst().toString());
 
                             //adding path
                             RDFNode o5 = shapeModel.createResource(propertyFullURI);
@@ -1201,6 +1214,8 @@ public class ShaclTools {
 
                                 //adding sh:nodeKind
                                 r.addProperty(SH.nodeKind, SH.IRI);
+
+                                //TODO add here
 
                             }
                         }
@@ -1645,36 +1660,36 @@ public class ShaclTools {
         shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes,RDF.type,OWL2.Ontology));
 
         for (Statement stmt : rdfsHeaderStatements) {
-            if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#title"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#versionIRI"))) {
+            if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#title")) || stmt.getPredicate().equals(DCTerms.title)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.title, stmt.getObject()));
+            } else if (stmt.getPredicate().equals(OWL2.versionIRI)) {
                 int len = Arrays.asList(stmt.getObject().toString().split("/")).size();
                 shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createProperty(baseURI+"/"+ Arrays.asList(stmt.getObject().toString().split("/")).get(len-1))));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/ns/dcat#keyword"))) {
+            } else if (stmt.getPredicate().equals(DCAT.keyword)) {
                 shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/ns/dcat#theme"))) {
+            } else if (stmt.getPredicate().equals(DCAT.theme)) {
                 shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createLangLiteral("constraint","en")));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#license"))) {
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#license")) || stmt.getPredicate().equals(DCTerms.license)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.license, stmt.getObject()));
+            } else if (stmt.getPredicate().equals(OWL2.versionInfo)) {
                 shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#versionInfo"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#rightsHolder"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#conformsTo"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#description"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createPlainLiteral("Describing constraints extracted from RDFS.")));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#modified"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#language"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#publisher"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), stmt.getObject()));
-            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#identifier"))) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, stmt.getPredicate(), ResourceFactory.createPlainLiteral("urn:uuid" + UUID.randomUUID())));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#rightsHolder")) || stmt.getPredicate().equals(DCTerms.rightsHolder)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.rightsHolder, stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#conformsTo")) || stmt.getPredicate().equals(DCTerms.conformsTo)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.conformsTo, stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#description")) || stmt.getPredicate().equals(DCTerms.description)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.description, ResourceFactory.createPlainLiteral("Describing constraints extracted from RDFS.")));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#modified")) || stmt.getPredicate().equals(DCTerms.modified)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.modified, stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#language")) || stmt.getPredicate().equals(DCTerms.language)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.language, stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#publisher")) || stmt.getPredicate().equals(DCTerms.publisher)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.publisher, stmt.getObject()));
+            } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#identifier")) || stmt.getPredicate().equals(DCTerms.identifier)) {
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.identifier, ResourceFactory.createPlainLiteral("urn:uuid" + UUID.randomUUID())));
             }
         }
-            shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, ResourceFactory.createProperty("http://purl.org/dc/terms/#issued"), ResourceFactory.createTypedLiteral(String.valueOf(java.time.LocalDateTime.now()),XSDDatatype.XSDdateTime)));
+            shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.issued, ResourceFactory.createTypedLiteral(String.valueOf(java.time.LocalDateTime.now()),XSDDatatype.XSDdateTime)));
         return shapeModel;
     }
     //get owl:imports
@@ -1718,6 +1733,48 @@ public class ShaclTools {
         return result;
     }
 
+    // print simple validation report
+    public static void printSHACLreport(ValidationReport report){
+
+        Model reportModel = report.getModel();
+
+        // Query for validation results in the report
+        //Property resultPredicate = SH.result;
+        ResIterator results = reportModel.listResourcesWithProperty(RDF.type, SHACL.ValidationResult);
+
+        while (results.hasNext()) {
+            Resource result = results.next();
+
+            // Get focus node
+            Resource focusNode = result.getPropertyResourceValue(SH.focusNode);
+            System.out.println("Focus Node: " + (focusNode != null ? focusNode.toString() : "None"));
+
+            // Get severity
+            Resource severity = result.getPropertyResourceValue(SH.resultSeverity);
+            System.out.println("Severity: " + (severity != null ? severity.getLocalName() : "None"));
+
+            // Get message
+            Statement messageStmt = result.getProperty(SH.resultMessage);
+            if (messageStmt != null) {
+                System.out.println("Message: " + messageStmt.getString());
+            }
+
+            // Get value causing the issue
+            Statement valueStmt = result.getProperty(SH.value);
+            if (valueStmt != null) {
+                System.out.println("Value: " + valueStmt.getObject().toString());
+            }
+
+            // Get path (if available)
+            Statement pathStmt = result.getProperty(SH.resultPath);
+            if (pathStmt != null) {
+                System.out.println("Path: " + pathStmt.getObject().toString());
+            }
+
+            System.out.println("----------\n");
+        }
+    }
+
 
     //This creates a shape model from a profile
     public static Model createShapesModelFromProfile(Model model, String nsPrefixprofile, String nsURIprofile, ArrayList<?> shapeData){
@@ -1730,6 +1787,8 @@ public class ShaclTools {
         shapeModel.setNsPrefix("rdfs", RDFS.getURI());
         shapeModel.setNsPrefix("owl", OWL.getURI());
         shapeModel.setNsPrefix("xsd", XSD.getURI());
+        shapeModel.setNsPrefix("dcat", DCAT.getURI());
+        shapeModel.setNsPrefix("dcterms", DCTerms.getURI());
         shapeModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
         shapeModel.setNsPrefix("dm", "http://iec.ch/TC57/61970-552/DifferenceModel/1#");
         shapeModel.setNsPrefixes(model.getNsPrefixMap());
@@ -1991,9 +2050,9 @@ public class ShaclTools {
                             propertyNodeFeatures.set(8, atas - 1); // this is the order
                             propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
                             List<Resource> concreteClasses = null;
-//                        if (localNameAssoc.contains("AssessedElement.ConductingEquipment")){
-//                            int k=1;
-//                        }
+//                            if (localNameAssoc.contains("Terminal.ConductingEquipment")){
+//                                int k=1;
+//                            }
 //                        System.out.println(localNameAssoc);
 //                        System.out.println(((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas));
                             // TODO check if this if is necessary if (((List<Resource>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.get(0)).get(cl)).get(atas)).get(11)).size()==1) {

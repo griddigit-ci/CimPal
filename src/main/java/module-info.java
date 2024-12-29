@@ -43,6 +43,7 @@ module CimPal {
     requires guru.nidi.graphviz;
     requires com.fasterxml.jackson.dataformat.xml;
     requires velocity.engine.core;
+    requires org.apache.jena.shacl;
 
     //requires smartgraph;
 }

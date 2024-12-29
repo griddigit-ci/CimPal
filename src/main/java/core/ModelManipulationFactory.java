@@ -98,6 +98,22 @@ public class ModelManipulationFactory {
         return rdfAboutList;
     }
 
+    public static Model LoadSHACLSHACL() {
+        Model shaclModel = ModelFactory.createDefaultModel();
+        InputStream inputStream = InstanceDataFactory.class.getResourceAsStream("/shaclttl/shacl-shaclFixed.ttl");
+
+        if (inputStream != null) {
+            RDFDataMgr.read(shaclModel, inputStream, "", Lang.TURTLE);
+        } else {
+            try {
+                throw new FileNotFoundException("File not found for shacl validation.");
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return shaclModel;
+    }
+
     public static Set<Resource> LoadRDFEnum(String xmlBase) throws FileNotFoundException {
         Set<Resource> RdfEnumList = new HashSet<>();
         Model model = ModelFactory.createDefaultModel();
