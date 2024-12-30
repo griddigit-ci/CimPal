@@ -2149,8 +2149,12 @@ public class ShaclTools {
                                 LinkedHashSet<Resource> concreteClasseshashSet = new LinkedHashSet<>(concreteClasses);
                                 Iterator<Resource> itr = concreteClasseshashSet.iterator();
                                 LinkedList<Resource> concreteClassesList = new LinkedList<>();
-                                while (itr.hasNext()) {
-                                    concreteClassesList.add(itr.next());
+                                if (shapesOnAbstractOption == 1){
+                                    concreteClassesList.add(assocRangeRes);
+                                }else {
+                                    while (itr.hasNext()) {
+                                        concreteClassesList.add(itr.next());
+                                    }
                                 }
                                 propertyNodeFeatures.set(10, concreteClassesList);
                                 propertyNodeFeatures.set(11, classFullURI);

@@ -3108,6 +3108,12 @@ public class MainController implements Initializable {
 
                         }
 
+                        if (unionmodelbaseprofilesshaclinheritance==null && baseprofilesshaclglag == 0){
+                            Model modelInh = modelInheritance(model, true, true);
+                            String titleSaveAsInh = "Save as for inheritance model: InheritanceStructure";
+                            ShaclTools.saveShapesFile(modelInh, "", 0, titleSaveAsInh);
+                        }
+
                     }
                     case "CIMToolOWL" -> {
                         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
@@ -3171,7 +3177,7 @@ public class MainController implements Initializable {
                 }
             }
 
-            if (cbRDFSSHACLinheritTree.isSelected()){
+            if (cbRDFSSHACLinheritTree.isSelected() && unionmodelbaseprofilesshaclinheritance != null){
                 //open the ChoiceDialog for the save file and save the file in different formats
                 String titleSaveAs = "Save as for inheritance model: InheritanceStructure";
                 ShaclTools.saveShapesFile(unionmodelbaseprofilesshaclinheritance, "", 0, titleSaveAs);
