@@ -19,8 +19,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 
 public class ExportRDFSdescriptions {
@@ -123,6 +122,101 @@ public class ExportRDFSdescriptions {
         exportDesciption(rdfsItem,rdfsItemDescription,"RDFS descriptions","RDFSdescription","Save descriptions from RDFS", rdfsItemMultiplicity, rdfsItemtype, rdfsItemAssociationUsed, rdfsStereotype, rdfsConcreteClass);
     }
 
+    public static void exportRDFToExcel(Model model) {
+        // Map to store data for each class (sheet name -> List of Maps for rows)
+        Map<String, List<Map<String, String>>> classData = new LinkedHashMap<>();
+
+        // Parse all subjects in the RDF model
+        ResIterator subjects = model.listSubjects();
+        while (subjects.hasNext()) {
+            Resource subject = subjects.next();
+
+            // Get the RDF type for the subject
+            Statement typeStatement = subject.getProperty(RDF.type);
+            if (typeStatement != null) {
+                String className = typeStatement.getObject().toString();
+
+                // Initialize storage for this class if it doesn't exist
+                classData.putIfAbsent(className, new LinkedList<>());
+
+                // Collect attributes for the current subject (row)
+                Map<String, String> rowData = new LinkedHashMap<>();
+                // Add the subject URI as a special column (e.g., "Subject")
+                rowData.put("rdf:id", subject.getURI()); // Add the subject's URI
+                StmtIterator properties = subject.listProperties();
+                while (properties.hasNext()) {
+                    Statement property = properties.next();
+                    // Get the prefix and local name of the property
+                    //String propertyUri = property.getPredicate().getURI();
+                    String prefix = model.getNsURIPrefix(property.getPredicate().getNameSpace());
+                    String propertyName = (prefix != null ? prefix + ":" : "") + property.getPredicate().getLocalName();
+
+                    // Determine and format the property value
+                    RDFNode object = property.getObject();
+                    String propertyValue;
+                    if (object.isResource()) {
+                        // If the object is a resource (URI), format it as prefix:localname
+                        //String objectUri = object.toString();
+                        String objectPrefix = model.getNsURIPrefix(object.asResource().getNameSpace());
+                        propertyValue = (objectPrefix != null ? objectPrefix + ":" : "") + object.asResource().getLocalName();
+                    } else {
+                        // Otherwise, just use the literal value
+                        propertyValue = object.toString();
+                    }
+                    rowData.put(propertyName, propertyValue);
+                }
+
+                // Add the row data to the corresponding class
+                classData.get(className).add(rowData);
+            }
+        }
+
+        // Create Excel workbook and populate it
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            for (Map.Entry<String, List<Map<String, String>>> entry : classData.entrySet()) {
+                Resource classResource = model.createResource(entry.getKey());
+                String sheetName = classResource.getLocalName(); // Retrieve local name directly from the resource
+                //String sheetName = entry.getKey().substring(entry.getKey().lastIndexOf('/') + 1); // Use local name
+                List<Map<String, String>> rows = entry.getValue();
+
+                // Create a new sheet for this class
+                XSSFSheet sheet = workbook.createSheet(sheetName);
+
+                // Create headers (based on the first row's keys)
+                if (!rows.isEmpty()) {
+                    XSSFRow headerRow = sheet.createRow(0);
+                    List<String> headers = new ArrayList<>(rows.getFirst().keySet());
+                    for (int i = 0; i < headers.size(); i++) {
+                        headerRow.createCell(i).setCellValue(headers.get(i));
+                    }
+
+                    // Populate data rows
+                    for (int i = 0; i < rows.size(); i++) {
+                        XSSFRow dataRow = sheet.createRow(i + 1);
+                        Map<String, String> row = rows.get(i);
+                        for (int j = 0; j < headers.size(); j++) {
+                            String value = row.get(headers.get(j));
+                            dataRow.createCell(j).setCellValue(value);
+                        }
+                    }
+                }
+            }
+
+
+            File saveFile = util.ModelFactory.filesavecustom("Excel files", List.of("*.xlsx"),"Save RDF to Excel","");
+            if (saveFile != null) {
+                try {
+                    FileOutputStream outputStream = new FileOutputStream(saveFile);
+                    workbook.write(outputStream);
+                    workbook.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 
 

@@ -72,7 +72,7 @@ import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
 import static core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
-import static core.ExportRDFSdescriptions.rdfsDescriptions;
+import static core.ExportRDFSdescriptions.*;
 import static core.RdfConvert.fileSaveDialog;
 import static core.RdfConvert.modelInheritance;
 
@@ -599,6 +599,29 @@ public class MainController implements Initializable {
                 progressBar.setProgress(0);
             }
             rdfsDescriptions(model);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+
+    }
+
+    @FXML
+    //action menu item Tools -> Export RDFS description
+    private void actionRDFSexportTripplesMenu() throws FileNotFoundException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        //open RDFS file
+        List<File> file = util.ModelFactory.filechoosercustom(true, "RDF files", List.of("*.rdf","*.xml"), "");
+
+        Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+        if (file.getFirst() != null) {// the file is selected
+            try {
+                RDFDataMgr.read(model, new FileInputStream(file.getFirst()), Lang.RDFXML);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                progressBar.setProgress(0);
+            }
+            exportRDFToExcel(model);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
