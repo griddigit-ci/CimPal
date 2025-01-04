@@ -581,10 +581,13 @@ public class ModelManipulationFactory {
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                                     }
                                     case "Resource" -> { //add resource
-                                        if(object.startsWith("http")){
+                                        if (object.startsWith("http")) {
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(object)));
-                                        }
-                                        else {
+                                        }else if (!object.contains("http") && object.contains(":")) {
+                                            String[] objSplit = object.split(":", 2);
+                                            String prefixUri = prefMap.get(objSplit[0]);
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                                        }else {
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase + "#" + object)));
                                         }
                                     }
