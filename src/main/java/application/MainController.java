@@ -63,6 +63,8 @@ import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -322,6 +324,10 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLinheritTree;
     @FXML
     private CheckBox cbRDFSSHACLvalidate;
+    @FXML
+    private TextField fPathShaclFilesValidator;
+    @FXML
+    private TextField fPathModelsForShaclValidator;
 
 
     public static File rdfModel1;
@@ -335,6 +341,7 @@ public class MainController implements Initializable {
     public static ArrayList<Object> compareResults;
     public static List<String> rdfsCompareFiles;
     private List<File> selectedFile;
+    private File selectedFolder;
 
     private ArrayList<Object> models;
     private ArrayList<Object> modelsNames;
@@ -1287,6 +1294,69 @@ public class MainController implements Initializable {
         } else {
             progressBar.setProgress(0);
         }
+    }
+    public void actionBrowseShaclFilesValidator(ActionEvent actionEvent) {
+        selectedFile = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        if (selectedFile != null) {
+            StringBuilder paths = new StringBuilder();
+            for (File file : selectedFile) {
+                paths.append(", ").append(file.toString());
+            }
+            fPathShaclFilesValidator.setText(paths.toString());
+        }
+    }
+    public void actionBrowsePathForShaclValidator(ActionEvent actionEvent) {
+        selectedFolder = util.ModelFactory.folderchoosercustom();
+        if (selectedFolder != null) {
+            fPathModelsForShaclValidator.setText(selectedFolder.toString());
+        }
+    }
+
+    @FXML
+    private void actionBtnRunShaclValidator() throws FileNotFoundException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        List<File> fileL = new ArrayList<>();
+        try {
+            Files.walkFileTree(selectedFolder.toPath(), EnumSet.noneOf(FileVisitOption.class), 3, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (file.toString().endsWith(".zip")) {
+                        fileL.add(file.toFile()); // Convert Path to File and add to list
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        if (!fileL.isEmpty()) {// the file is selected
+            Map<String,Model> modelMap = InstanceDataFactory.modelLoad(fileL, "", Lang.RDFXML, false);
+            Map<String,Model> shaclMap = InstanceDataFactory.modelLoad(selectedFile, "", Lang.TURTLE, true);
+            Model shaclModel = shaclMap.get("shacl");
+            Map<String, ValidationReport> reportMap = new HashMap<>();
+
+            modelMap.forEach((key, model) -> {
+                ValidationReport report = ShaclValidator.get().validate(shaclModel.getGraph(), model.getGraph());
+                reportMap.put(key,report);
+            });
+
+            reportMap.forEach((name, report) -> {
+                System.out.println("Report for: "+ name);
+                ShaclTools.printSHACLreport(report);
+            });
+
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+    }
+
+    public void actionBtnResetShaclValidator(ActionEvent actionEvent) {
+        fPathShaclFilesValidator.clear();
+        fPathModelsForShaclValidator.clear();
+        selectedFile = null;
     }
 
     @FXML

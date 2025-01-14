@@ -6,13 +6,39 @@
  @author Chavdar Ivanov
  -->
 
-<?import javafx.geometry.*?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.image.*?>
-<?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.MainController">
    <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -570,71 +596,6 @@
                         </VBox>
                      </AnchorPane>
                   </Tab>
-                  <Tab disable="true" text="Instance Data Browser">
-                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                        <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                           <VBox minWidth="300.0" spacing="5.0">
-                              <HBox.margin>
-                                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                              </HBox.margin>
-                              <Label prefWidth="120.0" text="Instance data" />
-                              <TreeView fx:id="treeViewInstanceData" minHeight="70.0" onMouseClicked="#selectActionTreeItemID" prefWidth="300.0" VBox.vgrow="ALWAYS" />
-                           </VBox>
-                           <VBox spacing="10.0" HBox.hgrow="ALWAYS">
-                              <HBox.margin>
-                                 <Insets bottom="5.0" right="5.0" top="5.0" />
-                              </HBox.margin>
-                              <VBox prefHeight="200.0" prefWidth="100.0">
-                                 <VBox.margin>
-                                    <Insets />
-                                 </VBox.margin>
-                                 <HBox spacing="10.0">
-                                    <padding>
-                                       <Insets left="5.0" right="5.0" top="5.0" />
-                                    </padding>
-                                    <CheckBox fx:id="cbShowUnionModelOnly" mnemonicParsing="false" selected="true" text="Show only Union Model">
-                                       <HBox.margin>
-                                          <Insets right="10.0" />
-                                       </HBox.margin>
-                                    </CheckBox>
-                                    <Label prefWidth="140.0" text="Shapes namespace:" />
-                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
-                                    <TextField fx:id="fPrefixGenerateTab1" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
-                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
-                                    <TextField fx:id="fURIGenerateTab1" editable="false" prefWidth="300.0" />
-                                 </HBox>
-                                 <HBox spacing="10.0">
-                                    <padding>
-                                       <Insets left="5.0" right="5.0" top="5.0" />
-                                    </padding>
-                                    <Label prefWidth="140.0" text="Shapes base URI:" />
-                                    <TextField fx:id="fshapesBaseURIDefineTab1" editable="false" prefWidth="530.0" />
-                                 </HBox>
-                                 <HBox spacing="10.0">
-                                    <padding>
-                                       <Insets left="5.0" right="5.0" top="5.0" />
-                                    </padding>
-                                    <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
-                                    <TextField fx:id="fowlImportsDefineTab1" editable="false" prefWidth="530.0" />
-                                 </HBox>
-                                 <ImageView fx:id="IDgraph" fitHeight="346.0" fitWidth="960.0" pickOnBounds="true" preserveRatio="true" VBox.vgrow="ALWAYS" />
-                              </VBox>
-                              <HBox alignment="BOTTOM_LEFT" spacing="10.0">
-                                 <VBox minWidth="200.0" spacing="5.0">
-                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
-                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
-                                    </HBox>
-                                 </VBox>
-                                 <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
-                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
-                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData" text="Load Data" HBox.hgrow="ALWAYS" />
-                                    </HBox>
-                                 </VBox>
-                              </HBox>
-                           </VBox>
-                        </HBox>
-                     </AnchorPane>
-                  </Tab>
                   <Tab text="SHACL Organizer">
                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                         <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -685,6 +646,136 @@
                            </HBox>
                         </VBox>
                      </AnchorPane>
+                  </Tab>
+                  <Tab text="SHACL Validator">
+                     <content>
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                           <children>
+                              <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                 <children>
+                                    <HBox spacing="10.0">
+                                       <padding>
+                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                       <children>
+                                          <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
+                                          <TextField fx:id="fPathShaclFilesValidator" editable="false" HBox.hgrow="ALWAYS" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesValidator" text="Browse" />
+                                       </children>
+                                    </HBox>
+                                    <HBox spacing="10.0">
+                                       <padding>
+                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                       <children>
+                                          <Label minWidth="90.0" prefHeight="17.0" prefWidth="105.0" text="Models to validate:" wrapText="true" />
+                                          <TextField fx:id="fPathModelsForShaclValidator" editable="false" HBox.hgrow="ALWAYS" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowsePathForShaclValidator" text="Browse" />
+                                       </children>
+                                    </HBox>
+                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                                       <VBox.margin>
+                                          <Insets bottom="5.0" right="5.0" />
+                                       </VBox.margin>
+                                       <children>
+                                          <Button fx:id="btnRunShaclValidator" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclValidator" text="Run" HBox.hgrow="ALWAYS" />
+                                          <Button fx:id="btnResetShaclValidator" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetShaclValidator" text="Reset" />
+                                       </children>
+                                    </HBox>
+                                 </children>
+                              </VBox>
+                           </children>
+                        </AnchorPane>
+                     </content>
+                  </Tab>
+                  <Tab text="Generate Instance data">
+                     <content>
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                           <children>
+                              <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                 <children>
+                                    <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                                       <children>
+                                          <HBox spacing="10.0">
+                                             <padding>
+                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                             </padding>
+                                             <children>
+                                                <Label minWidth="90.0" text="Xls template:" wrapText="true" />
+                                                <TextField fx:id="fsXlsTemplatePath" editable="false" HBox.hgrow="ALWAYS" />
+                                                <Button mnemonicParsing="false" onAction="#actionBrowseXlsTemplate" text="Browse" />
+                                             </children>
+                                          </HBox>
+                                          <HBox spacing="10.0">
+                                             <padding>
+                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                             </padding>
+                                             <children>
+                                                <Label minWidth="90.0" text="Generation options:" />
+                                                <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                                                   <children>
+                                                      <HBox spacing="10.0">
+                                                         <children>
+                                                            <Label minWidth="78.0" prefHeight="17.0" prefWidth="78.0" text="Use method:" wrapText="true" />
+                                                            <ChoiceBox fx:id="fcbGenMethodOptions" minWidth="400.0" />
+                                                            <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
+                                                            <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
+                                                               <toggleGroup>
+                                                                  <ToggleGroup fx:id="giDataLine" />
+                                                               </toggleGroup>
+                                                            </RadioButton>
+                                                            <RadioButton layoutX="488.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
+                                                            <Region minWidth="100.0" HBox.hgrow="ALWAYS" />
+                                                            <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create Xls template from RDF" />
+                                                         </children>
+                                                         <VBox.margin>
+                                                            <Insets />
+                                                         </VBox.margin>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
+                                             </children>
+                                          </HBox>
+                                          <HBox spacing="10.0">
+                                             <padding>
+                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                             </padding>
+                                             <children>
+                                                <Label minWidth="90.0" text="XML base:" wrapText="true" />
+                                                <TextField fx:id="fXmlBaseGen" maxWidth="1.7976931348623157E308" prefHeight="25.0" prefWidth="1116.0" HBox.hgrow="ALWAYS" />
+                                             </children>
+                                          </HBox>
+                                          <HBox spacing="10.0">
+                                             <padding>
+                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                             </padding>
+                                             <children>
+                                                <Label minWidth="50.0" text="Sorting options:" />
+                                                <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
+                                                   <HBox.margin>
+                                                      <Insets left="10.0" />
+                                                   </HBox.margin>
+                                                </CheckBox>
+                                                <Label text="Sorting options:" />
+                                                <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
+                                             </children>
+                                          </HBox>
+                                          <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                                             <VBox.margin>
+                                                <Insets bottom="5.0" right="5.0" />
+                                             </VBox.margin>
+                                             <children>
+                                                <Button fx:id="fbtnRunGenerateInstance" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunGenerateInstance" text="Run" HBox.hgrow="ALWAYS" />
+                                                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetGenerateInstance" text="Reset" />
+                                             </children>
+                                          </HBox>
+                                       </children>
+                                    </VBox>
+                                 </children>
+                              </HBox>
+                           </children>
+                        </AnchorPane>
+                     </content>
                   </Tab>
                   <Tab fx:id="IDpane" disable="true" text="Instance Data Browser Pane">
                      <content>
@@ -807,94 +898,70 @@
                         </AnchorPane>
                      </content>
                   </Tab>
-                  <Tab text="Generate Instance data">
-                     <content>
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                           <children>
-                              <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                 <children>
-                                    <VBox spacing="10.0" HBox.hgrow="ALWAYS">
-                                       <children>
-                                          <HBox spacing="10.0">
-                                             <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <Label minWidth="90.0" text="Xls template:" wrapText="true" />
-                                                <TextField fx:id="fsXlsTemplatePath" editable="false" HBox.hgrow="ALWAYS" />
-                                                <Button mnemonicParsing="false" onAction="#actionBrowseXlsTemplate" text="Browse" />
-                                             </children>
-                                          </HBox>
-                                          <HBox spacing="10.0">
-                                             <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <Label minWidth="90.0" text="Generation options:" />
-                                                <VBox spacing="10.0" HBox.hgrow="ALWAYS">
-                                                   <children>
-                                                      <HBox spacing="10.0">
-                                                         <children>
-                                                            <Label minWidth="78.0" prefHeight="17.0" prefWidth="78.0" text="Use method:" wrapText="true" />
-                                                            <ChoiceBox fx:id="fcbGenMethodOptions" minWidth="400.0" />
-                                                            <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
-                                                            <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
-                                                               <toggleGroup>
-                                                                  <ToggleGroup fx:id="giDataLine" />
-                                                               </toggleGroup>
-                                                            </RadioButton>
-                                                            <RadioButton layoutX="488.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
-                                                            <Region minWidth="100.0" HBox.hgrow="ALWAYS" />
-                                                            <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create Xls template from RDF" />
-                                                         </children>
-                                                         <VBox.margin>
-                                                            <Insets />
-                                                         </VBox.margin>
-                                                      </HBox>
-                                                   </children>
-                                                </VBox>
-                                             </children>
-                                          </HBox>
-                                          <HBox spacing="10.0">
-                                             <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <Label minWidth="90.0" text="XML base:" wrapText="true" />
-                                                <TextField fx:id="fXmlBaseGen" maxWidth="1.7976931348623157E308" prefHeight="25.0" prefWidth="1116.0" HBox.hgrow="ALWAYS" />
-                                             </children>
-                                          </HBox>
-                                          <HBox spacing="10.0">
-                                             <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <Label minWidth="50.0" text="Sorting options:" />
-                                                <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
-                                                   <HBox.margin>
-                                                      <Insets left="10.0" />
-                                                   </HBox.margin>
-                                                </CheckBox>
-                                                <Label text="Sorting options:" />
-                                                <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
-                                             </children>
-                                          </HBox>
-                                          <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
-                                             <VBox.margin>
-                                                <Insets bottom="5.0" right="5.0" />
-                                             </VBox.margin>
-                                             <children>
-                                                <Button fx:id="fbtnRunGenerateInstance" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunGenerateInstance" text="Run" HBox.hgrow="ALWAYS" />
-                                                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetGenerateInstance" text="Reset" />
-                                             </children>
-                                          </HBox>
-                                       </children>
-                                    </VBox>
-                                 </children>
+                  <Tab disable="true" text="Instance Data Browser">
+                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                           <VBox minWidth="300.0" spacing="5.0">
+                              <HBox.margin>
+                                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                              </HBox.margin>
+                              <Label prefWidth="120.0" text="Instance data" />
+                              <TreeView fx:id="treeViewInstanceData" minHeight="70.0" onMouseClicked="#selectActionTreeItemID" prefWidth="300.0" VBox.vgrow="ALWAYS" />
+                           </VBox>
+                           <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                              <HBox.margin>
+                                 <Insets bottom="5.0" right="5.0" top="5.0" />
+                              </HBox.margin>
+                              <VBox prefHeight="200.0" prefWidth="100.0">
+                                 <VBox.margin>
+                                    <Insets />
+                                 </VBox.margin>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <CheckBox fx:id="cbShowUnionModelOnly" mnemonicParsing="false" selected="true" text="Show only Union Model">
+                                       <HBox.margin>
+                                          <Insets right="10.0" />
+                                       </HBox.margin>
+                                    </CheckBox>
+                                    <Label prefWidth="140.0" text="Shapes namespace:" />
+                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
+                                    <TextField fx:id="fPrefixGenerateTab1" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
+                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
+                                    <TextField fx:id="fURIGenerateTab1" editable="false" prefWidth="300.0" />
+                                 </HBox>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <Label prefWidth="140.0" text="Shapes base URI:" />
+                                    <TextField fx:id="fshapesBaseURIDefineTab1" editable="false" prefWidth="530.0" />
+                                 </HBox>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
+                                    <TextField fx:id="fowlImportsDefineTab1" editable="false" prefWidth="530.0" />
+                                 </HBox>
+                                 <ImageView fx:id="IDgraph" fitHeight="346.0" fitWidth="960.0" pickOnBounds="true" preserveRatio="true" VBox.vgrow="ALWAYS" />
+                              </VBox>
+                              <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                 <VBox minWidth="200.0" spacing="5.0">
+                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
+                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
+                                    </HBox>
+                                 </VBox>
+                                 <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
+                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
+                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData" text="Load Data" HBox.hgrow="ALWAYS" />
+                                    </HBox>
+                                 </VBox>
                               </HBox>
-                           </children>
-                        </AnchorPane>
-                     </content>
+                           </VBox>
+                        </HBox>
+                     </AnchorPane>
                   </Tab>
                </TabPane>
             </HBox>
