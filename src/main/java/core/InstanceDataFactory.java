@@ -243,12 +243,16 @@ public class InstanceDataFactory {
             }
         }
 
-        if (keyword.equals("")){
+        if (keyword.isEmpty()){
+            try{
             List<Resource> listRes=model.listSubjectsWithProperty(RDF.type).toList();
             for (Resource res : listRes){
                 if (res.getLocalName().contains("Ontology.keyword")){
                     keyword = model.getRequiredProperty(res,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().asLiteral().getString();
                 }
+            }
+            } catch (NullPointerException e){
+                keyword = "";
             }
         }
 
