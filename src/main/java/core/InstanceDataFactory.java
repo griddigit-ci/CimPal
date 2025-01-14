@@ -52,7 +52,7 @@ public class InstanceDataFactory {
                 rdfSourceFormat = Lang.RDFXML;
                 if (inputStreamList.size()==1){
                     singlezip=true;
-                    inputStream=inputStreamList.get(0);
+                    inputStream=inputStreamList.getFirst();
                 }else{
                     singlezip=false;
                 }
@@ -85,10 +85,10 @@ public class InstanceDataFactory {
                 if (FilenameUtils.getName(file.toString()).equals("FileHeader.rdf")){
                     keyword="FH";
                 }
-                if (!keyword.equals("")) {
+                if (!keyword.isEmpty()) {
                     if (MainController.treeID && iszip) {
-                        unionModelMap.put(InstanceDataFactory.zipfilesnames.get(0)+"|"+keyword, model);
-                    }else if (MainController.treeID && !iszip) {
+                        unionModelMap.put(InstanceDataFactory.zipfilesnames.getFirst()+"|"+keyword, model);
+                    }else if (MainController.treeID) {
                         unionModelMap.put(FilenameUtils.getName(file.toString())+"|"+keyword, model);
                     }else{
                         unionModelMap.put(keyword, model);
@@ -114,7 +114,7 @@ public class InstanceDataFactory {
                     if (FilenameUtils.getName(file.toString()).equals("FileHeader.rdf")){
                         keyword="FH";
                     }
-                    if (!keyword.equals("")) {
+                    if (!keyword.isEmpty()) {
                         if (MainController.treeID) {
                             unionModelMap.put(InstanceDataFactory.zipfilesnames.get(ind)+"|"+keyword, model);
                         //}else if (MainController.treeID && !iszip) {
@@ -140,12 +140,11 @@ public class InstanceDataFactory {
         if (isSHACL){
             Model shaclModel= ShapeFactory.createShapeModelWithOwlImport(modelUnion);
             unionModelMap.put("shacl",shaclModel);
-            return unionModelMap;
         }else {
             unionModelMap.put("unionModel",modelUnion);
             unionModelMap.put("modelUnionWithoutHeader",modelUnionWithoutHeader);
-            return unionModelMap;
         }
+        return unionModelMap;
     }
 
     //get the keyword for the profile
