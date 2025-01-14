@@ -73,7 +73,7 @@ public class ShapeFactory {
                 String includeURI = t.getObject().getURI();
 
                 if(!reachedURIs.contains(includeURI)) {
-                    Model includeModel = JenaUtil.createDefaultModel();
+                    Model includeModel = ModelFactory.createDefaultModel();
 
                     /*if (includeURI.split("file:",2).length==2)
                     {
