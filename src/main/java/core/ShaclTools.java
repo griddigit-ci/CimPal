@@ -7,6 +7,7 @@ package core;
 
 
 import application.MainController;
+import dtos.SHACLValidationResult;
 import javafx.scene.control.ChoiceDialog;
 import javafx.stage.DirectoryChooser;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -19,18 +20,13 @@ import org.apache.jena.rdf.model.impl.PropertyImpl;
 import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.shacl.vocabulary.SHACL;
-import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
-import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import util.PropertyHolder;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.*;
 
 import static application.MainController.*;
@@ -1539,7 +1535,7 @@ public class ShaclTools {
 //            filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //            filechooserS.setTitle(title);
 //            saveFile = filechooserS.showSaveDialog(null);
-            saveFile = util.ModelFactory.filesavecustom(extensionText, List.of(extension),title,title.split(": ",2)[1]);
+            saveFile = util.ModelFactory.fileSaveCustom(extensionText, List.of(extension),title,title.split(": ",2)[1]);
             if (saveFile != null) {
                 //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
                 OutputStream out = new FileOutputStream(saveFile);
@@ -1770,6 +1766,35 @@ public class ShaclTools {
 
             System.out.println("----------\n");
         }
+    }
+
+    public static List<SHACLValidationResult> extractSHACLValidationResults(ValidationReport report) {
+        List<SHACLValidationResult> resultsList = new ArrayList<>();
+        Model reportModel = report.getModel();
+
+        ResIterator results = reportModel.listResourcesWithProperty(RDF.type, SH.ValidationResult);
+
+        while (results.hasNext()) {
+            Resource result = results.next();
+
+            String focusNode = getResourceValue(result.getPropertyResourceValue(SH.focusNode));
+            String severity = getResourceValue(result.getPropertyResourceValue(SH.resultSeverity));
+            String message = getStatementValue(result.getProperty(SH.resultMessage));
+            String value = getStatementValue(result.getProperty(SH.value));
+            String path = getStatementValue(result.getProperty(SH.resultPath));
+
+            resultsList.add(new SHACLValidationResult(focusNode, severity, message, value, path));
+        }
+
+        return resultsList;
+    }
+
+    private static String getResourceValue(Resource resource) {
+        return (resource != null) ? resource.toString() : "None";
+    }
+
+    private static String getStatementValue(Statement statement) {
+        return (statement != null) ? statement.getObject().toString() : "None";
     }
 
 
@@ -2782,7 +2807,7 @@ public class ShaclTools {
         Map<String, PropertyHolder> constraintPropertiesMap = new HashMap<>();
         Map<String, String> baseMap = new HashMap<>();
         Model shaclModel;
-        File folder = util.ModelFactory.folderchoosercustom();
+        File folder = util.ModelFactory.folderChooserCustom();
         //the map where we store the things before we process with the save
         //the string can ve the path and the file name that can be used by the save
         for (Object inputXLSrow : inputXLSdata) {

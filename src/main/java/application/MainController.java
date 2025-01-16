@@ -10,6 +10,7 @@ import common.customWriter.CustomRDFFormat;
 
 import java.io.InputStream;
 
+import dtos.SHACLValidationResult;
 import guru.nidi.graphviz.engine.Graphviz;
 import guru.nidi.graphviz.engine.Format;
 
@@ -48,7 +49,6 @@ import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
-import org.apache.jena.shacl.vocabulary.SHACL;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -319,7 +319,7 @@ public class MainController implements Initializable {
     @FXML
     private CheckBox cbRDFSSHACLabstract;
     @FXML
-    private  CheckBox cbRDFSSHACLoptionTypeWithOne;
+    private CheckBox cbRDFSSHACLoptionTypeWithOne;
     @FXML
     private CheckBox cbRDFSSHACLinheritTree;
     @FXML
@@ -595,7 +595,7 @@ public class MainController implements Initializable {
     private void actionRDFSexportDescriptionMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(true, "RDF files", List.of("*.rdf"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "");
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file.getFirst() != null) {// the file is selected
@@ -618,7 +618,7 @@ public class MainController implements Initializable {
     private void actionRDFSexportTripplesMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(true, "RDF files", List.of("*.rdf","*.xml"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.xml"), "");
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file.getFirst() != null) {// the file is selected
@@ -641,7 +641,7 @@ public class MainController implements Initializable {
     private void actionMenuExportSHACLInfo() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open SHACL files
-        List<File> file = util.ModelFactory.filechoosercustom(false, "SHACL files", List.of("*.ttl"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
 
         if (file != null) {// the file is selected
             boolean singleFile = false;
@@ -675,7 +675,7 @@ public class MainController implements Initializable {
     private void actionGenInfoFromRDFS() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(false, "RDF files", List.of("*.rdf"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
         List<Model> listModels = new LinkedList<>();
         if (file != null) {// the file is selected
             for (File fil : file) {
@@ -695,29 +695,13 @@ public class MainController implements Initializable {
         }
     }
 
-    @FXML
-    //action menu item Tools -> Instance data Excel template based on RDFS
-    private void actionRDFSInstanceDataTemplateMenu() throws FileNotFoundException {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-        //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(false, "RDF files", List.of("*.rdf"), "");
-        boolean templateOnly = true;
-        if (file != null) {// the file is selected
-            shaclNodataMap = 1; // as no mapping is to be used for this task
-            ExportInstanceDataTemplate.rdfsContent(file, templateOnly);
-            progressBar.setProgress(1);
-        } else {
-            progressBar.setProgress(0);
-        }
-    }
-
 
     @FXML
     //action menu item Tools -> Generate properties info from RDFS (xls, ttl, json)
     private void actionRDFSInstanceDataInfoMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(false, "RDF files", List.of("*.rdf"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
         boolean templateOnly = false;
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
@@ -796,9 +780,9 @@ public class MainController implements Initializable {
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
             //select file 1
-            file = util.ModelFactory.filechoosercustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
+            file = util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = util.ModelFactory.filechoosercustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
+            file = util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
         }
 
         assert file != null;
@@ -824,9 +808,9 @@ public class MainController implements Initializable {
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
             //select file 2
-            file = util.ModelFactory.filechoosercustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
+            file = util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = util.ModelFactory.filechoosercustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
+            file = util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
         }
 
         assert file != null;
@@ -849,7 +833,7 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
 
         //select file 1
-        List<File> fileL = util.ModelFactory.filechoosercustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
 
@@ -866,7 +850,7 @@ public class MainController implements Initializable {
     private void actionBrowseIDfile2() {
         progressBar.setProgress(0);
         //select file 1
-        List<File> fileL = util.ModelFactory.filechoosercustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
 
@@ -889,11 +873,11 @@ public class MainController implements Initializable {
         if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Generate from RDFS")) {
             MainController.IDmapSelect = 1;
             //select file
-            fileL = util.ModelFactory.filechoosercustom(false, "RDF files", List.of("*.rdf"), "");
+            fileL = util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
         } else if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Use saved map")) {
             MainController.IDmapSelect = 2;
             //select file
-            fileL = util.ModelFactory.filechoosercustom(false, "Map file", List.of("*.properties"), "");
+            fileL = util.ModelFactory.fileChooserCustom(false, "Map file", List.of("*.properties"), "");
         }
 
         if (fileL != null) {// the file is selected
@@ -917,7 +901,7 @@ public class MainController implements Initializable {
     private void actionBrowseRDFfileForExcel() {
         progressBar.setProgress(0);
         //select file
-        List<File> file = util.ModelFactory.filechoosercustom(true, "RDF files", List.of("*.rdf"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "");
         if (file.getFirst() != null) {// the file is selected
             fPathRdffileForExcel.setText(file.getFirst().toString());
             MainController.rdfModelExcelShacl = file.getFirst();
@@ -932,7 +916,7 @@ public class MainController implements Initializable {
     private void actionBrowseExcelfileForShape() {
         progressBar.setProgress(0);
         //select file
-        List<File> file = util.ModelFactory.filechoosercustom(true, "Excel files", List.of("*.xlsx"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "");
 
         if (file.getFirst() != null) {// the file is selected
             fPathXLSfileForShape.setText(file.getFirst().toString());
@@ -1250,7 +1234,7 @@ public class MainController implements Initializable {
 
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(false, "Reference data RDF files", List.of("*.rdf"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(false, "Reference data RDF files", List.of("*.rdf"), "");
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
             ModelManipulationFactory.generateCommonData(file);
@@ -1269,20 +1253,20 @@ public class MainController implements Initializable {
         shapeModels = null;
 
         //select file
-        List<File> fileL = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
 
         if (fileL != null) {// the file is selected
             for (int m = 0; m < fileL.size(); m++) {
                 util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
 
-                if (shaclRefModel == null){
+                if (shaclRefModel == null) {
                     shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
                 }
                 ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), ((Model) shapeModels.get(m)).getGraph());
 
                 if (report.conforms()) {
-                    System.out.printf("SHACL shapes: %s conform to SHACL-SHACL validation.\n",fileL.get(m).getName());
-                }else{
+                    System.out.printf("SHACL shapes: %s conform to SHACL-SHACL validation.\n", fileL.get(m).getName());
+                } else {
                     System.out.printf("Validation failed. SHACL shapes: %s does not conform to the SHACL-SHACL shapes.\n", fileL.get(m).getName());
                     System.out.println("Validation problems:");
                     ShaclTools.printSHACLreport(report);
@@ -1295,8 +1279,10 @@ public class MainController implements Initializable {
             progressBar.setProgress(0);
         }
     }
-    public void actionBrowseShaclFilesValidator(ActionEvent actionEvent) {
-        selectedFile = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+
+    @FXML
+    private void actionBrowseShaclFilesValidator(ActionEvent actionEvent) {
+        selectedFile = util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
             for (File file : selectedFile) {
@@ -1305,15 +1291,17 @@ public class MainController implements Initializable {
             fPathShaclFilesValidator.setText(paths.toString());
         }
     }
-    public void actionBrowsePathForShaclValidator(ActionEvent actionEvent) {
-        selectedFolder = util.ModelFactory.folderchoosercustom();
+
+    @FXML
+    private void actionBrowsePathForShaclValidator(ActionEvent actionEvent) {
+        selectedFolder = util.ModelFactory.folderChooserCustom();
         if (selectedFolder != null) {
             fPathModelsForShaclValidator.setText(selectedFolder.toString());
         }
     }
 
     @FXML
-    private void actionBtnRunShaclValidator() throws FileNotFoundException {
+    private void actionBtnRunShaclValidator() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         List<File> fileL = new ArrayList<>();
         try {
@@ -1332,19 +1320,20 @@ public class MainController implements Initializable {
 
 
         if (!fileL.isEmpty()) {// the file is selected
-            Map<String,Model> modelMap = InstanceDataFactory.modelLoad(fileL, "", Lang.RDFXML, false);
-            Map<String,Model> shaclMap = InstanceDataFactory.modelLoad(selectedFile, "", Lang.TURTLE, true);
+
+            Map<String, Model> shaclMap = InstanceDataFactory.modelLoad(selectedFile, "", Lang.TURTLE, true);
             Model shaclModel = shaclMap.get("shacl");
             Map<String, ValidationReport> reportMap = new HashMap<>();
 
-            modelMap.forEach((key, model) -> {
-                ValidationReport report = ShaclValidator.get().validate(shaclModel.getGraph(), model.getGraph());
-                reportMap.put(key,report);
-            });
+            for (File file : fileL) {
+                Map<String, Model> modelMap = InstanceDataFactory.modelLoad(new ArrayList<>(List.of(file)), "", Lang.RDFXML, false);
+                ValidationReport report = ShaclValidator.get().validate(shaclModel.getGraph(), modelMap.get("unionModel").getGraph());
+                reportMap.put(file.getName(), report);
+            }
 
             reportMap.forEach((name, report) -> {
-                System.out.println("Report for: "+ name);
-                ShaclTools.printSHACLreport(report);
+                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report);
+                ExcelTools.exportSHACLValidationToExcel(validationResults, selectedFolder, FilenameUtils.removeExtension(name) + "_report.xlsx");
             });
 
             progressBar.setProgress(1);
@@ -1367,12 +1356,12 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         shaclNodataMap = 1; // as this mapping should not be used for this task
         //select file
-        List<File> file = util.ModelFactory.filechoosercustom(false, "Input template instance data XLS", List.of("*.xlsx"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(false, "Input template instance data XLS", List.of("*.xlsx"), "");
 
         if (file != null) {// the file is selected
             MainController.inputXLS = file;
             //select file
-            file = util.ModelFactory.filechoosercustom(false, "RDF profile file", List.of("*.rdf", "*.ttl"), "");
+            file = util.ModelFactory.fileChooserCustom(false, "RDF profile file", List.of("*.rdf", "*.ttl"), "");
 
             if (file != null) {// the file is selected
                 MainController.rdfProfileFileList = file;
@@ -1471,7 +1460,7 @@ public class MainController implements Initializable {
 
         Map<String, RDFDatatype> dataTypeMap = DataTypeMaping.mapDatatypesFromRDF();
         if (dataTypeMap != null) {
-            File saveFile = util.ModelFactory.filesavecustom("Datatypes mapping files", List.of("*.properties"), "", "");
+            File saveFile = util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
             Properties properties = new Properties();
             for (Object key : dataTypeMap.keySet()) {
                 properties.put(key, dataTypeMap.get(key).toString());
@@ -1552,7 +1541,7 @@ public class MainController implements Initializable {
     // action on menu Convert Reference Data
     private void actionMenuConvertRefData() throws IOException {
         //select file 1
-        List<File> fileL = util.ModelFactory.filechoosercustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
             fPathIDfile1.setText(fileL.toString());
@@ -1561,7 +1550,7 @@ public class MainController implements Initializable {
             fPathIDfile1.clear();
         }
 
-        List<File> fileL1 = util.ModelFactory.filechoosercustom(false, "ap file", List.of("*.properties"), "");
+        List<File> fileL1 = util.ModelFactory.fileChooserCustom(false, "ap file", List.of("*.properties"), "");
 
         if (fileL1 != null) {// the file is selected
             fPathIDmap.setText(fileL1.toString());
@@ -1578,7 +1567,7 @@ public class MainController implements Initializable {
     // action on menu Generate QAR
     private void actionQARMenu() throws IOException, XMLStreamException {
         //select the xlsx file
-        List<File> fileL = util.ModelFactory.filechoosercustom(true, "Excel file with IDs", List.of("*.xlsx"), "Select input data: ");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(true, "Excel file with IDs", List.of("*.xlsx"), "Select input data: ");
 
         if (fileL != null) {// the file is selected
             for (File xmlfile : fileL) {
@@ -1700,13 +1689,13 @@ public class MainController implements Initializable {
         List<File> file = null;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2019";
-            file = util.ModelFactory.filechoosercustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "");
+            file = util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "");
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2020";
-            file = util.ModelFactory.filechoosercustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "");
+            file = util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "");
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool")) {
             rdfFormatInput = "CIMTool-merged-owl";
-            file = util.ModelFactory.filechoosercustom(false, "Merged OWL CIMTool files", List.of("*.owl"), "");
+            file = util.ModelFactory.fileChooserCustom(false, "Merged OWL CIMTool files", List.of("*.owl"), "");
         }
         this.selectedFile = file;
 
@@ -1753,7 +1742,7 @@ public class MainController implements Initializable {
         List<File> file;
         List<File> fileL;
         if (fcbRDFconvertModelUnion.isSelected()) {
-            fileL = util.ModelFactory.filechoosercustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            fileL = util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
             if (fileL != null) {// the file is selected
                 fsourcePathTextField.setText(fileL.toString());
@@ -1762,7 +1751,7 @@ public class MainController implements Initializable {
                 fsourcePathTextField.clear();
             }
         } else {
-            file = util.ModelFactory.filechoosercustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            file = util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
             if (file.getFirst() != null) {// the file is selected
                 //MainController.prefs.put("LastWorkingFolder", file.getParent());
@@ -2903,7 +2892,7 @@ public class MainController implements Initializable {
             if (cbRDFSSHACLoptionBaseprofiles.isSelected()) { // load base profiles if the checkbox is selected
                 baseprofilesshaclglag = 1;
                 //load base profiles for shacl
-                List<File> basefiles = util.ModelFactory.filechoosercustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
+                List<File> basefiles = util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
                 if (basefiles != null) {
                     unionmodelbaseprofilesshacl = util.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
                     unionmodelbaseprofilesshaclinheritance = modelInheritance(unionmodelbaseprofilesshacl, true, true);
@@ -2930,7 +2919,7 @@ public class MainController implements Initializable {
                     if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) { // load base profiles if the checkbox is selected
                         baseprofilesshaclglag2nd = 1;
                         //load base profiles for shacl
-                        List<File> basefiles2nd = util.ModelFactory.filechoosercustom(false, "RDF file", List.of("*.rdf"), "Select 2nd set of Base profiles");
+                        List<File> basefiles2nd = util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd set of Base profiles");
                         if (basefiles2nd != null) {
                             unionmodelbaseprofilesshacl2nd = util.ModelFactory.modelLoad(basefiles2nd, "", Lang.RDFXML, true);
                             unionmodelbaseprofilesshaclinheritance2nd = modelInheritance(unionmodelbaseprofilesshacl2nd, true, true);
@@ -2956,7 +2945,7 @@ public class MainController implements Initializable {
                             if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) { // load base profiles if the checkbox is selected
                                 baseprofilesshaclglag3rd = 1;
                                 //load base profiles for shacl
-                                List<File> basefiles3rd = util.ModelFactory.filechoosercustom(false, "RDF file", List.of("*.rdf"), "Select 3rd set of Base profiles");
+                                List<File> basefiles3rd = util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd set of Base profiles");
                                 if (basefiles3rd != null) {
                                     unionmodelbaseprofilesshacl3rd = util.ModelFactory.modelLoad(basefiles3rd, "", Lang.RDFXML, true);
                                     unionmodelbaseprofilesshaclinheritance3rd = modelInheritance(unionmodelbaseprofilesshacl3rd, true, true);
@@ -3167,14 +3156,14 @@ public class MainController implements Initializable {
                         //}
 
                         if (cbRDFSSHACLvalidate.isSelected()) { //do validation
-                            if (shaclRefModel == null){
+                            if (shaclRefModel == null) {
                                 shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
                             }
                             ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModel.getGraph());
 
                             if (report.conforms()) {
                                 System.out.print("Generated SHACL shapes conform to SHACL-SHACL validation.\n");
-                            }else{
+                            } else {
                                 System.out.println("Validation failed. Data does not conform to the SHACL-SHACL shapes.\n");
                                 System.out.println("Validation problems:");
                                 ShaclTools.printSHACLreport(report);
@@ -3201,7 +3190,7 @@ public class MainController implements Initializable {
 
                         }
 
-                        if (unionmodelbaseprofilesshaclinheritance==null && baseprofilesshaclglag == 0){
+                        if (unionmodelbaseprofilesshaclinheritance == null && baseprofilesshaclglag == 0) {
                             Model modelInh = modelInheritance(model, true, true);
                             String titleSaveAsInh = "Save as for inheritance model: InheritanceStructure";
                             ShaclTools.saveShapesFile(modelInh, "", 0, titleSaveAsInh);
@@ -3257,7 +3246,7 @@ public class MainController implements Initializable {
             }
 
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
-                File saveFile = util.ModelFactory.filesavecustom("Datatypes mapping files", List.of("*.properties"), "", "");
+                File saveFile = util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
 
                 if (saveFile != null) {
                     //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
@@ -3270,7 +3259,7 @@ public class MainController implements Initializable {
                 }
             }
 
-            if (cbRDFSSHACLinheritTree.isSelected() && unionmodelbaseprofilesshaclinheritance != null){
+            if (cbRDFSSHACLinheritTree.isSelected() && unionmodelbaseprofilesshaclinheritance != null) {
                 //open the ChoiceDialog for the save file and save the file in different formats
                 String titleSaveAs = "Save as for inheritance model: InheritanceStructure";
                 ShaclTools.saveShapesFile(unionmodelbaseprofilesshaclinheritance, "", 0, titleSaveAs);
@@ -3290,12 +3279,12 @@ public class MainController implements Initializable {
 
     @FXML
     //Action for button "Load Data" related to tab Instance Data Browser
-    private void actionBtnLoadInstanceData(ActionEvent actionEvent) throws FileNotFoundException {
+    private void actionBtnLoadInstanceData(ActionEvent actionEvent) throws IOException {
         progressBar.setProgress(0);
         treeID = true;
 
         //select file
-        List<File> fileL = util.ModelFactory.filechoosercustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
         String xmlBase = "http://griddigit.eu#";
 
         InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null, false);
@@ -3310,7 +3299,7 @@ public class MainController implements Initializable {
         treeID = true;
 
         //select file
-        List<File> fileL = util.ModelFactory.filechoosercustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
         String xmlBase = "http://griddigit.eu#";
 
         InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null, false);
@@ -3500,7 +3489,7 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
 
         //select file
-        List<File> fileL = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        List<File> fileL = util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
 
         if (fileL != null) {// the file is selected
             for (int m = 0; m < fileL.size(); m++) {
@@ -4453,7 +4442,7 @@ public class MainController implements Initializable {
     }
 
     public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
-        selectedFile = util.ModelFactory.filechoosercustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        selectedFile = util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
             for (int m = 0; m < selectedFile.size(); m++) {
@@ -4464,7 +4453,7 @@ public class MainController implements Initializable {
     }
 
     public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
-        List<File> file = util.ModelFactory.filechoosercustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
 
         if (!file.isEmpty()) {
             MainController.inputXLS = file;
@@ -4499,7 +4488,7 @@ public class MainController implements Initializable {
     private void actionBrowseXlsTemplate() {
         progressBar.setProgress(0);
         //select xls file
-        List<File> file = util.ModelFactory.filechoosercustom(true, "Xls template", List.of("*.xlsx"), "Browse for xls template");
+        List<File> file = util.ModelFactory.fileChooserCustom(true, "Xls template", List.of("*.xlsx"), "Browse for xls template");
 
         if (file != null) {// the file is selected
 
@@ -4580,7 +4569,7 @@ public class MainController implements Initializable {
 
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
         //open RDFS file
-        List<File> file = util.ModelFactory.filechoosercustom(false, "RDF files", List.of("*.rdf"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
 
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
