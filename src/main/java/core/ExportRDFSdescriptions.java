@@ -6,8 +6,6 @@
 
 package core;
 
-import application.MainController;
-import javafx.stage.FileChooser;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
@@ -203,7 +201,7 @@ public class ExportRDFSdescriptions {
             }
 
 
-            File saveFile = util.ModelFactory.filesavecustom("Excel files", List.of("*.xlsx"),"Save RDF to Excel","");
+            File saveFile = util.ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"),"Save RDF to Excel","");
             if (saveFile != null) {
                 try {
                     FileOutputStream outputStream = new FileOutputStream(saveFile);
@@ -302,7 +300,7 @@ public class ExportRDFSdescriptions {
             }
         }
 
-        File saveFile = util.ModelFactory.filesavecustom("Excel files", List.of("*.xlsx"),title,"");
+        File saveFile = util.ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"),title,"");
         if (saveFile != null) {
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);

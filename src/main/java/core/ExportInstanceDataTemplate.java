@@ -332,7 +332,7 @@ public class ExportInstanceDataTemplate {
     private static void exportDesciptionToJSON(Map<String, List<String>> rdfsInfo) {
 
 
-        File saveFile = util.ModelFactory.filesavecustom("JSON files", List.of("*.json"), "", "");
+        File saveFile = util.ModelFactory.fileSaveCustom("JSON files", List.of("*.json"), "", "");
         if (saveFile != null) {
             // Export to JSON
             ObjectMapper objectMapper = new ObjectMapper();

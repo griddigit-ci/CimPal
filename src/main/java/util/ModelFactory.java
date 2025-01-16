@@ -34,6 +34,8 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
+import static application.MainController.prefs;
+
 public class ModelFactory {
 
     //Loads one or many models
@@ -202,14 +204,14 @@ public class ModelFactory {
 
 
     //File(s) selection Filechooser
-    public static List<File> filechoosercustom(Boolean typeSingleFile, String titleExtensionFilter, List<String> extExtensionFilter, String title) {
+    public static List<File> fileChooserCustom(Boolean typeSingleFile, String titleExtensionFilter, List<String> extExtensionFilter, String title) {
 
         List<File> fileL = new LinkedList<>();
         File file = null;
 
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(titleExtensionFilter, extExtensionFilter));
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
+        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder", "")));
         filechooser.setTitle(title);
 
         try {
@@ -230,54 +232,53 @@ public class ModelFactory {
 
         if (typeSingleFile) {
             if (file != null) {// the file is selected
-                MainController.prefs.put("LastWorkingFolder", file.getParent());
+                prefs.put("LastWorkingFolder", file.getParent());
                 fileL.add(file);
             }
         } else {
             if (fileL != null) {// the file is selected
-                MainController.prefs.put("LastWorkingFolder", fileL.getFirst().getParent());
+                prefs.put("LastWorkingFolder", fileL.getFirst().getParent());
             }
         }
         return fileL;
     }
 
     //Folder selection
-    public static File folderchoosercustom() {
-
-
+    public static File folderChooserCustom() {
         DirectoryChooser directoryChooser = new DirectoryChooser();
         File selectedDirectory = null;
 
-        // Set the initial directory
-        directoryChooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
+        // Validate the stored last working folder
+        File initialDirectory = new File(prefs.get("LastWorkingFolder", ""));
+        if (!initialDirectory.exists() || !initialDirectory.isDirectory()) {
+            initialDirectory = FileUtils.getUserDirectory(); // Default to user's home directory
+        }
 
-        // Set the title of the dialog
+        directoryChooser.setInitialDirectory(initialDirectory);
         directoryChooser.setTitle("Select Output Folder");
 
         try {
-            // Show the directory chooser dialog
             selectedDirectory = directoryChooser.showDialog(null);
         } catch (Exception e) {
-            directoryChooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+            directoryChooser.setInitialDirectory(FileUtils.getUserDirectory());
             selectedDirectory = directoryChooser.showDialog(null);
-
         }
 
-        if (selectedDirectory != null) {// the file is selected
-            MainController.prefs.put("LastWorkingFolder", selectedDirectory.getAbsolutePath());
+        if (selectedDirectory != null) {
+            prefs.put("LastWorkingFolder", selectedDirectory.getAbsolutePath());
         }
 
         return selectedDirectory;
     }
 
     //File(s) selection Filechooser
-    public static File filesavecustom(String titleExtensionFilter, List<String> extExtensionFilter, String Dialogtitle, String filename) {
+    public static File fileSaveCustom(String titleExtensionFilter, List<String> extExtensionFilter, String Dialogtitle, String filename) {
 
         File file = null;
 
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(titleExtensionFilter, extExtensionFilter));
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
+        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder", "")));
         filechooser.setTitle(Dialogtitle);
         filechooser.setInitialFileName(filename);
 

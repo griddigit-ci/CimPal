@@ -28,7 +28,7 @@ import static application.MainController.unionmodelbaseprofilesshaclinheritanceo
 
 public class ModelManipulationFactory {
 
-    public static Map<String, Map> loadDataForIGMMulDateTime(String xmlBase, Boolean profileModelUnionFlag, Boolean instanceModelUnionFlag, Map<String, Boolean> inputData, Boolean shaclModelUnionFlag) throws FileNotFoundException {
+    public static Map<String, Map> loadDataForIGMMulDateTime(String xmlBase, Boolean profileModelUnionFlag, Boolean instanceModelUnionFlag, Map<String, Boolean> inputData, Boolean shaclModelUnionFlag) throws IOException {
 
         Map<String, Map> loadDataMap = new HashMap<>();
         Lang rdfProfileFormat = null;

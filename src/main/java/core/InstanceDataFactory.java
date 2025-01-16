@@ -31,7 +31,7 @@ public class InstanceDataFactory {
     public static LinkedList<String> zipfilesnames;
 
     //Loads one or many models
-    public static Map<String,Model> modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat, boolean isSHACL) throws FileNotFoundException {
+    public static Map<String,Model> modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat, boolean isSHACL) throws IOException {
 
         Map<String,Model> unionModelMap=new HashMap<>();
         Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
@@ -77,6 +77,7 @@ public class InstanceDataFactory {
             if (singlezip){
                 Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
                 RDFDataMgr.read(model, inputStream, xmlBase, rdfSourceFormat);
+                inputStream.close();
                 prefixMap.putAll(model.getNsPrefixMap());
                 prefixMapWithoutHeader.putAll(model.getNsPrefixMap());
 
@@ -106,6 +107,7 @@ public class InstanceDataFactory {
                 for (InputStream inputStreamItem : inputStreamList) {
                     Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
                     RDFDataMgr.read(model, inputStreamItem, xmlBase, rdfSourceFormat);
+                    inputStreamItem.close();
                     prefixMap.putAll(model.getNsPrefixMap());
                     prefixMapWithoutHeader.putAll(model.getNsPrefixMap());
 
@@ -389,7 +391,7 @@ public class InstanceDataFactory {
 //        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //        filechooserS.setTitle(title);
 //        saveFile = filechooserS.showSaveDialog(null);
-        File saveFile = util.ModelFactory.filesavecustom(extensionName, List.of(extension),title,filename);
+        File saveFile = util.ModelFactory.fileSaveCustom(extensionName, List.of(extension),title,filename);
         OutputStream out=null;
         if (saveFile!=null) {
             //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());

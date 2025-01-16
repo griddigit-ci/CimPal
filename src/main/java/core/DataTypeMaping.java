@@ -137,7 +137,7 @@ public class DataTypeMaping {
 //        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF files", "*.rdf"));
 //        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //        List<File> selFile = filechooser.showOpenMultipleDialog(null);
-        List<File> selFile = util.ModelFactory.filechoosercustom(false,"RDF files", List.of("*.rdf"),"");
+        List<File> selFile = util.ModelFactory.fileChooserCustom(false,"RDF files", List.of("*.rdf"),"");
 
 
         if (selFile != null) {// the file is selected

@@ -50,14 +50,14 @@ public class RdfConvert {
 
         if (modelUnionFlagDetailed) {
             //put first the main RDF
-            fileDet1 = util.ModelFactory.filechoosercustom(true, "RDF file", List.of("*.rdf", "*.xml", "*.ttl"), "Main RDF file");
+            fileDet1 = util.ModelFactory.fileChooserCustom(true, "RDF file", List.of("*.rdf", "*.xml", "*.ttl"), "Main RDF file");
             if (!fileDet1.isEmpty()) {
                 if (fileDet1.getFirst() != null) {
                     modelFiles.add(fileDet1.getFirst());
                 }
             }
 
-            fileDet2 = util.ModelFactory.filechoosercustom(true, "RDF file", List.of("*.rdf", "*.xml", "*.ttl"), "Deviation RDF file");
+            fileDet2 = util.ModelFactory.fileChooserCustom(true, "RDF file", List.of("*.rdf", "*.xml", "*.ttl"), "Deviation RDF file");
 
             if (!fileDet2.isEmpty()) {
                 if (fileDet2.getFirst() != null) {
@@ -65,7 +65,7 @@ public class RdfConvert {
                 }
             }
 
-            fileDet3 = util.ModelFactory.filechoosercustom(true, "RDF file", List.of("*.rdf", "*.xml", "*.ttl"), "Extended RDF file");
+            fileDet3 = util.ModelFactory.fileChooserCustom(true, "RDF file", List.of("*.rdf", "*.xml", "*.ttl"), "Extended RDF file");
 
             if (!fileDet3.isEmpty()) {
                 if (fileDet3.getFirst() != null) {
@@ -471,7 +471,7 @@ public class RdfConvert {
 //        filechooserS.setInitialFileName(title.split(": ", 2)[1]);
 //        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //        filechooserS.setTitle(title);
-        File saveFile = util.ModelFactory.filesavecustom(extensionName, List.of(extension), title, title.split(": ", 2)[1]);
+        File saveFile = util.ModelFactory.fileSaveCustom(extensionName, List.of(extension), title, title.split(": ", 2)[1]);
         try {
 //            try {
 //                saveFile = filechooserS.showSaveDialog(null);

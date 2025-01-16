@@ -9,7 +9,6 @@ package gui;
 
 import application.MainController;
 import javafx.scene.control.TableView;
-import javafx.stage.FileChooser;
 import org.apache.poi.ss.formula.functions.T;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -19,7 +18,6 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
@@ -115,7 +113,7 @@ public class ExcelExportTableView {
 //        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //        filechooser.setTitle(title);
 //        File saveFile = filechooser.showSaveDialog(null);
-        File saveFile = util.ModelFactory.filesavecustom("Excel files", List.of("*.xlsx"),title,"");
+        File saveFile = util.ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"),title,"");
         if (saveFile != null) {
             MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             try {
