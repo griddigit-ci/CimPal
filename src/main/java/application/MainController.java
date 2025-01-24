@@ -623,7 +623,7 @@ public class MainController implements Initializable {
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file.getFirst() != null) {// the file is selected
             try {
-                RDFDataMgr.read(model, new FileInputStream(file.getFirst()), Lang.RDFXML);
+                RDFDataMgr.read(model, new FileInputStream(file.getFirst()),"", Lang.RDFXML);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
                 progressBar.setProgress(0);
