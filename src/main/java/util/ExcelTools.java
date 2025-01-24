@@ -6,6 +6,7 @@
 
 package util;
 
+import dtos.GenDataTemplateMapInfo;
 import dtos.SHACLValidationResult;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.Resource;
@@ -326,6 +327,8 @@ public class ExcelTools {
         // Create cell style for header row
         CellStyle headerCellStyle = createHeaderStyle(workbook);
 
+        List<GenDataTemplateMapInfo> genDataInfos = new ArrayList<>();
+
         List<String> classNames = mapInfo.get("ClassName");
         List<String> classes = mapInfo.get("Class");
         List<String> props = mapInfo.get("Property-AttributeAssociation");
@@ -333,7 +336,13 @@ public class ExcelTools {
         List<String> datatypes = mapInfo.get("Datatype");
         List<String> types = mapInfo.get("Type");
 
-        AddConfigSheet(mapInfo, prefMap, headerCellStyle, workbook);
+        for (int i = 0; i < mapInfo.get("ClassName").size(); i++) {
+            genDataInfos.add(new GenDataTemplateMapInfo(classNames.get(i),classes.get(i),props.get(i),
+                    multiplicities.get(i), datatypes.get(i), types.get(i)));
+        }
+
+
+        AddConfigSheet(genDataInfos, prefMap, headerCellStyle, workbook);
 
         // Inverted HashMap
         HashMap<String, String> invertedPrefMap = new HashMap<>();
@@ -344,14 +353,18 @@ public class ExcelTools {
         }
 
         // make first class sheet
-        XSSFSheet classSheet = CreateTemplateSheetBase(classNames.getFirst(),classes.getFirst(),headerCellStyle,workbook,invertedPrefMap);
+        XSSFSheet classSheet = CreateTemplateSheetBase(genDataInfos.getFirst().getSheetClassName(),
+                genDataInfos.getFirst().getFullClassName(),headerCellStyle,workbook,invertedPrefMap);
 
         int sColN = 1;
         int maxWidthInCharacters = 150; // Maximum desired width in characters
         int defaultCharacterWidth = 256; // Default width of one character
-        for (int i = 0; i < classes.size(); i++) {
-            if (!classSheet.getSheetName().equals(classNames.get(i))){ // move to the other sheet if new class comes in the list
-                classSheet = CreateTemplateSheetBase(classNames.get(i), classes.get(i),headerCellStyle, workbook,invertedPrefMap);
+        for (int i = 0; i < genDataInfos.size(); i++) {
+            GenDataTemplateMapInfo genDataInfo = genDataInfos.get(i);
+            String sheetName = genDataInfo.getSheetClassName();
+            if (!classSheet.getSheetName().equals(sheetName)){ // move to the other sheet if new class comes in the list
+                classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
+                        headerCellStyle, workbook,invertedPrefMap);
                 sColN = 1;
             }
             XSSFRow attrRow = classSheet.getRow(1);
@@ -368,47 +381,48 @@ public class ExcelTools {
             XSSFCell multiCell = multiRow.createCell(sColN);
             multiCell.setCellStyle(headerCellStyle);
 
-            Resource propRes = ResourceFactory.createResource(props.get(i));
-            String propNameShort = props.get(i);
+            Resource propRes = ResourceFactory.createResource(genDataInfo.getProp());
+            String propNameShort = genDataInfo.getProp();
             if (invertedPrefMap.containsKey(propRes.getNameSpace())) {
                 propNameShort = invertedPrefMap.get(propRes.getNameSpace()) + ":" + propRes.getLocalName();
             }
             attrCell.setCellValue(propNameShort);
-            String typeValue = types.get(i);
+            String typeValue = genDataInfo.getTpe();
             if (typeValue.equals("Attribute"))
                 typeCell.setCellValue("Literal");
             else if (typeValue.equals("Association"))
                 typeCell.setCellValue("Resource");
             else
                 typeCell.setCellValue(typeValue);
-            String enumValuesFull = datatypes.get(i);
+            String enumValuesFull = genDataInfo.getDatatype();
             if (typeValue.equals("Enumeration")){
                 String cleanEnumInput = enumValuesFull.replaceAll("[\\[\\]]", "");
 
-                String enumNameShort = "[";
+                StringBuilder enumNameShort = new StringBuilder("[");
                 for (String value : cleanEnumInput.split(",")) {
                     String singleValue = value.trim();
                     Resource datatypeRes = ResourceFactory.createResource(singleValue);
                     if (invertedPrefMap.containsKey(datatypeRes.getNameSpace())) {
                         if (enumNameShort.length()>3) {
-                            enumNameShort = enumNameShort + "; " + invertedPrefMap.get(datatypeRes.getNameSpace()) + ":" + datatypeRes.getLocalName();
+                            enumNameShort.append("; ").append(invertedPrefMap.get(datatypeRes.getNameSpace())).append(":").append(datatypeRes.getLocalName());
                         }else{
-                            enumNameShort = enumNameShort + invertedPrefMap.get(datatypeRes.getNameSpace()) + ":" + datatypeRes.getLocalName();
+                            enumNameShort.append(invertedPrefMap.get(datatypeRes.getNameSpace())).append(":").append(datatypeRes.getLocalName());
                         }
                     }else{
                         if (enumNameShort.length()>3) {
-                            enumNameShort = enumNameShort + "; " + singleValue;
+                            enumNameShort.append("; ").append(singleValue);
                         }else{
-                            enumNameShort = enumNameShort + singleValue;
+                            enumNameShort.append(singleValue);
                         }
                     }
                 }
-                datatypeCell.setCellValue(enumNameShort+"]");
+                enumNameShort.append("]");
+                datatypeCell.setCellValue(enumNameShort.toString());
 
             }else {
                 datatypeCell.setCellValue(enumValuesFull);
             }
-            multiCell.setCellValue(multiplicities.get(i));
+            multiCell.setCellValue(genDataInfo.getMultiplicity());
 
             classSheet.autoSizeColumn(sColN);
 
@@ -427,7 +441,7 @@ public class ExcelTools {
 
     }
 
-    private static void AddConfigSheet(Map<String, List<String>> mapInfo, Map<String,String> prefMap,CellStyle headerCellStyle, XSSFWorkbook workbook) {
+    private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String,String> prefMap,CellStyle headerCellStyle, XSSFWorkbook workbook) {
         XSSFSheet configSheet = workbook.createSheet("Config");
         // Write header row
         XSSFRow headerRow = configSheet.createRow(0);
@@ -449,7 +463,8 @@ public class ExcelTools {
         hCell4.setCellValue("Classes to print [Refer to the name of the tab]");
         hCell5.setCellValue("Header class");
 
-        Set<String> classNameSet = new HashSet<>(mapInfo.get("ClassName"));
+        Set<String> classNameSet = new HashSet<>();
+        genDataInfos.forEach(genData -> classNameSet.add(genData.getSheetClassName()));
         List<String> classNames = new ArrayList<>(classNameSet);
 
         // Create rows
