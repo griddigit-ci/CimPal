@@ -309,6 +309,8 @@ public class MainController implements Initializable {
     @FXML
     private ChoiceBox fcbGenMethodOptions;
     @FXML
+    private CheckBox fcbAddInstanceData;
+    @FXML
     private Button fbtnRunGenerateInstance;
     @FXML
     private CheckBox fcbSortRDFGen;
@@ -4561,6 +4563,7 @@ public class MainController implements Initializable {
         fcbSortRDFGen.setSelected(true);
         fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
         fcbGenMethodOptions.getSelectionModel().selectFirst();
+        fcbAddInstanceData.setSelected(false);
     }
 
     @FXML
@@ -4568,12 +4571,18 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
+        boolean addInstanceData = fcbAddInstanceData.isSelected();
         //open RDFS file
-        List<File> file = util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
+        List<File> file = util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "Select RDF file(s) for template.");
+        List<File> iFileList = new ArrayList<>();
+        if (addInstanceData)
+            iFileList = util.ModelFactory.fileChooserCustom(true, "XML file", List.of("*.xml"), "Select XML file for template.");
 
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
-            CreateTemplateFromRDF(file, selectedMethod);
+            File iFile = iFileList.isEmpty() ? null : iFileList.getFirst();
+
+            CreateTemplateFromRDF(file, iFile,  selectedMethod);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);

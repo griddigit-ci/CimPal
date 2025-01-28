@@ -120,7 +120,7 @@ public class ExportRDFSdescriptions {
         exportDesciption(rdfsItem,rdfsItemDescription,"RDFS descriptions","RDFSdescription","Save descriptions from RDFS", rdfsItemMultiplicity, rdfsItemtype, rdfsItemAssociationUsed, rdfsStereotype, rdfsConcreteClass);
     }
 
-    public static void exportRDFToExcel(Model model) {
+    public static Map<String, List<Map<String, String>>> getRDFDataForClasses(Model model) {
         // Map to store data for each class (sheet name -> List of Maps for rows)
         Map<String, List<Map<String, String>>> classData = new LinkedHashMap<>();
 
@@ -140,7 +140,8 @@ public class ExportRDFSdescriptions {
                 // Collect attributes for the current subject (row)
                 Map<String, String> rowData = new LinkedHashMap<>();
                 // Add the subject URI as a special column (e.g., "Subject")
-                rowData.put("rdf:id", subject.getURI()); // Add the subject's URI
+                String[] splitSubjectUri = subject.getURI().split("#", -1);
+                rowData.put("rdf:id", splitSubjectUri[splitSubjectUri.length-1]); // Add the subject's URI
                 StmtIterator properties = subject.listProperties();
                 while (properties.hasNext()) {
                     Statement property = properties.next();
@@ -168,6 +169,12 @@ public class ExportRDFSdescriptions {
                 classData.get(className).add(rowData);
             }
         }
+        return classData;
+    }
+
+    public static void exportRDFToExcel(Model model) {
+        // Map to store data for each class (sheet name -> List of Maps for rows)
+        Map<String, List<Map<String, String>>> classData = getRDFDataForClasses(model);
 
         // Create Excel workbook and populate it
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
@@ -207,6 +214,7 @@ public class ExportRDFSdescriptions {
                     FileOutputStream outputStream = new FileOutputStream(saveFile);
                     workbook.write(outputStream);
                     workbook.close();
+                    outputStream.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

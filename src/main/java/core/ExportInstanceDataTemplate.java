@@ -23,6 +23,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import java.io.*;
 import java.util.*;
 
+import static core.ExportRDFSdescriptions.getRDFDataForClasses;
 import static core.RdfConvert.fileSaveDialog;
 import static util.ExcelTools.*;
 
@@ -471,7 +472,7 @@ public class ExportInstanceDataTemplate {
         model.write(outTTL, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), "");
     }
 
-    public static void CreateTemplateFromRDF(List<File> file, String selectedMethod) {
+    public static void CreateTemplateFromRDF(List<File> file, File iFile, String selectedMethod) {
         String cimsNs = MainController.prefs.get("cimsNamespace", "");
         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
 
@@ -615,16 +616,26 @@ public class ExportInstanceDataTemplate {
         rdfsInfo.put("Datatype", rdfsItemAttrDatatype);
         rdfsInfo.put("Type", rdfsAttrOrAssocFlag);
 
-        XSSFWorkbook workbook = new XSSFWorkbook();
-        switch (selectedMethod) {
-            case "Option 1 (Old)":
-                exportMapToExcel("Template", rdfsInfo, orderList, workbook);
-            case "Option 2 (New)":
-                exportMapToExcelv2(rdfsInfo, prefMap, workbook);
-                break;
-            case "Option 3 (TBD)":
-                break;
+        try(XSSFWorkbook workbook = new XSSFWorkbook()) {
+            switch (selectedMethod) {
+                case "Option 1 (Old)":
+                    exportMapToExcel("Template", rdfsInfo, orderList, workbook);
+                    break;
+                case "Option 2 (New)":
+                    Map<String, List<Map<String, String>>> instanceClassData = null;
+                    if (iFile != null) {
+                        Model model = ModelFactory.createDefaultModel();
+                        RDFDataMgr.read(model, new FileInputStream(iFile), Lang.RDFXML);
+                        instanceClassData = getRDFDataForClasses(model);
+                    }
+                    exportMapToExcelv2(rdfsInfo, prefMap, instanceClassData, workbook);
+                    break;
+                case "Option 3 (TBD)":
+                    break;
+            }
+            saveExcelFile(workbook, "Save Instance Data Template", "Template");
+        } catch (RuntimeException | IOException e) {
+            throw new RuntimeException(e);
         }
-        saveExcelFile(workbook, "Save Instance Data Template", "Template");
     }
 }

@@ -11,6 +11,7 @@ import dtos.SHACLValidationResult;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
+import org.apache.jena.reasoner.rulesys.builtins.IsLiteral;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCell;
@@ -322,7 +323,9 @@ public class ExcelTools {
         }
     }
 
-    public static void exportMapToExcelv2(Map<String, List<String>> mapInfo, Map<String,String> prefMap, XSSFWorkbook workbook) {
+    public static void exportMapToExcelv2(Map<String, List<String>> mapInfo, Map<String,String> prefMap,
+                                          Map<String, List<Map<String, String>>> instanceClassData,
+                                          XSSFWorkbook workbook) {
 
         // Create cell style for header row
         CellStyle headerCellStyle = createHeaderStyle(workbook);
@@ -359,12 +362,15 @@ public class ExcelTools {
         int sColN = 1;
         int maxWidthInCharacters = 150; // Maximum desired width in characters
         int defaultCharacterWidth = 256; // Default width of one character
-        for (int i = 0; i < genDataInfos.size(); i++) {
-            GenDataTemplateMapInfo genDataInfo = genDataInfos.get(i);
+        GenDataTemplateMapInfo prevgenDataInfo = genDataInfos.getFirst();
+        for (GenDataTemplateMapInfo genDataInfo : genDataInfos) {
             String sheetName = genDataInfo.getSheetClassName();
-            if (!classSheet.getSheetName().equals(sheetName)){ // move to the other sheet if new class comes in the list
+            if (!classSheet.getSheetName().equals(sheetName)) { // move to the other sheet if new class comes in the list
+                if (instanceClassData != null){
+                    FillSheetWithInstanceData(classSheet, instanceClassData, prevgenDataInfo);
+                }
                 classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
-                        headerCellStyle, workbook,invertedPrefMap);
+                        headerCellStyle, workbook, invertedPrefMap);
                 sColN = 1;
             }
             XSSFRow attrRow = classSheet.getRow(1);
@@ -395,7 +401,7 @@ public class ExcelTools {
             else
                 typeCell.setCellValue(typeValue);
             String enumValuesFull = genDataInfo.getDatatype();
-            if (typeValue.equals("Enumeration")){
+            if (typeValue.equals("Enumeration")) {
                 String cleanEnumInput = enumValuesFull.replaceAll("[\\[\\]]", "");
 
                 StringBuilder enumNameShort = new StringBuilder("[");
@@ -403,15 +409,15 @@ public class ExcelTools {
                     String singleValue = value.trim();
                     Resource datatypeRes = ResourceFactory.createResource(singleValue);
                     if (invertedPrefMap.containsKey(datatypeRes.getNameSpace())) {
-                        if (enumNameShort.length()>3) {
+                        if (enumNameShort.length() > 3) {
                             enumNameShort.append("; ").append(invertedPrefMap.get(datatypeRes.getNameSpace())).append(":").append(datatypeRes.getLocalName());
-                        }else{
+                        } else {
                             enumNameShort.append(invertedPrefMap.get(datatypeRes.getNameSpace())).append(":").append(datatypeRes.getLocalName());
                         }
-                    }else{
-                        if (enumNameShort.length()>3) {
+                    } else {
+                        if (enumNameShort.length() > 3) {
                             enumNameShort.append("; ").append(singleValue);
-                        }else{
+                        } else {
                             enumNameShort.append(singleValue);
                         }
                     }
@@ -419,7 +425,7 @@ public class ExcelTools {
                 enumNameShort.append("]");
                 datatypeCell.setCellValue(enumNameShort.toString());
 
-            }else {
+            } else {
                 datatypeCell.setCellValue(enumValuesFull);
             }
             multiCell.setCellValue(genDataInfo.getMultiplicity());
@@ -437,8 +443,43 @@ public class ExcelTools {
             classSheet.createFreezePane(0, 6); // Freeze when data starts
 
             sColN++;
+            prevgenDataInfo = genDataInfo;
         }
 
+    }
+
+    private static void FillSheetWithInstanceData(XSSFSheet sheet, Map<String, List<Map<String, String>>> instanceClassData,
+                                                  GenDataTemplateMapInfo genInfoData) {
+        List<Map<String, String>> dataInClass = instanceClassData.get(genInfoData.getFullClassName());
+        if (dataInClass == null)
+            return;
+
+        XSSFRow attrRow = sheet.getRow(1);
+        int rowNumber = 6;
+        for (Map<String, String> attrMap : dataInClass){
+            XSSFRow row = sheet.createRow(rowNumber);
+            for (Map.Entry<String, String> entry : attrMap.entrySet()){
+                int valueCol = getCellNumber(attrRow, entry.getKey());
+                if (valueCol == -1){
+                    valueCol = attrRow.getLastCellNum();
+                    XSSFCell attrCell = attrRow.createCell(valueCol);
+                    attrCell.setCellValue(entry.getKey());
+                }
+                XSSFCell valueCell = row.createCell(valueCol);
+                valueCell.setCellValue(entry.getValue());
+            }
+            rowNumber++;
+        }
+    }
+
+    private static int getCellNumber(XSSFRow attrRow, String attrName){
+        for (int i = 0; i < attrRow.getLastCellNum(); i++) {
+            XSSFCell cell = attrRow.getCell(i);
+            if (cell.getStringCellValue().equals(attrName)){
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String,String> prefMap,CellStyle headerCellStyle, XSSFWorkbook workbook) {

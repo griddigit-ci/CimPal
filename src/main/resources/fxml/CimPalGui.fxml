@@ -716,15 +716,9 @@
                                                          <children>
                                                             <Label minWidth="78.0" prefHeight="17.0" prefWidth="78.0" text="Use method:" wrapText="true" />
                                                             <ChoiceBox fx:id="fcbGenMethodOptions" minWidth="400.0" />
-                                                            <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
-                                                            <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
-                                                               <toggleGroup>
-                                                                  <ToggleGroup fx:id="giDataLine" />
-                                                               </toggleGroup>
-                                                            </RadioButton>
-                                                            <RadioButton layoutX="488.0" layoutY="10.0" mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
                                                             <Region minWidth="100.0" HBox.hgrow="ALWAYS" />
-                                                            <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create Xls template from RDF" />
+                                                            <CheckBox fx:id="fcbAddInstanceData" alignment="BOTTOM_LEFT" mnemonicParsing="false" prefHeight="21.0" prefWidth="182.0" text="Add instance data to template" />
+                                                            <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create Xls template" />
                                                          </children>
                                                          <VBox.margin>
                                                             <Insets />
@@ -748,7 +742,14 @@
                                                 <Insets left="5.0" right="5.0" top="5.0" />
                                              </padding>
                                              <children>
-                                                <Label minWidth="50.0" text="Sorting options:" />
+                                                <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
+                                                <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
+                                                   <toggleGroup>
+                                                      <ToggleGroup fx:id="giDataLine" />
+                                                   </toggleGroup>
+                                                </RadioButton>
+                                                <RadioButton mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
+                                                <Label minWidth="50.0" prefHeight="17.0" prefWidth="89.0" text="Sorting options:" />
                                                 <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
                                                    <HBox.margin>
                                                       <Insets left="10.0" />
