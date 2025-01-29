@@ -581,6 +581,8 @@ public class MainController implements Initializable {
         //Adding action to the choice box
         fcbRDFSformat.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBfcbRDFSformat());
 
+        fcbGenMethodOptions.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionHandleOptionsForGen(newV.toString()));
+
         //TODO: see how to have this default on the screen
         defaultShapesURI = "/Constraints";
 
@@ -4586,6 +4588,23 @@ public class MainController implements Initializable {
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
+        }
+    }
+
+    private void actionHandleOptionsForGen(String selected){
+        switch (selected){
+            case "Option 1 (Old)", "Option 3 (TBD)":
+                giDataLine.getToggles().forEach(rb -> ((RadioButton) rb).setDisable(true));
+                fcbAddInstanceData.setDisable(true);
+                fcbSortRDFGen.setDisable(true);
+                fcbRDFsortOptionsGen.setDisable(true);
+                break;
+            case "Option 2 (New)":
+                giDataLine.getToggles().forEach(rb -> ((RadioButton) rb).setDisable(false));
+                fcbAddInstanceData.setDisable(false);
+                fcbSortRDFGen.setDisable(false);
+                fcbRDFsortOptionsGen.setDisable(false);
+                break;
         }
     }
 }
