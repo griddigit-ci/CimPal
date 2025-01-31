@@ -626,7 +626,7 @@ public class ExportInstanceDataTemplate {
                     Map<String, List<List<RDFAttributeData>>> instanceClassData = null;
                     if (iFile != null) {
                         Model model = ModelFactory.createDefaultModel();
-                        RDFDataMgr.read(model, new FileInputStream(iFile), Lang.RDFXML);
+                        RDFDataMgr.read(model, new FileInputStream(iFile), "", Lang.RDFXML);
                         instanceClassData = getRDFDataForClasses(model);
                     }
                     exportMapToExcelv2(rdfsInfo, prefMap, instanceClassData, workbook);
