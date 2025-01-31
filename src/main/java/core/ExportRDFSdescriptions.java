@@ -6,6 +6,7 @@
 
 package core;
 
+import dtos.RDFAttributeData;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
@@ -120,9 +121,9 @@ public class ExportRDFSdescriptions {
         exportDesciption(rdfsItem,rdfsItemDescription,"RDFS descriptions","RDFSdescription","Save descriptions from RDFS", rdfsItemMultiplicity, rdfsItemtype, rdfsItemAssociationUsed, rdfsStereotype, rdfsConcreteClass);
     }
 
-    public static Map<String, List<Map<String, String>>> getRDFDataForClasses(Model model) {
+    public static Map<String, List<List<RDFAttributeData>>> getRDFDataForClasses(Model model) {
         // Map to store data for each class (sheet name -> List of Maps for rows)
-        Map<String, List<Map<String, String>>> classData = new LinkedHashMap<>();
+        Map<String, List<List<RDFAttributeData>>> classData = new LinkedHashMap<>();
 
         // Parse all subjects in the RDF model
         ResIterator subjects = model.listSubjects();
@@ -138,31 +139,35 @@ public class ExportRDFSdescriptions {
                 classData.putIfAbsent(className, new LinkedList<>());
 
                 // Collect attributes for the current subject (row)
-                Map<String, String> rowData = new LinkedHashMap<>();
+                List<RDFAttributeData> rowData = new ArrayList<>();
                 // Add the subject URI as a special column (e.g., "Subject")
                 String[] splitSubjectUri = subject.getURI().split("#", -1);
-                rowData.put("rdf:id", splitSubjectUri[splitSubjectUri.length-1]); // Add the subject's URI
+                rowData.add(new RDFAttributeData("rdf" ,"id", splitSubjectUri[splitSubjectUri.length-1],
+                        "Resource")); // Add the subject's URI
                 StmtIterator properties = subject.listProperties();
                 while (properties.hasNext()) {
                     Statement property = properties.next();
                     // Get the prefix and local name of the property
                     //String propertyUri = property.getPredicate().getURI();
                     String prefix = model.getNsURIPrefix(property.getPredicate().getNameSpace());
-                    String propertyName = (prefix != null ? prefix + ":" : "") + property.getPredicate().getLocalName();
+                    String propertyName = property.getPredicate().getLocalName();
 
                     // Determine and format the property value
                     RDFNode object = property.getObject();
                     String propertyValue;
+                    String tpe;
                     if (object.isResource()) {
                         // If the object is a resource (URI), format it as prefix:localname
                         //String objectUri = object.toString();
                         String objectPrefix = model.getNsURIPrefix(object.asResource().getNameSpace());
                         propertyValue = (objectPrefix != null ? objectPrefix + ":" : "") + object.asResource().getLocalName();
+                        tpe = "Resource";
                     } else {
                         // Otherwise, just use the literal value
                         propertyValue = object.toString();
+                        tpe = "Literal";
                     }
-                    rowData.put(propertyName, propertyValue);
+                    rowData.add(new RDFAttributeData(prefix != null ? prefix : "", propertyName, propertyValue, tpe));
                 }
 
                 // Add the row data to the corresponding class
@@ -174,15 +179,15 @@ public class ExportRDFSdescriptions {
 
     public static void exportRDFToExcel(Model model) {
         // Map to store data for each class (sheet name -> List of Maps for rows)
-        Map<String, List<Map<String, String>>> classData = getRDFDataForClasses(model);
+        Map<String, List<List<RDFAttributeData>>> classData = getRDFDataForClasses(model);
 
         // Create Excel workbook and populate it
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            for (Map.Entry<String, List<Map<String, String>>> entry : classData.entrySet()) {
+            for (Map.Entry<String, List<List<RDFAttributeData>>> entry : classData.entrySet()) {
                 Resource classResource = model.createResource(entry.getKey());
                 String sheetName = classResource.getLocalName(); // Retrieve local name directly from the resource
                 //String sheetName = entry.getKey().substring(entry.getKey().lastIndexOf('/') + 1); // Use local name
-                List<Map<String, String>> rows = entry.getValue();
+                List<List<RDFAttributeData>> rows = entry.getValue();
 
                 // Create a new sheet for this class
                 XSSFSheet sheet = workbook.createSheet(sheetName);
@@ -190,18 +195,25 @@ public class ExportRDFSdescriptions {
                 // Create headers (based on the first row's keys)
                 if (!rows.isEmpty()) {
                     XSSFRow headerRow = sheet.createRow(0);
-                    List<String> headers = new ArrayList<>(rows.getFirst().keySet());
-                    for (int i = 0; i < headers.size(); i++) {
-                        headerRow.createCell(i).setCellValue(headers.get(i));
+                    Set<String> headersSet = new HashSet<>();
+                    for (List<RDFAttributeData> row : rows){
+                        row.forEach(rdfAttributeData -> headersSet.add(rdfAttributeData.getFullName()));
+                    }
+                    List<String> headers = new ArrayList<>(headersSet);
+
+                    int hCol = 0;
+                    for (String header : headersSet) {
+                        headerRow.createCell(hCol).setCellValue(header);
+                        hCol++;
                     }
 
                     // Populate data rows
                     for (int i = 0; i < rows.size(); i++) {
                         XSSFRow dataRow = sheet.createRow(i + 1);
-                        Map<String, String> row = rows.get(i);
-                        for (int j = 0; j < headers.size(); j++) {
-                            String value = row.get(headers.get(j));
-                            dataRow.createCell(j).setCellValue(value);
+                        List<RDFAttributeData> row = rows.get(i);
+                        for (RDFAttributeData data : row) {
+                            int dCol = headers.indexOf(data.getFullName());
+                            dataRow.createCell(dCol).setCellValue(data.getValue());
                         }
                     }
                 }

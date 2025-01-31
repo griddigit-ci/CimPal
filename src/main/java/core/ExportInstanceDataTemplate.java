@@ -8,6 +8,7 @@ package core;
 
 import application.MainController;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dtos.RDFAttributeData;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.datatypes.xsd.impl.RDFLangString;
 import org.apache.jena.rdf.model.*;
@@ -488,7 +489,7 @@ public class ExportInstanceDataTemplate {
         for (File fil : file) {
             Model model = ModelFactory.createDefaultModel(); // model is the rdf file
             try {
-                RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
+                RDFDataMgr.read(model, new FileInputStream(fil),"" ,Lang.RDFXML);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
@@ -622,7 +623,7 @@ public class ExportInstanceDataTemplate {
                     exportMapToExcel("Template", rdfsInfo, orderList, workbook);
                     break;
                 case "Option 2 (New)":
-                    Map<String, List<Map<String, String>>> instanceClassData = null;
+                    Map<String, List<List<RDFAttributeData>>> instanceClassData = null;
                     if (iFile != null) {
                         Model model = ModelFactory.createDefaultModel();
                         RDFDataMgr.read(model, new FileInputStream(iFile), Lang.RDFXML);

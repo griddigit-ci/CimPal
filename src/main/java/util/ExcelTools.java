@@ -7,17 +7,14 @@
 package util;
 
 import dtos.GenDataTemplateMapInfo;
+import dtos.RDFAttributeData;
 import dtos.SHACLValidationResult;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
-import org.apache.jena.reasoner.rulesys.builtins.IsLiteral;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.usermodel.*;
 
 import java.io.*;
 import java.util.*;
@@ -324,7 +321,7 @@ public class ExcelTools {
     }
 
     public static void exportMapToExcelv2(Map<String, List<String>> mapInfo, Map<String,String> prefMap,
-                                          Map<String, List<Map<String, String>>> instanceClassData,
+                                          Map<String, List<List<RDFAttributeData>>> instanceClassData,
                                           XSSFWorkbook workbook) {
 
         // Create cell style for header row
@@ -367,7 +364,7 @@ public class ExcelTools {
             String sheetName = genDataInfo.getSheetClassName();
             if (!classSheet.getSheetName().equals(sheetName)) { // move to the other sheet if new class comes in the list
                 if (instanceClassData != null){
-                    FillSheetWithInstanceData(classSheet, instanceClassData, prevgenDataInfo);
+                    FillSheetWithInstanceData(workbook, classSheet, instanceClassData, prevgenDataInfo);
                 }
                 classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
                         headerCellStyle, workbook, invertedPrefMap);
@@ -448,31 +445,44 @@ public class ExcelTools {
 
     }
 
-    private static void FillSheetWithInstanceData(XSSFSheet sheet, Map<String, List<Map<String, String>>> instanceClassData,
+    private static void FillSheetWithInstanceData(Workbook workbook, XSSFSheet sheet, Map<String, List<List<RDFAttributeData>>> instanceClassData,
                                                   GenDataTemplateMapInfo genInfoData) {
-        List<Map<String, String>> dataInClass = instanceClassData.get(genInfoData.getFullClassName());
+        List<List<RDFAttributeData>> dataInClass = instanceClassData.get(genInfoData.getFullClassName());
         if (dataInClass == null)
             return;
 
+        CellStyle headerStyleRed = createHeaderStyle(workbook);
+        headerStyleRed.setFillForegroundColor(IndexedColors.DARK_RED.getIndex());
+        CellStyle dataStyle = createDataStyle(workbook);
         XSSFRow attrRow = sheet.getRow(1);
+        XSSFRow typeRow = sheet.getRow(2);
         int rowNumber = 6;
-        for (Map<String, String> attrMap : dataInClass){
+        for (List<RDFAttributeData> attrList : dataInClass){ // looping through the class instances
             XSSFRow row = sheet.createRow(rowNumber);
-            for (Map.Entry<String, String> entry : attrMap.entrySet()){
-                int valueCol = getCellNumber(attrRow, entry.getKey());
-                if (valueCol == -1){
+            for (RDFAttributeData data : attrList){ // loop on every attribute (creating new rows in the xls)
+                if (data.getName().equals("type"))
+                    continue;
+                int valueCol = getCellNumber(attrRow, data.getFullName());
+                if (valueCol == -1){  // add new attribute to the end of the row
                     valueCol = attrRow.getLastCellNum();
                     XSSFCell attrCell = attrRow.createCell(valueCol);
-                    attrCell.setCellValue(entry.getKey());
+                    attrCell.setCellStyle(headerStyleRed);
+                    attrCell.setCellValue(data.getFullName());
+                    XSSFCell typeCell = typeRow.createCell(valueCol);
+                    typeCell.setCellStyle(headerStyleRed);
+                    typeCell.setCellValue(data.getTpe());
                 }
                 XSSFCell valueCell = row.createCell(valueCol);
-                valueCell.setCellValue(entry.getValue());
+                valueCell.setCellStyle(dataStyle);
+                valueCell.setCellValue(data.getValue());
             }
             rowNumber++;
         }
     }
 
     private static int getCellNumber(XSSFRow attrRow, String attrName){
+        // Gives back the index of the column where the given attribute is found in the attributes row
+        // if not found return -1
         for (int i = 0; i < attrRow.getLastCellNum(); i++) {
             XSSFCell cell = attrRow.getCell(i);
             if (cell.getStringCellValue().equals(attrName)){
