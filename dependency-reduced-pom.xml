@@ -30,7 +30,7 @@
           <shadedArtifactAttached>false</shadedArtifactAttached>
           <transformers>
             <transformer>
-              <mainClass>application.CimPal</mainClass>
+              <mainClass>eu.griddigit.cimpal.application.CimPal</mainClass>
               <manifestEntries>
                 <Multi-Release>true</Multi-Release>
               </manifestEntries>
@@ -67,7 +67,7 @@
             </goals>
             <configuration>
               <dontWrapJar>false</dontWrapJar>
-              <headerType>gui</headerType>
+              <headerType>eu.griddigit.cimpal.gui</headerType>
               <jar>${project.build.directory}/${project.build.finalName}.jar</jar>
               <outfile>${project.build.directory}/${project.build.finalName}.exe</outfile>
               <errTitle>No Java installed.</errTitle>
