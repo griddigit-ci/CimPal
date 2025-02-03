@@ -75,7 +75,7 @@ public class MainGUI extends Application {
     @Override
     public void stop() throws Exception {
         super.stop();
-        Platform.exit(); // Exit the eu.griddigit.cimpal.application
+        Platform.exit(); // Exit the application
     }
 
     public static void main(String[] args) {

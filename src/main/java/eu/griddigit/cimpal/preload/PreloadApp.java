@@ -39,7 +39,7 @@ public class PreloadApp extends Preloader {
 
         // If preloader has complex UI it's initialization can be done in MyPreloader#init
         Platform.runLater(() -> {
-            Label title = new Label("CimPal eu.griddigit.cimpal.application\nLoading, please wait...");
+            Label title = new Label("CimPal application\nLoading, please wait...");
             title.setTextAlignment(TextAlignment.CENTER);
             progress = new Label("0%");
 
@@ -66,7 +66,7 @@ public class PreloadApp extends Preloader {
 
     @Override
     public void handleApplicationNotification(PreloaderNotification info) {
-        // Handle eu.griddigit.cimpal.application notification in this point (see MyApplication#init).
+        // Handle application notification in this point (see MyApplication#init).
         if (info instanceof ProgressNotification) {
             progress.setText(((ProgressNotification) info).getProgress() + "%");
         }
@@ -78,10 +78,10 @@ public class PreloadApp extends Preloader {
         StateChangeNotification.Type type = info.getType();
         switch (type) {
             case BEFORE_LOAD:
-                // Called after eu.griddigit.cimpal.preload Gui start is called.
+                // Called after preload Gui start is called.
                 break;
             case BEFORE_INIT:
-                // Called before eu.griddigit.cimpal.preload Gui init is called.
+                // Called before preload Gui init is called.
                 break;
             case BEFORE_START:
                 // Called after  CimHub init and before CimHub start is called.
@@ -116,7 +116,7 @@ public class PreloadApp extends Preloader {
 
 /*    @Override
     public void handleProgressNotification(ProgressNotification pn) {
-        //eu.griddigit.cimpal.application loading progress is rescaled to be first 50%
+        //application loading progress is rescaled to be first 50%
         //Even if there is nothing to load 0% and 100% events can be
         // delivered
         if (pn.getProgress() != 1.0 || !noLoadingProgress) {
