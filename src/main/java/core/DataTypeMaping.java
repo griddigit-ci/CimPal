@@ -39,7 +39,7 @@ public class DataTypeMaping {
                         dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDinteger);
                 case "http://www.w3.org/2001/XMLSchema#float", "Float" ->
                         dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDfloat);
-                case "http://www.w3.org/2001/XMLSchema#string", "String", "StringFixedLanguage" ->
+                case "http://www.w3.org/2001/XMLSchema#string", "String", "Version", "UUID","StringFixedLanguage" ->
                         dataTypeMap.putIfAbsent(propertyString.get(m), XSDDatatype.XSDstring);
                 case "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString", "LangString" ->
                         dataTypeMap.putIfAbsent(propertyString.get(m), RDFLangString.rdfLangString);
@@ -75,7 +75,7 @@ public class DataTypeMaping {
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDinteger);
             case "http://www.w3.org/2001/XMLSchema#float", "Float" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDfloat);
-            case "http://www.w3.org/2001/XMLSchema#string", "String", "StringFixedLanguage" ->
+            case "http://www.w3.org/2001/XMLSchema#string", "String",  "Version", "UUID","StringFixedLanguage" ->
                     dataTypeMap.putIfAbsent(propertyString, XSDDatatype.XSDstring);
             case "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString", "LangString" ->
                     dataTypeMap.putIfAbsent(propertyString, RDFLangString.rdfLangString);
