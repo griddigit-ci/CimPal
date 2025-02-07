@@ -447,7 +447,7 @@ public class ExcelTools {
 
     private static void FillSheetWithInstanceData(Workbook workbook, XSSFSheet sheet, Map<String, List<List<RDFAttributeData>>> instanceClassData,
                                                   GenDataTemplateMapInfo genInfoData) {
-        List<List<RDFAttributeData>> dataInClass = instanceClassData.get(genInfoData.getFullClassName());
+        List<List<RDFAttributeData>> dataInClass = instanceClassData.get(genInfoData.getClassName());
         if (dataInClass == null)
             return;
 

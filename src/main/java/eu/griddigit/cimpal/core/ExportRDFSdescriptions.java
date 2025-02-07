@@ -133,7 +133,7 @@ public class ExportRDFSdescriptions {
             // Get the RDF type for the subject
             Statement typeStatement = subject.getProperty(RDF.type);
             if (typeStatement != null) {
-                String className = typeStatement.getObject().toString();
+                String className = typeStatement.getObject().toString().split("#")[1];
 
                 // Initialize storage for this class if it doesn't exist
                 classData.putIfAbsent(className, new LinkedList<>());
