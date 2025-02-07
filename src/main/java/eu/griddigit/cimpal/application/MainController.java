@@ -4547,6 +4547,7 @@ public class MainController implements Initializable {
         switch (selectedMethod) {
             case "Option 1 (Old)":
                 ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties);
+                break;
             case "Option 2 (New)":
                 ModelManipulationFactory.generateDataFromXlsV2(xmlBase, inputXLS.getFirst(), saveProperties);
             case "Option 3 (TBD)":
