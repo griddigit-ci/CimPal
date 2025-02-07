@@ -4550,6 +4550,7 @@ public class MainController implements Initializable {
                 break;
             case "Option 2 (New)":
                 ModelManipulationFactory.generateDataFromXlsV2(xmlBase, inputXLS.getFirst(), saveProperties);
+                break;
             case "Option 3 (TBD)":
                 break;
         }
