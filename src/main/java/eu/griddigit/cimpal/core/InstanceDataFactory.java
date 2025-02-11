@@ -394,7 +394,7 @@ public class InstanceDataFactory {
         File saveFile = eu.griddigit.cimpal.util.ModelFactory.fileSaveCustom(extensionName, List.of(extension),title,filename);
         OutputStream out=null;
         if (saveFile!=null) {
-            //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             out = new FileOutputStream(saveFile);
         }
         return out;

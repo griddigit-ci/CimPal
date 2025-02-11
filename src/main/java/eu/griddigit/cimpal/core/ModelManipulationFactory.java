@@ -7,6 +7,7 @@ package eu.griddigit.cimpal.core;
 
 import eu.griddigit.cimpal.application.MainController;
 import eu.griddigit.cimpal.customWriter.CustomRDFFormat;
+import eu.griddigit.cimpal.gui.GUIhelper;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
@@ -216,54 +217,58 @@ public class ModelManipulationFactory {
                                 for (int col = 5; col < ((LinkedList<?>) inputXLSdata.get(row)).size(); col += 2) {
                                     //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col).toString());
                                     //System.out.println(((LinkedList) inputXLSdata.get(row)).get(col + 1).toString());
-                                    String rdfid = ((LinkedList<?>) inputXLSdata.get(row)).get(col).toString();
-                                    //System.out.println(row);
-                                    //System.out.println(rdfid);
-                                    String object = ((LinkedList<?>) inputXLSdata.get(row)).get(col + 1).toString();
+                                    try {
+                                        String rdfid = ((LinkedList<?>) inputXLSdata.get(row)).get(col).toString();
+                                        //System.out.println(row);
+                                        //System.out.println(rdfid);
+                                        String object = ((LinkedList<?>) inputXLSdata.get(row)).get(col + 1).toString();
 
-                                    //Add triples to the model
+                                        //Add triples to the model
 
-                                    //Add the Class type
-                                    if (rdfid.startsWith("urn:uuid:")) {
-                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-                                    } else {
-                                        if (rdfid.startsWith("http://")) {
+                                        //Add the Class type
+                                        if (rdfid.startsWith("urn:uuid:")) {
                                             model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
                                         } else {
-                                            model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
-                                        }
-                                    }
-
-
-                                    switch (propertyType) {
-                                        case "Attribute" -> { //add literal
-                                            if (rdfid.startsWith("urn:uuid:")) {
-                                                if (object.contains("LangXMLTag:")) {
-                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createLangLiteral(object.split("LangXMLTag:", 2)[0], object.split("LangXMLTag:", 2)[1])));
-                                                } else {
-                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-                                                }
+                                            if (rdfid.startsWith("http://")) {
+                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
                                             } else {
-                                                if (rdfid.startsWith("http://")) {
-                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-                                                } else {
-                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
-                                                }
+                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), RDF.type, ResourceFactory.createProperty(classURI)));
                                             }
                                         }
-                                        case "Association" -> { //add resource
-                                            if (rdfid.startsWith("urn:uuid:")) {
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
-                                            } else {
-                                                if (rdfid.startsWith("http://")) {
+
+
+                                        switch (propertyType) {
+                                            case "Attribute" -> { //add literal
+                                                if (rdfid.startsWith("urn:uuid:")) {
+                                                    if (object.contains("LangXMLTag:")) {
+                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createLangLiteral(object.split("LangXMLTag:", 2)[0], object.split("LangXMLTag:", 2)[1])));
+                                                    } else {
+                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                                                    }
+                                                } else {
+                                                    if (rdfid.startsWith("http://")) {
+                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                                                    } else {
+                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createPlainLiteral(object)));
+                                                    }
+                                                }
+                                            }
+                                            case "Association" -> { //add resource
+                                                if (rdfid.startsWith("urn:uuid:")) {
                                                     model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
                                                 } else {
-                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
+                                                    if (rdfid.startsWith("http://")) {
+                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
+                                                    } else {
+                                                        model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createProperty(object)));
+                                                    }
                                                 }
                                             }
+                                            case "Enumeration" -> //add enum
+                                                    model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
                                         }
-                                        case "Enumeration" -> //add enum
-                                                model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
+                                    } catch (IndexOutOfBoundsException e) {
+                                        GUIhelper.appendTextToOutputWindow("Object data missing at row:" + row, true);
                                     }
 
                                 }
@@ -283,22 +288,11 @@ public class ModelManipulationFactory {
 
 
                         if ((boolean) saveProperties.get("useAboutRules")) {
-//                            if (profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").hasNext()) {
-//                                rdfAboutList = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").toSet();
-//                            }
                             rdfAboutList = LoadRDFAbout(xmlBase);
                             rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
                         }
 
                         if ((boolean) saveProperties.get("useEnumRules")) {
-//                            for (ResIterator ii = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),
-//                                    ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")); ii.hasNext(); ) {
-//                                Resource resItem = ii.next();
-//                                for (ResIterator j = profileModelMap.get(originalNameInParts[0]).listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
-//                                    Resource resItemProp = j.next();
-//                                    rdfEnumList.add(resItemProp);
-//                                }
-//                            }
                             rdfEnumList = LoadRDFEnum(xmlBase);
                         }
 
@@ -312,11 +306,6 @@ public class ModelManipulationFactory {
                         } else {
                             saveProperties.put("rdfEnumList", rdfEnumList);
                         }
-
-                        //if (extension.equals("zip")) {
-                        //    fileName = fileName.replace(".zip", ".xml");
-                        // }
-
                     }
                     saveProperties.replace("filename", saveProperties.get("filename").toString().split(".xml", 2)[0] + "_" + originalNameInParts[0] + ".xml");
                     InstanceDataFactory.saveInstanceData(model, saveProperties);
@@ -351,7 +340,7 @@ public class ModelManipulationFactory {
                         prefMap.putIfAbsent(pref, ns);
                     }
                 }
-                if (((LinkedList<?>) o).size() == 1){
+                if (((LinkedList<?>) o).size() == 1) {
                     // getting classes to print when exceeding namespace rows
                     String className = ((LinkedList<?>) o).getFirst().toString();
                     if (!className.isEmpty()) {
@@ -363,8 +352,7 @@ public class ModelManipulationFactory {
                             throw new Exception("Couldn't find the sheet for class: " + className);
                     }
                     continue;
-                }
-                else if (((LinkedList<?>) o).size() < 4)
+                } else if (((LinkedList<?>) o).size() < 4)
                     continue;
 
                 // getting classes to print
@@ -469,10 +457,9 @@ public class ModelManipulationFactory {
                                 model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                             }
                             case "Resource" -> { //add resource
-                                if(object.startsWith("http")){
+                                if (object.startsWith("http")) {
                                     model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
-                                }
-                                else {
+                                } else {
                                     model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
                                 }
                             }
@@ -518,10 +505,11 @@ public class ModelManipulationFactory {
                 throw new Exception("rdf:id missing at class sheet: " + className);
 
             String[] splitClassName = className.split(":");
+            String classPrefix;
             String classWNS;
             try {
-                String propPref = prefMap.get(splitClassName[0]);
-                classWNS = propPref + splitClassName[1];
+                classPrefix = prefMap.get(splitClassName[0]);
+                classWNS = classPrefix + splitClassName[1];
             } catch (NullPointerException e) {
                 throw new Exception("Missing prefix in config for class: " + className + "\nMissing prefix: " + splitClassName[0]);
             }
@@ -532,7 +520,7 @@ public class ModelManipulationFactory {
                     String rdfid;
                     if (idxls.startsWith("http") || idxls.startsWith("urn:uuid")) {
                         rdfid = idxls;
-                    }else {
+                    } else {
                         rdfid = xmlBase + "#" + idxls;
                     }
 
@@ -578,11 +566,19 @@ public class ModelManipulationFactory {
                                     case "Resource" -> { //add resource
                                         if (object.startsWith("http")) {
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(object)));
-                                        }else if (!object.contains("http") && object.contains(":")) {
+                                        } else if (!object.contains("http") && object.contains(":")) {
                                             String[] objSplit = object.split(":", 2);
-                                            String prefixUri = prefMap.get(objSplit[0]);
-                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
-                                        }else {
+                                            String prefixUri;
+                                            String objData;
+                                            if (objSplit.length == 1) { // if there is no prefix than use the class one
+                                                prefixUri = prefMap.get(classPrefix);
+                                                objData = object;
+                                            } else {
+                                                prefixUri = prefMap.get(objSplit[0]);
+                                                objData = objSplit[1];
+                                            }
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objData)));
+                                        } else {
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase + "#" + object)));
                                         }
                                     }
@@ -593,8 +589,16 @@ public class ModelManipulationFactory {
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
                                         } else { // if there is the prefix with ':'
                                             String[] objSplit = object.split(":", 2);
-                                            String prefixUri = prefMap.get(objSplit[0]);
-                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                                            String prefixUri;
+                                            String objData;
+                                            if (objSplit.length == 1) { // if there is no prefix than use the class one
+                                                prefixUri = prefMap.get(classPrefix);
+                                                objData = object;
+                                            } else {
+                                                prefixUri = prefMap.get(objSplit[0]);
+                                                objData = objSplit[1];
+                                            }
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objData)));
                                         }
                                     }
                                 }
@@ -630,9 +634,15 @@ public class ModelManipulationFactory {
             saveProperties.put("rdfEnumList", rdfEnumList);
         }
 
-        saveProperties.replace("filename", saveProperties.get("filename").toString() + ".xml");
+        String saveFilename = xmlfile.getName()
+                .replaceAll("(?i)template", "")    // Remove standalone "template" (case-insensitive)
+                .replaceAll("(?i)\\.xlsx$", "")          // Remove .xlsx extension at the end (case-insensitive)
+                .replaceAll("\\s+", " ")                 // Replace multiple spaces with a single space
+                .trim();
+        saveProperties.replace("filename", saveFilename + ".xml");
         saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
         InstanceDataFactory.saveInstanceData(model, saveProperties);
+        saveProperties.put("useFileDialog", false);
 
         fis.close();
     }
