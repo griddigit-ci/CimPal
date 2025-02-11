@@ -4492,7 +4492,7 @@ public class MainController implements Initializable {
     private void actionBrowseXlsTemplate() {
         progressBar.setProgress(0);
         //select xls file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Xls template", List.of("*.xlsx"), "Browse for xls template");
+        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Xls template", List.of("*.xlsx"), "Browse for xls template");
 
         if (file != null) {// the file is selected
 
