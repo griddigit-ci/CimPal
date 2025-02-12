@@ -456,6 +456,9 @@ public class ModelManipulationFactory {
                             case "Literal" -> { //add literal
                                 model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                             }
+                            case "LiteralLangEN" -> {
+                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
+                            }
                             case "Resource" -> { //add resource
                                 if (object.startsWith("http")) {
                                     model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
@@ -562,6 +565,9 @@ public class ModelManipulationFactory {
                                 switch (propertyType) {
                                     case "Literal" -> { //add literal
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                                    }
+                                    case "LiteralLangEN" -> {
+                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
                                     }
                                     case "Resource" -> { //add resource
                                         if (object.startsWith("http")) {
