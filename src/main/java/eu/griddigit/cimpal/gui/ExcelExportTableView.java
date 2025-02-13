@@ -102,7 +102,10 @@ public class ExcelExportTableView {
         sheet.createFreezePane(0, 1); // Freeze the top row
 
         // Add filter to the populated columns
-        sheet.setAutoFilter(CellRangeAddress.valueOf("A1:" + getColumnName(tableView.getItems().size() - 1) + (tableView.getItems().size() + 1)));
+        int lastColumnIndex = tableView.getColumns().size() - 1;
+        int lastRowIndex = tableView.getItems().size() + 1; // assuming header row at row 1
+        sheet.setAutoFilter(CellRangeAddress.valueOf("A1:" + getColumnName(lastColumnIndex) + lastRowIndex));
+
 
 
 
