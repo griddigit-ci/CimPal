@@ -30,7 +30,7 @@
           <shadedArtifactAttached>false</shadedArtifactAttached>
           <transformers>
             <transformer>
-              <mainClass>application.CimPal</mainClass>
+              <mainClass>eu.griddigit.cimpal.application.CimPal</mainClass>
               <manifestEntries>
                 <Multi-Release>true</Multi-Release>
               </manifestEntries>
@@ -39,6 +39,51 @@
             <transformer />
             <transformer>
               <addHeader>false</addHeader>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/jniconfig-aarch64-darwin.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/jniconfig-arm64-ios.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/jniconfig-x86_64-darwin.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/jniconfig-x86_64-ios.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/reflectionconfig-aarch64-darwin.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/reflectionconfig-x86_64-darwin.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/jniconfig-x86_64-linux.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/reflectionconfig-x86_64-linux.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/reflectionconfig-aarch64-android.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/reflectionconfig-arm64-ios.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/reflectionconfig-x86_64-ios.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/jniconfig-aarch64-android.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/resourcebundles</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/substrate/config/reflectionconfig.json</resource>
+            </transformer>
+            <transformer>
+              <resource>META-INF/DEPENDENCIES</resource>
             </transformer>
           </transformers>
           <filters>
@@ -49,6 +94,8 @@
                 <exclude>META-INF/*.SF</exclude>
                 <exclude>META-INF/*.DSA</exclude>
                 <exclude>META-INF/*.RSA</exclude>
+                <exclude>META-INF/MANIFEST.MF</exclude>
+                <exclude>META-INF.versions.9.module-info*</exclude>
               </excludes>
             </filter>
           </filters>

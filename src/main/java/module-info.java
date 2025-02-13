@@ -4,11 +4,11 @@
  * @author Chavdar Ivanov
  */
 module CimPal {
-    exports application;
-    opens application;
-    opens preload;
-    opens gui;
-    opens core;
+    exports eu.griddigit.cimpal.application;
+    opens eu.griddigit.cimpal.application;
+    opens eu.griddigit.cimpal.preload;
+    opens eu.griddigit.cimpal.gui;
+    opens eu.griddigit.cimpal.core;
 
 
     requires javafx.base;

@@ -1,3 +1,3 @@
 Manifest-Version: 1.0
-Main-Class: application.CimPal
+Main-Class: eu.griddigit.cimpal.application.CimPal
 
