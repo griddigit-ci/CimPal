@@ -330,7 +330,14 @@ public class MainController implements Initializable {
     private TextField fPathShaclFilesValidator;
     @FXML
     private TextField fPathModelsForShaclValidator;
-
+    @FXML
+    private CheckBox cbRDFSSHACLoptionCount;
+    @FXML
+    private ChoiceBox shaclNSCommonType;
+    @FXML
+    private TextField fPrefixSHACLCommon;
+    @FXML
+    private TextField fURISHACLcommon;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -380,6 +387,10 @@ public class MainController implements Initializable {
     public static int baseprofilesshaclglag3rd;
     public static int baseprofilesshaclignorens;
     public static int shaclflaginverse;
+    public static int shaclflagCount;
+    public static int shaclflagCountDefaultURI;
+    public static String shaclCommonPref;
+    public static String shaclCommonURI;
     public static Model unionmodelbaseprofilesshacl;
     public static Model unionmodelbaseprofilesshacl2nd;
     public static Model unionmodelbaseprofilesshacl3rd;
@@ -470,6 +481,15 @@ public class MainController implements Initializable {
                 "LTDS profiles, release 1.0",
                 "Other"
         );
+
+        shaclNSCommonType.getItems().addAll(
+                "Profile namespace",
+                "Custom namespace"
+        );
+        shaclNSCommonType.getSelectionModel().selectLast();
+        fPrefixSHACLCommon.setText("cc");
+        fURISHACLcommon.setText("https://common-constraints.eu/");
+
 
         fselectDatatypeMapDefineConstraints.getItems().addAll(
                 "No map; No save", // the map will not be generated and not saved
@@ -1725,6 +1745,8 @@ public class MainController implements Initializable {
             cbRDFSSHACLoptionTypeWithOne.setDisable(false);
             cbRDFSSHACLinheritTree.setDisable(false);
             cbRDFSSHACLvalidate.setDisable(false);
+            cbRDFSSHACLoptionCount.setDisable(false);
+            shaclNSCommonType.setDisable(false);
             cbRDFSSHACLabstract.setDisable(false);
             cbRDFSSHACLoptionDescr.setDisable(false);
             cbRDFSSHACLoptionBaseprofiles.setDisable(false);
@@ -2982,6 +3004,20 @@ public class MainController implements Initializable {
             if (cbRDFSSHACLoptionInverse.isSelected()) {
                 shaclflaginverse = 1;
             }
+
+            shaclflagCount = 0;
+            if (cbRDFSSHACLoptionCount.isSelected()) {
+                shaclflagCount = 1;
+                shaclflagCountDefaultURI = 1;
+                shaclCommonPref = "";
+                shaclCommonURI = "";
+                if (shaclNSCommonType.getSelectionModel().getSelectedItem().toString().equals("Custom namespace")) {
+                    shaclflagCountDefaultURI = 0;
+                    shaclCommonPref = fPrefixSHACLCommon.getText();
+                    shaclCommonURI = fURISHACLcommon.getText();
+                }
+            }
+
 
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 

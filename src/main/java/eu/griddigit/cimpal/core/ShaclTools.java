@@ -650,6 +650,34 @@ public class ShaclTools {
         return shapeModel;
     }
 
+    //add a NodeShape to a shape model including all necessary properties for Class Count check
+    public static Model addNodeShapeProfileClassCount(Model shapeModel, String nsURIprofile, String localName, String classFullURI){
+        /*shapeModel - is the shape model
+         * nsURIprofile - is the namespace of the NodeShape
+         * localName - is the name of the NodeShape
+         * classFullURI - is the full URI of the CIM class
+         */
+
+        //creates the resource
+        Resource r = shapeModel.createResource(nsURIprofile + localName);
+        //creates the property
+        //Property p = shapeModel.createProperty(rdfURI, "type");
+        //creates the object
+        //RDFNode o = shapeModel.createResource(shaclURI + "NodeShape");
+        //adds the property
+        r.addProperty(RDF.type, SH.NodeShape);
+        //up to here this defines e.g. eqbd:GeographicalRegion a sh:NodeShape ;
+
+        //creates property sh:targetClass
+        //Property p1 = shapeModel.createProperty(shaclURI, "targetClass");
+        //creates the object which is the CIM class
+        RDFNode o1 = shapeModel.createResource(classFullURI);
+        r.addProperty(SH.targetNode, o1);
+        //up to here this defines e.g. sh:targetClass cim:GeographicalRegion ;
+
+        return shapeModel;
+    }
+
     //add a NodeShape to a shape model including all necessary properties
     public static Model addNodeShapeValueType(Model shapeModel, String nsURIprofile, String localName, String classFullURI){
         /*shapeModel - is the shape model
@@ -1572,6 +1600,16 @@ public class ShaclTools {
                                 .source(model)
                                 .output(out);
 
+                    }else if (rdfFormat.getLang().getLabel().equalsIgnoreCase("TURTLE")) {
+                        RDFWriter.create()
+                                .base(baseURI)
+                                .set(RIOT.symTurtleOmitBase, false)
+                                .set(RIOT.symTurtleIndentStyle, "wide")
+                                .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                                .set(RIOT.multilineLiterals, true)
+                                .lang(Lang.TURTLE)
+                                .source(model)
+                                .output(out);
                     }else{
                         model.write(out, rdfFormat.getLang().getLabel().toUpperCase(),baseURI);
                         //model.write(out, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), baseURI);
@@ -1903,7 +1941,7 @@ public class ShaclTools {
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
 
-        // Adding node shape and properti shape to check if we have additional classes that are not defined in the profile
+        // Adding node shape and property shape to check if we have additional classes that are not defined in the profile
         shapeModel = ShaclTools.addNodeShapeProfileClass(shapeModel, nsURIprofile, "AllowedClasses-node", RDF.type.getURI());
 
         //create the property shape
@@ -1944,6 +1982,84 @@ public class ShaclTools {
         RDFList enumRDFlist = shapeModel.createList(enumClass.iterator());
         r.addProperty(SH.in, enumRDFlist);
 
+
+        // Add shapes for counting classes
+        if (shaclflagCount==1) {
+            //for Profile Classes Count group
+            localNameGroup = "ClassesCountGroup";
+            groupFeatures.set(0, "ClassesCount");
+            groupFeatures.set(1, "This group of validation rules relate to count of classes.");
+            groupFeatures.set(2, "ClassesCount");
+            groupFeatures.set(3, 1);
+
+            String commonNSuri = nsURIprofile;
+
+            if (shaclflagCountDefaultURI == 0) {
+                commonNSuri = shaclCommonURI;
+                shapeModel.setNsPrefix(shaclCommonPref, shaclCommonURI);
+            }
+            shapeModel = ShaclTools.addPropertyGroup(shapeModel, commonNSuri, localNameGroup, groupFeatures);
+
+            //add NodeShape
+            shapeModel = ShaclTools.addNodeShapeProfileClassCount(shapeModel, commonNSuri, "ClassCount-node", commonNSuri+"ClassCount");
+
+            //create the property shape
+            RDFNode pc = shapeModel.createResource(commonNSuri + "ClassCount-property");
+            Resource nodeShapeResourceClasspc = shapeModel.getResource(commonNSuri + "ClassCount-node");
+            nodeShapeResourceClasspc.addProperty(SH.property, pc);
+
+            //add PropertyShape
+            Resource rc = shapeModel.createResource(commonNSuri + "ClassCount-property");
+            rc.addProperty(RDF.type, SH.PropertyShape);
+            rc.addProperty(SH.name, "ClassCount");
+            rc.addProperty(SH.description, "Counts instance of classes present in the data graph.");
+            RDFNode o8pc = shapeModel.createResource(SH.NS + "Info");
+            rc.addProperty(SH.severity, o8pc);
+            RDFNode o5pc = shapeModel.createResource(RDF.type.getURI());
+            rc.addProperty(path, o5pc);
+            RDFNode o1opc = shapeModel.createTypedLiteral(1, "http://www.w3.org/2001/XMLSchema#integer");
+            rc.addProperty(SH.order, o1opc);
+            RDFNode o1gpc = shapeModel.createResource(commonNSuri + "ClassesCountGroup");
+            rc.addProperty(SH.group, o1gpc);
+
+            //add SPARQL constraint
+            RDFNode spc = shapeModel.createResource(commonNSuri + "ClassCount-propertySparql");
+            rc.addProperty(SH.sparql, spc);
+
+            Resource ps = shapeModel.createResource(commonNSuri + "ClassCount-propertySparql");
+            ps.addProperty(RDF.type, SH.SPARQLConstraint);
+            ps.addProperty(SH.message, "The class {?class} appears {?value} times in the data graph.");
+            ps.addProperty(SH.select, """
+                    \s
+                                SELECT $this ?class (COUNT(?instance) AS ?value)
+                                WHERE {
+                                        ?instance rdf:type ?class .
+                                       }
+                                GROUP BY $this ?class
+                                \s""");
+
+
+            //declare prefixes
+            Resource commonRes = shapeModel.createResource(commonNSuri);
+            shapeModel.add(ResourceFactory.createStatement(commonRes,RDF.type,OWL2.Ontology));
+            shapeModel.add(ResourceFactory.createStatement(commonRes,OWL2.imports,ResourceFactory.createResource(SH.getURI())));
+
+            //List<RDFNode> prefixesList = new ArrayList<>();
+            Resource resbn = ResourceFactory.createResource();
+            Statement stmtbn0 = ResourceFactory.createStatement(resbn, RDF.type, SH.PrefixDeclaration);
+            Statement stmtbn1 = ResourceFactory.createStatement(resbn, SH.prefix, ResourceFactory.createPlainLiteral("rdf"));
+            Statement stmtbn2 = ResourceFactory.createStatement(resbn, SH.namespace, ResourceFactory.createPlainLiteral(RDF.getURI()));
+            shapeModel.add(stmtbn0);
+            shapeModel.add(stmtbn1);
+            shapeModel.add(stmtbn2);
+            commonRes.addProperty(SH.declare, resbn);
+
+            //prefixesList.add(resbn);
+            //RDFList prefixesListRDF = shapeModel.createList(prefixesList.iterator());
+            //ps.addProperty(SH.prefixes, prefixesListRDF);
+            ps.addProperty(SH.prefixes, commonRes);
+
+        }
 
         for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and add NodeShape for each concrete class
             //add the ShapeNode
