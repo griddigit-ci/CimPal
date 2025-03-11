@@ -4623,7 +4623,7 @@ public class MainController implements Initializable {
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
 
-            CreateTemplateFromRDF(file, (File) iFileList,  selectedMethod);
+            CreateTemplateFromRDF(file, iFileList,  selectedMethod);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);

@@ -391,8 +391,15 @@ public class ExcelTools {
             }
             attrCell.setCellValue(propNameShort);
             String typeValue = genDataInfo.getTpe();
-            if (typeValue.equals("Attribute"))
-                typeCell.setCellValue("Literal");
+            if (typeValue.equals("Attribute")){
+                String dataType = genDataInfo.getDatatype();
+                if (dataType.equalsIgnoreCase("LangString"))
+                    typeCell.setCellValue("LiteralLangEN");
+                else if (dataType.equalsIgnoreCase("URI"))
+                    typeCell.setCellValue("Resource");
+                else
+                    typeCell.setCellValue("Literal");
+            }
             else if (typeValue.equals("Association"))
                 typeCell.setCellValue("Resource");
             else
@@ -448,6 +455,9 @@ public class ExcelTools {
     private static void FillSheetWithInstanceData(Workbook workbook, XSSFSheet sheet, Map<String, List<List<RDFAttributeData>>> instanceClassData,
                                                   GenDataTemplateMapInfo genInfoData) {
         List<List<RDFAttributeData>> dataInClass = instanceClassData.get(genInfoData.getClassName());
+
+        if (genInfoData.getClassName().equalsIgnoreCase("Dataset"))
+            dataInClass = instanceClassData.get("FullModel");
         if (dataInClass == null)
             return;
 
