@@ -475,8 +475,8 @@ public class ExcelTools {
                                                   GenDataTemplateMapInfo genInfoData) {
         List<List<RDFAttributeData>> dataInClass = instanceClassData.get(genInfoData.getClassName());
 
-        if (genInfoData.getClassName().equalsIgnoreCase("Dataset"))
-            dataInClass = instanceClassData.get("FullModel");
+//        if (genInfoData.getClassName().equalsIgnoreCase("Dataset"))
+//            dataInClass = instanceClassData.get("FullModel");
         if (dataInClass == null)
             return;
 

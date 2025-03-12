@@ -6,13 +6,39 @@
  @author Chavdar Ivanov
  -->
 
-<?import javafx.geometry.*?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.image.*?>
-<?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
    <MenuBar prefHeight="13.0" prefWidth="1280.0" VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -688,9 +714,9 @@
                                  <children>
                                     <VBox spacing="10.0" HBox.hgrow="ALWAYS">
                                        <children>
-                                          <HBox spacing="10.0">
+                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
                                              <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                              </padding>
                                              <children>
                                                 <Label minWidth="90.0" text="Xls template:" wrapText="true" />
@@ -698,20 +724,20 @@
                                                 <Button mnemonicParsing="false" onAction="#actionBrowseXlsTemplate" text="Browse" />
                                              </children>
                                           </HBox>
-                                          <HBox spacing="10.0">
+                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
                                              <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                              </padding>
                                              <children>
                                                 <Label minWidth="90.0" text="Generation options:" />
-                                                <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                                                <VBox alignment="CENTER_LEFT" spacing="10.0" HBox.hgrow="ALWAYS">
                                                    <children>
-                                                      <HBox spacing="10.0">
+                                                      <HBox alignment="CENTER_LEFT" spacing="10.0">
                                                          <children>
                                                             <Label minWidth="78.0" prefHeight="17.0" prefWidth="78.0" text="Use method:" wrapText="true" />
                                                             <ChoiceBox fx:id="fcbGenMethodOptions" minWidth="400.0" />
                                                             <Region minWidth="100.0" HBox.hgrow="ALWAYS" />
-                                                            <CheckBox fx:id="fcbAddInstanceData" alignment="BOTTOM_LEFT" mnemonicParsing="false" prefHeight="21.0" prefWidth="182.0" text="Add instance data to template" />
+                                                            <CheckBox fx:id="fcbAddInstanceData" mnemonicParsing="false" prefHeight="21.0" prefWidth="182.0" text="Add instance data to template" />
                                                             <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create Xls template" />
                                                          </children>
                                                          <VBox.margin>
@@ -722,18 +748,18 @@
                                                 </VBox>
                                              </children>
                                           </HBox>
-                                          <HBox spacing="10.0">
+                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
                                              <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                              </padding>
                                              <children>
                                                 <Label minWidth="90.0" text="XML base:" wrapText="true" />
                                                 <TextField fx:id="fXmlBaseGen" maxWidth="1.7976931348623157E308" prefHeight="25.0" prefWidth="1116.0" HBox.hgrow="ALWAYS" />
                                              </children>
                                           </HBox>
-                                          <HBox spacing="10.0">
+                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
                                              <padding>
-                                                <Insets left="5.0" right="5.0" top="5.0" />
+                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                              </padding>
                                              <children>
                                                 <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
@@ -751,6 +777,7 @@
                                                 </CheckBox>
                                                 <Label text="Sorting options:" />
                                                 <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
+                                                <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
                                              </children>
                                           </HBox>
                                           <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
