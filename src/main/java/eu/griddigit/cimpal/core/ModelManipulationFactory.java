@@ -455,7 +455,13 @@ public class ModelManipulationFactory {
                         String object = value.toString();
                         switch (propertyType) {
                             case "Literal" -> { //add literal
-                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                                String datatype = ((LinkedList<?>) headerXlsData.get(3)).get(i).toString();
+                                if (datatype.equalsIgnoreCase("float"))
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Float.parseFloat(object)))));
+                                else if (datatype.equalsIgnoreCase("integer"))
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Math.round(Float.parseFloat(object))))));
+                                else
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                             }
                             case "LiteralLangEN" -> {
                                 model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
@@ -565,6 +571,12 @@ public class ModelManipulationFactory {
 
                                 switch (propertyType) {
                                     case "Literal" -> { //add literal
+                                        String datatype = ((LinkedList<?>) classXlsData.get(3)).get(j).toString();
+                                        if (datatype.equalsIgnoreCase("float"))
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Float.parseFloat(object)))));
+                                        else if (datatype.equalsIgnoreCase("integer"))
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Math.round(Float.parseFloat(object))))));
+                                        else
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                                     }
                                     case "LiteralLangEN" -> {
