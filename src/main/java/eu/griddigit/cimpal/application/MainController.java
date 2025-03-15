@@ -338,6 +338,10 @@ public class MainController implements Initializable {
     private TextField fPrefixSHACLCommon;
     @FXML
     private TextField fURISHACLcommon;
+    @FXML
+    private CheckBox fcbIDcompDiff;
+    @FXML
+    private CheckBox fcbIDcompPerFileAndAll;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -982,6 +986,12 @@ public class MainController implements Initializable {
 
         Model model1single = null;
         Model model2single = null;
+        Map<String, Model> model1Structure = new HashMap<>();
+        Map<String, Model> model2Structure = new HashMap<>();
+        Map<String, String> model1IDname = new HashMap<>();
+        Map<String, String> model2IDname = new HashMap<>();
+        Resource mdFullModelRes = ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+        Resource mdDiffernceModelRes = ResourceFactory.createResource("http://iec.ch/TC57/61970-552/DifferenceModel/1#DifferenceModel");
         Model model1 = ModelFactory.createDefaultModel();
         Map<String, String> prefixMap = model1.getNsPrefixMap();
 
@@ -1003,6 +1013,14 @@ public class MainController implements Initializable {
             }
             prefixMap.putAll(model1single.getNsPrefixMap());
             model1.add(model1single);
+            String model1ID = "";
+            if (model1single.listStatements(null,RDF.type,mdFullModelRes).hasNext()){
+                model1ID =  model1single.listStatements(null,RDF.type,mdFullModelRes).nextStatement().getSubject().getLocalName();
+            } else if (model1single.listStatements(null,RDF.type,mdDiffernceModelRes).hasNext()) {
+                model1ID = model1single.listStatements(null, RDF.type, mdDiffernceModelRes).nextStatement().getSubject().getLocalName();
+            }
+            model1Structure.put(model1ID, model1single);
+            model1IDname.put(model1ID,item.toString().toLowerCase());
         }
         model1.setNsPrefixes(prefixMap);
 
@@ -1030,91 +1048,198 @@ public class MainController implements Initializable {
             }
             prefixMap.putAll(model2single.getNsPrefixMap());
             model2.add(model2single);
+            String model2ID = "";
+            if (model2single.listStatements(null,RDF.type,mdFullModelRes).hasNext()){
+                model2ID =  model2single.listStatements(null,RDF.type,mdFullModelRes).nextStatement().getSubject().getLocalName();
+            } else if (model2single.listStatements(null,RDF.type,mdDiffernceModelRes).hasNext()) {
+                model2ID = model2single.listStatements(null, RDF.type, mdDiffernceModelRes).nextStatement().getSubject().getLocalName();
+            }
+            model2Structure.put(model2ID, model2single);
+            model2IDname.put(model2ID,item.toString().toLowerCase());
         }
         model2.setNsPrefixes(prefixMap);
         ComparisonSHACLshapes.modelsABPrefMap = prefixMap;
 
-        //proceed with the comparison
+        //TODO do a check if the ID of the model is existing, if yes, compare that one (this is what we have now), but then it could happen that ID is different and model 2 is empyty
+        // so we need to check if name of the file is matching and then compare. We need a warning/info what is used the ID or the name of the file
 
-        rdfsCompareFiles = new LinkedList<>();
-        if (MainController.IDModel1.size() == 1) {
-            rdfsCompareFiles.add(MainController.IDModel1.getFirst().getName());
-        } else {
-            rdfsCompareFiles.add("Model 1");
-        }
-        if (MainController.IDModel2.size() == 1) {
-            rdfsCompareFiles.add(MainController.IDModel2.getFirst().getName());
-        } else {
-            rdfsCompareFiles.add("Model 2");
-        }
-
-        compareIDmodel1 = model1;
-        compareIDmodel2 = model2;
-
-        LinkedList<Integer> options = new LinkedList<>();
-        options.add(0); //1 is ignore sv classes
-        options.add(0);
-        options.add(0);
-        options.add(0);
-        options.add(0);
-        options.add(0);
-        if (fcbIDcompIgnoreSV.isSelected()) {
-            options.set(0, 1);
-        }
-        if (fcbIDcompIgnoreDL.isSelected()) {
-            options.set(1, 1);
-        }
-        if (fcbIDcompCount.isSelected()) {
-            options.set(3, 1);
-            compareResults = CompareFactory.compareCountClasses(compareResults, model1, model2);
-        }
-        if (fcbIDcompIgnoreTP.isSelected()) {
-            options.set(4, 1);
-        }
-        if (fcbIDcompSVonlyCN.isSelected()) {
-            options.set(5, 1);
-        }
-        if (fcbIDcompSVonly.isSelected()) {
-            options.set(2, 1);
-            compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
-        }
-        if (!fcbIDcompCount.isSelected() && !fcbIDcompSVonly.isSelected()) {
-            compareResults = ComparisonInstanceData.compareInstanceData(compareResults, model1, model2, options);
-        }
-
-        if (fcbIDcompSolutionOverview.isSelected()) {
-            compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
-            List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
-        }
+        if (fcbIDcompPerFileAndAll.isSelected()) {
 
 
-        if (!compareResults.isEmpty()) {
+            for (Map.Entry<String, Model> entry : model1Structure.entrySet()) {
+                String key = entry.getKey();
+                Model valueModel1 = entry.getValue();
+                rdfsCompareFiles = new LinkedList<>();
+                rdfsCompareFiles.add(model1IDname.get(key));
+                rdfsCompareFiles.add(model2IDname.get(key));
+                compareIDmodel1 = valueModel1;
+                Model valueModel2 = model2Structure.get(key);
+                compareIDmodel2 = valueModel2;
 
-            if (fcbIDcompShowDetails.isSelected()) {
-                try {
-                    Stage guiRdfDiffResultsStage = new Stage();
-                    //Scene for the menu RDF differences
-                    //FXMLLoader fxmlLoader = new FXMLLoader();
-                    Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
-                    Scene rdfDiffscene = new Scene(rootRDFdiff);
-                    guiRdfDiffResultsStage.setScene(rdfDiffscene);
-                    guiRdfDiffResultsStage.setTitle("Comparison Instance data");
-                    guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
-                    rdfDiffResultController.initData(guiRdfDiffResultsStage);
-                    guiRdfDiffResultsStage.showAndWait();
+                LinkedList<Integer> options = new LinkedList<>();
+                options.add(0); //1 is ignore sv classes
+                options.add(0); // 1 is to ignore DL classes
+                options.add(0); //1 is to do the count
+                options.add(0); // 1 is to ignore TP
+                options.add(0); // 1 is to do SV only
+                options.add(0);
+                options.add(0);
+                options.add(0);
+                if (fcbIDcompIgnoreSV.isSelected()) {
+                    options.set(0, 1);
+                }
+                if (fcbIDcompIgnoreDL.isSelected()) {
+                    options.set(1, 1);
+                }
+                if (fcbIDcompCount.isSelected()) {
+                    options.set(3, 1);
+                    compareResults = CompareFactory.compareCountClasses(compareResults, valueModel1, valueModel2);
+                }
+                if (fcbIDcompIgnoreTP.isSelected()) {
+                    options.set(4, 1);
+                }
+                if (fcbIDcompSVonlyCN.isSelected()) {
+                    options.set(5, 1);
+                }
+                if (fcbIDcompDiff.isSelected()) {
+                    options.set(6, 1);
+                }
+                if (fcbIDcompPerFileAndAll.isSelected()) {
+                    options.set(7, 1);
+                }
+                if (fcbIDcompSVonly.isSelected()) {
+                    options.set(2, 1);
+                    compareResults = ComparisonInstanceData.compareSolution(compareResults, valueModel1, valueModel2, xmlBase, options);
+                }
+                if (!fcbIDcompCount.isSelected() && !fcbIDcompSVonly.isSelected()) {
+                    compareResults = ComparisonInstanceData.compareInstanceData(compareResults, valueModel1, valueModel2, options);
+                }
 
-                } catch (IOException e) {
-                    e.printStackTrace();
+                if (fcbIDcompSolutionOverview.isSelected()) {
+                    compareResults = ComparisonInstanceData.compareSolution(compareResults, valueModel1, valueModel2, xmlBase, options);
+                    List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
+                }
+
+
+                if (!compareResults.isEmpty()) {
+
+                    if (fcbIDcompShowDetails.isSelected()) {
+                        try {
+                            Stage guiRdfDiffResultsStage = new Stage();
+                            //Scene for the menu RDF differences
+                            //FXMLLoader fxmlLoader = new FXMLLoader();
+                            Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
+                            Scene rdfDiffscene = new Scene(rootRDFdiff);
+                            guiRdfDiffResultsStage.setScene(rdfDiffscene);
+                            guiRdfDiffResultsStage.setTitle("Comparison Instance data");
+                            guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
+                            rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                            guiRdfDiffResultsStage.showAndWait();
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                } else {
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setContentText("The two models are identical.");
+                    alert.setHeaderText(null);
+                    alert.setTitle("Information");
+                    alert.showAndWait();
                 }
             }
-        } else {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setContentText("The two models are identical.");
-            alert.setHeaderText(null);
-            alert.setTitle("Information");
-            alert.showAndWait();
-        }
 
+
+        }else {
+
+            //proceed with the comparison
+
+            rdfsCompareFiles = new LinkedList<>();
+            if (MainController.IDModel1.size() == 1) {
+                rdfsCompareFiles.add(MainController.IDModel1.getFirst().getName());
+            } else {
+                rdfsCompareFiles.add("Model 1");
+            }
+            if (MainController.IDModel2.size() == 1) {
+                rdfsCompareFiles.add(MainController.IDModel2.getFirst().getName());
+            } else {
+                rdfsCompareFiles.add("Model 2");
+            }
+
+            compareIDmodel1 = model1;
+            compareIDmodel2 = model2;
+
+            LinkedList<Integer> options = new LinkedList<>();
+            options.add(0); //1 is ignore sv classes
+            options.add(0); // 1 is to ignore DL classes
+            options.add(0); //1 is to do the count
+            options.add(0); // 1 is to ignore TP
+            options.add(0); // 1 is to do SV only
+            options.add(0);
+            options.add(0);
+            if (fcbIDcompIgnoreSV.isSelected()) {
+                options.set(0, 1);
+            }
+            if (fcbIDcompIgnoreDL.isSelected()) {
+                options.set(1, 1);
+            }
+            if (fcbIDcompCount.isSelected()) {
+                options.set(3, 1);
+                compareResults = CompareFactory.compareCountClasses(compareResults, model1, model2);
+            }
+            if (fcbIDcompIgnoreTP.isSelected()) {
+                options.set(4, 1);
+            }
+            if (fcbIDcompSVonlyCN.isSelected()) {
+                options.set(5, 1);
+            }
+            if (fcbIDcompDiff.isSelected()) {
+                options.set(6, 1);
+            }
+            if (fcbIDcompPerFileAndAll.isSelected()) {
+                options.set(7, 1);
+            }
+            if (fcbIDcompSVonly.isSelected()) {
+                options.set(2, 1);
+                compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
+            }
+            if (!fcbIDcompCount.isSelected() && !fcbIDcompSVonly.isSelected()) {
+                compareResults = ComparisonInstanceData.compareInstanceData(compareResults, model1, model2, options);
+            }
+
+            if (fcbIDcompSolutionOverview.isSelected()) {
+                compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
+                List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
+            }
+
+
+            if (!compareResults.isEmpty()) {
+
+                if (fcbIDcompShowDetails.isSelected()) {
+                    try {
+                        Stage guiRdfDiffResultsStage = new Stage();
+                        //Scene for the menu RDF differences
+                        //FXMLLoader fxmlLoader = new FXMLLoader();
+                        Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
+                        Scene rdfDiffscene = new Scene(rootRDFdiff);
+                        guiRdfDiffResultsStage.setScene(rdfDiffscene);
+                        guiRdfDiffResultsStage.setTitle("Comparison Instance data");
+                        guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
+                        rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                        guiRdfDiffResultsStage.showAndWait();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } else {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setContentText("The two models are identical.");
+                alert.setHeaderText(null);
+                alert.setTitle("Information");
+                alert.showAndWait();
+            }
+        }
         progressBar.setProgress(1);
 
     }

@@ -576,6 +576,8 @@
                                  </padding>
                                  <CheckBox fx:id="fcbIDcompSolutionOverview" mnemonicParsing="false" text="Create solution overview " />
                                  <CheckBox fx:id="fcbIDcompShowDetails" mnemonicParsing="false" text="Show details" />
+                                 <CheckBox fx:id="fcbIDcompDiff" mnemonicParsing="false" text="Consider Difference Set" />
+                                 <CheckBox fx:id="fcbIDcompPerFileAndAll" mnemonicParsing="false" text="Compare per file (if not selected  - it is as union)" />
                               </VBox>
                            </HBox>
                            <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">

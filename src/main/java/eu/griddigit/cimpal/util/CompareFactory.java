@@ -32,9 +32,13 @@ public class CompareFactory {
         String rdfType = getRDFtype(modelA,resItem);
         if (modelB.contains(resItem.getRequiredProperty(RDF.type))) {// the statement is in the other model which means that the class is there. Then need to compare the properties of the class
 
+            if (resItem.getLocalName().contains("Breaker")){
+                int k=1;
+            }
             if (reverse == 0) {// only in the first run as same classes need to be checked once
                 for (StmtIterator j = resItem.listProperties(); j.hasNext(); ) { //iterates on the properties of the class that has rdf:type
                     Statement resItemStmt = j.next();
+                    //model1.listStatements(new SimpleSelector(model1.listStatements(new SimpleSelector(null, ResourceFactory.createProperty(http://iec.ch/TC57/61970-552/DifferenceModel/1#reverseDifferences), (RDFNode) null)).toList().get(0).getObject().asResource(), null, (RDFNode) null)).toList().get(1).getObject()
                     if (!resItemStmt.getPredicate().equals(RDF.type)) {
                         if (!resItemStmt.getPredicate().equals(OWL2.oneOf)) {
 //                           if (resItemStmt.getPredicate().toString().endsWith("#path")){
@@ -47,31 +51,31 @@ public class CompareFactory {
                                }
                            }else {
                                if (!modelB.contains(resItemStmt)) {// does not contain the statement, i.e. the attribute/association; then the value needs to be compared as maybe it is either missing or just the value is different
-
                                    if (modelB.contains(resItemStmt.getSubject(), resItemStmt.getPredicate())) {// the class has same attribute in modelB, but the object is different as does not contain the complete statement
-                                       if (resItemStmt.getPredicate().getLocalName().equals("comment")){
+                                       if (resItemStmt.getPredicate().getLocalName().equals("comment")) {
                                            //if (resItemStmt.getPredicate().getLocalName().equals("UnitMultiplier.n")){
 
                                            //}
-                                           if (!modelB.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString().equals(modelA.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString())){
-                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
+                                           if (!modelB.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString().equals(modelA.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(), (RDFNode) null).nextStatement().getObject().asLiteral().getString())) {
+                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(), rdfType);
                                            }
-                                       }else {
+                                       } else {
                                            // need to check if this is literal and then compare the literal value if it is xsd float, integer or decimal
                                            if (resItemStmt.getObject().isLiteral()) {
-                                                Literal objectLit = resItemStmt.getObject().asLiteral();
+                                               Literal objectLit = resItemStmt.getObject().asLiteral();
                                                Object litValue = objectLit.getValue();
-                                                if (objectLit.getDatatype().getURI().equals(XSDDatatype.XSDdecimal.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDinteger.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDfloat.getURI())){
-                                                    if (!litValue.equals(modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().asLiteral().getValue())){
-                                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
-                                                    }
-                                                }else {//when it is not having datatype or if the datatype is not xsd float, integer or decimal
-                                                    compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
-                                                }
+                                               if (objectLit.getDatatype().getURI().equals(XSDDatatype.XSDdecimal.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDinteger.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDfloat.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDdateTime.getURI()) || objectLit.getDatatype().getURI().equals(XSDDatatype.XSDdateTimeStamp.getURI())) {
+                                                   if (!litValue.equals(modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().asLiteral().getValue())) {
+                                                       compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(), rdfType);
+                                                   }
+                                               } else {//when it is not having datatype or if the datatype is not xsd float, integer or decimal
+                                                   compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(), rdfType);
+                                               }
                                            } else {// when it is not literal
-                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(),rdfType);
+                                               compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), modelB.getRequiredProperty(resItemStmt.getSubject(), resItemStmt.getPredicate()).getObject().toString(), rdfType);
                                            }
                                        }
+
                                    } else {//the class in model B does not contain that attribute => this attribute/association is a difference
                                        compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), resItemStmt.getObject().toString(), "N/A",rdfType);
                                    }
@@ -102,6 +106,15 @@ public class CompareFactory {
                                 if (!modelB.contains(resItemStmt)) {// does not contain the statement, i.e. the attribute/association; then the value needs to be compared as maybe it is either missing or just the value is different
                                     if (!modelB.contains(resItemStmt.getSubject(), resItemStmt.getPredicate())) {// the class does not have that attribute in modelB => this is difference
                                         compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A", resItemStmt.getObject().toString(),rdfType);
+                                    }else {
+                                        List<Statement> multiplePropertiesList = modelA.listStatements(resItemStmt.getSubject(), resItemStmt.getPredicate(),(RDFNode) null).toList();
+                                        if (multiplePropertiesList.size() > 1) { //there is only one attribute
+                                            for (Statement st : multiplePropertiesList){
+                                                if (!modelB.contains(st)) {
+                                                    compareResults = addResult(compareResults, resItem.getLocalName(), modelA.getNsURIPrefix(resItemStmt.getPredicate().getNameSpace()) + ":" + resItemStmt.getPredicate().getLocalName(), "N/A", resItemStmt.getObject().toString(),rdfType);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
