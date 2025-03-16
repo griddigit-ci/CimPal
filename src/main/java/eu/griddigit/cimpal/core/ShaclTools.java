@@ -893,7 +893,13 @@ public class ShaclTools {
                         //this is the case where the datatype is a primitive or it is the primitive of the .value attribute of CIMDatatype
                         //Property p9 = shapeModel.createProperty(shaclURI, "nodeKind");
                         //RDFNode o9 = shapeModel.createResource(shaclURI + "Literal");
-                        r.addProperty(SH.nodeKind, SH.Literal);
+                        if (propertyNodeFeatures.get(6).toString().equals("URI")){
+                            if (shaclURIdatatypeAsResource){
+                                r.addProperty(SH.nodeKind, SH.IRI);
+                            }
+                        }else {
+                            r.addProperty(SH.nodeKind, SH.Literal);
+                        }
 
                         //Property p10 = shapeModel.createProperty(shaclURI, "datatype");
                         //the following are all primitives part of CIM17 domain package
@@ -922,6 +928,9 @@ public class ShaclTools {
                             o10 = shapeModel.createResource(XSDDatatype.XSDtime.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("URI")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
+                            if (!shaclURIdatatypeAsResource) {
+                                r.addProperty(SH.datatype, o10);
+                            }
                         } else if (propertyNodeFeatures.get(6).toString().equals("IRI")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("StringIRI")) {
@@ -930,14 +939,16 @@ public class ShaclTools {
                             o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("URL")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
-                        }else if (propertyNodeFeatures.get(6).toString().equals("LangString")) {
+                        } else if (propertyNodeFeatures.get(6).toString().equals("LangString")) {
                             o10 = shapeModel.createResource(RDFLangString.rdfLangString.getURI());
-                        }else if (propertyNodeFeatures.get(6).toString().equals("Version")) {
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Version")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
-                        }else if (propertyNodeFeatures.get(6).toString().equals("UUID")) {
+                        } else if (propertyNodeFeatures.get(6).toString().equals("UUID")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
                         }
-                        r.addProperty(SH.datatype, o10);
+                        if (!propertyNodeFeatures.get(6).toString().equals("URI")) {
+                            r.addProperty(SH.datatype, o10);
+                        }
                     }
                 }
                 break;
@@ -2128,6 +2139,9 @@ public class ShaclTools {
                             shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
 
                             //Association check for target class
+                            if (shaclSkipNcPropertyReference && localNameAssoc.contains(".PropertyReference")){
+                                continue;
+                            }
 
                             propertyNodeFeatures.set(0, "associationValueType");
                             //String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
@@ -2547,7 +2561,18 @@ public class ShaclTools {
 
         }
 
-
+        //Clean NodeShapes that do not have sh:property
+        List<Statement> statementsToDelete = new LinkedList<>();
+        for (StmtIterator i = shapeModel.listStatements(null, RDF.type, SH.NodeShape); i.hasNext(); ) {
+            Statement stmtNodeShape = i.next();
+            if (!shapeModel.listStatements(stmtNodeShape.getSubject(),SH.property,(RDFNode) null).hasNext()){
+                for (StmtIterator j = shapeModel.listStatements(stmtNodeShape.getSubject(), null, (RDFNode) null); j.hasNext(); ) {
+                    Statement stmtNodeShapeDelete = j.next();
+                    statementsToDelete.add(stmtNodeShapeDelete);
+                }
+            }
+        }
+        shapeModel.remove(statementsToDelete);
 
         return shapeModel;
     }

@@ -210,6 +210,15 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <children>
+                                    <CheckBox fx:id="cbRDFSSHACLuri" disable="true" mnemonicParsing="false" selected="true" text="Treat URI datatype as rdf:resource" />
+                                    <CheckBox fx:id="cbRDFSSHACLncProp" disable="true" mnemonicParsing="false" selected="true" text="Skip value type checks for associations to nc:PropertyReference" />
+                                 </children>
+                              </HBox>
+                              <HBox spacing="10.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
                                     <CheckBox fx:id="cbRDFSSHACLvalidate" disable="true" mnemonicParsing="false" selected="true" text="Validate generated SHACL shapes" />
                                  </children>
                               </HBox>

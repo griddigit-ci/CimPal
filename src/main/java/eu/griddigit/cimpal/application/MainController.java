@@ -342,6 +342,10 @@ public class MainController implements Initializable {
     private CheckBox fcbIDcompDiff;
     @FXML
     private CheckBox fcbIDcompPerFileAndAll;
+    @FXML
+    private CheckBox cbRDFSSHACLncProp;
+    @FXML
+    private CheckBox cbRDFSSHACLuri;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -412,6 +416,8 @@ public class MainController implements Initializable {
     public static String cim3Pref;
     public static Model compareIDmodel1;
     public static Model compareIDmodel2;
+    public static boolean shaclURIdatatypeAsResource;
+    public static boolean shaclSkipNcPropertyReference;
 
 
     public static Map<String, Model> InstanceModelMap;
@@ -1879,6 +1885,8 @@ public class MainController implements Initializable {
             cbRDFSSHACLoptionBaseprofiles3rd.setDisable(false);
             cbRDFSSHACLoptionBaseprofilesIgnoreNS.setDisable(false);
             cbRDFSSHACLoptionInverse.setDisable(false);
+            cbRDFSSHACLuri.setDisable(false);
+            cbRDFSSHACLncProp.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -2977,6 +2985,17 @@ public class MainController implements Initializable {
         } else {
             exportInheritTree = 0;
         }
+
+        shaclURIdatatypeAsResource = false;
+        shaclSkipNcPropertyReference = false;
+        if (cbRDFSSHACLuri.isSelected()){
+            shaclURIdatatypeAsResource = true;
+        }
+
+        if (cbRDFSSHACLncProp.isSelected()){
+            shaclSkipNcPropertyReference = true;
+        }
+
 
         if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
             //depending on the value of the choice box "Save datatype map"
