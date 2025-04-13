@@ -317,6 +317,8 @@ public class MainController implements Initializable {
     @FXML
     private ChoiceBox fcbRDFsortOptionsGen;
     @FXML
+    private CheckBox fcbStripPrefixesGen;
+    @FXML
     private ToggleGroup giDataLine;
     @FXML
     private CheckBox cbRDFSSHACLabstract;
@@ -4690,6 +4692,7 @@ public class MainController implements Initializable {
         Map<String, Object> saveProperties = new HashMap<>();
         boolean sortRDF = fcbSortRDFGen.isSelected();
         boolean sortPrefix = fcbRDFsortOptionsGen.getSelectionModel().getSelectedItem().toString().equals("Sorting by prefix");
+        boolean stripPrefixes = fcbStripPrefixesGen.isSelected();
         int dataStartsFrom = 5;
         RadioButton selected = (RadioButton) giDataLine.getSelectedToggle();
         String selectedRB = selected.getText();
@@ -4730,7 +4733,7 @@ public class MainController implements Initializable {
                 break;
             case "Option 2 (New)":
                 for (File file : inputXLS){
-                    ModelManipulationFactory.generateDataFromXlsV2(xmlBase, file, saveProperties);
+                    ModelManipulationFactory.generateDataFromXlsV2(xmlBase, file, saveProperties, stripPrefixes);
                 }
                 break;
             case "Option 3 (TBD)":
@@ -4767,7 +4770,7 @@ public class MainController implements Initializable {
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
 
-            CreateTemplateFromRDF(file, (File) iFileList,  selectedMethod);
+            CreateTemplateFromRDF(file, iFileList,  selectedMethod);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
@@ -4781,12 +4784,14 @@ public class MainController implements Initializable {
                 fcbAddInstanceData.setDisable(true);
                 fcbSortRDFGen.setDisable(true);
                 fcbRDFsortOptionsGen.setDisable(true);
+                fcbStripPrefixesGen.setDisable(true);
                 break;
             case "Option 2 (New)":
                 giDataLine.getToggles().forEach(rb -> ((RadioButton) rb).setDisable(false));
                 fcbAddInstanceData.setDisable(false);
                 fcbSortRDFGen.setDisable(false);
                 fcbRDFsortOptionsGen.setDisable(false);
+                fcbStripPrefixesGen.setDisable(false);
                 break;
         }
     }

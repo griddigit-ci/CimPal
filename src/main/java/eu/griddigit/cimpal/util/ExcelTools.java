@@ -341,8 +341,9 @@ public class ExcelTools {
                     multiplicities.get(i), datatypes.get(i), types.get(i)));
         }
 
+        String headerClass = getHeaderClass(instanceClassData);
 
-        AddConfigSheet(genDataInfos, prefMap, headerCellStyle, workbook);
+        AddConfigSheet(genDataInfos, prefMap, headerClass, headerCellStyle, workbook);
 
         // Inverted HashMap
         HashMap<String, String> invertedPrefMap = new HashMap<>();
@@ -391,8 +392,15 @@ public class ExcelTools {
             }
             attrCell.setCellValue(propNameShort);
             String typeValue = genDataInfo.getTpe();
-            if (typeValue.equals("Attribute"))
-                typeCell.setCellValue("Literal");
+            if (typeValue.equals("Attribute")){
+                String dataType = genDataInfo.getDatatype();
+                if (dataType.equalsIgnoreCase("LangString"))
+                    typeCell.setCellValue("LiteralLangEN");
+                else if (dataType.equalsIgnoreCase("URI"))
+                    typeCell.setCellValue("Resource");
+                else
+                    typeCell.setCellValue("Literal");
+            }
             else if (typeValue.equals("Association"))
                 typeCell.setCellValue("Resource");
             else
@@ -445,9 +453,30 @@ public class ExcelTools {
 
     }
 
+    private static String getHeaderClass(Map<String, List<List<RDFAttributeData>>> instanceClassData) {
+        // Give the config a header class if instance data has the info
+        String headerClass = "";
+        if (instanceClassData !=null){
+        if (instanceClassData.containsKey("Dataset")){
+            headerClass = "Dataset";
+        }
+        else if (instanceClassData.containsKey("DifferenceSet")){
+            headerClass = "DifferenceSet";
+        } else if (instanceClassData.containsKey("FullModel")) {
+            headerClass = "FullModel";
+        } else if (instanceClassData.containsKey("DifferenceModel")) {
+            headerClass = "DifferenceModel";
+        }
+        }
+        return headerClass;
+    }
+
     private static void FillSheetWithInstanceData(Workbook workbook, XSSFSheet sheet, Map<String, List<List<RDFAttributeData>>> instanceClassData,
                                                   GenDataTemplateMapInfo genInfoData) {
         List<List<RDFAttributeData>> dataInClass = instanceClassData.get(genInfoData.getClassName());
+
+//        if (genInfoData.getClassName().equalsIgnoreCase("Dataset"))
+//            dataInClass = instanceClassData.get("FullModel");
         if (dataInClass == null)
             return;
 
@@ -492,7 +521,7 @@ public class ExcelTools {
         return -1;
     }
 
-    private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String,String> prefMap,CellStyle headerCellStyle, XSSFWorkbook workbook) {
+    private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String,String> prefMap, String headerClass,CellStyle headerCellStyle, XSSFWorkbook workbook) {
         XSSFSheet configSheet = workbook.createSheet("Config");
         // Write header row
         XSSFRow headerRow = configSheet.createRow(0);
@@ -541,6 +570,12 @@ public class ExcelTools {
             if (classNames.size() > rowN){
                 row.createCell(3).setCellValue(classNames.get(rowN));
             }
+
+            // add header class if data exist
+            if (rowN == 0 && !headerClass.isEmpty()){
+                row.createCell(4).setCellValue(headerClass);
+            }
+
             rowN++;
         }
 

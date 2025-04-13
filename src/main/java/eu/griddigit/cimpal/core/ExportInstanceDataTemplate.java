@@ -473,7 +473,7 @@ public class ExportInstanceDataTemplate {
         model.write(outTTL, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), "");
     }
 
-    public static void CreateTemplateFromRDF(List<File> file, File iFile, String selectedMethod) {
+    public static void CreateTemplateFromRDF(List<File> file, List<File> iFiles, String selectedMethod) {
         String cimsNs = MainController.prefs.get("cimsNamespace", "");
         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
 
@@ -489,7 +489,7 @@ public class ExportInstanceDataTemplate {
         for (File fil : file) {
             Model model = ModelFactory.createDefaultModel(); // model is the rdf file
             try {
-                RDFDataMgr.read(model, new FileInputStream(fil),"" ,Lang.RDFXML);
+                RDFDataMgr.read(model, new FileInputStream(fil), "", Lang.RDFXML);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
@@ -617,26 +617,39 @@ public class ExportInstanceDataTemplate {
         rdfsInfo.put("Datatype", rdfsItemAttrDatatype);
         rdfsInfo.put("Type", rdfsAttrOrAssocFlag);
 
-        try(XSSFWorkbook workbook = new XSSFWorkbook()) {
-            switch (selectedMethod) {
-                case "Option 1 (Old)":
-                    exportMapToExcel("Template", rdfsInfo, orderList, workbook);
-                    break;
-                case "Option 2 (New)":
-                    Map<String, List<List<RDFAttributeData>>> instanceClassData = null;
-                    if (iFile != null) {
-                        Model model = ModelFactory.createDefaultModel();
-                        RDFDataMgr.read(model, new FileInputStream(iFile), "", Lang.RDFXML);
-                        instanceClassData = getRDFDataForClasses(model);
-                    }
-                    exportMapToExcelv2(rdfsInfo, prefMap, instanceClassData, workbook);
-                    break;
-                case "Option 3 (TBD)":
-                    break;
+        int i = 0;
+        do {
+            try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+                String outFileName = "Template";
+                switch (selectedMethod) {
+                    case "Option 1 (Old)":
+                        exportMapToExcel("Template", rdfsInfo, orderList, workbook);
+                        break;
+                    case "Option 2 (New)":
+                        Map<String, List<List<RDFAttributeData>>> instanceClassData = null;
+                        File iFile = null;
+                        if (!iFiles.isEmpty()) {
+                            iFile = iFiles.get(i);
+                            if (iFile != null) {
+                                Model model = ModelFactory.createDefaultModel();
+                                RDFDataMgr.read(model, new FileInputStream(iFile), "", Lang.RDFXML);
+                                instanceClassData = getRDFDataForClasses(model);
+                                outFileName = iFile.getName()
+                                        .replaceAll("(?i)\\.xml$", "")
+                                        .trim();
+                                outFileName = outFileName + "_Template";
+                            }
+                        }
+                        exportMapToExcelv2(rdfsInfo, prefMap, instanceClassData, workbook);
+                        break;
+                    case "Option 3 (TBD)":
+                        break;
+                }
+                saveExcelFile(workbook, "Save Instance Data Template", outFileName);
+            } catch (RuntimeException | IOException e) {
+                throw new RuntimeException(e);
             }
-            saveExcelFile(workbook, "Save Instance Data Template", "Template");
-        } catch (RuntimeException | IOException e) {
-            throw new RuntimeException(e);
-        }
+            i++;
+        } while (iFiles.size() > i);
     }
 }

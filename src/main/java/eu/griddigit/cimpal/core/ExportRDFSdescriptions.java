@@ -159,8 +159,9 @@ public class ExportRDFSdescriptions {
                     if (object.isResource()) {
                         // If the object is a resource (URI), format it as prefix:localname
                         //String objectUri = object.toString();
-                        String objectPrefix = model.getNsURIPrefix(object.asResource().getNameSpace());
-                        propertyValue = (objectPrefix != null ? objectPrefix + ":" : "") + object.asResource().getLocalName();
+                        String objectNs = object.asResource().getNameSpace();
+                        String objectPrefix = model.getNsURIPrefix(objectNs);
+                        propertyValue = (objectPrefix != null ? objectPrefix + ":" : (objectNs.startsWith("file://") ? "" : objectNs)) + object.asResource().getLocalName();
                         tpe = "Resource";
                     } else {
                         // Otherwise, just use the literal value
