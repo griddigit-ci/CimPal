@@ -381,7 +381,7 @@ public class ShaclTools {
                         RDFNode resItemNode = j.next();
                         Resource resItemNew = model.getResource(resItemNode.toString());
                         //System.out.println(resItemNew.toString());
-                        String[] rdfTypeInit = resItemNew.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
+                        String[] rdfTypeInit = resItemNew.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of the rdf:type
                         String rdfType;
                         if (rdfTypeInit.length == 0) {
                             rdfType = rdfTypeInit[0];
