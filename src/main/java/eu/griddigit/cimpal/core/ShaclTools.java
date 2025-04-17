@@ -145,7 +145,11 @@ public class ShaclTools {
                 } else {
                     classMyData.add("No");
                 }
-
+                if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                    classMyData.add(classItem.getRequiredProperty(RDFS.subClassOf).getResource().toString()); // the resource of the subClassOf
+                }else{
+                    classMyData.add("No");
+                }
                 classData.add(classMyData); // adds the 0 element for the class where
                 //add the class data to the temp model
                 profileDataMapAsModelTemp.add(resItem, RDF.type, RDFS.Class);
@@ -156,10 +160,11 @@ public class ShaclTools {
                  * 3 is the label - RDFS label
                  * 4 has "DescriptionStereotype" is the indication if the class is stereotyped description
                  * 5 has "classConcrete" is the indication if the class is concrete
+                 * 6 the parent class or No if no parent class
                  */
                 mainClassTemp = classItem;
 
-                if (shapesOnAbstractOption == 0) {
+                if (shapesOnAbstractOption == 0) {// the checkbox is not selected
                     if (classConcrete) {// the resource is concrete - it is a concrete class
                         int root = 0;
                         while (root == 0) {
@@ -1980,10 +1985,9 @@ public class ShaclTools {
         for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and add NodeShape for each concrete class
             //String localName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
             String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
-            if (originalModel.contains(ResourceFactory.createStatement(ResourceFactory.createResource(classFullURI), RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class")))) {
+            if ((originalModel.contains(ResourceFactory.createStatement(ResourceFactory.createResource(classFullURI), RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class"))) && ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size()>1) || !((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(6).toString().equals("No")) {
                 enumClass.add(shapeModel.createResource(classFullURI));
             }
-            //TODO see how to do for description classes
         }
         // add FullModel, DifferenceModel and Dataset
         enumClass.add(shapeModel.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"));
@@ -2075,9 +2079,21 @@ public class ShaclTools {
         for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and add NodeShape for each concrete class
             //add the ShapeNode
             String localName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
+//            if (localName.contains("Contingency")){
+//                int k=1;
+//            }
             String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
             //RDFNode classRes = ResourceFactory.createResource(classFullURI);
-            if (originalModel.contains(ResourceFactory.createStatement(ResourceFactory.createResource(classFullURI), RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class")))) {
+            if ((originalModel.contains(ResourceFactory.createStatement(ResourceFactory.createResource(classFullURI), RDF.type, ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#Class"))) && ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size()>1) || !((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(6).toString().equals("No")) {
+//                if (((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size()==1){
+//                    for (int clin = 0; clin < ((ArrayList<?>) shapeData.getFirst()).size(); clin++) {
+//                        if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(clin)).getFirst()).get(6).toString().equals(classFullURI)){
+//
+//                        }
+//                    }
+//
+//                }
+
                 //add NodeShape for the CIM class
                 shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
                 //check if the class is stereotyped Description
@@ -2085,7 +2101,6 @@ public class ShaclTools {
                 if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(4).toString().equals("Yes")) {
                     classDescripStereo = true;
                 }
-
 
                 for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size(); atas++) {
                     // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
