@@ -628,7 +628,7 @@ public class ShaclTools {
                             nodeShapeResourceClassProp.addProperty(SH.name, "PropertyNotInProfile");
                             nodeShapeResourceClassProp.addProperty(SH.description, "Checks if the dataset contains properties which are not defined in the profile to which this dataset conforms to.");
                             RDFNode o8p = shapeModel.createResource(SH.NS + "Info");
-                            nodeShapeResourceClassProp.addProperty(SH.severity, o8);
+                            nodeShapeResourceClassProp.addProperty(SH.severity, o8p);
                             nodeShapeResourceClassProp.addProperty(SH.message, "This property is not part of the profile to which this dataset conforms to.");
                             RDFNode o1op = shapeModel.createTypedLiteral(propertyGroupOrder+1, "http://www.w3.org/2001/XMLSchema#integer");
                             nodeShapeResourceClassProp.addProperty(SH.order, o1op);
