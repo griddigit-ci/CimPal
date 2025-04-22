@@ -6,7 +6,6 @@
 package eu.griddigit.cimpal.core;
 
 
-import eu.griddigit.cimpal.application.MainController;
 import eu.griddigit.cimpal.model.SHACLValidationResult;
 import javafx.scene.control.ChoiceDialog;
 import javafx.stage.DirectoryChooser;
@@ -293,6 +292,7 @@ public class ShaclTools {
         RDFNode literalYes = ResourceFactory.createPlainLiteral("Yes");
         Property assocUsed = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","AssociationUsed");
         Property multiplicity = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity");
+        Property dataType = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","dataType");
         Property inverseRoleName = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","inverseRoleName");
         //initial setup of the shape model
         //creates shape model. This is per profile.
@@ -386,6 +386,15 @@ public class ShaclTools {
         groupFeatures.set(1, "This group of validation rules relate to validation of target classes of associations.");
         groupFeatures.set(2, "Associations");
         groupFeatures.set(3, 2);
+
+        shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
+
+        //for Profile Properties group
+        localNameGroup = "ProfilePropertiesGroup";
+        groupFeatures.set(0, "ProfileProperties");
+        groupFeatures.set(1, "This group of validation rules relate to validation if a property is part of a Profile.");
+        groupFeatures.set(2, "ProfileProperties");
+        groupFeatures.set(3, 1);
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
 
@@ -565,6 +574,7 @@ public class ShaclTools {
             int assocGroupOrder=0;
             int inverseassocGroupOrder=0;
             int datatypeGroupOrder=0;
+            int propertyGroupOrder=0;
             for (ResIterator i = model.listResourcesWithProperty(RDF.type,RDFS.Class); i.hasNext(); ) {
                 Resource resItem = i.next();
                 if (classIsNotEnumOrDatatype(resItem, model)) {
@@ -591,7 +601,46 @@ public class ShaclTools {
                                 } else {
                                     root = 1;
                                 }
+                            }else{
+                                root = 1;
                             }
+                        }
+
+                        if (rdfsToShaclGuiMapBool.get("Closedshapes")){
+                            // Adding node shape and property shape to check if we have additional properties that are not defined in the profile
+                            shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, resItem.getLocalName()+"-AllowedProperties", resItem.getURI());
+
+                            //create the property shape
+                            //RDFNode o = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
+                            Resource nodeShapeResourceClassProp = shapeModel.getResource(nsURIprofile + resItem.getLocalName()+"-AllowedProperties");
+
+                            for (Statement stmtP : localInheritProperties) {
+                                Resource resbn = ResourceFactory.createResource();
+                                Statement stmtbnP = ResourceFactory.createStatement(resbn, SH.path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
+                                nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
+                                shapeModel.add(stmtbnP);
+                            }
+
+
+                            //adding the properties for the PropertyShape
+                            //Resource r = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
+                            //r.addProperty(RDF.type, SH.PropertyShape);
+                            nodeShapeResourceClassProp.addProperty(SH.name, "PropertyNotInProfile");
+                            nodeShapeResourceClassProp.addProperty(SH.description, "Checks if the dataset contains properties which are not defined in the profile to which this dataset conforms to.");
+                            RDFNode o8p = shapeModel.createResource(SH.NS + "Info");
+                            nodeShapeResourceClassProp.addProperty(SH.severity, o8);
+                            nodeShapeResourceClassProp.addProperty(SH.message, "This property is not part of the profile to which this dataset conforms to.");
+                            RDFNode o1op = shapeModel.createTypedLiteral(propertyGroupOrder+1, "http://www.w3.org/2001/XMLSchema#integer");
+                            nodeShapeResourceClassProp.addProperty(SH.order, o1op);
+                            propertyGroupOrder = propertyGroupOrder +1;
+                            RDFNode o1gp = shapeModel.createResource(nsURIprofile+"ProfilePropertiesGroup");
+                            nodeShapeResourceClassProp.addProperty(SH.group, o1gp);
+                            RDFNode o1closed = shapeModel.createTypedLiteral("true", "http://www.w3.org/2001/XMLSchema#boolean");
+                            nodeShapeResourceClassProp.addProperty(SH.closed, o1closed);
+                            LinkedList<RDFNode> ignorePropList = new LinkedList<>();
+                            ignorePropList.add(RDF.type);
+                            RDFList ignorePropListRDFlist = shapeModel.createList(ignorePropList.iterator());
+                            nodeShapeResourceClassProp.addProperty(SH.ignoredProperties, ignorePropListRDFlist);
                         }
 
                         for (Statement stmt : localInheritProperties) { // loop on the local and inherited properties
@@ -776,11 +825,14 @@ public class ShaclTools {
                                 }
                             }else {//if it is an attribute
 
+
                                 Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
                                 String localNameAttr = stmt.getSubject().getLocalName();
                                 String propertyFullURI = stmt.getSubject().getURI();
 
-
+//                                if (localNameAttr.equals("Location.mainAddress")){
+//                                    int k1=1;
+//                                }
                                 //need to check if the class has any subclasses in the base profiles, if it has then the property shape should appear on the subclasses
                                 if (rdfsToShaclGuiMapBool.get("excludeMRID")) { // user selects that mRID should be skipped for description classes
                                     if (classDescripStereo) { //the class is stereotyped with description
@@ -802,11 +854,12 @@ public class ShaclTools {
 
                                 //check if the attribute is datatype, if yes the whole structure of the compound should be checked and property nodes should be created
                                 // for each attribute of the compound
-                                //TODO compound
-//                                if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString().equals("Compound")) {
-//                                    ArrayList<?> shapeDataCompound = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10));
-//                                    shapeModel = addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompound, nsURIprofile, nodeShapeResource, localNameAttr, propertyFullURI,rdfsToShaclGuiMapBool);
-//                                }
+                                if (model.listStatements(stmt.getSubject(),dataType,(RDFNode) null).hasNext()) {
+                                    Resource datatypeRes = model.getRequiredProperty(stmt.getSubject(), dataType).getObject().asResource();
+                                    if (model.listStatements(datatypeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createPlainLiteral("Compound")).hasNext()) {
+                                        shapeModel = addPropertyNodeForAttributeCompoundNew(shapeModel, propertyNodeFeatures, model, nsURIprofile, nodeShapeResource, rdfsToShaclGuiMapBool, stmt.getSubject(), datatypeRes);
+                                    }
+                                }
                             }
                         }
                     }
@@ -1692,9 +1745,9 @@ public class ShaclTools {
                     } else { // it enters here when it is  compound and the sh:path needs to be a list
                         //path for the case when the attribute is a compound
                         List<RDFNode> pathList = (List<RDFNode>) propertyNodeFeatures.get(13);
-                        if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
-                            pathList.add(RDF.type.asResource());
-                        }
+//                        if (propertyNodeFeatures.get(6).toString().equals("Compound")) {
+//                            pathList.add(RDF.type.asResource());
+//                        }
                         RDFList pathRDFlist = shapeModel.createList(pathList.iterator());
                         r.addProperty(path, pathRDFlist);
                     }
@@ -3459,6 +3512,145 @@ public class ShaclTools {
         return shapeModel;
     }
 
+    //adds the PropertyNode for attribute for compound.
+    public static Model addPropertyNodeForAttributeCompoundNew(Model shapeModel, ArrayList<Object> propertyNodeFeatures, Model model,String nsURIprofile, Resource nodeShapeResource, Map<String,Boolean> rdfsToShaclGuiMapBool, Resource stmt, Resource datatypeRes){
+
+        for (StmtIterator i = model.listStatements(null, RDFS.domain, datatypeRes); i.hasNext(); ) {
+            Statement stmtComp = i.next();
+            String localNameAttrComp = stmtComp.getSubject().getLocalName();
+            String propertyFullURIComp = stmtComp.getSubject().getURI();
+            shapeModel= addPropertyNodeForAttributeSingleCompoundNew(shapeModel, propertyNodeFeatures, model, nsURIprofile,1, nodeShapeResource,localNameAttrComp,propertyFullURIComp,rdfsToShaclGuiMapBool, stmt, stmtComp.getSubject());
+//            if (((ArrayList<?>) shapeDataCompound.get(atasComp)).get(8).toString().equals("Compound")) {
+//                ArrayList<?> shapeDataCompoundDeep = ((ArrayList<?>) ((ArrayList<?>) shapeDataCompound.get(atasComp)).get(10));
+//                shapeModel= addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompoundDeep, nsURIprofile, nodeShapeResource, localNameAttrComp,propertyFullURIComp,rdfsToShaclGuiMapBool);
+//
+//            }
+        }
+
+        return shapeModel;
+    }
+
+    //adds the PropertyNode for attribute. It runs one time for a regular attribute and it is reused multiple times for Compound
+    public static Model addPropertyNodeForAttributeSingleCompoundNew(Model shapeModel, ArrayList<Object> propertyNodeFeatures, Model model,String nsURIprofile, Integer order, Resource nodeShapeResource, String localNameAttr,String propertyFullURI,Map<String,Boolean> rdfsToShaclGuiMapBool, Resource stmt, Resource stmtComp){
+        //Cardinality check
+        Property multiplicity = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity");
+        propertyNodeFeatures.set(0, "cardinality");
+        String cardinality = "";
+        Resource compFullRes = ResourceFactory.createResource(propertyFullURI);
+        if (model.listStatements(compFullRes,multiplicity,(RDFNode) null).hasNext()){
+            cardinality = model.listStatements(compFullRes,multiplicity,(RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
+        }
+        propertyNodeFeatures.set(5, cardinality);
+        propertyNodeFeatures.set(1, "Missing required attribute.");
+        propertyNodeFeatures.set(2, localNameAttr + "-cardinality");
+        propertyNodeFeatures.set(3, "This constraint validates the cardinality of the property (attribute).");
+        propertyNodeFeatures.set(4, "Violation");
+        propertyNodeFeatures.set(8, order); // this is the order
+        propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
+
+        boolean skip=false;
+        try {
+            List pathCompound = new ArrayList<>();
+            pathCompound.add(stmt);
+            pathCompound.add(stmtComp);
+            propertyNodeFeatures.set(13, pathCompound);
+        }catch(Exception e){
+            skip=true;
+        }
+        if (skip==false) {
+
+
+            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI,rdfsToShaclGuiMapBool);
+
+            //add datatypes checks depending on it is Primitive, Datatype or Enumeration
+            propertyNodeFeatures.set(2, localNameAttr + "-datatype");
+            propertyNodeFeatures.set(3, "This constraint validates the datatype of the property (attribute).");
+            propertyNodeFeatures.set(0, "datatype");
+            propertyNodeFeatures.set(8, order); // this is the order
+            propertyNodeFeatures.set(9, nsURIprofile + "DatatypesGroup"); // this is the group
+
+            Resource datatypeRes = null;
+            if (model.listStatements(stmt,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"),(RDFNode) null).hasNext()) {
+                datatypeRes = model.listStatements(stmt, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"), (RDFNode) null).next().getObject().asResource();
+            }else{
+                datatypeRes = model.listStatements(stmt, RDFS.range, (RDFNode) null).next().getObject().asResource();
+            }
+            if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("Primitive")).hasNext()){
+                String datatypePrimitive = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString(); //this is localName e.g. String
+
+                propertyNodeFeatures.set(6, datatypePrimitive);
+                propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
+
+            }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("CIMDatatype")).hasNext()){
+                Resource datatypevalue = ResourceFactory.createProperty(datatypeRes.getURI()+".value");
+
+                String datatypePrimitive = model.getRequiredProperty(datatypevalue,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType")).getObject().asResource().getLocalName(); //this is localName e.g. String
+
+                propertyNodeFeatures.set(6, datatypePrimitive);
+                propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
+            }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("Compound")).hasNext()){
+
+                //String datatypeCompound = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString();
+                String datatypeCompound = datatypeRes.getURI();
+
+                propertyNodeFeatures.set(6, "Compound");
+                propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");
+                propertyNodeFeatures.set(12, datatypeCompound);
+            }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createResource("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()){
+                propertyNodeFeatures.set(6, "Enumeration");
+                propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is enumerated value not part of the profile.");
+                //this adds the structure which is a list of possible enumerated values
+                List<Resource> enumValues = model.listSubjectsWithProperty(RDF.type,datatypeRes).toList();
+                List<String> enumValuesStr = new ArrayList<>();
+                for (Resource enumValue : enumValues) {
+                    enumValuesStr.add(enumValue.toString());
+                }
+                propertyNodeFeatures.set(7, enumValuesStr);
+            }
+
+
+
+
+
+
+//            switch (((ArrayList<?>) shapeData.get(atas)).get(8).toString()) {
+//                case "Primitive": {
+//                    String datatypePrimitive = ((ArrayList<?>) shapeData.get(atas)).get(10).toString(); //this is localName e.g. String
+//
+//                    propertyNodeFeatures.set(6, datatypePrimitive);
+//                    propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
+//
+//                    break;
+//                }
+//                case "CIMDatatype": {
+//                    String datatypePrimitive = ((ArrayList<?>) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
+//
+//                    propertyNodeFeatures.set(6, datatypePrimitive);
+//                    propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
+//
+//                    break;
+//                }
+//                case "Compound": {
+//                    String datatypeCompound = ((ArrayList<?>) shapeData.get(atas)).get(9).toString(); //this is localName e.g. String
+//
+//                    propertyNodeFeatures.set(6, "Compound");
+//                    propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");
+//                    propertyNodeFeatures.set(12, datatypeCompound);
+//                    break;
+//                }
+//                case "Enumeration":
+//                    propertyNodeFeatures.set(6, "Enumeration");
+//                    propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is an enumerated value which is not part of the enumeration.");
+//                    //this adds the structure which is a list of possible enumerated values
+//                    propertyNodeFeatures.set(7, ((ArrayList<?>) shapeData.get(atas)).get(10));
+//                    break;
+//            }
+            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAttr, propertyFullURI,rdfsToShaclGuiMapBool);
+            propertyNodeFeatures.set(13, ""); // in order to be empty for the next attribute
+        }
+        return shapeModel;
+    }
+
     //adds the PropertyNode for attribute. It runs one time for a regular attribute and it is reused multiple times for Compound
     public static Model addPropertyNodeForAttributeSingleCompound(Model shapeModel, ArrayList<Object> propertyNodeFeatures, ArrayList<?> shapeData,String nsURIprofile, Integer atas, Resource nodeShapeResource, String localNameAttr,String propertyFullURI,Map<String,Boolean> rdfsToShaclGuiMapBool){
         //Cardinality check
@@ -3623,8 +3815,9 @@ public class ShaclTools {
             propertyNodeFeatures.set(6, datatypePrimitive);
             propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
         }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("Compound")).hasNext()){
-            //TODO
-            String datatypeCompound = "";// ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+
+            //String datatypeCompound = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString();
+            String datatypeCompound = datatypeRes.getURI();
 
             propertyNodeFeatures.set(6, "Compound");
             propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");

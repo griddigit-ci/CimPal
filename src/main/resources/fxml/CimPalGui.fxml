@@ -183,6 +183,7 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <CheckBox fx:id="cbRDFSSHACLoptionInverse" disable="true" mnemonicParsing="false" selected="true" text="Create contstraints for checking multiplicity of inverse association's end" />
+                                 <CheckBox fx:id="cbRDFSSHACLoptionProperty" disable="true" mnemonicParsing="false" selected="true" text="Create constraints for checking presence of additional properties (i.e. properties not defined in the profile)" />
                               </HBox>
                               <HBox spacing="10.0">
                                  <padding>

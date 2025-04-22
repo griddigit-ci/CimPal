@@ -350,6 +350,8 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLncProp;
     @FXML
     private CheckBox cbRDFSSHACLuri;
+    @FXML
+    private CheckBox cbRDFSSHACLoptionProperty;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -1894,6 +1896,7 @@ public class MainController implements Initializable {
             cbRDFSSHACLoptionInverse.setDisable(false);
             cbRDFSSHACLuri.setDisable(false);
             cbRDFSSHACLncProp.setDisable(false);
+            cbRDFSSHACLoptionProperty.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -2996,6 +2999,13 @@ public class MainController implements Initializable {
             rdfsToShaclGuiMapBool.put("excludeMRID",true);
         }else{
             rdfsToShaclGuiMapBool.put("excludeMRID",false);
+        }
+
+        if (cbRDFSSHACLoptionProperty.isSelected()){
+
+            rdfsToShaclGuiMapBool.put("Closedshapes",true);
+        }else{
+            rdfsToShaclGuiMapBool.put("Closedshapes",false);
         }
         //excludeMRID = cbRDFSSHACLoptionDescr.isSelected();
 

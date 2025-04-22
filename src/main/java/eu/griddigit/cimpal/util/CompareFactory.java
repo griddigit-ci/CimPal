@@ -286,16 +286,20 @@ public class CompareFactory {
     //Compare RDFnode list - gives true if the lists are different
     private static boolean compareRDFlist(List<RDFNode> list1, List<RDFNode> list2) {
         boolean different = false;
-        if (list1.size()!=list2.size()){
-            different=true;
-        }else {
-            for (RDFNode resItem : list1) {
-                if (!list2.contains(resItem)) {
-                    different = true;
-                    break;
-                }
+        if (list1 != null && list2 != null) {
+            if (list1.size() != list2.size()) {
+                different = true;
+            } else {
+                for (RDFNode resItem : list1) {
+                    if (!list2.contains(resItem)) {
+                        different = true;
+                        break;
+                    }
 
+                }
             }
+        }else {
+            different = true;
         }
         return different;
     }
@@ -389,9 +393,16 @@ public class CompareFactory {
                     List<RDFNode> listModelB = isBNlistB.get(true);
                     if (compareRDFlist(listModelA, listModelB)) {
                         // the lists are different and the result will need to be recorded
-
-                        result.put("modelA",listModelA.toString());
-                        result.put("modelB",listModelB.toString());
+                        if (listModelA != null) {
+                            result.put("modelA", listModelA.toString());
+                        }else{
+                            result.put("modelA", "list is null");
+                        }
+                        if (listModelB != null) {
+                            result.put("modelB", listModelB.toString());
+                        }else{
+                            result.put("modelB", "list is null");
+                        }
                     }
 
                 } else { //the attribute is not in modelB - record difference
