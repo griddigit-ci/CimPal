@@ -571,7 +571,13 @@ public class ModelManipulationFactory {
 
                                 switch (propertyType) {
                                     case "Literal" -> { //add literal
-                                        String datatype = ((LinkedList<?>) classXlsData.get(3)).get(j).toString();
+                                        String datatype;
+                                        try {
+                                            datatype = ((LinkedList<?>) classXlsData.get(3)).get(j).toString();
+                                        }
+                                        catch (Exception e){
+                                            datatype = "";
+                                        }
                                         if (datatype.equalsIgnoreCase("float"))
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Float.parseFloat(object)))));
                                         else if (datatype.equalsIgnoreCase("integer"))
