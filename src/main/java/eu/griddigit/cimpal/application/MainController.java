@@ -2306,7 +2306,7 @@ public class MainController implements Initializable {
                     (!cbApplyDefNsDesignTab.isSelected() || !cbApplyDefBaseURIDesignTab.isSelected())) {
 
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().getFirst().getValue();
-                for (Object modelsNames : this.modelsNames) {
+                for (Object modelsNames : RDFSmodelsNames) {
                     if (selectedProfile.equals(((ArrayList<?>) modelsNames).getFirst())) {
                         int issueFound = 0;
                         if (!fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
