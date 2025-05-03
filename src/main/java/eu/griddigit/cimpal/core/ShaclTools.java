@@ -579,14 +579,13 @@ public class ShaclTools {
                 Resource resItem = i.next();
                 if (classIsNotEnumOrDatatype(resItem, model)) {
                     //check if the class is concrete
+                    boolean classDescripStereo = classIsDescription(resItem, model);
                     if (classIsConcrete(resItem, model)) {
                         //add the NodeShape
                         String localName = resItem.getLocalName();
                         String classFullURI = resItem.getURI();
                         //add NodeShape for the CIM class
                         shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
-
-                        boolean classDescripStereo = classIsDescription(resItem, model);
 
                         //get all local and inherited properties
                         List<Statement> localInheritProperties = new LinkedList<>();
@@ -616,7 +615,7 @@ public class ShaclTools {
 
                             for (Statement stmtP : localInheritProperties) {
                                 Resource resbn = ResourceFactory.createResource();
-                                Statement stmtbnP = ResourceFactory.createStatement(resbn, SH.path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
+                                Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
                                 nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
                                 shapeModel.add(stmtbnP);
                             }
@@ -630,17 +629,19 @@ public class ShaclTools {
                             RDFNode o8p = shapeModel.createResource(SH.NS + "Info");
                             nodeShapeResourceClassProp.addProperty(SH.severity, o8p);
                             nodeShapeResourceClassProp.addProperty(SH.message, "This property is not part of the profile to which this dataset conforms to.");
-                            RDFNode o1op = shapeModel.createTypedLiteral(propertyGroupOrder+1, "http://www.w3.org/2001/XMLSchema#integer");
-                            nodeShapeResourceClassProp.addProperty(SH.order, o1op);
-                            propertyGroupOrder = propertyGroupOrder +1;
+                            if (!shapeModel.listStatements(nodeShapeResourceClassProp, SH.order, (RDFNode) null).hasNext()) {
+                                RDFNode o1op = shapeModel.createTypedLiteral(propertyGroupOrder + 1, "http://www.w3.org/2001/XMLSchema#integer");
+                                nodeShapeResourceClassProp.addProperty(SH.order, o1op);
+                                propertyGroupOrder = propertyGroupOrder + 1;
+                            }
                             RDFNode o1gp = shapeModel.createResource(nsURIprofile+"ProfilePropertiesGroup");
                             nodeShapeResourceClassProp.addProperty(SH.group, o1gp);
                             RDFNode o1closed = shapeModel.createTypedLiteral("true", "http://www.w3.org/2001/XMLSchema#boolean");
                             nodeShapeResourceClassProp.addProperty(SH.closed, o1closed);
-                            LinkedList<RDFNode> ignorePropList = new LinkedList<>();
-                            ignorePropList.add(RDF.type);
-                            RDFList ignorePropListRDFlist = shapeModel.createList(ignorePropList.iterator());
-                            nodeShapeResourceClassProp.addProperty(SH.ignoredProperties, ignorePropListRDFlist);
+                            if (!shapeModel.listStatements(nodeShapeResourceClassProp, SH.ignoredProperties, (RDFNode) null).hasNext()) {
+                                //nodeShapeResourceClassProp.addProperty(SH.ignoredProperties, ignorePropListRDFlist);
+                                nodeShapeResourceClassProp.addProperty(SH.ignoredProperties, shapeModel.createList(new RDFNode[] { RDF.type }));
+                            }
                         }
 
                         for (Statement stmt : localInheritProperties) { // loop on the local and inherited properties
@@ -862,6 +863,302 @@ public class ShaclTools {
                                 }
                             }
                         }
+                    }else if (!classIsConcrete(resItem, model) && classDescripStereo) { //class is abstract, has attributes or associations and has description stereotype; then check for concrete classes in base profiles and crete shapes for them
+
+                        //check if the abstract class has properties
+                        if (model.listStatements(null,RDFS.domain,resItem).hasNext()) {
+
+//                            if (resItem.getLocalName().equals("FunctionBlock")){
+//                                int fb=1;
+//                            }
+                            // get concrete classes from base profile
+                            LinkedList<Resource> concreteClassesBase = getConcreteSubclassesFromBase(resItem, rdfsToShaclGuiMapBool, baseTier1Map, baseTier2Map, baseTier3Map);
+                            for (Resource resBaseItem : concreteClassesBase) {
+
+                                //add the NodeShape
+                                String localName = resBaseItem.getLocalName();
+                                String classFullURI = resBaseItem.getURI();
+                                //add NodeShape for the CIM class
+                                shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, localName, classFullURI);
+
+                                //get all local and inherited properties
+                                List<Statement> localInheritProperties = new LinkedList<>();
+
+                                int root = 0;
+                                Resource classItem = resItem;
+                                while (root == 0) {
+                                    if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
+                                        localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
+                                        if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                                            classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
+                                        } else {
+                                            root = 1;
+                                        }
+                                    } else {
+                                        root = 1;
+                                    }
+                                }
+
+                                if (rdfsToShaclGuiMapBool.get("Closedshapes")) {
+                                    // Adding node shape and property shape to check if we have additional properties that are not defined in the profile
+                                    shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, resBaseItem.getLocalName() + "-AllowedProperties", resBaseItem.getURI());
+
+                                    //create the property shape
+                                    //RDFNode o = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
+                                    Resource nodeShapeResourceClassProp = shapeModel.getResource(nsURIprofile + resBaseItem.getLocalName() + "-AllowedProperties");
+
+                                    for (Statement stmtP : localInheritProperties) {
+                                        Resource resbn = ResourceFactory.createResource();
+                                        Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
+                                        nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
+                                        shapeModel.add(stmtbnP);
+                                    }
+
+
+                                    //adding the properties for the PropertyShape
+                                    //Resource r = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
+                                    //r.addProperty(RDF.type, SH.PropertyShape);
+                                    nodeShapeResourceClassProp.addProperty(SH.name, "PropertyNotInProfile");
+                                    nodeShapeResourceClassProp.addProperty(SH.description, "Checks if the dataset contains properties which are not defined in the profile to which this dataset conforms to.");
+                                    RDFNode o8p = shapeModel.createResource(SH.NS + "Info");
+                                    nodeShapeResourceClassProp.addProperty(SH.severity, o8p);
+                                    nodeShapeResourceClassProp.addProperty(SH.message, "This property is not part of the profile to which this dataset conforms to.");
+                                    if (!shapeModel.listStatements(nodeShapeResourceClassProp, SH.order, (RDFNode) null).hasNext()) {
+                                        RDFNode o1op = shapeModel.createTypedLiteral(propertyGroupOrder + 1, "http://www.w3.org/2001/XMLSchema#integer");
+                                        nodeShapeResourceClassProp.addProperty(SH.order, o1op);
+                                        propertyGroupOrder = propertyGroupOrder + 1;
+                                    }
+                                    RDFNode o1gp = shapeModel.createResource(nsURIprofile + "ProfilePropertiesGroup");
+                                    nodeShapeResourceClassProp.addProperty(SH.group, o1gp);
+                                    RDFNode o1closed = shapeModel.createTypedLiteral("true", "http://www.w3.org/2001/XMLSchema#boolean");
+                                    nodeShapeResourceClassProp.addProperty(SH.closed, o1closed);
+                                    if (!shapeModel.listStatements(nodeShapeResourceClassProp, SH.ignoredProperties, (RDFNode) null).hasNext()) {
+                                        //nodeShapeResourceClassProp.addProperty(SH.ignoredProperties, ignorePropListRDFlist);
+                                        nodeShapeResourceClassProp.addProperty(SH.ignoredProperties,shapeModel.createList(new RDFNode[] { RDF.type }));
+                                    }
+                                }
+
+                                for (Statement stmt : localInheritProperties) { // loop on the local and inherited properties
+                                    ArrayList<Object> propertyNodeFeatures = new ArrayList<>();
+                                    /*
+                                     * propertyNodeFeatures structure
+                                     * 0 - type of check: cardinality, datatype, associationValueType
+                                     * 1 - message
+                                     * 2 - name
+                                     * 3 - description
+                                     * 4 - severity
+                                     * 5 - cardinality
+                                     * 6 - the primitive either it is directly a primitive or it is the primitive of the .value attribute of a CIMdatatype
+                                     * in case of enumeration 6 is set to Enumeration
+                                     * in case of compound 6 is set to Compound
+                                     * 7 - is a list of uri of the enumeration attributes
+                                     * 8 - order
+                                     * 9 - group
+                                     * 10 - the inverse role name in case of association - the inverse end
+                                     * 11 - the list of concrete classes for association - the value type at the used end
+                                     * 12 - classFullURI for the targetClass of the NodeShape
+                                     * 13 - the uri of the compound class to be used in sh:class
+                                     * 14 - path for the attributes of the compound
+                                     */
+                                    for (int ii = 0; ii < 14; ii++) {
+                                        propertyNodeFeatures.add("");
+                                    }
+
+                                    if (model.listStatements(stmt.getSubject(), assocUsed, (RDFNode) null).hasNext()) { // it is an association
+                                        if (model.listStatements(stmt.getSubject(), assocUsed, literalYes).hasNext()) { // the association direction exchanged
+                                            //Cardinality check
+                                            propertyNodeFeatures.set(0, "cardinality");
+                                            String cardinality = "";
+                                            if (model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).hasNext()) {
+                                                cardinality = model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
+                                            }
+                                            String localNameAssoc = stmt.getSubject().getLocalName();
+                                            propertyNodeFeatures.set(5, cardinality);
+                                            Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
+                                            propertyNodeFeatures.set(1, "Association with cardinality violation at the used direction.");
+                                            propertyNodeFeatures.set(2, localNameAssoc + "-cardinality");
+                                            propertyNodeFeatures.set(3, "This constraint validates the cardinality of the association at the used direction.");
+                                            propertyNodeFeatures.set(4, "Violation");
+                                            propertyNodeFeatures.set(8, cardGroupOrder + 1); // this is the order
+                                            cardGroupOrder = cardGroupOrder + 1;
+                                            propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
+
+                                            String propertyFullURI = stmt.getSubject().getURI();
+
+                                            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI, rdfsToShaclGuiMapBool);
+
+                                            //Association check for target class
+                                            if (rdfsToShaclGuiMapBool.get("shaclSkipNcPropertyReference") && localNameAssoc.contains(".PropertyReference")) {
+                                                continue;
+                                            }
+
+                                            propertyNodeFeatures.set(0, "associationValueType");
+
+                                            //Check if there is a self association on model header and if this is the case then do not include sh:in and the sh:path needs to be different
+                                            String assocDomain = model.listStatements(stmt.getSubject(), RDFS.domain, (RDFNode) null).next().getObject().toString();
+                                            String assocRange = model.listStatements(stmt.getSubject(), RDFS.range, (RDFNode) null).next().getObject().toString();
+                                            Resource assocRangeRes = model.listStatements(stmt.getSubject(), RDFS.range, (RDFNode) null).next().getObject().asResource();
+
+                                            if (assocDomain.equals(assocRange) && assocDomain.equals("http://iec.ch/TC57/61970-552/ModelDescription/1#Model")) { // this is the case when it is a header
+                                                propertyNodeFeatures.set(1, "Not correct serialisation (rdf:resource is expected).");
+                                                propertyNodeFeatures.set(2, localNameAssoc + "-nodeKind");
+                                                propertyNodeFeatures.set(3, "This constraint validates the node kind of the association at the used direction.");
+                                            } else {//any other case
+                                                propertyNodeFeatures.set(1, "Not correct target class.");
+                                                propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
+                                                propertyNodeFeatures.set(3, "This constraint validates the value of the association at the used direction.");
+                                            }
+
+                                            propertyNodeFeatures.set(4, "Violation");
+                                            propertyNodeFeatures.set(8, assocGroupOrder + 1); // this is the order
+                                            assocGroupOrder = assocGroupOrder + 1;
+                                            propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
+                                            List<Resource> concreteClasses = new LinkedList<>();
+
+                                            LinkedList<Resource> subclassResources = new LinkedList<>();
+                                            if (classIsConcrete(assocRangeRes, model)) {
+                                                subclassResources.add(assocRangeRes);
+                                            }
+                                            subclassResources = getAllSubclassesResource(model, assocRangeRes, subclassResources);
+                                            for (Resource res : subclassResources) {
+                                                if (classIsConcrete(res, model)) {
+                                                    concreteClasses.add(res);
+                                                }
+                                            }
+
+                                            concreteClasses.addAll(getConcreteSubclassesFromBase(assocRangeRes, rdfsToShaclGuiMapBool, baseTier1Map, baseTier2Map, baseTier3Map));
+                                            if (concreteClasses.isEmpty()) {
+                                                concreteClasses.add(assocRangeRes);
+                                                System.out.println("WARNING: The class " + assocRange + " is abstract and it is referenced by the association " + localNameAssoc + " for class " + classFullURI + ". ValueType SHACL constraint is set to require the type of this abstract class.");
+                                            }
+
+                                            LinkedHashSet<Resource> concreteClasseshashSet = new LinkedHashSet<>(concreteClasses);
+                                            Iterator<Resource> itr = concreteClasseshashSet.iterator();
+                                            LinkedList<Resource> concreteClassesList = new LinkedList<>();
+                                            while (itr.hasNext()) {
+                                                concreteClassesList.add(itr.next());
+                                            }
+//                                        if (shapesOnAbstractOption == 1){
+//                                            concreteClassesList.add(assocRangeRes);
+//                                        }else {
+//                                            while (itr.hasNext()) {
+//                                                concreteClassesList.add(itr.next());
+//                                            }
+//                                        }
+                                            propertyNodeFeatures.set(10, concreteClassesList);
+                                            propertyNodeFeatures.set(11, classFullURI);
+
+                                            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI, rdfsToShaclGuiMapBool);
+
+                                        } else { // this is for cardinality of inverse associations
+                                            //Add node shape and property shape for the presence of the inverse association
+                                            String invAssocURI = stmt.getSubject().getURI();
+                                            String localNameInvAssoc = stmt.getSubject().getLocalName();
+                                            shapeModel = ShaclTools.addNodeShapeProfileClass(shapeModel, nsURIprofile, localNameInvAssoc + "-inverseNodePresent", invAssocURI);
+                                            //create the property shape
+                                            RDFNode oi = shapeModel.createResource(nsURIprofile + localNameInvAssoc + "-propertyInverse");
+                                            Resource nodeShapeResourceClassInv = shapeModel.getResource(nsURIprofile + localNameInvAssoc + "-inverseNodePresent");
+                                            nodeShapeResourceClassInv.addProperty(SH.property, oi);
+
+                                            //adding the properties for the PropertyShape
+                                            Resource ri = shapeModel.createResource(nsURIprofile + localNameInvAssoc + "-propertyInverse");
+                                            ri.addProperty(RDF.type, SH.PropertyShape);
+                                            ri.addProperty(SH.name, "InverseAssociationPresent");
+                                            ri.addProperty(SH.description, "Inverse associations shall not be instantiated.");
+                                            RDFNode o8i = shapeModel.createResource(SH.NS + "Violation");
+                                            ri.addProperty(SH.severity, o8i);
+                                            ri.addProperty(SH.message, "Inverse association is present.");
+                                            RDFNode o5i = shapeModel.createResource(invAssocURI);
+                                            ri.addProperty(path, o5i);
+                                            RDFNode o1oi = shapeModel.createTypedLiteral(inverseassocGroupOrder + 1, "http://www.w3.org/2001/XMLSchema#integer");
+                                            inverseassocGroupOrder = inverseassocGroupOrder + 1;
+                                            ri.addProperty(SH.order, o1oi);
+                                            RDFNode o1gi = shapeModel.createResource(nsURIprofile + "InverseAssociationsGroup");
+                                            ri.addProperty(SH.group, o1gi);
+                                            RDFNode o4i = shapeModel.createTypedLiteral(0, "http://www.w3.org/2001/XMLSchema#integer");
+                                            ri.addProperty(SH.maxCount, o4i);
+
+                                            if (rdfsToShaclGuiMapBool.get("shaclflaginverse")) {
+                                                propertyNodeFeatures.set(0, "cardinality");
+                                                String cardinality = "";
+                                                if (model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).hasNext()) {
+                                                    cardinality = model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
+                                                }
+                                                String localNameAssoc = stmt.getSubject().getLocalName();
+                                                propertyNodeFeatures.set(5, cardinality);
+                                                Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
+                                                propertyNodeFeatures.set(1, "Association with cardinality violation at the inverse direction.");
+                                                propertyNodeFeatures.set(2, localNameAssoc + "-cardinality");
+                                                propertyNodeFeatures.set(3, "This constraint validates the cardinality of the association at the inverse direction.");
+                                                propertyNodeFeatures.set(4, "Violation");
+                                                propertyNodeFeatures.set(8, cardGroupOrder + 1); // this is the order
+                                                cardGroupOrder = cardGroupOrder + 1;
+                                                propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
+                                                Set<String> inverseAssocSet = new LinkedHashSet<>();
+                                                Property assocProp = ResourceFactory.createProperty(model.listStatements(stmt.getSubject(), inverseRoleName, (RDFNode) null).next().getObject().toString());
+                                                String assocPropName = assocProp.getLocalName();
+                                                String assocPropNS = assocProp.getNameSpace();
+                                                if (rdfsToShaclGuiMapBool.get("baseprofilesshaclglag")) {
+                                                    inverseAssocSet.add(assocProp.toString());
+                                                    //add the 3 cim namespaces if it is cim namespace
+                                                    if (assocPropNS.equals("http://iec.ch/TC57/CIM100#") || assocPropNS.equals("http://iec.ch/TC57/2013/CIM-schema-cim16#") || assocPropNS.equals("https://cim.ucaiug.io/ns#")) {
+                                                        inverseAssocSet.add("http://iec.ch/TC57/CIM100#" + assocPropName);
+                                                        inverseAssocSet.add("http://iec.ch/TC57/2013/CIM-schema-cim16#" + assocPropName);
+                                                        inverseAssocSet.add("https://cim.ucaiug.io/ns#" + assocPropName);
+                                                    }
+                                                } else {
+                                                    inverseAssocSet.add(assocProp.toString());
+                                                }
+                                                propertyNodeFeatures.set(10, inverseAssocSet); // this is a list of role names
+                                                //propertyNodeFeatures.set(10, ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString()); // this is the inverse role name
+                                                propertyNodeFeatures.set(11, "Inverse");
+
+                                                String propertyFullURI = stmt.getSubject().getURI();
+
+                                                shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI, rdfsToShaclGuiMapBool);
+                                            }
+                                        }
+                                    } else {//if it is an attribute
+
+
+                                        Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
+                                        String localNameAttr = stmt.getSubject().getLocalName();
+                                        String propertyFullURI = stmt.getSubject().getURI();
+
+//                                if (localNameAttr.equals("Location.mainAddress")){
+//                                    int k1=1;
+//                                }
+                                        //need to check if the class has any subclasses in the base profiles, if it has then the property shape should appear on the subclasses
+                                        if (rdfsToShaclGuiMapBool.get("excludeMRID")) { // user selects that mRID should be skipped for description classes
+                                            if (classDescripStereo) { //the class is stereotyped with description
+                                                if (!localNameAttr.equals("IdentifiedObject.mRID")) { //the attribute is not mRID
+                                                    shapeModel = addPropertyNodeForAttributeSingleNew(shapeModel, propertyNodeFeatures, nsURIprofile, nodeShapeResource, localNameAttr, propertyFullURI, rdfsToShaclGuiMapBool, cardGroupOrder, datatypeGroupOrder, model, stmt, multiplicity);
+                                                    cardGroupOrder = cardGroupOrder + 1;
+                                                    datatypeGroupOrder = datatypeGroupOrder + 1;
+                                                }
+                                            } else {
+                                                shapeModel = addPropertyNodeForAttributeSingleNew(shapeModel, propertyNodeFeatures, nsURIprofile, nodeShapeResource, localNameAttr, propertyFullURI, rdfsToShaclGuiMapBool, cardGroupOrder, datatypeGroupOrder, model, stmt, multiplicity);
+                                                cardGroupOrder = cardGroupOrder + 1;
+                                                datatypeGroupOrder = datatypeGroupOrder + 1;
+                                            }
+                                        } else {
+                                            shapeModel = addPropertyNodeForAttributeSingleNew(shapeModel, propertyNodeFeatures, nsURIprofile, nodeShapeResource, localNameAttr, propertyFullURI, rdfsToShaclGuiMapBool, cardGroupOrder, datatypeGroupOrder, model, stmt, multiplicity);
+                                            cardGroupOrder = cardGroupOrder + 1;
+                                            datatypeGroupOrder = datatypeGroupOrder + 1;
+                                        }
+
+                                        //check if the attribute is datatype, if yes the whole structure of the compound should be checked and property nodes should be created
+                                        // for each attribute of the compound
+                                        if (model.listStatements(stmt.getSubject(), dataType, (RDFNode) null).hasNext()) {
+                                            Resource datatypeRes = model.getRequiredProperty(stmt.getSubject(), dataType).getObject().asResource();
+                                            if (model.listStatements(datatypeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createPlainLiteral("Compound")).hasNext()) {
+                                                shapeModel = addPropertyNodeForAttributeCompoundNew(shapeModel, propertyNodeFeatures, model, nsURIprofile, nodeShapeResource, rdfsToShaclGuiMapBool, stmt.getSubject(), datatypeRes);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -881,6 +1178,21 @@ public class ShaclTools {
             }
         }
         shapeModel.remove(statementsToDelete);
+
+        //cleam rdf list that are not referenced
+        List<Statement> statementsToDeleteBlank = new LinkedList<>();
+        for (StmtIterator i = shapeModel.listStatements(); i.hasNext(); ) {
+            Statement stmtNodeShape = i.next();
+            if (stmtNodeShape.getSubject().isAnon()) {
+                if (!shapeModel.listStatements(null, null, stmtNodeShape.getSubject()).hasNext()) {
+                    for (StmtIterator j = shapeModel.listStatements(stmtNodeShape.getSubject(), null, (RDFNode)  null); j.hasNext(); ) {
+                        Statement stmtNodeShapeDel = j.next();
+                        statementsToDeleteBlank.add(stmtNodeShapeDel);
+                    }
+                }
+            }
+        }
+        shapeModel.remove(statementsToDeleteBlank);
 
         return shapeModel;
     }
@@ -3949,7 +4261,9 @@ public class ShaclTools {
             subclassResources = getAllSubclassesResource(baseTier1Map.get("unionmodelbaseprofilesshacl"), resItem, subclassResources);
             for (Resource res : subclassResources) {
                 if (classIsConcrete(res, baseTier1Map.get("unionmodelbaseprofilesshacl"))) {
-                    concreteclasses.add(res);
+                    if (!concreteclasses.contains(res)) {
+                        concreteclasses.add(res);
+                    }
                 }
             }
         }
@@ -3959,7 +4273,9 @@ public class ShaclTools {
             subclassResources = getAllSubclassesResource(baseTier2Map.get("unionmodelbaseprofilesshacl"), resItem, subclassResources);
             for (Resource res : subclassResources) {
                 if (classIsConcrete(res, baseTier2Map.get("unionmodelbaseprofilesshacl"))) {
-                    concreteclasses.add(res);
+                    if (!concreteclasses.contains(res)) {
+                        concreteclasses.add(res);
+                    }
                 }
             }
         }
@@ -3969,7 +4285,9 @@ public class ShaclTools {
             subclassResources = getAllSubclassesResource(baseTier3Map.get("unionmodelbaseprofilesshacl"), resItem, subclassResources);
             for (Resource res : subclassResources) {
                 if (classIsConcrete(res, baseTier3Map.get("unionmodelbaseprofilesshacl"))) {
-                    concreteclasses.add(res);
+                    if (!concreteclasses.contains(res)) {
+                        concreteclasses.add(res);
+                    }
                 }
             }
         }
@@ -3979,7 +4297,9 @@ public class ShaclTools {
             for (StmtIterator i = baseTier1Map.get("unionmodelbaseprofilesshaclinheritanceonly").listStatements(null, OWL2.members, (RDFNode) null); i.hasNext(); ) {
                 Statement stmtinheritanceign = i.next();
                 if (stmtinheritanceign.getSubject().getLocalName().equals(resItem.getLocalName())) {
-                    concreteclasses.add(stmtinheritanceign.getObject().asResource());
+                    if (!concreteclasses.contains(stmtinheritanceign.getObject().asResource())) {
+                        concreteclasses.add(stmtinheritanceign.getObject().asResource());
+                    }
                 }
             }
         }
