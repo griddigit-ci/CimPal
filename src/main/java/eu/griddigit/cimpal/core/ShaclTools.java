@@ -567,7 +567,7 @@ public class ShaclTools {
 
         }
 
-        if (rdfsToShaclGuiMapBool.get("shapesOnAbstractOption")){
+        if (rdfsToShaclGuiMapBool.get("shapesOnAbstractOption")){ // the option when shacl validation uses inheritance and the shapes are on abstract classes
 
         }else{
             int cardGroupOrder=0;
@@ -580,7 +580,9 @@ public class ShaclTools {
                 if (classIsNotEnumOrDatatype(resItem, model)) {
                     //check if the class is concrete
                     boolean classDescripStereo = classIsDescription(resItem, model);
-                    if (classIsConcrete(resItem, model)) {
+                    boolean isConcreteInBase = isClassConcreteInBase(resItem, rdfsToShaclGuiMapBool, baseTier1Map, baseTier2Map, baseTier3Map);
+                    boolean isConcrete = classIsConcrete(resItem, model);
+                    if (isConcrete && isConcreteInBase) {
                         //add the NodeShape
                         String localName = resItem.getLocalName();
                         String classFullURI = resItem.getURI();
@@ -863,7 +865,7 @@ public class ShaclTools {
                                 }
                             }
                         }
-                    }else if (!classIsConcrete(resItem, model) && classDescripStereo) { //class is abstract, has attributes or associations and has description stereotype; then check for concrete classes in base profiles and crete shapes for them
+                    }else if ((!isConcrete && classDescripStereo) || (isConcrete && classDescripStereo && !isConcreteInBase) ) { //class is abstract, has attributes or associations and has description stereotype; then check for concrete classes in base profiles and crete shapes for them
 
                         //check if the abstract class has properties
                         if (model.listStatements(null,RDFS.domain,resItem).hasNext()) {
@@ -4250,6 +4252,32 @@ public class ShaclTools {
                 }
         }
         return localConcreteClasses;
+    }
+
+    public static Boolean isClassConcreteInBase(Resource resItem, Map<String,Boolean> rdfsToShaclGuiMapBool, Map<String,Model> baseTier1Map, Map<String,Model> baseTier2Map, Map<String,Model> baseTier3Map) {
+
+        boolean isConcreteInBase = false;
+
+        if (rdfsToShaclGuiMapBool.get("baseprofilesshaclglag")) {
+            if (classIsConcrete(resItem, baseTier1Map.get("unionmodelbaseprofilesshacl"))) {
+                isConcreteInBase = true;
+            }
+        }
+
+        if (rdfsToShaclGuiMapBool.get("baseprofilesshaclglag2nd")) {
+            if (classIsConcrete(resItem, baseTier2Map.get("unionmodelbaseprofilesshacl"))) {
+                isConcreteInBase = true;
+            }
+        }
+
+        if (rdfsToShaclGuiMapBool.get("baseprofilesshaclglag3rd")) {
+            if (classIsConcrete(resItem, baseTier3Map.get("unionmodelbaseprofilesshacl"))) {
+                isConcreteInBase = true;
+            }
+        }
+
+
+        return isConcreteInBase;
     }
 
     public static LinkedList<Resource> getConcreteSubclassesFromBase(Resource resItem, Map<String,Boolean> rdfsToShaclGuiMapBool, Map<String,Model> baseTier1Map, Map<String,Model> baseTier2Map, Map<String,Model> baseTier3Map){
