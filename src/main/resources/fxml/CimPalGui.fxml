@@ -6,39 +6,13 @@
  @author Chavdar Ivanov
  -->
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.ChoiceBox?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Menu?>
-<?import javafx.scene.control.MenuBar?>
-<?import javafx.scene.control.MenuItem?>
-<?import javafx.scene.control.ProgressBar?>
-<?import javafx.scene.control.RadioButton?>
-<?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.control.Separator?>
-<?import javafx.scene.control.SeparatorMenuItem?>
-<?import javafx.scene.control.SplitPane?>
-<?import javafx.scene.control.Tab?>
-<?import javafx.scene.control.TabPane?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.ToggleButton?>
-<?import javafx.scene.control.ToggleGroup?>
-<?import javafx.scene.control.Tooltip?>
-<?import javafx.scene.control.TreeView?>
-<?import javafx.scene.image.ImageView?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Pane?>
-<?import javafx.scene.layout.Region?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
    <MenuBar prefHeight="13.0" prefWidth="1280.0" VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -209,6 +183,7 @@
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <CheckBox fx:id="cbRDFSSHACLoptionInverse" disable="true" mnemonicParsing="false" selected="true" text="Create contstraints for checking multiplicity of inverse association's end" />
+                                 <CheckBox fx:id="cbRDFSSHACLoptionProperty" disable="true" mnemonicParsing="false" selected="true" text="Create constraints for checking presence of additional properties (i.e. properties not defined in the profile)" />
                               </HBox>
                               <HBox spacing="10.0">
                                  <padding>
@@ -236,15 +211,20 @@
                                  <padding>
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
-                                 <children>
-                                    <CheckBox fx:id="cbRDFSSHACLvalidate" disable="true" mnemonicParsing="false" selected="true" text="Validate generated SHACL shapes" />
-                                 </children>
+                                 <CheckBox fx:id="cbRDFSSHACLuri" disable="true" mnemonicParsing="false" selected="true" text="Treat URI datatype as rdf:resource" />
+                                 <CheckBox fx:id="cbRDFSSHACLncProp" disable="true" mnemonicParsing="false" selected="true" text="Skip value type checks for associations to nc:PropertyReference" />
+                              </HBox>
+                              <HBox spacing="10.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <CheckBox fx:id="cbRDFSSHACLvalidate" disable="true" mnemonicParsing="false" selected="true" text="Validate generated SHACL shapes" />
                               </HBox>
                               <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                  <VBox.margin>
                                     <Insets bottom="5.0" right="5.0" />
                                  </VBox.margin>
-                                 <Button fx:id="btnConstructShacl" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnConstructShacl" text="Create" HBox.hgrow="ALWAYS" />
+                                 <Button fx:id="btnConstructShacl" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRDFStoShacl" text="Create" HBox.hgrow="ALWAYS" />
                                  <Button fx:id="btnApply" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnApply" text="Apply" />
                                  <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionOpenRDFS" text="Open RDFS for profiles">
                                     <tooltip>
@@ -761,24 +741,22 @@
                                              <padding>
                                                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                              </padding>
-                                             <children>
-                                                <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
-                                                <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
-                                                   <toggleGroup>
-                                                      <ToggleGroup fx:id="giDataLine" />
-                                                   </toggleGroup>
-                                                </RadioButton>
-                                                <RadioButton mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
-                                                <Label minWidth="50.0" prefHeight="17.0" prefWidth="89.0" text="Sorting options:" />
-                                                <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
-                                                   <HBox.margin>
-                                                      <Insets left="10.0" />
-                                                   </HBox.margin>
-                                                </CheckBox>
-                                                <Label text="Sorting options:" />
-                                                <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
-                                                <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
-                                             </children>
+                                             <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
+                                             <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
+                                                <toggleGroup>
+                                                   <ToggleGroup fx:id="giDataLine" />
+                                                </toggleGroup>
+                                             </RadioButton>
+                                             <RadioButton mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
+                                             <Label minWidth="50.0" prefHeight="17.0" prefWidth="89.0" text="Sorting options:" />
+                                             <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
+                                                <HBox.margin>
+                                                   <Insets left="10.0" />
+                                                </HBox.margin>
+                                             </CheckBox>
+                                             <Label text="Sorting options:" />
+                                             <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
+                                             <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
                                           </HBox>
                                           <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                              <VBox.margin>
@@ -798,125 +776,99 @@
                      </content>
                   </Tab>
                   <Tab fx:id="IDpane" disable="true" text="Instance Data Browser Pane">
-                     <content>
-                        <AnchorPane fx:id="IDpane" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                           <children>
-                              <VBox layoutX="27.0" layoutY="17.0" minWidth="200.0" prefHeight="451.0" prefWidth="1228.0" spacing="5.0">
-                                 <children>
-                                    <HBox fx:id="IDhbox" alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" prefHeight="411.0" prefWidth="1228.0" spacing="10.0">
-                                       <children>
-                                          <ImageView fx:id="IDImageView" fitHeight="411.0" fitWidth="1236.0" pickOnBounds="true" preserveRatio="true" />
-                                       </children>
-                                    </HBox>
-                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
-                                       <children>
-                                          <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData1" text="Load Data" />
-                                          <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
-                                       </children>
-                                    </HBox>
-                                 </children>
-                              </VBox>
-                           </children>
-                        </AnchorPane>
-                     </content>
+                     <AnchorPane fx:id="IDpane" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <VBox layoutX="27.0" layoutY="17.0" minWidth="200.0" prefHeight="451.0" prefWidth="1228.0" spacing="5.0">
+                           <HBox fx:id="IDhbox" alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" prefHeight="411.0" prefWidth="1228.0" spacing="10.0">
+                              <ImageView fx:id="IDImageView" fitHeight="411.0" fitWidth="1236.0" pickOnBounds="true" preserveRatio="true" />
+                           </HBox>
+                           <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
+                              <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData1" text="Load Data" />
+                              <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
+                           </HBox>
+                        </VBox>
+                     </AnchorPane>
                   </Tab>
                   <Tab disable="true" text="Instance Data Browser">
-                     <content>
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                           <children>
-                              <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                 <children>
-                                    <VBox minWidth="300.0" spacing="5.0">
+                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                           <VBox minWidth="300.0" spacing="5.0">
+                              <HBox.margin>
+                                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                              </HBox.margin>
+                              <Label prefWidth="120.0" text="Instance data" />
+                              <TreeView fx:id="treeViewInstanceData11" minHeight="70.0" onMouseClicked="#selectActionTreeItemID" prefWidth="300.0" VBox.vgrow="ALWAYS" />
+                           </VBox>
+                           <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                              <HBox.margin>
+                                 <Insets bottom="5.0" right="5.0" top="5.0" />
+                              </HBox.margin>
+                              <VBox prefHeight="200.0" prefWidth="100.0">
+                                 <VBox.margin>
+                                    <Insets />
+                                 </VBox.margin>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <CheckBox fx:id="cbShowUnionModelOnly11" mnemonicParsing="false" selected="true" text="Show only Union Model">
                                        <HBox.margin>
-                                          <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                          <Insets right="10.0" />
                                        </HBox.margin>
+                                    </CheckBox>
+                                    <Label prefWidth="140.0" text="Shapes namespace:" />
+                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
+                                    <TextField fx:id="fPrefixGenerateTab111" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
+                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
+                                    <TextField fx:id="fURIGenerateTab111" editable="false" prefWidth="300.0" />
+                                 </HBox>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <Label prefWidth="140.0" text="Shapes base URI:" />
+                                    <TextField fx:id="fshapesBaseURIDefineTab111" editable="false" prefWidth="530.0" />
+                                 </HBox>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <children>
+                                       <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
+                                       <TextField fx:id="fowlImportsDefineTab111" editable="false" prefWidth="530.0" />
+                                    </children>
+                                 </HBox>
+                              </VBox>
+                              <TableView fx:id="tableViewBrowseID11">
+                                 <columns>
+                                    <TableColumn fx:id="itemColumnBrowseModifyID11" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Property" />
+                                    <TableColumn fx:id="valueColumnBrowseModifyID11" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
+                                 </columns>
+                              </TableView>
+                              <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                 <children>
+                                    <VBox minWidth="200.0" spacing="5.0">
                                        <children>
-                                          <Label prefWidth="120.0" text="Instance data" />
-                                          <TreeView fx:id="treeViewInstanceData11" minHeight="70.0" onMouseClicked="#selectActionTreeItemID" prefWidth="300.0" VBox.vgrow="ALWAYS" />
+                                          <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
+                                             <children>
+                                                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
+                                             </children>
+                                          </HBox>
                                        </children>
                                     </VBox>
-                                    <VBox spacing="10.0" HBox.hgrow="ALWAYS">
-                                       <HBox.margin>
-                                          <Insets bottom="5.0" right="5.0" top="5.0" />
-                                       </HBox.margin>
+                                    <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
                                        <children>
-                                          <VBox prefHeight="200.0" prefWidth="100.0">
-                                             <VBox.margin>
-                                                <Insets />
-                                             </VBox.margin>
+                                          <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
                                              <children>
-                                                <HBox spacing="10.0">
-                                                   <padding>
-                                                      <Insets left="5.0" right="5.0" top="5.0" />
-                                                   </padding>
-                                                   <children>
-                                                      <CheckBox fx:id="cbShowUnionModelOnly11" mnemonicParsing="false" selected="true" text="Show only Union Model">
-                                                         <HBox.margin>
-                                                            <Insets right="10.0" />
-                                                         </HBox.margin>
-                                                      </CheckBox>
-                                                      <Label prefWidth="140.0" text="Shapes namespace:" />
-                                                      <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
-                                                      <TextField fx:id="fPrefixGenerateTab111" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
-                                                      <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
-                                                      <TextField fx:id="fURIGenerateTab111" editable="false" prefWidth="300.0" />
-                                                   </children>
-                                                </HBox>
-                                                <HBox spacing="10.0">
-                                                   <padding>
-                                                      <Insets left="5.0" right="5.0" top="5.0" />
-                                                   </padding>
-                                                   <children>
-                                                      <Label prefWidth="140.0" text="Shapes base URI:" />
-                                                      <TextField fx:id="fshapesBaseURIDefineTab111" editable="false" prefWidth="530.0" />
-                                                   </children>
-                                                </HBox>
-                                                <HBox spacing="10.0">
-                                                   <padding>
-                                                      <Insets left="5.0" right="5.0" top="5.0" />
-                                                   </padding>
-                                                   <children>
-                                                      <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
-                                                      <TextField fx:id="fowlImportsDefineTab111" editable="false" prefWidth="530.0" />
-                                                   </children>
-                                                </HBox>
-                                             </children>
-                                          </VBox>
-                                          <TableView fx:id="tableViewBrowseID11">
-                                             <columns>
-                                                <TableColumn fx:id="itemColumnBrowseModifyID11" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Property" />
-                                                <TableColumn fx:id="valueColumnBrowseModifyID11" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
-                                             </columns>
-                                          </TableView>
-                                          <HBox alignment="BOTTOM_LEFT" spacing="10.0">
-                                             <children>
-                                                <VBox minWidth="200.0" spacing="5.0">
-                                                   <children>
-                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
-                                                         <children>
-                                                            <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadInstanceData" text="Unload Data" />
-                                                         </children>
-                                                      </HBox>
-                                                   </children>
-                                                </VBox>
-                                                <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
-                                                   <children>
-                                                      <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
-                                                         <children>
-                                                            <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData" text="Load Data" HBox.hgrow="ALWAYS" />
-                                                         </children>
-                                                      </HBox>
-                                                   </children>
-                                                </VBox>
+                                                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnLoadInstanceData" text="Load Data" HBox.hgrow="ALWAYS" />
                                              </children>
                                           </HBox>
                                        </children>
                                     </VBox>
                                  </children>
                               </HBox>
-                           </children>
-                        </AnchorPane>
-                     </content>
+                           </VBox>
+                        </HBox>
+                     </AnchorPane>
                   </Tab>
                   <Tab disable="true" text="Instance Data Browser">
                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">

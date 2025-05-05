@@ -17,6 +17,7 @@ import javafx.stage.Stage;
 import javafx.util.Callback;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.URL;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -85,7 +86,7 @@ public class rdfDiffResultController implements Initializable {
     }
 
     @FXML
-    private void actionBtnExportResult(ActionEvent actionEvent) throws FileNotFoundException {
+    private void actionBtnExportResult(ActionEvent actionEvent) throws IOException {
         export(tableViewResults,"RDFS comparison results","RDFScomparisonResult","Save RDFS comparison result");
         //RDFDataMgr.write(System.out, AddShapesController.reportResource.getModel(), RDFFormat.TURTLE);
 
