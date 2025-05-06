@@ -307,8 +307,6 @@ public class MainController implements Initializable {
     @FXML
     private TextField fsXlsTemplatePath;
     @FXML
-    private TextField fXmlBaseGen;
-    @FXML
     private ChoiceBox fcbGenMethodOptions;
     @FXML
     private CheckBox fcbAddInstanceData;
@@ -352,6 +350,8 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLuri;
     @FXML
     private CheckBox cbRDFSSHACLoptionProperty;
+    @FXML
+    private ChoiceBox fcb_giVersion;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -582,6 +582,12 @@ public class MainController implements Initializable {
 
         );
 
+        fcb_giVersion.getItems().addAll(
+                "IEC 61970-600-1&2 (CGMES 3.0.0)",
+                "IEC TS 61970-600-1&2 (CGMES 2.4.15)"
+        );
+        fcb_giVersion.getSelectionModel().selectFirst();
+
 
         fcbIDmap.getItems().addAll(
                 "No datatypes mapping",
@@ -624,7 +630,6 @@ public class MainController implements Initializable {
         //TODO: see how to have this default on the screen
         defaultShapesURI = "/Constraints";
 
-        fXmlBaseGen.setText("http://iec.ch/TC57/CIM100");
     }
 
 
@@ -4957,7 +4962,17 @@ public class MainController implements Initializable {
     private void actionBtnRunGenerateInstance() throws Exception {
         progressBar.setProgress(0);
 
-        String xmlBase = fXmlBaseGen.getText();
+        String xmlBase = "";
+        switch (fcb_giVersion.getSelectionModel().getSelectedItem().toString()){
+            case "IEC 61970-600-1&2 (CGMES 3.0.0)":
+                xmlBase = "http://iec.ch/TC57/CIM100";
+                break;
+                case "IEC TS 61970-600-1&2 (CGMES 2.4.15)":
+                xmlBase = "http://iec.ch/TC57/2013/CIM-schema-cim16";
+                break;
+            default:
+                break;
+        }
         Map<String, Object> saveProperties = new HashMap<>();
         boolean sortRDF = fcbSortRDFGen.isSelected();
         boolean sortPrefix = fcbRDFsortOptionsGen.getSelectionModel().getSelectedItem().toString().equals("Sorting by prefix");
@@ -5017,7 +5032,7 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         MainController.inputXLS = null;
         fsXlsTemplatePath.clear();
-        fXmlBaseGen.setText("http://iec.ch/TC57/CIM100");
+        fcb_giVersion.getSelectionModel().selectFirst();
         fcbSortRDFGen.setSelected(true);
         fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
         fcbGenMethodOptions.getSelectionModel().selectFirst();
