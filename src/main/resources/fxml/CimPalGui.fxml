@@ -838,7 +838,7 @@
                      </content>
                   </Tab>
                   <Tab fx:id="IDpane" disable="true" text="Instance Data Browser Pane">
-                     <AnchorPane fx:id="IDpane" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                         <VBox layoutX="27.0" layoutY="17.0" minWidth="200.0" prefHeight="451.0" prefWidth="1228.0" spacing="5.0">
                            <HBox fx:id="IDhbox" alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" prefHeight="411.0" prefWidth="1228.0" spacing="10.0">
                               <ImageView fx:id="IDImageView" fitHeight="411.0" fitWidth="1236.0" pickOnBounds="true" preserveRatio="true" />
