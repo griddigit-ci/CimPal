@@ -77,6 +77,8 @@ import static eu.griddigit.cimpal.core.ExportInstanceDataTemplate.CreateTemplate
 import static eu.griddigit.cimpal.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.core.RdfConvert.fileSaveDialog;
 import static eu.griddigit.cimpal.core.RdfConvert.modelInheritance;
+import static eu.griddigit.cimpal.core.ShaclTools.createShapesModelFromRDFS;
+import static eu.griddigit.cimpal.core.ShaclTools.prepareShapesModelFromRDFS;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
@@ -340,6 +342,16 @@ public class MainController implements Initializable {
     private TextField fPrefixSHACLCommon;
     @FXML
     private TextField fURISHACLcommon;
+    @FXML
+    private CheckBox fcbIDcompDiff;
+    @FXML
+    private CheckBox fcbIDcompPerFileAndAll;
+    @FXML
+    private CheckBox cbRDFSSHACLncProp;
+    @FXML
+    private CheckBox cbRDFSSHACLuri;
+    @FXML
+    private CheckBox cbRDFSSHACLoptionProperty;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -356,6 +368,8 @@ public class MainController implements Initializable {
 
     private ArrayList<Object> models;
     private ArrayList<Object> modelsNames;
+    public static ArrayList<Model> RDFSmodels;
+    public static ArrayList<Object> RDFSmodelsNames;
     public static ArrayList<Object> shapeModelsNames;
 
     private ArrayList<String> packages;
@@ -410,6 +424,8 @@ public class MainController implements Initializable {
     public static String cim3Pref;
     public static Model compareIDmodel1;
     public static Model compareIDmodel2;
+    public static boolean shaclURIdatatypeAsResource;
+    public static boolean shaclSkipNcPropertyReference;
 
 
     public static Map<String, Model> InstanceModelMap;
@@ -1006,6 +1022,12 @@ public class MainController implements Initializable {
 
         Model model1single = null;
         Model model2single = null;
+        Map<String, Model> model1Structure = new HashMap<>();
+        Map<String, Model> model2Structure = new HashMap<>();
+        Map<String, String> model1IDname = new HashMap<>();
+        Map<String, String> model2IDname = new HashMap<>();
+        Resource mdFullModelRes = ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+        Resource mdDiffernceModelRes = ResourceFactory.createResource("http://iec.ch/TC57/61970-552/DifferenceModel/1#DifferenceModel");
         Model model1 = ModelFactory.createDefaultModel();
         Map<String, String> prefixMap = model1.getNsPrefixMap();
 
@@ -1027,6 +1049,14 @@ public class MainController implements Initializable {
             }
             prefixMap.putAll(model1single.getNsPrefixMap());
             model1.add(model1single);
+            String model1ID = "";
+            if (model1single.listStatements(null,RDF.type,mdFullModelRes).hasNext()){
+                model1ID =  model1single.listStatements(null,RDF.type,mdFullModelRes).nextStatement().getSubject().getLocalName();
+            } else if (model1single.listStatements(null,RDF.type,mdDiffernceModelRes).hasNext()) {
+                model1ID = model1single.listStatements(null, RDF.type, mdDiffernceModelRes).nextStatement().getSubject().getLocalName();
+            }
+            model1Structure.put(model1ID, model1single);
+            model1IDname.put(model1ID,item.toString().toLowerCase());
         }
         model1.setNsPrefixes(prefixMap);
 
@@ -1054,91 +1084,198 @@ public class MainController implements Initializable {
             }
             prefixMap.putAll(model2single.getNsPrefixMap());
             model2.add(model2single);
+            String model2ID = "";
+            if (model2single.listStatements(null,RDF.type,mdFullModelRes).hasNext()){
+                model2ID =  model2single.listStatements(null,RDF.type,mdFullModelRes).nextStatement().getSubject().getLocalName();
+            } else if (model2single.listStatements(null,RDF.type,mdDiffernceModelRes).hasNext()) {
+                model2ID = model2single.listStatements(null, RDF.type, mdDiffernceModelRes).nextStatement().getSubject().getLocalName();
+            }
+            model2Structure.put(model2ID, model2single);
+            model2IDname.put(model2ID,item.toString().toLowerCase());
         }
         model2.setNsPrefixes(prefixMap);
         ComparisonSHACLshapes.modelsABPrefMap = prefixMap;
 
-        //proceed with the comparison
+        //TODO do a check if the ID of the model is existing, if yes, compare that one (this is what we have now), but then it could happen that ID is different and model 2 is empyty
+        // so we need to check if name of the file is matching and then compare. We need a warning/info what is used the ID or the name of the file
 
-        rdfsCompareFiles = new LinkedList<>();
-        if (MainController.IDModel1.size() == 1) {
-            rdfsCompareFiles.add(MainController.IDModel1.getFirst().getName());
-        } else {
-            rdfsCompareFiles.add("Model 1");
-        }
-        if (MainController.IDModel2.size() == 1) {
-            rdfsCompareFiles.add(MainController.IDModel2.getFirst().getName());
-        } else {
-            rdfsCompareFiles.add("Model 2");
-        }
-
-        compareIDmodel1 = model1;
-        compareIDmodel2 = model2;
-
-        LinkedList<Integer> options = new LinkedList<>();
-        options.add(0); //1 is ignore sv classes
-        options.add(0);
-        options.add(0);
-        options.add(0);
-        options.add(0);
-        options.add(0);
-        if (fcbIDcompIgnoreSV.isSelected()) {
-            options.set(0, 1);
-        }
-        if (fcbIDcompIgnoreDL.isSelected()) {
-            options.set(1, 1);
-        }
-        if (fcbIDcompCount.isSelected()) {
-            options.set(3, 1);
-            compareResults = CompareFactory.compareCountClasses(compareResults, model1, model2);
-        }
-        if (fcbIDcompIgnoreTP.isSelected()) {
-            options.set(4, 1);
-        }
-        if (fcbIDcompSVonlyCN.isSelected()) {
-            options.set(5, 1);
-        }
-        if (fcbIDcompSVonly.isSelected()) {
-            options.set(2, 1);
-            compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
-        }
-        if (!fcbIDcompCount.isSelected() && !fcbIDcompSVonly.isSelected()) {
-            compareResults = ComparisonInstanceData.compareInstanceData(compareResults, model1, model2, options);
-        }
-
-        if (fcbIDcompSolutionOverview.isSelected()) {
-            compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
-            List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
-        }
+        if (fcbIDcompPerFileAndAll.isSelected()) {
 
 
-        if (!compareResults.isEmpty()) {
+            for (Map.Entry<String, Model> entry : model1Structure.entrySet()) {
+                String key = entry.getKey();
+                Model valueModel1 = entry.getValue();
+                rdfsCompareFiles = new LinkedList<>();
+                rdfsCompareFiles.add(model1IDname.get(key));
+                rdfsCompareFiles.add(model2IDname.get(key));
+                compareIDmodel1 = valueModel1;
+                Model valueModel2 = model2Structure.get(key);
+                compareIDmodel2 = valueModel2;
 
-            if (fcbIDcompShowDetails.isSelected()) {
-                try {
-                    Stage guiRdfDiffResultsStage = new Stage();
-                    //Scene for the menu RDF differences
-                    //FXMLLoader fxmlLoader = new FXMLLoader();
-                    Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
-                    Scene rdfDiffscene = new Scene(rootRDFdiff);
-                    guiRdfDiffResultsStage.setScene(rdfDiffscene);
-                    guiRdfDiffResultsStage.setTitle("Comparison Instance data");
-                    guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
-                    rdfDiffResultController.initData(guiRdfDiffResultsStage);
-                    guiRdfDiffResultsStage.showAndWait();
+                LinkedList<Integer> options = new LinkedList<>();
+                options.add(0); //1 is ignore sv classes
+                options.add(0); // 1 is to ignore DL classes
+                options.add(0); //1 is to do the count
+                options.add(0); // 1 is to ignore TP
+                options.add(0); // 1 is to do SV only
+                options.add(0);
+                options.add(0);
+                options.add(0);
+                if (fcbIDcompIgnoreSV.isSelected()) {
+                    options.set(0, 1);
+                }
+                if (fcbIDcompIgnoreDL.isSelected()) {
+                    options.set(1, 1);
+                }
+                if (fcbIDcompCount.isSelected()) {
+                    options.set(3, 1);
+                    compareResults = CompareFactory.compareCountClasses(compareResults, valueModel1, valueModel2);
+                }
+                if (fcbIDcompIgnoreTP.isSelected()) {
+                    options.set(4, 1);
+                }
+                if (fcbIDcompSVonlyCN.isSelected()) {
+                    options.set(5, 1);
+                }
+                if (fcbIDcompDiff.isSelected()) {
+                    options.set(6, 1);
+                }
+                if (fcbIDcompPerFileAndAll.isSelected()) {
+                    options.set(7, 1);
+                }
+                if (fcbIDcompSVonly.isSelected()) {
+                    options.set(2, 1);
+                    compareResults = ComparisonInstanceData.compareSolution(compareResults, valueModel1, valueModel2, xmlBase, options);
+                }
+                if (!fcbIDcompCount.isSelected() && !fcbIDcompSVonly.isSelected()) {
+                    compareResults = ComparisonInstanceData.compareInstanceData(compareResults, valueModel1, valueModel2, options);
+                }
 
-                } catch (IOException e) {
-                    e.printStackTrace();
+                if (fcbIDcompSolutionOverview.isSelected()) {
+                    compareResults = ComparisonInstanceData.compareSolution(compareResults, valueModel1, valueModel2, xmlBase, options);
+                    List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
+                }
+
+
+                if (!compareResults.isEmpty()) {
+
+                    if (fcbIDcompShowDetails.isSelected()) {
+                        try {
+                            Stage guiRdfDiffResultsStage = new Stage();
+                            //Scene for the menu RDF differences
+                            //FXMLLoader fxmlLoader = new FXMLLoader();
+                            Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
+                            Scene rdfDiffscene = new Scene(rootRDFdiff);
+                            guiRdfDiffResultsStage.setScene(rdfDiffscene);
+                            guiRdfDiffResultsStage.setTitle("Comparison Instance data");
+                            guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
+                            rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                            guiRdfDiffResultsStage.showAndWait();
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                } else {
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setContentText("The two models are identical.");
+                    alert.setHeaderText(null);
+                    alert.setTitle("Information");
+                    alert.showAndWait();
                 }
             }
-        } else {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setContentText("The two models are identical.");
-            alert.setHeaderText(null);
-            alert.setTitle("Information");
-            alert.showAndWait();
-        }
 
+
+        }else {
+
+            //proceed with the comparison
+
+            rdfsCompareFiles = new LinkedList<>();
+            if (MainController.IDModel1.size() == 1) {
+                rdfsCompareFiles.add(MainController.IDModel1.getFirst().getName());
+            } else {
+                rdfsCompareFiles.add("Model 1");
+            }
+            if (MainController.IDModel2.size() == 1) {
+                rdfsCompareFiles.add(MainController.IDModel2.getFirst().getName());
+            } else {
+                rdfsCompareFiles.add("Model 2");
+            }
+
+            compareIDmodel1 = model1;
+            compareIDmodel2 = model2;
+
+            LinkedList<Integer> options = new LinkedList<>();
+            options.add(0); //1 is ignore sv classes
+            options.add(0); // 1 is to ignore DL classes
+            options.add(0); //1 is to do the count
+            options.add(0); // 1 is to ignore TP
+            options.add(0); // 1 is to do SV only
+            options.add(0);
+            options.add(0);
+            if (fcbIDcompIgnoreSV.isSelected()) {
+                options.set(0, 1);
+            }
+            if (fcbIDcompIgnoreDL.isSelected()) {
+                options.set(1, 1);
+            }
+            if (fcbIDcompCount.isSelected()) {
+                options.set(3, 1);
+                compareResults = CompareFactory.compareCountClasses(compareResults, model1, model2);
+            }
+            if (fcbIDcompIgnoreTP.isSelected()) {
+                options.set(4, 1);
+            }
+            if (fcbIDcompSVonlyCN.isSelected()) {
+                options.set(5, 1);
+            }
+            if (fcbIDcompDiff.isSelected()) {
+                options.set(6, 1);
+            }
+            if (fcbIDcompPerFileAndAll.isSelected()) {
+                options.set(7, 1);
+            }
+            if (fcbIDcompSVonly.isSelected()) {
+                options.set(2, 1);
+                compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
+            }
+            if (!fcbIDcompCount.isSelected() && !fcbIDcompSVonly.isSelected()) {
+                compareResults = ComparisonInstanceData.compareInstanceData(compareResults, model1, model2, options);
+            }
+
+            if (fcbIDcompSolutionOverview.isSelected()) {
+                compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
+                List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
+            }
+
+
+            if (!compareResults.isEmpty()) {
+
+                if (fcbIDcompShowDetails.isSelected()) {
+                    try {
+                        Stage guiRdfDiffResultsStage = new Stage();
+                        //Scene for the menu RDF differences
+                        //FXMLLoader fxmlLoader = new FXMLLoader();
+                        Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
+                        Scene rdfDiffscene = new Scene(rootRDFdiff);
+                        guiRdfDiffResultsStage.setScene(rdfDiffscene);
+                        guiRdfDiffResultsStage.setTitle("Comparison Instance data");
+                        guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
+                        rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                        guiRdfDiffResultsStage.showAndWait();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } else {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setContentText("The two models are identical.");
+                alert.setHeaderText(null);
+                alert.setTitle("Information");
+                alert.showAndWait();
+            }
+        }
         progressBar.setProgress(1);
 
     }
@@ -1753,7 +1890,8 @@ public class MainController implements Initializable {
             int iterSize = file.size();
 
             for (int m = 0; m < iterSize; m++) {
-                modelLoad(m);
+                //modelLoad(m); //TODO disable this when switch to the new RDFS to SHACL
+                modelLoadRDFS(m);
                 setPackageStructure(m);
             }
 
@@ -1778,6 +1916,9 @@ public class MainController implements Initializable {
             cbRDFSSHACLoptionBaseprofiles3rd.setDisable(false);
             cbRDFSSHACLoptionBaseprofilesIgnoreNS.setDisable(false);
             cbRDFSSHACLoptionInverse.setDisable(false);
+            cbRDFSSHACLuri.setDisable(false);
+            cbRDFSSHACLncProp.setDisable(false);
+            cbRDFSSHACLoptionProperty.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -2084,6 +2225,25 @@ public class MainController implements Initializable {
         this.models.add(model);
     }
 
+    //Loads model data
+    private void modelLoadRDFS(int m) {
+
+        if (m == 0) {
+            RDFSmodels = new ArrayList<>(); // this is a collection of models (rdf profiles) that are imported
+            RDFSmodelsNames = new ArrayList<>(); // this is a collection of the name of the profile packages
+            //modelsOnt =new ArrayList<>();
+        }
+        Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+        //for the text of ontology model
+        try {
+            RDFDataMgr.read(model, new FileInputStream(this.selectedFile.get(m).toString()), Lang.RDFXML);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        RDFSmodels.add(model);
+    }
+
     //initializes the TreeView in the tab Generate Shapes - profile tree vew
     private void guiTreeProfileConstraintsInit() {
         TreeItem<String> rootMain;
@@ -2092,7 +2252,8 @@ public class MainController implements Initializable {
         rootMain.setExpanded(true);
         treeViewProfileConstraints.setRoot(rootMain); // sets the root to the eu.griddigit.cimpal.gui object
         treeViewProfileConstraints.setShowRoot(false);
-        for (Object modelsName : this.modelsNames) {
+        //for (Object modelsName : this.modelsNames) {
+        for (Object modelsName : RDFSmodelsNames) {
             TreeItem<String> profileItem = new TreeItem<>(((ArrayList<?>) modelsName).getFirst().toString()); // level for the Classes
             rootMain.getChildren().add(profileItem);
         }
@@ -2105,7 +2266,8 @@ public class MainController implements Initializable {
     private void setPackageStructure(int m) {
 
         //set package structure
-        Model model = (Model) this.models.get(m);
+        //Model model = (Model) this.models.get(m);
+        Model model = (Model) RDFSmodels.get(m);
         this.packages = new ArrayList<>();
 
         if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019") || rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2020")) {
@@ -2127,7 +2289,8 @@ public class MainController implements Initializable {
         mpak1.add(""); // reserved for the URI of the profile
         mpak1.add(""); // reserved for the baseURI of the profile
         mpak1.add(""); // reserved for owl:imports
-        this.modelsNames.add(mpak1);
+        //this.modelsNames.add(mpak1);
+        RDFSmodelsNames.add(mpak1);
     }
 
     @FXML
@@ -2165,7 +2328,7 @@ public class MainController implements Initializable {
                     (!cbApplyDefNsDesignTab.isSelected() || !cbApplyDefBaseURIDesignTab.isSelected())) {
 
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().getFirst().getValue();
-                for (Object modelsNames : this.modelsNames) {
+                for (Object modelsNames : RDFSmodelsNames) {
                     if (selectedProfile.equals(((ArrayList<?>) modelsNames).getFirst())) {
                         int issueFound = 0;
                         if (!fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
@@ -2220,7 +2383,8 @@ public class MainController implements Initializable {
 
             if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size() == 1) {
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().getFirst().getValue();
-                for (Object modelsName : this.modelsNames) {
+                //for (Object modelsName : this.modelsNames) {
+                for (Object modelsName : RDFSmodelsNames) {
                     if (selectedProfile.equals(((ArrayList<?>) modelsName).getFirst().toString())) {
                         if (fowlImportsCreateCompleteSMTab.getText().isEmpty()) {
                             ((ArrayList) modelsName).set(4, "");
@@ -2252,7 +2416,8 @@ public class MainController implements Initializable {
             }
             if (cbApplyDefNsDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();
-                for (Object modelsNames : this.modelsNames) {
+                //for (Object modelsNames : this.modelsNames) {
+                for (Object modelsNames : RDFSmodelsNames) {
                     for (TreeItem<String> treeitem : treeitems) {
                         if (treeitem.getValue().equals(((ArrayList<?>) modelsNames).get(0))) {
                             switch (treeitem.getValue()) {
@@ -2565,7 +2730,8 @@ public class MainController implements Initializable {
             }
             if (cbApplyDefBaseURIDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();
-                for (Object modelsNames : this.modelsNames) {
+                //for (Object modelsNames : this.modelsNames) {
+                for (Object modelsNames : RDFSmodelsNames) {
                     for (TreeItem<String> treeitem : treeitems) {
                         if (treeitem.getValue().equals(((ArrayList) modelsNames).get(0))) {
                             switch (treeitem.getValue()) {
@@ -2833,7 +2999,8 @@ public class MainController implements Initializable {
     private void actionTreeProfileConstraintsTab(MouseEvent mouseEvent) {
 
         String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().getFirst().getValue();
-        for (Object modelsNames : this.modelsNames) {
+        //for (Object modelsNames : this.modelsNames) {
+        for (Object modelsNames : RDFSmodelsNames) {
             if (selectedProfile.equals(((ArrayList<?>) modelsNames).getFirst())) {
                 fPrefixCreateCompleteSMTab.setText(((ArrayList<?>) modelsNames).get(1).toString());
                 fURICreateCompleteSMTab.setText(((ArrayList<?>) modelsNames).get(2).toString());
@@ -2842,6 +3009,238 @@ public class MainController implements Initializable {
         }
 
         btnConstructShacl.setDisable(false);
+    }
+
+    @FXML
+    //Action for button Create in the tab RDFS to SHACL (new implementation)
+    private void actionBtnRDFStoShacl(ActionEvent actionEvent) throws IOException {
+
+        Map<String, Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
+        Map<String, String> rdfsToShaclGuiMapStr = new HashMap<>();
+        if (cbRDFSSHACLoptionDescr.isSelected()){
+            rdfsToShaclGuiMapBool.put("excludeMRID",true);
+        }else{
+            rdfsToShaclGuiMapBool.put("excludeMRID",false);
+        }
+
+        if (cbRDFSSHACLoptionProperty.isSelected()){
+
+            rdfsToShaclGuiMapBool.put("Closedshapes",true);
+        }else{
+            rdfsToShaclGuiMapBool.put("Closedshapes",false);
+        }
+        //excludeMRID = cbRDFSSHACLoptionDescr.isSelected();
+
+        //String cbvalue;
+        //Model shaclRefModel = null;
+        if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem() == null) {
+            //cbvalue = "";
+            rdfsToShaclGuiMapStr.put("cbvalue","");
+        } else {
+            //cbvalue = fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
+            rdfsToShaclGuiMapStr.put("cbvalue",fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString());
+        }
+        if (cbRDFSSHACLoption1.isSelected()) {
+            //associationValueTypeOption = 1;
+            rdfsToShaclGuiMapBool.put("associationValueTypeOption",true);
+        } else {
+            //associationValueTypeOption = 0;
+            rdfsToShaclGuiMapBool.put("associationValueTypeOption",false);
+        }
+        if (cbRDFSSHACLoptionTypeWithOne.isSelected()) {
+            //associationValueTypeOptionSingle = 1;
+            rdfsToShaclGuiMapBool.put("associationValueTypeOptionSingle",true);
+        } else {
+            //associationValueTypeOptionSingle = 0;
+            rdfsToShaclGuiMapBool.put("associationValueTypeOptionSingle",false);
+        }
+        if (cbRDFSSHACLabstract.isSelected()) {
+            //shapesOnAbstractOption = 1;
+            rdfsToShaclGuiMapBool.put("shapesOnAbstractOption",true);
+        } else {
+            //shapesOnAbstractOption = 0;
+            rdfsToShaclGuiMapBool.put("shapesOnAbstractOption",false);
+        }
+        if (cbRDFSSHACLinheritTree.isSelected()) {
+            //exportInheritTree = 1;
+            rdfsToShaclGuiMapBool.put("exportInheritTree",true);
+        } else {
+            //exportInheritTree = 0;
+            rdfsToShaclGuiMapBool.put("exportInheritTree",false);
+        }
+
+        //shaclURIdatatypeAsResource = false;
+        //shaclSkipNcPropertyReference = false;
+        if (cbRDFSSHACLuri.isSelected()){
+            //shaclURIdatatypeAsResource = true;
+            rdfsToShaclGuiMapBool.put("shaclURIdatatypeAsResource",true);
+        }else{
+            rdfsToShaclGuiMapBool.put("shaclURIdatatypeAsResource",false);
+        }
+
+        if (cbRDFSSHACLncProp.isSelected()){
+            //haclSkipNcPropertyReference = true;
+            rdfsToShaclGuiMapBool.put("shaclSkipNcPropertyReference",true);
+        }else{
+            rdfsToShaclGuiMapBool.put("shaclSkipNcPropertyReference",false);
+        }
+
+
+        if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
+            //depending on the value of the choice box "Save datatype map"
+            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
+                //shaclNodataMap = 1;
+                rdfsToShaclGuiMapBool.put("shaclNodataMap",true);
+            } else {
+                //shaclNodataMap = 0;
+                rdfsToShaclGuiMapBool.put("shaclNodataMap",false);
+            }
+            if (shapeModels == null) {
+                shapeModels = new ArrayList<>();
+            }
+            if (shapeModelsNames == null) {
+                shapeModelsNames = new ArrayList<>();
+            }
+            shapeDatas = new ArrayList<>();
+            //Map<String, RDFDatatype> dataTypeMapFromShapesComplete = new HashMap<>(); // this is the complete map for the export in one .properties
+            ArrayList<Integer> modelNumber = new ArrayList<>();
+            List<String> profileList = new ArrayList<>();
+            List<String> prefixes = new ArrayList<>();
+            List<String> namespaces = new ArrayList<>();
+            List<String> baseURIs = new ArrayList<>();
+            List<String> owlImports = new ArrayList<>();
+            for (int sel = 0; sel < treeViewProfileConstraints.getSelectionModel().getSelectedItems().size(); sel++) {
+                String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().get(sel).getValue();
+                for (int i = 0; i < RDFSmodelsNames.size(); i++) {
+                    if (((ArrayList<?>) RDFSmodelsNames.get(i)).get(0).equals(selectedProfile)) {
+                        modelNumber.add(i);
+                        profileList.add(selectedProfile);
+                        prefixes.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(1).toString());
+                        namespaces.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(2).toString());
+                        baseURIs.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(3).toString());
+                        owlImports.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(4).toString());
+                    }
+                }
+            }
+            // ask for confirmation before proceeding
+            String title = "Confirmation needed";
+            String header = "The shapes will be generated with the following basic conditions. Please review and confirm in order to proceed.";
+            String contextText = "Could you confirm the information below?";
+            String labelText = "Details:";
+            //TODO: make this nicer
+            //set the content of the details window
+            String detailedText = "The following profiles are selected: \n";
+            detailedText = detailedText + profileList + "\n";
+            detailedText = detailedText + "The namespaces for the selected profiles are: \n";
+            detailedText = detailedText + prefixes + "\n";
+            detailedText = detailedText + namespaces + "\n";
+            detailedText = detailedText + "The base URIs for the selected profiles are: \n";
+            detailedText = detailedText + baseURIs + "\n";
+            detailedText = detailedText + "The owl:imports for the selected profiles are: \n";
+            detailedText = detailedText + owlImports + "\n";
+            Alert alert = GUIhelper.expandableAlert(title, header, contextText, labelText, detailedText);
+            alert.getDialogPane().setExpanded(true);
+
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.get() != ButtonType.OK) {
+                return;
+            }
+
+            if (cbRDFSSHACLoptionBaseprofiles.isSelected()) { // load base profiles if the checkbox is selected
+                //baseprofilesshaclglag = 1;
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclglag", true);
+            }else{
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclglag", false);
+            }
+
+            if (cbRDFSSHACLoptionBaseprofilesIgnoreNS.isSelected()) {
+                //baseprofilesshaclignorens = 1;
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclignorens", true);
+            }else{
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclignorens", false);
+            }
+
+            if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) { // load base profiles if the checkbox is selected
+                //baseprofilesshaclglag2nd = 1;
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclglag2nd", true);
+            }else{
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclglag2nd", false);
+            }
+
+            if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) { // load base profiles if the checkbox is selected
+                //baseprofilesshaclglag3rd = 1;
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclglag3rd", true);
+            }else{
+                rdfsToShaclGuiMapBool.put("baseprofilesshaclglag3rd", false);
+            }
+
+
+            //shaclflaginverse = 0;
+            if (cbRDFSSHACLoptionInverse.isSelected()) {
+                //shaclflaginverse = 1;
+                rdfsToShaclGuiMapBool.put("shaclflaginverse", true);
+            }else{
+                rdfsToShaclGuiMapBool.put("shaclflaginverse", false);
+            }
+
+            //shaclflagCount = 0;
+            if (cbRDFSSHACLoptionCount.isSelected()) {
+                //shaclflagCount = 1;
+                rdfsToShaclGuiMapBool.put("shaclflagCount", true);
+                //shaclflagCountDefaultURI = 1;
+                rdfsToShaclGuiMapBool.put("shaclflagCountDefaultURI", true);
+                //shaclCommonPref = "";
+                rdfsToShaclGuiMapStr.put("shaclCommonPref","");
+                //shaclCommonURI = "";
+                rdfsToShaclGuiMapStr.put("shaclCommonURI","");
+                if (shaclNSCommonType.getSelectionModel().getSelectedItem().toString().equals("Custom namespace")) {
+                    //shaclflagCountDefaultURI = 0;
+                    rdfsToShaclGuiMapBool.put("shaclflagCountDefaultURI", false);
+                    //shaclCommonPref = fPrefixSHACLCommon.getText();
+                    rdfsToShaclGuiMapStr.put("shaclCommonPref", fPrefixSHACLCommon.getText());
+                    //shaclCommonURI = fURISHACLcommon.getText();
+                    rdfsToShaclGuiMapStr.put("shaclCommonURI", fURISHACLcommon.getText());
+                }
+            }else{
+                rdfsToShaclGuiMapBool.put("shaclflagCount", false);
+            }
+
+            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
+                rdfsToShaclGuiMapBool.put("AllProfilesOneMap", true);
+            }else{
+                rdfsToShaclGuiMapBool.put("AllProfilesOneMap", false);
+            }
+
+            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
+                rdfsToShaclGuiMapBool.put("PerProfile", true);
+            }else{
+                rdfsToShaclGuiMapBool.put("PerProfile", false);
+            }
+
+            if (cbRDFSSHACLvalidate.isSelected()) { //do validation
+                rdfsToShaclGuiMapBool.put("RDFSSHACLvalidate",true);
+            }else{
+                rdfsToShaclGuiMapBool.put("RDFSSHACLvalidate",false);
+            }
+
+
+
+            progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+
+            prepareShapesModelFromRDFS(rdfsToShaclGuiMapBool,rdfsToShaclGuiMapStr);
+
+
+            progressBar.setProgress(1);
+            System.out.print("Generation of SHACL shapes is completed.\n");
+
+        } else {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setContentText("Please select a profile for which you would like to generate Shapes and the RDFS format.");
+            alert.setHeaderText(null);
+            alert.setTitle("Error - no profile selected");
+            alert.showAndWait();
+        }
     }
 
     @FXML
@@ -2876,6 +3275,17 @@ public class MainController implements Initializable {
         } else {
             exportInheritTree = 0;
         }
+
+        shaclURIdatatypeAsResource = false;
+        shaclSkipNcPropertyReference = false;
+        if (cbRDFSSHACLuri.isSelected()){
+            shaclURIdatatypeAsResource = true;
+        }
+
+        if (cbRDFSSHACLncProp.isSelected()){
+            shaclSkipNcPropertyReference = true;
+        }
+
 
         if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
             //depending on the value of the choice box "Save datatype map"
@@ -3079,7 +3489,8 @@ public class MainController implements Initializable {
                         //}
                         String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
                         //generate the shape model
-                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
+                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
 
 
                         if (baseprofilesshaclglag == 1) {
@@ -3143,7 +3554,8 @@ public class MainController implements Initializable {
                         //}
                         String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
                         //generate the shape model
-                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
+                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
 
                         //add the owl:imports
                         shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
@@ -3278,7 +3690,8 @@ public class MainController implements Initializable {
                         //}
                         String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
                         //generate the shape model
-                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
+                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
+                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
 
                         //add the owl:imports
                         shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
