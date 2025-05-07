@@ -139,7 +139,7 @@ public class ModelManipulationFactory {
         return RdfEnumList;
     }
 
-
+    //Model transformation method
     public static void modelTransformation(List<File> fileOrigModelList, List<File>  fileSHACLTransList) throws IOException {
 
 // Load your data and shapes (SHACL rules)
