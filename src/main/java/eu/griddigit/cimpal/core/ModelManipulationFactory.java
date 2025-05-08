@@ -207,7 +207,8 @@ public class ModelManipulationFactory {
         //saveProperties.put("dataStartsFrom", dataStartsFrom);
 
         saveProperties.put("putHeaderOnTop", true);
-        saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+        //saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+        saveProperties.put("headerClassResource", "http://www.w3.org/ns/dcat#Dataset");
         saveProperties.put("extensionName", "RDF XML");
         saveProperties.put("fileExtension", "*.xml");
         saveProperties.put("fileDialogTitle", "Save RDF XML for");
