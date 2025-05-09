@@ -56,6 +56,7 @@
          <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
          <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
+         <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text=" Model transformation" />
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />

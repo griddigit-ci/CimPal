@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.core;
 import eu.griddigit.cimpal.application.MainController;
 import eu.griddigit.cimpal.customWriter.CustomRDFFormat;
 import eu.griddigit.cimpal.gui.GUIhelper;
+import javafx.scene.control.RadioButton;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
@@ -18,6 +19,7 @@ import org.apache.jena.vocabulary.RDFS;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import eu.griddigit.cimpal.util.ExcelTools;
+import org.topbraid.shacl.rules.RuleUtil;
 
 import java.io.*;
 import java.util.*;
@@ -208,7 +210,116 @@ public class ModelManipulationFactory {
         return RdfEnumList;
     }
 
-    public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties) throws IOException {
+    //Model transformation method
+    public static void modelTransformation(List<File> fileOrigModelList, List<File>  fileSHACLTransList) throws IOException {
+
+// Load your data and shapes (SHACL rules)
+
+
+        Model model1single = null;
+        String xmlBase = "http://iec.ch/TC57/CIM100";
+        Model dataModel = ModelFactory.createDefaultModel();
+        Map<String, String> prefixMap = dataModel.getNsPrefixMap();
+
+        for (File item : fileOrigModelList) {
+            if (item.getName().toLowerCase().endsWith(".zip")) {
+                model1single = eu.griddigit.cimpal.util.ModelFactory.unzip(item, null, xmlBase, 3);
+
+            } else if (item.getName().toLowerCase().endsWith(".xml")) {
+                InputStream inputStream = new FileInputStream(item);
+                model1single = ModelFactory.createDefaultModel();
+                RDFDataMgr.read(model1single, inputStream, xmlBase, Lang.RDFXML);
+            }
+            prefixMap.putAll(model1single.getNsPrefixMap());
+            dataModel.add(model1single);
+        }
+
+        Lang rdfSourceFormat1 = Lang.TURTLE;
+        Model rulesModel = eu.griddigit.cimpal.util.ModelFactory.modelLoad(fileSHACLTransList, null, rdfSourceFormat1, false);
+
+        // Execute the rules and store inferences
+        Model inferredModel = RuleUtil.executeRules(dataModel, rulesModel, null, null);
+
+
+        inferredModel.setNsPrefix("nc", "https://cim4.eu/ns/nc#");
+        inferredModel.setNsPrefix("cim", "https://cim.ucaiug.io/ns#");
+        inferredModel.setNsPrefix("dcat", "http://www.w3.org/ns/dcat#");
+        inferredModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
+        inferredModel.setNsPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
+        inferredModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+        // Print the output
+       // inferredModel.write(System.out, "TURTLE");
+
+
+
+        // save file
+        Map<String, Object> saveProperties = new HashMap<>();
+        boolean sortRDF = true;
+        boolean sortPrefix = false;
+        boolean stripPrefixes = true;
+
+        saveProperties.put("filename", "test");
+        saveProperties.put("showXmlDeclaration", "true");
+        saveProperties.put("showDoctypeDeclaration", "false");
+        saveProperties.put("tab", "2");
+        saveProperties.put("relativeURIs", "same-document");
+        saveProperties.put("showXmlEncoding", "true");
+        saveProperties.put("xmlBase", xmlBase);
+        saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
+        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
+        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
+        saveProperties.put("useFileDialog", true);
+        saveProperties.put("fileFolder", "C:");
+        saveProperties.put("dozip", false);
+        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("showXmlBaseDeclaration", "false");
+        saveProperties.put("sortRDF", sortRDF);
+        saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localName
+        //saveProperties.put("dataStartsFrom", dataStartsFrom);
+
+        saveProperties.put("putHeaderOnTop", true);
+        //saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
+        saveProperties.put("headerClassResource", "http://www.w3.org/ns/dcat#Dataset");
+        saveProperties.put("extensionName", "RDF XML");
+        saveProperties.put("fileExtension", "*.xml");
+        saveProperties.put("fileDialogTitle", "Save RDF XML for");
+
+
+        Set<Resource> rdfAboutList = new HashSet<>();
+        Set<Resource> rdfEnumList = new HashSet<>();
+
+
+        if ((boolean) saveProperties.get("useAboutRules")) {
+            rdfAboutList = LoadRDFAbout(xmlBase);
+            rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
+        }
+
+        if ((boolean) saveProperties.get("useEnumRules")) {
+            rdfEnumList = LoadRDFEnum(xmlBase);
+        }
+
+        if (saveProperties.containsKey("rdfAboutList")) {
+            saveProperties.replace("rdfAboutList", rdfAboutList);
+        } else {
+            saveProperties.put("rdfAboutList", rdfAboutList);
+        }
+        if (saveProperties.containsKey("rdfEnumList")) {
+            saveProperties.replace("rdfEnumList", rdfEnumList);
+        } else {
+            saveProperties.put("rdfEnumList", rdfEnumList);
+        }
+
+        String saveFilename = "TransformedModel";
+        saveProperties.replace("filename", saveFilename + ".xml");
+        saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
+        InstanceDataFactory.saveInstanceData(inferredModel, saveProperties);
+        saveProperties.put("useFileDialog", false);
+
+
+
+    }
+
+        public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties) throws IOException {
 
         //this is to load profile data - this is needed for the export
         //Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);

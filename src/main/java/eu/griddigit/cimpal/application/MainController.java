@@ -718,6 +718,28 @@ public class MainController implements Initializable {
 
     }
 
+
+    @FXML
+    //action menu item Tools -> Model Transformation
+    private void actionModelTransformationMenu() throws IOException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        //open SHACL files
+        List<File> fileOrigModelList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Original model ", List.of("*.xml","*.zip"), "");
+
+        //open SHACL files
+        List<File> fileSHACLTransList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "SPARQL Transformation files", List.of("*.ttl"), "");
+
+        if (fileOrigModelList != null && fileSHACLTransList != null) {// the file is selected
+
+            ModelManipulationFactory.modelTransformation(fileOrigModelList,fileSHACLTransList);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+
+    }
+
     @FXML
     private void actionGenInfoFromRDFS() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
