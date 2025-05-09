@@ -757,7 +757,7 @@
                                                    <children>
                                                       <HBox alignment="CENTER_LEFT" spacing="10.0">
                                                          <children>
-                                                            <CheckBox fx:id="fcbAddInstanceData1" mnemonicParsing="false" prefHeight="21.0" prefWidth="182.0" text="Add instance data to template" />
+                                                            <CheckBox fx:id="fcbAddInstanceData" mnemonicParsing="false" prefHeight="21.0" prefWidth="182.0" text="Add instance data to template" />
                                                             <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create XLS template" />
                                                          </children>
                                                          <VBox.margin>
