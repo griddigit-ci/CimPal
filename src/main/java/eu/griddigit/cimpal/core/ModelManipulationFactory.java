@@ -67,7 +67,7 @@ public class ModelManipulationFactory {
         return loadDataMap;
     }
 
-    public static Set<Resource> LoadRDFAbout(String xmlBase) throws FileNotFoundException {
+    public static Set<Resource> LoadRDFAbout(String xmlBase) throws FileNotFoundException { // not working properly !!!
         Set<Resource> rdfAboutList = new HashSet<>();
         Model model = ModelFactory.createDefaultModel();
         InputStream inputStream = null;
@@ -94,6 +94,41 @@ public class ModelManipulationFactory {
         return rdfAboutList;
     }
 
+    public static Set<Resource> LoadRDFAbout(String xmlBase, List<String> profileURIs) throws FileNotFoundException {
+        Set<Resource> rdfAboutList = new HashSet<>();
+        Model model = ModelFactory.createDefaultModel();
+        InputStream inputStream = null;
+        if (xmlBase.equals("http://iec.ch/TC57/CIM100")) {
+            inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
+        } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
+            inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
+        }
+        if (inputStream != null) {
+            RDFDataMgr.read(model, inputStream, xmlBase, Lang.TURTLE);
+        } else {
+            throw new FileNotFoundException("File not found for serialization.");
+        }
+        for (StmtIterator it = model.listStatements(null, RDF.type, RDFS.Class); it.hasNext(); ) {
+            Statement stmt = it.next();
+            // Check if the subject matches any of the profile URIs RdfAbout line
+            boolean found = false;
+            for (String profileURI : profileURIs) {
+                if (stmt.getSubject().equals(ResourceFactory.createResource(profileURI + (profileURI.endsWith("#") ? "" : "#") + "RdfAbout"))) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) {
+                for (NodeIterator iter = model.listObjectsOfProperty(stmt.getSubject(), OWL2.members); iter.hasNext(); ) {
+                    RDFNode o_i = iter.next();
+                    rdfAboutList.add(ResourceFactory.createResource(o_i.toString()));
+                }
+            }
+        }
+        return rdfAboutList;
+    }
+
     public static Model LoadSHACLSHACL() {
         Model shaclModel = ModelFactory.createDefaultModel();
         InputStream inputStream = InstanceDataFactory.class.getResourceAsStream("/shaclttl/shacl-shaclFixed.ttl");
@@ -110,7 +145,7 @@ public class ModelManipulationFactory {
         return shaclModel;
     }
 
-    public static Set<Resource> LoadRDFEnum(String xmlBase) throws FileNotFoundException {
+    public static Set<Resource> LoadRDFEnum(String xmlBase) throws FileNotFoundException { // not working properly !!!
         Set<Resource> RdfEnumList = new HashSet<>();
         Model model = ModelFactory.createDefaultModel();
         InputStream inputStream = null;
@@ -127,7 +162,43 @@ public class ModelManipulationFactory {
 
         for (StmtIterator it = model.listStatements(null, RDF.type, RDFS.Class); it.hasNext(); ) {
             Statement stmt = it.next();
-            if (stmt.getSubject() == ResourceFactory.createResource(xmlBase + "RdfEnum")) {
+            if (stmt.getSubject().toString().contains("RdfEnum")) {
+                for (NodeIterator iter = model.listObjectsOfProperty(stmt.getSubject(), OWL2.members); iter.hasNext(); ) {
+                    RDFNode o_i = iter.next();
+                    RdfEnumList.add(ResourceFactory.createResource(o_i.toString()));
+                }
+            }
+        }
+        return RdfEnumList;
+    }
+
+    public static Set<Resource> LoadRDFEnum(String xmlBase, List<String> profileURIs) throws FileNotFoundException {
+        Set<Resource> RdfEnumList = new HashSet<>();
+        Model model = ModelFactory.createDefaultModel();
+        InputStream inputStream = null;
+        if (xmlBase.equals("http://iec.ch/TC57/CIM100")) {
+            inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
+        } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
+            inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
+        }
+        if (inputStream != null) {
+            RDFDataMgr.read(model, inputStream, xmlBase, Lang.TURTLE);
+        } else {
+            throw new FileNotFoundException("File not found for serialization.");
+        }
+
+        for (StmtIterator it = model.listStatements(null, RDF.type, RDFS.Class); it.hasNext(); ) {
+            Statement stmt = it.next();
+            // Check if the subject matches any of the profile URIs RdfEnum line
+            boolean found = false;
+            for (String profileURI : profileURIs) {
+                if (stmt.getSubject().equals(ResourceFactory.createResource(profileURI + (profileURI.endsWith("#") ? "" : "#") + "RdfEnum"))) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) {
                 for (NodeIterator iter = model.listObjectsOfProperty(stmt.getSubject(), OWL2.members); iter.hasNext(); ) {
                     RDFNode o_i = iter.next();
                     RdfEnumList.add(ResourceFactory.createResource(o_i.toString()));
@@ -388,6 +459,7 @@ public class ModelManipulationFactory {
 
         Model model = ModelFactory.createDefaultModel();
         model.setNsPrefixes(prefMap);
+        List<String> modelProfileURIs = new LinkedList<>(); // to be used for the profile URI data store
 
         // Add header class
         int headerCols = ((LinkedList<?>) headerXlsData.get(1)).size();
@@ -426,62 +498,68 @@ public class ModelManipulationFactory {
                 throw new Exception("Missing prefix in config for class: " + headerClassName + "\nMissing prefix: " + splitClassName[0]);
             }
             model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
-
-            for (int i = 0; i < headerCols; i++) {
-                if (i != rdfidCol && i < ((LinkedList<?>) headerXlsData.get(dataStartFrom)).size()) {
-                    Object value = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(i);
-                    Object propertyURI_obj = ((LinkedList<?>) headerXlsData.get(1)).get(i);
-                    if (value != null && propertyURI_obj != null) {
-                        String propertyURI = propertyURI_obj.toString();
-                        try {
-                            String[] splitPropUri;
-                            String propPref;
-                            if (propertyURI.startsWith("http")) {
-                                splitPropUri = propertyURI.split("#");
-                                propPref = splitPropUri[0] + "#";
-                            } else {
-                                splitPropUri = propertyURI.split(":");
-                                propPref = prefMap.get(splitPropUri[0]);
-                            }
-
-                            if (propPref == null || !prefMap.containsValue(propPref))
-                                throw new Exception("Property URI not found: " + splitPropUri[0] + " in class: " + headerClassName);
-                            propertyURI = propPref + splitPropUri[1];
-                        } catch (NullPointerException e) {
-                            throw new Exception("Missing prefix in config for property: " + propertyURI);
-                        }
-                        Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
-                        String propertyType = ((LinkedList<?>) headerXlsData.get(2)).get(i).toString();
-                        String object = value.toString();
-                        switch (propertyType) {
-                            case "Literal" -> { //add literal
-                                String datatype = ((LinkedList<?>) headerXlsData.get(3)).get(i).toString();
-                                if (datatype.equalsIgnoreCase("float"))
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Float.parseFloat(object)))));
-                                else if (datatype.equalsIgnoreCase("integer"))
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Math.round(Float.parseFloat(object))))));
-                                else
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
-                            }
-                            case "LiteralLangEN" -> {
-                                model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
-                            }
-                            case "Resource" -> { //add resource
-                                if (object.startsWith("http")) {
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+            for (int i = dataStartFrom; i < headerXlsData.size(); i++) {
+                for (int j = 0; j < headerCols; j++) {
+                    if (j != rdfidCol && j < ((LinkedList<?>) headerXlsData.get(i)).size()) {
+                        Object value = ((LinkedList<?>) headerXlsData.get(i)).get(j);
+                        Object propertyURI_obj = ((LinkedList<?>) headerXlsData.get(1)).get(j);
+                        if (value != null && propertyURI_obj != null) {
+                            String propertyURI = propertyURI_obj.toString();
+                            try {
+                                String[] splitPropUri;
+                                String propPref;
+                                if (propertyURI.startsWith("http")) {
+                                    splitPropUri = propertyURI.split("#");
+                                    propPref = splitPropUri[0] + "#";
                                 } else {
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
+                                    splitPropUri = propertyURI.split(":");
+                                    propPref = prefMap.get(splitPropUri[0]);
                                 }
+
+                                if (propPref == null || !prefMap.containsValue(propPref))
+                                    throw new Exception("Property URI not found: " + splitPropUri[0] + " in class: " + headerClassName);
+                                propertyURI = propPref + splitPropUri[1];
+                            } catch (NullPointerException e) {
+                                throw new Exception("Missing prefix in config for property: " + propertyURI);
                             }
-                            case "Enumeration" -> { //add enum
-                                if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
-                                } else if (object.split("#").length > 1) { // if it doesn't have http://
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
-                                } else { // if there is the prefix with ':'
-                                    String[] objSplit = object.split(":", 2);
-                                    String prefixUri = prefMap.get(objSplit[0]);
-                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                            Property propertyURIProp = ResourceFactory.createProperty(propertyURI);
+                            String propertyType = ((LinkedList<?>) headerXlsData.get(2)).get(j).toString();
+                            String object = value.toString();
+
+                            if (propertyURI.contains("Model.profile")) { // Getting the profile URIs if exist for the enum and about import
+                                modelProfileURIs.add(object);
+                            }
+
+                            switch (propertyType) {
+                                case "Literal" -> { //add literal
+                                    String datatype = ((LinkedList<?>) headerXlsData.get(3)).get(j).toString();
+                                    if (datatype.equalsIgnoreCase("float"))
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Float.parseFloat(object)))));
+                                    else if (datatype.equalsIgnoreCase("integer"))
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Math.round(Float.parseFloat(object))))));
+                                    else
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                                }
+                                case "LiteralLangEN" -> {
+                                    model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
+                                }
+                                case "Resource" -> { //add resource
+                                    if (object.startsWith("http") || object.startsWith("urn:uuid:")) {
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                    } else {
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
+                                    }
+                                }
+                                case "Enumeration" -> { //add enum
+                                    if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                    } else if (object.split("#").length > 1) { // if it doesn't have http://
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
+                                    } else { // if there is the prefix with ':'
+                                        String[] objSplit = object.split(":", 2);
+                                        String prefixUri = prefMap.get(objSplit[0]);
+                                        model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                                    }
                                 }
                             }
                         }
@@ -589,7 +667,7 @@ public class ModelManipulationFactory {
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
                                     }
                                     case "Resource" -> { //add resource
-                                        if (object.startsWith("http")) {
+                                        if (object.startsWith("http") || object.startsWith("urn:uuid:")) {
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(object)));
                                         } else if (!object.contains("http") && object.contains(":")) {
                                             String[] objSplit = object.split(":", 2);
@@ -673,12 +751,12 @@ public class ModelManipulationFactory {
 
 
         if ((boolean) saveProperties.get("useAboutRules")) {
-            rdfAboutList = LoadRDFAbout(xmlBase);
+            rdfAboutList = LoadRDFAbout(xmlBase, modelProfileURIs);
             rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
         }
 
         if ((boolean) saveProperties.get("useEnumRules")) {
-            rdfEnumList = LoadRDFEnum(xmlBase);
+            rdfEnumList = LoadRDFEnum(xmlBase, modelProfileURIs);
         }
 
         if (saveProperties.containsKey("rdfAboutList")) {

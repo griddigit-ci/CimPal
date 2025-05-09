@@ -307,7 +307,7 @@ public class ExcelTools {
     }
 
     public static void saveExcelFile(XSSFWorkbook workbook, String title, String initialFileName) {
-        File saveFile = eu.griddigit.cimpal.util.ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"), title, initialFileName);
+        File saveFile = ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"), title, initialFileName);
         if (saveFile != null) {
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
@@ -353,23 +353,37 @@ public class ExcelTools {
             invertedPrefMap.put(entry.getValue(), entry.getKey());
         }
 
-        // make first class sheet
-        XSSFSheet classSheet = CreateTemplateSheetBase(genDataInfos.getFirst().getSheetClassName(),
-                genDataInfos.getFirst().getFullClassName(),headerCellStyle,workbook,invertedPrefMap);
-
+        // make a sheet for the first class
+        String sheetName = genDataInfos.getFirst().getSheetClassName();
+        XSSFSheet classSheet;
         int sColN = 1;
+        if (workbook.getSheetIndex( sheetName ) != -1 ) { // if the sheet already exists, we just get it and continue on the last column
+            classSheet = workbook.getSheet( sheetName );
+            sColN = classSheet.getRow(1).getLastCellNum();
+        }
+        else {
+            classSheet = CreateTemplateSheetBase(sheetName,
+                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap);
+        }
+
         int maxWidthInCharacters = 150; // Maximum desired width in characters
         int defaultCharacterWidth = 256; // Default width of one character
         GenDataTemplateMapInfo prevgenDataInfo = genDataInfos.getFirst();
         for (GenDataTemplateMapInfo genDataInfo : genDataInfos) {
-            String sheetName = genDataInfo.getSheetClassName();
+            sheetName = genDataInfo.getSheetClassName();
             if (!classSheet.getSheetName().equals(sheetName)) { // move to the other sheet if new class comes in the list
-                if (instanceClassData != null){
+                if (instanceClassData != null) { // if instance data is available, fill the sheet with it
                     FillSheetWithInstanceData(workbook, classSheet, instanceClassData, prevgenDataInfo);
                 }
-                classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
-                        headerCellStyle, workbook, invertedPrefMap);
-                sColN = 1;
+                if (workbook.getSheetIndex( sheetName ) != -1 ){ // if the sheet already exists, we just get it and continue on the last column
+                    classSheet = workbook.getSheet( sheetName );
+                    sColN = classSheet.getRow(1).getLastCellNum();
+                }
+                else {
+                    classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
+                            headerCellStyle, workbook, invertedPrefMap);
+                    sColN = 1;
+                }
             }
             XSSFRow attrRow = classSheet.getRow(1);
             XSSFRow typeRow = classSheet.getRow(2);
@@ -486,13 +500,22 @@ public class ExcelTools {
         XSSFRow attrRow = sheet.getRow(1);
         XSSFRow typeRow = sheet.getRow(2);
         int rowNumber = 6;
+
         for (List<RDFAttributeData> attrList : dataInClass){ // looping through the class instances
             XSSFRow row = sheet.createRow(rowNumber);
+            RDFAttributeData idAttribute = attrList.stream().filter(data -> "id".equals(data.getName())).findFirst().orElse(null);
+            if (idAttribute == null) {
+                System.out.println("No id attribute found for class: " + genInfoData.getClassName());
+                continue;
+            }
+            int idCol = getCellNumber(attrRow, idAttribute.getFullName());
+            int rowOffset = 0;
+
             for (RDFAttributeData data : attrList){ // loop on every attribute (creating new rows in the xls)
                 if (data.getName().equals("type"))
                     continue;
                 int valueCol = getCellNumber(attrRow, data.getFullName());
-                if (valueCol == -1){  // add new attribute to the end of the row
+                if (valueCol == -1){  // add a new attribute to the end of the row
                     valueCol = attrRow.getLastCellNum();
                     XSSFCell attrCell = attrRow.createCell(valueCol);
                     attrCell.setCellStyle(headerStyleRed);
@@ -501,11 +524,40 @@ public class ExcelTools {
                     typeCell.setCellStyle(headerStyleRed);
                     typeCell.setCellValue(data.getTpe());
                 }
-                XSSFCell valueCell = row.createCell(valueCol);
-                valueCell.setCellStyle(dataStyle);
-                valueCell.setCellValue(data.getValue());
+                XSSFCell valueCell = row.getCell(valueCol);
+                int currentRowOffset = 0;
+                while (valueCell != null) {
+                    currentRowOffset++;
+                    XSSFRow nextRow = sheet.getRow(rowNumber+currentRowOffset);
+                    if (nextRow != null)
+                        valueCell = nextRow.getCell(valueCol);
+                    else
+                        break;
+                }
+                if (currentRowOffset > rowOffset)
+                    rowOffset = currentRowOffset;
+
+                if (currentRowOffset == 0){
+                    valueCell = row.createCell(valueCol);
+                    valueCell.setCellStyle(dataStyle);
+                    valueCell.setCellValue(data.getValue());
+                }
+                else { // Already has data in the instance, so we make a new row for the new data for the same attribute
+                    XSSFRow offsetRow = sheet.getRow(rowNumber + currentRowOffset);
+                    if (offsetRow == null) {
+                        offsetRow = sheet.createRow(rowNumber + currentRowOffset);
+                    }
+                    valueCell = offsetRow.createCell(valueCol);
+                    valueCell.setCellStyle(dataStyle);
+                    valueCell.setCellValue(data.getValue());
+
+                    // Set the id to the first column of the new row
+                    XSSFCell idCell = offsetRow.createCell(idCol);
+                    idCell.setCellStyle(dataStyle);
+                    idCell.setCellValue(idAttribute.getValue());
+                }
             }
-            rowNumber++;
+            rowNumber = rowNumber + rowOffset + 1;
         }
     }
 
