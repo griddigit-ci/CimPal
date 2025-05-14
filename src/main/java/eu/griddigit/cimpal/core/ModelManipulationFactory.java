@@ -10,6 +10,7 @@ import eu.griddigit.cimpal.customWriter.CustomRDFFormat;
 import eu.griddigit.cimpal.gui.GUIhelper;
 import javafx.scene.control.RadioButton;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
@@ -213,32 +214,130 @@ public class ModelManipulationFactory {
     //Model transformation method
     public static void modelTransformation(List<File> fileOrigModelList, List<File>  fileSHACLTransList) throws IOException {
 
-// Load your data and shapes (SHACL rules)
+        // Load your data and shapes (SHACL rules)
+
+
+//        System.out.println("=== Checking Named Graph Content ===");
+//        String checkNamedGraphQuery = """
+//    SELECT ?g ?s ?p ?o
+//    WHERE {
+//      GRAPH ?g {
+//        ?s ?p ?o
+//      }
+//    }
+//    LIMIT 50
+//""";
+//
+//        try (QueryExecution qexec = QueryExecutionFactory.create(checkNamedGraphQuery, dataset)) {
+//            ResultSet results = qexec.execSelect();
+//            if (!results.hasNext()) {
+//                System.out.println("No triples found in any named graph.");
+//            } else {
+//                while (results.hasNext()) {
+//                    QuerySolution soln = results.next();
+//                    System.out.println("Graph: " + soln.getResource("g") +
+//                            " Subject: " + soln.getResource("s") +
+//                            " Predicate: " + soln.getResource("p") +
+//                            " Object: " + soln.get("o"));
+//                }
+//            }
+//        }
+
+
+//        String queryStr = """
+//    SELECT ?g ?s
+//    WHERE {
+//      GRAPH ?g {
+//        ?s a ?type .
+//        FILTER (?type IN (<http://iec.ch/TC57/CIM100#RegulatingControl>, <http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel>))
+//      }
+//    }
+//    LIMIT 100
+//""";
+//
+//        try (QueryExecution qexec = QueryExecutionFactory.create(queryStr, dataset)) {
+//            ResultSet results = qexec.execSelect();
+//            if (!results.hasNext()) {
+//                System.out.println("No RegulatingControl or FullModel instances found.");
+//            } else {
+//                while (results.hasNext()) {
+//                    QuerySolution soln = results.next();
+//                    System.out.println("Graph: " + soln.getResource("g") + " Subject: " + soln.getResource("s"));
+//                }
+//            }
+//        }
 
 
         Model model1single = null;
-        String xmlBase = "http://iec.ch/TC57/CIM100";
-        Model dataModel = ModelFactory.createDefaultModel();
-        Map<String, String> prefixMap = dataModel.getNsPrefixMap();
+        String baseIRI = "http://iec.ch/TC57/CIM100";
+        Map<String,Model> dataModelMap = new HashMap<>();
+        Map<String, String> prefixMap = new HashMap<>();
 
         for (File item : fileOrigModelList) {
             if (item.getName().toLowerCase().endsWith(".zip")) {
-                model1single = eu.griddigit.cimpal.util.ModelFactory.unzip(item, null, xmlBase, 3);
+                model1single = eu.griddigit.cimpal.util.ModelFactory.unzip(item, null, baseIRI, 3);
 
             } else if (item.getName().toLowerCase().endsWith(".xml")) {
                 InputStream inputStream = new FileInputStream(item);
                 model1single = ModelFactory.createDefaultModel();
-                RDFDataMgr.read(model1single, inputStream, xmlBase, Lang.RDFXML);
+                RDFDataMgr.read(model1single, inputStream, baseIRI, Lang.RDFXML);
             }
             prefixMap.putAll(model1single.getNsPrefixMap());
-            dataModel.add(model1single);
+            //get header ID
+            String headerID = model1single.listStatements(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).next().getSubject().getLocalName();
+            dataModelMap.put(headerID,model1single);
         }
 
-        Lang rdfSourceFormat1 = Lang.TURTLE;
-        Model rulesModel = eu.griddigit.cimpal.util.ModelFactory.modelLoad(fileSHACLTransList, null, rdfSourceFormat1, false);
+
+        Dataset dataset = RDFDataMgr.loadDataset(fileSHACLTransList.getFirst().toString());
+
+        Map<String, Model> rulesModelMap = new HashMap<>();
+        dataset.listNames().forEachRemaining(graphURI -> {
+            Model model = dataset.getNamedModel(graphURI);
+            rulesModelMap.put(graphURI, model);
+        });
+
+
+        // Combine default graph and named graph when building rules model
+        Model initRulesModel = ModelFactory.createUnion(
+                dataset.getDefaultModel(),
+                dataset.getNamedModel("http://griddigit.eu/model-transformation/SSH-SHS#init")
+        );
+        //Model initRulesModel = dataset.getNamedModel("http://griddigit.eu/model-transformation/SSH-SHS#init");
+
+        Model updateRulesModel = ModelFactory.createUnion(
+                dataset.getDefaultModel(),
+                dataset.getNamedModel("http://griddigit.eu/model-transformation/SSH-SHS#update")
+        );
+        //Model updateRulesModel = dataset.getNamedModel("http://griddigit.eu/model-transformation/SSH-SHS#update");
+
+        //Lang rdfSourceFormat1 = Lang.TURTLE;
+        //Model rulesModel = eu.griddigit.cimpal.util.ModelFactory.modelLoad(fileSHACLTransList, null, rdfSourceFormat1, false);
 
         // Execute the rules and store inferences
-        Model inferredModel = RuleUtil.executeRules(dataModel, rulesModel, null, null);
+        Model inferredModel = ModelFactory.createDefaultModel();;
+        List<Map.Entry<String, Model>> entries = new ArrayList<>(dataModelMap.entrySet());
+
+// Process first entry separately if needed
+        Map.Entry<String, Model> firstEntry = entries.getFirst();
+        String firstModelId = firstEntry.getKey();
+        Model firstModel = firstEntry.getValue();
+
+// Example: Apply init rules first
+        Model tempinferredModel = RuleUtil.executeRules(firstModel, initRulesModel, null, null);
+        inferredModel.add(tempinferredModel);
+// Process remaining entries
+        for (int i = 1; i < entries.size(); i++) {
+            Map.Entry<String, Model> entry = entries.get(i);
+            String modelId = entry.getKey();
+            Model model = entry.getValue();
+
+            // Example: Apply update rules
+            //inferredModel = RuleUtil.executeRules(model, updateRulesModel, inferredModel, null);
+            tempinferredModel = RuleUtil.executeRules(model, updateRulesModel, null, null);
+            inferredModel.add(tempinferredModel);
+        }
+        //Model inferredModel = RuleUtil.executeRules(dataModelMap.get("1"), initRulesModel, null, null);
 
 
         inferredModel.setNsPrefix("nc", "https://cim4.eu/ns/nc#");
@@ -247,8 +346,7 @@ public class ModelManipulationFactory {
         inferredModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
         inferredModel.setNsPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
         inferredModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-        // Print the output
-       // inferredModel.write(System.out, "TURTLE");
+
 
 
 
@@ -264,7 +362,7 @@ public class ModelManipulationFactory {
         saveProperties.put("tab", "2");
         saveProperties.put("relativeURIs", "same-document");
         saveProperties.put("showXmlEncoding", "true");
-        saveProperties.put("xmlBase", xmlBase);
+        saveProperties.put("xmlBase", baseIRI);
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
         saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
@@ -290,12 +388,12 @@ public class ModelManipulationFactory {
 
 
         if ((boolean) saveProperties.get("useAboutRules")) {
-            rdfAboutList = LoadRDFAbout(xmlBase);
+            rdfAboutList = LoadRDFAbout(baseIRI);
             rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
         }
 
         if ((boolean) saveProperties.get("useEnumRules")) {
-            rdfEnumList = LoadRDFEnum(xmlBase);
+            rdfEnumList = LoadRDFEnum(baseIRI);
         }
 
         if (saveProperties.containsKey("rdfAboutList")) {

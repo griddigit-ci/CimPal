@@ -724,11 +724,11 @@ public class MainController implements Initializable {
     private void actionModelTransformationMenu() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-        //open SHACL files
-        List<File> fileOrigModelList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Original model ", List.of("*.xml","*.zip"), "");
+        //open original xml files
+        List<File> fileOrigModelList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Original model ", List.of("*.xml","*.zip"), "");
 
         //open SHACL files
-        List<File> fileSHACLTransList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "SPARQL Transformation files", List.of("*.ttl"), "");
+        List<File> fileSHACLTransList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "SPARQL Transformation files", List.of("*.ttl","*.trig"), "");
 
         if (fileOrigModelList != null && fileSHACLTransList != null) {// the file is selected
 
