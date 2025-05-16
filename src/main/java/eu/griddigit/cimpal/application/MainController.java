@@ -319,7 +319,7 @@ public class MainController implements Initializable {
     @FXML
     private CheckBox fcbStripPrefixesGen;
     @FXML
-    private ToggleGroup giDataLine;
+    private CheckBox fcbExportExtensionsGen;
     @FXML
     private CheckBox cbRDFSSHACLabstract;
     @FXML
@@ -4999,11 +4999,7 @@ public class MainController implements Initializable {
         boolean sortRDF = fcbSortRDFGen.isSelected();
         boolean sortPrefix = fcbRDFsortOptionsGen.getSelectionModel().getSelectedItem().toString().equals("Sorting by prefix");
         boolean stripPrefixes = fcbStripPrefixesGen.isSelected();
-        int dataStartsFrom = 5;
-        RadioButton selected = (RadioButton) giDataLine.getSelectedToggle();
-        String selectedRB = selected.getText();
-        if (selectedRB.equals("Line 7"))
-            dataStartsFrom = 6;
+        boolean exportExtensions = fcbExportExtensionsGen.isSelected();
 
         saveProperties.put("filename", "test");
         saveProperties.put("showXmlDeclaration", "true");
@@ -5021,8 +5017,7 @@ public class MainController implements Initializable {
         saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
         saveProperties.put("showXmlBaseDeclaration", "false");
         saveProperties.put("sortRDF", sortRDF);
-        saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localName
-        saveProperties.put("dataStartsFrom", dataStartsFrom);
+        saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localNam
 
         saveProperties.put("putHeaderOnTop", true);
         saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
@@ -5039,7 +5034,7 @@ public class MainController implements Initializable {
                 break;
             case "Option 2 (New)":
                 for (File file : inputXLS){
-                    ModelManipulationFactory.generateDataFromXlsV2(xmlBase, file, saveProperties, stripPrefixes);
+                    ModelManipulationFactory.generateDataFromXlsV2(xmlBase, file, saveProperties, stripPrefixes, exportExtensions);
                 }
                 break;
             case "Option 3 (TBD)":
@@ -5086,18 +5081,18 @@ public class MainController implements Initializable {
     private void actionHandleOptionsForGen(String selected){
         switch (selected){
             case "Option 1 (Old)", "Option 3 (TBD)":
-                giDataLine.getToggles().forEach(rb -> ((RadioButton) rb).setDisable(true));
                 fcbAddInstanceData.setDisable(true);
                 fcbSortRDFGen.setDisable(true);
                 fcbRDFsortOptionsGen.setDisable(true);
                 fcbStripPrefixesGen.setDisable(true);
+                fcbExportExtensionsGen.setDisable(true);
                 break;
             case "Option 2 (New)":
-                giDataLine.getToggles().forEach(rb -> ((RadioButton) rb).setDisable(false));
                 fcbAddInstanceData.setDisable(false);
                 fcbSortRDFGen.setDisable(false);
                 fcbRDFsortOptionsGen.setDisable(false);
                 fcbStripPrefixesGen.setDisable(false);
+                fcbExportExtensionsGen.setDisable(false);
                 break;
         }
     }

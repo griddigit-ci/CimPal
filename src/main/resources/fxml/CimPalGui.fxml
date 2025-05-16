@@ -6,13 +6,36 @@
  @author Chavdar Ivanov
  -->
 
-<?import javafx.geometry.*?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.image.*?>
-<?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
    <MenuBar prefHeight="13.0" prefWidth="1280.0" VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -781,13 +804,6 @@
                                              <padding>
                                                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                              </padding>
-                                             <Label minWidth="78.0" prefHeight="17.0" prefWidth="103.0" text="Data starting from:" wrapText="true" />
-                                             <RadioButton mnemonicParsing="false" selected="true" text="Line 6">
-                                                <toggleGroup>
-                                                   <ToggleGroup fx:id="giDataLine" />
-                                                </toggleGroup>
-                                             </RadioButton>
-                                             <RadioButton mnemonicParsing="false" selected="true" text="Line 7" toggleGroup="$giDataLine" />
                                              <Label minWidth="50.0" prefHeight="17.0" prefWidth="89.0" text="Sorting options:" />
                                              <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
                                                 <HBox.margin>
@@ -796,7 +812,15 @@
                                              </CheckBox>
                                              <Label text="Sorting options:" />
                                              <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
-                                             <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
+                                          </HBox>
+                                          <HBox spacing="10.0">
+                                             <padding>
+                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                             </padding>
+                                             <children>
+                                                <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
+                                                <CheckBox fx:id="fcbExportExtensionsGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Export extensions (marked red in template)" />
+                                             </children>
                                           </HBox>
                                           <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                              <VBox.margin>

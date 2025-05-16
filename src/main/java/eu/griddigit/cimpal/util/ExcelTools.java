@@ -340,8 +340,11 @@ public class ExcelTools {
             genDataInfos.add(new GenDataTemplateMapInfo(classNames.get(i),classes.get(i),props.get(i),
                     multiplicities.get(i), datatypes.get(i), types.get(i)));
         }
+        genDataInfos.sort(Comparator.comparing(GenDataTemplateMapInfo::getClassName));
 
-        String headerClass = getHeaderClass(instanceClassData);
+        boolean hasInstanceData = instanceClassData != null;
+
+        String headerClass = getHeaderClass(instanceClassData, classNames);
 
         AddConfigSheet(genDataInfos, prefMap, headerClass, headerCellStyle, workbook);
 
@@ -363,7 +366,7 @@ public class ExcelTools {
         }
         else {
             classSheet = CreateTemplateSheetBase(sheetName,
-                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap);
+                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap, hasInstanceData);
         }
 
         int maxWidthInCharacters = 150; // Maximum desired width in characters
@@ -372,7 +375,7 @@ public class ExcelTools {
         for (GenDataTemplateMapInfo genDataInfo : genDataInfos) {
             sheetName = genDataInfo.getSheetClassName();
             if (!classSheet.getSheetName().equals(sheetName)) { // move to the other sheet if new class comes in the list
-                if (instanceClassData != null) { // if instance data is available, fill the sheet with it
+                if (hasInstanceData) { // if instance data is available, fill the sheet with it
                     FillSheetWithInstanceData(workbook, classSheet, instanceClassData, prevgenDataInfo);
                 }
                 if (workbook.getSheetIndex( sheetName ) != -1 ){ // if the sheet already exists, we just get it and continue on the last column
@@ -381,7 +384,7 @@ public class ExcelTools {
                 }
                 else {
                     classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
-                            headerCellStyle, workbook, invertedPrefMap);
+                            headerCellStyle, workbook, invertedPrefMap, hasInstanceData);
                     sColN = 1;
                 }
             }
@@ -389,6 +392,7 @@ public class ExcelTools {
             XSSFRow typeRow = classSheet.getRow(2);
             XSSFRow datatypeRow = classSheet.getRow(3);
             XSSFRow multiRow = classSheet.getRow(4);
+            XSSFRow isExtensionRow = classSheet.getRow(5);
 
             XSSFCell attrCell = attrRow.createCell(sColN);
             attrCell.setCellStyle(headerCellStyle);
@@ -398,6 +402,9 @@ public class ExcelTools {
             datatypeCell.setCellStyle(headerCellStyle);
             XSSFCell multiCell = multiRow.createCell(sColN);
             multiCell.setCellStyle(headerCellStyle);
+            XSSFCell isExtensionCell = isExtensionRow.createCell(sColN);
+            isExtensionCell.setCellStyle(headerCellStyle);
+            isExtensionCell.setCellValue("-");
 
             Resource propRes = ResourceFactory.createResource(genDataInfo.getProp());
             String propNameShort = genDataInfo.getProp();
@@ -467,20 +474,32 @@ public class ExcelTools {
 
     }
 
-    private static String getHeaderClass(Map<String, List<List<RDFAttributeData>>> instanceClassData) {
-        // Give the config a header class if instance data has the info
+    private static String getHeaderClass(Map<String, List<List<RDFAttributeData>>> instanceClassData, List<String> classNames) {
+        // Give the config a header class if instance data has the info if not than we pick from the RDFS class names
         String headerClass = "";
-        if (instanceClassData !=null){
-        if (instanceClassData.containsKey("Dataset")){
-            headerClass = "Dataset";
+        if (instanceClassData != null){
+            if (instanceClassData.containsKey("Dataset")){
+                headerClass = "Dataset";
+            }
+            else if (instanceClassData.containsKey("DifferenceSet")){
+                headerClass = "DifferenceSet";
+            } else if (instanceClassData.containsKey("FullModel")) {
+                headerClass = "FullModel";
+            } else if (instanceClassData.containsKey("DifferenceModel")) {
+                headerClass = "DifferenceModel";
+            }
         }
-        else if (instanceClassData.containsKey("DifferenceSet")){
-            headerClass = "DifferenceSet";
-        } else if (instanceClassData.containsKey("FullModel")) {
-            headerClass = "FullModel";
-        } else if (instanceClassData.containsKey("DifferenceModel")) {
-            headerClass = "DifferenceModel";
-        }
+        else {
+            if (classNames.contains("Dataset")){
+                headerClass = "Dataset";
+            }
+            else if (classNames.contains("DifferenceSet")){
+                headerClass = "DifferenceSet";
+            } else if (classNames.contains("FullModel")) {
+                headerClass = "FullModel";
+            } else if (classNames.contains("DifferenceModel")) {
+                headerClass = "DifferenceModel";
+            }
         }
         return headerClass;
     }
@@ -495,11 +514,12 @@ public class ExcelTools {
             return;
 
         CellStyle headerStyleRed = createHeaderStyle(workbook);
-        headerStyleRed.setFillForegroundColor(IndexedColors.DARK_RED.getIndex());
+        headerStyleRed.setFillForegroundColor(IndexedColors.RED.getIndex());
         CellStyle dataStyle = createDataStyle(workbook);
         XSSFRow attrRow = sheet.getRow(1);
         XSSFRow typeRow = sheet.getRow(2);
-        int rowNumber = 6;
+        XSSFRow isExtensionRow = sheet.getRow(5);
+        int rowNumber = 7;
 
         for (List<RDFAttributeData> attrList : dataInClass){ // looping through the class instances
             XSSFRow row = sheet.createRow(rowNumber);
@@ -523,6 +543,9 @@ public class ExcelTools {
                     XSSFCell typeCell = typeRow.createCell(valueCol);
                     typeCell.setCellStyle(headerStyleRed);
                     typeCell.setCellValue(data.getTpe());
+                    XSSFCell isExtensionCell = isExtensionRow.createCell(valueCol);
+                    isExtensionCell.setCellStyle(headerStyleRed);
+                    isExtensionCell.setCellValue("Extension");
                 }
                 XSSFCell valueCell = row.getCell(valueCol);
                 int currentRowOffset = 0;
@@ -633,7 +656,9 @@ public class ExcelTools {
 
     }
 
-    private static XSSFSheet CreateTemplateSheetBase(String sheetName,String className, CellStyle headerCellStyle,XSSFWorkbook workbook,Map<String,String> invertedPrefMap){
+    private static XSSFSheet CreateTemplateSheetBase(String sheetName,String className, CellStyle headerCellStyle,
+                                                     XSSFWorkbook workbook,Map<String,String> invertedPrefMap,
+                                                     boolean hasInstanceData) {
         XSSFSheet sheet = workbook.createSheet(sheetName);
 
         // Class row
@@ -670,11 +695,25 @@ public class ExcelTools {
         cell = row.createCell(0);
         cell.setCellValue("1..1");
         cell.setCellStyle(headerCellStyle);
-        // Mapping row
-        row = sheet.createRow(5);
-        cell = row.createCell(0);
-        cell.setCellValue("Mapping");
-        cell.setCellStyle(headerCellStyle);
+        // Mapping row and Extension row
+        if (hasInstanceData){
+            // Extension row
+            row = sheet.createRow(5);
+            cell = row.createCell(0);
+            cell.setCellValue("IsExtension");
+            cell.setCellStyle(headerCellStyle);
+            // Mapping row
+            row = sheet.createRow(6);
+            cell = row.createCell(0);
+            cell.setCellValue("Mapping");
+            cell.setCellStyle(headerCellStyle);
+        }
+        else {
+            row = sheet.createRow(5);
+            cell = row.createCell(0);
+            cell.setCellValue("Mapping");
+            cell.setCellStyle(headerCellStyle);
+        }
 
         return sheet;
     }

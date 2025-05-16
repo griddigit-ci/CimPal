@@ -596,12 +596,11 @@ public class ModelManipulationFactory {
     }
 
     public static void generateDataFromXlsV2(String xmlBase, File xmlfile, Map<String, Object> saveProperties,
-                                             Boolean stripPrefixes) throws Exception {
+                                             Boolean stripPrefixes, Boolean exportExtensions) throws Exception {
         ArrayList<Object> headerXlsData = null;
         String headerClassName = "";
         Map<String, ArrayList<Object>> classesXlsData = new HashMap<>();
         Map<String, String> prefMap = new HashMap<>();
-        int dataStartFrom = (int) saveProperties.get("dataStartsFrom");
 
         FileInputStream fis = new FileInputStream(xmlfile);
         XSSFWorkbook book = new XSSFWorkbook(fis);
@@ -689,6 +688,25 @@ public class ModelManipulationFactory {
         if (rdfidCol == -1)
             throw new Exception("Header rdf:id missing from xls.");
 
+        // get which row data is starting from
+        int dataStartFrom = 6;
+
+        for (int i = 0; i < headerXlsData.size(); i++) {
+            if (((LinkedList<?>) headerXlsData.get(i)).getFirst().equals("Mapping")) {
+                dataStartFrom = i + 1;
+                break;
+            }
+        }
+
+        // get which row contains the extension flags?
+        int isExtensionRow = -1;
+        for (int i = 0; i < headerXlsData.size(); i++) {
+            if (((LinkedList<?>) headerXlsData.get(i)).getFirst().equals("IsExtension")) {
+                isExtensionRow = i;
+                break;
+            }
+        }
+
         if (headerXlsData.size() > dataStartFrom) {
 
             String headRdfid = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(rdfidCol).toString();
@@ -710,6 +728,11 @@ public class ModelManipulationFactory {
             for (int i = dataStartFrom; i < headerXlsData.size(); i++) {
                 for (int j = 0; j < headerCols; j++) {
                     if (j != rdfidCol && j < ((LinkedList<?>) headerXlsData.get(i)).size()) {
+                        // Check if it is an extension
+                        if (isExtensionRow != -1 && !exportExtensions &&
+                                ((LinkedList<?>) headerXlsData.get(isExtensionRow)).get(j).toString().equals("Extension")) {
+                            continue;
+                        }
                         Object value = ((LinkedList<?>) headerXlsData.get(i)).get(j);
                         Object propertyURI_obj = ((LinkedList<?>) headerXlsData.get(1)).get(j);
                         if (value != null && propertyURI_obj != null) {
@@ -824,9 +847,13 @@ public class ModelManipulationFactory {
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
                     model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
-
                     for (int j = 0; j < cols; j++) {
                         if (j != rdfidCol && j < ((LinkedList<?>) classXlsData.get(i)).size()) {
+                            // Check if it is an extension
+                            if (isExtensionRow != -1 && !exportExtensions &&
+                                    ((LinkedList<?>) classXlsData.get(isExtensionRow)).get(j).toString().equals("Extension")) {
+                                continue;
+                            }
                             Object value = ((LinkedList<?>) classXlsData.get(i)).get(j);
                             Object propertyURI_obj = ((LinkedList<?>) classXlsData.get(1)).get(j);
                             if (value != null && propertyURI_obj != null) {
@@ -916,6 +943,13 @@ public class ModelManipulationFactory {
                                 }
                             }
                         }
+                    }
+
+                    if (!model.listStatements(rdfidRes, null, (RDFNode)null)
+                            .filterDrop(stmt -> stmt.getPredicate().equals(RDF.type))
+                            .hasNext()) {
+                        // If no properties other than rdf:type, remove the type statement
+                        model.remove(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
                     }
                 }
             }
