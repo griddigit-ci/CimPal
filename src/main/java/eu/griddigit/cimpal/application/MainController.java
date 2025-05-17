@@ -77,7 +77,6 @@ import static eu.griddigit.cimpal.core.ExportInstanceDataTemplate.CreateTemplate
 import static eu.griddigit.cimpal.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.core.RdfConvert.fileSaveDialog;
 import static eu.griddigit.cimpal.core.RdfConvert.modelInheritance;
-import static eu.griddigit.cimpal.core.ShaclTools.createShapesModelFromRDFS;
 import static eu.griddigit.cimpal.core.ShaclTools.prepareShapesModelFromRDFS;
 
 import org.apache.velocity.Template;
@@ -352,6 +351,8 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLoptionProperty;
     @FXML
     private ChoiceBox fcb_giVersion;
+    @FXML
+    private CheckBox cbRDFSSHACLdatatypesplit;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -1924,6 +1925,7 @@ public class MainController implements Initializable {
             cbRDFSSHACLuri.setDisable(false);
             cbRDFSSHACLncProp.setDisable(false);
             cbRDFSSHACLoptionProperty.setDisable(false);
+            cbRDFSSHACLdatatypesplit.setDisable(false);
 
             progressBar.setProgress(1);
         }
@@ -3033,6 +3035,11 @@ public class MainController implements Initializable {
             rdfsToShaclGuiMapBool.put("Closedshapes",true);
         }else{
             rdfsToShaclGuiMapBool.put("Closedshapes",false);
+        }
+        if (cbRDFSSHACLdatatypesplit.isSelected()){
+            rdfsToShaclGuiMapBool.put("SplitDatatypes",true);
+        }else{
+            rdfsToShaclGuiMapBool.put("SplitDatatypes",false);
         }
         //excludeMRID = cbRDFSSHACLoptionDescr.isSelected();
 
