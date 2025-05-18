@@ -296,7 +296,8 @@ public class ShaclTools {
 
                     }
 
-                    if (baseTier1Map.get("unionmodelbaseprofilesshaclinheritance") == null && rdfsToShaclGuiMapBool.get("exportInheritTree")) {
+                    //if (baseTier1Map.get("unionmodelbaseprofilesshaclinheritance") == null && rdfsToShaclGuiMapBool.get("exportInheritTree")) {
+                    if (rdfsToShaclGuiMapBool.get("exportInheritTree")) {
                         Model modelInh = modelInheritance(model, true, true);
                         //leave only subclassof and property of
                         List<Statement> stmtToRemove = new LinkedList<>();
