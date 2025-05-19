@@ -331,6 +331,7 @@ public class ExcelTools {
 
         List<String> classNames = mapInfo.get("ClassName");
         List<String> classes = mapInfo.get("Class");
+        List<String> classDescription = mapInfo.get("ClassIfDescription");
         List<String> props = mapInfo.get("Property-AttributeAssociation");
         List<String> multiplicities = mapInfo.get("Multiplicity");
         List<String> datatypes = mapInfo.get("Datatype");
@@ -338,7 +339,7 @@ public class ExcelTools {
 
         for (int i = 0; i < mapInfo.get("ClassName").size(); i++) {
             genDataInfos.add(new GenDataTemplateMapInfo(classNames.get(i),classes.get(i),props.get(i),
-                    multiplicities.get(i), datatypes.get(i), types.get(i)));
+                    multiplicities.get(i), datatypes.get(i), types.get(i), classDescription.get(i)));
         }
         genDataInfos.sort(Comparator.comparing(GenDataTemplateMapInfo::getClassName));
 
@@ -366,7 +367,7 @@ public class ExcelTools {
         }
         else {
             classSheet = CreateTemplateSheetBase(sheetName,
-                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap, hasInstanceData);
+                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap, hasInstanceData,genDataInfos.getFirst().getClsDescr());
         }
 
         int maxWidthInCharacters = 150; // Maximum desired width in characters
@@ -384,7 +385,7 @@ public class ExcelTools {
                 }
                 else {
                     classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
-                            headerCellStyle, workbook, invertedPrefMap, hasInstanceData);
+                            headerCellStyle, workbook, invertedPrefMap, hasInstanceData,genDataInfo.getClsDescr());
                     sColN = 1;
                 }
             }
@@ -658,7 +659,7 @@ public class ExcelTools {
 
     private static XSSFSheet CreateTemplateSheetBase(String sheetName,String className, CellStyle headerCellStyle,
                                                      XSSFWorkbook workbook,Map<String,String> invertedPrefMap,
-                                                     boolean hasInstanceData) {
+                                                     boolean hasInstanceData, String classDescr) {
         XSSFSheet sheet = workbook.createSheet(sheetName);
 
         // Class row
@@ -674,6 +675,18 @@ public class ExcelTools {
         }
         cellClass.setCellValue(classNameShort);
         cellClass.setCellStyle(headerCellStyle);
+
+        XSSFCell cellClassDescAbout = firstRow.createCell(2);
+        cellClassDescAbout.setCellValue("rdf:about");
+        cellClassDescAbout.setCellStyle(headerCellStyle);
+
+        XSSFCell cellClassDesc = firstRow.createCell(3);
+        if (classNameRes.getLocalName().equals("Dataset") || classNameRes.getLocalName().equals("DifferenceSet") || classNameRes.getLocalName().equals("FullModel") || classNameRes.getLocalName().equals("DifferenceModel")){
+            cellClassDesc.setCellValue("true");
+        }else {
+            cellClassDesc.setCellValue(classDescr);
+        }
+        cellClassDesc.setCellStyle(headerCellStyle);
 
         // Attribute row
         XSSFRow row = sheet.createRow(1);

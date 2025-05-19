@@ -585,7 +585,8 @@ public class MainController implements Initializable {
 
         fcb_giVersion.getItems().addAll(
                 "IEC 61970-600-1&2 (CGMES 3.0.0)",
-                "IEC TS 61970-600-1&2 (CGMES 2.4.15)"
+                "IEC TS 61970-600-1&2 (CGMES 2.4.15)",
+                "Other"
         );
         fcb_giVersion.getSelectionModel().selectFirst();
 
@@ -4998,6 +4999,9 @@ public class MainController implements Initializable {
                 break;
                 case "IEC TS 61970-600-1&2 (CGMES 2.4.15)":
                 xmlBase = "http://iec.ch/TC57/2013/CIM-schema-cim16";
+                break;
+                case "Other":
+                xmlBase = "https://cim.ucaiug.io/ns";
                 break;
             default:
                 break;

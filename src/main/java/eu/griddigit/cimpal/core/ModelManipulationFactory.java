@@ -601,6 +601,9 @@ public class ModelManipulationFactory {
         String headerClassName = "";
         Map<String, ArrayList<Object>> classesXlsData = new HashMap<>();
         Map<String, String> prefMap = new HashMap<>();
+        Set<Resource> rdfEnumList = new HashSet<>();
+        Set<Resource> rdfAboutList = new HashSet<>();
+
 
         FileInputStream fis = new FileInputStream(xmlfile);
         XSSFWorkbook book = new XSSFWorkbook(fis);
@@ -725,6 +728,9 @@ public class ModelManipulationFactory {
                 throw new Exception("Missing prefix in config for class: " + headerClassName + "\nMissing prefix: " + splitClassName[0]);
             }
             model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
+
+            rdfAboutList.add(ResourceFactory.createResource(headerClassWNS));
+
             for (int i = dataStartFrom; i < headerXlsData.size(); i++) {
                 for (int j = 0; j < headerCols; j++) {
                     if (j != rdfidCol && j < ((LinkedList<?>) headerXlsData.get(i)).size()) {
@@ -785,12 +791,15 @@ public class ModelManipulationFactory {
                                 case "Enumeration" -> { //add enum
                                     if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
                                         model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                        rdfEnumList.add(ResourceFactory.createResource(object));
                                     } else if (object.split("#").length > 1) { // if it doesn't have http://
                                         model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
+                                        rdfEnumList.add(ResourceFactory.createResource("http://" + object));
                                     } else { // if there is the prefix with ':'
                                         String[] objSplit = object.split(":", 2);
                                         String prefixUri = prefMap.get(objSplit[0]);
                                         model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objSplit[1])));
+                                        rdfEnumList.add(ResourceFactory.createResource(prefixUri + objSplit[1]));
                                     }
                                 }
                             }
@@ -847,6 +856,9 @@ public class ModelManipulationFactory {
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
                     model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
+                    if (((LinkedList<?>) classXlsData.getFirst()).get(3).toString().equals("true")){
+                        rdfAboutList.add(ResourceFactory.createResource(classWNS));
+                    }
                     for (int j = 0; j < cols; j++) {
                         if (j != rdfidCol && j < ((LinkedList<?>) classXlsData.get(i)).size()) {
                             // Check if it is an extension
@@ -924,8 +936,10 @@ public class ModelManipulationFactory {
                                     case "Enumeration" -> { //add enum
                                         if (object.split("#").length > 1 && object.startsWith("http")) { // if we have it as a http://...#
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
+                                            rdfEnumList.add(ResourceFactory.createResource(object));
                                         } else if (object.split("#").length > 1) { // if it doesn't have http://
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource("http://" + object)));
+                                            rdfEnumList.add(ResourceFactory.createResource("http://" + object));
                                         } else { // if there is the prefix with ':'
                                             String[] objSplit = object.split(":", 2);
                                             String prefixUri;
@@ -938,6 +952,7 @@ public class ModelManipulationFactory {
                                                 objData = objSplit[1];
                                             }
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objData)));
+                                            rdfEnumList.add(ResourceFactory.createResource(prefixUri + objData));
                                         }
                                     }
                                 }
@@ -989,18 +1004,18 @@ public class ModelManipulationFactory {
         }
 
         // save file
-        Set<Resource> rdfAboutList = new HashSet<>();
-        Set<Resource> rdfEnumList = new HashSet<>();
-
-
-        if ((boolean) saveProperties.get("useAboutRules")) {
-            rdfAboutList = LoadRDFAbout(xmlBase, modelProfileURIs);
-            rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
-        }
-
-        if ((boolean) saveProperties.get("useEnumRules")) {
-            rdfEnumList = LoadRDFEnum(xmlBase, modelProfileURIs);
-        }
+//        Set<Resource> rdfAboutList = new HashSet<>();
+//        Set<Resource> rdfEnumList = new HashSet<>();
+//
+//
+//        if ((boolean) saveProperties.get("useAboutRules")) {
+//            rdfAboutList = LoadRDFAbout(xmlBase, modelProfileURIs);
+//            rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
+//        }
+//
+//        if ((boolean) saveProperties.get("useEnumRules")) {
+//            rdfEnumList = LoadRDFEnum(xmlBase, modelProfileURIs);
+//        }
 
         if (saveProperties.containsKey("rdfAboutList")) {
             saveProperties.replace("rdfAboutList", rdfAboutList);

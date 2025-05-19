@@ -7,15 +7,17 @@ public class GenDataTemplateMapInfo {
     private String multiplicity;
     private String datatype;
     private String tpe;
+    private String clsDescr;
 
     public GenDataTemplateMapInfo(String className, String fullClassName,
-                                  String prop, String multiplicity, String datatype, String tpe) {
+                                  String prop, String multiplicity, String datatype, String tpe, String classDescription) {
         this.className = className;
         this.fullClassName = fullClassName;
         this.prop = prop;
         this.multiplicity = multiplicity;
         this.datatype = datatype;
         this.tpe = tpe;
+        this.clsDescr = classDescription;
     }
 
     private static String shortenName(String input) {
@@ -67,5 +69,8 @@ public class GenDataTemplateMapInfo {
 
     public String getTpe() {
         return tpe;
+    }
+    public String getClsDescr() {
+        return clsDescr;
     }
 }

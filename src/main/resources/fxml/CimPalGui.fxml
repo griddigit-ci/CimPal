@@ -715,100 +715,96 @@
                                                 </HBox>
                                              </children>
                                           </HBox>
-                                          <HBox>
-                                             <children>
-                                                <Label text="XLS template creator">
-                                                   <font>
-                                                      <Font name="System Bold" size="24.0" />
-                                                   </font>
-                                                </Label>
-                                             </children>
-                                             <padding>
-                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                          </HBox>
-                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
-                                             <padding>
-                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <VBox alignment="CENTER_LEFT" spacing="10.0" HBox.hgrow="ALWAYS">
-                                                   <children>
-                                                      <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                          <Accordion>
+                                            <panes>
+                                              <TitledPane animated="false" text="Create xlsx template from RDFS or dataset serialised in CIMXML">
+                                                <content>
+                                                  <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                                                          <children>
-                                                            <CheckBox fx:id="fcbAddInstanceData" mnemonicParsing="false" prefHeight="21.0" prefWidth="182.0" text="Add instance data to template" />
-                                                            <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create XLS template" />
+                                                            <VBox>
+                                                               <children>
+                                                                  <HBox spacing="10.0">
+                                                                     <children>
+                                                                        <CheckBox fx:id="fcbAddInstanceData" mnemonicParsing="false" text="Add instance data (CIMXML) to generated template" />
+                                                                        <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create XLSX template" />
+                                                                     </children>
+                                                                     <VBox.margin>
+                                                                        <Insets top="10.0" />
+                                                                     </VBox.margin>
+                                                                  </HBox>
+                                                               </children>
+                                                            </VBox>
                                                          </children>
-                                                         <VBox.margin>
+                                                      </AnchorPane>
+                                                </content>
+                                              </TitledPane>
+                                              <TitledPane animated="false" text="Create CIMXML dataset based on xlsx template">
+                                                <content>
+                                                  <AnchorPane>
+                                                         <children>
+                                                            <VBox spacing="5.0">
+                                                               <children>
+                                                                  <HBox spacing="10.0">
+                                                                     <padding>
+                                                                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                                     </padding>
+                                                                     <children>
+                                                                        <Label text="XLS template:" wrapText="true" />
+                                                                        <TextField fx:id="fsXlsTemplatePath" editable="false" HBox.hgrow="ALWAYS" />
+                                                                        <Button mnemonicParsing="false" onAction="#actionBrowseXlsTemplate" text="Browse" />
+                                                                     </children>
+                                                                     <VBox.margin>
+                                                                        <Insets top="10.0" />
+                                                                     </VBox.margin>
+                                                                  </HBox>
+                                                                  <HBox spacing="10.0">
+                                                                     <padding>
+                                                                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                                     </padding>
+                                                                     <Label minWidth="50.0" prefHeight="17.0" prefWidth="89.0" text="Sorting options:" />
+                                                                     <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
+                                                                        <HBox.margin>
+                                                                           <Insets left="10.0" />
+                                                                        </HBox.margin>
+                                                                     </CheckBox>
+                                                                     <Label text="Sorting options:" />
+                                                                     <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
+                                                                  </HBox>
+                                                                  <HBox spacing="10.0">
+                                                                     <padding>
+                                                                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                                     </padding>
+                                                                     <children>
+                                                                        <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
+                                                                        <CheckBox fx:id="fcbExportExtensionsGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Export extensions (marked red in template)" />
+                                                                     </children>
+                                                                  </HBox>
+                                                                  <HBox nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
+                                                                     <children>
+                                                                        <Button fx:id="fbtnRunGenerateInstance" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunGenerateInstance" text="Run" HBox.hgrow="ALWAYS" />
+                                                                        <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetGenerateInstance" text="Reset" />
+                                                                     </children>
+                                                                  </HBox>
+                                                                  <HBox spacing="10.0" visible="false">
+                                                                     <padding>
+                                                                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                                     </padding>
+                                                                     <children>
+                                                                        <Label text="Profile version:" wrapText="true" />
+                                                                        <ChoiceBox fx:id="fcb_giVersion" minWidth="400.0" />
+                                                                     </children>
+                                                                  </HBox>
+                                                               </children>
+                                                            </VBox>
+                                                         </children>
+                                                         <opaqueInsets>
                                                             <Insets />
-                                                         </VBox.margin>
-                                                      </HBox>
-                                                   </children>
-                                                </VBox>
-                                             </children>
-                                          </HBox>
-                                          <HBox>
-                                             <children>
-                                                <Label text="XLS to XML conversion">
-                                                   <font>
-                                                      <Font name="System Bold" size="24.0" />
-                                                   </font>
-                                                </Label>
-                                             </children>
-                                             <padding>
-                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                          </HBox>
-                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
-                                             <padding>
-                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <Label text="XLS template:" wrapText="true" />
-                                                <TextField fx:id="fsXlsTemplatePath" editable="false" HBox.hgrow="ALWAYS" />
-                                                <Button mnemonicParsing="false" onAction="#actionBrowseXlsTemplate" text="Browse" />
-                                             </children>
-                                          </HBox>
-                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
-                                             <padding>
-                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <Label text="Profile version:" wrapText="true" />
-                                                <ChoiceBox fx:id="fcb_giVersion" minWidth="400.0" />
-                                             </children>
-                                          </HBox>
-                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
-                                             <padding>
-                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <Label minWidth="50.0" prefHeight="17.0" prefWidth="89.0" text="Sorting options:" />
-                                             <CheckBox fx:id="fcbSortRDFGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
-                                                <HBox.margin>
-                                                   <Insets left="10.0" />
-                                                </HBox.margin>
-                                             </CheckBox>
-                                             <Label text="Sorting options:" />
-                                             <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0" />
-                                          </HBox>
-                                          <HBox spacing="10.0">
-                                             <padding>
-                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                             </padding>
-                                             <children>
-                                                <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
-                                                <CheckBox fx:id="fcbExportExtensionsGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Export extensions (marked red in template)" />
-                                             </children>
-                                          </HBox>
-                                          <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
-                                             <VBox.margin>
-                                                <Insets bottom="5.0" right="5.0" />
-                                             </VBox.margin>
-                                             <children>
-                                                <Button fx:id="fbtnRunGenerateInstance" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunGenerateInstance" text="Run" HBox.hgrow="ALWAYS" />
-                                                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetGenerateInstance" text="Reset" />
-                                             </children>
-                                          </HBox>
+                                                         </opaqueInsets>
+                                                      </AnchorPane>
+                                                </content>
+                                              </TitledPane>
+                                            </panes>
+                                          </Accordion>
                                        </children>
                                     </VBox>
                                  </children>

@@ -20,13 +20,16 @@ import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.topbraid.shacl.vocabulary.SH;
 
 import java.io.*;
 import java.util.*;
 
 import static eu.griddigit.cimpal.core.ExportRDFSdescriptions.getRDFDataForClasses;
 import static eu.griddigit.cimpal.core.RdfConvert.fileSaveDialog;
+import static eu.griddigit.cimpal.core.ShaclTools.*;
 import static eu.griddigit.cimpal.util.ExcelTools.*;
+import static org.topbraid.shacl.vocabulary.SH.path;
 
 
 public class ExportInstanceDataTemplate {
@@ -478,6 +481,7 @@ public class ExportInstanceDataTemplate {
         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
 
         List<String> rdfsClassName = new LinkedList<>(); // list for the name of the class without namespace
+        List<String> rdfsClassDescription = new LinkedList<>(); // list for the class if it is description
         List<String> rdfsClass = new LinkedList<>(); // list for the classes
         List<String> rdfsAttrAssoc = new LinkedList<>(); // list for the property attribute or association
         List<String> rdfsAttrOrAssocFlag = new LinkedList<>(); // list for the identification if is attribute or association
@@ -498,108 +502,226 @@ public class ExportInstanceDataTemplate {
             prefMap.putAll(prefMapTemp);
 
             MainController.shapesOnAbstractOption = 0;
-            ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
+            RDFNode literalYes = ResourceFactory.createPlainLiteral("Yes");
+            Property assocUsed = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","AssociationUsed");
+            Property multiplicity = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity");
 
-            for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and record for each concrete class
-                //add the Class
-                String classLocalName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
-                String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
+            for (ResIterator i = model.listResourcesWithProperty(RDF.type, RDFS.Class); i.hasNext(); ) {
+                Resource resItem = i.next();
+                if (classIsNotEnumOrDatatype(resItem, model)) {
+                    //check if the class is concrete
+                    boolean classDescripStereo = classIsDescription(resItem, model);
+                    boolean isConcrete = classIsConcrete(resItem, model);
+                    if (isConcrete) {
+                        String localName = resItem.getLocalName();
+                        String classFullURI = resItem.getURI();
 
-                //check if the class has stereotype "Description" and remove IdentifiedObject.name, .description, .mRID in case they are there
-                boolean classIsDescription = false;
-                for (StmtIterator i = model.listStatements(ResourceFactory.createResource(classFullURI), ResourceFactory.createProperty(cimsNs, "stereotype"), (RDFNode) null); i.hasNext(); ) {
-                    Statement stmt = i.next();
-                    if (stmt.getObject().toString().equals("Description")) {
-                        classIsDescription = true;
-                    }
-                }
+                        //get all local and inherited properties
+                        List<Statement> localInheritProperties = new LinkedList<>();
 
-                for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size(); atas++) {
-                    // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
-
-                /*
-                //every time a new property is added the reference is also added to the ShapeNode of the class
-                ArrayList<Object> propertyNodeFeatures = new ArrayList<>();
-                *//*
-                     * propertyNodeFeatures structure
-                     * 0 - type of check: cardinality, datatype, associationValueType
-                     * 1 - message
-                     * 2 - name
-                     * 3 - description
-                     * 4 - severity
-                     * 5 - cardinality
-                     * 6 - the primitive either it is directly a primitive or it is the primitive of the .value attribute of a CIMdatatype
-                     * in case of enumeration 6 is set to Enumeration
-                     * in case of compound 6 is set to Compound
-                     * 7 - is a list of uri of the enumeration attributes
-                     * 8 - order
-                     * 9 - group
-                     * 10 - the list of concrete classes for association - the value type at the used end
-                     * 11 - classFullURI for the targetClass of the NodeShape
-                     * 12 - the uri of the compound class to be used in sh:class
-                     * 13 - path for the attributes of the compound
-                     *//*
-                for (int i = 0; i < 14; i++) {
-                    propertyNodeFeatures.add("");
-                }*/
-
-                    if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).getFirst().toString().equals("Association")) {//if it is an association
-                        if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
-                            String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
-                            //Cardinality check
-                            String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(6).toString();
-                            rdfsClassName.add(classLocalName);
-                            rdfsClass.add(classFullURI);
-                            rdfsAttrAssoc.add(propertyFullURI);
-                            rdfsAttrOrAssocFlag.add("Association");
-                            rdfsItemAttrDatatype.add("N/A");
-                            rdfsItemMultiplicity.add(cardinality);
+                        int root = 0;
+                        Resource classItem = resItem;
+                        while (root == 0) {
+                            if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
+                                localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
+                                if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                                    classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
+                                } else {
+                                    root = 1;
+                                }
+                            } else {
+                                root = 1;
+                            }
                         }
 
-                    } else if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
-                        String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString();
-                        String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
+                        for (Statement stmt : localInheritProperties) { // loop on the local and inherited properties
+                            if (model.listStatements(stmt.getSubject(), assocUsed, (RDFNode) null).hasNext()) { // it is an association
+                                if (model.listStatements(stmt.getSubject(), assocUsed, literalYes).hasNext()) { // the association direction exchanged
 
-                        String propertyLocalName = ResourceFactory.createResource(propertyFullURI).getLocalName();
-                        if (classIsDescription && (propertyLocalName.equals("IdentifiedObject.name") || propertyLocalName.equals("IdentifiedObject.description") || propertyLocalName.equals("IdentifiedObject.mRID"))) {
-                            continue;
-                        }
+                                    String propertyFullURI = stmt.getSubject().getURI();
+                                    String cardinality = "";
+                                    if (model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).hasNext()) {
+                                        cardinality = model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
+                                    }
+                                    rdfsClassName.add(localName);
+                                    rdfsClassDescription.add(String.valueOf(classDescripStereo));
+                                    rdfsClass.add(classFullURI);
+                                    rdfsAttrAssoc.add(propertyFullURI);
+                                    rdfsAttrOrAssocFlag.add("Association");
+                                    rdfsItemAttrDatatype.add("N/A");
+                                    rdfsItemMultiplicity.add(cardinality);
 
-                        rdfsClassName.add(classLocalName);
-                        rdfsClass.add(classFullURI);
-                        rdfsAttrAssoc.add(propertyFullURI);
+                                }
+                            } else {//if it is an attribute
 
-                        rdfsItemMultiplicity.add(cardinality);
-                        //add datatypes checks depending on it is Primitive, Datatype or Enumeration
-                        switch (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString()) {
-                            case "Primitive": {
-                                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
-                                rdfsItemAttrDatatype.add(datatypePrimitive);
-                                rdfsAttrOrAssocFlag.add("Attribute");
-                                break;
+                                String localNameAttr = stmt.getSubject().getLocalName();
+                                String propertyFullURI = stmt.getSubject().getURI();
+
+                                String propertyLocalName = ResourceFactory.createResource(propertyFullURI).getLocalName();
+                                if (classDescripStereo && (propertyLocalName.equals("IdentifiedObject.name") || propertyLocalName.equals("IdentifiedObject.description") || propertyLocalName.equals("IdentifiedObject.mRID"))) {
+                                    continue;
+                                }
+
+                                rdfsClassName.add(localName);
+                                rdfsClassDescription.add(String.valueOf(classDescripStereo));
+                                rdfsClass.add(classFullURI);
+                                rdfsAttrAssoc.add(propertyFullURI);
+                                String cardinality = model.listStatements(stmt.getSubject(),multiplicity,(RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
+                                rdfsItemMultiplicity.add(cardinality);
+                                //add datatypes checks depending on it is Primitive, Datatype or Enumeration
+                                Resource datatypeRes = null;
+                                if (model.listStatements(stmt.getSubject(),ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"),(RDFNode) null).hasNext()) {
+                                    datatypeRes = model.listStatements(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"), (RDFNode) null).next().getObject().asResource();
+                                }else{
+                                    datatypeRes = model.listStatements(stmt.getSubject(), RDFS.range, (RDFNode) null).next().getObject().asResource();
+                                }
+                                if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("Primitive")).hasNext()){
+                                    String datatypePrimitive = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString(); //this is localName e.g. String
+
+                                    rdfsItemAttrDatatype.add(datatypePrimitive);
+                                    rdfsAttrOrAssocFlag.add("Attribute");
+                                }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("CIMDatatype")).hasNext()){
+                                    Resource datatypevalue = ResourceFactory.createProperty(datatypeRes.getURI()+".value");
+
+                                    String datatypePrimitive = model.getRequiredProperty(datatypevalue,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType")).getObject().asResource().getLocalName(); //this is localName e.g. String
+                                    rdfsItemAttrDatatype.add(datatypePrimitive);
+                                    rdfsAttrOrAssocFlag.add("Attribute");
+                                }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("Compound")).hasNext()){
+
+                                    //String datatypeCompound = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString();
+                                    String datatypeCompound = datatypeRes.getURI();
+
+                                    rdfsItemAttrDatatype.add(datatypeCompound);
+                                    rdfsAttrOrAssocFlag.add("Compound");
+                                }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createResource("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()){
+
+                                    //this adds the structure which is a list of possible enumerated values
+                                    List<Resource> enumValues = model.listSubjectsWithProperty(RDF.type,datatypeRes).toList();
+                                    List<String> enumValuesStr = new ArrayList<>();
+                                    for (Resource enumValue : enumValues) {
+                                        enumValuesStr.add(enumValue.toString());
+                                    }
+                                    rdfsItemAttrDatatype.add(enumValuesStr.toString());
+                                    rdfsAttrOrAssocFlag.add("Enumeration");
+                                }
                             }
-                            case "CIMDatatype": {
-                                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
-                                rdfsItemAttrDatatype.add(datatypePrimitive);
-                                rdfsAttrOrAssocFlag.add("Attribute");
-                                break;
-                            }
-                            case "Compound": {
-                                String datatypeCompound = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
-                                rdfsItemAttrDatatype.add(datatypeCompound);
-                                rdfsAttrOrAssocFlag.add("Compound");
-                                break;
-                            }
-                            case "Enumeration":
-                                rdfsItemAttrDatatype.add(((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString());
-                                rdfsAttrOrAssocFlag.add("Enumeration");
-                                break;
                         }
                     }
                 }
             }
-
         }
+
+
+
+
+
+
+
+//
+//                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
+//
+//            for (int cl = 0; cl < ((ArrayList<?>) shapeData.getFirst()).size(); cl++) { //this is to loop on the classes in the profile and record for each concrete class
+//                //add the Class
+//                String classLocalName = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).get(2).toString();
+//                String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).getFirst()).getFirst().toString();
+//
+//                //check if the class has stereotype "Description" and remove IdentifiedObject.name, .description, .mRID in case they are there
+//                boolean classIsDescription = false;
+//                for (StmtIterator i = model.listStatements(ResourceFactory.createResource(classFullURI), ResourceFactory.createProperty(cimsNs, "stereotype"), (RDFNode) null); i.hasNext(); ) {
+//                    Statement stmt = i.next();
+//                    if (stmt.getObject().toString().equals("Description")) {
+//                        classIsDescription = true;
+//                    }
+//                }
+//
+//                for (int atas = 1; atas < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).size(); atas++) {
+//                    // this is to loop on the attributes and associations (including inherited) for a given class and add PropertyNode for each attribute or association
+//
+//                /*
+//                //every time a new property is added the reference is also added to the ShapeNode of the class
+//                ArrayList<Object> propertyNodeFeatures = new ArrayList<>();
+//                *//*
+//                     * propertyNodeFeatures structure
+//                     * 0 - type of check: cardinality, datatype, associationValueType
+//                     * 1 - message
+//                     * 2 - name
+//                     * 3 - description
+//                     * 4 - severity
+//                     * 5 - cardinality
+//                     * 6 - the primitive either it is directly a primitive or it is the primitive of the .value attribute of a CIMdatatype
+//                     * in case of enumeration 6 is set to Enumeration
+//                     * in case of compound 6 is set to Compound
+//                     * 7 - is a list of uri of the enumeration attributes
+//                     * 8 - order
+//                     * 9 - group
+//                     * 10 - the list of concrete classes for association - the value type at the used end
+//                     * 11 - classFullURI for the targetClass of the NodeShape
+//                     * 12 - the uri of the compound class to be used in sh:class
+//                     * 13 - path for the attributes of the compound
+//                     *//*
+//                for (int i = 0; i < 14; i++) {
+//                    propertyNodeFeatures.add("");
+//                }*/
+//
+//                    if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).getFirst().toString().equals("Association")) {//if it is an association
+//                        if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
+//                            String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(2).toString();
+//                            //Cardinality check
+//                            String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(6).toString();
+//                            rdfsClassName.add(classLocalName);
+//                            rdfsClassDescription.add(String.valueOf(classIsDescription));
+//                            rdfsClass.add(classFullURI);
+//                            rdfsAttrAssoc.add(propertyFullURI);
+//                            rdfsAttrOrAssocFlag.add("Association");
+//                            rdfsItemAttrDatatype.add("N/A");
+//                            rdfsItemMultiplicity.add(cardinality);
+//                        }
+//
+//                    } else if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
+//                        String propertyFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(1).toString();
+//                        String cardinality = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(5).toString();
+//
+//                        String propertyLocalName = ResourceFactory.createResource(propertyFullURI).getLocalName();
+//                        if (classIsDescription && (propertyLocalName.equals("IdentifiedObject.name") || propertyLocalName.equals("IdentifiedObject.description") || propertyLocalName.equals("IdentifiedObject.mRID"))) {
+//                            continue;
+//                        }
+//
+//                        rdfsClassName.add(classLocalName);
+//                        rdfsClassDescription.add(String.valueOf(classIsDescription));
+//                        rdfsClass.add(classFullURI);
+//                        rdfsAttrAssoc.add(propertyFullURI);
+//
+//                        rdfsItemMultiplicity.add(cardinality);
+//                        //add datatypes checks depending on it is Primitive, Datatype or Enumeration
+//                        switch (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(8).toString()) {
+//                            case "Primitive": {
+//                                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
+//                                rdfsItemAttrDatatype.add(datatypePrimitive);
+//                                rdfsAttrOrAssocFlag.add("Attribute");
+//                                break;
+//                            }
+//                            case "CIMDatatype": {
+//                                String datatypePrimitive = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+//                                rdfsItemAttrDatatype.add(datatypePrimitive);
+//                                rdfsAttrOrAssocFlag.add("Attribute");
+//                                break;
+//                            }
+//                            case "Compound": {
+//                                String datatypeCompound = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
+//                                rdfsItemAttrDatatype.add(datatypeCompound);
+//                                rdfsAttrOrAssocFlag.add("Compound");
+//                                break;
+//                            }
+//                            case "Enumeration":
+//                                rdfsItemAttrDatatype.add(((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(cl)).get(atas)).get(10).toString());
+//                                rdfsAttrOrAssocFlag.add("Enumeration");
+//                                break;
+//                        }
+//                    }
+//                }
+//            }
+
+        //}
 
         Map<String, List<String>> rdfsInfo = new HashMap<>();
         List<String> orderList = new LinkedList<>(); // list of order
@@ -611,6 +733,7 @@ public class ExportInstanceDataTemplate {
         orderList.add("Multiplicity");
 
         rdfsInfo.put("Class", rdfsClass);
+        rdfsInfo.put("ClassIfDescription", rdfsClassDescription);
         rdfsInfo.put("ClassName", rdfsClassName);
         rdfsInfo.put("Property-AttributeAssociation", rdfsAttrAssoc);
         rdfsInfo.put("Multiplicity", rdfsItemMultiplicity);
