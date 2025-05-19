@@ -715,9 +715,9 @@
                                                 </HBox>
                                              </children>
                                           </HBox>
-                                          <Accordion>
+                                          <Accordion prefHeight="145.0" prefWidth="1282.0">
                                             <panes>
-                                              <TitledPane animated="false" text="Create xlsx template from RDFS or dataset serialised in CIMXML">
+                                              <TitledPane prefHeight="181.0" prefWidth="1282.0" text="Create xlsx template from RDFS or dataset serialised in CIMXML">
                                                 <content>
                                                   <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                                                          <children>
@@ -738,7 +738,7 @@
                                                       </AnchorPane>
                                                 </content>
                                               </TitledPane>
-                                              <TitledPane animated="false" text="Create CIMXML dataset based on xlsx template">
+                                              <TitledPane prefHeight="259.0" prefWidth="1282.0" text="Create CIMXML dataset based on xlsx template">
                                                 <content>
                                                   <AnchorPane>
                                                          <children>
@@ -781,8 +781,8 @@
                                                                   </HBox>
                                                                   <HBox nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
                                                                      <children>
-                                                                        <Button fx:id="fbtnRunGenerateInstance" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunGenerateInstance" text="Run" HBox.hgrow="ALWAYS" />
-                                                                        <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetGenerateInstance" text="Reset" />
+                                                                        <Button fx:id="fbtnRunGenerateInstance" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunGenerateInstance" text="Create" HBox.hgrow="ALWAYS" />
+                                                                        <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetGenerateInstance" text="Reset" visible="false" />
                                                                      </children>
                                                                   </HBox>
                                                                   <HBox spacing="10.0" visible="false">
