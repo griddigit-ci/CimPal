@@ -522,17 +522,18 @@ public class ExportInstanceDataTemplate {
                         int root = 0;
                         Resource classItem = resItem;
                         while (root == 0) {
+                            //has subClassOf
+                            // the resource of the subClassOf
                             if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
                                 localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
-                                if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
-                                    classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
-                                } else {
-                                    root = 1;
-                                }
+                            }
+                            if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                                classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
                             } else {
                                 root = 1;
                             }
                         }
+
 
                         for (Statement stmt : localInheritProperties) { // loop on the local and inherited properties
                             if (model.listStatements(stmt.getSubject(), assocUsed, (RDFNode) null).hasNext()) { // it is an association

@@ -677,6 +677,7 @@ public class ShaclTools {
                             }
                         }
 
+
                         if (rdfsToShaclGuiMapBool.get("Closedshapes") && !localInheritProperties.isEmpty()) {
 
                             //exclude inverse associations
@@ -974,17 +975,31 @@ public class ShaclTools {
                         //get all local and inherited properties
                         List<Statement> localInheritProperties = new LinkedList<>();
 
+//                        int root = 0;
+//                        Resource classItem = resItem;
+//                        while (root == 0) {
+//                            if(model.listStatements(null, RDFS.domain, classItem).hasNext()) {
+//                                localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
+//                                if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+//                                    classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
+//                                } else {
+//                                    root = 1;
+//                                }
+//                            }else{
+//                                root = 1;
+//                            }
+//                        }
+
                         int root = 0;
                         Resource classItem = resItem;
                         while (root == 0) {
-                            if(model.listStatements(null, RDFS.domain, classItem).hasNext()) {
+                            // the resource of the subClassOf
+                            if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
                                 localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
-                                if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
-                                    classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
-                                } else {
-                                    root = 1;
-                                }
-                            }else{
+                            }
+                            if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                                classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
+                            } else {
                                 root = 1;
                             }
                         }
@@ -1278,16 +1293,30 @@ public class ShaclTools {
                                 //get all local and inherited properties
                                 List<Statement> localInheritProperties = new LinkedList<>();
 
+//                                int root = 0;
+//                                Resource classItem = resItem;
+//                                while (root == 0) {
+//                                    if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
+//                                        localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
+//                                        if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+//                                            classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
+//                                        } else {
+//                                            root = 1;
+//                                        }
+//                                    } else {
+//                                        root = 1;
+//                                    }
+//                                }
+
                                 int root = 0;
                                 Resource classItem = resItem;
                                 while (root == 0) {
+                                    // the resource of the subClassOf
                                     if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
                                         localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
-                                        if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
-                                            classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
-                                        } else {
-                                            root = 1;
-                                        }
+                                    }
+                                    if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                                        classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
                                     } else {
                                         root = 1;
                                     }
