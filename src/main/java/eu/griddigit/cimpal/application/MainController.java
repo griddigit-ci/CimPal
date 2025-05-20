@@ -5079,6 +5079,7 @@ public class MainController implements Initializable {
         if(!fcbAddInstanceData.isSelected()) {
             hideEmptySheets.setVisible(false);
             hideEmptySheets.setDisable(true);
+            hideEmptySheets.setSelected(false);
         }
     }
 
