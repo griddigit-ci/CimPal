@@ -9,6 +9,7 @@ package eu.griddigit.cimpal.util;
 import eu.griddigit.cimpal.model.GenDataTemplateMapInfo;
 import eu.griddigit.cimpal.model.RDFAttributeData;
 import eu.griddigit.cimpal.model.SHACLValidationResult;
+import javafx.fxml.FXML;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
@@ -322,7 +323,7 @@ public class ExcelTools {
 
     public static void exportMapToExcelv2(Map<String, List<String>> mapInfo, Map<String,String> prefMap,
                                           Map<String, List<List<RDFAttributeData>>> instanceClassData,
-                                          XSSFWorkbook workbook) {
+                                          XSSFWorkbook workbook, boolean hide) {
 
         // Create cell style for header row
         CellStyle headerCellStyle = createHeaderStyle(workbook);
@@ -338,7 +339,7 @@ public class ExcelTools {
         List<String> types = mapInfo.get("Type");
 
         for (int i = 0; i < mapInfo.get("ClassName").size(); i++) {
-            genDataInfos.add(new GenDataTemplateMapInfo(classNames.get(i),classes.get(i),props.get(i),
+            genDataInfos.add(new GenDataTemplateMapInfo(classNames.get(i), classes.get(i), props.get(i),
                     multiplicities.get(i), datatypes.get(i), types.get(i), classDescription.get(i)));
         }
         genDataInfos.sort(Comparator.comparing(GenDataTemplateMapInfo::getClassName));
@@ -361,13 +362,12 @@ public class ExcelTools {
         String sheetName = genDataInfos.getFirst().getSheetClassName();
         XSSFSheet classSheet;
         int sColN = 1;
-        if (workbook.getSheetIndex( sheetName ) != -1 ) { // if the sheet already exists, we just get it and continue on the last column
-            classSheet = workbook.getSheet( sheetName );
+        if (workbook.getSheetIndex(sheetName) != -1) { // if the sheet already exists, we just get it and continue on the last column
+            classSheet = workbook.getSheet(sheetName);
             sColN = classSheet.getRow(1).getLastCellNum();
-        }
-        else {
+        } else {
             classSheet = CreateTemplateSheetBase(sheetName,
-                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap, hasInstanceData,genDataInfos.getFirst().getClsDescr());
+                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap, hasInstanceData, genDataInfos.getFirst().getClsDescr());
         }
 
         int maxWidthInCharacters = 150; // Maximum desired width in characters
@@ -379,13 +379,12 @@ public class ExcelTools {
                 if (hasInstanceData) { // if instance data is available, fill the sheet with it
                     FillSheetWithInstanceData(workbook, classSheet, instanceClassData, prevgenDataInfo);
                 }
-                if (workbook.getSheetIndex( sheetName ) != -1 ){ // if the sheet already exists, we just get it and continue on the last column
-                    classSheet = workbook.getSheet( sheetName );
+                if (workbook.getSheetIndex(sheetName) != -1) { // if the sheet already exists, we just get it and continue on the last column
+                    classSheet = workbook.getSheet(sheetName);
                     sColN = classSheet.getRow(1).getLastCellNum();
-                }
-                else {
+                } else {
                     classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
-                            headerCellStyle, workbook, invertedPrefMap, hasInstanceData,genDataInfo.getClsDescr());
+                            headerCellStyle, workbook, invertedPrefMap, hasInstanceData, genDataInfo.getClsDescr());
                     sColN = 1;
                 }
             }
@@ -414,7 +413,7 @@ public class ExcelTools {
             }
             attrCell.setCellValue(propNameShort);
             String typeValue = genDataInfo.getTpe();
-            if (typeValue.equals("Attribute")){
+            if (typeValue.equals("Attribute")) {
                 String dataType = genDataInfo.getDatatype();
                 if (dataType.equalsIgnoreCase("LangString"))
                     typeCell.setCellValue("LiteralLangEN");
@@ -422,8 +421,7 @@ public class ExcelTools {
                     typeCell.setCellValue("Resource");
                 else
                     typeCell.setCellValue("Literal");
-            }
-            else if (typeValue.equals("Association"))
+            } else if (typeValue.equals("Association"))
                 typeCell.setCellValue("Resource");
             else
                 typeCell.setCellValue(typeValue);
@@ -473,6 +471,68 @@ public class ExcelTools {
             prevgenDataInfo = genDataInfo;
         }
 
+        //reordering sheets
+        //Capture all sheet names
+        List<String> allSheetNames = new ArrayList<>();
+        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+            allSheetNames.add(workbook.getSheetName(i));
+        }
+
+        //Config sheet always first
+        List<String> orderedSheets = new ArrayList<>();
+        String configSheetName = "Config";  // or "Template"/"RDFS_info" if those are used
+        orderedSheets.add(configSheetName);
+
+        //Extract sheet name from cell E2
+        XSSFSheet configSheet = workbook.getSheet(configSheetName);
+        if (configSheet != null) {
+            Row row = configSheet.getRow(1);
+            String name = row.getCell(4).getStringCellValue();
+            if (name != null && !name.isBlank() && workbook.getSheet(name) != null) {
+                orderedSheets.add(name);
+            }
+
+            //Divide empty and filled sheets
+            Set<String> dataSheets = new TreeSet<>();
+            Set<String> emptySheets = new TreeSet<>();
+
+            for (String orderSheetName : allSheetNames) {
+                if (orderedSheets.contains(orderSheetName)) continue; // already ordered
+
+                Sheet sheet = workbook.getSheet(orderSheetName);
+                Row row8 = (sheet != null) ? sheet.getRow(7) : null;
+                boolean isEmpty = true;
+                if (row8 != null) {
+                    for (Cell cell : row8) {
+                        if (cell.getCellType() != CellType.BLANK && !cell.toString().trim().isEmpty()) {
+                            isEmpty = false;
+                            break;
+                        }
+                    }
+                }
+                if (isEmpty) {
+                    emptySheets.add(orderSheetName);
+                } else {
+                    dataSheets.add(orderSheetName);
+                }
+            }
+            orderedSheets.addAll(dataSheets);
+            int emptySheetsFrom = orderedSheets.size();
+            orderedSheets.addAll(emptySheets);
+
+            //Apply ordering
+            for (int i = 0; i < orderedSheets.size(); i++) {
+                workbook.setSheetOrder(orderedSheets.get(i), i);
+            }
+
+            //hiding empty sheets
+            if(hide) {
+                for (int i = emptySheetsFrom; i < orderedSheets.size(); i++) {
+                    workbook.setSheetHidden(i, true);
+                }
+            }
+
+        }
     }
 
     private static String getHeaderClass(Map<String, List<List<RDFAttributeData>>> instanceClassData, List<String> classNames) {

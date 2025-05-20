@@ -353,6 +353,8 @@ public class MainController implements Initializable {
     private ChoiceBox fcb_giVersion;
     @FXML
     private CheckBox cbRDFSSHACLdatatypesplit;
+    @FXML
+    private CheckBox hideEmptySheets;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -5067,12 +5069,27 @@ public class MainController implements Initializable {
         fcbAddInstanceData.setSelected(false);
     }
 
+
+    @FXML
+    private void checkInstanceData() {
+        if (fcbAddInstanceData.isSelected()) {
+            hideEmptySheets.setVisible(true);
+            hideEmptySheets.setDisable(false);
+        }
+        if(!fcbAddInstanceData.isSelected()) {
+            hideEmptySheets.setVisible(false);
+            hideEmptySheets.setDisable(true);
+        }
+    }
+
     @FXML
     private void actionCreateXlsTemplate() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
         boolean addInstanceData = fcbAddInstanceData.isSelected();
+        boolean hide = hideEmptySheets.isSelected();
+
         //open RDFS file
         List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "Select RDF file(s) for template.");
         List<File> iFileList = new ArrayList<>();
@@ -5082,7 +5099,7 @@ public class MainController implements Initializable {
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
 
-            CreateTemplateFromRDF(file, iFileList,  selectedMethod);
+            CreateTemplateFromRDF(file, iFileList,  selectedMethod, hide);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
