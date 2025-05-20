@@ -751,15 +751,15 @@
                                                                   <HBox spacing="10.0">
                                                                      <children>
                                                                         <CheckBox fx:id="fcbAddInstanceData" mnemonicParsing="false" onAction="#checkInstanceData" text="Add instance data (CIMXML) to generated template" />
+                                                                        <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create XLSX template" />
                                                                      </children>
                                                                      <VBox.margin>
                                                                         <Insets top="10.0" />
                                                                      </VBox.margin>
                                                                   </HBox>
+                                                                  <CheckBox fx:id="hideEmptySheets" disable="true" mnemonicParsing="false" text="Hide empty sheets" visible="false" />
                                                                </children>
                                                             </VBox>
-                                                            <CheckBox fx:id="hideEmptySheets" disable="true" layoutY="39.0" mnemonicParsing="false" text="Hide empty sheets" visible="false" />
-                                                            <Button layoutX="311.0" layoutY="27.0" mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create XLSX template" />
                                                          </children>
                                                       </AnchorPane>
                                                 </content>

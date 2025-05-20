@@ -476,6 +476,7 @@ public class ExportInstanceDataTemplate {
         model.write(outTTL, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), "");
     }
 
+
     public static void CreateTemplateFromRDF(List<File> file, List<File> iFiles, String selectedMethod, boolean hide) {
         String cimsNs = MainController.prefs.get("cimsNamespace", "");
         String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
@@ -764,6 +765,7 @@ public class ExportInstanceDataTemplate {
                                 outFileName = outFileName + "_Template";
                             }
                         }
+
 
                         exportMapToExcelv2(rdfsInfo, prefMap, instanceClassData, workbook, hide);
                         break;
