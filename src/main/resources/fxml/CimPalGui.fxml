@@ -6,38 +6,13 @@
  @author Chavdar Ivanov
  -->
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Accordion?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.ChoiceBox?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Menu?>
-<?import javafx.scene.control.MenuBar?>
-<?import javafx.scene.control.MenuItem?>
-<?import javafx.scene.control.ProgressBar?>
-<?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.control.Separator?>
-<?import javafx.scene.control.SeparatorMenuItem?>
-<?import javafx.scene.control.SplitPane?>
-<?import javafx.scene.control.Tab?>
-<?import javafx.scene.control.TabPane?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.TitledPane?>
-<?import javafx.scene.control.ToggleButton?>
-<?import javafx.scene.control.Tooltip?>
-<?import javafx.scene.control.TreeView?>
-<?import javafx.scene.image.ImageView?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Pane?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.application.MainController">
    <MenuBar prefHeight="13.0" prefWidth="1280.0" VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
@@ -751,7 +726,10 @@
                                                                   <HBox spacing="10.0">
                                                                      <children>
                                                                         <CheckBox fx:id="fcbAddInstanceData" mnemonicParsing="false" onAction="#checkInstanceData" text="Add instance data (CIMXML) to generated template" />
-                                                                        <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create XLSX template" />
+                                                                        <Button mnemonicParsing="false" onAction="#actionCreateXlsTemplate" text="Create">
+                                                                           <HBox.margin>
+                                                                              <Insets left="50.0" />
+                                                                           </HBox.margin></Button>
                                                                      </children>
                                                                      <VBox.margin>
                                                                         <Insets top="10.0" />
@@ -764,7 +742,7 @@
                                                       </AnchorPane>
                                                 </content>
                                               </TitledPane>
-                                              <TitledPane prefHeight="259.0" prefWidth="1282.0" text="Create CIMXML dataset based on xlsx template">
+                                              <TitledPane prefHeight="162.0" prefWidth="1282.0" text="Create CIMXML dataset based on xlsx template">
                                                 <content>
                                                   <AnchorPane>
                                                          <children>
@@ -802,7 +780,7 @@
                                                                      </padding>
                                                                      <children>
                                                                         <CheckBox fx:id="fcbStripPrefixesGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
-                                                                        <CheckBox fx:id="fcbExportExtensionsGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Export extensions (marked red in template)" />
+                                                                        <CheckBox fx:id="fcbExportExtensionsGen" minWidth="150.0" mnemonicParsing="false" selected="true" text="Export extensions (identified extensions in the template)" />
                                                                      </children>
                                                                   </HBox>
                                                                   <HBox nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
