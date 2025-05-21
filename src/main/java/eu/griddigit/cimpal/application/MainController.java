@@ -611,9 +611,8 @@ public class MainController implements Initializable {
         fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
 
         fcbGenMethodOptions.getItems().addAll(
-                "Option 1 (Old)",
-                "Option 2 (New)",
-                "Option 3 (TBD)"
+                "Old template (not maintained)",
+                "Advanced template"
         );
         fcbGenMethodOptions.getSelectionModel().select(1);
 
@@ -5042,15 +5041,13 @@ public class MainController implements Initializable {
 
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
         switch (selectedMethod) {
-            case "Option 1 (Old)":
+            case "Old template (not maintained)":
                 ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties);
                 break;
-            case "Option 2 (New)":
+            case "Advanced template":
                 for (File file : inputXLS){
                     ModelManipulationFactory.generateDataFromXlsV2(xmlBase, file, saveProperties, stripPrefixes, exportExtensions);
                 }
-                break;
-            case "Option 3 (TBD)":
                 break;
         }
 
@@ -5110,14 +5107,14 @@ public class MainController implements Initializable {
 
     private void actionHandleOptionsForGen(String selected){
         switch (selected){
-            case "Option 1 (Old)", "Option 3 (TBD)":
+            case "Old template (not maintained)":
                 fcbAddInstanceData.setDisable(true);
                 fcbSortRDFGen.setDisable(true);
                 fcbRDFsortOptionsGen.setDisable(true);
                 fcbStripPrefixesGen.setDisable(true);
                 fcbExportExtensionsGen.setDisable(true);
                 break;
-            case "Option 2 (New)":
+            case "Advanced template":
                 fcbAddInstanceData.setDisable(false);
                 fcbSortRDFGen.setDisable(false);
                 fcbRDFsortOptionsGen.setDisable(false);

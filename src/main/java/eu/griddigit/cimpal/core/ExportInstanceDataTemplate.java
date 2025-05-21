@@ -747,10 +747,10 @@ public class ExportInstanceDataTemplate {
             try (XSSFWorkbook workbook = new XSSFWorkbook()) {
                 String outFileName = "Template";
                 switch (selectedMethod) {
-                    case "Option 1 (Old)":
+                    case "Old template (not maintained)":
                         exportMapToExcel("Template", rdfsInfo, orderList, workbook);
                         break;
-                    case "Option 2 (New)":
+                    case "Advanced template":
                         Map<String, List<List<RDFAttributeData>>> instanceClassData = null;
                         File iFile = null;
                         if (!iFiles.isEmpty()) {
@@ -768,8 +768,6 @@ public class ExportInstanceDataTemplate {
 
 
                         exportMapToExcelv2(rdfsInfo, prefMap, instanceClassData, workbook, hide);
-                        break;
-                    case "Option 3 (TBD)":
                         break;
                 }
                 saveExcelFile(workbook, "Save Instance Data Template", outFileName);

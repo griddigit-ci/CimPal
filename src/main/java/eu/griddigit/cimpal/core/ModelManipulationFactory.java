@@ -736,7 +736,7 @@ public class ModelManipulationFactory {
                     if (j != rdfidCol && j < ((LinkedList<?>) headerXlsData.get(i)).size()) {
                         // Check if it is an extension
                         if (isExtensionRow != -1 && !exportExtensions &&
-                                ((LinkedList<?>) headerXlsData.get(isExtensionRow)).get(j).toString().equals("Extension")) {
+                                ((LinkedList<?>) headerXlsData.get(isExtensionRow)).get(j).toString().equals("Yes")) {
                             continue;
                         }
                         Object value = ((LinkedList<?>) headerXlsData.get(i)).get(j);
@@ -863,7 +863,7 @@ public class ModelManipulationFactory {
                         if (j != rdfidCol && j < ((LinkedList<?>) classXlsData.get(i)).size()) {
                             // Check if it is an extension
                             if (isExtensionRow != -1 && !exportExtensions &&
-                                    ((LinkedList<?>) classXlsData.get(isExtensionRow)).get(j).toString().equals("Extension")) {
+                                    ((LinkedList<?>) classXlsData.get(isExtensionRow)).get(j).toString().equals("Yes")) {
                                 continue;
                             }
                             Object value = ((LinkedList<?>) classXlsData.get(i)).get(j);

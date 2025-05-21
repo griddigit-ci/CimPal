@@ -162,7 +162,7 @@ public class ExcelTools {
             XSSFRow xssfRow = sheet.createRow(rowNum);
             columnIndex = 0;
             for (String key : orderList) {
-                putExcelCellInfo(key, rowNum, columnIndex, xssfRow, mapInfo,headerCellStyle,dataCellStyle);
+                putExcelCellInfo(key, rowNum, columnIndex, xssfRow, mapInfo, headerCellStyle, dataCellStyle);
                 columnIndex = columnIndex + 1;
             }
         }
@@ -322,7 +322,7 @@ public class ExcelTools {
     }
 
 
-    public static void exportMapToExcelv2(Map<String, List<String>> mapInfo, Map<String,String> prefMap,
+    public static void exportMapToExcelv2(Map<String, List<String>> mapInfo, Map<String, String> prefMap,
                                           Map<String, List<List<RDFAttributeData>>> instanceClassData,
                                           XSSFWorkbook workbook, boolean hide) {
 
@@ -405,7 +405,7 @@ public class ExcelTools {
             multiCell.setCellStyle(headerCellStyle);
             XSSFCell isExtensionCell = isExtensionRow.createCell(sColN);
             isExtensionCell.setCellStyle(headerCellStyle);
-            isExtensionCell.setCellValue("-");
+            isExtensionCell.setCellValue("No");
 
             Resource propRes = ResourceFactory.createResource(genDataInfo.getProp());
             String propNameShort = genDataInfo.getProp();
@@ -527,7 +527,7 @@ public class ExcelTools {
             }
 
             //hiding empty sheets
-            if(hide) {
+            if (hide) {
                 for (int i = emptySheetsFrom; i < orderedSheets.size(); i++) {
                     workbook.setSheetHidden(i, true);
                 }
@@ -539,23 +539,20 @@ public class ExcelTools {
     private static String getHeaderClass(Map<String, List<List<RDFAttributeData>>> instanceClassData, List<String> classNames) {
         // Give the config a header class if instance data has the info if not than we pick from the RDFS class names
         String headerClass = "";
-        if (instanceClassData != null){
-            if (instanceClassData.containsKey("Dataset")){
+        if (instanceClassData != null) {
+            if (instanceClassData.containsKey("Dataset")) {
                 headerClass = "Dataset";
-            }
-            else if (instanceClassData.containsKey("DifferenceSet")){
+            } else if (instanceClassData.containsKey("DifferenceSet")) {
                 headerClass = "DifferenceSet";
             } else if (instanceClassData.containsKey("FullModel")) {
                 headerClass = "FullModel";
             } else if (instanceClassData.containsKey("DifferenceModel")) {
                 headerClass = "DifferenceModel";
             }
-        }
-        else {
-            if (classNames.contains("Dataset")){
+        } else {
+            if (classNames.contains("Dataset")) {
                 headerClass = "Dataset";
-            }
-            else if (classNames.contains("DifferenceSet")){
+            } else if (classNames.contains("DifferenceSet")) {
                 headerClass = "DifferenceSet";
             } else if (classNames.contains("FullModel")) {
                 headerClass = "FullModel";
@@ -583,7 +580,7 @@ public class ExcelTools {
         XSSFRow isExtensionRow = sheet.getRow(5);
         int rowNumber = 7;
 
-        for (List<RDFAttributeData> attrList : dataInClass){ // looping through the class instances
+        for (List<RDFAttributeData> attrList : dataInClass) { // looping through the class instances
             XSSFRow row = sheet.createRow(rowNumber);
             RDFAttributeData idAttribute = attrList.stream().filter(data -> "id".equals(data.getName())).findFirst().orElse(null);
             if (idAttribute == null) {
@@ -593,11 +590,11 @@ public class ExcelTools {
             int idCol = getCellNumber(attrRow, idAttribute.getFullName());
             int rowOffset = 0;
 
-            for (RDFAttributeData data : attrList){ // loop on every attribute (creating new rows in the xls)
+            for (RDFAttributeData data : attrList) { // loop on every attribute (creating new rows in the xls)
                 if (data.getName().equals("type"))
                     continue;
                 int valueCol = getCellNumber(attrRow, data.getFullName());
-                if (valueCol == -1){  // add a new attribute to the end of the row
+                if (valueCol == -1) {  // add a new attribute to the end of the row
                     valueCol = attrRow.getLastCellNum();
                     XSSFCell attrCell = attrRow.createCell(valueCol);
                     attrCell.setCellStyle(headerStyleRed);
@@ -607,13 +604,13 @@ public class ExcelTools {
                     typeCell.setCellValue(data.getTpe());
                     XSSFCell isExtensionCell = isExtensionRow.createCell(valueCol);
                     isExtensionCell.setCellStyle(headerStyleRed);
-                    isExtensionCell.setCellValue("Extension");
+                    isExtensionCell.setCellValue("Yes");
                 }
                 XSSFCell valueCell = row.getCell(valueCol);
                 int currentRowOffset = 0;
                 while (valueCell != null) {
                     currentRowOffset++;
-                    XSSFRow nextRow = sheet.getRow(rowNumber+currentRowOffset);
+                    XSSFRow nextRow = sheet.getRow(rowNumber + currentRowOffset);
                     if (nextRow != null)
                         valueCell = nextRow.getCell(valueCol);
                     else
@@ -622,12 +619,11 @@ public class ExcelTools {
                 if (currentRowOffset > rowOffset)
                     rowOffset = currentRowOffset;
 
-                if (currentRowOffset == 0){
+                if (currentRowOffset == 0) {
                     valueCell = row.createCell(valueCol);
                     valueCell.setCellStyle(dataStyle);
                     valueCell.setCellValue(data.getValue());
-                }
-                else { // Already has data in the instance, so we make a new row for the new data for the same attribute
+                } else { // Already has data in the instance, so we make a new row for the new data for the same attribute
                     XSSFRow offsetRow = sheet.getRow(rowNumber + currentRowOffset);
                     if (offsetRow == null) {
                         offsetRow = sheet.createRow(rowNumber + currentRowOffset);
@@ -646,19 +642,19 @@ public class ExcelTools {
         }
     }
 
-    private static int getCellNumber(XSSFRow attrRow, String attrName){
+    private static int getCellNumber(XSSFRow attrRow, String attrName) {
         // Gives back the index of the column where the given attribute is found in the attributes row
         // if not found return -1
         for (int i = 0; i < attrRow.getLastCellNum(); i++) {
             XSSFCell cell = attrRow.getCell(i);
-            if (cell.getStringCellValue().equals(attrName)){
+            if (cell.getStringCellValue().equals(attrName)) {
                 return i;
             }
         }
         return -1;
     }
 
-    private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String,String> prefMap, String headerClass,CellStyle headerCellStyle, XSSFWorkbook workbook) {
+    private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String, String> prefMap, String headerClass, CellStyle headerCellStyle, XSSFWorkbook workbook) {
         XSSFSheet configSheet = workbook.createSheet("Config");
         // Write header row
         XSSFRow headerRow = configSheet.createRow(0);
@@ -688,14 +684,14 @@ public class ExcelTools {
         List<XSSFRow> dataRows = new ArrayList<>();
         int maxRowNumber = Math.max(classNames.size(), prefMap.size());
 
-        for (int i = 1; i < maxRowNumber+1; i++){
+        for (int i = 1; i < maxRowNumber + 1; i++) {
             dataRows.add(configSheet.createRow(i));
         }
 
         int rowN = 0;
         var prefKeys = prefMap.keySet().toArray();
 
-        for (XSSFRow row : dataRows){
+        for (XSSFRow row : dataRows) {
             // add namespaces
             if (prefKeys.length > rowN) {
                 row.createCell(0).setCellValue((String) prefKeys[rowN]); // Namespace prefix
@@ -704,12 +700,12 @@ public class ExcelTools {
             }
 
             // add classes to print
-            if (classNames.size() > rowN){
+            if (classNames.size() > rowN) {
                 row.createCell(3).setCellValue(classNames.get(rowN));
             }
 
             // add header class if data exist
-            if (rowN == 0 && !headerClass.isEmpty()){
+            if (rowN == 0 && !headerClass.isEmpty()) {
                 row.createCell(4).setCellValue(headerClass);
             }
 
@@ -718,8 +714,8 @@ public class ExcelTools {
 
     }
 
-    private static XSSFSheet CreateTemplateSheetBase(String sheetName,String className, CellStyle headerCellStyle,
-                                                     XSSFWorkbook workbook,Map<String,String> invertedPrefMap,
+    private static XSSFSheet CreateTemplateSheetBase(String sheetName, String className, CellStyle headerCellStyle,
+                                                     XSSFWorkbook workbook, Map<String, String> invertedPrefMap,
                                                      boolean hasInstanceData, String classDescr) {
         XSSFSheet sheet = workbook.createSheet(sheetName);
 
@@ -742,9 +738,9 @@ public class ExcelTools {
         cellClassDescAbout.setCellStyle(headerCellStyle);
 
         XSSFCell cellClassDesc = firstRow.createCell(3);
-        if (classNameRes.getLocalName().equals("Dataset") || classNameRes.getLocalName().equals("DifferenceSet") || classNameRes.getLocalName().equals("FullModel") || classNameRes.getLocalName().equals("DifferenceModel")){
+        if (classNameRes.getLocalName().equals("Dataset") || classNameRes.getLocalName().equals("DifferenceSet") || classNameRes.getLocalName().equals("FullModel") || classNameRes.getLocalName().equals("DifferenceModel")) {
             cellClassDesc.setCellValue("true");
-        }else {
+        } else {
             cellClassDesc.setCellValue(classDescr);
         }
         cellClassDesc.setCellStyle(headerCellStyle);
@@ -769,25 +765,17 @@ public class ExcelTools {
         cell = row.createCell(0);
         cell.setCellValue("1..1");
         cell.setCellStyle(headerCellStyle);
-        // Mapping row and Extension row
-        if (hasInstanceData){
-            // Extension row
-            row = sheet.createRow(5);
-            cell = row.createCell(0);
-            cell.setCellValue("IsExtension");
-            cell.setCellStyle(headerCellStyle);
-            // Mapping row
-            row = sheet.createRow(6);
-            cell = row.createCell(0);
-            cell.setCellValue("Mapping");
-            cell.setCellStyle(headerCellStyle);
-        }
-        else {
-            row = sheet.createRow(5);
-            cell = row.createCell(0);
-            cell.setCellValue("Mapping");
-            cell.setCellStyle(headerCellStyle);
-        }
+        // Extension row
+        row = sheet.createRow(5);
+        cell = row.createCell(0);
+        cell.setCellValue("IsExtension");
+        cell.setCellStyle(headerCellStyle);
+        // Mapping row
+        row = sheet.createRow(6);
+        cell = row.createCell(0);
+        cell.setCellValue("Mapping");
+        cell.setCellStyle(headerCellStyle);
+
 
         return sheet;
     }
