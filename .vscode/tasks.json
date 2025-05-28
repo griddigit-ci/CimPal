@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run CimPal via Maven",
+      "type": "shell",
+      "command": "mvn compile exec:java",
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,173 @@
+= CimPal
+:toc:
+:toc-placement: preamble
+:icons: font
+:sectnums:
+
+CimPal is a graphical JavaFX-based application for working with CIM-based power system data.  
+It is built in Java 21 using Apache Maven and relies on several supporting libraries including Apache Jena, JavaFX, Apache POI, Jackson, and others.
+
+This guide explains how to build, run, and develop CimPal using **Visual Studio Code (VSCode)**.
+
+== Prerequisites
+
+Make sure the following are installed and configured:
+
+=== 1. Java JDK 21
+
+Download from https://jdk.java.net/21/ or via your package manager.
+
+Verify:
+
+[source,cmd]
+----
+java -version
+----
+
+Set `JAVA_HOME` to point to JDK 21.
+
+=== 2. Apache Maven 3.9+
+
+Download from https://maven.apache.org/download.cgi
+
+Verify:
+[source,cmd]
+----
+mvn -version
+----
+Add Maven's `bin` folder to your system `PATH`.
+
+=== 3. VSCode Extensions
+
+Install these from the Marketplace:
+
+* https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack]
+* https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-maven[Maven for Java]
+* https://marketplace.visualstudio.com/items?itemName=shrey150.javafx-support[JavaFX Support] (optional)
+
+== Development in VSCode
+
+The project contains a `.vscode/` folder with configuration files for running and building CimPal directly in VSCode.
+
+=== `.vscode/launch.json`
+
+Defines VSCode *Run/Debug* configurations:
+
+* `Run CimPal GUI` — launches `eu.griddigit.cimpal.application.CimPal`
+* `Run MainGUI` — alternative entry point
+
+Includes required VM arguments for JavaFX:
+[source,cmd]
+----
+--add-modules javafx.controls,javafx.fxml
+----
+
+=== `.vscode/tasks.json`
+
+Defines reusable VSCode task:
+
+* `Run CimPal via Maven` — runs the application using:
+[source,cmd]
+----
+mvn compile exec:java
+----
+
+=== `.vscode/settings.json`
+
+(Optional) Custom workspace preferences. Can include formatting rules, Java preview settings, etc.
+
+== Building and Running CimPal
+
+=== Build Project
+
+Use Maven to build:
+[source,cmd]
+----
+mvn clean compile
+----
+
+To package an executable JAR + optional Windows `.exe`:
+[source,cmd]
+----
+mvn clean package
+----
+
+=== Run CimPal (Recommended via Maven)
+
+Run from terminal:
+[source,cmd]
+----
+mvn compile exec:java
+----
+
+This uses Maven's classpath resolution to launch:
+`eu.griddigit.cimpal.application.CimPal`
+
+=== Run in VSCode
+
+Option A:
+* Open the *Run and Debug* panel
+* Select `Run CimPal GUI`
+* Press ▶️ Run
+
+Option B:
+* Open Command Palette: `Ctrl+Shift+P`
+* Choose: `Tasks: Run Task`
+* Select: `Run CimPal via Maven`
+
+== Jena Verification
+
+Jena libraries are included as Maven dependencies. To confirm they are downloaded:
+
+Check your Maven local repo:
+
+* On Windows: `%USERPROFILE%\.m2\repository\org\apache\jena`
+* On Linux/macOS: `~/.m2/repository/org/apache/jena`
+
+To test independently, create a minimal Maven project with:
+
+[source,xml]
+----
+<dependency>
+  <groupId>org.apache.jena</groupId>
+  <artifactId>jena-core</artifactId>
+  <version>5.4.0</version>
+</dependency>
+----
+
+Then run:
+[source,cmd]
+----
+mvn compile
+----
+
+== Output
+
+Running mvn clean package produces:
+
+target/CimPal.jar — executable JAR
+
+target/CimPal.exe — Launch4j Windows executable
+
+These can be distributed for running without VSCode.
+
+== Project Structure
+
+Common folders:
+
+src/main/java — Java source code
+
+src/main/resources — config and FXML
+
+target/ — build output
+
+.vscode/ — VSCode-specific settings and launch configs
+
+== Notes
+
+JavaFX is handled entirely through Maven — no manual SDK installation needed.
+
+Log4j, Apache Jena, and other libraries are also resolved via Maven.
+
+If launch.json fails with ClassNotFoundException, use the Maven-based task instead (mvn exec:java).
+
