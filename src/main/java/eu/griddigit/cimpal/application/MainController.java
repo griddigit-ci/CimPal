@@ -1104,8 +1104,6 @@ public class MainController implements Initializable {
         model2.setNsPrefixes(prefixMap);
         ComparisonSHACLshapes.modelsABPrefMap = prefixMap;
 
-        //TODO do a check if the ID of the model is existing, if yes, compare that one (this is what we have now), but then it could happen that ID is different and model 2 is empyty
-        // so we need to check if name of the file is matching and then compare. We need a warning/info what is used the ID or the name of the file
 
         if (fcbIDcompPerFileAndAll.isSelected()) {
 
@@ -1119,6 +1117,36 @@ public class MainController implements Initializable {
                 compareIDmodel1 = valueModel1;
                 Model valueModel2 = model2Structure.get(key);
                 compareIDmodel2 = valueModel2;
+
+                if (valueModel2 == null){
+                    System.out.printf("WARNING: The dataset ID is not part of the 2nd set: %s . Checking if there is matching file name.....\n", key);
+                    //check the file name
+                    boolean foundMatch = false;
+                    for (File item : MainController.IDModel1) {
+                        if (model1IDname.get(key).equals(item.toString())) {
+                            for (File item1 : MainController.IDModel2) {
+                                if (item1.getName().equals(item.getName())) {
+                                    //get the ID and find it in the structure
+                                    for (Map.Entry<String, String> entry1 : model2IDname.entrySet()) {
+                                        String key1 = entry1.getKey();
+                                        String value1 = entry1.getValue();
+                                        if (value1.contains(item1.toString())) {
+                                            valueModel2 = model2Structure.get(key1);
+                                            compareIDmodel2 = valueModel2;
+                                            foundMatch = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (foundMatch) {
+                        continue;
+                    }else{
+                        System.out.printf("WARNING: The dataset filename is not part of the 2nd set: %s . No comparison is done for this file. \n", model1IDname.get(key));
+                        break;
+                    }
+                }
 
                 LinkedList<Integer> options = new LinkedList<>();
                 options.add(0); //1 is ignore sv classes
