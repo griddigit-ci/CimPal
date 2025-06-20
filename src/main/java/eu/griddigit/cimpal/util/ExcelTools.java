@@ -9,7 +9,6 @@ package eu.griddigit.cimpal.util;
 import eu.griddigit.cimpal.model.GenDataTemplateMapInfo;
 import eu.griddigit.cimpal.model.RDFAttributeData;
 import eu.griddigit.cimpal.model.SHACLValidationResult;
-import javafx.fxml.FXML;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
@@ -377,9 +376,6 @@ public class ExcelTools {
         for (GenDataTemplateMapInfo genDataInfo : genDataInfos) {
             sheetName = genDataInfo.getSheetClassName();
             if (!classSheet.getSheetName().equals(sheetName)) { // move to the other sheet if new class comes in the list
-                if (hasInstanceData) { // if instance data is available, fill the sheet with it
-                    FillSheetWithInstanceData(workbook, classSheet, instanceClassData, prevgenDataInfo);
-                }
                 if (workbook.getSheetIndex(sheetName) != -1) { // if the sheet already exists, we just get it and continue on the last column
                     classSheet = workbook.getSheet(sheetName);
                     sColN = classSheet.getRow(1).getLastCellNum();
@@ -470,6 +466,10 @@ public class ExcelTools {
 
             sColN++;
             prevgenDataInfo = genDataInfo;
+        }
+
+        if (hasInstanceData) { // if instance data is available, fill the sheets with it
+            FillSheetWithInstanceData(workbook, instanceClassData, genDataInfos);
         }
 
         //reordering sheets
@@ -563,83 +563,95 @@ public class ExcelTools {
         return headerClass;
     }
 
-    private static void FillSheetWithInstanceData(Workbook workbook, XSSFSheet sheet, Map<String, List<List<RDFAttributeData>>> instanceClassData,
-                                                  GenDataTemplateMapInfo genInfoData) {
-        List<List<RDFAttributeData>> dataInClass = instanceClassData.get(genInfoData.getClassName());
+    private static void FillSheetWithInstanceData(XSSFWorkbook workbook, Map<String, List<List<RDFAttributeData>>> instanceClassData,
+                                                  List<GenDataTemplateMapInfo> genDataInfos) {
+        List<String> classNames = genDataInfos.stream()
+                .map(GenDataTemplateMapInfo::getClassName)
+                .distinct()
+                .toList();
+        List<String> sheetClassNames = genDataInfos.stream()
+                .map(GenDataTemplateMapInfo::getSheetClassName)
+                .distinct()
+                .toList();
+        for (int i = 0; i < classNames.size(); i++) {
+            XSSFSheet sheet = workbook.getSheet(sheetClassNames.get(i));
+            String className = classNames.get(i);
 
-//        if (genInfoData.getClassName().equalsIgnoreCase("Dataset"))
-//            dataInClass = instanceClassData.get("FullModel");
-        if (dataInClass == null)
-            return;
+            List<List<RDFAttributeData>> dataInClass = instanceClassData.get(className);
 
-        CellStyle headerStyleRed = createHeaderStyle(workbook);
-        headerStyleRed.setFillForegroundColor(IndexedColors.RED.getIndex());
-        CellStyle dataStyle = createDataStyle(workbook);
-        XSSFRow attrRow = sheet.getRow(1);
-        XSSFRow typeRow = sheet.getRow(2);
-        XSSFRow isExtensionRow = sheet.getRow(5);
-        int rowNumber = 7;
-
-        for (List<RDFAttributeData> attrList : dataInClass) { // looping through the class instances
-            XSSFRow row = sheet.createRow(rowNumber);
-            RDFAttributeData idAttribute = attrList.stream().filter(data -> "id".equals(data.getName())).findFirst().orElse(null);
-            if (idAttribute == null) {
-                System.out.println("No id attribute found for class: " + genInfoData.getClassName());
+            if (dataInClass == null)
                 continue;
-            }
-            int idCol = getCellNumber(attrRow, idAttribute.getFullName());
-            int rowOffset = 0;
 
-            for (RDFAttributeData data : attrList) { // loop on every attribute (creating new rows in the xls)
-                if (data.getName().equals("type"))
+            CellStyle headerStyleRed = createHeaderStyle(workbook);
+            headerStyleRed.setFillForegroundColor(IndexedColors.RED.getIndex());
+            CellStyle dataStyle = createDataStyle(workbook);
+            XSSFRow attrRow = sheet.getRow(1);
+            XSSFRow typeRow = sheet.getRow(2);
+            XSSFRow isExtensionRow = sheet.getRow(5);
+            int rowNumber = 7;
+
+            for (List<RDFAttributeData> attrList : dataInClass) { // looping through the class instances
+                XSSFRow row = sheet.createRow(rowNumber);
+                RDFAttributeData idAttribute = attrList.stream().filter(data -> "id".equals(data.getName())).findFirst().orElse(null);
+                if (idAttribute == null) {
+                    System.out.println("No id attribute found for class: " + className);
                     continue;
-                int valueCol = getCellNumber(attrRow, data.getFullName());
-                if (valueCol == -1) {  // add a new attribute to the end of the row
-                    valueCol = attrRow.getLastCellNum();
-                    XSSFCell attrCell = attrRow.createCell(valueCol);
-                    attrCell.setCellStyle(headerStyleRed);
-                    attrCell.setCellValue(data.getFullName());
-                    XSSFCell typeCell = typeRow.createCell(valueCol);
-                    typeCell.setCellStyle(headerStyleRed);
-                    typeCell.setCellValue(data.getTpe());
-                    XSSFCell isExtensionCell = isExtensionRow.createCell(valueCol);
-                    isExtensionCell.setCellStyle(headerStyleRed);
-                    isExtensionCell.setCellValue("Yes");
                 }
-                XSSFCell valueCell = row.getCell(valueCol);
-                int currentRowOffset = 0;
-                while (valueCell != null) {
-                    currentRowOffset++;
-                    XSSFRow nextRow = sheet.getRow(rowNumber + currentRowOffset);
-                    if (nextRow != null)
-                        valueCell = nextRow.getCell(valueCol);
-                    else
-                        break;
-                }
-                if (currentRowOffset > rowOffset)
-                    rowOffset = currentRowOffset;
+                int idCol = getCellNumber(attrRow, idAttribute.getFullName());
+                int rowOffset = 0;
 
-                if (currentRowOffset == 0) {
-                    valueCell = row.createCell(valueCol);
-                    valueCell.setCellStyle(dataStyle);
-                    valueCell.setCellValue(data.getValue());
-                } else { // Already has data in the instance, so we make a new row for the new data for the same attribute
-                    XSSFRow offsetRow = sheet.getRow(rowNumber + currentRowOffset);
-                    if (offsetRow == null) {
-                        offsetRow = sheet.createRow(rowNumber + currentRowOffset);
+                for (RDFAttributeData data : attrList) { // loop on every attribute (creating new rows in the xls)
+                    if (data.getName().equals("type"))
+                        continue;
+                    int valueCol = getCellNumber(attrRow, data.getFullName());
+                    if (valueCol == -1) {  // add a new attribute to the end of the row
+                        valueCol = attrRow.getLastCellNum();
+                        XSSFCell attrCell = attrRow.createCell(valueCol);
+                        attrCell.setCellStyle(headerStyleRed);
+                        attrCell.setCellValue(data.getFullName());
+                        XSSFCell typeCell = typeRow.createCell(valueCol);
+                        typeCell.setCellStyle(headerStyleRed);
+                        typeCell.setCellValue(data.getTpe());
+                        XSSFCell isExtensionCell = isExtensionRow.createCell(valueCol);
+                        isExtensionCell.setCellStyle(headerStyleRed);
+                        isExtensionCell.setCellValue("Yes");
                     }
-                    valueCell = offsetRow.createCell(valueCol);
-                    valueCell.setCellStyle(dataStyle);
-                    valueCell.setCellValue(data.getValue());
+                    XSSFCell valueCell = row.getCell(valueCol);
+                    int currentRowOffset = 0;
+                    while (valueCell != null) {
+                        currentRowOffset++;
+                        XSSFRow nextRow = sheet.getRow(rowNumber + currentRowOffset);
+                        if (nextRow != null)
+                            valueCell = nextRow.getCell(valueCol);
+                        else
+                            break;
+                    }
+                    if (currentRowOffset > rowOffset)
+                        rowOffset = currentRowOffset;
 
-                    // Set the id to the first column of the new row
-                    XSSFCell idCell = offsetRow.createCell(idCol);
-                    idCell.setCellStyle(dataStyle);
-                    idCell.setCellValue(idAttribute.getValue());
+                    if (currentRowOffset == 0) {
+                        valueCell = row.createCell(valueCol);
+                        valueCell.setCellStyle(dataStyle);
+                        valueCell.setCellValue(data.getValue());
+                    } else { // Already has data in the instance, so we make a new row for the new data for the same attribute
+                        XSSFRow offsetRow = sheet.getRow(rowNumber + currentRowOffset);
+                        if (offsetRow == null) {
+                            offsetRow = sheet.createRow(rowNumber + currentRowOffset);
+                        }
+                        valueCell = offsetRow.createCell(valueCol);
+                        valueCell.setCellStyle(dataStyle);
+                        valueCell.setCellValue(data.getValue());
+
+                        // Set the id to the first column of the new row
+                        XSSFCell idCell = offsetRow.createCell(idCol);
+                        idCell.setCellStyle(dataStyle);
+                        idCell.setCellValue(idAttribute.getValue());
+                    }
                 }
+                rowNumber = rowNumber + rowOffset + 1;
             }
-            rowNumber = rowNumber + rowOffset + 1;
         }
+
     }
 
     private static int getCellNumber(XSSFRow attrRow, String attrName) {
