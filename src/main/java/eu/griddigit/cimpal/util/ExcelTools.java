@@ -18,6 +18,7 @@ import org.apache.poi.xssf.usermodel.*;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ExcelTools {
 
@@ -675,22 +676,43 @@ public class ExcelTools {
         XSSFCell hCell3 = headerRow.createCell(2);
         XSSFCell hCell4 = headerRow.createCell(3);
         XSSFCell hCell5 = headerRow.createCell(4);
+        XSSFCell hCell6 = headerRow.createCell(5);
 
         hCell1.setCellStyle(headerCellStyle);
         hCell2.setCellStyle(headerCellStyle);
         hCell3.setCellStyle(headerCellStyle);
         hCell4.setCellStyle(headerCellStyle);
         hCell5.setCellStyle(headerCellStyle);
+        hCell6.setCellStyle(headerCellStyle);
 
         hCell1.setCellValue("Namespace prefix");
         hCell2.setCellValue("Namespace URI");
         hCell3.setCellValue("Include Namespace [Yes,No]");
-        hCell4.setCellValue("Classes to print [Refer to the name of the tab]");
-        hCell5.setCellValue("Header class");
+        hCell4.setCellValue("All classes (not used for xml generation)");
+        hCell5.setCellValue("Classes to print [Refer to the name of the tab]");
+        hCell6.setCellValue("Header class");
 
-        Set<String> classNameSet = new HashSet<>();
-        genDataInfos.forEach(genData -> classNameSet.add(genData.getSheetClassName()));
-        List<String> classNames = new ArrayList<>(classNameSet);
+        List<String> sheetClassNames = genDataInfos.stream()
+                .map(GenDataTemplateMapInfo::getSheetClassName)
+                .distinct()
+                .toList();
+        List<String> classNames = new ArrayList<>(genDataInfos.stream()
+                .map(GenDataTemplateMapInfo::getFullClassName)
+                .distinct()
+                .toList());
+
+        Map<String, String> invertedPrefMap = prefMap.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+
+        for (int i = 0; i < classNames.size(); i++) {
+            String className = classNames.get(i);
+            String[] parts = className.split("#", 2);
+            String prefix = invertedPrefMap.get(parts[0] + "#");
+            if (prefix != null) {
+                className = prefix + ":" + parts[1]; // Add prefix to class name
+                classNames.set(i, className); // Update the class name in the list
+            }
+        }
 
         // Create rows
         List<XSSFRow> dataRows = new ArrayList<>();
@@ -714,11 +736,13 @@ public class ExcelTools {
             // add classes to print
             if (classNames.size() > rowN) {
                 row.createCell(3).setCellValue(classNames.get(rowN));
+                // add class sheet names to print
+                row.createCell(4).setCellValue(sheetClassNames.get(rowN));
             }
 
             // add header class if data exist
             if (rowN == 0 && !headerClass.isEmpty()) {
-                row.createCell(4).setCellValue(headerClass);
+                row.createCell(5).setCellValue(headerClass);
             }
 
             rowN++;

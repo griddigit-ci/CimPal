@@ -640,7 +640,7 @@ public class ModelManipulationFactory {
 
                 // getting classes to print
 
-                String className = ((LinkedList<?>) o).get(3).toString();
+                String className = ((LinkedList<?>) o).get(4).toString();
                 if (!className.isEmpty()) {
                     int classSheetIdx = book.getSheetIndex(className);
                     if (classSheetIdx != -1) {
@@ -652,7 +652,7 @@ public class ModelManipulationFactory {
                 // getting header class
 
                 if (headerClassName.isEmpty()) {
-                    headerClassName = ((LinkedList<?>) o).get(4).toString();
+                    headerClassName = ((LinkedList<?>) o).get(5).toString();
                     if (!headerClassName.isEmpty()) {
                         int headerSheetIdx = book.getSheetIndex(headerClassName);
                         if (headerSheetIdx != -1)
