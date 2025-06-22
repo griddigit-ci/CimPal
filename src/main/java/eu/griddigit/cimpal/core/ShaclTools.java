@@ -844,14 +844,14 @@ public class ShaclTools {
                                     //Add node shape and property shape for the presence of the inverse association
                                     String invAssocURI = stmt.getSubject().getURI();
                                     String localNameInvAssoc = stmt.getSubject().getLocalName();
-                                    shapeModel = ShaclTools.addNodeShapeProfileClass(shapeModel, nsURIprofile, localNameInvAssoc+"-inverseNodePresent", invAssocURI);
+                                    shapeModel = ShaclTools.addNodeShapeProfileClass(shapeModel, nsURIprofile, localNameInvAssoc + "-inverseNodePresent", invAssocURI);
                                     //create the property shape
-                                    RDFNode oi = shapeModel.createResource(nsURIprofile + localNameInvAssoc+"-propertyInverse");
-                                    Resource nodeShapeResourceClassInv = shapeModel.getResource(nsURIprofile + localNameInvAssoc+"-inverseNodePresent");
+                                    RDFNode oi = shapeModel.createResource(nsURIprofile + localNameInvAssoc + "-propertyInverse");
+                                    Resource nodeShapeResourceClassInv = shapeModel.getResource(nsURIprofile + localNameInvAssoc + "-inverseNodePresent");
                                     nodeShapeResourceClassInv.addProperty(SH.property, oi);
 
                                     //adding the properties for the PropertyShape
-                                    Resource ri = shapeModel.createResource(nsURIprofile +localNameInvAssoc+"-propertyInverse");
+                                    Resource ri = shapeModel.createResource(nsURIprofile + localNameInvAssoc + "-propertyInverse");
                                     ri.addProperty(RDF.type, SH.PropertyShape);
                                     ri.addProperty(SH.name, "InverseAssociationPresent");
                                     ri.addProperty(SH.description, "Inverse associations shall not be instantiated.");
@@ -862,7 +862,9 @@ public class ShaclTools {
                                     ri.addProperty(path, o5i);
                                     RDFNode o1oi = shapeModel.createTypedLiteral(inverseassocGroupOrder + 1, "http://www.w3.org/2001/XMLSchema#integer");
                                     inverseassocGroupOrder = inverseassocGroupOrder + 1;
-                                    ri.addProperty(SH.order, o1oi);
+                                    if (!shapeModel.listStatements(ri, SH.order, (RDFNode) null).hasNext()) {
+                                        ri.addProperty(SH.order, o1oi);
+                                    }
                                     RDFNode o1gi = shapeModel.createResource(nsURIprofile+"InverseAssociationsGroup");
                                     ri.addProperty(SH.group, o1gi);
                                     RDFNode o4i = shapeModel.createTypedLiteral(0, "http://www.w3.org/2001/XMLSchema#integer");
@@ -1187,7 +1189,9 @@ public class ShaclTools {
                                     ri.addProperty(path, o5i);
                                     RDFNode o1oi = shapeModel.createTypedLiteral(inverseassocGroupOrder + 1, "http://www.w3.org/2001/XMLSchema#integer");
                                     inverseassocGroupOrder = inverseassocGroupOrder + 1;
-                                    ri.addProperty(SH.order, o1oi);
+                                    if (!shapeModel.listStatements(ri, SH.order, (RDFNode) null).hasNext()) {
+                                        ri.addProperty(SH.order, o1oi);
+                                    }
                                     RDFNode o1gi = shapeModel.createResource(nsURIprofile+"InverseAssociationsGroup");
                                     ri.addProperty(SH.group, o1gi);
                                     RDFNode o4i = shapeModel.createTypedLiteral(0, "http://www.w3.org/2001/XMLSchema#integer");
@@ -1505,7 +1509,9 @@ public class ShaclTools {
                                             ri.addProperty(path, o5i);
                                             RDFNode o1oi = shapeModel.createTypedLiteral(inverseassocGroupOrder + 1, "http://www.w3.org/2001/XMLSchema#integer");
                                             inverseassocGroupOrder = inverseassocGroupOrder + 1;
-                                            ri.addProperty(SH.order, o1oi);
+                                            if (!shapeModel.listStatements(ri, SH.order, (RDFNode) null).hasNext()) {
+                                                ri.addProperty(SH.order, o1oi);
+                                            }
                                             RDFNode o1gi = shapeModel.createResource(nsURIprofile + "InverseAssociationsGroup");
                                             ri.addProperty(SH.group, o1gi);
                                             RDFNode o4i = shapeModel.createTypedLiteral(0, "http://www.w3.org/2001/XMLSchema#integer");
@@ -4141,7 +4147,9 @@ public class ShaclTools {
                             RDFNode o5i = shapeModel.createResource(invAssocURI);
                             ri.addProperty(path, o5i);
                             RDFNode o1oi = shapeModel.createTypedLiteral(atas - 1, "http://www.w3.org/2001/XMLSchema#integer");
-                            ri.addProperty(SH.order, o1oi);
+                            if (!shapeModel.listStatements(ri, SH.order, (RDFNode) null).hasNext()) {
+                                ri.addProperty(SH.order, o1oi);
+                            }
                             RDFNode o1gi = shapeModel.createResource(nsURIprofile+"InverseAssociationsGroup");
                             ri.addProperty(SH.group, o1gi);
                             RDFNode o4i = shapeModel.createTypedLiteral(0, "http://www.w3.org/2001/XMLSchema#integer");
