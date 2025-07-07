@@ -7,7 +7,7 @@
 
 package eu.griddigit.cimpal.core;
 
-import eu.griddigit.cimpal.gui.GUIhelper;
+import eu.griddigit.cimpal.interfaces.IOutputHandler;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.apache.commons.math3.util.Precision;
@@ -755,7 +755,7 @@ public class ComparisonInstanceData {
 
 
     //Create solution overview
-    public static List<String> solutionOverview() {
+    public static List<String> solutionOverview(IOutputHandler outputHandler) {
 
         List<String> solutionOverviewResult = new LinkedList<>();
         //process SvVoltage
@@ -818,7 +818,7 @@ public class ComparisonInstanceData {
 
         //print the result in the output window
         for (String strValue : solutionOverviewResult) {
-            GUIhelper.appendTextToOutputWindow(strValue,true);
+            outputHandler.appendOutput(strValue,true);
         }
         return solutionOverviewResult;
     }

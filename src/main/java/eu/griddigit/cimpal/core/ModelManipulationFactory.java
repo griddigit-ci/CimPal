@@ -8,7 +8,7 @@ package eu.griddigit.cimpal.core;
 import eu.griddigit.cimpal.application.MainController;
 import eu.griddigit.cimpal.customWriter.CustomRDFFormat;
 import eu.griddigit.cimpal.gui.GUIhelper;
-import javafx.scene.control.RadioButton;
+import eu.griddigit.cimpal.interfaces.IOutputHandler;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
@@ -417,7 +417,7 @@ public class ModelManipulationFactory {
 
     }
 
-        public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties) throws IOException {
+        public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties, IOutputHandler outputHandler) throws IOException {
 
         //this is to load profile data - this is needed for the export
         //Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
@@ -548,7 +548,7 @@ public class ModelManipulationFactory {
                                                     model.add(ResourceFactory.createStatement(ResourceFactory.createResource(classNS + rdfid), ResourceFactory.createProperty(propertyURI), ResourceFactory.createResource(object)));
                                         }
                                     } catch (IndexOutOfBoundsException e) {
-                                        GUIhelper.appendTextToOutputWindow("Object data missing at row:" + row, true);
+                                        outputHandler.appendOutput("Object data missing at row:" + row, true);
                                     }
 
                                 }

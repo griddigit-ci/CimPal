@@ -93,6 +93,8 @@ import java.util.Properties;
 
 public class MainController implements Initializable {
 
+    private GUIhelper guiHelper;
+
     public TabPane tabPaneConstraintsDetails;
     public Tab tabCreateCompleteSM1;
     public Tab tabCreateCompleteSM11;
@@ -439,7 +441,7 @@ public class MainController implements Initializable {
 
 
     public MainController() {
-
+        guiHelper = new GUIhelper();
     }
 
     @Override
@@ -1189,7 +1191,7 @@ public class MainController implements Initializable {
 
                 if (fcbIDcompSolutionOverview.isSelected()) {
                     compareResults = ComparisonInstanceData.compareSolution(compareResults, valueModel1, valueModel2, xmlBase, options);
-                    List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
+                    List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview(guiHelper);
                 }
 
 
@@ -1281,7 +1283,7 @@ public class MainController implements Initializable {
 
             if (fcbIDcompSolutionOverview.isSelected()) {
                 compareResults = ComparisonInstanceData.compareSolution(compareResults, model1, model2, xmlBase, options);
-                List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview();
+                List<String> solutionOverviewResult = ComparisonInstanceData.solutionOverview(guiHelper);
             }
 
 
@@ -1662,7 +1664,7 @@ public class MainController implements Initializable {
 
                 progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties);
+                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties, guiHelper);
 
                 progressBar.setProgress(1);
                 System.out.print("Conversion finished.\n");
@@ -5070,7 +5072,7 @@ public class MainController implements Initializable {
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
         switch (selectedMethod) {
             case "Old template (not maintained)":
-                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties);
+                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties, guiHelper);
                 break;
             case "Advanced template":
                 for (File file : inputXLS){

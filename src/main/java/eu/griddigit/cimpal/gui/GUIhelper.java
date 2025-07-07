@@ -6,8 +6,7 @@
 package eu.griddigit.cimpal.gui;
 
 import eu.griddigit.cimpal.application.MainController;
-import javafx.beans.value.ChangeListener;
-import javafx.geometry.Insets;
+import eu.griddigit.cimpal.interfaces.IOutputHandler;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
@@ -15,11 +14,10 @@ import javafx.util.Pair;
 import org.apache.jena.rdf.model.Model;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import static eu.griddigit.cimpal.application.MainController.foutputWindowVar;
 
-public class GUIhelper {
+public class GUIhelper implements IOutputHandler {
 
     public static Alert expandableAlert(String title, String header, String contextText, String labelText, String detailsText){
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
@@ -163,7 +161,7 @@ public class GUIhelper {
     }
 
     //Append text to output window
-    public static void appendTextToOutputWindow(String valueOf,Boolean nextLine) {
+    public void appendOutput(String valueOf, Boolean nextLine) {
         if (nextLine){
             foutputWindowVar.appendText("\n");
         }

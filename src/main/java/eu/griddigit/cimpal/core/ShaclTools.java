@@ -2003,7 +2003,7 @@ public class ShaclTools {
                     if (isAttr==1) {
                         //TODO - need to have something more clever here. if there are different cardinalities for different profiles with same attribute/association
                         if (model.listObjectsOfProperty(resItemDomain, model.getProperty(rdfNs, "multiplicity")).toList().size() > 1) {
-                            //GuiHelper.appendTextToOutputWindow("[Attention] The property: " + resItemDomain.getLocalName() + " has different multiplicity in different profiles.", true);
+                            //GuiHelper.appendOutput("[Attention] The property: " + resItemDomain.getLocalName() + " has different multiplicity in different profiles.", true);
                             break;
                         }
                     }
