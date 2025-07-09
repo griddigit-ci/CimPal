@@ -3,10 +3,11 @@
  * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
-package eu.griddigit.cimpal.application;
+package eu.griddigit.cimpal.Main.application;
 
-import eu.griddigit.cimpal.gui.RDFcomparisonResultModel;
-import eu.griddigit.cimpal.gui.TextAreaEditTableCell;
+import eu.griddigit.cimpal.Main.gui.RDFcomparisonResultModel;
+import eu.griddigit.cimpal.Main.gui.TextAreaEditTableCell;
+import eu.griddigit.cimpal.Core.models.RDFCompareResultEntry;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -16,13 +17,12 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
 import java.util.ResourceBundle;
 
-import static eu.griddigit.cimpal.gui.ExcelExportTableView.export;
+import static eu.griddigit.cimpal.Main.gui.ExcelExportTableView.export;
 
 public class rdfDiffResultController implements Initializable {
     public Button btnCancel;
@@ -73,9 +73,11 @@ public class rdfDiffResultController implements Initializable {
 
         ObservableList<RDFcomparisonResultModel> tableResultsData= tableViewResults.getItems();
 
-        for (int row=0; row<MainController.compareResults.size(); row++) {
-            List<String> line = (List<String>) MainController.compareResults.get(row);
-            tableResultsData.add(new RDFcomparisonResultModel(line.get(0), line.get(1), line.get(2), line.get(3), line.get(4)));
+        List<RDFCompareResultEntry> rdfCompareResultEntries = MainController.rdfCompareResult.GetEntries();
+
+        for (RDFCompareResultEntry result : rdfCompareResultEntries) {
+            tableResultsData.add(new RDFcomparisonResultModel(result.getItem(), result.getRdfType(), result.getProperty(),
+                    result.getValueModelA(), result.getValueModelB()));
         }
 
         labelModelA.setText(MainController.rdfsCompareFiles.get(0));

@@ -367,6 +367,7 @@ public class MainController implements Initializable {
     public static File rdfModelExcelShacl;
     public static File xlsFileExcelShacl;
     public static ArrayList<Object> compareResults;
+    public static RDFCompareResult rdfCompareResult;
     public static List<String> rdfsCompareFiles;
     private List<File> selectedFile;
     private File selectedFolder;
@@ -1408,23 +1409,31 @@ public class MainController implements Initializable {
         rdfsCompareFiles.add(MainController.rdfModel1.getName());
         rdfsCompareFiles.add(MainController.rdfModel2.getName());
 
+        RDFComparator rdfComparator = null;
+
         switch (fcbRDFSformat.getSelectionModel().getSelectedItem().toString()) {
             case "RDFS (augmented) by CimSyntaxGen":
-                compareResults = ComparisonRDFSprofile.compareRDFSprofile(model1, model2);
+                rdfComparator = new ComparisonRDFSprofile();
                 break;
             case "RDFS (augmented) by CimSyntaxGen with CIMTool":
-                compareResults = ComparisonRDFSprofileCIMTool.compareRDFSprofileCIMTool(model1, model2);
-                break;
-            case "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen":
-                compareResults = ComparissonRDFS501Ed2.compareRDFS501Ed2(model1, model2);
+                rdfComparator = new ComparisonRDFSprofileCIMTool();
                 break;
             case "Universal method inlc. SHACL Shapes":
-                compareResults = ComparisonSHACLshapes.compareSHACLshapes(model1, model2);
+                rdfComparator = new ComparisonSHACLshapes();
                 break;
+            default:
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setContentText("Unexpected RDFS format selected.");
+                alert.setHeaderText(null);
+                alert.setTitle("Error");
+                alert.showAndWait();
+                progressBar.setProgress(0);
+                return;
         }
 
+        rdfCompareResult = rdfComparator.compare(model1, model2);
 
-        if (!compareResults.isEmpty()) {
+        if (!rdfCompareResult.HasDifference()) {
 
             try {
                 Stage guiRdfDiffResultsStage = new Stage();
