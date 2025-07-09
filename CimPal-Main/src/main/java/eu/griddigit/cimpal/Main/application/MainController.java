@@ -3,20 +3,26 @@
  * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
-package eu.griddigit.cimpal.application;
+package eu.griddigit.cimpal.Main.application;
 
-import eu.griddigit.cimpal.core.*;
-import eu.griddigit.cimpal.customWriter.CustomRDFFormat;
+import eu.griddigit.cimpal.Main.core.*;
+import eu.griddigit.cimpal.Main.gui.*;
+import eu.griddigit.cimpal.Core.comparators.ComparisonRDFSprofile;
+import eu.griddigit.cimpal.Core.comparators.ComparisonRDFSprofileCIMTool;
+import eu.griddigit.cimpal.Core.comparators.ComparisonSHACLshapes;
+import eu.griddigit.cimpal.Main.customWriter.CustomRDFFormat;
 
 import java.io.InputStream;
 
-import eu.griddigit.cimpal.model.SHACLValidationResult;
+import eu.griddigit.cimpal.Core.interfaces.RDFComparator;
+import eu.griddigit.cimpal.Core.models.RDFCompareResult;
+import eu.griddigit.cimpal.Core.models.RDFCompareResultEntry;
+import eu.griddigit.cimpal.Main.model.SHACLValidationResult;
 import guru.nidi.graphviz.engine.Graphviz;
 import guru.nidi.graphviz.engine.Format;
 
 import java.io.ByteArrayInputStream;
 
-import eu.griddigit.cimpal.gui.*;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -55,9 +61,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.topbraid.jenax.util.JenaUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
-import eu.griddigit.cimpal.util.CompareFactory;
-import eu.griddigit.cimpal.util.ExcelTools;
-import eu.griddigit.cimpal.util.PlantUMLGenerator;
+import eu.griddigit.cimpal.Main.util.CompareFactory;
+import eu.griddigit.cimpal.Main.util.ExcelTools;
+import eu.griddigit.cimpal.Main.util.PlantUMLGenerator;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
@@ -73,11 +79,11 @@ import java.util.*;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
-import static eu.griddigit.cimpal.core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
-import static eu.griddigit.cimpal.core.ExportRDFSdescriptions.*;
-import static eu.griddigit.cimpal.core.RdfConvert.fileSaveDialog;
-import static eu.griddigit.cimpal.core.RdfConvert.modelInheritance;
-import static eu.griddigit.cimpal.core.ShaclTools.prepareShapesModelFromRDFS;
+import static eu.griddigit.cimpal.Main.core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
+import static eu.griddigit.cimpal.Main.core.ExportRDFSdescriptions.*;
+import static eu.griddigit.cimpal.Main.core.RdfConvert.fileSaveDialog;
+import static eu.griddigit.cimpal.Main.core.RdfConvert.modelInheritance;
+import static eu.griddigit.cimpal.Main.core.ShaclTools.prepareShapesModelFromRDFS;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
@@ -524,7 +530,6 @@ public class MainController implements Initializable {
         fcbRDFSformat.getItems().addAll(
                 "RDFS (augmented) by CimSyntaxGen",
                 "RDFS (augmented) by CimSyntaxGen with CIMTool",
-                "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen",
                 "Universal method inlc. SHACL Shapes"
 
         );
@@ -648,7 +653,7 @@ public class MainController implements Initializable {
     private void actionRDFSexportDescriptionMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "");
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file.getFirst() != null) {// the file is selected
@@ -671,7 +676,7 @@ public class MainController implements Initializable {
     private void actionRDFSexportTripplesMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.xml"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.xml"), "");
 
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file.getFirst() != null) {// the file is selected
@@ -694,7 +699,7 @@ public class MainController implements Initializable {
     private void actionMenuExportSHACLInfo() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open SHACL files
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
 
         if (file != null) {// the file is selected
             boolean singleFile = false;
@@ -731,10 +736,10 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         //open original xml files
-        List<File> fileOrigModelList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Original model ", List.of("*.xml","*.zip"), "");
+        List<File> fileOrigModelList = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Original model ", List.of("*.xml","*.zip"), "");
 
         //open SHACL files
-        List<File> fileSHACLTransList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "SPARQL Transformation files", List.of("*.ttl","*.trig"), "");
+        List<File> fileSHACLTransList = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "SPARQL Transformation files", List.of("*.ttl","*.trig"), "");
 
         if (fileOrigModelList != null && fileSHACLTransList != null) {// the file is selected
 
@@ -750,7 +755,7 @@ public class MainController implements Initializable {
     private void actionGenInfoFromRDFS() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
         List<Model> listModels = new LinkedList<>();
         if (file != null) {// the file is selected
             for (File fil : file) {
@@ -776,7 +781,7 @@ public class MainController implements Initializable {
     private void actionRDFSInstanceDataInfoMenu() throws FileNotFoundException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
         boolean templateOnly = false;
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
@@ -855,9 +860,9 @@ public class MainController implements Initializable {
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
             //select file 1
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
         }
 
         assert file != null;
@@ -883,9 +888,9 @@ public class MainController implements Initializable {
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
             //select file 2
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
         }
 
         assert file != null;
@@ -908,7 +913,7 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
 
         //select file 1
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
 
@@ -925,7 +930,7 @@ public class MainController implements Initializable {
     private void actionBrowseIDfile2() {
         progressBar.setProgress(0);
         //select file 1
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
 
@@ -948,11 +953,11 @@ public class MainController implements Initializable {
         if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Generate from RDFS")) {
             MainController.IDmapSelect = 1;
             //select file
-            fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
+            fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
         } else if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Use saved map")) {
             MainController.IDmapSelect = 2;
             //select file
-            fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Map file", List.of("*.properties"), "");
+            fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Map file", List.of("*.properties"), "");
         }
 
         if (fileL != null) {// the file is selected
@@ -976,7 +981,7 @@ public class MainController implements Initializable {
     private void actionBrowseRDFfileForExcel() {
         progressBar.setProgress(0);
         //select file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "");
         if (file.getFirst() != null) {// the file is selected
             fPathRdffileForExcel.setText(file.getFirst().toString());
             MainController.rdfModelExcelShacl = file.getFirst();
@@ -991,7 +996,7 @@ public class MainController implements Initializable {
     private void actionBrowseExcelfileForShape() {
         progressBar.setProgress(0);
         //select file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "");
 
         if (file.getFirst() != null) {// the file is selected
             fPathXLSfileForShape.setText(file.getFirst().toString());
@@ -1045,9 +1050,9 @@ public class MainController implements Initializable {
         for (File item : MainController.IDModel1) {
             if (item.getName().toLowerCase().endsWith(".zip")) {
                 if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
-                    model1single = eu.griddigit.cimpal.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 3);
+                    model1single = eu.griddigit.cimpal.Main.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 3);
                 } else {
-                    model1single = eu.griddigit.cimpal.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 2);
+                    model1single = eu.griddigit.cimpal.Main.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 2);
                 }
             } else if (item.getName().toLowerCase().endsWith(".xml")) {
                 InputStream inputStream = new FileInputStream(item);
@@ -1055,7 +1060,7 @@ public class MainController implements Initializable {
                     model1single = ModelFactory.createDefaultModel();
                     RDFDataMgr.read(model1single, inputStream, xmlBase, Lang.RDFXML);
                 } else {
-                    model1single = eu.griddigit.cimpal.util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
+                    model1single = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
                 }
             }
             prefixMap.putAll(model1single.getNsPrefixMap());
@@ -1079,9 +1084,9 @@ public class MainController implements Initializable {
         for (File item : MainController.IDModel2) {
             if (item.getName().toLowerCase().endsWith(".zip")) {
                 if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
-                    model2single = eu.griddigit.cimpal.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 3);
+                    model2single = eu.griddigit.cimpal.Main.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 3);
                 } else {
-                    model2single = eu.griddigit.cimpal.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 2);
+                    model2single = eu.griddigit.cimpal.Main.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 2);
                 }
             } else if (item.getName().toLowerCase().endsWith(".xml")) {
                 InputStream inputStream = new FileInputStream(item);
@@ -1089,7 +1094,7 @@ public class MainController implements Initializable {
                     model2single = ModelFactory.createDefaultModel();
                     RDFDataMgr.read(model2single, inputStream, xmlBase, Lang.RDFXML);
                 } else {
-                    model2single = eu.griddigit.cimpal.util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
+                    model2single = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
                 }
 
             }
@@ -1199,6 +1204,12 @@ public class MainController implements Initializable {
                 if (!compareResults.isEmpty()) {
 
                     if (fcbIDcompShowDetails.isSelected()) {
+                        RDFCompareResult result =  new RDFCompareResult(); // Todo make a new class for the instance data comparison results
+                        for (Object diffItem : compareResults) {
+                            List<String> item = (List<String>) diffItem;
+                            result.AddEntry(new RDFCompareResultEntry(item.get(0), item.get(1), item.get(2), item.get(3), item.get(4)));
+                        }
+                        rdfCompareResult = result;
                         try {
                             Stage guiRdfDiffResultsStage = new Stage();
                             //Scene for the menu RDF differences
@@ -1291,6 +1302,12 @@ public class MainController implements Initializable {
             if (!compareResults.isEmpty()) {
 
                 if (fcbIDcompShowDetails.isSelected()) {
+                    RDFCompareResult result =  new RDFCompareResult(); // Todo make a new class for the instance data comparison results
+                    for (Object diffItem : compareResults) {
+                        List<String> item = (List<String>) diffItem;
+                        result.AddEntry(new RDFCompareResultEntry(item.get(0), item.get(1), item.get(2), item.get(3), item.get(4)));
+                    }
+                    rdfCompareResult = result;
                     try {
                         Stage guiRdfDiffResultsStage = new Stage();
                         //Scene for the menu RDF differences
@@ -1355,8 +1372,8 @@ public class MainController implements Initializable {
         List<File> modelFiles2 = new LinkedList<>();
         modelFiles2.add(MainController.rdfModel2);
 
-        Model model1 = eu.griddigit.cimpal.util.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false);
-        Model model2Temp = eu.griddigit.cimpal.util.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false);
+        Model model1 = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false);
+        Model model2Temp = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false);
 
         Model model2 = null;
         boolean error = false;
@@ -1466,7 +1483,7 @@ public class MainController implements Initializable {
 
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Reference data RDF files", List.of("*.rdf"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Reference data RDF files", List.of("*.rdf"), "");
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
             ModelManipulationFactory.generateCommonData(file);
@@ -1485,11 +1502,11 @@ public class MainController implements Initializable {
         shapeModels = null;
 
         //select file
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
 
         if (fileL != null) {// the file is selected
             for (int m = 0; m < fileL.size(); m++) {
-                eu.griddigit.cimpal.util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
+                eu.griddigit.cimpal.Main.util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
 
                 if (shaclRefModel == null) {
                     shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
@@ -1514,7 +1531,7 @@ public class MainController implements Initializable {
 
     @FXML
     private void actionBrowseShaclFilesValidator(ActionEvent actionEvent) {
-        selectedFile = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        selectedFile = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
             for (File file : selectedFile) {
@@ -1526,7 +1543,7 @@ public class MainController implements Initializable {
 
     @FXML
     private void actionBrowsePathForShaclValidator(ActionEvent actionEvent) {
-        selectedFolder = eu.griddigit.cimpal.util.ModelFactory.folderChooserCustom();
+        selectedFolder = eu.griddigit.cimpal.Main.util.ModelFactory.folderChooserCustom();
         if (selectedFolder != null) {
             fPathModelsForShaclValidator.setText(selectedFolder.toString());
         }
@@ -1588,12 +1605,12 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         shaclNodataMap = 1; // as this mapping should not be used for this task
         //select file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Input template instance data XLS", List.of("*.xlsx"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Input template instance data XLS", List.of("*.xlsx"), "");
 
         if (file != null) {// the file is selected
             MainController.inputXLS = file;
             //select file
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF profile file", List.of("*.rdf", "*.ttl"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF profile file", List.of("*.rdf", "*.ttl"), "");
 
             if (file != null) {// the file is selected
                 MainController.rdfProfileFileList = file;
@@ -1692,7 +1709,7 @@ public class MainController implements Initializable {
 
         Map<String, RDFDatatype> dataTypeMap = DataTypeMaping.mapDatatypesFromRDF();
         if (dataTypeMap != null) {
-            File saveFile = eu.griddigit.cimpal.util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
+            File saveFile = eu.griddigit.cimpal.Main.util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
             Properties properties = new Properties();
             for (Object key : dataTypeMap.keySet()) {
                 properties.put(key, dataTypeMap.get(key).toString());
@@ -1773,7 +1790,7 @@ public class MainController implements Initializable {
     // action on menu Convert Reference Data
     private void actionMenuConvertRefData() throws IOException {
         //select file 1
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
             fPathIDfile1.setText(fileL.toString());
@@ -1782,7 +1799,7 @@ public class MainController implements Initializable {
             fPathIDfile1.clear();
         }
 
-        List<File> fileL1 = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "ap file", List.of("*.properties"), "");
+        List<File> fileL1 = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "ap file", List.of("*.properties"), "");
 
         if (fileL1 != null) {// the file is selected
             fPathIDmap.setText(fileL1.toString());
@@ -1799,7 +1816,7 @@ public class MainController implements Initializable {
     // action on menu Generate QAR
     private void actionQARMenu() throws IOException, XMLStreamException {
         //select the xlsx file
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Excel file with IDs", List.of("*.xlsx"), "Select input data: ");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Excel file with IDs", List.of("*.xlsx"), "Select input data: ");
 
         if (fileL != null) {// the file is selected
             for (File xmlfile : fileL) {
@@ -1921,13 +1938,13 @@ public class MainController implements Initializable {
         List<File> file = null;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2019";
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "");
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2020";
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "");
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool")) {
             rdfFormatInput = "CIMTool-merged-owl";
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Merged OWL CIMTool files", List.of("*.owl"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Merged OWL CIMTool files", List.of("*.owl"), "");
         }
         this.selectedFile = file;
 
@@ -1981,7 +1998,7 @@ public class MainController implements Initializable {
         List<File> file;
         List<File> fileL;
         if (fcbRDFconvertModelUnion.isSelected()) {
-            fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
             if (fileL != null) {// the file is selected
                 fsourcePathTextField.setText(fileL.toString());
@@ -1990,7 +2007,7 @@ public class MainController implements Initializable {
                 fsourcePathTextField.clear();
             }
         } else {
-            file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
             if (file.getFirst() != null) {// the file is selected
                 //MainController.prefs.put("LastWorkingFolder", file.getParent());
@@ -3405,9 +3422,9 @@ public class MainController implements Initializable {
             if (cbRDFSSHACLoptionBaseprofiles.isSelected()) { // load base profiles if the checkbox is selected
                 baseprofilesshaclglag = 1;
                 //load base profiles for shacl
-                List<File> basefiles = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
+                List<File> basefiles = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
                 if (basefiles != null) {
-                    unionmodelbaseprofilesshacl = eu.griddigit.cimpal.util.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
+                    unionmodelbaseprofilesshacl = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
                     unionmodelbaseprofilesshaclinheritance = modelInheritance(unionmodelbaseprofilesshacl, true, true);
                     unionmodelbaseprofilesshaclinheritanceonly = modelInheritance; // this contains the inheritance of the classes under OWL2.members
 
@@ -3432,9 +3449,9 @@ public class MainController implements Initializable {
                     if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) { // load base profiles if the checkbox is selected
                         baseprofilesshaclglag2nd = 1;
                         //load base profiles for shacl
-                        List<File> basefiles2nd = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd set of Base profiles");
+                        List<File> basefiles2nd = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd set of Base profiles");
                         if (basefiles2nd != null) {
-                            unionmodelbaseprofilesshacl2nd = eu.griddigit.cimpal.util.ModelFactory.modelLoad(basefiles2nd, "", Lang.RDFXML, true);
+                            unionmodelbaseprofilesshacl2nd = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(basefiles2nd, "", Lang.RDFXML, true);
                             unionmodelbaseprofilesshaclinheritance2nd = modelInheritance(unionmodelbaseprofilesshacl2nd, true, true);
                             unionmodelbaseprofilesshaclinheritanceonly2nd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
 
@@ -3458,9 +3475,9 @@ public class MainController implements Initializable {
                             if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) { // load base profiles if the checkbox is selected
                                 baseprofilesshaclglag3rd = 1;
                                 //load base profiles for shacl
-                                List<File> basefiles3rd = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd set of Base profiles");
+                                List<File> basefiles3rd = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd set of Base profiles");
                                 if (basefiles3rd != null) {
-                                    unionmodelbaseprofilesshacl3rd = eu.griddigit.cimpal.util.ModelFactory.modelLoad(basefiles3rd, "", Lang.RDFXML, true);
+                                    unionmodelbaseprofilesshacl3rd = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(basefiles3rd, "", Lang.RDFXML, true);
                                     unionmodelbaseprofilesshaclinheritance3rd = modelInheritance(unionmodelbaseprofilesshacl3rd, true, true);
                                     unionmodelbaseprofilesshaclinheritanceonly3rd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
 
@@ -3776,7 +3793,7 @@ public class MainController implements Initializable {
             }
 
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
-                File saveFile = eu.griddigit.cimpal.util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
+                File saveFile = eu.griddigit.cimpal.Main.util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
 
                 if (saveFile != null) {
                     //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
@@ -3814,7 +3831,7 @@ public class MainController implements Initializable {
         treeID = true;
 
         //select file
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
         String xmlBase = "http://griddigit.eu#";
 
         InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null, false);
@@ -3829,7 +3846,7 @@ public class MainController implements Initializable {
         treeID = true;
 
         //select file
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
         String xmlBase = "http://griddigit.eu#";
 
         InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null, false);
@@ -4019,11 +4036,11 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
 
         //select file
-        List<File> fileL = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        List<File> fileL = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
 
         if (fileL != null) {// the file is selected
             for (int m = 0; m < fileL.size(); m++) {
-                eu.griddigit.cimpal.util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
+                eu.griddigit.cimpal.Main.util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
                 ArrayList<String> mpak1 = new ArrayList<>();
                 mpak1.add(FilenameUtils.getBaseName(((File) fileL.get(m)).getName())); // adds the name without the extension.
                 Map<String, String> prefixMap = ((Model) shapeModels.get(m)).getNsPrefixMap();
@@ -4972,7 +4989,7 @@ public class MainController implements Initializable {
     }
 
     public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
-        selectedFile = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        selectedFile = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
             for (int m = 0; m < selectedFile.size(); m++) {
@@ -4983,7 +5000,7 @@ public class MainController implements Initializable {
     }
 
     public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
 
         if (!file.isEmpty()) {
             MainController.inputXLS = file;
@@ -4995,7 +5012,7 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         if (selectedFile != null) {
             for (int m = 0; m < selectedFile.size(); m++) {
-                eu.griddigit.cimpal.util.ModelFactory.shapeModelLoad(m, selectedFile);
+                eu.griddigit.cimpal.Main.util.ModelFactory.shapeModelLoad(m, selectedFile);
             }
         }
         ArrayList<Object> inputXLSdata;
@@ -5018,7 +5035,7 @@ public class MainController implements Initializable {
     private void actionBrowseXlsTemplate() {
         progressBar.setProgress(0);
         //select xls file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "Xls template", List.of("*.xlsx"), "Browse for xls template");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "Xls template", List.of("*.xlsx"), "Browse for xls template");
 
         if (file != null) {// the file is selected
 
@@ -5129,10 +5146,10 @@ public class MainController implements Initializable {
         boolean hide = hideEmptySheets.isSelected();
 
         //open RDFS file
-        List<File> file = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "Select RDF file(s) for template.");
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "Select RDF file(s) for template.");
         List<File> iFileList = new ArrayList<>();
         if (addInstanceData)
-            iFileList = eu.griddigit.cimpal.util.ModelFactory.fileChooserCustom(false, "XML file(s)", List.of("*.xml"), "Select XML file(s) for template.");
+            iFileList = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "XML file(s)", List.of("*.xml"), "Select XML file(s) for template.");
 
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
