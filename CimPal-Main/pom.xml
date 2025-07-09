@@ -6,7 +6,7 @@
     <parent>
         <groupId>eu.griddigit.CimPal</groupId>
         <artifactId>CimPal</artifactId>
-        <version>2023.2.0.0</version>
+        <version>2025.9.7.1</version>
     </parent>
 
     <artifactId>CimPal-Main</artifactId>
@@ -27,8 +27,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
+                    <release>${jdk.version}</release>
                     <compilerArgs>--enable-preview</compilerArgs>
                 </configuration>
             </plugin>
@@ -185,7 +184,7 @@
         <dependency>
             <groupId>eu.griddigit.CimPal</groupId>
             <artifactId>CimPal-Core</artifactId>
-            <version>2023.2.0.0</version>
+            <version>2025.9.7.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.jena</groupId>
