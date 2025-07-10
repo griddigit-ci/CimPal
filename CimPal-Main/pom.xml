@@ -184,7 +184,7 @@
         <dependency>
             <groupId>eu.griddigit.CimPal</groupId>
             <artifactId>CimPal-Core</artifactId>
-            <version>2025.9.7.1</version>
+            <version>2023.2.0.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.jena</groupId>
