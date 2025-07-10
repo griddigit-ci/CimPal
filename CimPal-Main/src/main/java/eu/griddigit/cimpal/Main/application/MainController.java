@@ -857,16 +857,15 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         List<File> file = null;
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
-                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
-                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
+                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool")) {
             //select file 1
             file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
             file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
         }
+        else return;
 
-        assert file != null;
-        if (file.getFirst() != null) {// the file is selected
+        if (!file.isEmpty() && file.getFirst() != null) {// the file is selected
 
             fPathRdffile1.setText(file.getFirst().toString());
             MainController.rdfModel1 = file.getFirst();
@@ -885,16 +884,15 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
         List<File> file = null;
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
-                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool") ||
-                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen")) {
+                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool")) {
             //select file 2
             file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
             file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
         }
+        else return;
 
-        assert file != null;
-        if (file.getFirst() != null) {// the file is selected
+        if (!file.isEmpty() && file.getFirst() != null) {// the file is selected
             fPathRdffile2.setText(file.getFirst().toString());
             MainController.rdfModel2 = file.getFirst();
             if (!fPathRdffile1.getText().isEmpty()) {
