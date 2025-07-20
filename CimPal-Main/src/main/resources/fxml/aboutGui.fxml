@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+ Licensed under the EUPL-1.2-or-later.
+ Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ @author Chavdar Ivanov
+ -->
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.*?>
+<?import javafx.scene.text.*?>
+
+<VBox xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.Main.application.AboutController">
+   <HBox alignment="TOP_CENTER" prefHeight="100.0" prefWidth="200.0" VBox.vgrow="ALWAYS">
+      <AnchorPane fx:id="faPane" prefHeight="507.0" prefWidth="800.0" HBox.hgrow="ALWAYS">
+         <HBox.margin>
+            <Insets />
+         </HBox.margin>
+         <ImageView fx:id="fImage" fitHeight="162.0" fitWidth="576.0" layoutX="186.0" layoutY="14.0" pickOnBounds="true" preserveRatio="true">
+            <Image url="@../graphics/Logo_gridDigIt.png" />
+         </ImageView>
+         <Line endX="667.0" layoutX="115.0" layoutY="203.0" startX="-100.0" strokeLineCap="ROUND" strokeWidth="2.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" />
+         <Label contentDisplay="TOP" layoutX="69.0" layoutY="216.0" text="CimPal&#10;Version: 2025.0&#10;Date: 6-Jan-2025&#10;&#10;Based on &#10;- Apache Jena (Apache License v2.0), &#10;- TopBraid SHACL API (Apache License v2.0), and &#10;- JAVAFX (GPLv2+CE license)&#10;&#10;CimPal is licensed under  EUPL-1.2-or-later&#10;Copyright 2020, gridDigIt Kft. All rights reserved.&#10;&#10;gridDigIt aims at providing support and further enhancement of the CimPal. &#10;Please address any requests either via the support email or in GitHub." textAlignment="CENTER" wrapText="true">
+            <font>
+               <Font name="System Bold" size="18.0" />
+            </font>
+         </Label>
+      </AnchorPane>
+   </HBox>
+   <HBox>
+      <Hyperlink fx:id="fsupportemail" text="Support email: cimpal@griddigit.eu" textAlignment="CENTER">
+         <HBox.margin>
+            <Insets left="10.0" />
+         </HBox.margin>
+         <font>
+            <Font size="14.0" />
+         </font>
+      </Hyperlink>
+   </HBox>
+   <HBox>
+      <Hyperlink fx:id="fwebsite" nodeOrientation="LEFT_TO_RIGHT" text="Web site: cimpal.app" textAlignment="CENTER">
+         <HBox.margin>
+            <Insets left="10.0" />
+         </HBox.margin>
+         <font>
+            <Font size="14.0" />
+         </font>
+      </Hyperlink>
+   </HBox>
+   <HBox>
+      <Hyperlink fx:id="fgitHub" nodeOrientation="LEFT_TO_RIGHT" text="GitHub repository" textAlignment="CENTER">
+         <HBox.margin>
+            <Insets left="10.0" />
+         </HBox.margin>
+         <font>
+            <Font size="14.0" />
+         </font>
+      </Hyperlink>
+   </HBox>
+   <HBox>
+      <ButtonBar prefHeight="40.0" HBox.hgrow="ALWAYS">
+         <buttons>
+            <Button fx:id="btnOK" mnemonicParsing="false" onAction="#actionBtnOK" text="Close" />
+            <Button mnemonicParsing="false" onAction="#actionBtnLicense" text="License at EC site" />
+            <Button mnemonicParsing="false" onAction="#actionBtnLicenseLocal" text="License in English" />
+         </buttons>
+         <HBox.margin>
+            <Insets right="5.0" />
+         </HBox.margin>
+      </ButtonBar>
+   </HBox>
+</VBox>
