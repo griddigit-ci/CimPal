@@ -18,6 +18,9 @@ public class CompareFactory {
         for (ResIterator i = modelA.listSubjects(); i.hasNext(); ) {
             Resource resItem = i.next();
             if (!resItem.isAnon()){
+//                if (!modelA.listStatements(resItem, RDF.type, (RDFNode)  null).hasNext()) {
+//                    int k=1;
+//                }
                 String classType = resItem.getRequiredProperty(RDF.type).getObject().asResource().getLocalName();
                 if (!skiplist.contains(classType)) {
                     compareResults = compareModelsDetail(compareResults, modelA, modelB, reverse, resItem);

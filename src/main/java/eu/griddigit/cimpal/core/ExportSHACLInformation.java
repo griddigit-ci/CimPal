@@ -44,17 +44,17 @@ public class ExportSHACLInformation {
             }
 
             List<String> propertyShapeID = new LinkedList<>(); // list for the property shape uri
-            propertyShapeID.add("PropertyShape ID");
+            propertyShapeID.add("PropertyShape/NodeShape ID");
             List<String> propertyShapeDescription = new LinkedList<>(); // list for the description of the property shape
-            propertyShapeDescription.add("PropertyShape Description");
+            propertyShapeDescription.add("Constraint Description");
             List<String> propertyShapeName = new LinkedList<>(); // list for the name of the property shape
-            propertyShapeName.add("PropertyShape Name");
+            propertyShapeName.add("Constraint Name");
             List<String> propertyShapeGroup = new LinkedList<>(); // list for the property shape group
-            propertyShapeGroup.add("PropertyShape Group");
+            propertyShapeGroup.add("Group");
             List<String> propertyShapeType = new LinkedList<>(); // list for the type of the property shape = sparql or not
-            propertyShapeType.add("PropertyShape Type");
+            propertyShapeType.add("Type");
             List<String> propertyShapeSeverity = new LinkedList<>(); // list for the severity of the shape
-            propertyShapeSeverity.add("PropertyShape Severity");
+            propertyShapeSeverity.add("Severity");
             List<String> propertyShapeIn = new LinkedList<>(); // list for sh:in
             List<String> propertyShapeMinCount = new LinkedList<>(); // list for minCount
             List<String> propertyShapeMaxCount = new LinkedList<>(); // list for maxCount
@@ -65,19 +65,19 @@ public class ExportSHACLInformation {
             List<String> sparqlConstraintID = new LinkedList<>(); // list id of the sparql constraint
             sparqlConstraintID.add("SPARQL constraint ID");
             List<String> constraintMessage = new LinkedList<>(); // list message of constraint
-            constraintMessage.add("PropertyShape Message");
+            constraintMessage.add("Message");
             List<String> sparqlConstraintSelect = new LinkedList<>(); // list select of sparql constraint
             List<String> orderList = new LinkedList<>(); // list of order
             Map<String, List<String>> shaclInfo = new HashMap<>();
 
-            orderList.add("PropertyShape ID");
-            orderList.add("PropertyShape Name");
-            orderList.add("PropertyShape Group");
-            orderList.add("PropertyShape Type");
+            orderList.add("PropertyShape/NodeShape ID");
+            orderList.add("Constraint Name");
+            orderList.add("Group");
+            orderList.add("Type");
             orderList.add("SPARQL constraint ID");
-            orderList.add("PropertyShape Severity");
-            orderList.add("PropertyShape Message");
-            orderList.add("PropertyShape Description");
+            orderList.add("Severity");
+            orderList.add("Message");
+            orderList.add("Constraint Description");
 
 
             //iterate on all PropertyShape
@@ -111,14 +111,47 @@ public class ExportSHACLInformation {
                 }
             }
 
-            shaclInfo.put("PropertyShape ID", propertyShapeID);
-            shaclInfo.put("PropertyShape Name", propertyShapeName);
-            shaclInfo.put("PropertyShape Group", propertyShapeGroup);
-            shaclInfo.put("PropertyShape Type", propertyShapeType);
+            //iterate on all NodeShape
+            for (StmtIterator i = model.listStatements(null, RDF.type, SH.NodeShape); i.hasNext(); ) {
+                Statement stmtPS = i.next();
+                if (model.listStatements(stmtPS.getSubject(), SH.severity, (RDFNode) null).hasNext()) {
+                    propertyShapeID.add(model.getNsURIPrefix(stmtPS.getSubject().getNameSpace()) + ":" + stmtPS.getSubject().getLocalName());
+                    String name = model.listStatements(stmtPS.getSubject(), SH.name, (RDFNode) null).next().getObject().toString();
+                    propertyShapeName.add(name);
+                    Resource group = model.listStatements(stmtPS.getSubject(), SH.group, (RDFNode) null).next().getObject().asResource();
+                    propertyShapeGroup.add(model.getNsURIPrefix(group.getNameSpace()) + ":" + group.getLocalName());
+                    String description = model.listStatements(stmtPS.getSubject(), SH.description, (RDFNode) null).next().getObject().toString();
+                    propertyShapeDescription.add(description);
+                    Resource severity = model.listStatements(stmtPS.getSubject(), SH.severity, (RDFNode) null).next().getObject().asResource();
+                    propertyShapeSeverity.add(model.getNsURIPrefix(severity.getNameSpace()) + ":" + severity.getLocalName());
+
+                    if (model.listStatements(stmtPS.getSubject(), SH.sparql, (RDFNode) null).hasNext()) {
+                        Statement sparqlStmt = model.listStatements(stmtPS.getSubject(), SH.sparql, (RDFNode) null).next();
+                        propertyShapeType.add("SPARQL");
+                        sparqlConstraintID.add(model.getNsURIPrefix(sparqlStmt.getObject().asResource().getNameSpace()) + ":" + sparqlStmt.getObject().asResource().getLocalName());
+                        String message = "N/A";
+                        if (model.listStatements(sparqlStmt.getObject().asResource(), SH.message, (RDFNode) null).hasNext()) {
+                            message = model.listStatements(sparqlStmt.getObject().asResource(), SH.message, (RDFNode) null).next().getObject().toString();
+                        }
+
+                        constraintMessage.add(message);
+                    } else {
+                        propertyShapeType.add("Regular SHACL");
+                        sparqlConstraintID.add("N/A");
+                        String message = model.listStatements(stmtPS.getSubject(), SH.message, (RDFNode) null).next().getObject().toString();
+                        constraintMessage.add(message);
+                    }
+                }
+            }
+
+            shaclInfo.put("PropertyShape/NodeShape ID", propertyShapeID);
+            shaclInfo.put("Constraint Name", propertyShapeName);
+            shaclInfo.put("Group", propertyShapeGroup);
+            shaclInfo.put("Type", propertyShapeType);
             shaclInfo.put("SPARQL constraint ID", sparqlConstraintID);
-            shaclInfo.put("PropertyShape Severity", propertyShapeSeverity);
-            shaclInfo.put("PropertyShape Message", constraintMessage);
-            shaclInfo.put("PropertyShape Description", propertyShapeDescription);
+            shaclInfo.put("Severity", propertyShapeSeverity);
+            shaclInfo.put("Message", constraintMessage);
+            shaclInfo.put("Constraint Description", propertyShapeDescription);
 
             // do the excel export
             if (singleFile) {

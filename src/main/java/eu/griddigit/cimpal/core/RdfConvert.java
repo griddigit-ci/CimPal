@@ -97,11 +97,15 @@ public class RdfConvert {
                     //delete all classes
                     List<Statement> stdelete = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                     stmtToDeleteClass.addAll(stdelete);
-                    //check of the class is an enumeration
+                    //check if the class is an enumeration
                     if (model.listStatements(stmt.getSubject(),ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype"),ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()) {
                         for (Statement stmpProp : stdelete) {
                             List<Statement> stdeleteProp = model.listStatements(null, RDF.type, stmpProp.getSubject()).toList();
                             stmtToDeleteClass.addAll(stdeleteProp);
+                            for (Statement stmpPropEn : stdeleteProp) {
+                                List<Statement> stdeletePropEn = model.listStatements(stmpProp.getSubject(), null, (RDFNode) null).toList();
+                                stmtToDeleteClass.addAll(stdeletePropEn);
+                            }
                         }
                     }else {
                         //delete all attributes and associations with domain of the deleted classes

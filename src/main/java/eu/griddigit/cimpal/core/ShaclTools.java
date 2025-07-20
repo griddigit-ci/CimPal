@@ -4997,6 +4997,7 @@ public class ShaclTools {
         File folder = eu.griddigit.cimpal.util.ModelFactory.folderChooserCustom();
         //the map where we store the things before we process with the save
         //the string can ve the path and the file name that can be used by the save
+        int constraintCount = 0;
         for (Object inputXLSrow : inputXLSdata) {
 
             List<String> currentRow = (List<String>) inputXLSrow;
@@ -5009,6 +5010,7 @@ public class ShaclTools {
             String newGroupName = currentRow.get(7); // this is the group Name
             PropertyHolder properties = new PropertyHolder(constraintFilePath, newPrefix, newPrefixNS, newBaseURI, newGroupURI, newGroupName);
             constraintPropertiesMap.put(constraintName,properties);
+            boolean constraintFound = false;
 
             if (newPrefixNS.equals("skip")){ // of that column is "skip" we do not process that constraint// TODO see if we want to create another column for this or we use this one
                 continue;
@@ -5025,15 +5027,29 @@ public class ShaclTools {
 
 
             for (Object shapeModel : shapeModels) {
-                // here we go through each imported models
-                //here we need to check if the constraintName if in some of the files and take it then put it in the model that will populate constraintFilePath
+                // here we go through each imported model
+                //here we need to check if the constraintName is in some of the files and take it then put it in the model that will populate constraintFilePath
                 Model shModel = (Model) shapeModel;  // see if this works, but the idea is to get the model
-                if (shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).hasNext()) {
-                    // the sh:name is found
+
+                //find the constraints
+                //get of sh.name
+                Statement leadStmt = null;
+                for (StmtIterator i = shModel.listStatements(null, SH.name, (RDFNode) null); i.hasNext(); ) {
+                    Statement stmt = i.next();
+                    if (stmt.getObject().asLiteral().getString().contains(constraintName)) {
+                        leadStmt = stmt;
+                        // the sh:name is found
+                        constraintFound = true;
+                    }
+                }
+
+
+                //if (shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).hasNext()) {
+                if (leadStmt != null) {
                     //here we need to take the things
                     LinkedList<Statement> stmtTosave = new LinkedList<>();
 
-                    Statement leadStmt = shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).next();
+                    //Statement leadStmt = shModel.listStatements(null, SH.name, ResourceFactory.createPlainLiteral(constraintName)).next();
 
                     //this below assumes that the sh:name is in the PropertyShape, but we may need to improve as I think we may have cases where we do not have PropertyShape and we have the name in the NodeShape
                     Resource sparqlURI = ResourceFactory.createResource("https://griddigit.eu/sparql/empty");
@@ -5148,7 +5164,13 @@ public class ShaclTools {
                 }
 
             }
+            if (!constraintFound) {
+                System.out.println("This constraint was not found: " + constraintName);
+            }
+            constraintCount++;
         }
+
+        System.out.println("Total numbber of contarints in the input: " + constraintCount);
 
         //here you iterate on the splitShaclMap
         //and for each file path splitShaclMap the key, we save the model which is in the value
