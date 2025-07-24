@@ -82,7 +82,7 @@ public class ExcelExportTableView {
             sheet.createFreezePane(0, 1);
 
             // Apply auto-filters
-            String filterRange = STR."A1:\{getColumnName(tableView.getColumns().size() - 1)}\{items.size() + 1}";
+            String filterRange = "A1:" + getColumnName(tableView.getColumns().size() - 1) + (items.size() + 1);
             sheet.setAutoFilter(CellRangeAddress.valueOf(filterRange));
 
             // Save to file
@@ -127,9 +127,9 @@ public class ExcelExportTableView {
 
         // Special cases for specific column titles
         if ("Value Model A".equals(columnTitle)) {
-            return STR."\{columnTitle}: \{MainController.rdfsCompareFiles.get(0)}";
+            return columnTitle + ": " + MainController.rdfsCompareFiles.getFirst();
         } else if ("Value Model B".equals(columnTitle)) {
-            return STR."\{columnTitle}: \{MainController.rdfsCompareFiles.get(1)}";
+            return columnTitle + ": " + MainController.rdfsCompareFiles.get(1);
         }
 
         // Return title without modification for general cases

@@ -28,7 +28,7 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>${jdk.version}</release>
-                    <compilerArgs>--enable-preview</compilerArgs>
+                    <fork>true</fork>
                 </configuration>
             </plugin>
 
