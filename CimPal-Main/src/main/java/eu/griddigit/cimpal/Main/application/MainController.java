@@ -1370,8 +1370,8 @@ public class MainController implements Initializable {
         List<File> modelFiles2 = new LinkedList<>();
         modelFiles2.add(MainController.rdfModel2);
 
-        Model model1 = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false);
-        Model model2Temp = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false);
+        Model model1 = eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false);
+        Model model2Temp = eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false);
 
         Model model2 = null;
         boolean error = false;
@@ -3422,7 +3422,7 @@ public class MainController implements Initializable {
                 //load base profiles for shacl
                 List<File> basefiles = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
                 if (basefiles != null) {
-                    unionmodelbaseprofilesshacl = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
+                    unionmodelbaseprofilesshacl = eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
                     unionmodelbaseprofilesshaclinheritance = modelInheritance(unionmodelbaseprofilesshacl, true, true);
                     unionmodelbaseprofilesshaclinheritanceonly = modelInheritance; // this contains the inheritance of the classes under OWL2.members
 
@@ -3449,7 +3449,7 @@ public class MainController implements Initializable {
                         //load base profiles for shacl
                         List<File> basefiles2nd = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd set of Base profiles");
                         if (basefiles2nd != null) {
-                            unionmodelbaseprofilesshacl2nd = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(basefiles2nd, "", Lang.RDFXML, true);
+                            unionmodelbaseprofilesshacl2nd = eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(basefiles2nd, "", Lang.RDFXML, true);
                             unionmodelbaseprofilesshaclinheritance2nd = modelInheritance(unionmodelbaseprofilesshacl2nd, true, true);
                             unionmodelbaseprofilesshaclinheritanceonly2nd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
 
@@ -3475,7 +3475,7 @@ public class MainController implements Initializable {
                                 //load base profiles for shacl
                                 List<File> basefiles3rd = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd set of Base profiles");
                                 if (basefiles3rd != null) {
-                                    unionmodelbaseprofilesshacl3rd = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(basefiles3rd, "", Lang.RDFXML, true);
+                                    unionmodelbaseprofilesshacl3rd = eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(basefiles3rd, "", Lang.RDFXML, true);
                                     unionmodelbaseprofilesshaclinheritance3rd = modelInheritance(unionmodelbaseprofilesshacl3rd, true, true);
                                     unionmodelbaseprofilesshaclinheritanceonly3rd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
 

@@ -1643,7 +1643,7 @@ public class ShaclTools {
         //load base profiles for shacl
         List<File> basefiles = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
         if (basefiles != null) {
-            baseTierMap.put("unionmodelbaseprofilesshacl", eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true));
+            baseTierMap.put("unionmodelbaseprofilesshacl", eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true));
             baseTierMap.put("unionmodelbaseprofilesshaclinheritance", modelInheritance(baseTierMap.get("unionmodelbaseprofilesshacl"), true, true));
             baseTierMap.put("unionmodelbaseprofilesshaclinheritanceonly", modelInheritance); // this contains the inheritance of the classes under OWL2.members
 

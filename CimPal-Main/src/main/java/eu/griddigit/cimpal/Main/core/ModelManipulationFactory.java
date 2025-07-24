@@ -1231,7 +1231,7 @@ public class ModelManipulationFactory {
 //        }
 //    }
     public static void generateCommonData(List<File> file) throws IOException {
-        Model model = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(file, "", Lang.RDFXML, false);
+        Model model = eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(file, "", Lang.RDFXML, false);
         Map<String, String> prefixMap = model.getNsPrefixMap();
         String cimURI = prefixMap.get("cim");
         String nc = prefixMap.get("nc");

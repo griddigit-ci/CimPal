@@ -165,7 +165,7 @@ public class RdfConvert {
 
         } else {
             // load all models
-            model = eu.griddigit.cimpal.Main.util.ModelFactory.modelLoad(modelFiles, xmlBase, rdfSourceFormat, false);
+            model = eu.griddigit.cimpal.Core.utils.ModelFactory.modelLoad(modelFiles, xmlBase, rdfSourceFormat, false);
         }
 
 
