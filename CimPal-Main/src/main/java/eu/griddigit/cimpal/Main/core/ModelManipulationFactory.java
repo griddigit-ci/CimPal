@@ -6,7 +6,7 @@
 package eu.griddigit.cimpal.Main.core;
 
 import eu.griddigit.cimpal.Main.application.MainController;
-import eu.griddigit.cimpal.Main.customWriter.CustomRDFFormat;
+import eu.griddigit.cimpal.CustomWriter.formats.CustomRDFFormat;
 import eu.griddigit.cimpal.Main.interfaces.IOutputHandler;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.query.*;

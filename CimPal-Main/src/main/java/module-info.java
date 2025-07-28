@@ -47,6 +47,7 @@ module CimPal.Main {
     requires velocity.engine.core;
     requires org.apache.jena.shacl;
     requires CimPal.Core;
+    requires CimPal.CustomWriter;
 
     //requires smartgraph;
 }

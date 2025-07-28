@@ -10,7 +10,7 @@ import eu.griddigit.cimpal.Main.gui.*;
 import eu.griddigit.cimpal.Core.comparators.ComparisonRDFSprofile;
 import eu.griddigit.cimpal.Core.comparators.ComparisonRDFSprofileCIMTool;
 import eu.griddigit.cimpal.Core.comparators.ComparisonSHACLshapes;
-import eu.griddigit.cimpal.Main.customWriter.CustomRDFFormat;
+import eu.griddigit.cimpal.CustomWriter.formats.CustomRDFFormat;
 
 import java.io.InputStream;
 

@@ -1,6 +1,6 @@
-package eu.griddigit.cimpal.Main.customWriter.jena;
+package eu.griddigit.cimpal.CustomWriter.jena;
 
-import eu.griddigit.cimpal.Main.customWriter.CustomBaseXMLWriter;
+import eu.griddigit.cimpal.CustomWriter.formats.CustomBaseXMLWriter;
 import org.apache.jena.util.iterator.Map1Iterator;
 import org.apache.jena.util.iterator.WrappedIterator;
 

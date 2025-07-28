@@ -22,6 +22,7 @@
     <modules>
         <module>CimPal-Core</module>
         <module>CimPal-Main</module>
+        <module>CimPal-CustomWriter</module>
     </modules>
 
     <build>

@@ -1,7 +1,7 @@
-package eu.griddigit.cimpal.Main.customWriter.jena;
+package eu.griddigit.cimpal.CustomWriter.jena;
 
 
-import eu.griddigit.cimpal.Main.customWriter.CustomBaseXMLWriter;
+import eu.griddigit.cimpal.CustomWriter.formats.CustomBaseXMLWriter;
 
 /**
  * unmodified copy of org.apache.jena.rdfxml.xmloutput.impl.PairEntry

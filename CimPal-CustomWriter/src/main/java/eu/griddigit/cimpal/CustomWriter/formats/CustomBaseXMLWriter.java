@@ -4,9 +4,9 @@
  * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
-package eu.griddigit.cimpal.Main.customWriter;
+package eu.griddigit.cimpal.CustomWriter.formats;
 
-import eu.griddigit.cimpal.Main.customWriter.jena.CustomRelation;
+import eu.griddigit.cimpal.CustomWriter.jena.CustomRelation;
 import org.apache.jena.iri.IRI;
 import org.apache.jena.iri.IRIFactory;
 import org.apache.jena.rdf.model.*;

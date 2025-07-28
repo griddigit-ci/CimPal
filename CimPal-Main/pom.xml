@@ -187,6 +187,11 @@
             <version>${cimpal.version}</version>
         </dependency>
         <dependency>
+            <groupId>eu.griddigit.CimPal</groupId>
+            <artifactId>CimPal-CustomWriter</artifactId>
+            <version>${cimpal.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.jena</groupId>
             <artifactId>jena</artifactId>
             <version>${jena.version}</version>

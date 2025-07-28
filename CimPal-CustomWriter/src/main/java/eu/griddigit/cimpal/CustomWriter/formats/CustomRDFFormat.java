@@ -5,7 +5,7 @@
  * @author Chavdar Ivanov
  */
 
-package eu.griddigit.cimpal.Main.customWriter;
+package eu.griddigit.cimpal.CustomWriter.formats;
 
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFFormat;
