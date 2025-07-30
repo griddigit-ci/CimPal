@@ -395,6 +395,36 @@
                                  <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" text="Inherited members - only concrete classes" wrapText="true" />
                                  <CheckBox fx:id="fcbRDFConveraddowl" mnemonicParsing="false" text="Add OWL" wrapText="true" />
                               </HBox>
+                              <HBox fx:id="mainRdfBox" layoutX="10.0" layoutY="50.0" spacing="20.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <Label minWidth="90.0" text="Main RDF file:" wrapText="true" />
+                                    <TextField fx:id="fMainRdfPathTextField" editable="false" HBox.hgrow="ALWAYS" />
+                                    <Button mnemonicParsing="false" onAction="#actionBrowseMainRDF" text="Browse" />
+                                 </children>
+                              </HBox>
+                              <HBox fx:id="deviationRdfBox" layoutX="10.0" layoutY="99.0" spacing="20.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <Label minWidth="90.0" text="Deviation RDF file:" wrapText="true" />
+                                    <TextField fx:id="fDeviationRdfPathTextField" editable="false" HBox.hgrow="ALWAYS" />
+                                    <Button mnemonicParsing="false" onAction="#actionBrowseDeviationRDF" text="Browse" />
+                                 </children>
+                              </HBox>
+                              <HBox fx:id="extRdfBox" spacing="20.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                                 <children>
+                                    <Label minWidth="90.0" text="Extended RDF file:" wrapText="true" />
+                                    <TextField fx:id="fExtendedRdfPathTextField" editable="false" HBox.hgrow="ALWAYS" />
+                                    <Button mnemonicParsing="false" onAction="#actionBrowseExtendedRDF" text="Browse" />
+                                 </children>
+                              </HBox>
                               <HBox spacing="10.0">
                                  <padding>
                                     <Insets left="5.0" right="5.0" top="5.0" />

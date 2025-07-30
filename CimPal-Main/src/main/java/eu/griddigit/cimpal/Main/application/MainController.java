@@ -5,6 +5,8 @@
  */
 package eu.griddigit.cimpal.Main.application;
 
+import eu.griddigit.cimpal.Core.converters.RDFConverter;
+import eu.griddigit.cimpal.Core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.Main.core.*;
 import eu.griddigit.cimpal.Main.gui.*;
 import eu.griddigit.cimpal.Core.comparators.ComparisonRDFSprofile;
@@ -50,11 +52,10 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.*;
-import org.apache.jena.riot.Lang;
-import org.apache.jena.riot.RDFDataMgr;
-import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
+import org.apache.jena.sparql.util.Context;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -189,6 +190,18 @@ public class MainController implements Initializable {
     private TextField fPathXLSfileForShape;
     @FXML
     private TextField fsourcePathTextField;
+    @FXML
+    private TextField fMainRdfPathTextField;
+    @FXML
+    private TextField fDeviationRdfPathTextField;
+    @FXML
+    private TextField fExtendedRdfPathTextField;
+    @FXML
+    private HBox mainRdfBox;
+    @FXML
+    private HBox deviationRdfBox;
+    @FXML
+    private HBox extRdfBox;
     @FXML
     private ChoiceBox fsourceFormatChoiceBox;
     @FXML
@@ -390,7 +403,8 @@ public class MainController implements Initializable {
     private static Map<String, RDFDatatype> dataTypeMapFromShapes;
     private static int shaclNodataMap;
     public static File rdfConvertFile;
-    public static List rdfConvertFileList;
+    public static List<File> rdfConvertFileList;
+    private static List<File> rdfConvertModelUnionDetailedFiles;
 
     private static String defaultShapesURI;
     public static String rdfFormatInput;
@@ -500,6 +514,10 @@ public class MainController implements Initializable {
         } catch (BackingStoreException e) {
             e.printStackTrace();
         }
+
+        mainRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
+        deviationRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
+        extRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
 
         cbProfilesVersionCreateCompleteSMTab.getItems().addAll(
                 "IEC TS 61970-600-1&2 (CGMES 2.4.15)",
@@ -2018,6 +2036,40 @@ public class MainController implements Initializable {
     }
 
     @FXML
+    private void actionBrowseMainRDF(){
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Main RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+
+        if (file.getFirst() != null) {// the file is selected
+            fMainRdfPathTextField.setText(file.getFirst().toString());
+            MainController.rdfConvertModelUnionDetailedFiles.addAll(file);
+        } else {
+            fMainRdfPathTextField.clear();
+        }
+    }
+    @FXML
+    private void actionBrowseDeviationRDF(){
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Deviation RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+
+        if (file.getFirst() != null) {// the file is selected
+            fDeviationRdfPathTextField.setText(file.getFirst().toString());
+            MainController.rdfConvertModelUnionDetailedFiles.addAll(file);
+        } else {
+            fDeviationRdfPathTextField.clear();
+        }
+    }
+    @FXML
+    private void actionBrowseExtendedRDF(){
+        List<File> file = eu.griddigit.cimpal.Main.util.ModelFactory.fileChooserCustom(true, "Extended RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+
+        if (file.getFirst() != null) {// the file is selected
+            fExtendedRdfPathTextField.setText(file.getFirst().toString());
+            MainController.rdfConvertModelUnionDetailedFiles.addAll(file);
+        } else {
+            fExtendedRdfPathTextField.clear();
+        }
+    }
+
+    @FXML
     //Action for button "Convert" related to the RDF Convert
     private void actionBtnRunRDFConvert() throws IOException {
 
@@ -2101,9 +2153,61 @@ public class MainController implements Initializable {
         boolean addowl = fcbRDFConveraddowl.isSelected();
         boolean modelUnionFixPackage = fcbRDFconvertFixPackage.isSelected();
 
-        RdfConvert.rdfConversion(MainController.rdfConvertFile, MainController.rdfConvertFileList, sourceFormat,
-                targetFormat, xmlBase, rdfFormat, showXmlDeclaration, showDoctypeDeclaration, tab,
-                relativeURIs, modelUnionFlag, inheritanceOnly, inheritanceList, inheritanceListConcrete, addowl, modelUnionFlagDetailed, sortRDF, rdfSortOptions, stripPrefixes, convertInstanceData, modelUnionFixPackage);
+        // Create RDFConvertOptions object
+        RDFConvertOptions options = new RDFConvertOptions(
+                sourceFormat,
+                targetFormat,
+                xmlBase,
+                rdfFormat,
+                showXmlDeclaration,
+                showDoctypeDeclaration,
+                tab,
+                relativeURIs,
+                modelUnionFlag,
+                inheritanceOnly,
+                inheritanceList,
+                inheritanceListConcrete,
+                addowl,
+                modelUnionFlagDetailed,
+                sortRDF,
+                rdfSortOptions,
+                stripPrefixes,
+                convertInstanceData,
+                modelUnionFixPackage
+        );
+
+        RDFConverter rdfConverter = new RDFConverter(options);
+        // run the conversion
+        rdfConverter.convert(MainController.rdfConvertFile, MainController.rdfConvertFileList, MainController.rdfConvertModelUnionDetailedFiles);
+
+        // select the output file
+        String filename = "";
+        if (!modelUnionFlag && MainController.rdfConvertFile != null) {
+            filename = MainController.rdfConvertFile.getName().split("\\.", 2)[0];
+        } else {
+            filename = "MultipleModels";
+        }
+        OutputStream out = null;
+        switch (targetFormat) {
+            case "RDF XML (.rdf or .xml)" -> {
+                out = fileSaveDialog("Save RDF XML for: " + filename, "RDF XML", "*.rdf");
+            }
+            case "RDF Turtle (.ttl)" -> {
+                out = fileSaveDialog("Save RDF Turtle for: " + filename, "RDF Turtle", "*.ttl");
+            }
+            case "JSON-LD (.jsonld)" -> {
+                out = fileSaveDialog("Save JSON-LD for: " + filename, "JSON-LD", "*.jsonld");
+            }
+        }
+        // write the converted model to the output file
+        rdfConverter.writeConvertedModel(out);
+
+        // write the inheritance list if required
+        if(options.isInheritanceList()) {
+            OutputStream outInheritance = fileSaveDialog("Save inheritance for: " + filename + "Inheritance", "RDF Turtle", "*.ttl");;
+
+            rdfConverter.writeInheritanceModel(outInheritance);
+        }
 
         progressBar.setProgress(1);
     }
@@ -2123,7 +2227,32 @@ public class MainController implements Initializable {
         fcbRDFConverInheritanceList.setDisable(true);
         fcbRDFConverInheritanceListConcrete.setSelected(false);
         fcbRDFConverInheritanceListConcrete.setDisable(true);
-
+        fcbRDFconvertModelUnionDetailed.setSelected(false);
+        fcbRDFconvertFixPackage.setSelected(false);
+        fcbRDFconvertInstanceData.setSelected(false);
+        fcbRDFformat.getSelectionModel().clearSelection();
+        fcbShowXMLDeclaration.setSelected(true);
+        fcbShowXMLDeclaration.setDisable(true);
+        fcbShowDoctypeDeclaration.setSelected(false);
+        fcbShowDoctypeDeclaration.setDisable(true);
+        fRDFconvertTab.setText("2");
+        fRDFconvertTab.setDisable(true);
+        fcbRelativeURIs.getSelectionModel().clearSelection();
+        fcbRelativeURIs.setDisable(true);
+        fcbRDFformat.getSelectionModel().clearSelection();
+        fcbRDFformat.setDisable(true);
+        fcbSortRDF.setSelected(false);
+        fcbSortRDF.setDisable(true);
+        fcbRDFsortOptions.getSelectionModel().clearSelection();
+        fcbRDFsortOptions.setDisable(true);
+        fcbStripPrefixes.setSelected(false);
+        fcbStripPrefixes.setDisable(true);
+        fMainRdfPathTextField.clear();
+        fDeviationRdfPathTextField.clear();
+        fExtendedRdfPathTextField.clear();
+        MainController.rdfConvertModelUnionDetailedFiles.clear();
+        MainController.rdfConvertFile = null;
+        MainController.rdfConvertFileList.clear();
     }
 
     @FXML
