@@ -4,13 +4,13 @@
  * @author Chavdar Ivanov
  */
 module CimPal.Main {
-    exports eu.griddigit.cimpal.Main.application;
-    exports eu.griddigit.cimpal.Main.model;
-    exports eu.griddigit.cimpal.Main.interfaces;
-    opens eu.griddigit.cimpal.Main.application;
-    opens eu.griddigit.cimpal.Main.preload;
-    opens eu.griddigit.cimpal.Main.gui;
-    opens eu.griddigit.cimpal.Main.core;
+    exports eu.griddigit.cimpal.main.application;
+    exports eu.griddigit.cimpal.main.model;
+    exports eu.griddigit.cimpal.main.interfaces;
+    opens eu.griddigit.cimpal.main.application;
+    opens eu.griddigit.cimpal.main.preload;
+    opens eu.griddigit.cimpal.main.gui;
+    opens eu.griddigit.cimpal.main.core;
 
 
     requires javafx.base;

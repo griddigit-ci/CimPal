@@ -13,7 +13,7 @@
 <?import javafx.scene.shape.*?>
 <?import javafx.scene.text.*?>
 
-<VBox xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.Main.application.AboutController">
+<VBox xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.AboutController">
    <HBox alignment="TOP_CENTER" prefHeight="100.0" prefWidth="200.0" VBox.vgrow="ALWAYS">
       <AnchorPane fx:id="faPane" prefHeight="507.0" prefWidth="800.0" HBox.hgrow="ALWAYS">
          <HBox.margin>

@@ -40,7 +40,7 @@
                     <shadedArtifactAttached>false</shadedArtifactAttached>
                     <transformers>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                            <mainClass>eu.griddigit.cimpal.Main.application.CimPal</mainClass>
+                            <mainClass>eu.griddigit.cimpal.main.application.CimPal</mainClass>
                             <manifestEntries>
                                 <Multi-Release>true</Multi-Release>
                             </manifestEntries>
