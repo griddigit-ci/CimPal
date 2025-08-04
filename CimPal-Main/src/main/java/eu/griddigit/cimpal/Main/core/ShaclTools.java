@@ -680,6 +680,7 @@ public class ShaclTools {
 
                         if (rdfsToShaclGuiMapBool.get("Closedshapes") && !localInheritProperties.isEmpty()) {
 
+
                             //exclude inverse associations
                             List<Statement> localInheritPropertiesNoInverse = new LinkedList<>();
                             for (Statement stmtP : localInheritProperties) {
@@ -959,7 +960,7 @@ public class ShaclTools {
             int propertyGroupOrder=0;
             for (ResIterator i = model.listResourcesWithProperty(RDF.type,RDFS.Class); i.hasNext(); ) {
                 Resource resItem = i.next();
-//                if (resItem.getLocalName().contains("DiagramObjectPoint")){
+//                if (resItem.getLocalName().contains("Terminal")){
 //                    int k =1;
 //                }
                 if (classIsNotEnumOrDatatype(resItem, model)) {
@@ -1023,7 +1024,7 @@ public class ShaclTools {
                                 //RDFNode o = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
                                 Resource nodeShapeResourceClassProp = shapeModel.getResource(nsURIprofile + resItem.getLocalName() + "-AllowedProperties");
 
-                                for (Statement stmtP : localInheritProperties) {
+                                for (Statement stmtP : localInheritPropertiesNoInverse) {
                                     Resource resbn = ResourceFactory.createResource();
                                     Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
                                     nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
@@ -5036,7 +5037,7 @@ public class ShaclTools {
                 Statement leadStmt = null;
                 for (StmtIterator i = shModel.listStatements(null, SH.name, (RDFNode) null); i.hasNext(); ) {
                     Statement stmt = i.next();
-                    if (stmt.getObject().asLiteral().getString().contains(constraintName)) {
+                    if (stmt.getObject().asLiteral().getString().equals(constraintName) || (stmt.getObject().asLiteral().getString().contains(constraintName) && stmt.getObject().asLiteral().getString().contains("|"))) {
                         leadStmt = stmt;
                         // the sh:name is found
                         constraintFound = true;
