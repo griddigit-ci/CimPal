@@ -25,8 +25,11 @@ public class RDFConverter {
     }
 
     //RDF conversion
-    public void convert(File file, List<File> modelUnionFiles, List<File> modelUnionDetailedFiles) throws IOException {
+    public void convert() throws IOException {
 
+        File sourceFile = options.getSourceFile();
+        List<File> modelUnionFiles = options.getModelUnionFiles();
+        List<File> modelUnionDetailedFiles = options.getModelUnionDetailedFiles();
         String sourceFormat = options.getSourceFormat();
         String xmlBase = options.getXmlBase();
         boolean modelUnionFlag = options.isModelUnionFlag();
@@ -46,8 +49,8 @@ public class RDFConverter {
         };
         List<File> modelFiles = new LinkedList<File>();
         if (!modelUnionFlagDetailed) {
-            if (!modelUnionFlag && file != null) {
-                modelFiles.add(file);
+            if (!modelUnionFlag && sourceFile != null) {
+                modelFiles.add(sourceFile);
             } else {
                 modelFiles = modelUnionFiles;
             }

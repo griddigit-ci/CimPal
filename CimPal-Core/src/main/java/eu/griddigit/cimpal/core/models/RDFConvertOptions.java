@@ -2,202 +2,240 @@ package eu.griddigit.cimpal.core.models;
 
 import org.apache.jena.riot.RDFFormat;
 
+import java.io.File;
+import java.util.List;
+
 public class RDFConvertOptions {
-    private String sourceFormat;
-    private String targetFormat;
-    private String xmlBase;
-    private RDFFormat rdfFormat;
-    private String showXmlDeclaration;
-    private String showDoctypeDeclaration;
-    private String tabCharacter;
-    private String relativeURIs;
-    private boolean modelUnionFlag;
-    private boolean inheritanceOnly;
-    private boolean inheritanceList;
-    private boolean isInheritanceListConcrete;
-    private boolean addOwl;
-    private boolean modelUnionFlagDetailed;
-    private String sortRDF;
-    private String rdfSortOptions;
-    private boolean stripPrefixes;
-    private String convertInstanceData;
-    private boolean modelUnionFixPackage;
+    // ------------- all fields are now final -------------
+    private final File sourceFile;
+    private final List<File> modelUnionFiles;
+    private final List<File> modelUnionDetailedFiles;
+    private final String sourceFormat;
+    private final String targetFormat;
+    private final String xmlBase;
+    private final RDFFormat rdfFormat;
+    private final String showXmlDeclaration;
+    private final String showDoctypeDeclaration;
+    private final String tabCharacter;
+    private final String relativeURIs;
+    private final boolean modelUnionFlag;
+    private final boolean inheritanceOnly;
+    private final boolean inheritanceList;
+    private final boolean isInheritanceListConcrete;
+    private final boolean addOwl;
+    private final boolean modelUnionFlagDetailed;
+    private final String sortRDF;
+    private final String rdfSortOptions;
+    private final boolean stripPrefixes;
+    private final String convertInstanceData;
+    private final boolean modelUnionFixPackage;
 
-    public RDFConvertOptions(String sourceFormat, String targetFormat, String xmlBase, RDFFormat rdfFormat,
-                             String showXmlDeclaration, String showDoctypeDeclaration, String tabCharacter,
-                             String relativeURIs, boolean modelUnionFlag, boolean inheritanceOnly, boolean inheritanceList,
-                             boolean isInheritanceListConcrete, boolean addOwl, boolean modelUnionFlagDetailed, String sortRDF,
-                             String rdfSortOptions, boolean stripPrefixes, String convertInstanceData, boolean modelUnionFixPackage) {
-        this.sourceFormat = sourceFormat;
-        this.targetFormat = targetFormat;
-        this.xmlBase = xmlBase;
-        this.rdfFormat = rdfFormat;
-        this.showXmlDeclaration = showXmlDeclaration;
-        this.showDoctypeDeclaration = showDoctypeDeclaration;
-        this.tabCharacter = tabCharacter;
-        this.relativeURIs = relativeURIs;
-        this.modelUnionFlag = modelUnionFlag;
-        this.inheritanceOnly = inheritanceOnly;
-        this.inheritanceList = inheritanceList;
-        this.isInheritanceListConcrete = isInheritanceListConcrete;
-        this.addOwl = addOwl;
-        this.modelUnionFlagDetailed = modelUnionFlagDetailed;
-        this.sortRDF = sortRDF;
-        this.rdfSortOptions = rdfSortOptions;
-        this.stripPrefixes = stripPrefixes;
-        this.convertInstanceData = convertInstanceData;
-        this.modelUnionFixPackage = modelUnionFixPackage;
+    // private constructor takes the Builder
+    private RDFConvertOptions(Builder b) {
+        this.sourceFile                  = b.sourceFile;
+        this.modelUnionFiles             = b.modelUnionFiles;
+        this.modelUnionDetailedFiles     = b.modelUnionDetailedFiles;
+        this.sourceFormat               = b.sourceFormat;
+        this.targetFormat               = b.targetFormat;
+        this.xmlBase                    = b.xmlBase;
+        this.rdfFormat                  = b.rdfFormat;
+        this.showXmlDeclaration         = b.showXmlDeclaration;
+        this.showDoctypeDeclaration     = b.showDoctypeDeclaration;
+        this.tabCharacter               = b.tabCharacter;
+        this.relativeURIs               = b.relativeURIs;
+        this.modelUnionFlag             = b.modelUnionFlag;
+        this.inheritanceOnly            = b.inheritanceOnly;
+        this.inheritanceList            = b.inheritanceList;
+        this.isInheritanceListConcrete  = b.isInheritanceListConcrete;
+        this.addOwl                     = b.addOwl;
+        this.modelUnionFlagDetailed     = b.modelUnionFlagDetailed;
+        this.sortRDF                    = b.sortRDF;
+        this.rdfSortOptions             = b.rdfSortOptions;
+        this.stripPrefixes              = b.stripPrefixes;
+        this.convertInstanceData        = b.convertInstanceData;
+        this.modelUnionFixPackage       = b.modelUnionFixPackage;
     }
 
-    public String getSourceFormat() {
-        return sourceFormat;
+    // static entry-point for the builder
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public void setSourceFormat(String sourceFormat) {
-        this.sourceFormat = sourceFormat;
-    }
+    public File getSourceFile()                { return sourceFile; }
+    public List<File> getModelUnionFiles()     { return modelUnionFiles; }
+    public List<File> getModelUnionDetailedFiles() { return modelUnionDetailedFiles; }
+    public String getSourceFormat()               { return sourceFormat; }
+    public String getTargetFormat()               { return targetFormat; }
+    public String getXmlBase()                    { return xmlBase; }
+    public RDFFormat getRdfFormat()               { return rdfFormat; }
+    public String getShowXmlDeclaration()         { return showXmlDeclaration; }
+    public String getShowDoctypeDeclaration()     { return showDoctypeDeclaration; }
+    public String getTabCharacter()               { return tabCharacter; }
+    public String getRelativeURIs()               { return relativeURIs; }
+    public boolean isModelUnionFlag()             { return modelUnionFlag; }
+    public boolean isInheritanceOnly()            { return inheritanceOnly; }
+    public boolean isInheritanceList()            { return inheritanceList; }
+    public boolean isInheritanceListConcrete()    { return isInheritanceListConcrete; }
+    public boolean isAddOwl()                     { return addOwl; }
+    public boolean isModelUnionFlagDetailed()     { return modelUnionFlagDetailed; }
+    public String getSortRDF()                    { return sortRDF; }
+    public String getRdfSortOptions()             { return rdfSortOptions; }
+    public boolean isStripPrefixes()              { return stripPrefixes; }
+    public String getConvertInstanceData()        { return convertInstanceData; }
+    public boolean isModelUnionFixPackage()       { return modelUnionFixPackage; }
 
-    public String getTargetFormat() {
-        return targetFormat;
-    }
 
-    public void setTargetFormat(String targetFormat) {
-        this.targetFormat = targetFormat;
-    }
+    // ============ the Builder ============
 
-    public String getXmlBase() {
-        return xmlBase;
-    }
+    public static class Builder {
+        // same fields, but non-final, with defaults
+        private File sourceFile = null;
+        private List<File> modelUnionFiles = null;
+        private List<File> modelUnionDetailedFiles = null;
+        private String sourceFormat = null;
+        private String targetFormat = null;
+        private String xmlBase            = null;
+        private RDFFormat rdfFormat       = null;
+        private String showXmlDeclaration = null;
+        private String showDoctypeDeclaration = null;
+        private String tabCharacter       = null;
+        private String relativeURIs       = null;
+        private boolean modelUnionFlag            = false;
+        private boolean inheritanceOnly           = false;
+        private boolean inheritanceList           = false;
+        private boolean isInheritanceListConcrete = false;
+        private boolean addOwl                    = false;
+        private boolean modelUnionFlagDetailed    = false;
+        private String sortRDF               = null;
+        private String rdfSortOptions        = null;
+        private boolean stripPrefixes             = false;
+        private String convertInstanceData  = null;
+        private boolean modelUnionFixPackage = false;
 
-    public void setXmlBase(String xmlBase) {
-        this.xmlBase = xmlBase;
-    }
+        public Builder sourceFile(File sourceFile) {
+            this.sourceFile = sourceFile;
+            return this;
+        }
 
-    public RDFFormat getRdfFormat() {
-        return rdfFormat;
-    }
+        public Builder modelUnionFiles(List<File> modelUnionFiles) {
+            this.modelUnionFiles = modelUnionFiles;
+            return this;
+        }
 
-    public void setRdfFormat(RDFFormat rdfFormat) {
-        this.rdfFormat = rdfFormat;
-    }
+        public Builder modelUnionDetailedFiles(List<File> modelUnionDetailedFiles) {
+            this.modelUnionDetailedFiles = modelUnionDetailedFiles;
+            return this;
+        }
 
-    public String getShowXmlDeclaration() {
-        return showXmlDeclaration;
-    }
+        public Builder sourceFormat(String sourceFormat) {
+            this.sourceFormat = sourceFormat;
+            return this;
+        }
 
-    public void setShowXmlDeclaration(String showXmlDeclaration) {
-        this.showXmlDeclaration = showXmlDeclaration;
-    }
+        public Builder targetFormat(String targetFormat) {
+            this.targetFormat = targetFormat;
+            return this;
+        }
 
-    public String getShowDoctypeDeclaration() {
-        return showDoctypeDeclaration;
-    }
+        // the rest are optional
+        public Builder xmlBase(String xmlBase) {
+            this.xmlBase = xmlBase;
+            return this;
+        }
+        public Builder rdfFormat(RDFFormat rdfFormat) {
+            this.rdfFormat = rdfFormat;
+            return this;
+        }
+        public Builder showXmlDeclaration(String flag) {
+            this.showXmlDeclaration = flag;
+            return this;
+        }
+        public Builder showDoctypeDeclaration(String flag) {
+            this.showDoctypeDeclaration = flag;
+            return this;
+        }
+        public Builder tabCharacter(String tabCharacter) {
+            this.tabCharacter = tabCharacter;
+            return this;
+        }
+        public Builder relativeURIs(String relativeURIs) {
+            this.relativeURIs = relativeURIs;
+            return this;
+        }
+        public Builder modelUnionFlag(boolean on) {
+            this.modelUnionFlag = on;
+            return this;
+        }
+        public Builder inheritanceOnly(boolean on) {
+            this.inheritanceOnly = on;
+            return this;
+        }
+        public Builder inheritanceList(boolean on) {
+            this.inheritanceList = on;
+            return this;
+        }
+        public Builder inheritanceListConcrete(boolean on) {
+            this.isInheritanceListConcrete = on;
+            return this;
+        }
+        public Builder addOwl(boolean on) {
+            this.addOwl = on;
+            return this;
+        }
+        public Builder modelUnionFlagDetailed(boolean on) {
+            this.modelUnionFlagDetailed = on;
+            return this;
+        }
+        public Builder sortRDF(String sortRDF) {
+            this.sortRDF = sortRDF;
+            return this;
+        }
+        public Builder rdfSortOptions(String opts) {
+            this.rdfSortOptions = opts;
+            return this;
+        }
+        public Builder stripPrefixes(boolean on) {
+            this.stripPrefixes = on;
+            return this;
+        }
+        public Builder convertInstanceData(String dataOpt) {
+            this.convertInstanceData = dataOpt;
+            return this;
+        }
+        public Builder modelUnionFixPackage(boolean on) {
+            this.modelUnionFixPackage = on;
+            return this;
+        }
 
-    public void setShowDoctypeDeclaration(String showDoctypeDeclaration) {
-        this.showDoctypeDeclaration = showDoctypeDeclaration;
-    }
+        /** Builds the immutable RDFConvertOptions, validating required fields */
+        public RDFConvertOptions build() {
+            if (sourceFormat == null) {
+                throw new IllegalStateException("sourceFormat must not be null");
+            }
+            if (sourceFile == null && !modelUnionFlag) {
+                throw new IllegalStateException("sourceFile must not be null");
+            }
+            if (xmlBase == null) {
+                throw new IllegalStateException("xmlBase must not be null");
+            }
+            if (targetFormat == null) {
+                throw new IllegalStateException("targetFormat must not be null");
+            }
+            if (modelUnionFlagDetailed) {
+                if (modelUnionDetailedFiles == null || modelUnionDetailedFiles.isEmpty()) {
+                    throw new IllegalStateException("modelUnionDetailedFiles must not be null or empty when modelUnionFlagDetailed is true");
+                }
+                if (modelUnionFlag){
+                    if (modelUnionFiles == null || modelUnionFiles.isEmpty()) {
+                        throw new IllegalStateException("modelUnionFiles must not be null or empty when modelUnionFlag is true");
+                    }
+                }
+            }
 
-    public String getTabCharacter() {
-        return tabCharacter;
-    }
+            // settings for saving RDF
 
-    public void setTabCharacter(String tabCharacter) {
-        this.tabCharacter = tabCharacter;
-    }
-
-    public String getRelativeURIs() {
-        return relativeURIs;
-    }
-
-    public void setRelativeURIs(String relativeURIs) {
-        this.relativeURIs = relativeURIs;
-    }
-
-    public boolean isModelUnionFlag() {
-        return modelUnionFlag;
-    }
-
-    public void setModelUnionFlag(boolean modelUnionFlag) {
-        this.modelUnionFlag = modelUnionFlag;
-    }
-
-    public boolean isInheritanceOnly() {
-        return inheritanceOnly;
-    }
-
-    public void setInheritanceOnly(boolean inheritanceOnly) {
-        this.inheritanceOnly = inheritanceOnly;
-    }
-
-    public boolean isInheritanceList() {
-        return inheritanceList;
-    }
-
-    public void setInheritanceList(boolean inheritanceList) {
-        this.inheritanceList = inheritanceList;
-    }
-
-    public boolean isInheritanceListConcrete() {
-        return isInheritanceListConcrete;
-    }
-
-    public void setInheritanceListConcrete(boolean inheritanceListConcrete) {
-        isInheritanceListConcrete = inheritanceListConcrete;
-    }
-
-    public boolean isAddOwl() {
-        return addOwl;
-    }
-
-    public void setAddOwl(boolean addOwl) {
-        this.addOwl = addOwl;
-    }
-
-    public boolean isModelUnionFlagDetailed() {
-        return modelUnionFlagDetailed;
-    }
-
-    public void setModelUnionFlagDetailed(boolean modelUnionFlagDetailed) {
-        this.modelUnionFlagDetailed = modelUnionFlagDetailed;
-    }
-
-    public String getSortRDF() {
-        return sortRDF;
-    }
-
-    public void setSortRDF(String sortRDF) {
-        this.sortRDF = sortRDF;
-    }
-
-    public String getRdfSortOptions() {
-        return rdfSortOptions;
-    }
-
-    public void setRdfSortOptions(String rdfSortOptions) {
-        this.rdfSortOptions = rdfSortOptions;
-    }
-
-    public boolean isStripPrefixes() {
-        return stripPrefixes;
-    }
-
-    public void setStripPrefixes(boolean stripPrefixes) {
-        this.stripPrefixes = stripPrefixes;
-    }
-
-    public String getConvertInstanceData() {
-        return convertInstanceData;
-    }
-
-    public void setConvertInstanceData(String convertInstanceData) {
-        this.convertInstanceData = convertInstanceData;
-    }
-
-    public boolean isModelUnionFixPackage() {
-        return modelUnionFixPackage;
-    }
-
-    public void setModelUnionFixPackage(boolean modelUnionFixPackage) {
-        this.modelUnionFixPackage = modelUnionFixPackage;
+            return new RDFConvertOptions(this);
+        }
     }
 }
+

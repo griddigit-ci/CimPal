@@ -2153,31 +2153,35 @@ public class MainController implements Initializable {
         boolean modelUnionFixPackage = fcbRDFconvertFixPackage.isSelected();
 
         // Create RDFConvertOptions object
-        RDFConvertOptions options = new RDFConvertOptions(
-                sourceFormat,
-                targetFormat,
-                xmlBase,
-                rdfFormat,
-                showXmlDeclaration,
-                showDoctypeDeclaration,
-                tab,
-                relativeURIs,
-                modelUnionFlag,
-                inheritanceOnly,
-                inheritanceList,
-                inheritanceListConcrete,
-                addowl,
-                modelUnionFlagDetailed,
-                sortRDF,
-                rdfSortOptions,
-                stripPrefixes,
-                convertInstanceData,
-                modelUnionFixPackage
-        );
+        RDFConvertOptions.Builder builder = RDFConvertOptions.builder()
+                .sourceFile(MainController.rdfConvertFile)
+                .modelUnionFiles(MainController.rdfConvertFileList)
+                .modelUnionDetailedFiles(MainController.rdfConvertModelUnionDetailedFiles)
+                .sourceFormat(sourceFormat)
+                .targetFormat(targetFormat)
+                .xmlBase(xmlBase)
+                .rdfFormat(rdfFormat)
+                .showXmlDeclaration(showXmlDeclaration)
+                .showDoctypeDeclaration(showDoctypeDeclaration)
+                .tabCharacter(tab)
+                .relativeURIs(relativeURIs)
+                .modelUnionFlag(modelUnionFlag)
+                .inheritanceOnly(inheritanceOnly)
+                .inheritanceList(inheritanceList)
+                .inheritanceListConcrete(inheritanceListConcrete)
+                .addOwl(addowl)
+                .modelUnionFlagDetailed(modelUnionFlagDetailed)
+                .sortRDF(sortRDF)
+                .rdfSortOptions(rdfSortOptions)
+                .stripPrefixes(stripPrefixes)
+                .convertInstanceData(convertInstanceData)
+                .modelUnionFixPackage(modelUnionFixPackage);
+
+        RDFConvertOptions options = builder.build();
 
         RDFConverter rdfConverter = new RDFConverter(options);
         // run the conversion
-        rdfConverter.convert(MainController.rdfConvertFile, MainController.rdfConvertFileList, MainController.rdfConvertModelUnionDetailedFiles);
+        rdfConverter.convert();
 
         // select the output file
         String filename = "";
