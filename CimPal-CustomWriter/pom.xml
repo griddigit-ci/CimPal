@@ -9,14 +9,13 @@
         <version>2025.9.7.1</version>
     </parent>
 
-    <artifactId>CimPal-Core</artifactId>
+    <artifactId>CimPal-CustomWriter</artifactId>
     <packaging>jar</packaging>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jena.version>5.4.0</jena.version>
     </properties>
 
     <build>
@@ -34,11 +33,6 @@
     </build>
 
     <dependencies>
-        <dependency>
-            <groupId>eu.griddigit.CimPal</groupId>
-            <artifactId>CimPal-CustomWriter</artifactId>
-            <version>${cimpal.version}</version>
-        </dependency>
         <dependency>
             <groupId>org.apache.jena</groupId>
             <artifactId>jena</artifactId>
@@ -70,5 +64,11 @@
             <artifactId>jena-core</artifactId>
             <version>${jena.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.16</version>
+        </dependency>
     </dependencies>
+
 </project>
