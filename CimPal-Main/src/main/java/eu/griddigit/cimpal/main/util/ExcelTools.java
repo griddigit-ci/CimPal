@@ -29,7 +29,52 @@ public class ExcelTools {
             FileInputStream fis = new FileInputStream(excel);
             XSSFWorkbook book = new XSSFWorkbook(fis);
             XSSFSheet sheet = book.getSheetAt(sheetNum);
-            // Iterating over Excel file in Java
+
+            if (sheet == null) {
+                System.out.println("Sheet No." + sheetNum+1 + " does not exist in the workbook.");
+                return dataExcel;
+            }
+
+            for (Row cells : sheet) {
+                LinkedList<Object> rowItem = new LinkedList<>();
+                Row currentRow = cells;
+
+                for (Cell currentCell : currentRow) {
+
+                    //getCellTypeEnum shown as deprecated for version 3.15
+                    //getCellTypeEnum ill be renamed to getCellType starting from version 4.0
+                    if (currentCell.getCellType() == CellType.STRING) {
+                        //System.out.print(currentCell.getStringCellValue() + "--");
+                        rowItem.add(currentCell.getStringCellValue());
+                    } else if (currentCell.getCellType() == CellType.NUMERIC) {
+                        //System.out.print(currentCell.getNumericCellValue() + "--");
+                        rowItem.add(currentCell.getNumericCellValue());
+                    }
+
+                }
+                dataExcel.add(rowItem);
+                //System.out.println();
+
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return dataExcel;
+    }
+
+    public static ArrayList<Object> importXLSX(String fileName, String sheetName) {
+        ArrayList<Object> dataExcel = new ArrayList<>();
+        try {
+            File excel = new File(fileName);
+            FileInputStream fis = new FileInputStream(excel);
+            XSSFWorkbook book = new XSSFWorkbook(fis);
+            XSSFSheet sheet = book.getSheet(sheetName);
+
+            if (sheet == null) {
+                System.err.println("Sheet with name '" + sheetName + "' not found in the workbook.");
+                return dataExcel; // Return empty list if sheet not found
+            }
 
             for (Row cells : sheet) {
                 LinkedList<Object> rowItem = new LinkedList<>();
