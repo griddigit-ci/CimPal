@@ -967,8 +967,9 @@ public class ShaclTools {
                     //check if the class is concrete
                     boolean classDescripStereo = classIsDescription(resItem, model);
                     boolean isConcreteInBase = isClassConcreteInBase(resItem, rdfsToShaclGuiMapBool, baseTier1Map, baseTier2Map, baseTier3Map);
+                    boolean existsInBase = existsInBase(resItem, rdfsToShaclGuiMapBool, baseTier1Map, baseTier2Map, baseTier3Map);
                     boolean isConcrete = classIsConcrete(resItem, model);
-                    if (isConcrete && isConcreteInBase) {
+                    if ((isConcrete && isConcreteInBase && existsInBase) || (isConcrete && !existsInBase)) {
                         //add the NodeShape
                         String localName = resItem.getLocalName();
                         String classFullURI = resItem.getURI();
@@ -4718,6 +4719,32 @@ public class ShaclTools {
 
 
         return isConcreteInBase;
+    }
+
+    public static Boolean existsInBase(Resource resItem, Map<String,Boolean> rdfsToShaclGuiMapBool, Map<String,Model> baseTier1Map, Map<String,Model> baseTier2Map, Map<String,Model> baseTier3Map) {
+
+        boolean exixtsInBase = false;
+
+        //if (rdfsToShaclGuiMapBool.get("baseprofilesshaclglag")) {
+        if (baseTier1Map.get("unionmodelbaseprofilesshacl").listStatements(resItem,RDF.type,RDFS.Class).hasNext()) {
+            exixtsInBase = true;
+        }
+        //}
+
+        if (rdfsToShaclGuiMapBool.get("baseprofilesshaclglag2nd")) {
+            if (baseTier2Map.get("unionmodelbaseprofilesshacl").listStatements(resItem,RDF.type,RDFS.Class).hasNext()) {
+                exixtsInBase = true;
+            }
+        }
+
+        if (rdfsToShaclGuiMapBool.get("baseprofilesshaclglag3rd")) {
+            if (baseTier3Map.get("unionmodelbaseprofilesshacl").listStatements(resItem,RDF.type,RDFS.Class).hasNext()) {
+                exixtsInBase = true;
+            }
+        }
+
+
+        return exixtsInBase;
     }
 
     public static LinkedList<Resource> getConcreteSubclassesFromBase(Resource resItem, Map<String,Boolean> rdfsToShaclGuiMapBool, Map<String,Model> baseTier1Map, Map<String,Model> baseTier2Map, Map<String,Model> baseTier3Map){
