@@ -4973,11 +4973,11 @@ public class MainController implements Initializable {
         groupFeatures.set(3, 0);
 
         shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
-
+        boolean has = false;
         for (int row = 1; row < dataExcel.size(); row++) { //loop on the rows in the xlsx
             //String localName = ((LinkedList) dataExcel.get(row)).get(6).toString();// here map to "NodeShape" column
-            String attributeName = ((LinkedList<?>) dataExcel.get(row)).get(8).toString(); //here map to "path" column
-            String attributeNameNoNamespace = attributeName.split("#", 2)[1];
+            String attributeName = ((LinkedList<?>) dataExcel.get(row)).get(8).toString().trim(); //here map to "path" column
+            String attributeNameNoNamespace = attributeName.split("#", 2)[1].trim();
             for (int classRDF = 0; classRDF < ((ArrayList<?>) shapeData.getFirst()).size(); classRDF++) { // this loops the concrete classes in the RDFS
                 for (int attr = 1; attr < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(classRDF)).size(); attr++) { //this loops the attributes of a concrete class including the inherited
                     if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(classRDF)).get(attr)).getFirst().equals("Attribute")) { //this is when the property is an attribute
@@ -4986,7 +4986,7 @@ public class MainController implements Initializable {
 
 
                         if (attributeNameNoNamespace.equals(attributeNameRDFS)) {
-
+                            has = true;
                             Resource propertyShapeResource = ResourceFactory.createResource(nsURIprofile + ((LinkedList<?>) dataExcel.get(row)).get(7).toString());
                             if (!shapeModel.containsResource(propertyShapeResource)) { // creates only if it is missing
 
@@ -5120,6 +5120,9 @@ public class MainController implements Initializable {
                     }
                 }
             }
+            if (!has)
+                foutputWindow.appendText("Warning: the attribute " + attributeName + " is not found in the RDFS model and therefore it is skipped.\n");
+            has = false;
         }
 
         //open the ChoiceDialog for the save file and save the file in different formats
