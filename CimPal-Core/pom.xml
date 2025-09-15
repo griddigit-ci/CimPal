@@ -70,5 +70,20 @@
             <artifactId>jena-core</artifactId>
             <version>${jena.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.topbraid</groupId>
+            <artifactId>shacl</artifactId>
+            <version>1.4.4</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>jena-arq</artifactId>
+                    <groupId>org.apache.jena</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>slf4j-api</artifactId>
+                    <groupId>org.slf4j</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 </project>

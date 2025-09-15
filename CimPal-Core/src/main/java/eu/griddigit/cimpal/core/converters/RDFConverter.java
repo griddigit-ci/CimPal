@@ -87,7 +87,7 @@ public class RDFConverter {
                     List<Statement> stdelete = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                     stmtToDeleteClass.addAll(stdelete);
                     //check if the class is an enumeration
-                    if (model.listStatements(stmt.getSubject(),ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype"),ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()) {
+                    if (model.listStatements(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype"), ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()) {
                         for (Statement stmpProp : stdelete) {
                             List<Statement> stdeleteProp = model.listStatements(null, RDF.type, stmpProp.getSubject()).toList();
                             stmtToDeleteClass.addAll(stdeleteProp);
@@ -96,7 +96,7 @@ public class RDFConverter {
                                 stmtToDeleteClass.addAll(stdeletePropEn);
                             }
                         }
-                    }else {
+                    } else {
                         //delete all attributes and associations with domain of the deleted classes
                         for (Statement stmpProp : stdelete) {
                             List<Statement> stdeleteProp = model.listStatements(null, RDFS.domain, stmpProp.getSubject()).toList();
@@ -160,7 +160,12 @@ public class RDFConverter {
 
         //in case only inheritance related structure should be converted
         if (inheritanceOnly) {
-            model = modelInheritance(model, inheritanceList, inheritanceListConcrete);
+            var res =
+                    eu.griddigit.cimpal.core.utils.ModelFactory.generateInheritanceModels(model,
+                            inheritanceList,
+                            inheritanceListConcrete);
+            model = res.processedModel;
+            modelInheritance = res.inheritanceModel;
         }
 
         List<Statement> stmttoadd = new LinkedList<>();
@@ -199,7 +204,7 @@ public class RDFConverter {
 
         if (modelUnionFlagDetailed) {
             //ensure one ontology class
-            if (modelUnionDetailedFiles.size() >=2) {
+            if (modelUnionDetailedFiles.size() >= 2) {
                 List<Statement> stmtToDeleteOntology = new LinkedList<>();
                 int maxstmt = 0;
                 Resource maxstmpst = null;
@@ -285,19 +290,19 @@ public class RDFConverter {
             model.remove(stmtToDeleteOldPackage);
 
             //add the new package
-            Resource packageRes = ResourceFactory.createResource(packageURI+"Package_"+packageName+"Profile");
+            Resource packageRes = ResourceFactory.createResource(packageURI + "Package_" + packageName + "Profile");
             model.add(ResourceFactory.createStatement(packageRes, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory")));
-            model.add(ResourceFactory.createStatement(packageRes,RDFS.comment,ResourceFactory.createPlainLiteral("This is a package for the "+packageName+" profile.")));
-            model.add(ResourceFactory.createStatement(packageRes,RDFS.label,ResourceFactory.createLangLiteral(packageName+"Profile","en")));
+            model.add(ResourceFactory.createStatement(packageRes, RDFS.comment, ResourceFactory.createPlainLiteral("This is a package for the " + packageName + " profile.")));
+            model.add(ResourceFactory.createStatement(packageRes, RDFS.label, ResourceFactory.createLangLiteral(packageName + "Profile", "en")));
 
             //replace cims:belongsToCategory
             List<Statement> stmtToAddPackage = new LinkedList<>();
             List<Statement> stmtToDeletePackage = new LinkedList<>();
-            Property belongsToCategory = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","belongsToCategory");
+            Property belongsToCategory = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "belongsToCategory");
             for (StmtIterator i = model.listStatements(null, belongsToCategory, (RDFNode) null); i.hasNext(); ) {
                 Statement stmt = i.next();
                 stmtToDeletePackage.add(stmt);
-                stmtToAddPackage.add(ResourceFactory.createStatement(stmt.getSubject(),belongsToCategory,ResourceFactory.createProperty(packageRes.toString())));
+                stmtToAddPackage.add(ResourceFactory.createStatement(stmt.getSubject(), belongsToCategory, ResourceFactory.createProperty(packageRes.toString())));
             }
             model.remove(stmtToDeletePackage);
             model.add(stmtToAddPackage);
@@ -305,72 +310,6 @@ public class RDFConverter {
 
         this.convertedModel = model;
 
-    }
-
-    //Creates another model that contains only inheritance related properties
-    private Model modelInheritance(Model model, Boolean inheritanceList, Boolean inheritanceListConcrete) {
-        Model modelProcessed = ModelFactory.createDefaultModel();
-        modelProcessed.setNsPrefixes(model.getNsPrefixMap());
-        modelInheritance = ModelFactory.createDefaultModel();
-        modelInheritance.setNsPrefixes(model.getNsPrefixMap());
-        modelInheritance.setNsPrefix("owl", OWL2.NS);
-
-        for (StmtIterator i = model.listStatements(); i.hasNext(); ) {
-            Statement stmt = i.next();
-            if (!inheritanceList) {
-                if (stmt.getPredicate().equals(RDF.type) || stmt.getPredicate().equals(RDFS.subClassOf) || stmt.getPredicate().equals(RDFS.subPropertyOf) ||
-                        stmt.getPredicate().equals(RDFS.domain) || stmt.getPredicate().equals(RDFS.range)) {
-                    modelProcessed.add(stmt);
-                }
-            } else {
-                if (stmt.getPredicate().equals(RDF.type) || stmt.getPredicate().equals(RDFS.subClassOf) || stmt.getPredicate().equals(RDFS.subPropertyOf) ||
-                        stmt.getPredicate().equals(RDFS.domain) || stmt.getPredicate().equals(RDFS.range)) {
-                    modelProcessed.add(stmt);
-                    if (stmt.getPredicate().equals(RDF.type)) {
-                        Resource stmtSubject = stmt.getSubject();
-                        modelInheritance = inheritanceStructure(stmtSubject, stmtSubject, modelInheritance, model, inheritanceListConcrete);
-
-                    }
-
-
-                }
-            }
-        }
-
-        return modelProcessed;
-    }
-    // Adds the inheritance structure in the model
-    private Model inheritanceStructure(Resource stmtSubject, Resource res, Model modelInheritance, Model model, Boolean inheritanceListConcrete) {
-
-        for (ResIterator j = model.listSubjectsWithProperty(RDFS.subClassOf, res); j.hasNext(); ) {
-            Resource resSub = j.next();
-            //check if the class is concrete
-
-            if (inheritanceListConcrete) {
-                boolean addConcrete = false;
-                if (model.listObjectsOfProperty(resSub, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype")).hasNext()) {
-                    for (NodeIterator k = model.listObjectsOfProperty(resSub, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype")); k.hasNext(); ) {
-                        RDFNode objC = k.next();
-                        if (objC.isResource()) {
-                            if (objC.toString().equals("http://iec.ch/TC57/NonStandard/UML#concrete")) {
-                                addConcrete = true;
-                            }
-                        }
-                    }
-                }//TODO add else if to support other ways to identify if the class is concrete
-                if (addConcrete) {
-                    modelInheritance.add(stmtSubject, OWL2.members, resSub);
-                    modelInheritance.add(stmtSubject, RDF.type, OWL2.Class);
-                }
-            } else {
-                modelInheritance.add(stmtSubject, OWL2.members, resSub);
-                modelInheritance.add(stmtSubject, RDF.type, OWL2.Class);
-            }
-            modelInheritance = inheritanceStructure(stmtSubject, resSub, modelInheritance, model, inheritanceListConcrete);
-        }
-
-
-        return modelInheritance;
     }
 
     public void writeConvertedModel(OutputStream outputStream) throws IOException {
@@ -406,33 +345,55 @@ public class RDFConverter {
                 boolean useEnumRules = false;//(boolean) saveProperties.get("useEnumRules");   //switch to trigger special treatment when Enum is reference
                 Set<Resource> rdfAboutList = null; //(Set<Resource>) saveProperties.get("rdfAboutList");
                 Set<Resource> rdfEnumList = null;//(Set<Resource>) saveProperties.get("rdfEnumList");
-                    try {
-                        if (rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY || rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN) {
+                try {
+                    if (rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY || rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN) {
+                        Map<String, Object> properties = new HashMap<>();
+                        properties.put("showXmlDeclaration", showXmlDeclaration);
+                        properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
+                        properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
+                        //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
+                        //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
+                        //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
+                        if (putHeaderOnTop) {
+                            properties.put("prettyTypes", new Resource[]{ResourceFactory.createResource(headerClassResource)});
+                        }
+                        properties.put("xmlbase", xmlBase);
+                        properties.put("tab", tab);
+                        properties.put("relativeURIs", relativeURIs);
+                        properties.put("instanceData", convertInstanceData);
+                        properties.put("sortRDF", sortRDF);
+                        properties.put("sortRDFprefix", rdfSortOptions);
+                        properties.put("showXmlBaseDeclaration", "true");
+
+                        if (useAboutRules) {
+                            properties.put("aboutRules", rdfAboutList);
+                        }
+
+                        if (useEnumRules) {
+                            properties.put("enumRules", rdfEnumList);
+                        }
+
+                        // Put a properties object into the Context.
+                        Context cxt = new Context();
+                        cxt.set(SysRIOT.sysRdfWriterProperties, properties);
+
+                        RDFWriter.create()
+                                .base(xmlBase)
+                                .format(rdfFormat)
+                                .context(cxt)
+                                .source(convertedModel)
+                                .output(outputStream);
+
+                    } else {
+                        try (outputStream) {
                             Map<String, Object> properties = new HashMap<>();
                             properties.put("showXmlDeclaration", showXmlDeclaration);
                             properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
-                            properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
-                            //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
-                            //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
-                            //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
-                            if (putHeaderOnTop) {
-                                properties.put("prettyTypes", new Resource[]{ResourceFactory.createResource(headerClassResource)});
-                            }
+                            //properties.put("blockRules", RDFSyntax.propertyAttr.toString()); //???? not sure
                             properties.put("xmlbase", xmlBase);
                             properties.put("tab", tab);
+                            //properties.put("prettyTypes",new Resource[] {ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")});
                             properties.put("relativeURIs", relativeURIs);
-                            properties.put("instanceData", convertInstanceData);
-                            properties.put("sortRDF", sortRDF);
-                            properties.put("sortRDFprefix", rdfSortOptions);
-                            properties.put("showXmlBaseDeclaration", "true");
-
-                            if (useAboutRules) {
-                                properties.put("aboutRules", rdfAboutList);
-                            }
-
-                            if (useEnumRules) {
-                                properties.put("enumRules", rdfEnumList);
-                            }
 
                             // Put a properties object into the Context.
                             Context cxt = new Context();
@@ -444,34 +405,12 @@ public class RDFConverter {
                                     .context(cxt)
                                     .source(convertedModel)
                                     .output(outputStream);
-
-                        } else {
-                            try (outputStream) {
-                                Map<String, Object> properties = new HashMap<>();
-                                properties.put("showXmlDeclaration", showXmlDeclaration);
-                                properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
-                                //properties.put("blockRules", RDFSyntax.propertyAttr.toString()); //???? not sure
-                                properties.put("xmlbase", xmlBase);
-                                properties.put("tab", tab);
-                                //properties.put("prettyTypes",new Resource[] {ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")});
-                                properties.put("relativeURIs", relativeURIs);
-
-                                // Put a properties object into the Context.
-                                Context cxt = new Context();
-                                cxt.set(SysRIOT.sysRdfWriterProperties, properties);
-
-                                RDFWriter.create()
-                                        .base(xmlBase)
-                                        .format(rdfFormat)
-                                        .context(cxt)
-                                        .source(convertedModel)
-                                        .output(outputStream);
-                            }
                         }
-                    } finally {
-                        outputStream.flush();
-                        outputStream.close();
                     }
+                } finally {
+                    outputStream.flush();
+                    outputStream.close();
+                }
             }
             case "RDF Turtle (.ttl)" -> {
                 try (outputStream) {
@@ -499,7 +438,7 @@ public class RDFConverter {
 
         String xmlBase = options.getXmlBase();
 
-        try (outputStream){
+        try (outputStream) {
             modelInheritance.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
         }
     }

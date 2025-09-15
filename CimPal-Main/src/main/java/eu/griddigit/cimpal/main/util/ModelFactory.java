@@ -239,6 +239,33 @@ public class ModelFactory {
         return selectedDirectory;
     }
 
+    public static File folderChooserCustom(String title) {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        File selectedDirectory = null;
+
+        // Validate the stored last working folder
+        File initialDirectory = new File(prefs.get("LastWorkingFolder", ""));
+        if (!initialDirectory.exists() || !initialDirectory.isDirectory()) {
+            initialDirectory = FileUtils.getUserDirectory(); // Default to user's home directory
+        }
+
+        directoryChooser.setInitialDirectory(initialDirectory);
+        directoryChooser.setTitle(title);
+
+        try {
+            selectedDirectory = directoryChooser.showDialog(null);
+        } catch (Exception e) {
+            directoryChooser.setInitialDirectory(FileUtils.getUserDirectory());
+            selectedDirectory = directoryChooser.showDialog(null);
+        }
+
+        if (selectedDirectory != null) {
+            prefs.put("LastWorkingFolder", selectedDirectory.getAbsolutePath());
+        }
+
+        return selectedDirectory;
+    }
+
     //File(s) selection Filechooser
     public static File fileSaveCustom(String titleExtensionFilter, List<String> extExtensionFilter, String Dialogtitle, String filename) {
 

@@ -6,7 +6,8 @@
 package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.core.converters.RDFConverter;
-import eu.griddigit.cimpal.core.models.RDFConvertOptions;
+import eu.griddigit.cimpal.core.converters.SHACLFromRDF;
+import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
 import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofile;
@@ -17,8 +18,6 @@ import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import java.io.InputStream;
 
 import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
-import eu.griddigit.cimpal.core.models.RDFCompareResult;
-import eu.griddigit.cimpal.core.models.RDFCompareResultEntry;
 import eu.griddigit.cimpal.main.model.SHACLValidationResult;
 import guru.nidi.graphviz.engine.Graphviz;
 import guru.nidi.graphviz.engine.Format;
@@ -393,7 +392,7 @@ public class MainController implements Initializable {
     private ArrayList<Object> models;
     private ArrayList<Object> modelsNames;
     public static ArrayList<Model> RDFSmodels;
-    public static ArrayList<Object> RDFSmodelsNames;
+    public static List<RdfsModelDefinition> RDFSmodelsNames;
     public static ArrayList<Object> shapeModelsNames;
 
     private ArrayList<String> packages;
@@ -698,7 +697,7 @@ public class MainController implements Initializable {
         Model model = ModelFactory.createDefaultModel(); // model is the rdf file
         if (file.getFirst() != null) {// the file is selected
             try {
-                RDFDataMgr.read(model, new FileInputStream(file.getFirst()),"", Lang.RDFXML);
+                RDFDataMgr.read(model, new FileInputStream(file.getFirst()), "", Lang.RDFXML);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
                 progressBar.setProgress(0);
@@ -753,14 +752,14 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         //open original xml files
-        List<File> fileOrigModelList = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Original model ", List.of("*.xml","*.zip"), "");
+        List<File> fileOrigModelList = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Original model ", List.of("*.xml", "*.zip"), "");
 
         //open SHACL files
-        List<File> fileSHACLTransList = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "SPARQL Transformation files", List.of("*.ttl","*.trig"), "");
+        List<File> fileSHACLTransList = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "SPARQL Transformation files", List.of("*.ttl", "*.trig"), "");
 
         if (fileOrigModelList != null && fileSHACLTransList != null) {// the file is selected
 
-            ModelManipulationFactory.modelTransformation(fileOrigModelList,fileSHACLTransList);
+            ModelManipulationFactory.modelTransformation(fileOrigModelList, fileSHACLTransList);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
@@ -879,8 +878,7 @@ public class MainController implements Initializable {
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
-        }
-        else return;
+        } else return;
 
         if (!file.isEmpty() && file.getFirst() != null) {// the file is selected
 
@@ -906,8 +904,7 @@ public class MainController implements Initializable {
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
-        }
-        else return;
+        } else return;
 
         if (!file.isEmpty() && file.getFirst() != null) {// the file is selected
             fPathRdffile2.setText(file.getFirst().toString());
@@ -1081,13 +1078,13 @@ public class MainController implements Initializable {
             prefixMap.putAll(model1single.getNsPrefixMap());
             model1.add(model1single);
             String model1ID = "";
-            if (model1single.listStatements(null,RDF.type,mdFullModelRes).hasNext()){
-                model1ID =  model1single.listStatements(null,RDF.type,mdFullModelRes).nextStatement().getSubject().getLocalName();
-            } else if (model1single.listStatements(null,RDF.type,mdDiffernceModelRes).hasNext()) {
+            if (model1single.listStatements(null, RDF.type, mdFullModelRes).hasNext()) {
+                model1ID = model1single.listStatements(null, RDF.type, mdFullModelRes).nextStatement().getSubject().getLocalName();
+            } else if (model1single.listStatements(null, RDF.type, mdDiffernceModelRes).hasNext()) {
                 model1ID = model1single.listStatements(null, RDF.type, mdDiffernceModelRes).nextStatement().getSubject().getLocalName();
             }
             model1Structure.put(model1ID, model1single);
-            model1IDname.put(model1ID,item.toString().toLowerCase());
+            model1IDname.put(model1ID, item.toString().toLowerCase());
         }
         model1.setNsPrefixes(prefixMap);
 
@@ -1116,13 +1113,13 @@ public class MainController implements Initializable {
             prefixMap.putAll(model2single.getNsPrefixMap());
             model2.add(model2single);
             String model2ID = "";
-            if (model2single.listStatements(null,RDF.type,mdFullModelRes).hasNext()){
-                model2ID =  model2single.listStatements(null,RDF.type,mdFullModelRes).nextStatement().getSubject().getLocalName();
-            } else if (model2single.listStatements(null,RDF.type,mdDiffernceModelRes).hasNext()) {
+            if (model2single.listStatements(null, RDF.type, mdFullModelRes).hasNext()) {
+                model2ID = model2single.listStatements(null, RDF.type, mdFullModelRes).nextStatement().getSubject().getLocalName();
+            } else if (model2single.listStatements(null, RDF.type, mdDiffernceModelRes).hasNext()) {
                 model2ID = model2single.listStatements(null, RDF.type, mdDiffernceModelRes).nextStatement().getSubject().getLocalName();
             }
             model2Structure.put(model2ID, model2single);
-            model2IDname.put(model2ID,item.toString().toLowerCase());
+            model2IDname.put(model2ID, item.toString().toLowerCase());
         }
         model2.setNsPrefixes(prefixMap);
         ComparisonSHACLshapes.modelsABPrefMap = prefixMap;
@@ -1141,7 +1138,7 @@ public class MainController implements Initializable {
                 Model valueModel2 = model2Structure.get(key);
                 compareIDmodel2 = valueModel2;
 
-                if (valueModel2 == null){
+                if (valueModel2 == null) {
                     System.out.printf("WARNING: The dataset ID is not part of the 2nd set: %s . Checking if there is matching file name.....\n", key);
                     //check the file name
                     boolean foundMatch = false;
@@ -1165,7 +1162,7 @@ public class MainController implements Initializable {
                     }
                     if (foundMatch) {
                         continue;
-                    }else{
+                    } else {
                         System.out.printf("WARNING: The dataset filename is not part of the 2nd set: %s . No comparison is done for this file. \n", model1IDname.get(key));
                         break;
                     }
@@ -1219,7 +1216,7 @@ public class MainController implements Initializable {
                 if (!compareResults.isEmpty()) {
 
                     if (fcbIDcompShowDetails.isSelected()) {
-                        RDFCompareResult result =  new RDFCompareResult(); // Todo make a new class for the instance data comparison results
+                        RDFCompareResult result = new RDFCompareResult(); // Todo make a new class for the instance data comparison results
                         for (Object diffItem : compareResults) {
                             List<String> item = (List<String>) diffItem;
                             result.addEntry(new RDFCompareResultEntry(item.get(0), item.get(1), item.get(2), item.get(3), item.get(4)));
@@ -1251,7 +1248,7 @@ public class MainController implements Initializable {
             }
 
 
-        }else {
+        } else {
 
             //proceed with the comparison
 
@@ -1317,7 +1314,7 @@ public class MainController implements Initializable {
             if (!compareResults.isEmpty()) {
 
                 if (fcbIDcompShowDetails.isSelected()) {
-                    RDFCompareResult result =  new RDFCompareResult(); // Todo make a new class for the instance data comparison results
+                    RDFCompareResult result = new RDFCompareResult(); // Todo make a new class for the instance data comparison results
                     for (Object diffItem : compareResults) {
                         List<String> item = (List<String>) diffItem;
                         result.addEntry(new RDFCompareResultEntry(item.get(0), item.get(1), item.get(2), item.get(3), item.get(4)));
@@ -2035,7 +2032,7 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    private void actionBrowseMainRDF(){
+    private void actionBrowseMainRDF() {
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Main RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
         if (file.getFirst() != null) {// the file is selected
@@ -2045,8 +2042,9 @@ public class MainController implements Initializable {
             fMainRdfPathTextField.clear();
         }
     }
+
     @FXML
-    private void actionBrowseDeviationRDF(){
+    private void actionBrowseDeviationRDF() {
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Deviation RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
         if (file.getFirst() != null) {// the file is selected
@@ -2056,8 +2054,9 @@ public class MainController implements Initializable {
             fDeviationRdfPathTextField.clear();
         }
     }
+
     @FXML
-    private void actionBrowseExtendedRDF(){
+    private void actionBrowseExtendedRDF() {
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Extended RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
         if (file.getFirst() != null) {// the file is selected
@@ -2206,8 +2205,9 @@ public class MainController implements Initializable {
         rdfConverter.writeConvertedModel(out);
 
         // write the inheritance list if required
-        if(options.isInheritanceList()) {
-            OutputStream outInheritance = fileSaveDialog("Save inheritance for: " + filename + "Inheritance", "RDF Turtle", "*.ttl");;
+        if (options.isInheritanceList()) {
+            OutputStream outInheritance = fileSaveDialog("Save inheritance for: " + filename + "Inheritance", "RDF Turtle", "*.ttl");
+            ;
 
             rdfConverter.writeInheritanceModel(outInheritance);
         }
@@ -2448,8 +2448,8 @@ public class MainController implements Initializable {
         treeViewProfileConstraints.setRoot(rootMain); // sets the root to the eu.griddigit.cimpal.gui object
         treeViewProfileConstraints.setShowRoot(false);
         //for (Object modelsName : this.modelsNames) {
-        for (Object modelsName : RDFSmodelsNames) {
-            TreeItem<String> profileItem = new TreeItem<>(((ArrayList<?>) modelsName).getFirst().toString()); // level for the Classes
+        for (RdfsModelDefinition modelsName : RDFSmodelsNames) {
+            TreeItem<String> profileItem = new TreeItem<>(modelsName.getModelName()); // level for the Classes
             rootMain.getChildren().add(profileItem);
         }
 
@@ -2478,12 +2478,7 @@ public class MainController implements Initializable {
             this.packages.add(this.selectedFile.get(m).getName());
         }
 
-        ArrayList<String> mpak1 = new ArrayList<>();
-        mpak1.add(this.packages.getFirst());
-        mpak1.add(""); //reserved for the prefix of the profile
-        mpak1.add(""); // reserved for the URI of the profile
-        mpak1.add(""); // reserved for the baseURI of the profile
-        mpak1.add(""); // reserved for owl:imports
+        RdfsModelDefinition mpak1 = new RdfsModelDefinition(this.packages.getFirst(), "", "", "", "");
         //this.modelsNames.add(mpak1);
         RDFSmodelsNames.add(mpak1);
     }
@@ -2523,11 +2518,11 @@ public class MainController implements Initializable {
                     (!cbApplyDefNsDesignTab.isSelected() || !cbApplyDefBaseURIDesignTab.isSelected())) {
 
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().getFirst().getValue();
-                for (Object modelsNames : RDFSmodelsNames) {
-                    if (selectedProfile.equals(((ArrayList<?>) modelsNames).getFirst())) {
+                for (RdfsModelDefinition modelsNames : RDFSmodelsNames) {
+                    if (selectedProfile.equals(modelsNames.getModelName())) {
                         int issueFound = 0;
                         if (!fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
-                            ((ArrayList<String>) modelsNames).set(1, fPrefixCreateCompleteSMTab.getText());
+                            modelsNames.setBaseUri(fPrefixCreateCompleteSMTab.getText());
                         } else if (fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.WARNING);
                             alert.setContentText("Please confirm that you would like to use a namespace with empty prefix.");
@@ -2542,7 +2537,7 @@ public class MainController implements Initializable {
                             }
                         }
                         if (!fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {//TODO: check if it is resource
-                            ((ArrayList<String>) modelsNames).set(2, fURICreateCompleteSMTab.getText());
+                            modelsNames.setNsPrefix(fURICreateCompleteSMTab.getText());
                         } else if (fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add URI of the namespace.");
@@ -2552,7 +2547,7 @@ public class MainController implements Initializable {
                             issueFound = 1;
                         }
                         if (!fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {//TODO: check if it is resource
-                            ((ArrayList<String>) modelsNames).set(3, fshapesBaseURICreateCompleteSMTab.getText());
+                            modelsNames.setNsUri(fshapesBaseURICreateCompleteSMTab.getText());
                         } else if (fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add the base URI of the shapes model.");
@@ -2579,13 +2574,13 @@ public class MainController implements Initializable {
             if (treeViewProfileConstraints.getSelectionModel().getSelectedItems().size() == 1) {
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().getFirst().getValue();
                 //for (Object modelsName : this.modelsNames) {
-                for (Object modelsName : RDFSmodelsNames) {
-                    if (selectedProfile.equals(((ArrayList<?>) modelsName).getFirst().toString())) {
+                for (RdfsModelDefinition modelsName : RDFSmodelsNames) {
+                    if (selectedProfile.equals(modelsName.getModelName())) {
                         if (fowlImportsCreateCompleteSMTab.getText().isEmpty()) {
-                            ((ArrayList) modelsName).set(4, "");
+                            modelsName.setOwlImport("");
                             break;
                         } else {
-                            ((ArrayList) modelsName).set(4, fowlImportsCreateCompleteSMTab.getText());
+                            modelsName.setOwlImport(fowlImportsCreateCompleteSMTab.getText());
                             break;
                         }
                     }
@@ -2612,311 +2607,311 @@ public class MainController implements Initializable {
             if (cbApplyDefNsDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();
                 //for (Object modelsNames : this.modelsNames) {
-                for (Object modelsNames : RDFSmodelsNames) {
+                for (RdfsModelDefinition modelsNames : RDFSmodelsNames) {
                     for (TreeItem<String> treeitem : treeitems) {
-                        if (treeitem.getValue().equals(((ArrayList<?>) modelsNames).get(0))) {
+                        if (treeitem.getValue().equals(modelsNames.getModelName())) {
                             switch (treeitem.getValue()) {
                                 case "CoreEquipmentProfile", "EquipmentProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "eq");
+                                    modelsNames.setNsPrefix("eq");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentCore/3/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/EquipmentCore/3/1/Constraints#");
                                     } else if (profileVersion == 3) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/CoreEquipment/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/CoreEquipment/Constraints#");
                                     }
                                 }
                                 case "OperationProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "op");
+                                    modelsNames.setNsPrefix("op");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentOperation/3/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/EquipmentOperation/3/1/Constraints#");
                                     } else if (profileVersion == 3) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Operation/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/Operation/Constraints#");
                                     }
                                 }
                                 case "ShortCircuitProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sc");
+                                    modelsNames.setNsPrefix("sc");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentShortCircuit/3/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/EquipmentShortCircuit/3/1/Constraints#");
                                     } else if (profileVersion == 3) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/ShortCircuit/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/ShortCircuit/Constraints#");
                                     }
                                 }
                                 case "SteadyStateHypothesisProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ssh");
+                                    modelsNames.setNsPrefix("ssh");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/SteadyStateHypothesis/1/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/SteadyStateHypothesis/1/1/Constraints#");
                                     }
                                 }
                                 case "TopologyProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "tp");
+                                    modelsNames.setNsPrefix("tp");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/Topology/4/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/Topology/4/1/Constraints#");
                                     }
                                 }
                                 case "StateVariablesProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sv");
+                                    modelsNames.setNsPrefix("sv");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/StateVariables-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/StateVariables-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/StateVariables/4/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/StateVariables/4/1/Constraints#");
                                     }
                                 }
                                 case "DiagramLayoutProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "dl");
+                                    modelsNames.setNsPrefix("dl");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/DiagramLayout/3/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/DiagramLayout/3/1/Constraints#");
                                     }
                                 }
                                 case "GeographicalLocationProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "gl");
+                                    modelsNames.setNsPrefix("gl");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/GeographicalLocation/2/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/GeographicalLocation/2/1/Constraints#");
                                     }
                                 }
                                 case "DynamicsProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "dy");
+                                    modelsNames.setNsPrefix("dy");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/Dynamics/3/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/Dynamics/3/1/Constraints#");
                                     } else if (profileVersion == 4) {
-                                        ((ArrayList) modelsNames).set(2, "http://cim-profile.ucaiug.io/grid/Dynamics/Constraints/2.0#");
+                                        modelsNames.setNsUri("http://cim-profile.ucaiug.io/grid/Dynamics/Constraints/2.0#");
                                     }
                                 }
                                 case "EquipmentBoundaryProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "eqbd");
+                                    modelsNames.setNsPrefix("eqbd");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/EquipmentBoundary/3/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/EquipmentBoundary/3/1/Constraints#");
                                     }
                                 }
                                 case "TopologyBoundaryProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "tpbd");
+                                    modelsNames.setNsPrefix("tpbd");
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints#");
+                                        modelsNames.setNsUri("http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints#");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/CIM/TopologyBoundary/3/1/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/CIM/TopologyBoundary/3/1/Constraints#");
                                     }
                                 }
                                 case "FileHeaderProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "fh");
-                                    ((ArrayList) modelsNames).set(2, "http://iec.ch/TC57/61970-552/ModelDescription/Constraints#");
+                                    modelsNames.setNsPrefix("fh");
+                                    modelsNames.setNsUri("http://iec.ch/TC57/61970-552/ModelDescription/Constraints#");
                                 }
                                 case "PowerSystemProjectProfile", "DocPowerSystemProjectProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "psp");
+                                    modelsNames.setNsPrefix("psp");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/PowerSystemProject-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/PowerSystemProject-Simple/2.3#");
                                     }
                                 }
                                 case "RemedialActionScheduleProfile", "DocRemedialActionScheduleProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ras");
+                                    modelsNames.setNsPrefix("ras");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/RemedialActionSchedule-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/RemedialActionSchedule-Simple/2.3#");
                                     }
                                 }
                                 case "SecurityAnalysisResultProfile", "DocSecurityAnalysisResultProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sar");
+                                    modelsNames.setNsPrefix("sar");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.4#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.4#");
                                     }
                                 }
                                 case "SensitivityMatrixProfile", "DocSensitivityMatrixProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sm");
+                                    modelsNames.setNsPrefix("sm");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SensitivityMatrix-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/SensitivityMatrix-Simple/2.3#");
                                     }
                                 }
                                 case "EquipmentReliabilityProfile", "DocEquipmentReliabilityProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "er");
+                                    modelsNames.setNsPrefix("er");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/EquipmentReliability-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/EquipmentReliability-Simple/2.3#");
                                     }
                                 }
                                 case "RemedialActionProfile", "DocRemedialActionProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ra");
+                                    modelsNames.setNsPrefix("ra");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/RemedialAction-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/RemedialAction-Simple/2.3#");
                                     }
                                 }
                                 case "SteadyStateInstructionProfile", "DocSteadyStateInstructionProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ssi");
+                                    modelsNames.setNsPrefix("ssi");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SteadyStateInstruction-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/SteadyStateInstruction-Simple/2.3#");
                                     }
                                 }
                                 case "AvailabilityScheduleProfile", "DocAvailabilityScheduleProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "as");
+                                    modelsNames.setNsPrefix("as");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/AvailabilitySchedule-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/AvailabilitySchedule-Simple/2.3#");
                                     }
                                 }
                                 case "AssessedElementProfile", "DocAssessedElementProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ae");
+                                    modelsNames.setNsPrefix("ae");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/AssessedElement-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/AssessedElement-Simple/2.3#");
                                     }
                                 }
                                 case "StateInstructionScheduleProfile", "DocStateInstructionScheduleProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sis");
+                                    modelsNames.setNsPrefix("sis");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/StateInstructionSchedule-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/StateInstructionSchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/StateInstructionSchedule-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/StateInstructionSchedule-Simple/2.3#");
                                     }
                                 }
                                 case "ContingencyProfile", "DocContingencyProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "co");
+                                    modelsNames.setNsPrefix("co");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/Contingency-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/Contingency-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/Contingency-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/Contingency-Simple/2.3#");
                                     }
                                 }
                                 case "DocumentHeaderProfile", "DocDocumentHeaderProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "dh");
+                                    modelsNames.setNsPrefix("dh");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/DocumentHeader-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/DocumentHeader-Simple/2.3#");
                                     }
                                 }
                                 case "DatasetMetadataProfile", "DocDatasetMetadataProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "dm");
+                                    modelsNames.setNsPrefix("dm");
                                     if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/DatasetMetadata-Simple/2.4#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/DatasetMetadata-Simple/2.4#");
                                     }
                                 }
                                 case "GridDisturbanceProfile", "DocGridDisturbanceProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "gd");
+                                    modelsNames.setNsPrefix("gd");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/GridDisturbance-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/GridDisturbance-Simple/2.3#");
                                     }
                                 }
                                 case "ImpactAssessmentMatrixProfile", "DocImpactAssessmentMatrixProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "iam");
+                                    modelsNames.setNsPrefix("iam");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/ImpactAssessmentMatrix-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/ImpactAssessmentMatrix-Simple/2.3#");
                                     }
                                 }
                                 case "MonitoringAreaProfile", "DocMonitoringAreaProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ma");
+                                    modelsNames.setNsPrefix("ma");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/MonitoringArea-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/MonitoringArea-Simple/2.3#");
                                     }
                                 }
                                 case "ObjectRegistryProfile", "DocObjectRegistryProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "or");
+                                    modelsNames.setNsPrefix("or");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/ObjectRegistry-Simple/2.2#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/ObjectRegistry-Simple/2.2#");
                                     }
                                 }
                                 case "PowerScheduleProfile", "DocPowerScheduleProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ps");
+                                    modelsNames.setNsPrefix("ps");
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(2, "http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints#");
+                                        modelsNames.setNsUri("http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints#");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/PowerSchedule-Simple/2.3#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/PowerSchedule-Simple/2.3#");
                                     }
                                 }
                                 case "SteadyStateHypothesisScheduleProfile",
                                      "DocSteadyStateHypothesisScheduleProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "shs");
+                                    modelsNames.setNsPrefix("shs");
                                     if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(2, "https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Simple/1.0#");
+                                        modelsNames.setNsUri("https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Simple/1.0#");
                                     }
                                 }
                                 case "DetailedModelConfigurationProfile", "DocDetailedModelConfigurationProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "dmc");
-                                    ((ArrayList) modelsNames).set(2, "http://cim-profile.ucaiug.io/grid/DetailedModelConfiguration/Constraints/1.0#");
+                                    modelsNames.setNsPrefix("dmc");
+                                    modelsNames.setNsUri("http://cim-profile.ucaiug.io/grid/DetailedModelConfiguration/Constraints/1.0#");
                                 }
                                 case "DetailedModelParameterisationProfile",
                                      "DocDetailedModelParameterisationProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "dmp");
-                                    ((ArrayList) modelsNames).set(2, "http://cim-profile.ucaiug.io/grid/DetailedModelParameterisation/Constraints/1.0#");
+                                    modelsNames.setNsPrefix("dmp");
+                                    modelsNames.setNsUri("http://cim-profile.ucaiug.io/grid/DetailedModelParameterisation/Constraints/1.0#");
                                 }
                                 case "SimulationSettingsProfile", "DocSimulationSettingsProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "set");
-                                    ((ArrayList) modelsNames).set(2, "http://cim-profile.ucaiug.io/grid/SimulationSettings/Constraints/1.0#");
+                                    modelsNames.setNsPrefix("set");
+                                    modelsNames.setNsUri("http://cim-profile.ucaiug.io/grid/SimulationSettings/Constraints/1.0#");
                                 }
                                 case "SimulationResultsProfile", "DocSimulationResultsProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sr");
-                                    ((ArrayList) modelsNames).set(2, "http://cim-profile.ucaiug.io/grid/SimulationResults/Constraints/1.0#");
+                                    modelsNames.setNsPrefix("sr");
+                                    modelsNames.setNsUri("http://cim-profile.ucaiug.io/grid/SimulationResults/Constraints/1.0#");
                                 }
                                 case "DLProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "dl");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints#");
+                                    modelsNames.setNsPrefix("dl");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints#");
                                 }
                                 case "EQProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "eq");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints#");
+                                    modelsNames.setNsPrefix("eq");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints#");
                                 }
                                 case "GLProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "gl");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints#");
+                                    modelsNames.setNsPrefix("gl");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints#");
                                 }
                                 case "SCProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sc");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints#");
+                                    modelsNames.setNsPrefix("sc");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints#");
                                 }
                                 case "SSHProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "ssh");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints#");
+                                    modelsNames.setNsPrefix("ssh");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints#");
                                 }
                                 case "SVProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "sv");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints#");
+                                    modelsNames.setNsPrefix("sv");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints#");
                                 }
                                 case "TPProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "tp");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints#");
+                                    modelsNames.setNsPrefix("tp");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints#");
                                 }
                                 case "LTDSShortCircuitResultProfile", "DocLTDSShortCircuitResultProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "scr");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints#");
+                                    modelsNames.setNsPrefix("scr");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints#");
                                 }
                                 case "LTDSSystemCapacityProfile", "DocLTDSSystemCapacityProfile" -> {
-                                    ((ArrayList) modelsNames).set(1, "syscap");
-                                    ((ArrayList) modelsNames).set(2, "http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints#");
+                                    modelsNames.setNsPrefix("syscap");
+                                    modelsNames.setNsUri("http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints#");
                                 }
                             }
                         }
@@ -2926,261 +2921,261 @@ public class MainController implements Initializable {
             if (cbApplyDefBaseURIDesignTab.isSelected()) {
                 ObservableList<TreeItem<String>> treeitems = treeViewProfileConstraints.getRoot().getChildren();
                 //for (Object modelsNames : this.modelsNames) {
-                for (Object modelsNames : RDFSmodelsNames) {
+                for (RdfsModelDefinition modelsNames : RDFSmodelsNames) {
                     for (TreeItem<String> treeitem : treeitems) {
-                        if (treeitem.getValue().equals(((ArrayList) modelsNames).get(0))) {
+                        if (treeitem.getValue().equals(modelsNames.getModelName())) {
                             switch (treeitem.getValue()) {
                                 case "CoreEquipmentProfile", "EquipmentProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentCore/3/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/EquipmentCore/3/1/Constraints");
                                     } else if (profileVersion == 3) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/CoreEquipment/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/CoreEquipment/Constraints");
                                     }
                                 }
                                 case "OperationProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/Operation-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentOperation/3/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/EquipmentOperation/3/1/Constraints");
                                     } else if (profileVersion == 3) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Operation/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/Operation/Constraints");
                                     }
                                 }
                                 case "ShortCircuitProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentShortCircuit/3/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/EquipmentShortCircuit/3/1/Constraints");
                                     } else if (profileVersion == 3) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/ShortCircuit/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/ShortCircuit/Constraints");
                                     }
                                 }
                                 case "SteadyStateHypothesisProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/SteadyStateHypothesis/1/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/SteadyStateHypothesis/1/1/Constraints");
                                     }
                                 }
                                 case "TopologyProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/Topology-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/Topology/4/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/Topology/4/1/Constraints");
                                     }
                                 }
                                 case "StateVariablesProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/StateVariables-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/StateVariables-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/StateVariables/4/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/StateVariables/4/1/Constraints");
                                     }
                                 }
                                 case "DiagramLayoutProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/DiagramLayout/3/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/DiagramLayout/3/1/Constraints");
                                     }
                                 }
                                 case "GeographicalLocationProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/GeographicalLocation/2/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/GeographicalLocation/2/1/Constraints");
                                     }
                                 }
                                 case "DynamicsProfile", "DocDynamicsProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/Dynamics-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/Dynamics/3/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/Dynamics/3/1/Constraints");
                                     } else if (profileVersion == 4) {
-                                        ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/Dynamics/Constraints/2.0");
+                                        modelsNames.setBaseUri("http://cim-profile.ucaiug.io/grid/Dynamics/Constraints/2.0");
                                     }
                                 }
                                 case "EquipmentBoundaryProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/EquipmentBoundary/3/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/EquipmentBoundary/3/1/Constraints");
                                     }
                                 }
                                 case "TopologyBoundaryProfile" -> {
                                     if (profileVersion == 1) {
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/ns/CIM/TopologyBoundary-EU/Constraints");
                                     } else if (profileVersion == 2) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/CIM/TopologyBoundary/3/1/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/CIM/TopologyBoundary/3/1/Constraints");
                                     }
                                 }
                                 case "FileHeaderProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://iec.ch/TC57/61970-552/ModelDescription/Constraints");
+                                        modelsNames.setBaseUri("http://iec.ch/TC57/61970-552/ModelDescription/Constraints");
                                 case "PowerSystemProjectProfile", "DocPowerSystemProjectProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/PowerSystemProject-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/PowerSystemProject-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/PowerSystemProject-Simple/2.3");
                                     }
                                 }
                                 case "RemedialActionScheduleProfile", "DocRemedialActionScheduleProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/RemedialActionSchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/RemedialActionSchedule-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/RemedialActionSchedule-Simple/2.3");
                                     }
                                 }
                                 case "SecurityAnalysisResultProfile", "DocSecurityAnalysisResultProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/SecurityAnalysisResult-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.4");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/SecurityAnalysisResult-Simple/2.4");
                                     }
                                 }
                                 case "SensitivityMatrixProfile", "DocSensitivityMatrixProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/SensitivityMatrix-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SensitivityMatrix-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/SensitivityMatrix-Simple/2.3");
                                     }
                                 }
                                 case "EquipmentReliabilityProfile", "DocEquipmentReliabilityProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/EquipmentReliability-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/EquipmentReliability-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/EquipmentReliability-Simple/2.3");
                                     }
                                 }
                                 case "RemedialActionProfile", "DocRemedialActionProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/RemedialAction-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/RemedialAction-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/RemedialAction-Simple/2.3");
                                     }
                                 }
                                 case "SteadyStateInstructionProfile", "DocSteadyStateInstructionProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/SteadyStateInstruction-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SteadyStateInstruction-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/SteadyStateInstruction-Simple/2.3");
                                     }
                                 }
                                 case "AvailabilityScheduleProfile", "DocAvailabilityScheduleProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/AvailabilitySchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/AvailabilitySchedule-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/AvailabilitySchedule-Simple/2.3");
                                     }
                                 }
                                 case "AssessedElementProfile", "DocAssessedElementProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/AssessedElement-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/AssessedElement-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/AssessedElement-Simple/2.3");
                                     }
                                 }
                                 case "SecurityScheduleProfile", "DocSecurityScheduleProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/SecuritySchedule-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/SecuritySchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SecuritySchedule-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/SecuritySchedule-Simple/2.3");
                                     }
                                 }
                                 case "ContingencyProfile", "DocContingencyProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/Contingency-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/Contingency-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/Contingency-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/Contingency-Simple/2.3");
                                     }
                                 }
                                 case "DocumentHeaderProfile", "DocDocumentHeaderProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/DocumentHeader-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/DocumentHeader-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/DocumentHeader-Simple/2.3");
                                     }
                                 }
                                 case "DatasetMetadataProfile", "DocDatasetMetadataProfile" -> {
                                     if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/DatasetMetadata-Simple/2.4");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/DatasetMetadata-Simple/2.4");
                                     }
                                 }
                                 case "GridDisturbanceProfile", "DocGridDisturbanceProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/GridDisturbance-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/GridDisturbance-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/GridDisturbance-Simple/2.3");
                                     }
                                 }
                                 case "ImpactAssessmentMatrixProfile", "DocImpactAssessmentMatrixProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/ImpactAssessmentMatrix-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/ImpactAssessmentMatrix-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/ImpactAssessmentMatrix-Simple/2.3");
                                     }
                                 }
                                 case "MonitoringAreaProfile", "DocMonitoringAreaProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/MonitoringArea-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/MonitoringArea-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/MonitoringArea-Simple/2.3");
                                     }
                                 }
                                 case "ObjectRegistryProfile", "DocObjectRegistryProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/ObjectRegistry-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/ObjectRegistry-Simple/2.2");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/ObjectRegistry-Simple/2.2");
                                     }
                                 }
                                 case "PowerScheduleProfile", "DocPowerScheduleProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/PowerSchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/PowerSchedule-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/PowerSchedule-Simple/2.3");
                                     }
                                 }
                                 case "StateInstructionScheduleProfile", "DocStateInstructionScheduleProfile" -> {
                                     if (profileVersion == 5) {
-                                        ((ArrayList) modelsNames).set(3, "http://entsoe.eu/ns/CIM/StateInstructionSchedule-EU/Constraints");
+                                        modelsNames.setBaseUri("http://entsoe.eu/ns/CIM/StateInstructionSchedule-EU/Constraints");
                                     } else if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/StateInstructionSchedule-Simple/2.3");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/StateInstructionSchedule-Simple/2.3");
                                     }
                                 }
                                 case "SteadyStateHypothesisScheduleProfile",
                                      "DocSteadyStateHypothesisScheduleProfile" -> {
                                     if (profileVersion == 6) {
-                                        ((ArrayList) modelsNames).set(3, "https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Simple/1.0");
+                                        modelsNames.setBaseUri("https://ap-con.cim4.eu/SteadyStateHypothesisSchedule-Simple/1.0");
                                     }
                                 }
                                 case "DetailedModelConfigurationProfile", "DocDetailedModelConfigurationProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/DetailedModelConfiguration/Constraints/1.0");
+                                        modelsNames.setBaseUri("http://cim-profile.ucaiug.io/grid/DetailedModelConfiguration/Constraints/1.0");
                                 case "DetailedModelParameterisationProfile",
                                      "DocDetailedModelParameterisationProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/DetailedModelParameterisation/Constraints/1.0");
+                                        modelsNames.setBaseUri("http://cim-profile.ucaiug.io/grid/DetailedModelParameterisation/Constraints/1.0");
                                 case "SimulationSettingsProfile", "DocSimulationSettingsProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/SimulationSettings/Constraints/1.0");
+                                        modelsNames.setBaseUri("http://cim-profile.ucaiug.io/grid/SimulationSettings/Constraints/1.0");
                                 case "SimulationResultsProfile", "DocSimulationResultsProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://cim-profile.ucaiug.io/grid/SimulationResults/Constraints/1.0");
+                                        modelsNames.setBaseUri("http://cim-profile.ucaiug.io/grid/SimulationResults/Constraints/1.0");
                                 case "DLProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/DiagramLayout/Constraints");
                                 case "EQProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/Equipment/Constraints");
                                 case "GLProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/GeographicalLocation/Constraints");
                                 case "SCProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuit/Constraints");
                                 case "SSHProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/SteadyStateHypothesis/Constraints");
                                 case "SVProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/StateVariables/Constraints");
                                 case "TPProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/Topology/Constraints");
                                 case "LTDSShortCircuitResultProfile", "DocLTDSShortCircuitResultProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/ShortCircuitResults/Constraints");
                                 case "LTDSSystemCapacityProfile", "DocLTDSSystemCapacityProfile" ->
-                                        ((ArrayList) modelsNames).set(3, "http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints");
+                                        modelsNames.setBaseUri("http://ofgem.gov.uk/ns/CIM/LTDS/SystemCapacity/Constraints");
                             }
                         }
                     }
@@ -3195,11 +3190,11 @@ public class MainController implements Initializable {
 
         String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().getFirst().getValue();
         //for (Object modelsNames : this.modelsNames) {
-        for (Object modelsNames : RDFSmodelsNames) {
-            if (selectedProfile.equals(((ArrayList<?>) modelsNames).getFirst())) {
-                fPrefixCreateCompleteSMTab.setText(((ArrayList<?>) modelsNames).get(1).toString());
-                fURICreateCompleteSMTab.setText(((ArrayList<?>) modelsNames).get(2).toString());
-                fshapesBaseURICreateCompleteSMTab.setText(((ArrayList<?>) modelsNames).get(3).toString());
+        for (RdfsModelDefinition modelsNames : RDFSmodelsNames) {
+            if (selectedProfile.equals(modelsNames.getModelName())) {
+                fPrefixCreateCompleteSMTab.setText(modelsNames.getNsPrefix());
+                fURICreateCompleteSMTab.setText(modelsNames.getNsUri());
+                fshapesBaseURICreateCompleteSMTab.setText(modelsNames.getBaseUri());
             }
         }
 
@@ -3212,22 +3207,22 @@ public class MainController implements Initializable {
 
         Map<String, Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
         Map<String, String> rdfsToShaclGuiMapStr = new HashMap<>();
-        if (cbRDFSSHACLoptionDescr.isSelected()){
-            rdfsToShaclGuiMapBool.put("excludeMRID",true);
-        }else{
-            rdfsToShaclGuiMapBool.put("excludeMRID",false);
+        if (cbRDFSSHACLoptionDescr.isSelected()) {
+            rdfsToShaclGuiMapBool.put("excludeMRID", true);
+        } else {
+            rdfsToShaclGuiMapBool.put("excludeMRID", false);
         }
 
-        if (cbRDFSSHACLoptionProperty.isSelected()){
+        if (cbRDFSSHACLoptionProperty.isSelected()) {
 
-            rdfsToShaclGuiMapBool.put("Closedshapes",true);
-        }else{
-            rdfsToShaclGuiMapBool.put("Closedshapes",false);
+            rdfsToShaclGuiMapBool.put("Closedshapes", true);
+        } else {
+            rdfsToShaclGuiMapBool.put("Closedshapes", false);
         }
-        if (cbRDFSSHACLdatatypesplit.isSelected()){
-            rdfsToShaclGuiMapBool.put("SplitDatatypes",true);
-        }else{
-            rdfsToShaclGuiMapBool.put("SplitDatatypes",false);
+        if (cbRDFSSHACLdatatypesplit.isSelected()) {
+            rdfsToShaclGuiMapBool.put("SplitDatatypes", true);
+        } else {
+            rdfsToShaclGuiMapBool.put("SplitDatatypes", false);
         }
         //excludeMRID = cbRDFSSHACLoptionDescr.isSelected();
 
@@ -3235,54 +3230,54 @@ public class MainController implements Initializable {
         //Model shaclRefModel = null;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem() == null) {
             //cbvalue = "";
-            rdfsToShaclGuiMapStr.put("cbvalue","");
+            rdfsToShaclGuiMapStr.put("cbvalue", "");
         } else {
             //cbvalue = fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
-            rdfsToShaclGuiMapStr.put("cbvalue",fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString());
+            rdfsToShaclGuiMapStr.put("cbvalue", fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString());
         }
         if (cbRDFSSHACLoption1.isSelected()) {
             //associationValueTypeOption = 1;
-            rdfsToShaclGuiMapBool.put("associationValueTypeOption",true);
+            rdfsToShaclGuiMapBool.put("associationValueTypeOption", true);
         } else {
             //associationValueTypeOption = 0;
-            rdfsToShaclGuiMapBool.put("associationValueTypeOption",false);
+            rdfsToShaclGuiMapBool.put("associationValueTypeOption", false);
         }
         if (cbRDFSSHACLoptionTypeWithOne.isSelected()) {
             //associationValueTypeOptionSingle = 1;
-            rdfsToShaclGuiMapBool.put("associationValueTypeOptionSingle",true);
+            rdfsToShaclGuiMapBool.put("associationValueTypeOptionSingle", true);
         } else {
             //associationValueTypeOptionSingle = 0;
-            rdfsToShaclGuiMapBool.put("associationValueTypeOptionSingle",false);
+            rdfsToShaclGuiMapBool.put("associationValueTypeOptionSingle", false);
         }
         if (cbRDFSSHACLabstract.isSelected()) {
             //shapesOnAbstractOption = 1;
-            rdfsToShaclGuiMapBool.put("shapesOnAbstractOption",true);
+            rdfsToShaclGuiMapBool.put("shapesOnAbstractOption", true);
         } else {
             //shapesOnAbstractOption = 0;
-            rdfsToShaclGuiMapBool.put("shapesOnAbstractOption",false);
+            rdfsToShaclGuiMapBool.put("shapesOnAbstractOption", false);
         }
         if (cbRDFSSHACLinheritTree.isSelected()) {
             //exportInheritTree = 1;
-            rdfsToShaclGuiMapBool.put("exportInheritTree",true);
+            rdfsToShaclGuiMapBool.put("exportInheritTree", true);
         } else {
             //exportInheritTree = 0;
-            rdfsToShaclGuiMapBool.put("exportInheritTree",false);
+            rdfsToShaclGuiMapBool.put("exportInheritTree", false);
         }
 
         //shaclURIdatatypeAsResource = false;
         //shaclSkipNcPropertyReference = false;
-        if (cbRDFSSHACLuri.isSelected()){
+        if (cbRDFSSHACLuri.isSelected()) {
             //shaclURIdatatypeAsResource = true;
-            rdfsToShaclGuiMapBool.put("shaclURIdatatypeAsResource",true);
-        }else{
-            rdfsToShaclGuiMapBool.put("shaclURIdatatypeAsResource",false);
+            rdfsToShaclGuiMapBool.put("shaclURIdatatypeAsResource", true);
+        } else {
+            rdfsToShaclGuiMapBool.put("shaclURIdatatypeAsResource", false);
         }
 
-        if (cbRDFSSHACLncProp.isSelected()){
+        if (cbRDFSSHACLncProp.isSelected()) {
             //haclSkipNcPropertyReference = true;
-            rdfsToShaclGuiMapBool.put("shaclSkipNcPropertyReference",true);
-        }else{
-            rdfsToShaclGuiMapBool.put("shaclSkipNcPropertyReference",false);
+            rdfsToShaclGuiMapBool.put("shaclSkipNcPropertyReference", true);
+        } else {
+            rdfsToShaclGuiMapBool.put("shaclSkipNcPropertyReference", false);
         }
 
 
@@ -3290,10 +3285,10 @@ public class MainController implements Initializable {
             //depending on the value of the choice box "Save datatype map"
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
                 //shaclNodataMap = 1;
-                rdfsToShaclGuiMapBool.put("shaclNodataMap",true);
+                rdfsToShaclGuiMapBool.put("shaclNodataMap", true);
             } else {
                 //shaclNodataMap = 0;
-                rdfsToShaclGuiMapBool.put("shaclNodataMap",false);
+                rdfsToShaclGuiMapBool.put("shaclNodataMap", false);
             }
             if (shapeModels == null) {
                 shapeModels = new ArrayList<>();
@@ -3312,13 +3307,14 @@ public class MainController implements Initializable {
             for (int sel = 0; sel < treeViewProfileConstraints.getSelectionModel().getSelectedItems().size(); sel++) {
                 String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().get(sel).getValue();
                 for (int i = 0; i < RDFSmodelsNames.size(); i++) {
-                    if (((ArrayList<?>) RDFSmodelsNames.get(i)).get(0).equals(selectedProfile)) {
+                    RdfsModelDefinition modelDef = RDFSmodelsNames.get(i);
+                    if (modelDef.getModelName().equals(selectedProfile)) {
                         modelNumber.add(i);
                         profileList.add(selectedProfile);
-                        prefixes.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(1).toString());
-                        namespaces.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(2).toString());
-                        baseURIs.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(3).toString());
-                        owlImports.add(((ArrayList<?>) RDFSmodelsNames.get(i)).get(4).toString());
+                        prefixes.add(modelDef.getNsPrefix());
+                        namespaces.add(modelDef.getNsUri());
+                        baseURIs.add(modelDef.getBaseUri());
+                        owlImports.add(modelDef.getOwlImport());
                     }
                 }
             }
@@ -3349,28 +3345,28 @@ public class MainController implements Initializable {
             if (cbRDFSSHACLoptionBaseprofiles.isSelected()) { // load base profiles if the checkbox is selected
                 //baseprofilesshaclglag = 1;
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclglag", true);
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclglag", false);
             }
 
             if (cbRDFSSHACLoptionBaseprofilesIgnoreNS.isSelected()) {
                 //baseprofilesshaclignorens = 1;
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclignorens", true);
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclignorens", false);
             }
 
             if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) { // load base profiles if the checkbox is selected
                 //baseprofilesshaclglag2nd = 1;
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclglag2nd", true);
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclglag2nd", false);
             }
 
             if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) { // load base profiles if the checkbox is selected
                 //baseprofilesshaclglag3rd = 1;
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclglag3rd", true);
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("baseprofilesshaclglag3rd", false);
             }
 
@@ -3379,7 +3375,7 @@ public class MainController implements Initializable {
             if (cbRDFSSHACLoptionInverse.isSelected()) {
                 //shaclflaginverse = 1;
                 rdfsToShaclGuiMapBool.put("shaclflaginverse", true);
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("shaclflaginverse", false);
             }
 
@@ -3390,9 +3386,9 @@ public class MainController implements Initializable {
                 //shaclflagCountDefaultURI = 1;
                 rdfsToShaclGuiMapBool.put("shaclflagCountDefaultURI", true);
                 //shaclCommonPref = "";
-                rdfsToShaclGuiMapStr.put("shaclCommonPref","");
+                rdfsToShaclGuiMapStr.put("shaclCommonPref", "");
                 //shaclCommonURI = "";
-                rdfsToShaclGuiMapStr.put("shaclCommonURI","");
+                rdfsToShaclGuiMapStr.put("shaclCommonURI", "");
                 if (shaclNSCommonType.getSelectionModel().getSelectedItem().toString().equals("Custom namespace")) {
                     //shaclflagCountDefaultURI = 0;
                     rdfsToShaclGuiMapBool.put("shaclflagCountDefaultURI", false);
@@ -3401,546 +3397,109 @@ public class MainController implements Initializable {
                     //shaclCommonURI = fURISHACLcommon.getText();
                     rdfsToShaclGuiMapStr.put("shaclCommonURI", fURISHACLcommon.getText());
                 }
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("shaclflagCount", false);
             }
 
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
                 rdfsToShaclGuiMapBool.put("AllProfilesOneMap", true);
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("AllProfilesOneMap", false);
             }
 
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
                 rdfsToShaclGuiMapBool.put("PerProfile", true);
-            }else{
+            } else {
                 rdfsToShaclGuiMapBool.put("PerProfile", false);
             }
 
             if (cbRDFSSHACLvalidate.isSelected()) { //do validation
-                rdfsToShaclGuiMapBool.put("RDFSSHACLvalidate",true);
-            }else{
-                rdfsToShaclGuiMapBool.put("RDFSSHACLvalidate",false);
-            }
-
-
-
-            progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-
-            prepareShapesModelFromRDFS(rdfsToShaclGuiMapBool,rdfsToShaclGuiMapStr);
-
-
-            progressBar.setProgress(1);
-            System.out.print("Generation of SHACL shapes is completed.\n");
-
-        } else {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setContentText("Please select a profile for which you would like to generate Shapes and the RDFS format.");
-            alert.setHeaderText(null);
-            alert.setTitle("Error - no profile selected");
-            alert.showAndWait();
-        }
-    }
-
-    @FXML
-    //action for button Create in the tab RDFS to SHACL
-    private void actionBtnConstructShacl(ActionEvent actionEvent) throws IOException {
-        excludeMRID = cbRDFSSHACLoptionDescr.isSelected();
-
-        String cbvalue;
-        Model shaclRefModel = null;
-        if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem() == null) {
-            cbvalue = "";
-        } else {
-            cbvalue = fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
-        }
-        if (cbRDFSSHACLoption1.isSelected()) {
-            associationValueTypeOption = 1;
-        } else {
-            associationValueTypeOption = 0;
-        }
-        if (cbRDFSSHACLoptionTypeWithOne.isSelected()) {
-            associationValueTypeOptionSingle = 1;
-        } else {
-            associationValueTypeOptionSingle = 0;
-        }
-        if (cbRDFSSHACLabstract.isSelected()) {
-            shapesOnAbstractOption = 1;
-        } else {
-            shapesOnAbstractOption = 0;
-        }
-        if (cbRDFSSHACLinheritTree.isSelected()) {
-            exportInheritTree = 1;
-        } else {
-            exportInheritTree = 0;
-        }
-
-        shaclURIdatatypeAsResource = false;
-        shaclSkipNcPropertyReference = false;
-        if (cbRDFSSHACLuri.isSelected()){
-            shaclURIdatatypeAsResource = true;
-        }
-
-        if (cbRDFSSHACLncProp.isSelected()){
-            shaclSkipNcPropertyReference = true;
-        }
-
-
-        if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
-            //depending on the value of the choice box "Save datatype map"
-            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
-                shaclNodataMap = 1;
+                rdfsToShaclGuiMapBool.put("RDFSSHACLvalidate", true);
             } else {
-                shaclNodataMap = 0;
-            }
-            if (shapeModels == null) {
-                shapeModels = new ArrayList<>();
-            }
-            if (shapeModelsNames == null) {
-                shapeModelsNames = new ArrayList<>();
-            }
-            shapeDatas = new ArrayList<>();
-            Map<String, RDFDatatype> dataTypeMapFromShapesComplete = new HashMap<>(); // this is the complete map for the export in one .properties
-            ArrayList<Integer> modelNumber = new ArrayList<>();
-            List<String> profileList = new ArrayList<>();
-            List<String> prefixes = new ArrayList<>();
-            List<String> namespaces = new ArrayList<>();
-            List<String> baseURIs = new ArrayList<>();
-            List<String> owlImports = new ArrayList<>();
-            for (int sel = 0; sel < treeViewProfileConstraints.getSelectionModel().getSelectedItems().size(); sel++) {
-                String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().get(sel).getValue();
-                for (int i = 0; i < this.modelsNames.size(); i++) {
-                    if (((ArrayList<?>) this.modelsNames.get(i)).get(0).equals(selectedProfile)) {
-                        modelNumber.add(i);
-                        profileList.add(selectedProfile);
-                        prefixes.add(((ArrayList<?>) this.modelsNames.get(i)).get(1).toString());
-                        namespaces.add(((ArrayList<?>) this.modelsNames.get(i)).get(2).toString());
-                        baseURIs.add(((ArrayList<?>) this.modelsNames.get(i)).get(3).toString());
-                        owlImports.add(((ArrayList<?>) this.modelsNames.get(i)).get(4).toString());
-                    }
-                }
-            }
-            // ask for confirmation before proceeding
-            String title = "Confirmation needed";
-            String header = "The shapes will be generated with the following basic conditions. Please review and confirm in order to proceed.";
-            String contextText = "Could you confirm the information below?";
-            String labelText = "Details:";
-            //TODO: make this nicer
-            //set the content of the details window
-            String detailedText = "The following profiles are selected: \n";
-            detailedText = detailedText + profileList + "\n";
-            detailedText = detailedText + "The namespaces for the selected profiles are: \n";
-            detailedText = detailedText + prefixes + "\n";
-            detailedText = detailedText + namespaces + "\n";
-            detailedText = detailedText + "The base URIs for the selected profiles are: \n";
-            detailedText = detailedText + baseURIs + "\n";
-            detailedText = detailedText + "The owl:imports for the selected profiles are: \n";
-            detailedText = detailedText + owlImports + "\n";
-            Alert alert = GUIhelper.expandableAlert(title, header, contextText, labelText, detailedText);
-            alert.getDialogPane().setExpanded(true);
-
-            Optional<ButtonType> result = alert.showAndWait();
-            if (result.get() != ButtonType.OK) {
-                return;
+                rdfsToShaclGuiMapBool.put("RDFSSHACLvalidate", false);
             }
 
-            baseprofilesshaclglag = 0;
-            baseprofilesshaclglag2nd = 0;
-            baseprofilesshaclglag3rd = 0;
-            baseprofilesshaclignorens = 0;
-            if (cbRDFSSHACLoptionBaseprofiles.isSelected()) { // load base profiles if the checkbox is selected
-                baseprofilesshaclglag = 1;
-                //load base profiles for shacl
-                List<File> basefiles = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
-                if (basefiles != null) {
-                    unionmodelbaseprofilesshacl = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
-                    unionmodelbaseprofilesshaclinheritance = modelInheritance(unionmodelbaseprofilesshacl, true, true);
-                    unionmodelbaseprofilesshaclinheritanceonly = modelInheritance; // this contains the inheritance of the classes under OWL2.members
+            List<File> baseModelFiles1 = null;
+            List<File> baseModelFiles2 = null;
+            List<File> baseModelFiles3 = null;
 
-//                    if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim") != null) {
-//                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim");
-//                    }
-                    if (cbRDFSSHACLoptionBaseprofilesIgnoreNS.isSelected()) {
-                        baseprofilesshaclignorens = 1;
-                    }
-
-                    if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim16") != null) {
-                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim16");
-                        cimPref = "cim16";
-                    } else if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim17") != null) {
-                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim17");
-                        cimPref = "cim17";
-                    } else if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim18") != null) {
-                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim18");
-                        cimPref = "cim18";
-                    }
-
-                    if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) { // load base profiles if the checkbox is selected
-                        baseprofilesshaclglag2nd = 1;
-                        //load base profiles for shacl
-                        List<File> basefiles2nd = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd set of Base profiles");
-                        if (basefiles2nd != null) {
-                            unionmodelbaseprofilesshacl2nd = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles2nd, "", Lang.RDFXML, true);
-                            unionmodelbaseprofilesshaclinheritance2nd = modelInheritance(unionmodelbaseprofilesshacl2nd, true, true);
-                            unionmodelbaseprofilesshaclinheritanceonly2nd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
-
-                            if (unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim16") != null) {
-                                cim2URI = unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim16");
-                                cim2Pref = "cim16";
-                            } else if (unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim17") != null) {
-                                cim2URI = unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim17");
-                                cim2Pref = "cim17";
-                            } else if (unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim18") != null) {
-                                cim2URI = unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim18");
-                                cim2Pref = "cim18";
-                            }
-
-                            if (cim2Pref.equals("cim16") || cim2Pref.equals("cim17") || cim2Pref.equals("cim18")) {
-                                unionmodelbaseprofilesshacl.add(unionmodelbaseprofilesshacl2nd);
-                                unionmodelbaseprofilesshaclinheritance.add(unionmodelbaseprofilesshaclinheritance2nd);
-                                unionmodelbaseprofilesshaclinheritanceonly.add(unionmodelbaseprofilesshaclinheritanceonly2nd);
-                            }
-
-                            if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) { // load base profiles if the checkbox is selected
-                                baseprofilesshaclglag3rd = 1;
-                                //load base profiles for shacl
-                                List<File> basefiles3rd = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd set of Base profiles");
-                                if (basefiles3rd != null) {
-                                    unionmodelbaseprofilesshacl3rd = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles3rd, "", Lang.RDFXML, true);
-                                    unionmodelbaseprofilesshaclinheritance3rd = modelInheritance(unionmodelbaseprofilesshacl3rd, true, true);
-                                    unionmodelbaseprofilesshaclinheritanceonly3rd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
-
-                                    if (unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim16") != null) {
-                                        cim3URI = unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim16");
-                                        cim3Pref = "cim16";
-                                    } else if (unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim17") != null) {
-                                        cim3URI = unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim17");
-                                        cim3Pref = "cim17";
-                                    } else if (unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim18") != null) {
-                                        cim3URI = unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim18");
-                                        cim3Pref = "cim18";
-                                    }
-
-                                    if (cim3Pref.equals("cim16") || cim3Pref.equals("cim17") || cim3Pref.equals("cim18")) {
-                                        unionmodelbaseprofilesshacl.add(unionmodelbaseprofilesshacl3rd);
-                                        unionmodelbaseprofilesshaclinheritance.add(unionmodelbaseprofilesshaclinheritance3rd);
-                                        unionmodelbaseprofilesshaclinheritanceonly.add(unionmodelbaseprofilesshaclinheritanceonly3rd);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            if (cbRDFSSHACLoptionBaseprofiles.isSelected()) {
+                baseModelFiles1 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 1st Base profiles");
+            }
+            if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) {
+                baseModelFiles2 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd Base profiles");
+            }
+            if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) {
+                baseModelFiles3 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd Base profiles");
             }
 
-            shaclflaginverse = 0;
-            if (cbRDFSSHACLoptionInverse.isSelected()) {
-                shaclflaginverse = 1;
-            }
 
-            shaclflagCount = 0;
-            if (cbRDFSSHACLoptionCount.isSelected()) {
-                shaclflagCount = 1;
-                shaclflagCountDefaultURI = 1;
-                shaclCommonPref = "";
-                shaclCommonURI = "";
-                if (shaclNSCommonType.getSelectionModel().getSelectedItem().toString().equals("Custom namespace")) {
-                    shaclflagCountDefaultURI = 0;
-                    shaclCommonPref = fPrefixSHACLCommon.getText();
-                    shaclCommonURI = fURISHACLcommon.getText();
-                }
+            String rdfFormatcbInput = fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
+            RDFtoSHACLOptions.RdfsFormatShapes rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.RDFS_AUGMENTED_2020;
+            if (rdfFormatcbInput.equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
+                rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.RDFS_AUGMENTED_2019;
+            } else if (rdfFormatcbInput.equals("CIMTool-merged-owl")) {
+                rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.CIMTOOL_MERGED_OWL;
             }
-
 
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-            for (int m : modelNumber) {
-                //here the preparation starts
-                dataTypeMapFromShapes = new HashMap<>();
+            RDFtoSHACLOptions.Builder builder = RDFtoSHACLOptions.builder()
+                    .excludeMRID(cbRDFSSHACLoptionDescr.isSelected())
+                    .closedShapes(cbRDFSSHACLoptionProperty.isSelected())
+                    .splitDatatypes(cbRDFSSHACLdatatypesplit.isSelected())
+                    .rdfsFormatShapes(rdfsFormatShapes)
+                    .associationValueTypeOption(cbRDFSSHACLoption1.isSelected())
+                    .associationValueTypeOptionSingle(cbRDFSSHACLoptionTypeWithOne.isSelected())
+                    .shapesOnAbstractOption(cbRDFSSHACLabstract.isSelected())
+                    .exportInheritTree(cbRDFSSHACLinheritTree.isSelected())
+                    .shaclURIDatatypeAsResource(cbRDFSSHACLuri.isSelected())
+                    .shaclSkipNcPropertyReference(cbRDFSSHACLncProp.isSelected())
+                    .baseprofilesshaclglag(cbRDFSSHACLoptionBaseprofiles.isSelected())
+                    .baseprofilesshaclignorens(cbRDFSSHACLoptionBaseprofilesIgnoreNS.isSelected())
+                    .baseprofilesshaclglag2nd(cbRDFSSHACLoptionBaseprofiles2nd.isSelected())
+                    .baseprofilesshaclglag3rd(cbRDFSSHACLoptionBaseprofiles3rd.isSelected())
+                    .shaclFlagInverse(cbRDFSSHACLoptionInverse.isSelected())
+                    .baseModelFiles1(baseModelFiles1)
+                    .baseModelFiles2(baseModelFiles2)
+                    .baseModelFiles3(baseModelFiles3)
+                    .rdfsModelDefinitions(RDFSmodelsNames)
+                    .rdfsModels(RDFSmodels)
+                    .shaclOutputFormat(RDFtoSHACLOptions.SerializationFormat.TURTLE)
+                    .iOprefix(prefs.get("IOprefix", ""))
+                    .iOuri(prefs.get("IOuri", ""))
+                    .cimsNamespace(prefs.get("cimsNamespace", ""));
 
-                Model model = (Model) this.models.get(m);
-                String rdfNs = MainController.prefs.get("cimsNamespace", "");
-                String rdfCase = "";
-                if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019") && cbvalue.equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
-                    rdfCase = "RDFS2019";
-                } else if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2020") && cbvalue.equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
-                    rdfCase = "RDFS2020";
-                    //this option is adding header to the SHACL that is generated.
-                } else if (rdfFormatInput.equals("CIMTool-merged-owl") && cbvalue.equals("CIMTool-merged-owl")) {
-                    rdfCase = "CIMToolOWL";
-                }
+            RDFtoSHACLOptions options = builder.build();
 
+            SHACLFromRDF rdftoSHACL = new SHACLFromRDF(options);
 
-                switch (rdfCase) {
-                    case "RDFS2019" -> {
-                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
-                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
-
-                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
-
-                        //here the preparation ends
-
-                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
-
-                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
-
-                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
-                        //}
-                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
-                        //generate the shape model
-                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
-                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
-
-
-                        if (baseprofilesshaclglag == 1) {
-                            shapeModel.setNsPrefix(cimPref, cimURI);
-                        }
-
-                        if (baseprofilesshaclglag2nd == 1) {
-                            shapeModel.setNsPrefix(cim2Pref, cim2URI);
-                        }
-
-                        if (baseprofilesshaclglag3rd == 1) {
-                            shapeModel.setNsPrefix(cim3Pref, cim3URI);
-                        }
-
-                        //add the owl:imports
-                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
-
-                        shapeModels.add(shapeModel);
-                        shapeModelsNames.add(this.modelsNames.get(m));
-
-                        //open the ChoiceDialog for the save file and save the file in different formats
-                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
-
-                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
-
-                        //this is used for the printing of the complete map in option "All profiles in one map"
-                        for (Object key : dataTypeMapFromShapes.keySet()) {
-                            dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
-                        }
-                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
-                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
-                            Properties properties = new Properties();
-
-                            for (Object key : dataTypeMapFromShapes.keySet()) {
-                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
-                            }
-                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
-                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
-
-                        }
-                        //add the shapes in the tree view
-
-
-                        //exporting the model to ttl ready function
-
-                    }
-                    case "RDFS2020" -> {
-                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
-
-                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
-
-                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
-
-                        //here the preparation ends
-
-                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
-
-                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
-
-                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
-                        //}
-                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
-                        //generate the shape model
-                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
-                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
-
-                        //add the owl:imports
-                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
-
-                        //add header
-                        if (model.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()) {
-                            shapeModel = ShaclTools.addSHACLheader(shapeModel, baseURI);
-                        }
-
-                        if (baseprofilesshaclglag == 1) {
-                            shapeModel.setNsPrefix(cimPref, cimURI);
-                        }
-
-                        if (baseprofilesshaclglag2nd == 1) {
-                            shapeModel.setNsPrefix(cim2Pref, cim2URI);
-                        }
-
-                        if (baseprofilesshaclglag3rd == 1) {
-                            shapeModel.setNsPrefix(cim3Pref, cim3URI);
-                        }
-
-                        shapeModels.add(shapeModel);
-                        shapeModelsNames.add(this.modelsNames.get(m));
-                        //optimise prefixes, strip unused prefixes
-                        //if (stripPrefixes){
-                        Map<String, String> modelPrefMap = shapeModel.getNsPrefixMap();
-                        LinkedList<String> uniqueNamespacesList = new LinkedList<>();
-                        for (StmtIterator ns = shapeModel.listStatements(); ns.hasNext(); ) {
-                            Statement stmtNS = ns.next();
-                            if (!uniqueNamespacesList.contains(stmtNS.getSubject().getNameSpace())) {
-                                uniqueNamespacesList.add(stmtNS.getSubject().getNameSpace());
-                            }
-                            if (!uniqueNamespacesList.contains(stmtNS.getPredicate().getNameSpace())) {
-                                uniqueNamespacesList.add(stmtNS.getPredicate().getNameSpace());
-                            }
-                            if (stmtNS.getObject().isResource()) {
-                                if (!uniqueNamespacesList.contains(stmtNS.getObject().asResource().getNameSpace())) {
-                                    uniqueNamespacesList.add(stmtNS.getObject().asResource().getNameSpace());
-                                }
-                            }
-                        }
-                        LinkedList<Map.Entry<String, String>> entryToRemove = new LinkedList<>();
-                        for (Map.Entry<String, String> entry : modelPrefMap.entrySet()) {
-                            //String key = entry.getKey();
-                            String value = entry.getValue();
-
-                            // Check if either the key or value is present in uniqueNamespacesList
-                            if (!uniqueNamespacesList.contains(value)) {
-                                entryToRemove.add(entry);
-                            }
-                        }
-                        for (Map.Entry<String, String> entryTR : entryToRemove) {
-                            shapeModel.removeNsPrefix(entryTR.getKey());
-                        }
-
-
-                        // Create a new HashMap to store the unique key-value pairs
-                        HashMap<String, String> uniqueMap = new HashMap<>();
-
-                        // Create a Set to track unique values
-                        Set<String> uniqueValues = new HashSet<>();
-
-                        //Iterate through the original HashMap
-                        Map<String, String> origPrefMap = shapeModel.getNsPrefixMap();
-                        for (Map.Entry<String, String> entry : origPrefMap.entrySet()) {
-                            if (uniqueValues.add(entry.getValue())) {
-                                // If the value was added to the set, it means it's unique
-                                uniqueMap.put(entry.getKey(), entry.getValue());
-                            }
-                        }
-                        //TODO check if there is cim just to avoid that cim was deleted instead of cim16,cim17 or cim18 in cases where the namespace was the same
-                        shapeModel.clearNsPrefixMap();
-                        shapeModel.setNsPrefixes(uniqueMap);
-                        //}
-
-                        if (cbRDFSSHACLvalidate.isSelected()) { //do validation
-                            if (shaclRefModel == null) {
-                                shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
-                            }
-                            ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModel.getGraph());
-
-                            if (report.conforms()) {
-                                System.out.print("Generated SHACL shapes conform to SHACL-SHACL validation.\n");
-                            } else {
-                                System.out.println("Validation failed. Data does not conform to the SHACL-SHACL shapes.\n");
-                                System.out.println("Validation problems:");
-                                ShaclTools.printSHACLreport(report);
-                            }
-                        }
-
-                        //open the ChoiceDialog for the save file and save the file in different formats
-                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).getFirst().toString();
-                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
-
-                        //this is used for the printing of the complete map in option "All profiles in one map"
-                        for (String key : dataTypeMapFromShapes.keySet()) {
-                            dataTypeMapFromShapesComplete.putIfAbsent(key, dataTypeMapFromShapes.get(key));
-                        }
-                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
-                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
-                            Properties properties = new Properties();
-
-                            for (String key : dataTypeMapFromShapes.keySet()) {
-                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
-                            }
-                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
-                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
-
-                        }
-
-                        if (unionmodelbaseprofilesshaclinheritance == null && baseprofilesshaclglag == 0) {
-                            Model modelInh = modelInheritance(model, true, true);
-                            String titleSaveAsInh = "Save as for inheritance model: InheritanceStructure";
-                            ShaclTools.saveShapesFile(modelInh, "", 0, titleSaveAsInh);
-                        }
-
-                    }
-                    case "CIMToolOWL" -> {
-                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
-                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
-
-                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
-
-                        //here the preparation ends
-
-                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
-
-                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
-
-
-                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
-                        //}
-                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
-                        //generate the shape model
-                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
-                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
-
-                        //add the owl:imports
-                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
-
-                        shapeModels.add(shapeModel);
-                        shapeModelsNames.add(this.modelsNames.get(m));
-
-                        //open the ChoiceDialog for the save file and save the file in different formats
-                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
-                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
-
-                        //this is used for the printing of the complete map in option "All profiles in one map"
-                        for (String key : dataTypeMapFromShapes.keySet()) {
-                            dataTypeMapFromShapesComplete.putIfAbsent(key, dataTypeMapFromShapes.get(key));
-                        }
-                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
-                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
-                            Properties properties = new Properties();
-
-                            for (String key : dataTypeMapFromShapes.keySet()) {
-                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
-                            }
-                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
-                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
-
-                        }
-                    }
-                }
+            rdftoSHACL.convert();
+            if (cbRDFSSHACLvalidate.isSelected()) {
+                rdftoSHACL.validateShapeModels();
             }
 
-            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
-                File saveFile = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
+            // save the generated shapes
+            Path outputFolderPath = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select output folder").toPath();
+            rdftoSHACL.saveShapeModel(outputFolderPath);
 
-                if (saveFile != null) {
-                    //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
-                    Properties properties = new Properties();
-
-                    for (String key : dataTypeMapFromShapesComplete.keySet()) {
-                        properties.put(key, dataTypeMapFromShapesComplete.get(key).toString());
-                    }
-                    properties.store(new FileOutputStream(saveFile.toString()), null);
-                }
+            // save datatype map if requested
+            if (cbRDFSSHACLdatatypesplit.isSelected()) {
+                rdftoSHACL.saveShapeModelDT(outputFolderPath);
             }
 
-            if (cbRDFSSHACLinheritTree.isSelected() && unionmodelbaseprofilesshaclinheritance != null) {
-                //open the ChoiceDialog for the save file and save the file in different formats
-                String titleSaveAs = "Save as for inheritance model: InheritanceStructure";
-                ShaclTools.saveShapesFile(unionmodelbaseprofilesshaclinheritance, "", 0, titleSaveAs);
+            if (cbRDFSSHACLinheritTree.isSelected()) {
+                rdftoSHACL.saveInheritanceModel(outputFolderPath);
             }
+
+            // todo datatype map storing is not implemented
+//            if(fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
+//                rdftoSHACL.saveProfilesMap(new File(outputFolderPath.toFile(), "datatype.properties"));
+//            }
+
+
+            // prepareShapesModelFromRDFS(rdfsToShaclGuiMapBool,rdfsToShaclGuiMapStr);
+
 
             progressBar.setProgress(1);
             System.out.print("Generation of SHACL shapes is completed.\n");
@@ -3954,6 +3513,517 @@ public class MainController implements Initializable {
         }
     }
 
+    //@FXML
+    //action for button Create in the tab RDFS to SHACL
+//    private void actionBtnConstructShacl(ActionEvent actionEvent) throws IOException {
+//        excludeMRID = cbRDFSSHACLoptionDescr.isSelected();
+//
+//        String cbvalue;
+//        Model shaclRefModel = null;
+//        if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem() == null) {
+//            cbvalue = "";
+//        } else {
+//            cbvalue = fcbRDFSformatShapes.getSelectionModel().getSelectedItem().toString();
+//        }
+//        if (cbRDFSSHACLoption1.isSelected()) {
+//            associationValueTypeOption = 1;
+//        } else {
+//            associationValueTypeOption = 0;
+//        }
+//        if (cbRDFSSHACLoptionTypeWithOne.isSelected()) {
+//            associationValueTypeOptionSingle = 1;
+//        } else {
+//            associationValueTypeOptionSingle = 0;
+//        }
+//        if (cbRDFSSHACLabstract.isSelected()) {
+//            shapesOnAbstractOption = 1;
+//        } else {
+//            shapesOnAbstractOption = 0;
+//        }
+//        if (cbRDFSSHACLinheritTree.isSelected()) {
+//            exportInheritTree = 1;
+//        } else {
+//            exportInheritTree = 0;
+//        }
+//
+//        shaclURIdatatypeAsResource = false;
+//        shaclSkipNcPropertyReference = false;
+//        if (cbRDFSSHACLuri.isSelected()){
+//            shaclURIdatatypeAsResource = true;
+//        }
+//
+//        if (cbRDFSSHACLncProp.isSelected()){
+//            shaclSkipNcPropertyReference = true;
+//        }
+//
+//
+//        if (!treeViewProfileConstraints.getSelectionModel().getSelectedItems().isEmpty()) {
+//            //depending on the value of the choice box "Save datatype map"
+//            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("No map; No save")) {
+//                shaclNodataMap = 1;
+//            } else {
+//                shaclNodataMap = 0;
+//            }
+//            if (shapeModels == null) {
+//                shapeModels = new ArrayList<>();
+//            }
+//            if (shapeModelsNames == null) {
+//                shapeModelsNames = new ArrayList<>();
+//            }
+//            shapeDatas = new ArrayList<>();
+//            Map<String, RDFDatatype> dataTypeMapFromShapesComplete = new HashMap<>(); // this is the complete map for the export in one .properties
+//            ArrayList<Integer> modelNumber = new ArrayList<>();
+//            List<String> profileList = new ArrayList<>();
+//            List<String> prefixes = new ArrayList<>();
+//            List<String> namespaces = new ArrayList<>();
+//            List<String> baseURIs = new ArrayList<>();
+//            List<String> owlImports = new ArrayList<>();
+//            for (int sel = 0; sel < treeViewProfileConstraints.getSelectionModel().getSelectedItems().size(); sel++) {
+//                String selectedProfile = treeViewProfileConstraints.getSelectionModel().getSelectedItems().get(sel).getValue();
+//                for (int i = 0; i < this.modelsNames.size(); i++) {
+//                    if (((ArrayList<?>) this.modelsNames.get(i)).get(0).equals(selectedProfile)) {
+//                        modelNumber.add(i);
+//                        profileList.add(selectedProfile);
+//                        prefixes.add(((ArrayList<?>) this.modelsNames.get(i)).get(1).toString());
+//                        namespaces.add(((ArrayList<?>) this.modelsNames.get(i)).get(2).toString());
+//                        baseURIs.add(((ArrayList<?>) this.modelsNames.get(i)).get(3).toString());
+//                        owlImports.add(((ArrayList<?>) this.modelsNames.get(i)).get(4).toString());
+//                    }
+//                }
+//            }
+//            // ask for confirmation before proceeding
+//            String title = "Confirmation needed";
+//            String header = "The shapes will be generated with the following basic conditions. Please review and confirm in order to proceed.";
+//            String contextText = "Could you confirm the information below?";
+//            String labelText = "Details:";
+//            //TODO: make this nicer
+//            //set the content of the details window
+//            String detailedText = "The following profiles are selected: \n";
+//            detailedText = detailedText + profileList + "\n";
+//            detailedText = detailedText + "The namespaces for the selected profiles are: \n";
+//            detailedText = detailedText + prefixes + "\n";
+//            detailedText = detailedText + namespaces + "\n";
+//            detailedText = detailedText + "The base URIs for the selected profiles are: \n";
+//            detailedText = detailedText + baseURIs + "\n";
+//            detailedText = detailedText + "The owl:imports for the selected profiles are: \n";
+//            detailedText = detailedText + owlImports + "\n";
+//            Alert alert = GUIhelper.expandableAlert(title, header, contextText, labelText, detailedText);
+//            alert.getDialogPane().setExpanded(true);
+//
+//            Optional<ButtonType> result = alert.showAndWait();
+//            if (result.get() != ButtonType.OK) {
+//                return;
+//            }
+//
+//            baseprofilesshaclglag = 0;
+//            baseprofilesshaclglag2nd = 0;
+//            baseprofilesshaclglag3rd = 0;
+//            baseprofilesshaclignorens = 0;
+//            if (cbRDFSSHACLoptionBaseprofiles.isSelected()) { // load base profiles if the checkbox is selected
+//                baseprofilesshaclglag = 1;
+//                //load base profiles for shacl
+//                List<File> basefiles = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
+//                if (basefiles != null) {
+//                    unionmodelbaseprofilesshacl = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
+//                    unionmodelbaseprofilesshaclinheritance = modelInheritance(unionmodelbaseprofilesshacl, true, true);
+//                    unionmodelbaseprofilesshaclinheritanceonly = modelInheritance; // this contains the inheritance of the classes under OWL2.members
+//
+
+    /// /                    if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim") != null) {
+    /// /                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim");
+    /// /                    }
+//                    if (cbRDFSSHACLoptionBaseprofilesIgnoreNS.isSelected()) {
+//                        baseprofilesshaclignorens = 1;
+//                    }
+//
+//                    if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim16") != null) {
+//                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim16");
+//                        cimPref = "cim16";
+//                    } else if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim17") != null) {
+//                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim17");
+//                        cimPref = "cim17";
+//                    } else if (unionmodelbaseprofilesshacl.getNsPrefixURI("cim18") != null) {
+//                        cimURI = unionmodelbaseprofilesshacl.getNsPrefixURI("cim18");
+//                        cimPref = "cim18";
+//                    }
+//
+//                    if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) { // load base profiles if the checkbox is selected
+//                        baseprofilesshaclglag2nd = 1;
+//                        //load base profiles for shacl
+//                        List<File> basefiles2nd = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd set of Base profiles");
+//                        if (basefiles2nd != null) {
+//                            unionmodelbaseprofilesshacl2nd = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles2nd, "", Lang.RDFXML, true);
+//                            unionmodelbaseprofilesshaclinheritance2nd = modelInheritance(unionmodelbaseprofilesshacl2nd, true, true);
+//                            unionmodelbaseprofilesshaclinheritanceonly2nd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
+//
+//                            if (unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim16") != null) {
+//                                cim2URI = unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim16");
+//                                cim2Pref = "cim16";
+//                            } else if (unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim17") != null) {
+//                                cim2URI = unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim17");
+//                                cim2Pref = "cim17";
+//                            } else if (unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim18") != null) {
+//                                cim2URI = unionmodelbaseprofilesshacl2nd.getNsPrefixURI("cim18");
+//                                cim2Pref = "cim18";
+//                            }
+//
+//                            if (cim2Pref.equals("cim16") || cim2Pref.equals("cim17") || cim2Pref.equals("cim18")) {
+//                                unionmodelbaseprofilesshacl.add(unionmodelbaseprofilesshacl2nd);
+//                                unionmodelbaseprofilesshaclinheritance.add(unionmodelbaseprofilesshaclinheritance2nd);
+//                                unionmodelbaseprofilesshaclinheritanceonly.add(unionmodelbaseprofilesshaclinheritanceonly2nd);
+//                            }
+//
+//                            if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) { // load base profiles if the checkbox is selected
+//                                baseprofilesshaclglag3rd = 1;
+//                                //load base profiles for shacl
+//                                List<File> basefiles3rd = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd set of Base profiles");
+//                                if (basefiles3rd != null) {
+//                                    unionmodelbaseprofilesshacl3rd = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles3rd, "", Lang.RDFXML, true);
+//                                    unionmodelbaseprofilesshaclinheritance3rd = modelInheritance(unionmodelbaseprofilesshacl3rd, true, true);
+//                                    unionmodelbaseprofilesshaclinheritanceonly3rd = modelInheritance; // this contains the inheritance of the classes under OWL2.members
+//
+//                                    if (unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim16") != null) {
+//                                        cim3URI = unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim16");
+//                                        cim3Pref = "cim16";
+//                                    } else if (unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim17") != null) {
+//                                        cim3URI = unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim17");
+//                                        cim3Pref = "cim17";
+//                                    } else if (unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim18") != null) {
+//                                        cim3URI = unionmodelbaseprofilesshacl3rd.getNsPrefixURI("cim18");
+//                                        cim3Pref = "cim18";
+//                                    }
+//
+//                                    if (cim3Pref.equals("cim16") || cim3Pref.equals("cim17") || cim3Pref.equals("cim18")) {
+//                                        unionmodelbaseprofilesshacl.add(unionmodelbaseprofilesshacl3rd);
+//                                        unionmodelbaseprofilesshaclinheritance.add(unionmodelbaseprofilesshaclinheritance3rd);
+//                                        unionmodelbaseprofilesshaclinheritanceonly.add(unionmodelbaseprofilesshaclinheritanceonly3rd);
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//
+//            shaclflaginverse = 0;
+//            if (cbRDFSSHACLoptionInverse.isSelected()) {
+//                shaclflaginverse = 1;
+//            }
+//
+//            shaclflagCount = 0;
+//            if (cbRDFSSHACLoptionCount.isSelected()) {
+//                shaclflagCount = 1;
+//                shaclflagCountDefaultURI = 1;
+//                shaclCommonPref = "";
+//                shaclCommonURI = "";
+//                if (shaclNSCommonType.getSelectionModel().getSelectedItem().toString().equals("Custom namespace")) {
+//                    shaclflagCountDefaultURI = 0;
+//                    shaclCommonPref = fPrefixSHACLCommon.getText();
+//                    shaclCommonURI = fURISHACLcommon.getText();
+//                }
+//            }
+//
+//
+//            progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+//
+//            for (int m : modelNumber) {
+//                //here the preparation starts
+//                dataTypeMapFromShapes = new HashMap<>();
+//
+//                Model model = (Model) this.models.get(m);
+//                String rdfNs = MainController.prefs.get("cimsNamespace", "");
+//                String rdfCase = "";
+//                if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2019") && cbvalue.equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
+//                    rdfCase = "RDFS2019";
+//                } else if (rdfFormatInput.equals("CimSyntaxGen-RDFS-Augmented-2020") && cbvalue.equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
+//                    rdfCase = "RDFS2020";
+//                    //this option is adding header to the SHACL that is generated.
+//                } else if (rdfFormatInput.equals("CIMTool-merged-owl") && cbvalue.equals("CIMTool-merged-owl")) {
+//                    rdfCase = "CIMToolOWL";
+//                }
+//
+//
+//                switch (rdfCase) {
+//                    case "RDFS2019" -> {
+//                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+//                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
+//
+//                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+//
+//                        //here the preparation ends
+//
+//                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+//
+//                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+//
+//                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
+//                        //}
+//                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
+//                        //generate the shape model
+//                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
+//                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
+//
+//
+//                        if (baseprofilesshaclglag == 1) {
+//                            shapeModel.setNsPrefix(cimPref, cimURI);
+//                        }
+//
+//                        if (baseprofilesshaclglag2nd == 1) {
+//                            shapeModel.setNsPrefix(cim2Pref, cim2URI);
+//                        }
+//
+//                        if (baseprofilesshaclglag3rd == 1) {
+//                            shapeModel.setNsPrefix(cim3Pref, cim3URI);
+//                        }
+//
+//                        //add the owl:imports
+//                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
+//
+//                        shapeModels.add(shapeModel);
+//                        shapeModelsNames.add(this.modelsNames.get(m));
+//
+//                        //open the ChoiceDialog for the save file and save the file in different formats
+//                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
+//
+//                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+//
+//                        //this is used for the printing of the complete map in option "All profiles in one map"
+//                        for (Object key : dataTypeMapFromShapes.keySet()) {
+//                            dataTypeMapFromShapesComplete.putIfAbsent((String) key, dataTypeMapFromShapes.get(key));
+//                        }
+//                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
+//                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
+//                            Properties properties = new Properties();
+//
+//                            for (Object key : dataTypeMapFromShapes.keySet()) {
+//                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
+//                            }
+//                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+//                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+//
+//                        }
+//                        //add the shapes in the tree view
+//
+//
+//                        //exporting the model to ttl ready function
+//
+//                    }
+//                    case "RDFS2020" -> {
+//                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+//
+//                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
+//
+//                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+//
+//                        //here the preparation ends
+//
+//                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+//
+//                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+//
+//                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
+//                        //}
+//                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
+//                        //generate the shape model
+//                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
+//                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
+//
+//                        //add the owl:imports
+//                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
+//
+//                        //add header
+//                        if (model.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()) {
+//                            shapeModel = ShaclTools.addSHACLheader(shapeModel, baseURI);
+//                        }
+//
+//                        if (baseprofilesshaclglag == 1) {
+//                            shapeModel.setNsPrefix(cimPref, cimURI);
+//                        }
+//
+//                        if (baseprofilesshaclglag2nd == 1) {
+//                            shapeModel.setNsPrefix(cim2Pref, cim2URI);
+//                        }
+//
+//                        if (baseprofilesshaclglag3rd == 1) {
+//                            shapeModel.setNsPrefix(cim3Pref, cim3URI);
+//                        }
+//
+//                        shapeModels.add(shapeModel);
+//                        shapeModelsNames.add(this.modelsNames.get(m));
+//                        //optimise prefixes, strip unused prefixes
+//                        //if (stripPrefixes){
+//                        Map<String, String> modelPrefMap = shapeModel.getNsPrefixMap();
+//                        LinkedList<String> uniqueNamespacesList = new LinkedList<>();
+//                        for (StmtIterator ns = shapeModel.listStatements(); ns.hasNext(); ) {
+//                            Statement stmtNS = ns.next();
+//                            if (!uniqueNamespacesList.contains(stmtNS.getSubject().getNameSpace())) {
+//                                uniqueNamespacesList.add(stmtNS.getSubject().getNameSpace());
+//                            }
+//                            if (!uniqueNamespacesList.contains(stmtNS.getPredicate().getNameSpace())) {
+//                                uniqueNamespacesList.add(stmtNS.getPredicate().getNameSpace());
+//                            }
+//                            if (stmtNS.getObject().isResource()) {
+//                                if (!uniqueNamespacesList.contains(stmtNS.getObject().asResource().getNameSpace())) {
+//                                    uniqueNamespacesList.add(stmtNS.getObject().asResource().getNameSpace());
+//                                }
+//                            }
+//                        }
+//                        LinkedList<Map.Entry<String, String>> entryToRemove = new LinkedList<>();
+//                        for (Map.Entry<String, String> entry : modelPrefMap.entrySet()) {
+//                            //String key = entry.getKey();
+//                            String value = entry.getValue();
+//
+//                            // Check if either the key or value is present in uniqueNamespacesList
+//                            if (!uniqueNamespacesList.contains(value)) {
+//                                entryToRemove.add(entry);
+//                            }
+//                        }
+//                        for (Map.Entry<String, String> entryTR : entryToRemove) {
+//                            shapeModel.removeNsPrefix(entryTR.getKey());
+//                        }
+//
+//
+//                        // Create a new HashMap to store the unique key-value pairs
+//                        HashMap<String, String> uniqueMap = new HashMap<>();
+//
+//                        // Create a Set to track unique values
+//                        Set<String> uniqueValues = new HashSet<>();
+//
+//                        //Iterate through the original HashMap
+//                        Map<String, String> origPrefMap = shapeModel.getNsPrefixMap();
+//                        for (Map.Entry<String, String> entry : origPrefMap.entrySet()) {
+//                            if (uniqueValues.add(entry.getValue())) {
+//                                // If the value was added to the set, it means it's unique
+//                                uniqueMap.put(entry.getKey(), entry.getValue());
+//                            }
+//                        }
+//                        //TODO check if there is cim just to avoid that cim was deleted instead of cim16,cim17 or cim18 in cases where the namespace was the same
+//                        shapeModel.clearNsPrefixMap();
+//                        shapeModel.setNsPrefixes(uniqueMap);
+//                        //}
+//
+//                        if (cbRDFSSHACLvalidate.isSelected()) { //do validation
+//                            if (shaclRefModel == null) {
+//                                shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
+//                            }
+//                            ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModel.getGraph());
+//
+//                            if (report.conforms()) {
+//                                System.out.print("Generated SHACL shapes conform to SHACL-SHACL validation.\n");
+//                            } else {
+//                                System.out.println("Validation failed. Data does not conform to the SHACL-SHACL shapes.\n");
+//                                System.out.println("Validation problems:");
+//                                ShaclTools.printSHACLreport(report);
+//                            }
+//                        }
+//
+//                        //open the ChoiceDialog for the save file and save the file in different formats
+//                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).getFirst().toString();
+//                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+//
+//                        //this is used for the printing of the complete map in option "All profiles in one map"
+//                        for (String key : dataTypeMapFromShapes.keySet()) {
+//                            dataTypeMapFromShapesComplete.putIfAbsent(key, dataTypeMapFromShapes.get(key));
+//                        }
+//                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
+//                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
+//                            Properties properties = new Properties();
+//
+//                            for (String key : dataTypeMapFromShapes.keySet()) {
+//                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
+//                            }
+//                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+//                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+//
+//                        }
+//
+//                        if (unionmodelbaseprofilesshaclinheritance == null && baseprofilesshaclglag == 0) {
+//                            Model modelInh = modelInheritance(model, true, true);
+//                            String titleSaveAsInh = "Save as for inheritance model: InheritanceStructure";
+//                            ShaclTools.saveShapesFile(modelInh, "", 0, titleSaveAsInh);
+//                        }
+//
+//                    }
+//                    case "CIMToolOWL" -> {
+//                        String concreteNs = "http://iec.ch/TC57/NonStandard/UML#concrete";
+//                        ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, rdfNs, concreteNs);
+//
+//                        shapeDatas.add(shapeData); // shapeDatas stores the shaclData for all profiles
+//
+//                        //here the preparation ends
+//
+//                        String nsPrefixprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+//
+//                        String nsURIprofile = ((ArrayList<?>) this.modelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+//
+//
+//                        String baseURI = ((ArrayList<?>) this.modelsNames.get(m)).get(3).toString();
+//                        //}
+//                        String owlImport = ((ArrayList<?>) this.modelsNames.get(m)).get(4).toString();
+//                        //generate the shape model
+//                        Map<String,Boolean> rdfsToShaclGuiMapBool = new HashMap<>();
+//                        Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData,rdfsToShaclGuiMapBool);
+//
+//                        //add the owl:imports
+//                        shapeModel = ShaclTools.addOWLimports(shapeModel, baseURI, owlImport);
+//
+//                        shapeModels.add(shapeModel);
+//                        shapeModelsNames.add(this.modelsNames.get(m));
+//
+//                        //open the ChoiceDialog for the save file and save the file in different formats
+//                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) this.modelsNames.get(m)).get(0).toString();
+//                        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+//
+//                        //this is used for the printing of the complete map in option "All profiles in one map"
+//                        for (String key : dataTypeMapFromShapes.keySet()) {
+//                            dataTypeMapFromShapesComplete.putIfAbsent(key, dataTypeMapFromShapes.get(key));
+//                        }
+//                        //saves the datatypes map .properties file for each profile. The base name is the same as the shacl file name given by the user
+//                        if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("Per profile")) {
+//                            Properties properties = new Properties();
+//
+//                            for (String key : dataTypeMapFromShapes.keySet()) {
+//                                properties.put(key, dataTypeMapFromShapes.get(key).toString());
+//                            }
+//                            String fileName = FilenameUtils.getBaseName(String.valueOf(savedFile));
+//                            properties.store(new FileOutputStream(savedFile.getParent() + "\\" + fileName + ".properties"), null);
+//
+//                        }
+//                    }
+//                }
+//            }
+//
+//            if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
+//                File saveFile = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom("Datatypes mapping files", List.of("*.properties"), "", "");
+//
+//                if (saveFile != null) {
+//                    //MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+//                    Properties properties = new Properties();
+//
+//                    for (String key : dataTypeMapFromShapesComplete.keySet()) {
+//                        properties.put(key, dataTypeMapFromShapesComplete.get(key).toString());
+//                    }
+//                    properties.store(new FileOutputStream(saveFile.toString()), null);
+//                }
+//            }
+//
+//            if (cbRDFSSHACLinheritTree.isSelected() && unionmodelbaseprofilesshaclinheritance != null) {
+//                //open the ChoiceDialog for the save file and save the file in different formats
+//                String titleSaveAs = "Save as for inheritance model: InheritanceStructure";
+//                ShaclTools.saveShapesFile(unionmodelbaseprofilesshaclinheritance, "", 0, titleSaveAs);
+//            }
+//
+//            progressBar.setProgress(1);
+//            System.out.print("Generation of SHACL shapes is completed.\n");
+//
+//        } else {
+//            Alert alert = new Alert(Alert.AlertType.ERROR);
+//            alert.setContentText("Please select a profile for which you would like to generate Shapes and the RDFS format.");
+//            alert.setHeaderText(null);
+//            alert.setTitle("Error - no profile selected");
+//            alert.showAndWait();
+//        }
+//    }
     @FXML
     //Action for button "Load Data" related to tab Instance Data Browser
     private void actionBtnLoadInstanceData(ActionEvent actionEvent) throws IOException {
@@ -4937,8 +5007,7 @@ public class MainController implements Initializable {
             if (!MainController.prefs.get("prefixOther", "").isEmpty() && !MainController.prefs.get("uriOther", "").isEmpty()) {
                 shapeModel.setNsPrefix(MainController.prefs.get("prefixOther", ""), MainController.prefs.get("uriOther", ""));
             }
-        }
-        else {
+        } else {
             for (int row = 1; row < configSheet.size(); row++) { //loop on the rows in the xlsx
                 String prefix = ((LinkedList<?>) configSheet.get(row)).get(0).toString();
                 String uri = ((LinkedList<?>) configSheet.get(row)).get(1).toString();
@@ -5194,14 +5263,14 @@ public class MainController implements Initializable {
         progressBar.setProgress(0);
 
         String xmlBase = "";
-        switch (fcb_giVersion.getSelectionModel().getSelectedItem().toString()){
+        switch (fcb_giVersion.getSelectionModel().getSelectedItem().toString()) {
             case "IEC 61970-600-1&2 (CGMES 3.0.0)":
                 xmlBase = "http://iec.ch/TC57/CIM100";
                 break;
-                case "IEC TS 61970-600-1&2 (CGMES 2.4.15)":
+            case "IEC TS 61970-600-1&2 (CGMES 2.4.15)":
                 xmlBase = "http://iec.ch/TC57/2013/CIM-schema-cim16";
                 break;
-                case "Other":
+            case "Other":
                 xmlBase = "https://cim.ucaiug.io/ns";
                 break;
             default:
@@ -5245,7 +5314,7 @@ public class MainController implements Initializable {
                 ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties, guiHelper);
                 break;
             case "Advanced template":
-                for (File file : inputXLS){
+                for (File file : inputXLS) {
                     ModelManipulationFactory.generateDataFromXlsV2(xmlBase, file, saveProperties, stripPrefixes, exportExtensions);
                 }
                 break;
@@ -5273,7 +5342,7 @@ public class MainController implements Initializable {
             hideEmptySheets.setVisible(true);
             hideEmptySheets.setDisable(false);
         }
-        if(!fcbAddInstanceData.isSelected()) {
+        if (!fcbAddInstanceData.isSelected()) {
             hideEmptySheets.setVisible(false);
             hideEmptySheets.setDisable(true);
             hideEmptySheets.setSelected(false);
@@ -5298,15 +5367,15 @@ public class MainController implements Initializable {
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
 
-            CreateTemplateFromRDF(file, iFileList,  selectedMethod, hide);
+            CreateTemplateFromRDF(file, iFileList, selectedMethod, hide);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
         }
     }
 
-    private void actionHandleOptionsForGen(String selected){
-        switch (selected){
+    private void actionHandleOptionsForGen(String selected) {
+        switch (selected) {
             case "Old template (not maintained)":
                 fcbAddInstanceData.setDisable(true);
                 fcbSortRDFGen.setDisable(true);

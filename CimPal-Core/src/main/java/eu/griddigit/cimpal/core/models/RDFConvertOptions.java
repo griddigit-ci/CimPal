@@ -6,7 +6,7 @@ import java.io.File;
 import java.util.List;
 
 public class RDFConvertOptions {
-    // ------------- all fields are now final -------------
+
     private final File sourceFile;
     private final List<File> modelUnionFiles;
     private final List<File> modelUnionDetailedFiles;

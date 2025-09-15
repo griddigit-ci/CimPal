@@ -130,13 +130,13 @@ public class ShaclTools {
 
                     //here the preparation ends
 
-                    String nsPrefixprofile = ((ArrayList<?>) RDFSmodelsNames.get(m)).get(1).toString(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
+                    String nsPrefixprofile = RDFSmodelsNames.get(m).getNsPrefix(); // ((ArrayList) this.modelsNames.get(m)).get(1).toString(); // this is the prefix of the the profile
 
-                    String nsURIprofile = ((ArrayList<?>) RDFSmodelsNames.get(m)).get(2).toString(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
+                    String nsURIprofile = RDFSmodelsNames.get(m).getNsUri(); //((ArrayList) this.modelsNames.get(m)).get(2).toString(); //this the namespace of the the profile
 
-                    String baseURI = ((ArrayList<?>) RDFSmodelsNames.get(m)).get(3).toString();
+                    String baseURI = RDFSmodelsNames.get(m).getBaseUri();
                     //}
-                    String owlImport = ((ArrayList<?>) RDFSmodelsNames.get(m)).get(4).toString();
+                    String owlImport = RDFSmodelsNames.get(m).getOwlImport();
                     //generate the shape model
                     //Model shapeModel = ShaclTools.createShapesModelFromProfile(model, nsPrefixprofile, nsURIprofile, shapeData);
                     Model shapeModel = createShapesModelFromRDFS(model, nsPrefixprofile, nsURIprofile,rdfsToShaclGuiMapBool,rdfsToShaclGuiMapStr,baseTier1Map,baseTier2Map,baseTier3Map,
@@ -269,13 +269,13 @@ public class ShaclTools {
                         shapeModelDT.add(datatypeStatements);
                         shapeModel.remove(datatypeStatements);
 
-                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) RDFSmodelsNames.get(m)).getFirst().toString();
+                        String titleSaveAs = "Save as for shape model: " + RDFSmodelsNames.get(m).getModelName();
                         savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
-                        String titleSaveAsDT = "Save as for shape model - Datatypes: " + ((ArrayList<?>) RDFSmodelsNames.get(m)).getFirst().toString();
+                        String titleSaveAsDT = "Save as for shape model - Datatypes: " + RDFSmodelsNames.get(m).getModelName();
                         File savedFileDT = ShaclTools.saveShapesFile(shapeModelDT, baseURI, 0, titleSaveAsDT);
                     }else{
                         //open the ChoiceDialog for the save file and save the file in different formats
-                        String titleSaveAs = "Save as for shape model: " + ((ArrayList<?>) RDFSmodelsNames.get(m)).getFirst().toString();
+                        String titleSaveAs = "Save as for shape model: " + RDFSmodelsNames.get(m).getModelName();
                         savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
                     }
 
@@ -3276,7 +3276,6 @@ public class ShaclTools {
                                 .set(RIOT.symTurtleOmitBase, false)
                                 .set(RIOT.symTurtleIndentStyle, "wide")
                                 .set(RIOT.symTurtleDirectiveStyle, "rdf10")
-                                .set(RIOT.multilineLiterals, true)
                                 .lang(Lang.TURTLE)
                                 .source(model)
                                 .output(out);

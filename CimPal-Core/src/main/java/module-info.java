@@ -8,4 +8,7 @@ module CimPal.Core {
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
     requires CimPal.CustomWriter;
+    requires org.apache.jena.shacl;
+    requires org.apache.commons.io;
+    requires shacl;
 }
