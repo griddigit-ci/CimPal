@@ -82,7 +82,6 @@ import static eu.griddigit.cimpal.main.core.ExportInstanceDataTemplate.CreateTem
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
 import static eu.griddigit.cimpal.main.core.RdfConvert.modelInheritance;
-import static eu.griddigit.cimpal.main.core.ShaclTools.prepareShapesModelFromRDFS;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
@@ -2073,9 +2072,11 @@ public class MainController implements Initializable {
 
         progressBar.setProgress(0);
         //format from
-        String sourceFormat = fsourceFormatChoiceBox.getSelectionModel().getSelectedItem().toString();
+        String sourceFormatString = fsourceFormatChoiceBox.getSelectionModel().getSelectedItem().toString();
+        RDFConvertOptions.RDFFormats sourceFormat = RDFConvertOptions.RDFFormats.RDFXML;
         //format to
-        String targetFormat = ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString();
+        String targetFormatString = ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString();
+        RDFConvertOptions.RDFFormats targetFormat = RDFConvertOptions.RDFFormats.RDFXML;
         //xmlBase
         String xmlBase = null;
 
@@ -2099,27 +2100,40 @@ public class MainController implements Initializable {
 
         //sort options
         String sortOptions = "";
-        if (targetFormat.equals("RDF XML (.rdf or .xml)")) {
+        if (targetFormatString.equals("RDF XML (.rdf or .xml)")) {
             sortOptions = fcbRDFsortOptions.getSelectionModel().getSelectedItem().toString();
         }
 
         String showXmlDeclaration = "false";
-        if (targetFormat.equals("RDF XML (.rdf or .xml)") && fcbShowXMLDeclaration.isSelected()) {
+        if (targetFormatString.equals("RDF XML (.rdf or .xml)") && fcbShowXMLDeclaration.isSelected()) {
             showXmlDeclaration = "true";
         }
 
         String showDoctypeDeclaration = "false";
-        if (targetFormat.equals("RDF XML (.rdf or .xml)") && fcbShowDoctypeDeclaration.isSelected()) {
+        if (targetFormatString.equals("RDF XML (.rdf or .xml)") && fcbShowDoctypeDeclaration.isSelected()) {
             showDoctypeDeclaration = "true";
         }
         String tab = "";
-        if (targetFormat.equals("RDF XML (.rdf or .xml)")) {
+        if (targetFormatString.equals("RDF XML (.rdf or .xml)")) {
             tab = fRDFconvertTab.getText();
         }
         String relativeURIs = "";
-        if (targetFormat.equals("RDF XML (.rdf or .xml)")) {
+        if (targetFormatString.equals("RDF XML (.rdf or .xml)")) {
             relativeURIs = fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
         }
+
+        if(sourceFormatString.equals("RDF Turtle (.ttl)")) {
+            sourceFormat = RDFConvertOptions.RDFFormats.TURTLE;
+        } else if(sourceFormatString.equals("JSON-LD (.jsonld)")) {
+            sourceFormat = RDFConvertOptions.RDFFormats.JSONLD;
+        }
+
+        if (targetFormatString.equals("RDF Turtle (.ttl)")) {
+            targetFormat = RDFConvertOptions.RDFFormats.TURTLE;
+        } else if (targetFormatString.equals("JSON-LD (.jsonld)")) {
+            targetFormat = RDFConvertOptions.RDFFormats.JSONLD;
+        }
+
         String sortRDF = "false";
         if (fcbSortRDF.isSelected()) {
             sortRDF = "true";
@@ -2159,7 +2173,7 @@ public class MainController implements Initializable {
                 .sourceFormat(sourceFormat)
                 .targetFormat(targetFormat)
                 .xmlBase(xmlBase)
-                .rdfFormat(rdfFormat)
+                .rdfXmlFormat(rdfFormat)
                 .showXmlDeclaration(showXmlDeclaration)
                 .showDoctypeDeclaration(showDoctypeDeclaration)
                 .tabCharacter(tab)
@@ -2190,7 +2204,7 @@ public class MainController implements Initializable {
             filename = "MultipleModels";
         }
         OutputStream out = null;
-        switch (targetFormat) {
+        switch (targetFormatString) {
             case "RDF XML (.rdf or .xml)" -> {
                 out = fileSaveDialog("Save RDF XML for: " + filename, "RDF XML", "*.rdf");
             }

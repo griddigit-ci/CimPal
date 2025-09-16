@@ -30,7 +30,7 @@ public class RDFConverter {
         File sourceFile = options.getSourceFile();
         List<File> modelUnionFiles = options.getModelUnionFiles();
         List<File> modelUnionDetailedFiles = options.getModelUnionDetailedFiles();
-        String sourceFormat = options.getSourceFormat();
+        RDFConvertOptions.RDFFormats sourceFormat = options.getSourceFormat();
         String xmlBase = options.getXmlBase();
         boolean modelUnionFlag = options.isModelUnionFlag();
         boolean inheritanceOnly = options.isInheritanceOnly();
@@ -42,9 +42,9 @@ public class RDFConverter {
         boolean modelUnionFixPackage = options.isModelUnionFixPackage();
 
         Lang rdfSourceFormat = switch (sourceFormat) {
-            case "RDF XML (.rdf or .xml)" -> Lang.RDFXML;
-            case "RDF Turtle (.ttl)" -> Lang.TURTLE;
-            case "JSON-LD (.jsonld)" -> Lang.JSONLD;
+            case RDFConvertOptions.RDFFormats.RDFXML -> Lang.RDFXML;
+            case RDFConvertOptions.RDFFormats.TURTLE -> Lang.TURTLE;
+            case RDFConvertOptions.RDFFormats.JSONLD -> Lang.JSONLD;
             default -> throw new IllegalStateException("Unexpected value: " + sourceFormat);
         };
         List<File> modelFiles = new LinkedList<File>();
@@ -317,8 +317,8 @@ public class RDFConverter {
             throw new IllegalStateException("Converted model is null. Please run convert() method first.");
         }
 
-        String targetFormat = options.getTargetFormat();
-        RDFFormat rdfFormat = options.getRdfFormat();
+        RDFConvertOptions.RDFFormats targetFormat = options.getTargetFormat();
+        RDFFormat rdfFormat = options.getRdfXmlFormat();
         String xmlBase = options.getXmlBase();
         String showXmlDeclaration = options.getShowXmlDeclaration();
         String showDoctypeDeclaration = options.getShowDoctypeDeclaration();
@@ -329,7 +329,7 @@ public class RDFConverter {
         String rdfSortOptions = options.getRdfSortOptions();
 
         switch (targetFormat) {
-            case "RDF XML (.rdf or .xml)" -> {
+            case RDFConvertOptions.RDFFormats.RDFXML -> {
                 //register custom format
                 CustomRDFFormat.RegisterCustomFormatWriters();
                 String showXmlEncoding = "true"; //saveProperties.get("showXmlEncoding").toString();
@@ -412,13 +412,13 @@ public class RDFConverter {
                     outputStream.close();
                 }
             }
-            case "RDF Turtle (.ttl)" -> {
+            case RDFConvertOptions.RDFFormats.TURTLE -> {
                 try (outputStream) {
                     convertedModel.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
                 }
 
             }
-            case "JSON-LD (.jsonld)" -> {
+            case RDFConvertOptions.RDFFormats.JSONLD -> {
                 try (outputStream) {
                     convertedModel.write(outputStream, RDFFormat.JSONLD.getLang().getLabel().toUpperCase(), xmlBase);
                 }
