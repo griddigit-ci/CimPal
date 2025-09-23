@@ -50,6 +50,7 @@
          <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuExportSHACLInfo" text="Export SHACL constraints informatiion to Excel" />
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuExportAllSHACLInfo" text="Export All SHACL constraints informatiion to Excel" />
          <MenuItem mnemonicParsing="false" onAction="#actionGenInfoFromRDFS" text="Generate information from RDFS - needed for serialisation" />
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />

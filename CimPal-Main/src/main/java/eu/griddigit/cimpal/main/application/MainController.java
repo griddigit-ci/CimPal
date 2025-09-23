@@ -744,6 +744,41 @@ public class MainController implements Initializable {
 
     }
 
+    @FXML
+    //action menu item Tools -> Export SHACL constraints information to Excel
+    private void actionMenuExportAllSHACLInfo() throws FileNotFoundException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        //open SHACL files
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
+
+        if (file != null) {// the file is selected
+            boolean singleFile = false;
+            if (file.size() > 1) {
+                //open a question/confirmation dialog to ask on the export
+                Alert alert1 = new Alert(Alert.AlertType.CONFIRMATION);
+                alert1.setContentText("More than one .ttl is selected. Would you like to export the information in multiple .xlsx files or as one file with multiple tabs?.");
+                alert1.setHeaderText("Confirm the way of export.");
+                alert1.setTitle("Confirmation needed");
+
+                ButtonType btnOneFile = new ButtonType("Export in one file");
+                ButtonType btnMultiple = new ButtonType("Export in multiple files");
+                alert1.getButtonTypes().setAll(btnOneFile, btnMultiple);
+                Optional<ButtonType> result1 = alert1.showAndWait();
+                if (result1.get() == btnOneFile) {
+                    singleFile = true;
+                }
+            } else if (file.size() == 1) {
+                singleFile = true;
+            }
+
+            ExportSHACLInformation.exportCompleteSHACLInformation(singleFile, file);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+
+    }
+
 
     @FXML
     //action menu item Tools -> Model Transformation

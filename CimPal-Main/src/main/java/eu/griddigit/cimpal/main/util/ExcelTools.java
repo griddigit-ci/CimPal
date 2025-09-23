@@ -192,8 +192,13 @@ public class ExcelTools {
     }
 
     public static XSSFWorkbook exportMapToExcel(String sheetName, Map<String, List<String>> mapInfo, List<String> orderList, XSSFWorkbook workbook) {
-
-        XSSFSheet sheet = workbook.createSheet(sheetName);
+        XSSFSheet sheet;
+        if (workbook.getSheet(sheetName) == null) {
+            sheet = workbook.createSheet(sheetName);
+        }
+        else {
+            sheet = workbook.getSheet(sheetName);
+        }
 
         // Create cell style for header row
         CellStyle headerCellStyle = createHeaderStyle(workbook);
