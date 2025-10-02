@@ -5413,7 +5413,7 @@ public class MainController implements Initializable {
         if (addInstanceData)
             iFileList = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "XML file(s)", List.of("*.xml"), "Select XML file(s) for template.");
 
-        if (file != null) {// the file is selected
+        if (file != null || iFileList != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
 
             CreateTemplateFromRDF(file, iFileList, selectedMethod, hide);

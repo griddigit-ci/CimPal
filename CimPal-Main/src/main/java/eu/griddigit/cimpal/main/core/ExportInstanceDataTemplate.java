@@ -489,126 +489,208 @@ public class ExportInstanceDataTemplate {
 
         Map<String, String> prefMap = new HashMap<>();
 
-        for (File fil : file) {
-            Model model = ModelFactory.createDefaultModel(); // model is the rdf file
-            try {
-                RDFDataMgr.read(model, new FileInputStream(fil), "", Lang.RDFXML);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
+        if (file != null) {
+            for (File fil : file) {
+                Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+                try {
+                    RDFDataMgr.read(model, new FileInputStream(fil), "", Lang.RDFXML);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
 
-            Map<String, String> prefMapTemp = model.getNsPrefixMap();
-            prefMap.putAll(prefMapTemp);
+                Map<String, String> prefMapTemp = model.getNsPrefixMap();
+                prefMap.putAll(prefMapTemp);
 
-            MainController.shapesOnAbstractOption = 0;
-            RDFNode literalYes = ResourceFactory.createPlainLiteral("Yes");
-            Property assocUsed = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","AssociationUsed");
-            Property multiplicity = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#","multiplicity");
+                RDFNode literalYes = ResourceFactory.createPlainLiteral("Yes");
+                Property assocUsed = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed");
+                Property multiplicity = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "multiplicity");
 
-            for (ResIterator i = model.listResourcesWithProperty(RDF.type, RDFS.Class); i.hasNext(); ) {
-                Resource resItem = i.next();
-                if (classIsNotEnumOrDatatype(resItem, model)) {
-                    //check if the class is concrete
-                    boolean classDescripStereo = classIsDescription(resItem, model);
-                    boolean isConcrete = classIsConcrete(resItem, model);
-                    if (isConcrete) {
-                        String localName = resItem.getLocalName();
-                        String classFullURI = resItem.getURI();
+                for (ResIterator i = model.listResourcesWithProperty(RDF.type, RDFS.Class); i.hasNext(); ) {
+                    Resource resItem = i.next();
+                    if (classIsNotEnumOrDatatype(resItem, model)) {
+                        //check if the class is concrete
+                        boolean classDescripStereo = classIsDescription(resItem, model);
+                        boolean isConcrete = classIsConcrete(resItem, model);
+                        if (isConcrete) {
+                            String localName = resItem.getLocalName();
+                            String classFullURI = resItem.getURI();
 
-                        //get all local and inherited properties
-                        List<Statement> localInheritProperties = new LinkedList<>();
+                            //get all local and inherited properties
+                            List<Statement> localInheritProperties = new LinkedList<>();
 
-                        int root = 0;
-                        Resource classItem = resItem;
-                        while (root == 0) {
-                            //has subClassOf
-                            // the resource of the subClassOf
-                            if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
-                                localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
+                            int root = 0;
+                            Resource classItem = resItem;
+                            while (root == 0) {
+                                //has subClassOf
+                                // the resource of the subClassOf
+                                if (model.listStatements(null, RDFS.domain, classItem).hasNext()) {
+                                    localInheritProperties.addAll(model.listStatements(null, RDFS.domain, classItem).toList());
+                                }
+                                if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
+                                    classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
+                                } else {
+                                    root = 1;
+                                }
                             }
-                            if (classItem.hasProperty(RDFS.subClassOf)) {//has subClassOf
-                                classItem = classItem.getRequiredProperty(RDFS.subClassOf).getResource(); // the resource of the subClassOf
-                            } else {
-                                root = 1;
-                            }
-                        }
 
 
-                        for (Statement stmt : localInheritProperties) { // loop on the local and inherited properties
-                            if (model.listStatements(stmt.getSubject(), assocUsed, (RDFNode) null).hasNext()) { // it is an association
-                                if (model.listStatements(stmt.getSubject(), assocUsed, literalYes).hasNext()) { // the association direction exchanged
+                            for (Statement stmt : localInheritProperties) { // loop on the local and inherited properties
+                                if (model.listStatements(stmt.getSubject(), assocUsed, (RDFNode) null).hasNext()) { // it is an association
+                                    if (model.listStatements(stmt.getSubject(), assocUsed, literalYes).hasNext()) { // the association direction exchanged
 
-                                    String propertyFullURI = stmt.getSubject().getURI();
-                                    String cardinality = "";
-                                    if (model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).hasNext()) {
-                                        cardinality = model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
+                                        String propertyFullURI = stmt.getSubject().getURI();
+                                        String cardinality = "";
+                                        if (model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).hasNext()) {
+                                            cardinality = model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
+                                        }
+                                        rdfsClassName.add(localName);
+                                        rdfsClassDescription.add(String.valueOf(classDescripStereo));
+                                        rdfsClass.add(classFullURI);
+                                        rdfsAttrAssoc.add(propertyFullURI);
+                                        rdfsAttrOrAssocFlag.add("Association");
+                                        rdfsItemAttrDatatype.add("N/A");
+                                        rdfsItemMultiplicity.add(cardinality);
+
                                     }
+                                } else {//if it is an attribute
+
+                                    String localNameAttr = stmt.getSubject().getLocalName();
+                                    String propertyFullURI = stmt.getSubject().getURI();
+
+                                    String propertyLocalName = ResourceFactory.createResource(propertyFullURI).getLocalName();
+                                    if (classDescripStereo && (propertyLocalName.equals("IdentifiedObject.name") || propertyLocalName.equals("IdentifiedObject.description") || propertyLocalName.equals("IdentifiedObject.mRID"))) {
+                                        continue;
+                                    }
+
                                     rdfsClassName.add(localName);
                                     rdfsClassDescription.add(String.valueOf(classDescripStereo));
                                     rdfsClass.add(classFullURI);
                                     rdfsAttrAssoc.add(propertyFullURI);
-                                    rdfsAttrOrAssocFlag.add("Association");
-                                    rdfsItemAttrDatatype.add("N/A");
+                                    String cardinality = model.listStatements(stmt.getSubject(), multiplicity, (RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
                                     rdfsItemMultiplicity.add(cardinality);
-
-                                }
-                            } else {//if it is an attribute
-
-                                String localNameAttr = stmt.getSubject().getLocalName();
-                                String propertyFullURI = stmt.getSubject().getURI();
-
-                                String propertyLocalName = ResourceFactory.createResource(propertyFullURI).getLocalName();
-                                if (classDescripStereo && (propertyLocalName.equals("IdentifiedObject.name") || propertyLocalName.equals("IdentifiedObject.description") || propertyLocalName.equals("IdentifiedObject.mRID"))) {
-                                    continue;
-                                }
-
-                                rdfsClassName.add(localName);
-                                rdfsClassDescription.add(String.valueOf(classDescripStereo));
-                                rdfsClass.add(classFullURI);
-                                rdfsAttrAssoc.add(propertyFullURI);
-                                String cardinality = model.listStatements(stmt.getSubject(),multiplicity,(RDFNode) null).next().getObject().toString().split("#M:", 2)[1];
-                                rdfsItemMultiplicity.add(cardinality);
-                                //add datatypes checks depending on it is Primitive, Datatype or Enumeration
-                                Resource datatypeRes = null;
-                                if (model.listStatements(stmt.getSubject(),ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"),(RDFNode) null).hasNext()) {
-                                    datatypeRes = model.listStatements(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"), (RDFNode) null).next().getObject().asResource();
-                                }else{
-                                    datatypeRes = model.listStatements(stmt.getSubject(), RDFS.range, (RDFNode) null).next().getObject().asResource();
-                                }
-                                if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("Primitive")).hasNext()){
-                                    String datatypePrimitive = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString(); //this is localName e.g. String
-
-                                    rdfsItemAttrDatatype.add(datatypePrimitive);
-                                    rdfsAttrOrAssocFlag.add("Attribute");
-                                }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("CIMDatatype")).hasNext()){
-                                    Resource datatypevalue = ResourceFactory.createProperty(datatypeRes.getURI()+".value");
-
-                                    String datatypePrimitive = model.getRequiredProperty(datatypevalue,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType")).getObject().asResource().getLocalName(); //this is localName e.g. String
-                                    rdfsItemAttrDatatype.add(datatypePrimitive);
-                                    rdfsAttrOrAssocFlag.add("Attribute");
-                                }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createPlainLiteral("Compound")).hasNext()){
-
-                                    //String datatypeCompound = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString();
-                                    String datatypeCompound = datatypeRes.getURI();
-
-                                    rdfsItemAttrDatatype.add(datatypeCompound);
-                                    rdfsAttrOrAssocFlag.add("Compound");
-                                }else if (model.listStatements(datatypeRes,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),ResourceFactory.createResource("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()){
-
-                                    //this adds the structure which is a list of possible enumerated values
-                                    List<Resource> enumValues = model.listSubjectsWithProperty(RDF.type,datatypeRes).toList();
-                                    List<String> enumValuesStr = new ArrayList<>();
-                                    for (Resource enumValue : enumValues) {
-                                        enumValuesStr.add(enumValue.toString());
+                                    //add datatypes checks depending on it is Primitive, Datatype or Enumeration
+                                    Resource datatypeRes = null;
+                                    if (model.listStatements(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"), (RDFNode) null).hasNext()) {
+                                        datatypeRes = model.listStatements(stmt.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType"), (RDFNode) null).next().getObject().asResource();
+                                    } else {
+                                        datatypeRes = model.listStatements(stmt.getSubject(), RDFS.range, (RDFNode) null).next().getObject().asResource();
                                     }
-                                    rdfsItemAttrDatatype.add(enumValuesStr.toString());
-                                    rdfsAttrOrAssocFlag.add("Enumeration");
+                                    if (model.listStatements(datatypeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createPlainLiteral("Primitive")).hasNext()) {
+                                        String datatypePrimitive = model.getRequiredProperty(datatypeRes, RDFS.label).getObject().asLiteral().getString(); //this is localName e.g. String
+
+                                        rdfsItemAttrDatatype.add(datatypePrimitive);
+                                        rdfsAttrOrAssocFlag.add("Attribute");
+                                    } else if (model.listStatements(datatypeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createPlainLiteral("CIMDatatype")).hasNext()) {
+                                        Resource datatypevalue = ResourceFactory.createProperty(datatypeRes.getURI() + ".value");
+
+                                        String datatypePrimitive = model.getRequiredProperty(datatypevalue, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#dataType")).getObject().asResource().getLocalName(); //this is localName e.g. String
+                                        rdfsItemAttrDatatype.add(datatypePrimitive);
+                                        rdfsAttrOrAssocFlag.add("Attribute");
+                                    } else if (model.listStatements(datatypeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createPlainLiteral("Compound")).hasNext()) {
+
+                                        //String datatypeCompound = model.getRequiredProperty(datatypeRes,RDFS.label).getObject().asLiteral().getString();
+                                        String datatypeCompound = datatypeRes.getURI();
+
+                                        rdfsItemAttrDatatype.add(datatypeCompound);
+                                        rdfsAttrOrAssocFlag.add("Compound");
+                                    } else if (model.listStatements(datatypeRes, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), ResourceFactory.createResource("http://iec.ch/TC57/NonStandard/UML#enumeration")).hasNext()) {
+
+                                        //this adds the structure which is a list of possible enumerated values
+                                        List<Resource> enumValues = model.listSubjectsWithProperty(RDF.type, datatypeRes).toList();
+                                        List<String> enumValuesStr = new ArrayList<>();
+                                        for (Resource enumValue : enumValues) {
+                                            enumValuesStr.add(enumValue.toString());
+                                        }
+                                        rdfsItemAttrDatatype.add(enumValuesStr.toString());
+                                        rdfsAttrOrAssocFlag.add("Enumeration");
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+        else if (iFiles != null){
+            for (File fil : iFiles) {
+                Model model = ModelFactory.createDefaultModel(); // model is the rdf file
+                try {
+                    RDFDataMgr.read(model, new FileInputStream(fil), "", Lang.RDFXML);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+
+                Map<String, String> prefMapTemp = model.getNsPrefixMap();
+                prefMap.putAll(prefMapTemp);
+
+                ResIterator subjects = model.listSubjects();
+                while (subjects.hasNext()) {
+                    Resource subject = subjects.next();
+
+                    StmtIterator typeStatements = model.listStatements(subject, RDF.type, (RDFNode) null);
+                    if (typeStatements.hasNext()) {
+                        List<RDFNode> typeObjects = new ArrayList<>();
+
+                        // Collect all RDF.type objects
+                        while (typeStatements.hasNext()) {
+                            Statement stmt = typeStatements.nextStatement();
+                            typeObjects.add(stmt.getObject());
+                        }
+
+                        RDFNode selectedType = null;
+                        if (typeObjects.size() > 1) {
+                            // Multiple types found
+                            for (RDFNode typeObj : typeObjects) { // try to find a type that is in the concrete namespace
+                                if (rdfsClass.contains(typeObj.toString())) {
+                                    selectedType = typeObj;
+                                    break;
+                                }
+                            }
+                            if (selectedType == null) { // No matching type found, prompt user to select
+                                selectedType = showTypeSelectionDialog(subject, typeObjects);
+                                if (selectedType == null) {
+                                    selectedType = typeObjects.getFirst();
+                                }
+                            }
+                        } else {
+                            // Only one type found
+                            selectedType = typeObjects.getFirst();
+                        }
+
+                        String localName = selectedType.toString().split("#", 2)[1];
+                        String classFullURI = selectedType.toString();
+
+                        StmtIterator properties = subject.listProperties();
+                        while (properties.hasNext()) {
+                            Statement property = properties.next();
+                            String propertyName = property.getPredicate().getURI();
+
+                            if (rdfsAttrAssoc.contains(propertyName) && rdfsClass.contains(classFullURI)) {
+                                continue;
+                            }
+
+                            rdfsClassName.add(localName);
+                            rdfsClassDescription.add("false");
+                            rdfsClass.add(classFullURI);
+                            rdfsAttrAssoc.add(propertyName);
+                            rdfsItemAttrDatatype.add("N/A");
+                            rdfsItemMultiplicity.add("N/A");
+
+                            RDFNode object = property.getObject();
+                            if (object.isResource()) {
+                                // If the object is a resource (URI)
+                                rdfsAttrOrAssocFlag.add("Resource");
+                            } else {
+                                // Otherwise, just use the literal value
+                                rdfsAttrOrAssocFlag.add("Literal");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            throw new IllegalStateException("An RDFS or Instance file must be selected");
         }
 
 
@@ -774,5 +856,26 @@ public class ExportInstanceDataTemplate {
             }
             i++;
         } while (iFiles.size() > i);
+    }
+
+    private static RDFNode showTypeSelectionDialog(Resource subject, List<RDFNode> typeObjects) {
+        String[] options = typeObjects.stream()
+                .map(type -> type.toString().split("#")[1]) // Get local names
+                .toArray(String[]::new);
+
+        String message = "Subject: " + subject.getLocalName() + "\nMultiple RDF types found. Select the primary one:";
+
+        int choice = javax.swing.JOptionPane.showOptionDialog(
+                null,
+                message,
+                "Select RDF Type",
+                javax.swing.JOptionPane.DEFAULT_OPTION,
+                javax.swing.JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+
+        return (choice >= 0) ? typeObjects.get(choice) : null;
     }
 }

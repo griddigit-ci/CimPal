@@ -132,9 +132,36 @@ public class ExportRDFSdescriptions {
             Resource subject = subjects.next();
 
             // Get the RDF type for the subject
-            Statement typeStatement = subject.getProperty(RDF.type);
-            if (typeStatement != null) {
-                String className = typeStatement.getObject().toString().split("#")[1];
+            StmtIterator typeStatements = model.listStatements(subject, RDF.type, (RDFNode) null);
+            if (typeStatements.hasNext()) {
+                List<RDFNode> typeObjects = new ArrayList<>();
+
+                // Collect all RDF.type objects
+                while (typeStatements.hasNext()) {
+                    Statement stmt = typeStatements.nextStatement();
+                    typeObjects.add(stmt.getObject());
+                }
+
+                RDFNode selectedType = null;
+                if (typeObjects.size() > 1) {
+                    // Multiple types found
+                    for (RDFNode typeObj : typeObjects) { // try to find a type that is in the concrete namespace
+                        if (classData.containsKey(typeObj.toString().split("#")[1])) {
+                            selectedType = typeObj;
+                            break;
+                        }
+                    }
+                    if (selectedType == null) { // No matching type found, prompt user to select
+                        selectedType = showTypeSelectionDialog(subject, typeObjects);
+                        if (selectedType == null) {
+                            selectedType = typeObjects.getFirst();
+                        }
+                    }
+                } else {
+                    // Only one type found
+                    selectedType = typeObjects.getFirst();
+                }
+                String className = selectedType.toString().split("#")[1];
 
                 // Initialize storage for this class if it doesn't exist
                 classData.putIfAbsent(className, new LinkedList<>());
@@ -177,6 +204,27 @@ public class ExportRDFSdescriptions {
             }
         }
         return classData;
+    }
+
+    private static RDFNode showTypeSelectionDialog(Resource subject, List<RDFNode> typeObjects) {
+        String[] options = typeObjects.stream()
+                .map(type -> type.toString().split("#")[1]) // Get local names
+                .toArray(String[]::new);
+
+        String message = "Subject: " + subject.getLocalName() + "\nMultiple RDF types found. Select the primary one:";
+
+        int choice = javax.swing.JOptionPane.showOptionDialog(
+                null,
+                message,
+                "Select RDF Type",
+                javax.swing.JOptionPane.DEFAULT_OPTION,
+                javax.swing.JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+
+        return (choice >= 0) ? typeObjects.get(choice) : null;
     }
 
     public static void exportRDFToExcel(Model model) {
