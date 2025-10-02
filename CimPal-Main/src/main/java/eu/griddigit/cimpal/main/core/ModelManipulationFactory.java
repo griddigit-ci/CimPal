@@ -651,7 +651,12 @@ public class ModelManipulationFactory {
                 // getting header class
 
                 if (headerClassName.isEmpty()) {
-                    headerClassName = ((LinkedList<?>) o).get(5).toString();
+                    try {
+                        headerClassName = ((LinkedList<?>) o).get(5).toString();
+                    }
+                    catch (IndexOutOfBoundsException e) {
+                        throw new NoSuchElementException("Missing header class name from config tab.");
+                    }
                     if (!headerClassName.isEmpty()) {
                         int headerSheetIdx = book.getSheetIndex(headerClassName);
                         if (headerSheetIdx != -1)
@@ -769,7 +774,13 @@ public class ModelManipulationFactory {
 
                             switch (propertyType) {
                                 case "Literal" -> { //add literal
-                                    String datatype = ((LinkedList<?>) headerXlsData.get(3)).get(j).toString();
+                                    String datatype;
+                                    try {
+                                        datatype = ((LinkedList<?>) headerXlsData.get(3)).get(j).toString();
+                                    }
+                                    catch (IndexOutOfBoundsException e) {
+                                        datatype = "string";
+                                    }
                                     if (datatype.equalsIgnoreCase("float"))
                                         model.add(ResourceFactory.createStatement(headRdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Float.parseFloat(object)))));
                                     else if (datatype.equalsIgnoreCase("integer"))
