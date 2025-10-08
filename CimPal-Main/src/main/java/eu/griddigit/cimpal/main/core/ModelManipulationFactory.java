@@ -634,7 +634,7 @@ public class ModelManipulationFactory {
                             throw new Exception("Couldn't find the sheet for class: " + className);
                     }
                     continue;
-                } else if (((LinkedList<?>) o).size() < 4)
+                } else if (((LinkedList<?>) o).size() <=4)
                     continue;
 
                 // getting classes to print
