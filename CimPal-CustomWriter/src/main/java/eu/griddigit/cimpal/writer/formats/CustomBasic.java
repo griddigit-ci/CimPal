@@ -311,6 +311,10 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 }
             }
 
+            if (url.startsWith("#http")) {
+                url = url.substring(1);
+            }
+
             writer.print(
                     rdfAt(placeholder)
                             + "="

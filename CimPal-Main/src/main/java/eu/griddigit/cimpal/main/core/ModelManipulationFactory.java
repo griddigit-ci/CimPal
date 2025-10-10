@@ -857,7 +857,7 @@ public class ModelManipulationFactory {
                 if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
                     String idxls = ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
                     String rdfid;
-                    if (idxls.startsWith("http") || idxls.startsWith("urn:uuid")) {
+                    if (idxls.startsWith("urn:uuid")) {
                         rdfid = idxls;
                     } else {
                         rdfid = xmlBase + "#" + idxls;
@@ -865,7 +865,7 @@ public class ModelManipulationFactory {
 
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
-                    model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
+
                     if (((LinkedList<?>) classXlsData.getFirst()).get(3).toString().equals("true")){
                         rdfAboutList.add(ResourceFactory.createResource(classWNS));
                     }
@@ -969,12 +969,9 @@ public class ModelManipulationFactory {
                             }
                         }
                     }
-
-                    if (!model.listStatements(rdfidRes, null, (RDFNode)null)
-                            .filterDrop(stmt -> stmt.getPredicate().equals(RDF.type))
-                            .hasNext()) {
-                        // If no properties other than rdf:type, remove the type statement
-                        model.remove(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
+                    if (model.listStatements(rdfidRes, null, (RDFNode)null).hasNext()) {
+                        // If it has properties then add the primary class type
+                        model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
                     }
                 }
             }
