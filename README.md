@@ -1,5 +1,9 @@
 # CimPal
 
+## Dependencies
+
+See [Dependencies](dependencies.md) for the full list of project dependencies.
+
 ## General
 CimPal is an open source Java application published by gridDigIt and Licensed under the [EUPL-1.2](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12)-or-later.
 The application is based on Apache Jena (Apache License v2.0), TopBraid SHACL API (Apache License v2.0), and JAVAFX (GPLv2+CE license).
