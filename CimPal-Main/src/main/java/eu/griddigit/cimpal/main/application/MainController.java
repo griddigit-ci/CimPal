@@ -374,6 +374,8 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLdatatypesplit;
     @FXML
     private CheckBox hideEmptySheets;
+    @FXML
+    private TreeView<String> treeViewShaclFiles;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -1577,7 +1579,7 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    private void actionBrowseShaclFilesValidator(ActionEvent actionEvent) {
+    private void actionBrowseShaclFilesTester(ActionEvent actionEvent) {
         selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
@@ -1589,10 +1591,12 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    private void actionBrowsePathForShaclValidator(ActionEvent actionEvent) {
+    private void actionBrowseFolderPathForShaclTester(ActionEvent actionEvent) {
         selectedFolder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom();
         if (selectedFolder != null) {
             fPathModelsForShaclValidator.setText(selectedFolder.toString());
+
+            GUIhelper.buildFileTree(selectedFolder, treeViewShaclFiles);
         }
     }
 

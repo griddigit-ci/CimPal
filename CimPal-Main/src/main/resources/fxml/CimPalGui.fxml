@@ -705,35 +705,43 @@
                         </VBox>
                      </AnchorPane>
                   </Tab>
-                  <Tab text="SHACL Validator">
+                  <Tab text="SHACL tester">
                      <content>
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <AnchorPane>
                            <children>
-                              <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                              <VBox alignment="CENTER_LEFT" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                  <children>
-                                    <HBox spacing="10.0">
+                                    <HBox alignment="CENTER_LEFT" spacing="5.0">
                                        <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                                        </padding>
                                        <children>
-                                          <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
+                                          <Label text="SHACL files:" wrapText="true" />
                                           <TextField fx:id="fPathShaclFilesValidator" editable="false" HBox.hgrow="ALWAYS" />
-                                          <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesValidator" text="Browse" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesTester" text="Browse" />
                                        </children>
                                     </HBox>
-                                    <HBox spacing="10.0">
+                                    <HBox alignment="CENTER_LEFT" spacing="5.0">
                                        <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                                        </padding>
                                        <children>
-                                          <Label minWidth="90.0" prefHeight="17.0" prefWidth="105.0" text="Models to validate:" wrapText="true" />
+                                          <Label text="Parent folder for test models:" wrapText="true" />
                                           <TextField fx:id="fPathModelsForShaclValidator" editable="false" HBox.hgrow="ALWAYS" />
-                                          <Button mnemonicParsing="false" onAction="#actionBrowsePathForShaclValidator" text="Browse" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowseFolderPathForShaclTester" text="Browse" />
                                        </children>
+                                    </HBox>
+                                    <HBox alignment="CENTER">
+                                       <children>
+                                          <TreeView fx:id="treeViewShaclFiles" showRoot="false" HBox.hgrow="ALWAYS" />
+                                       </children>
+                                       <padding>
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                                       </padding>
                                     </HBox>
                                     <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                        <VBox.margin>
-                                          <Insets bottom="5.0" right="5.0" />
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                                        </VBox.margin>
                                        <children>
                                           <Button fx:id="btnRunShaclValidator" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclValidator" text="Run" HBox.hgrow="ALWAYS" />
