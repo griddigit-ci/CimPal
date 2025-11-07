@@ -1390,7 +1390,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Run in RDF comparison
-    private void actionBtnRunRDFcompare() throws FileNotFoundException {
+    private void actionBtnRunRDFcompare() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         Lang rdfSourceFormat1 = Lang.RDFXML;
@@ -1424,8 +1424,8 @@ public class MainController implements Initializable {
         List<File> modelFiles2 = new LinkedList<>();
         modelFiles2.add(MainController.rdfModel2);
 
-        Model model1 = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false);
-        Model model2Temp = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false);
+        Model model1 = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false, false).get("unionModel");
+        Model model2Temp = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false, false).get("unionModel");
 
         Model model2 = null;
         boolean error = false;
@@ -2224,9 +2224,9 @@ public class MainController implements Initializable {
             relativeURIs = fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
         }
 
-        if(sourceFormatString.equals("RDF Turtle (.ttl)")) {
+        if (sourceFormatString.equals("RDF Turtle (.ttl)")) {
             sourceFormat = RDFConvertOptions.RDFFormats.TURTLE;
-        } else if(sourceFormatString.equals("JSON-LD (.jsonld)")) {
+        } else if (sourceFormatString.equals("JSON-LD (.jsonld)")) {
             sourceFormat = RDFConvertOptions.RDFFormats.JSONLD;
         }
 

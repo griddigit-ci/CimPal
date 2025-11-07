@@ -452,12 +452,12 @@ public class SHACLFromRDF {
         }
     }
 
-    private Map<String, Model> loadBaseModel(List<File> basefiles) throws FileNotFoundException {
+    private Map<String, Model> loadBaseModel(List<File> basefiles) throws IOException {
 
         Map<String, Model> baseTierMap = new HashMap<>();
 
         if (basefiles != null) {
-            Model basemodel = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true);
+            Model basemodel = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true, false).get("unionModel");
             var inheritanceResult = eu.griddigit.cimpal.core.utils.ModelFactory.generateInheritanceModels(basemodel, true, true);
             baseTierMap.put("unionmodelbaseprofilesshacl", basemodel);
             baseTierMap.put("unionmodelbaseprofilesshaclinheritance", inheritanceResult.processedModel);

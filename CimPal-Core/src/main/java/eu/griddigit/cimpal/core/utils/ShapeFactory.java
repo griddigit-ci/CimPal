@@ -4,7 +4,7 @@
  * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
-package eu.griddigit.cimpal.main.core;
+package eu.griddigit.cimpal.core.utils;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.graph.Graph;
