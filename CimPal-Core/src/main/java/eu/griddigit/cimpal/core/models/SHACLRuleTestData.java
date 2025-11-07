@@ -1,4 +1,4 @@
-package eu.griddigit.cimpal.main.model;
+package eu.griddigit.cimpal.core.models;
 
 import org.apache.jena.shacl.ValidationReport;
 

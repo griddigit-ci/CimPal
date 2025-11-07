@@ -7,19 +7,19 @@ package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.converters.SHACLFromRDF;
+import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
+import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
 import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofile;
 import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofileCIMTool;
 import eu.griddigit.cimpal.core.comparators.ComparisonSHACLshapes;
-import eu.griddigit.cimpal.main.model.SHACLRuleTestData;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 
 import java.io.InputStream;
 
 import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
-import eu.griddigit.cimpal.main.model.SHACLValidationResult;
 import guru.nidi.graphviz.engine.Graphviz;
 import guru.nidi.graphviz.engine.Format;
 
@@ -51,7 +51,6 @@ import javafx.util.Callback;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
-import org.apache.jena.query.DatasetFactory;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
@@ -59,11 +58,7 @@ import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.topbraid.jenax.util.DatasetWithDifferentDefaultModel;
 import org.topbraid.jenax.util.JenaUtil;
-import org.topbraid.shacl.validation.ValidationEngine;
-import org.topbraid.shacl.validation.ValidationEngineFactory;
-import org.topbraid.shacl.validation.ValidationUtil;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import eu.griddigit.cimpal.main.util.CompareFactory;
@@ -1616,86 +1611,22 @@ public class MainController implements Initializable {
                 }
             });
         } catch (IOException e) {
-            e.printStackTrace();
+            foutputWindow.appendText(e.getMessage());
         }
 
         if (!fileL.isEmpty()) {
-            Map<String, Model> shaclMap = InstanceDataFactory.modelLoad(selectedFile, "", Lang.TURTLE, true);
-            Model shaclModel = shaclMap.get("shacl");
-            Map<String, SHACLRuleTestData> ruleTestDataMap = new HashMap<>();
-
-            for (File file : fileL) {
-                Path fullPath = file.toPath(); // Changed from Paths.get(file.getPath())
-                Path inputFolderPath = selectedFolder.toPath();
-                Path relativePath = inputFolderPath.relativize(fullPath);
-
-                String ruleName = relativePath.getName(0).toString();
-                String category = relativePath.getName(1).toString();
-                String fileName = relativePath.getFileName().toString();
-
-                SHACLRuleTestData data = ruleTestDataMap.get(ruleName);
-                if (data == null) {
-                    data = new SHACLRuleTestData(ruleName);
-                    ruleTestDataMap.put(ruleName, data);
+            ShaclAutoTester shaclAutoTester = new ShaclAutoTester(new ShaclAutoTesterCallback() {
+                @Override
+                public void updateProgress(double progress) {
+                    Platform.runLater(() -> progressBar.setProgress(progress));
                 }
-                data.addFile(category, file);
-//                try {
-//                    Map<String, Model> modelMap = InstanceDataFactory.modelLoad(new ArrayList<>(List.of(file.getAbsoluteFile())), "", Lang.RDFXML, false);
-//                    Model dataModel = modelMap.get("unionModel");
-//                    Resource reportResource = ValidationUtil.validateModel(dataModel, shaclModel, false);
-//                    ValidationEngine validationEngine = ValidationUtil.createValidationEngine(dataModel, shaclModel, false);
-//                    validationEngine.validateAll();
-//                    org.topbraid.shacl.validation.ValidationReport report = validationEngine.getValidationReport();
-//                } catch (Exception e) {
-//                    foutputWindow.appendText("Error validating file: " + file.getName() + " - " + e.getMessage() + "\n");
-//                }
 
-            }
-
-            // shaclModel.getProperty(ResourceFactory.createResource("http://iec.ch/TC57/ns/CIM/constraints/QoCDC/Level3-IGM#ACDCTerminal.sequenceNumber-numbering"), ResourceFactory.createProperty("http://www.w3.org/ns/shacl#name"))
-
-            ValidationReport report;
-            for (Map.Entry<String, SHACLRuleTestData> ruleTestDataEntry : ruleTestDataMap.entrySet()){
-                for (File conformFile : ruleTestDataEntry.getValue().getConformFiles()){
-                    try {
-                        Map<String, Model> modelMap = InstanceDataFactory.modelLoad(new ArrayList<>(List.of(conformFile)), "", Lang.RDFXML, false);
-                        report = ShaclValidator.get().validate(shaclModel.getGraph(), modelMap.get("unionModel").getGraph());
-                        ruleTestDataEntry.getValue().addReport(conformFile.getName(), report, true);
-                    }
-                    catch (Exception e) {
-                        foutputWindow.appendText("Error validating file: " + conformFile.getName() + " - " + e.getMessage() + "\n");
-                    }
+                @Override
+                public void appendOutput(String message) {
+                    Platform.runLater(() -> foutputWindow.appendText(message));
                 }
-                for (File nonConformFile : ruleTestDataEntry.getValue().getNonConformFiles()){
-                    try {
-                        Map<String, Model> modelMap = InstanceDataFactory.modelLoad(new ArrayList<>(List.of(nonConformFile)), "", Lang.RDFXML, false);
-                        report = ShaclValidator.get().validate(shaclModel.getGraph(), modelMap.get("unionModel").getGraph());
-                        ruleTestDataEntry.getValue().addReport(nonConformFile.getName(), report, false);
-                    }
-                    catch (Exception e){
-                        foutputWindow.appendText("Error validating file: " + nonConformFile.getName() + " - " + e.getMessage() + "\n");
-                    }
-                }
-            }
-
-            ruleTestDataMap.forEach((ruleName, testData) -> {
-                foutputWindow.appendText("SHACL Rule: " + ruleName + "\n");
-                foutputWindow.appendText("Conform files:\n");
-                testData.getConformReports().forEach((fileName, validationReport) -> {
-                    foutputWindow.appendText("  File: " + fileName + " - Conforms: " + validationReport.conforms() + "\n");
-
-                    List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(validationReport);
-                    ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getConformFolderPath()), FilenameUtils.removeExtension(fileName) + "_report.xlsx");
-                });
-                foutputWindow.appendText("Non-conform files:\n");
-                testData.getNonConformReports().forEach((fileName, validationReport) -> {
-                    foutputWindow.appendText("  File: " + fileName + " - Conforms: " + validationReport.conforms() + "\n");
-
-                    List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(validationReport);
-                    ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getNonConformFolderPath()), FilenameUtils.removeExtension(fileName) + "_report.xlsx");
-                });
-                foutputWindow.appendText("\n");
             });
+            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL);
 
             progressBar.setProgress(1);
         } else {
