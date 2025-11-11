@@ -50,6 +50,19 @@ public class ShaclAutoTester {
     }
 
     public void runTests(List<File> selectedFile, File selectedFolder, List<File> fileL) throws IOException {
+        // Run on a background thread
+        Thread testThread = new Thread(() -> {
+            try {
+                runTestsInternal(selectedFile, selectedFolder, fileL);
+            } catch (IOException e) {
+                appendOutput("Error during testing: " + e.getMessage() + "\n");
+            }
+        });
+        testThread.setDaemon(true);
+        testThread.start();
+    }
+
+    public void runTestsInternal(List<File> selectedFile, File selectedFolder, List<File> fileL) throws IOException {
         Map<String, Model> shaclMap = ModelFactory.modelLoad(selectedFile, "", Lang.TURTLE, true, false);
         Model shaclModel = shaclMap.get("shacl");
         Map<String, SHACLRuleTestData> ruleTestDataMap = getRuleTestDataMap(selectedFolder, fileL);
@@ -73,6 +86,7 @@ public class ShaclAutoTester {
             for (File conformFile : testData.getConformFiles()) {
 
                 String filePath = conformFile.getAbsolutePath();
+                String cacheKey = conformFile.getName();
 
                 // Check if model is already loaded
                 Model dataModel = modelCache.get(filePath);
@@ -81,7 +95,7 @@ public class ShaclAutoTester {
                         Map<String, Model> modelMap = ModelFactory.modelLoad(
                                 new ArrayList<>(List.of(conformFile)), "", Lang.RDFXML, false, false);
                         dataModel = modelMap.get("unionModel");
-                        modelCache.put(filePath, dataModel);
+                        modelCache.put(cacheKey, dataModel);
                     }
 
                 } catch (Exception e) {
@@ -96,7 +110,7 @@ public class ShaclAutoTester {
                     if (report == null) {
                         report = ShaclValidator.get().validate(
                                 shaclModel.getGraph(), dataModel.getGraph());
-                        validationCache.put(filePath, report);
+                        validationCache.put(cacheKey, report);
                     }
                 } catch (Exception e) {
                     logger.logValidationError(conformFile.getName(), e.getMessage());
@@ -123,6 +137,7 @@ public class ShaclAutoTester {
             for (File nonConformFile : testData.getNonConformFiles()) {
 
                 String filePath = nonConformFile.getAbsolutePath();
+                String cacheKey = nonConformFile.getName();
 
                 Model dataModel = modelCache.get(filePath);
                 try {
@@ -130,7 +145,7 @@ public class ShaclAutoTester {
                         Map<String, Model> modelMap = ModelFactory.modelLoad(
                                 new ArrayList<>(List.of(nonConformFile)), "", Lang.RDFXML, false, false);
                         dataModel = modelMap.get("unionModel");
-                        modelCache.put(filePath, dataModel);
+                        modelCache.put(cacheKey, dataModel);
                     }
                 } catch (Exception e) {
                     logger.logModelLoadError(nonConformFile.getName(), e.getMessage());
@@ -142,7 +157,7 @@ public class ShaclAutoTester {
                     if (report == null) {
                         report = ShaclValidator.get().validate(
                                 shaclModel.getGraph(), dataModel.getGraph());
-                        validationCache.put(filePath, report);
+                        validationCache.put(cacheKey, report);
                     }
                 } catch (Exception e) {
                     logger.logValidationError(nonConformFile.getName(), e.getMessage());
@@ -176,6 +191,8 @@ public class ShaclAutoTester {
         } catch (IOException e) {
             appendOutput("Failed to save validation log: " + e.getMessage() + "\n");
         }
+
+        updateProgress(1.0);
     }
 
     private static Map<String, SHACLRuleTestData> getRuleTestDataMap(File selectedFolder, List<File> fileL) {
