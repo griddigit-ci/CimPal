@@ -21,8 +21,8 @@ import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import java.io.InputStream;
 
 import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
-import guru.nidi.graphviz.engine.Graphviz;
-import guru.nidi.graphviz.engine.Format;
+//import guru.nidi.graphviz.engine.Graphviz;
+//import guru.nidi.graphviz.engine.Format;
 
 import java.io.ByteArrayInputStream;
 
@@ -51,7 +51,6 @@ import javafx.stage.Stage;
 import javafx.util.Callback;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
-import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
@@ -60,7 +59,6 @@ import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.topbraid.jenax.util.JenaUtil;
-import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import eu.griddigit.cimpal.main.util.ExcelTools;
@@ -83,7 +81,6 @@ import java.util.prefs.Preferences;
 import static eu.griddigit.cimpal.main.core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
-import static eu.griddigit.cimpal.main.core.RdfConvert.modelInheritance;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
@@ -4121,21 +4118,21 @@ public class MainController implements Initializable {
         String dot = convertModelToDOT(model);
 
         // Render DOT string to a byte array
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try {
-            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+//        ByteArrayOutputStream out = new ByteArrayOutputStream();
+//        try {
+//            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
 
         // Load the image from the byte array
-        ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
-        Image image = new Image(in);
+//        ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
+//        Image image = new Image(in);
 //        ImageView imageView = new ImageView(image);
 //        IDhbox.getChildren().add(imageView);
 
         // Update the existing ImageView with the new image
-        IDImageView.setImage(image);
+//        IDImageView.setImage(image);
 
         // Zoom functionality
         IDImageView.setOnScroll((ScrollEvent event) -> {
