@@ -125,10 +125,6 @@ public class MainController implements Initializable {
     public TextField fPrefixShaclOrganizer;
     public TextField fNSShaclOrganizer;
     @FXML
-    private TableView tableViewBrowseID;
-    public TableColumn itemColumnBrowseModifyID;
-    public TableColumn valueColumnBrowseModifyID;
-    @FXML
     private TextArea foutputWindow;
     @FXML
     private ProgressBar progressBar;
@@ -225,24 +221,6 @@ public class MainController implements Initializable {
     @FXML
     private CheckBox fcbStripPrefixes;
     @FXML
-    private TreeView treeViewConstraints;
-    //    @FXML
-//    private TreeView treeViewInstanceData;
-    @FXML
-    private TextField fPrefixGenerateTab;
-    @FXML
-    private TextField fURIGenerateTab;
-    @FXML
-    private TextField fshapesBaseURIDefineTab;
-    @FXML
-    private TextField fowlImportsDefineTab;
-    @FXML
-    private TableView tableViewBrowseModify;
-    @FXML
-    private TableColumn itemColumnBrowseModify;
-    @FXML
-    private TableColumn valueColumnBrowseModify;
-    @FXML
     private Tab tabConstraintsSourceCode;
     @FXML
     private ToggleButton btnShowSourceCodeDefineTab;
@@ -313,21 +291,11 @@ public class MainController implements Initializable {
     @FXML
     private CheckBox fcbRDFconvertFixPackage;
     @FXML
-    private TreeView InstanceDataBrowser;
-    @FXML
-    private ImageView IDgraph;
-    @FXML
-    private HBox IDhbox;
-    @FXML
-    private ImageView IDImageView;
-    @FXML
     private TextField fsXlsTemplatePath;
     @FXML
     private ChoiceBox fcbGenMethodOptions;
     @FXML
     private CheckBox fcbAddInstanceData;
-    @FXML
-    private Button fbtnRunGenerateInstance;
     @FXML
     private CheckBox fcbSortRDFGen;
     @FXML
@@ -412,10 +380,7 @@ public class MainController implements Initializable {
     private static Map<TreeItem, String> treeMapConstraints;
     private static Map<TreeItem, String> treeMapID;
     private static Map<String, TreeItem> treeMapConstraintsInverse;
-    public static Integer associationValueTypeOption;
-    public static Integer associationValueTypeOptionSingle;
     public static Integer shapesOnAbstractOption;
-    public static Integer exportInheritTree;
 
     public static TextArea foutputWindowVar;
     public static boolean excludeMRID;
@@ -434,21 +399,14 @@ public class MainController implements Initializable {
     public static Model unionmodelbaseprofilesshacl;
     public static Model unionmodelbaseprofilesshacl2nd;
     public static Model unionmodelbaseprofilesshacl3rd;
-    public static Model unionmodelbaseprofilesshaclinheritance;
-    public static Model unionmodelbaseprofilesshaclinheritance2nd;
-    public static Model unionmodelbaseprofilesshaclinheritance3rd;
+
     public static Model unionmodelbaseprofilesshaclinheritanceonly;
-    public static Model unionmodelbaseprofilesshaclinheritanceonly2nd;
-    public static Model unionmodelbaseprofilesshaclinheritanceonly3rd;
     public static String cim2URI;
     public static String cim3URI;
     public static String cimURI;
-    public static String cimPref;
-    public static String cim2Pref;
-    public static String cim3Pref;
+
     public static Model compareIDmodel1;
     public static Model compareIDmodel2;
-    public static boolean shaclURIdatatypeAsResource;
     public static boolean shaclSkipNcPropertyReference;
 
 
@@ -474,32 +432,11 @@ public class MainController implements Initializable {
         System.setOut(new PrintStream(out, true));
         System.setErr(new PrintStream(out, true));
         treeID = false;
-        treeViewConstraintsStatic = treeViewConstraints;
         treeViewIDStatic = treeViewInstanceData;
         foutputWindowVar = foutputWindow;
         //initialization of the Browse and Modify table - SHACL Shapes Browse
-        tableViewBrowseModify.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        tableViewBrowseModify.setEditable(false);
-        tableViewBrowseModify.setPlaceholder(new Label("No shape properties present"));
-
         Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
 
-        //set column 1
-        itemColumnBrowseModify.setCellValueFactory(new PropertyValueFactory<TableColumnsSetup, String>("column1"));
-        itemColumnBrowseModify.setCellFactory(cellFactory);
-        itemColumnBrowseModify.setOnEditCommit(
-                (EventHandler<TableColumn.CellEditEvent<TableColumnsSetup, String>>) t -> t.getTableView().getItems().get(
-                        t.getTablePosition().getRow()).setColumn1(t.getNewValue())
-        );
-
-        //set column 2
-        valueColumnBrowseModify.setCellValueFactory(new PropertyValueFactory<TableColumnsSetup, String>("column2"));
-        Callback<TableColumn, TableCell> cellFactoryC2 = p -> new TextAreaEditTableCell();
-        valueColumnBrowseModify.setCellFactory(cellFactoryC2);
-        valueColumnBrowseModify.setOnEditCommit(
-                (EventHandler<TableColumn.CellEditEvent<TableColumnsSetup, String>>) t -> t.getTableView().getItems().get(
-                        t.getTablePosition().getRow()).setColumn2(t.getNewValue())
-        );
 
         try {
             if (!Preferences.userRoot().nodeExists("CimPal")) {
@@ -4135,25 +4072,6 @@ public class MainController implements Initializable {
 //        IDImageView.setImage(image);
 
         // Zoom functionality
-        IDImageView.setOnScroll((ScrollEvent event) -> {
-            double delta = event.getDeltaY();
-            double scale = IDImageView.getScaleX() + delta / 100;
-            scale = Math.max(scale, 0.1); // Prevent scaling to zero or negative
-            IDImageView.setScaleX(scale);
-            IDImageView.setScaleY(scale);
-        });
-//
-        // Drag functionality
-        IDImageView.setOnMousePressed(event -> {
-            initialX = event.getSceneX() - IDImageView.getTranslateX();
-            initialY = event.getSceneY() - IDImageView.getTranslateY();
-        });
-
-        IDImageView.setOnMouseDragged(event -> {
-            IDImageView.setTranslateX(event.getSceneX() - initialX);
-            IDImageView.setTranslateY(event.getSceneY() - initialY);
-        });
-
 
 //
 //        // Render DOT string to a temporary file
@@ -4279,65 +4197,6 @@ public class MainController implements Initializable {
         return dot.toString();
     }
 
-    @FXML
-    //Action for button "Open" related to tab SHACL Shape Browser
-    private void actionBtnOpenShapeBrowser(ActionEvent actionEvent) {
-        progressBar.setProgress(0);
-
-        //select file
-        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
-
-        if (fileL != null) {// the file is selected
-            for (int m = 0; m < fileL.size(); m++) {
-                eu.griddigit.cimpal.main.util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
-                ArrayList<String> mpak1 = new ArrayList<>();
-                mpak1.add(FilenameUtils.getBaseName(((File) fileL.get(m)).getName())); // adds the name without the extension.
-                Map<String, String> prefixMap = ((Model) shapeModels.get(m)).getNsPrefixMap();
-                for (Object o : prefixMap.values()) {
-                    String value = o.toString();
-                    if (value.contains(defaultShapesURI) || value.toLowerCase().contains("constraints")) {
-                        mpak1.add(((Model) shapeModels.get(m)).getNsURIPrefix(value)); //reserved for the prefix of the profile/shapes
-                        mpak1.add(value); // reserved for the URI of the profile/shapes
-                        mpak1.add(value); // reserved for the baseURI of the shapes
-                        mpak1.add("");// reserved for the owl:imports
-                        break;
-                    }
-                }
-                shapeModelsNames.add(mpak1);
-            }
-            guiTreeDesignShapesInit(); //initializes the tree in the design shapes tab //Perhaps not forMalte
-        }
-    }
-
-    @FXML
-    //Action for button "Unload Shapes" related to tab SHACL Shape Browser
-    private void actionBrtUnloadInstanceData(ActionEvent actionEvent) {
-        progressBar.setProgress(0);
-        MainController.InstanceModelMap = null;
-        treeViewIDStatic.setRoot(null);
-        //fPrefixGenerateTab.clear();
-        //fURIGenerateTab.clear();
-        //fshapesBaseURIDefineTab.clear();
-        //fowlImportsDefineTab.clear();
-        fsourceDefineTab.clear();
-        tableViewBrowseID.getItems().clear();
-    }
-
-    @FXML
-    //Action for button "Unload Shapes" related to tab SHACL Shape Browser
-    private void actionBrtUnloadShapes(ActionEvent actionEvent) {
-        progressBar.setProgress(0);
-        MainController.shapeModels = null;
-        MainController.shapeModelsNames = null;
-        treeViewConstraints.setRoot(null);
-        fPrefixGenerateTab.clear();
-        fURIGenerateTab.clear();
-        fshapesBaseURIDefineTab.clear();
-        fowlImportsDefineTab.clear();
-        fsourceDefineTab.clear();
-        tableViewBrowseModify.getItems().clear();
-    }
-
 
     @FXML
     // action on button "Show/Hide source code" in the SHACL Shapes Browser
@@ -4348,77 +4207,6 @@ public class MainController implements Initializable {
             btnShowSourceCodeDefineTab.setText("Show");
             fsourceDefineTab.clear();
         }
-    }
-
-    //initializes the TreeView in the SHACL Shape Browser
-    private static void guiTreeDesignShapesInit() {
-
-        TreeItem<String> rootMain = treeViewConstraintsStatic.getRoot();
-        if (rootMain == null) {
-            //define the Treeview
-            rootMain = new CheckBoxTreeItem<>("Main root");
-            rootMain.setExpanded(true);
-            treeViewConstraintsStatic.setRoot(rootMain); // sets the root to the eu.griddigit.cimpal.gui object
-            treeViewConstraintsStatic.setShowRoot(false);
-            treeMapConstraints = new HashMap<>();
-            treeMapConstraintsInverse = new HashMap<>();
-        }
-        for (int sm = 0; sm < shapeModels.size(); sm++) {
-            Model shapeModel = (Model) shapeModels.get(sm);
-            String profileItemString = ((ArrayList<?>) shapeModelsNames.get(sm)).get(1).toString() + ":" + ((ArrayList<?>) shapeModelsNames.get(sm)).get(0).toString();
-            if (!treeMapConstraints.containsValue(profileItemString)) {
-                TreeItem<String> profileItem = new TreeItem<>(profileItemString);
-                rootMain.getChildren().add(profileItem);
-                treeMapConstraints.putIfAbsent(profileItem, profileItemString);
-                treeMapConstraintsInverse.putIfAbsent(profileItemString, profileItem);
-
-                //showing the PropertyGroup
-                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "PropertyGroup")); i.hasNext(); ) {
-                    Resource resItem = i.next();
-                    String propertyGroupItemString = resItem.getLocalName();
-                    String propertyGroupPrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
-                    TreeItem<String> propertyGroupItem = new TreeItem<>(propertyGroupPrefix + ":" + propertyGroupItemString); // level for the NodeShapes
-                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(propertyGroupItem);
-                }
-
-                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "SPARQLConstraint")); i.hasNext(); ) {
-                    Resource resItem = i.next();
-                    String sparqlItemString = resItem.getLocalName();
-                    String sparqlPrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
-                    TreeItem<String> sparqlItem = new TreeItem<>(sparqlPrefix + ":" + sparqlItemString); // level for the SPARQLConstraint
-                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(sparqlItem);
-                }
-
-                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "NodeShape")); i.hasNext(); ) {
-                    Resource resItem = i.next();
-                    String nodeShapeItemString = resItem.getLocalName();
-                    String nodeShapePrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
-                    TreeItem<String> nodeShapeItem = new TreeItem<>(nodeShapePrefix + ":" + nodeShapeItemString); // level for the NodeShapes
-                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(nodeShapeItem);
-                    for (NodeIterator j = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "sparql")); j.hasNext(); ) { // this is if the NodeShape has sparqlConstraint
-                        RDFNode resItemObject = j.next();
-                        String sparqlConstraintPrefix = shapeModel.getNsURIPrefix(resItemObject.asResource().getNameSpace());
-                        TreeItem<String> sparqlConstraintItem = new TreeItem<>(sparqlConstraintPrefix + ":" + resItemObject.asResource().getLocalName()); // level for the sparqlConstraint
-                        nodeShapeItem.getChildren().add(sparqlConstraintItem);
-                    }
-                    for (NodeIterator j = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "property")); j.hasNext(); ) {
-                        RDFNode resItemObject = j.next();
-                        String propertyShapePrefix = shapeModel.getNsURIPrefix(resItemObject.asResource().getNameSpace());
-                        TreeItem<String> propertyShapeItem = new TreeItem<>(propertyShapePrefix + ":" + resItemObject.asResource().getLocalName()); // level for the PropertyShapes
-                        nodeShapeItem.getChildren().add(propertyShapeItem);
-                        for (NodeIterator sc = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "sparql")); sc.hasNext(); ) { // this is if the PropertyShape has sparqlConstraint
-                            RDFNode resItemObjectSC = sc.next();
-                            String sparqlConstraintPrefix = shapeModel.getNsURIPrefix(resItemObjectSC.asResource().getNameSpace());
-                            TreeItem<String> sparqlConstraintItem = new TreeItem<>(sparqlConstraintPrefix + ":" + resItemObjectSC.asResource().getLocalName()); // level for the sparqlConstraint
-                            propertyShapeItem.getChildren().add(sparqlConstraintItem);
-                        }
-                    }
-                }
-            }
-        }
-        //treeViewConstraints.setCellFactory(CheckBoxTreeCell.<String>forTreeView()); //this sets checkbox in front
-        treeViewConstraintsStatic.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-
     }
 
     //initializes the TreeView in the Instance Data Browser
@@ -4640,350 +4428,9 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    //select action on the tree view Instance data
-    private void selectActionTreeItemID(MouseEvent mouseEvent) throws Exception {
-        //Initialisation GUI
-//        tableViewBrowseID.getItems().clear();
-//
-        Node node = mouseEvent.getPickResult().getIntersectedNode();
-        // Accept clicks only on node cells, and not on empty spaces of the TreeView
-        if (node instanceof Text || (node instanceof TreeCell && ((TreeCell) node).getText() != null)) {
-            ArrayList<Object> parentInfo = getParent(treeViewIDStatic); //returns a structure containing the profile parent, the tree level, the selected item
-
-//            ObservableList<TableColumnsSetup> tableData = tableViewBrowseID.getItems();
-//            tableViewBrowseID.setItems(tableData);
-
-        }
-
-        //    @FXML
-//    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
-//
-        //String uml = "@startuml\nAlice -> Bob: Hello\n@enduml";
-//        String uml = """
-//@startuml
-//!theme cerulean
-//skinparam class {
-//    BackgroundColor LightBlue
-//    ArrowColor DarkBlue
-//    BorderColor Black
-//}
-//class User {
-//    +String name
-//    +String email
-//}
-//class Order {
-//    +int id
-//    +Date date
-//}
-//User --> Order : places
-//@enduml
-//""";
-
-
-        String uml = """
-                @startuml
-                left to right direction
-                skinparam class {
-                    BackgroundColor LightBlue
-                    ArrowColor DarkBlue
-                    BorderColor Black
-                }
-                class User {
-                    +String name
-                    +String email
-                }
-                class Order {
-                    +int id
-                    +Date date
-                }
-                User --> Order : places
-                @enduml
-                """;
-//
-//        String uml = """
-//        @startuml
-//        !pragma svginteractive true
-//        actor User
-//        User -> (Login)
-//        @enduml
-//        """;
-//
-//        String svg = PlantUMLGenerator.generateDiagram(uml);
-//
-//        // Create a WebView to display the SVG
-//        //WebView webView = new WebView();
-//        IDgraph.getEngine().loadContent(svg, "text/html");
-
-
-        byte[] diagram = PlantUMLGenerator.generateDiagram(uml);
-
-        //Image image = new Image(new ByteArrayInputStream(diagram));
-        //IDgraph.setImage(diagram);
-
-        // Convert byte array to InputStream
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(diagram);
-
-// Create an Image from the InputStream
-        Image image = new Image(inputStream);
-
-// Set the Image to the ImageView
-        IDgraph.setImage(image);
-//        ImageView imageView = new ImageView(image);
-//        StackPane root = new StackPane(imageView);
-//        Scene scene = new Scene(root, 800, 600);
-//
-//        primaryStage.setTitle("PlantUML in JavaFX");
-//        primaryStage.setScene(scene);
-//        primaryStage.show()
-//
-//    }
-
-        // Zoom functionality
-        IDgraph.setOnScroll((ScrollEvent event) -> {
-            double delta = event.getDeltaY();
-            double scale = IDgraph.getScaleX() + delta / 100;
-            scale = Math.max(scale, 0.1); // Prevent scaling to zero or negative
-            IDgraph.setScaleX(scale);
-            IDgraph.setScaleY(scale);
-        });
-
-        // Drag functionality
-        IDgraph.setOnMousePressed(event -> {
-            initialX = event.getSceneX() - IDgraph.getTranslateX();
-            initialY = event.getSceneY() - IDgraph.getTranslateY();
-        });
-
-        IDgraph.setOnMouseDragged(event -> {
-            IDgraph.setTranslateX(event.getSceneX() - initialX);
-            IDgraph.setTranslateY(event.getSceneY() - initialY);
-        });
-
-    }
-
-
-    @FXML
-    //select action on the tree view SHACL Shapes
-    private void selectActionTreeItemConstraits(MouseEvent mouseEvent) throws IOException {
-        //Initialisation GUI
-        tableViewBrowseModify.getItems().clear();
-
-        fPrefixGenerateTab.setText(""); // namespace "Prefix"
-        fURIGenerateTab.setText(""); //namespace "URI"
-        fshapesBaseURIDefineTab.setText(""); //baseURI
-        fowlImportsDefineTab.setText(""); // "owl:imports"
-
-        Node node = mouseEvent.getPickResult().getIntersectedNode();
-        // Accept clicks only on node cells, and not on empty spaces of the TreeView
-        if (node instanceof Text || (node instanceof TreeCell && ((TreeCell) node).getText() != null)) {
-            //String name = (String) ((TreeItem)treeViewRDFS.getSelectionModel().getSelectedItem()).getValue();
-            ArrayList<Object> parentInfo = getParent(treeViewConstraints); //returns a structure containing the profile parent, the tree level, the selected item
-
-            int m = 0;
-            for (int i = 0; i < shapeModelsNames.size(); i++) {
-                //if (((ArrayList) shapeModelsNames.get(i)).get(0).equals(parentInfo.get(0))) {
-                if (parentInfo.get(0).equals(((ArrayList) shapeModelsNames.get(i)).get(1) + ":" + ((ArrayList) shapeModelsNames.get(i)).get(0))) {
-                    m = i;
-                }
-            }
-
-            Model shapeModel = (Model) shapeModels.get(m);
-            //selectedShapeModel=m; // used for the combobox constraints
-
-            String prefix = ((TreeItem<String>) parentInfo.get(2)).getValue().split(":", 2)[0];
-            // set namespace "Prefix"
-            fPrefixGenerateTab.setText(prefix);
-            String uri = shapeModel.getNsPrefixURI(prefix);
-            //set namespace "URI"
-            fURIGenerateTab.setText(uri);
-            //set baseURI
-            String baseURI = ((ArrayList) shapeModelsNames.get(m)).get(3).toString();
-            fshapesBaseURIDefineTab.setText(baseURI);
-            //set Owl:imports
-            int printSource = 0; //important for the printing of the source of the elements
-            if (((TreeView<String>) treeViewConstraints).getSelectionModel().getSelectedItems().get(0).getValue().equals(parentInfo.get(0))) {
-                //this is when the parent (the shape model/profile) is selected
-                String owlImports = ShaclTools.getOWLimports(shapeModel, uri);
-                fowlImportsDefineTab.setText(owlImports);
-
-                //set "As source code" for the whole shape model
-                if (btnShowSourceCodeDefineTab.isSelected()) {
-                    ByteArrayOutputStream os = new ByteArrayOutputStream();
-
-                    shapeModel.write(os, "TURTLE", baseURI);
-                    String stringForGui = os.toString("UTF-8");
-                    fsourceDefineTab.setText(stringForGui);
-                    os.close();
-                }
-                //fshapeTypeDefineTab.setText("Type: Shape model");
-                return;
-            } else {
-                //this is when other thing is selected is selected
-                //set "As source code" for the whole shape model
-                if (btnShowSourceCodeDefineTab.isSelected()) {// the button to show the source is selected
-                    printSource = 1;
-                }
-            }
-
-
-            String name = ((TreeItem<String>) parentInfo.get(2)).getValue().split(":", 2)[1];
-            // set "Shape IRI"
-            //fShapeIRIDefineTab.setText(((TreeItem<String>) parentInfo.get(2)).getValue());
-            Resource resItem = shapeModel.getResource(uri + name);
-            //selectedShapeResource=resItem; // used for the combobox constraints
-
-            //This is used for the printing of the source code
-            Model shapeModelPart = JenaUtil.createDefaultModel();
-            shapeModelPart.setNsPrefixes(shapeModel.getNsPrefixMap()); // set the same prefixes like the shapeModel
-            List<Statement> shapeModelPartStmt = new LinkedList<>();
-
-            //gives all statements related to the resource. 0 means that the resource trippe is not included
-            List<Statement> statementsList = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
-
-            ObservableList<TableColumnsSetup> tableData = tableViewBrowseModify.getItems();
-
-            ArrayList<String> shaclNodeShapeProperties = ShaclTools.getListShaclNodeShapeProperties();
-            ArrayList<String> shaclPropertyShapeProperties = ShaclTools.getListShaclPropertyShapeProperties();
-            ArrayList<String> shaclPropertyGroupProperties = ShaclTools.getListShaclPropertyGroupProperties();
-            ArrayList<String> shaclSPARQLConstraintProperties = ShaclTools.getListShaclSPARQLConstraintProperties();
-            ArrayList<String> shaclTypeProperties = ShaclTools.getListShacltypeProperties();
-
-
-            String ShapeType = "";
-            for (int stmt = 0; stmt < statementsList.size(); stmt++) {
-                if (stmt == 0) {
-                    ShapeType = statementsList.get(stmt).getObject().asResource().getLocalName();
-                    String propertyValue;
-                    String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
-                    String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
-                    propertyValue = propertyValuePrefix + ":" + propertyValueLN;
-                    shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                    tableData.add(new TableColumnsSetup("rdf:type",
-                            propertyValue, FXCollections.<String>observableArrayList(shaclTypeProperties)));
-                } else {
-                    if (!statementsList.get(stmt).getPredicate().equals(RDF.type)) {
-                        //if (!ShapeType.equals(statementsList.get(stmt).getObject().asResource().getLocalName())) {
-                        String propertyValue = "";
-                        String shapePropertyPrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getPredicate().getNameSpace());
-                        String shapePropertyLN = statementsList.get(stmt).getPredicate().getLocalName();
-
-                        if (statementsList.get(stmt).getObject().isResource()) {
-                            if (!statementsList.get(stmt).getObject().isAnon()) {
-                                String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
-                                String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
-                                propertyValue = propertyValuePrefix + ":" + propertyValueLN;
-                                shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                            } else { //if the object is a blank node
-                                //it is assumed that this is a list, e.g. this works for sh:in and sh:or
-
-                                Resource list = statementsList.get(stmt).getObject().asResource();
-                                RDFList rdfList = list.as(RDFList.class);
-                                ExtendedIterator<RDFNode> items = rdfList.iterator();
-
-                                // add in the the blank node info for the source code
-                                Resource blankNode = shapeModelPart.getResource(statementsList.get(stmt).getSubject().getURI());
-                                RDFList orRDFlist = shapeModelPart.createList(rdfList.iterator());
-                                blankNode.addProperty(statementsList.get(stmt).getPredicate(), orRDFlist);
-
-                                int firstTime = 0;
-                                while (items.hasNext()) {
-                                    Resource item = items.next().asResource();
-
-                                    String propertyValuePrefix = shapeModel.getNsURIPrefix(item.getNameSpace());
-                                    String propertyValueLN = item.getLocalName();
-                                    if (firstTime == 0) {
-                                        propertyValue = propertyValuePrefix + ":" + propertyValueLN;
-
-                                        firstTime = 1;
-                                    } else {
-                                        propertyValue = propertyValue + " , " + propertyValuePrefix + ":" + propertyValueLN;
-                                    }
-                                }
-                            }
-                        } else if (statementsList.get(stmt).getObject().isLiteral()) {
-                            propertyValue = statementsList.get(stmt).getObject().asLiteral().getString();//TODO see if the datatype should be shown
-                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                        } else {
-                            propertyValue = statementsList.get(stmt).getObject().toString();
-                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                        }
-                        switch (ShapeType) {
-                            case "NodeShape":
-
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclNodeShapeProperties)));
-
-                                break;
-                            case "PropertyShape":
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyShapeProperties)));
-                                break;
-                            case "PropertyGroup":
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyGroupProperties)));
-                                break;
-                            case "SPARQLConstraint":
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclSPARQLConstraintProperties)));
-                                //TODO also for the rest
-                                break;
-                        }
-                        //}
-                    }
-                }
-            }
-            tableViewBrowseModify.setItems(tableData);
-
-
-            // set "As source code" this is when other thing is selected is selected
-            if (printSource == 1) {
-                ByteArrayOutputStream os = new ByteArrayOutputStream();
-                //LocationMapper.setGlobalLocationMapper(new LocationMapper());
-
-                //TODO see how to cut prefix information not to be printed
-
-                //List<Statement> result = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
-                shapeModelPart.add(shapeModelPartStmt);
-
-                shapeModelPart.write(os, "TURTLE", baseURI);
-                String stringForGui = os.toString(StandardCharsets.UTF_8);
-                fsourceDefineTab.setText(stringForGui);
-                os.close();
-            }
-        }
-
-    }
-
-    //find parent in a tree view
-    private ArrayList<Object> getParent(TreeView<String> treeViewToProcess) {
-        int parentFound = 0;
-        String parentProfile = ""; // this is the name of the profile
-        TreeItem<String> selectedItem = treeViewToProcess.getSelectionModel().getSelectedItem();
-        TreeItem<String> selectedItemP = selectedItem;
-        int treeLevel = 0; //treeLevel=1 if it is the profile level; 2 if it is NodeShape level (for the constraints) or PropertyGroup;
-        // 3 is it is PropertyShape level (for the constraints); 4 is if there is a sparql constraint on the PropertyShape
-        while (parentFound == 0) {
-            if (selectedItemP.getParent().getValue() != null) {
-                if (selectedItemP.getParent().getValue().equals("Main root")) {
-                    parentProfile = selectedItemP.getValue();
-                    treeLevel++;
-                    parentFound = 1;
-                } else {
-                    selectedItemP = selectedItemP.getParent();
-                    treeLevel++;
-                }
-            }
-        }
-        ArrayList<Object> getParentInfo = new ArrayList<>();
-        getParentInfo.add(parentProfile);
-        getParentInfo.add(treeLevel);
-        getParentInfo.add(selectedItem);
-        return getParentInfo;
-    }
-
-    @FXML
     // //action for tab pane down - the tab pane with the source code
     private void actionTabConstraintsSourceCode() {
-        btnShowSourceCodeDefineTab.setDisable(!tabConstraintsSourceCode.isSelected() || treeViewConstraints.getRoot() == null);
+        btnShowSourceCodeDefineTab.setDisable(!tabConstraintsSourceCode.isSelected());
     }
 
 
