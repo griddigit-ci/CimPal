@@ -359,6 +359,38 @@
                               <Label minWidth="90.0" text="Namespace:" wrapText="true" />
                               <TextField fx:id="fNSexcelShape" HBox.hgrow="ALWAYS" />
                            </HBox>
+                           <!-- New: Excel→TTL change inputs -->
+                           <HBox spacing="10.0">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="40.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="Modify Constraints from xls file" wrapText="true" />
+                           </HBox>
+                           <HBox spacing="10.0">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="5.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="Changes Excel:" wrapText="true" />
+                              <TextField fx:id="fPathXLSChangesExcelToTtl" editable="false" HBox.hgrow="ALWAYS" />
+                              <Button mnemonicParsing="false" onAction="#actionBrowseXlsChangesExcelToTtl" text="Browse" />
+                           </HBox>
+
+                           <HBox spacing="10.0">
+                              <padding>
+                                 <Insets left="5.0" right="5.0" top="5.0" />
+                              </padding>
+                              <Label minWidth="90.0" text="Target TTL:" wrapText="true" />
+                              <TextField fx:id="fPathTTLChangesExcelToTtl" editable="false" HBox.hgrow="ALWAYS" />
+                              <Button mnemonicParsing="false" onAction="#actionBrowseTtlChangesExcelToTtl" text="Browse" />
+                           </HBox>
+                           <!-- New: Left-side Run/Reset for Excel→TTL -->
+                           <HBox alignment="BOTTOM_LEFT" spacing="10.0" VBox.vgrow="NEVER">
+                              <VBox.margin>
+                                 <Insets left="5.0" bottom="5.0" />
+                              </VBox.margin>
+                              <Button fx:id="btnRunExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelToTtl" text="Run" />
+                              <Button fx:id="btnResetExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetExcelToTtl" text="Reset" />
+                           </HBox>
                            <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                               <VBox.margin>
                                  <Insets bottom="5.0" right="5.0" />
