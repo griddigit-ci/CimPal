@@ -528,79 +528,6 @@
                         </HBox>
                      </AnchorPane>
                   </Tab>
-                  <Tab text="SHACL Shape Browser">
-                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                        <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                           <VBox minWidth="300.0" spacing="5.0">
-                              <HBox.margin>
-                                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                              </HBox.margin>
-                              <Label prefWidth="120.0" text="SHACL Shapes" />
-                              <TreeView fx:id="treeViewConstraints" minHeight="70.0" onMouseClicked="#selectActionTreeItemConstraits" prefWidth="300.0" VBox.vgrow="ALWAYS">
-                                 <tooltip>
-                                    <Tooltip contentDisplay="BOTTOM" graphicTextGap="5.0" text="The list of imported SHACL Shapes." wrapText="true">
-                                       <font>
-                                          <Font size="14.0" />
-                                       </font>
-                                    </Tooltip>
-                                 </tooltip>
-                              </TreeView>
-                           </VBox>
-                           <VBox spacing="10.0" HBox.hgrow="ALWAYS">
-                              <HBox.margin>
-                                 <Insets bottom="5.0" right="5.0" top="5.0" />
-                              </HBox.margin>
-                              <VBox prefHeight="200.0" prefWidth="100.0">
-                                 <VBox.margin>
-                                    <Insets />
-                                 </VBox.margin>
-                                 <HBox spacing="10.0">
-                                    <padding>
-                                       <Insets left="5.0" right="5.0" top="5.0" />
-                                    </padding>
-                                    <Label prefWidth="140.0" text="Shapes namespace:" />
-                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
-                                    <TextField fx:id="fPrefixGenerateTab" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
-                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
-                                    <TextField fx:id="fURIGenerateTab" editable="false" prefWidth="300.0" />
-                                 </HBox>
-                                 <HBox spacing="10.0">
-                                    <padding>
-                                       <Insets left="5.0" right="5.0" top="5.0" />
-                                    </padding>
-                                    <Label prefWidth="140.0" text="Shapes base URI:" />
-                                    <TextField fx:id="fshapesBaseURIDefineTab" editable="false" prefWidth="530.0" />
-                                 </HBox>
-                                 <HBox spacing="10.0">
-                                    <padding>
-                                       <Insets left="5.0" right="5.0" top="5.0" />
-                                    </padding>
-                                    <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
-                                    <TextField fx:id="fowlImportsDefineTab" editable="false" prefWidth="530.0" />
-                                 </HBox>
-                              </VBox>
-                              <TableView fx:id="tableViewBrowseModify">
-                                 <columns>
-                                    <TableColumn fx:id="itemColumnBrowseModify" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Shape property" />
-                                    <TableColumn fx:id="valueColumnBrowseModify" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
-                                 </columns>
-                              </TableView>
-                              <HBox alignment="BOTTOM_LEFT" spacing="10.0">
-                                 <VBox minWidth="200.0" spacing="5.0">
-                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
-                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadShapes" text="Unload Shapes" />
-                                    </HBox>
-                                 </VBox>
-                                 <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
-                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
-                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnOpenShapeBrowser" text="Open" HBox.hgrow="ALWAYS" />
-                                    </HBox>
-                                 </VBox>
-                              </HBox>
-                           </VBox>
-                        </HBox>
-                     </AnchorPane>
-                  </Tab>
                   <Tab text="Instance Data Comparison">
                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                         <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -737,35 +664,43 @@
                         </VBox>
                      </AnchorPane>
                   </Tab>
-                  <Tab text="SHACL Validator">
+                  <Tab text="SHACL tester">
                      <content>
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <AnchorPane>
                            <children>
-                              <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                              <VBox alignment="CENTER_LEFT" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                  <children>
-                                    <HBox spacing="10.0">
+                                    <HBox alignment="CENTER_LEFT" spacing="5.0">
                                        <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                                        </padding>
                                        <children>
-                                          <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
+                                          <Label text="SHACL files:" wrapText="true" />
                                           <TextField fx:id="fPathShaclFilesValidator" editable="false" HBox.hgrow="ALWAYS" />
-                                          <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesValidator" text="Browse" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesTester" text="Browse" />
                                        </children>
                                     </HBox>
-                                    <HBox spacing="10.0">
+                                    <HBox alignment="CENTER_LEFT" spacing="5.0">
                                        <padding>
-                                          <Insets left="5.0" right="5.0" top="5.0" />
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                                        </padding>
                                        <children>
-                                          <Label minWidth="90.0" prefHeight="17.0" prefWidth="105.0" text="Models to validate:" wrapText="true" />
+                                          <Label text="Parent folder for test models:" wrapText="true" />
                                           <TextField fx:id="fPathModelsForShaclValidator" editable="false" HBox.hgrow="ALWAYS" />
-                                          <Button mnemonicParsing="false" onAction="#actionBrowsePathForShaclValidator" text="Browse" />
+                                          <Button mnemonicParsing="false" onAction="#actionBrowseFolderPathForShaclTester" text="Browse" />
                                        </children>
+                                    </HBox>
+                                    <HBox alignment="CENTER">
+                                       <children>
+                                          <TreeView fx:id="treeViewShaclFiles" showRoot="false" HBox.hgrow="ALWAYS" />
+                                       </children>
+                                       <padding>
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                                       </padding>
                                     </HBox>
                                     <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                        <VBox.margin>
-                                          <Insets bottom="5.0" right="5.0" />
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                                        </VBox.margin>
                                        <children>
                                           <Button fx:id="btnRunShaclValidator" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclValidator" text="Run" HBox.hgrow="ALWAYS" />
@@ -1000,6 +935,79 @@
                         </HBox>
                      </AnchorPane>
                   </Tab>
+                  <Tab disable="true" text="SHACL Shape Browser">
+                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                        <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                           <VBox minWidth="300.0" spacing="5.0">
+                              <HBox.margin>
+                                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                              </HBox.margin>
+                              <Label prefWidth="120.0" text="SHACL Shapes" />
+                              <TreeView fx:id="treeViewConstraints" minHeight="70.0" onMouseClicked="#selectActionTreeItemConstraits" prefWidth="300.0" VBox.vgrow="ALWAYS">
+                                 <tooltip>
+                                    <Tooltip contentDisplay="BOTTOM" graphicTextGap="5.0" text="The list of imported SHACL Shapes." wrapText="true">
+                                       <font>
+                                          <Font size="14.0" />
+                                       </font>
+                                    </Tooltip>
+                                 </tooltip>
+                              </TreeView>
+                           </VBox>
+                           <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                              <HBox.margin>
+                                 <Insets bottom="5.0" right="5.0" top="5.0" />
+                              </HBox.margin>
+                              <VBox prefHeight="200.0" prefWidth="100.0">
+                                 <VBox.margin>
+                                    <Insets />
+                                 </VBox.margin>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <Label prefWidth="140.0" text="Shapes namespace:" />
+                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
+                                    <TextField fx:id="fPrefixGenerateTab" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
+                                    <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
+                                    <TextField fx:id="fURIGenerateTab" editable="false" prefWidth="300.0" />
+                                 </HBox>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <Label prefWidth="140.0" text="Shapes base URI:" />
+                                    <TextField fx:id="fshapesBaseURIDefineTab" editable="false" prefWidth="530.0" />
+                                 </HBox>
+                                 <HBox spacing="10.0">
+                                    <padding>
+                                       <Insets left="5.0" right="5.0" top="5.0" />
+                                    </padding>
+                                    <Label prefWidth="140.0" text="Shapes owl:imports URIs:" />
+                                    <TextField fx:id="fowlImportsDefineTab" editable="false" prefWidth="530.0" />
+                                 </HBox>
+                              </VBox>
+                              <TableView fx:id="tableViewBrowseModify">
+                                 <columns>
+                                    <TableColumn fx:id="itemColumnBrowseModify" maxWidth="1.7976931348623157E308" minWidth="200.0" prefWidth="-1.0" text="Shape property" />
+                                    <TableColumn fx:id="valueColumnBrowseModify" maxWidth="1.7976931348623157E308" minWidth="600.0" prefWidth="-1.0" text="Value" />
+                                 </columns>
+                              </TableView>
+                              <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                 <VBox minWidth="200.0" spacing="5.0">
+                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="LEFT_TO_RIGHT" spacing="10.0">
+                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtUnloadShapes" text="Unload Shapes" />
+                                    </HBox>
+                                 </VBox>
+                                 <VBox minWidth="200.0" spacing="5.0" HBox.hgrow="ALWAYS">
+                                    <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0">
+                                       <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnOpenShapeBrowser" text="Open" HBox.hgrow="ALWAYS" />
+                                    </HBox>
+                                 </VBox>
+                              </HBox>
+                           </VBox>
+                        </HBox>
+                     </AnchorPane>
+                  </Tab>
                   <Tab disable="true" text="Instance Data Browser">
                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                         <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -1117,6 +1125,6 @@
             </padding>
          </ProgressBar>
       </Pane>
-      <Label font="$x3" text="Version: 2025.0" HBox.hgrow="NEVER" />
+      <Label font="$x3" text="Version: 2025.11.12.1" HBox.hgrow="NEVER" />
    </HBox>
 </VBox>

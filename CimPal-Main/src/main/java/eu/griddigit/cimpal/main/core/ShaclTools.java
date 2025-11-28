@@ -6,7 +6,6 @@
 package eu.griddigit.cimpal.main.core;
 
 
-import eu.griddigit.cimpal.main.model.SHACLValidationResult;
 import javafx.scene.control.ChoiceDialog;
 import javafx.stage.DirectoryChooser;
 import org.apache.commons.io.FilenameUtils;
@@ -1638,14 +1637,14 @@ public class ShaclTools {
         return shapeModel;
     }
 
-    public static Map<String,Model> loadBaseModel() throws FileNotFoundException {
+    public static Map<String,Model> loadBaseModel() throws IOException {
 
         Map<String,Model> baseTierMap = new HashMap<>();
 
         //load base profiles for shacl
         List<File> basefiles = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select Base profiles");
         if (basefiles != null) {
-            baseTierMap.put("unionmodelbaseprofilesshacl", eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true));
+            baseTierMap.put("unionmodelbaseprofilesshacl", eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true, false).get("shacl"));
             baseTierMap.put("unionmodelbaseprofilesshaclinheritance", modelInheritance(baseTierMap.get("unionmodelbaseprofilesshacl"), true, true));
             baseTierMap.put("unionmodelbaseprofilesshaclinheritanceonly", modelInheritance); // this contains the inheritance of the classes under OWL2.members
 
@@ -3479,36 +3478,6 @@ public class ShaclTools {
         }
     }
 
-    public static List<SHACLValidationResult> extractSHACLValidationResults(ValidationReport report) {
-        List<SHACLValidationResult> resultsList = new ArrayList<>();
-        Model reportModel = report.getModel();
-
-        ResIterator results = reportModel.listResourcesWithProperty(RDF.type, SH.ValidationResult);
-
-        while (results.hasNext()) {
-            Resource result = results.next();
-
-            String focusNode = getResourceValue(result.getPropertyResourceValue(SH.focusNode));
-            String severity = getResourceValue(result.getPropertyResourceValue(SH.resultSeverity));
-            String message = getStatementValue(result.getProperty(SH.resultMessage));
-            String value = getStatementValue(result.getProperty(SH.value));
-            String path = getStatementValue(result.getProperty(SH.resultPath));
-
-            resultsList.add(new SHACLValidationResult(focusNode, severity, message, value, path));
-        }
-
-        return resultsList;
-    }
-
-    private static String getResourceValue(Resource resource) {
-        return (resource != null) ? resource.toString() : "None";
-    }
-
-    private static String getStatementValue(Statement statement) {
-        return (statement != null) ? statement.getObject().toString() : "None";
-    }
-
-
     //This creates a shape model from a profile
     public static Model createShapesModelFromProfile(Model model, String nsPrefixprofile, String nsURIprofile, ArrayList<?> shapeData,Map<String,Boolean> rdfsToShaclGuiMapBool){
 
@@ -5226,7 +5195,7 @@ public class ShaclTools {
                             .set(RIOT.symTurtleOmitBase, false)
                             .set(RIOT.symTurtleIndentStyle, "wide")
                             .set(RIOT.symTurtleDirectiveStyle, "rdf10")
-                            .set(RIOT.multilineLiterals, true)
+                            .set(RIOT.symTurtleMultilineLiterals, true)
                             .lang(Lang.TURTLE)
                             .source(shaclModelToSave)
                             .output(out);

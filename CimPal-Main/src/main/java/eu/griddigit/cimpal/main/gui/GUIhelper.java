@@ -13,13 +13,15 @@ import javafx.scene.layout.Priority;
 import javafx.util.Pair;
 import org.apache.jena.rdf.model.Model;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import static eu.griddigit.cimpal.main.application.MainController.foutputWindowVar;
 
 public class GUIhelper implements IOutputHandler {
 
-    public static Alert expandableAlert(String title, String header, String contextText, String labelText, String detailsText){
+    public static Alert expandableAlert(String title, String header, String contextText, String labelText, String detailsText) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle(title);
         alert.setHeaderText(header);
@@ -144,27 +146,68 @@ public class GUIhelper implements IOutputHandler {
 //    }
 
 
-
-    public static Pair<Integer,Model> getShapeModel(String shapeModelName){
+    public static Pair<Integer, Model> getShapeModel(String shapeModelName) {
         Model shapeModel = null;
-        int index=0;
+        int index = 0;
         for (int i = 0; i < MainController.shapeModelsNames.size(); i++) {
             if (((ArrayList) MainController.shapeModelsNames.get(i)).get(0).equals(shapeModelName)) {
                 shapeModel = (Model) MainController.shapeModels.get(i);
-                index=i;
+                index = i;
                 break;
             }
         }
 
-        Pair<Integer,Model> result = new Pair(index, shapeModel);
+        Pair<Integer, Model> result = new Pair(index, shapeModel);
         return result;
     }
 
     //Append text to output window
     public void appendOutput(String valueOf, Boolean nextLine) {
-        if (nextLine){
+        if (nextLine) {
             foutputWindowVar.appendText("\n");
         }
         foutputWindowVar.appendText(valueOf);
     }
+
+    public static void buildFileTree(File rootFolder, TreeView<String> treeView) {
+        if (rootFolder == null || !rootFolder.isDirectory()) {
+            return;
+        }
+
+        TreeItem<String> rootItem = new TreeItem<>(rootFolder.getName());
+        rootItem.setExpanded(true);
+        treeView.setRoot(rootItem);
+
+        addFilesToTree(rootFolder, rootItem);
+    }
+
+    private static void addFilesToTree(File directory, TreeItem<String> parentItem) {
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return;
+        }
+
+        // Sort files: directories first, then files
+        Arrays.sort(files, (f1, f2) -> {
+            if (f1.isDirectory() && !f2.isDirectory()) return -1;
+            if (!f1.isDirectory() && f2.isDirectory()) return 1;
+            return f1.getName().compareToIgnoreCase(f2.getName());
+        });
+
+        for (File file : files) {
+            if (file.isDirectory()) {
+                TreeItem<String> item = new TreeItem<>(file.getName());
+                parentItem.getChildren().add(item);
+                addFilesToTree(file, item);
+            } else {
+                String fileName = file.getName().toLowerCase();
+                if (fileName.endsWith(".xml") || fileName.endsWith(".zip")) {
+                    TreeItem<String> item = new TreeItem<>(file.getName());
+                    parentItem.getChildren().add(item);
+                    parentItem.setExpanded(true);
+                }
+            }
+        }
+    }
+
 }

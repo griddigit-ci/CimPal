@@ -1,20 +1,27 @@
 package eu.griddigit.cimpal.core.utils;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.vocabulary.DCAT;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
+import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class ModelFactory {
+
+    public static LinkedList<String> zipfilesnames;
+
 
     public static class InheritanceResult {
         public final Model processedModel;
@@ -26,35 +33,264 @@ public class ModelFactory {
     }
 
     //Loads one or many models
-    public static Model modelLoad(List<File> files, String xmlBase, Lang rdfSourceFormat, Boolean considerCimDiff) throws FileNotFoundException {
-        Model modelUnion = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-        Map<String, String> prefixMap = modelUnion.getNsPrefixMap();
-        for (Object file : files) {
-            Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-            InputStream inputStream = new FileInputStream(file.toString());
-            RDFDataMgr.read(model, inputStream, xmlBase, rdfSourceFormat);
-            prefixMap.putAll(model.getNsPrefixMap());
-            if (considerCimDiff) {
-                String cim2URI = prefixMap.get("cim");
-                if (!cim2URI.isEmpty()) {
-                    model.removeNsPrefix("cim");
-                    prefixMap.remove("cim");
-                    String cim2Pref = switch (cim2URI) {
-                        case "http://iec.ch/TC57/2013/CIM-schema-cim16#",
-                             "https://iec.ch/TC57/2013/CIM-schema-cim16#" -> "cim16";
-                        case "http://iec.ch/TC57/CIM100#", "https://iec.ch/TC57/CIM100#" -> "cim17";
-                        case "http://cim.ucaiug.io/ns#", "https://cim.ucaiug.io/ns#" -> "cim18";
-                        default -> throw new IllegalStateException("Unexpected value: " + cim2URI);
-                    };
-                    model.setNsPrefix(cim2Pref, cim2URI);
-                    prefixMap.putIfAbsent(cim2Pref, cim2URI);
+    public static Map<String, Model> modelLoad(
+            List<File> files, String xmlBase,Lang rdfSourceFormat, boolean isSHACL, boolean treeID) throws IOException {
+
+        // Thread-safe map for individual models
+        ConcurrentMap<String, Model> modelMap = new ConcurrentHashMap<>();
+
+        // Thread-safe union models
+        Model unionModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Model unionNoHeader = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+
+        // Lock objects to safely modify shared union models
+        Object unionLock = new Object();
+        Object unionNoHeaderLock = new Object();
+
+        files.parallelStream().forEach(file -> {
+            String ext = FilenameUtils.getExtension(file.getName()).toLowerCase();
+            boolean isZip = ext.equals("zip");
+            Lang format;
+
+            List<InputStream> streams;
+            try {
+                if (isZip) {
+                    streams = unzip(file);
+                    format = Lang.RDFXML;
+                } else {
+                    streams = List.of(new FileInputStream(file));
+                    format = getLangFromExtension(ext, rdfSourceFormat);
+                }
+
+                for (int i = 0; i < streams.size(); i++) {
+                    try (InputStream in = streams.get(i)) {
+                        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                        RDFDataMgr.read(model, in, xmlBase, format);
+
+                        // Merge prefixes (deferred until after parallel loop)
+                        String keyword = getProfileKeyword(model);
+                        if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
+                        String key = buildModelKey(file, keyword, isZip, i, treeID);
+
+                        modelMap.put(key, model);
+
+                        synchronized (unionLock) {
+                            unionModel.add(model);
+                            unionModel.setNsPrefixes(model);
+                        }
+                        if (!"FH".equals(keyword)) {
+                            synchronized (unionNoHeaderLock) {
+                                unionNoHeader.add(model);
+                                unionNoHeader.setNsPrefixes(model);
+                            }
+                        }
+
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+
+        // Post-process final models
+        Map<String, Model> result = new HashMap<>(modelMap);
+
+        if (isSHACL) {
+            Model shaclModel = ShapeFactory.createShapeModelWithOwlImport(unionModel);
+            result.put("shacl", shaclModel);
+        } else {
+            result.put("unionModel", unionModel);
+            result.put("modelUnionWithoutHeader", unionNoHeader);
+        }
+
+        return result;
+    }
+
+    private static Lang getLangFromExtension(String ext, Lang fallback) {
+        return switch (ext) {
+            case "rdf", "xml" -> Lang.RDFXML;
+            case "ttl" -> Lang.TURTLE;
+            case "jsonld" -> Lang.JSONLD;
+            default -> fallback;
+        };
+    }
+
+    private static String buildModelKey(File file, String keyword, boolean isZip, int index, boolean treeID) {
+        if (keyword == null || keyword.isEmpty()) {
+            return FilenameUtils.getName(file.getName());
+        }
+
+        if (treeID) {
+            if (isZip && !zipfilesnames.isEmpty()) {
+                String zipName = zipfilesnames.get(Math.min(index,
+                        zipfilesnames.size() - 1));
+                return zipName + "|" + keyword;
+            } else {
+                return file.getName() + "|" + keyword;
+            }
+        }
+        return keyword;
+    }
+
+    public static List<InputStream> unzip(File selectedFile) {
+        List<InputStream> inputstreamlist = new LinkedList<>();
+        zipfilesnames = new LinkedList<>();
+        InputStream inputStream = null;
+        try{
+            ZipFile zipFile = new ZipFile(selectedFile);
+
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+
+
+            while(entries.hasMoreElements()){
+                ZipEntry entry = entries.nextElement();
+
+                    String destPath = selectedFile.getParent() + File.separator+ entry.getName();
+
+                    if(! isValidDestPath(selectedFile.getParent(), destPath)){
+                        throw new IOException("Final file output path is invalid: " + destPath);
+                    }
+
+                    try{
+                        inputStream = zipFile.getInputStream(entry);
+                        inputstreamlist.add(inputStream);
+                        zipfilesnames.add(entry.getName());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+            }
+        } catch(IOException e){
+            throw new RuntimeException("Error unzipping file " + selectedFile, e);
+        }
+        return inputstreamlist;
+    }
+
+    private static boolean isValidDestPath(String targetDir, String destPathStr) {
+        // validate the destination path of a ZipFile entry,
+        // and return true or false telling if it's valid or not.
+
+        Path destPath           = Paths.get(destPathStr);
+        Path destPathNormalized = destPath.normalize(); //remove ../../ etc.
+
+        return destPathNormalized.toString().startsWith(targetDir + File.separator);
+    }
+
+    //get the keyword for the profile
+    public static String getProfileKeyword(Model model) {
+
+        String keyword="";
+
+
+        if (model.listObjectsOfProperty(DCAT.keyword).hasNext()){
+            keyword=model.listObjectsOfProperty(DCAT.keyword).next().toString();
+        }
+        if (model.listObjectsOfProperty(ResourceFactory.createProperty(DCAT.NS,"Model.keyword")).hasNext()){
+            keyword=model.listObjectsOfProperty(ResourceFactory.createProperty(DCAT.NS,"Model.keyword")).next().toString();
+        }
+
+        if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#EquipmentVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))){
+            keyword=model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#EquipmentVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#EquipmentBoundaryVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#EquipmentBoundaryVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+            keyword="EQBD";
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#TopologyBoundaryVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#TopologyBoundaryVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+            //TODO maybe fix RDFS. Here a quick override
+            keyword="TPBD";
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#TopologyVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#TopologyVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#SteadyStateHypothesisVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#SteadyStateHypothesisVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#StateVariablesVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#StateVariablesVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#EDynamicsVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#EDynamicsVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#GeographicalLocationVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#GeographicalLocationVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#DiagramLayoutVersion.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#DiagramLayoutVersion.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.contains(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#Ontology.shortName"),
+                ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed"))) {
+            keyword = model.getRequiredProperty(ResourceFactory.createResource("http://entsoe.eu/CIM/SchemaExtension/3/1#Ontology.shortName"),
+                    ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().toString();
+        }else if (model.listObjectsOfProperty(ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.profile")).hasNext()){
+            List<RDFNode> profileString=model.listObjectsOfProperty(ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.profile")).toList();
+            for (RDFNode node: profileString){
+                String nodeString=node.toString();
+                if (nodeString.equals("http://entsoe.eu/CIM/EquipmentCore/3/1") || nodeString.equals("http://entsoe.eu/CIM/EquipmentOperation/3/1") || nodeString.equals("http://entsoe.eu/CIM/EquipmentShortCircuit/3/1")){
+                    keyword="EQ";
+                }else if (nodeString.equals("http://entsoe.eu/CIM/SteadyStateHypothesis/1/1")){
+                    keyword="SSH";
+                }else if (nodeString.equals("http://entsoe.eu/CIM/Topology/4/1")) {
+                    keyword = "TP";
+                }else if (nodeString.equals("http://entsoe.eu/CIM/StateVariables/4/1")) {
+                    keyword = "SV";
+                }else if (nodeString.equals("http://entsoe.eu/CIM/EquipmentBoundary/3/1") || nodeString.equals("http://entsoe.eu/CIM/EquipmentBoundaryOperation/3/1")) {
+                    keyword = "EQBD";
+                }else if (nodeString.equals("http://entsoe.eu/CIM/TopologyBoundary/3/1")) {
+                    keyword = "TPBD";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/3.0")) {
+                    keyword = "EQ";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/Operation-EU/3.0")) {
+                    keyword = "OP";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/ShortCircuit-EU/3.0")) {
+                    keyword = "SC";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/3.0")){
+                    keyword="SSH";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/Topology-EU/3.0")) {
+                    keyword = "TP";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/StateVariables-EU/3.0")) {
+                    keyword = "SV";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/EquipmentBoundary-EU/3.0")) {
+                    keyword = "EQBD";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/DiagramLayout-EU/3.0")) {
+                    keyword = "DL";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/GeographicalLocation-EU/3.0")) {
+                    keyword = "GL";
+                }else if (nodeString.equals("http://iec.ch/TC57/ns/CIM/Dynamics-EU/1.0")) {
+                    keyword = "DY";
                 }
             }
-            modelUnion.add(model);
         }
-        modelUnion.setNsPrefixes(prefixMap);
-        return modelUnion;
+
+        if (keyword.isEmpty()){
+            try{
+                List<Resource> listRes=model.listSubjectsWithProperty(RDF.type).toList();
+                for (Resource res : listRes){
+                    if (res.getLocalName().contains("Ontology.keyword")){
+                        keyword = model.getRequiredProperty(res,ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#isFixed")).getObject().asLiteral().getString();
+                    }
+                }
+            } catch (NullPointerException e){
+                keyword = "";
+            }
+        }
+
+        return keyword;
     }
+
+
 
     public static InheritanceResult generateInheritanceModels(
             Model model, boolean inheritanceList, boolean inheritanceListConcrete) {

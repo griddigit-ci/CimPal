@@ -8,7 +8,6 @@ package eu.griddigit.cimpal.main.util;
 
 import eu.griddigit.cimpal.main.model.GenDataTemplateMapInfo;
 import eu.griddigit.cimpal.main.model.RDFAttributeData;
-import eu.griddigit.cimpal.main.model.SHACLValidationResult;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
@@ -31,7 +30,7 @@ public class ExcelTools {
             XSSFSheet sheet = book.getSheetAt(sheetNum);
 
             if (sheet == null) {
-                System.out.println("Sheet No." + sheetNum+1 + " does not exist in the workbook.");
+                System.out.println("Sheet No." + sheetNum + 1 + " does not exist in the workbook.");
                 return dataExcel;
             }
 
@@ -195,8 +194,7 @@ public class ExcelTools {
         XSSFSheet sheet;
         if (workbook.getSheet(sheetName) == null) {
             sheet = workbook.createSheet(sheetName);
-        }
-        else {
+        } else {
             sheet = workbook.getSheet(sheetName);
         }
 
@@ -242,49 +240,6 @@ public class ExcelTools {
 
     }
 
-    public static void exportSHACLValidationToExcel(List<SHACLValidationResult> validationResults, File selectedFolder, String fileName) {
-        if (selectedFolder == null || !selectedFolder.isDirectory()) {
-            System.err.println("Invalid directory: " + selectedFolder);
-            return;
-        }
-
-        File outputFile = new File(selectedFolder, fileName);
-
-        try (Workbook workbook = new XSSFWorkbook(); FileOutputStream fos = new FileOutputStream(outputFile)) {
-            Sheet sheet = workbook.createSheet("SHACL Report");
-
-            // Create header row
-            Row headerRow = sheet.createRow(0);
-            String[] headers = {"Focus Node", "Severity", "Message", "Value", "Path"};
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(createHeaderStyle(workbook)); // Apply bold style
-            }
-
-            // Write validation results to rows
-            int rowNum = 1;
-            for (SHACLValidationResult result : validationResults) {
-                Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(result.getFocusNode());
-                row.createCell(1).setCellValue(result.getSeverity());
-                row.createCell(2).setCellValue(result.getMessage());
-                row.createCell(3).setCellValue(result.getValue());
-                row.createCell(4).setCellValue(result.getPath());
-            }
-
-            // Auto-size columns
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            workbook.write(fos);
-            System.out.println("SHACL report successfully exported to: " + outputFile.getAbsolutePath());
-
-        } catch (IOException e) {
-            System.err.println("Error exporting SHACL report: " + e.getMessage());
-        }
-    }
 
     private static void putExcelCellInfo(String key, int rowNum, int columnIndex, XSSFRow xssfRow, Map<String, List<String>> mapInfo, CellStyle headerCellStyle, CellStyle dataCellStyle) {
         Object cellValue = mapInfo.get(key).get(rowNum);
