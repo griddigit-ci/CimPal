@@ -44,6 +44,7 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -341,6 +342,17 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLdatatypesplit;
     @FXML
     private CheckBox hideEmptySheets;
+    @FXML
+    private TextField fPathTTLChangesExcelToTtl;
+    @FXML
+    private TextField fPathXLSChangesExcelToTtl;
+    @FXML
+    private Button btnRunExcelToTtl;
+    @FXML
+    private Button btnResetExcelToTtl;
+
+    @FXML
+    private TreeView<String> treeViewShaclFiles;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -350,6 +362,8 @@ public class MainController implements Initializable {
     public static int IDmapSelect;
     public static File rdfModelExcelShacl;
     public static File xlsFileExcelShacl;
+    public static File TtlChangesExcelToTtl;
+    public static File XlsChangesExcelToTtl;
     public static ArrayList<Object> compareResults;
     public static RDFCompareResult rdfCompareResult;
     public static List<String> rdfsCompareFiles;
@@ -987,6 +1001,37 @@ public class MainController implements Initializable {
 
         } else {
             fPathXLSfileForShape.clear();
+        }
+    }
+
+    @FXML
+    //action button RDF file Browse for Excel to SHACL
+    private void actionBrowseTtlChangesExcelToTtl() {
+        progressBar.setProgress(0);
+        //select file
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "TTL files", List.of("*.ttl"), "");
+        if (file.getFirst() != null) {// the file is selected
+            fPathTTLChangesExcelToTtl.setText(file.getFirst().toString());
+            MainController.TtlChangesExcelToTtl = file.getFirst();
+
+        } else {
+            fPathTTLChangesExcelToTtl.clear();
+        }
+    }
+
+    @FXML
+    //action button XLS file Browse for Excel to SHACL
+    private void actionBrowseXlsChangesExcelToTtl() {
+        progressBar.setProgress(0);
+        //select file
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "");
+
+        if (file.getFirst() != null) {// the file is selected
+            fPathXLSChangesExcelToTtl.setText(file.getFirst().toString());
+            MainController.XlsChangesExcelToTtl = file.getFirst();
+
+        } else {
+            fPathXLSChangesExcelToTtl.clear();
         }
     }
 
@@ -4887,6 +4932,109 @@ public class MainController implements Initializable {
                 fcbExportExtensionsGen.setDisable(false);
                 break;
         }
+    }
+
+    @FXML
+    public void actionBtnRunExcelToTtl(ActionEvent actionEvent) {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        try {
+            if (fPathXLSChangesExcelToTtl.getText().isBlank() || fPathTTLChangesExcelToTtl.getText().isBlank()) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setContentText("Please complete all fields.");
+                alert.setHeaderText(null);
+                alert.setTitle("Error - not all fields are filled in");
+                alert.showAndWait();
+                progressBar.setProgress(0);
+                return;
+            }
+
+            // 1) Read Excel
+            ArrayList<Object> dataExcel = ExcelTools.importXLSX(String.valueOf(MainController.XlsChangesExcelToTtl), 0);
+
+            // Simple header detection (exact match, case-sensitive like the applier):
+            int startRow = 0;
+            if (!dataExcel.isEmpty() && dataExcel.get(0) instanceof java.util.List<?> hdr) {
+                String c0 = hdr.size() > 0 ? String.valueOf(hdr.get(0)) : "";
+                String c1 = hdr.size() > 1 ? String.valueOf(hdr.get(1)) : "";
+                if (("Name".equals(c0) || "sh:name".equals(c0)) && ("Property".equals(c1) || "Property Type".equals(c1))) {
+                    startRow = 1;
+                }
+            }
+
+            // 2) Read TTL shapes model (single file)
+            java.util.List<File> modelFiles1 = new java.util.LinkedList<>();
+            modelFiles1.add(MainController.TtlChangesExcelToTtl);
+            Model model1 = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles1, null, Lang.TURTLE, true, false).get("shacl");
+
+            System.out.println("Loaded triples: " + model1.size());
+
+            // 3) Apply updates (mutates model1 in place; 'updated' == model1)
+            Model updated = eu.griddigit.cimpal.main.core.ShaclExcelApplier.applyPropsFromExcelSimple(model1, dataExcel, startRow);
+
+            // Ensure common prefixes (especially sh:) before saving
+            model1.setNsPrefix("sh", "http://www.w3.org/ns/shacl#");
+            model1.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+            model1.setNsPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
+            model1.setNsPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
+
+            // --- Optional debug roundtrip ---
+            if (false) {
+                File outRaw = new File("roundtrip_no_change.ttl");
+                try (FileOutputStream fos = new FileOutputStream(outRaw)) {
+                    RDFDataMgr.write(fos, updated, org.apache.jena.riot.Lang.TURTLE);
+                }
+                Model reread = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                try (java.io.FileInputStream in = new java.io.FileInputStream(outRaw)) {
+                    RDFDataMgr.read(reread, in, null, org.apache.jena.riot.Lang.TURTLE);
+                }
+                System.out.println("Isomorphic (loaded vs roundtrip)? " + model1.isIsomorphicWith(reread));
+            }
+            // --- end optional debug ---
+
+
+
+            // 4) Save-as
+            FileChooser fc = new FileChooser();
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Turtle (*.ttl)", "*.ttl"));
+            File out = fc.showSaveDialog(btnRunExcelToTtl.getScene().getWindow());
+            if (out != null) {
+                String saveBaseURI = null; // keep as given
+
+                try (OutputStream os = new FileOutputStream(out)) {
+                    RDFWriter.create()
+                            .base(saveBaseURI)                        // leave as null per your request
+                            .set(RIOT.symTurtleOmitBase, false)
+                            .set(RIOT.symTurtleIndentStyle, "wide")
+                            .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                            .lang(Lang.TURTLE)
+                            .source(updated)
+                            .output(os);
+                    System.out.println("Model saved successfully to " + out.getAbsolutePath());
+                } catch (IOException e) {
+                    System.err.println("Error saving model to file: " + e.getMessage());
+                }
+            }
+
+            System.out.println("Apply finished.");
+            progressBar.setProgress(1.0);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            progressBar.setProgress(0);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setContentText("Failed to apply changes: " + e.getMessage());
+            alert.setHeaderText(null);
+            alert.setTitle("Error");
+            alert.showAndWait();
+        }
+    }
+
+
+    @FXML
+    public void actionBtnResetExcelToTtl(ActionEvent actionEvent) {
+        fPathTTLChangesExcelToTtl.clear();
+        fPathXLSChangesExcelToTtl.clear();
     }
 }
 
