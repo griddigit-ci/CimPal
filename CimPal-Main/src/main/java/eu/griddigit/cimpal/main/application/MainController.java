@@ -4809,6 +4809,7 @@ public class MainController implements Initializable {
                             .set(RIOT.symTurtleOmitBase, false)
                             .set(RIOT.symTurtleIndentStyle, "wide")
                             .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                            .set(RIOT.symTurtleMultilineLiterals, true)
                             .lang(Lang.TURTLE)
                             .source(updated)
                             .output(os);

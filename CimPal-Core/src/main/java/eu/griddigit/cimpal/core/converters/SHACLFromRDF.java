@@ -442,6 +442,7 @@ public class SHACLFromRDF {
                         .set(RIOT.symTurtleOmitBase, false)
                         .set(RIOT.symTurtleIndentStyle, "wide")
                         .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                        .set(RIOT.symTurtleMultilineLiterals, true)
                         .lang(Lang.TURTLE)
                         .source(shapeModel)
                         .output(outputStream);
