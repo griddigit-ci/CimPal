@@ -82,6 +82,7 @@ import java.util.prefs.Preferences;
 import static eu.griddigit.cimpal.main.core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
+import static eu.griddigit.cimpal.main.util.ExcelTools.CreateTemplateFromXMLQAR;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
@@ -4838,6 +4839,21 @@ public class MainController implements Initializable {
     public void actionBtnResetExcelToTtl(ActionEvent actionEvent) {
         fPathTTLChangesExcelToTtl.clear();
         fPathXLSChangesExcelToTtl.clear();
+    }
+
+    @FXML
+    public void actionCreateQARTemplate(ActionEvent actionEvent) throws IOException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        List<File> files = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "QAR models", List.of("*.xml", "*.zip"), "Select QAR models.");
+
+        if (files != null) {// the file is selected
+            CreateTemplateFromXMLQAR(files);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+
     }
 }
 

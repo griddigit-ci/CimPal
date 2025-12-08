@@ -52,6 +52,7 @@
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
          <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
+         <MenuItem mnemonicParsing="false" onAction="#actionCreateQARTemplate" text="Create xlsx template from QAR" />
          <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
          <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text=" Model transformation" />
@@ -383,7 +384,7 @@
                            <!-- New: Left-side Run/Reset for Excel→TTL -->
                            <HBox alignment="BOTTOM_LEFT" spacing="10.0" VBox.vgrow="NEVER">
                               <VBox.margin>
-                                 <Insets left="5.0" bottom="5.0" />
+                                 <Insets bottom="5.0" left="5.0" />
                               </VBox.margin>
                               <Button fx:id="btnRunExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelToTtl" text="Run" />
                               <Button fx:id="btnResetExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetExcelToTtl" text="Reset" />

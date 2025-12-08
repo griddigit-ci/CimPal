@@ -9,8 +9,10 @@ package eu.griddigit.cimpal.main.util;
 import eu.griddigit.cimpal.main.model.GenDataTemplateMapInfo;
 import eu.griddigit.cimpal.main.model.RDFAttributeData;
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
+import org.apache.jena.riot.Lang;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.*;
@@ -820,4 +822,104 @@ public class ExcelTools {
 
         return sheet;
     }
+
+    public static void CreateTemplateFromXMLQAR(List<File> files) throws IOException {
+        Map<String, Model> modelMap = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoadPerFiles(files, "http://griddigit.eu#", Lang.RDFXML);
+
+        // Create workbook
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        XSSFSheet sheet = workbook.createSheet("FileData");
+
+        // Create header style
+        CellStyle headerCellStyle = createHeaderStyle(workbook);
+        CellStyle dataCellStyle = createDataStyle(workbook);
+
+        // Create header row
+        XSSFRow headerRow = sheet.createRow(0);
+        String[] headers = {"FileName", "FileProfile", "MAS", "FileID"};
+        for (int i = 0; i < headers.length; i++) {
+            XSSFCell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerCellStyle);
+        }
+
+        // Process each model and extract data
+        int rowNum = 1;
+        for (Map.Entry<String, Model> entry : modelMap.entrySet()) {
+            String fileName = entry.getKey();
+            Model model = entry.getValue();
+
+            // Extract FileProfile from model (e.g., "EQ", "SSH", "SV", "TP")
+            String fileProfile = eu.griddigit.cimpal.core.utils.ModelFactory.getProfileKeyword(model);
+
+            // Query model for MAS and FileID
+            String mas = extractMAS(model);
+            String fileID = extractFileID(model);
+
+            // Create data row
+            XSSFRow dataRow = sheet.createRow(rowNum++);
+
+            XSSFCell fileNameCell = dataRow.createCell(0);
+            fileNameCell.setCellValue(fileName);
+            fileNameCell.setCellStyle(dataCellStyle);
+
+            XSSFCell profileCell = dataRow.createCell(1);
+            profileCell.setCellValue(fileProfile);
+            profileCell.setCellStyle(dataCellStyle);
+
+            XSSFCell masCell = dataRow.createCell(2);
+            masCell.setCellValue(mas);
+            masCell.setCellStyle(dataCellStyle);
+
+            XSSFCell fileIDCell = dataRow.createCell(3);
+            fileIDCell.setCellValue(fileID);
+            fileIDCell.setCellStyle(dataCellStyle);
+        }
+
+        // Auto-size columns
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        // Freeze header row
+        sheet.createFreezePane(0, 1);
+
+        // Add filter
+        sheet.setAutoFilter(new CellRangeAddress(0, rowNum - 1, 0, headers.length - 1));
+
+        // Save the file
+        saveExcelFile(workbook, "Save QAR template", "QAR_template.xlsx");
+    }
+
+    private static String extractMAS(Model model) {
+        // Query for md:Model.modelingAuthoritySet
+        String query = "PREFIX md: <http://iec.ch/TC57/61970-552/ModelDescription/1#> " +
+                "SELECT ?mas WHERE { ?model md:Model.modelingAuthoritySet ?mas }";
+
+        try (org.apache.jena.query.QueryExecution qexec =
+                     org.apache.jena.query.QueryExecutionFactory.create(query, model)) {
+            org.apache.jena.query.ResultSet results = qexec.execSelect();
+            if (results.hasNext()) {
+                return results.next().get("mas").toString();
+            }
+        }
+        return "";
+    }
+
+    private static String extractFileID(Model model) {
+        // Query for rdf:about or rdf:ID of the main model resource
+        String query = "PREFIX md: <http://iec.ch/TC57/61970-552/ModelDescription/1#> " +
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " +
+                "SELECT ?id WHERE { ?model rdf:type md:FullModel . BIND(str(?model) AS ?id) }";
+
+        try (org.apache.jena.query.QueryExecution qexec =
+                     org.apache.jena.query.QueryExecutionFactory.create(query, model)) {
+            org.apache.jena.query.ResultSet results = qexec.execSelect();
+            if (results.hasNext()) {
+                return results.next().get("id").toString();
+            }
+        }
+        return "";
+    }
+
 }

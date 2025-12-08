@@ -108,6 +108,68 @@ public class ModelFactory {
         return result;
     }
 
+    public static Map<String, Model> modelLoadPerFiles(List<File> files, String xmlBase, Lang defaultLang) throws IOException {
+        ConcurrentMap<String, Model> result = new ConcurrentHashMap<>();
+
+        files.parallelStream().forEach(file -> {
+            try {
+                String ext = FilenameUtils.getExtension(file.getName()).toLowerCase(Locale.ROOT);
+                boolean isZip = "zip".equals(ext);
+
+                if (isZip) {
+                    try (ZipFile zipFile = new ZipFile(file)) {
+                        Path parentDir = file.getParentFile() != null
+                                ? file.getParentFile().toPath().toAbsolutePath()
+                                : Paths.get("").toAbsolutePath();
+
+                        // Collect all valid entries first
+                        List<ZipEntry> validEntries = new ArrayList<>();
+                        Enumeration<? extends ZipEntry> entries = zipFile.entries();
+                        while (entries.hasMoreElements()) {
+                            ZipEntry entry = entries.nextElement();
+                            if (!entry.isDirectory()) {
+                                validEntries.add(entry);
+                            }
+                        }
+
+                        // Process entries in parallel
+                        validEntries.parallelStream().forEach(entry -> {
+                            try {
+                                String entryName = entry.getName();
+                                Path destPath = parentDir.resolve(entryName).normalize();
+                                if (!destPath.startsWith(parentDir)) {
+                                    throw new IOException("Invalid zip entry path (possible zip-slip): " + entryName);
+                                }
+
+                                String entryExt = FilenameUtils.getExtension(entryName).toLowerCase(Locale.ROOT);
+                                Lang lang = getLangFromExtension(entryExt, defaultLang);
+
+                                try (InputStream in = zipFile.getInputStream(entry)) {
+                                    Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                                    RDFDataMgr.read(model, in, xmlBase, lang);
+                                    result.put(entryName, model);
+                                }
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                        });
+                    }
+                } else {
+                    Lang lang = getLangFromExtension(ext, defaultLang);
+                    try (InputStream in = new FileInputStream(file)) {
+                        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                        RDFDataMgr.read(model, in, xmlBase, lang);
+                        result.put(file.getName(), model);
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+
+        return new HashMap<>(result);
+    }
+
     private static Lang getLangFromExtension(String ext, Lang fallback) {
         return switch (ext) {
             case "rdf", "xml" -> Lang.RDFXML;
