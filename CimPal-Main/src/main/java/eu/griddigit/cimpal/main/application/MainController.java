@@ -1920,6 +1920,7 @@ public class MainController implements Initializable {
                             context.put("processType", process);
                             context.put("qualityIndicator", "Valid");
                             context.put("resources", resources);
+                            context.put("qarid", "urn:uuid:" + UUID.randomUUID());
 
                             // Merge data and template
                             StringWriter stringWriter = new StringWriter();
