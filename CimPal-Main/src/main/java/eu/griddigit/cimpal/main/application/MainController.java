@@ -1880,9 +1880,8 @@ public class MainController implements Initializable {
                         if (!processed.contains(timestamp + process + tso + version)) {
                             // Initialize Velocity engine
                             Properties properties = new Properties();
-                            properties.setProperty("resource.loader", "file");
-                            properties.setProperty("file.resource.loader.class", "org.apache.velocity.runtime.resource.loader.FileResourceLoader");
-                            properties.setProperty("file.resource.loader.path", "src/main/resources");
+                            properties.setProperty("resource.loader", "classpath");
+                            properties.setProperty("classpath.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
 
                             VelocityEngine velocityEngine = new VelocityEngine(properties);
                             velocityEngine.init();
