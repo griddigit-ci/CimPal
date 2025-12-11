@@ -1875,8 +1875,8 @@ public class MainController implements Initializable {
                         String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row + 1)).get(3).toString();
                         String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row + 2)).get(3).toString();
                         String fileID_3 = ((LinkedList<?>) inputXLSdata.get(row + 3)).get(3).toString();
-                        String fileID_EQBD = "urn:uuid:60076a01-df7a-0083-be02-d69cc8c050f6";
-                        String fileID_TPBD = "urn:uuid:3a558800-363d-4c12-9f73-f07142100d5e";
+                        String fileID_EQBD = "urn:uuid:1d663a7c-bea9-492f-8173-5ae1aaee33fe";
+                        String fileID_TPBD = "urn:uuid:181474c1-7754-45a3-b11e-a7588766e00d";
                         if (!processed.contains(timestamp + process + tso + version)) {
                             // Initialize Velocity engine
                             Properties properties = new Properties();
@@ -1907,8 +1907,8 @@ public class MainController implements Initializable {
                             context.put("created", formattedNow);
                             context.put("schemeVersion", "2.0");
                             context.put("serviceProvider", "Global");
-                            context.put("rslVersion", "5.4.102");
-                            context.put("igmCreated", "2023-09-12T15:52:00Z");
+                            context.put("rslVersion", "6.1.030");
+                            context.put("igmCreated", "2025-11-17T11:42:21.000Z");
                             DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm'Z'");
                             LocalDateTime localDateTime = LocalDateTime.parse(timestamp, inputFormatter);
                             ZonedDateTime zonedDateTime = localDateTime.atZone(ZoneOffset.UTC);
