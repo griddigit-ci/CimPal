@@ -756,7 +756,7 @@
                                                                         <Insets top="10.0" />
                                                                      </VBox.margin>
                                                                   </HBox>
-                                                                  <CheckBox fx:id="hideEmptySheets" disable="true" mnemonicParsing="false" text="Hide empty sheets" visible="false" />
+                                                                  <CheckBox fx:id="hideEmptySheets" disable="true" mnemonicParsing="false" text="Hide empty sheets" />
                                                                </children>
                                                             </VBox>
                                                          </children>

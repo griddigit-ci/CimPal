@@ -4683,11 +4683,9 @@ public class MainController implements Initializable {
     @FXML
     private void checkInstanceData() {
         if (fcbAddInstanceData.isSelected()) {
-            hideEmptySheets.setVisible(true);
             hideEmptySheets.setDisable(false);
         }
         if (!fcbAddInstanceData.isSelected()) {
-            hideEmptySheets.setVisible(false);
             hideEmptySheets.setDisable(true);
             hideEmptySheets.setSelected(false);
         }
