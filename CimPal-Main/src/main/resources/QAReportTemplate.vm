@@ -1,8 +1,20 @@
 <?xml version='1.0' encoding='utf-8'?>
-<QAReport xmlns="http://entsoe.eu/checks" created="$created" schemeVersion="$schemeVersion" serviceProvider="$serviceProvider" rslVersion="$rslVersion">
-    <IGM created="$igmCreated" scenarioTime="$igmScenarioTime" tso="$tso" version="$version" processType="$processType" qualityIndicator="$qualityIndicator">
-        #foreach($resource in $resources)
-            <resource>$resource</resource>
-        #end
-    </IGM>
-</QAReport>
+<sm:ValidateResult xmlns:sm="http://entsoe.eu/opde/ServiceModel/1/0">
+    <sm:part name="identifier" type="opde:ShortMetaData">
+        <opdm:OPDMObject xmlns:opdm="http://entsoe.eu/opdm/ObjectModel/1/0">
+            <opde:Id xmlns:opde="http://entsoe.eu/opde/ObjectModel/1/0">$qarid</opde:Id>
+            <opde:Object-Type xmlns:opde="http://entsoe.eu/opde/ObjectModel/1/0">IGM</opde:Object-Type>
+        </opdm:OPDMObject>
+    </sm:part>
+    <sm:part name="report" type="opde:QualityReport">
+        <opdm:QualityReport xmlns:opdm="http://entsoe.eu/opdm/ObjectModel/1/0">
+            <QAReport xmlns="http://entsoe.eu/checks" created="$created" schemeVersion="$schemeVersion" serviceProvider="$serviceProvider" rslVersion="$rslVersion">
+                <IGM created="$igmCreated" processType="$processType" qualityIndicator="$qualityIndicator" scenarioTime="$igmScenarioTime" tso="$tso" version="$version" >
+                    #foreach($resource in $resources)
+                        <resource>$resource</resource>
+                    #end
+                </IGM>
+            </QAReport>
+        </opdm:QualityReport>
+    </sm:part>
+</sm:ValidateResult>
