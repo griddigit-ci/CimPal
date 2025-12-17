@@ -708,13 +708,16 @@ public class ExcelTools {
                 .distinct()
                 .toList());
 
-        Map<String, String> invertedPrefMap = prefMap.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+        Map<String, List<String>> invertedPrefMap = prefMap.entrySet().stream()
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getValue,
+                        Collectors.mapping(Map.Entry::getKey, Collectors.toList())
+                ));
 
         for (int i = 0; i < classNames.size(); i++) {
             String className = classNames.get(i);
             String[] parts = className.split("#", 2);
-            String prefix = invertedPrefMap.get(parts[0] + "#");
+            String prefix = invertedPrefMap.get(parts[0] + "#").getFirst();
             if (prefix != null) {
                 className = prefix + ":" + parts[1]; // Add prefix to class name
                 classNames.set(i, className); // Update the class name in the list
