@@ -28,6 +28,7 @@ import java.io.ByteArrayInputStream;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -297,8 +298,6 @@ public class MainController implements Initializable {
     @FXML
     private ChoiceBox fcbGenMethodOptions;
     @FXML
-    private CheckBox fcbAddInstanceData;
-    @FXML
     private CheckBox fcbSortRDFGen;
     @FXML
     private ChoiceBox fcbRDFsortOptionsGen;
@@ -350,7 +349,12 @@ public class MainController implements Initializable {
     private Button btnRunExcelToTtl;
     @FXML
     private Button btnResetExcelToTtl;
-
+    @FXML
+    private ListView<String> ls_geni_rdfs;
+    @FXML
+    private ListView<String> ls_geni_instances;
+    @FXML
+    private Label label_geninfo;
     @FXML
     private TreeView<String> treeViewShaclFiles;
 
@@ -422,6 +426,8 @@ public class MainController implements Initializable {
     public static Model compareIDmodel2;
     public static boolean shaclSkipNcPropertyReference;
 
+    private static List<File> genRDFSFiles;
+    private static List<File> genInstanceFiles;
 
     public static Map<String, Model> InstanceModelMap;
     public static boolean treeID;
@@ -606,6 +612,39 @@ public class MainController implements Initializable {
 
         //TODO: see how to have this default on the screen
         defaultShapesURI = "/Constraints";
+
+        ls_geni_rdfs.getItems().addListener((ListChangeListener<String>) c -> {
+            double maxWidth = 0;
+            Text helper = new Text();
+            helper.setFont(Font.font("System", 12));
+
+            for (String item : ls_geni_rdfs.getItems()) {
+                helper.setText(item);
+                double width = helper.getLayoutBounds().getWidth();
+                if (width > maxWidth) {
+                    maxWidth = width;
+                }
+            }
+
+            ls_geni_rdfs.setPrefWidth(Math.min(maxWidth + 40, 400));
+        });
+
+        ls_geni_instances.getItems().addListener((ListChangeListener<String>) c -> {
+            double maxWidth = 0;
+            Text helper = new Text();
+            helper.setFont(Font.font("System", 12));
+
+            for (String item : ls_geni_instances.getItems()) {
+                helper.setText(item);
+                double width = helper.getLayoutBounds().getWidth();
+                if (width > maxWidth) {
+                    maxWidth = width;
+                }
+            }
+
+            ls_geni_instances.setPrefWidth(Math.min(maxWidth + 40, 400));
+        });
+
 
     }
 
@@ -4676,16 +4715,14 @@ public class MainController implements Initializable {
         fcbSortRDFGen.setSelected(true);
         fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
         fcbGenMethodOptions.getSelectionModel().selectFirst();
-        fcbAddInstanceData.setSelected(false);
     }
 
 
-    @FXML
     private void checkInstanceData() {
-        if (fcbAddInstanceData.isSelected()) {
+        if (!ls_geni_instances.getItems().isEmpty()) {
             hideEmptySheets.setDisable(false);
         }
-        if (!fcbAddInstanceData.isSelected()) {
+        else {
             hideEmptySheets.setDisable(true);
             hideEmptySheets.setSelected(false);
         }
@@ -4697,36 +4734,83 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
-        boolean addInstanceData = fcbAddInstanceData.isSelected();
         boolean hide = hideEmptySheets.isSelected();
 
-        //open RDFS file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "Select RDF file(s) for template.");
-        List<File> iFileList = new ArrayList<>();
-        if (addInstanceData)
-            iFileList = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "XML file(s)", List.of("*.xml"), "Select XML file(s) for template.");
-
-        if (file != null || iFileList != null) {// the file is selected
+        if (genRDFSFiles != null || genInstanceFiles != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
 
-            CreateTemplateFromRDF(file, iFileList, selectedMethod, hide);
+            CreateTemplateFromRDF(genRDFSFiles, genInstanceFiles, selectedMethod, hide);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
         }
     }
 
+    private void updateGenInfoLabel() {
+        String infoText = "Load RDFS and/or Instance data to generate template.";
+        if (genRDFSFiles != null && !genRDFSFiles.isEmpty()) {
+            if (genInstanceFiles != null && !genInstanceFiles.isEmpty()) {
+                infoText = "Template will be created based on RDFS files and populated with instance data.";
+            }
+            else {
+                infoText = "Empty template will be created based on RDFS files.";
+            }
+        }
+        else {
+            if (genInstanceFiles != null && !genInstanceFiles.isEmpty()) {
+                infoText = "Template will be created using only instance data information. Select RDFS files to create a more complete template!";
+            }
+        }
+        label_geninfo.setText(infoText);
+    }
+    @FXML
+    private void actionLoadRDFSGen(){
+        try {
+            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS files", List.of("*.rdf"), "Select RDF file(s) for template.");
+            ls_geni_rdfs.getItems().clear();
+            genRDFSFiles = file;
+            if (file != null) {// the file is selected
+                ObservableList<String> filenames = FXCollections.observableArrayList();
+                file.forEach(f -> filenames.add(f.getName()));
+                ls_geni_rdfs.setItems(filenames);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            updateGenInfoLabel();
+        }
+    }
+
+    @FXML
+    private void actionLoadInstanceDataGen(){
+        try {
+            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml"), "Select instance file(s) for template.");
+            ls_geni_instances.getItems().clear();
+            genInstanceFiles = file;
+            if (!file.isEmpty()) {// the file is selected
+                ObservableList<String> filenames = FXCollections.observableArrayList();
+                file.forEach(f -> filenames.add(f.getName()));
+                ls_geni_instances.setItems(filenames);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            updateGenInfoLabel();
+            checkInstanceData();
+        }
+    }
+
     private void actionHandleOptionsForGen(String selected) {
         switch (selected) {
             case "Old template (not maintained)":
-                fcbAddInstanceData.setDisable(true);
                 fcbSortRDFGen.setDisable(true);
                 fcbRDFsortOptionsGen.setDisable(true);
                 fcbStripPrefixesGen.setDisable(true);
                 fcbExportExtensionsGen.setDisable(true);
                 break;
             case "Advanced template":
-                fcbAddInstanceData.setDisable(false);
                 fcbSortRDFGen.setDisable(false);
                 fcbRDFsortOptionsGen.setDisable(false);
                 fcbStripPrefixesGen.setDisable(false);
