@@ -154,7 +154,7 @@ public class RDFConverter {
 
         } else {
             // load all models
-            model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles, xmlBase, rdfSourceFormat, false);
+            model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles, xmlBase, rdfSourceFormat, false, false).get("unionModel");
         }
 
 

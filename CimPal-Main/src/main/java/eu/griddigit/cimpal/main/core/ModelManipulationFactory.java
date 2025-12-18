@@ -1239,7 +1239,7 @@ public class ModelManipulationFactory {
 //        }
 //    }
     public static void generateCommonData(List<File> file) throws IOException {
-        Model model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(file, "", Lang.RDFXML, false);
+        Model model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(file, "", Lang.RDFXML, false, false).get("unionModel");
         Map<String, String> prefixMap = model.getNsPrefixMap();
         String cimURI = prefixMap.get("cim");
         String nc = prefixMap.get("nc");

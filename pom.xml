@@ -4,20 +4,28 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <properties>
-        <jdk.version>21</jdk.version>
-        <cimpal.version>2025.10.13.1</cimpal.version> <!-- Always sync with version tag -->
+        <jdk.version>25</jdk.version>
+        <cimpal.version>2025.12.18.1</cimpal.version> <!-- Always sync with version tag -->
         <log4j.version>2.24.1</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jena.version>5.4.0</jena.version>
+        <jena.version>5.6.0</jena.version>
         <launch4j.version>2.5.2</launch4j.version>
-        <javafx.version>23.0.1</javafx.version>
+        <javafx.version>25.0.1</javafx.version>
     </properties>
 
     <groupId>eu.griddigit.CimPal</groupId>
     <artifactId>CimPal</artifactId>
-    <version>2025.10.13.1</version>
+    <version>2025.12.18.1</version>
     <packaging>pom</packaging>
     <name>CimPal</name>
+    <organization>
+        <name>gridDigIt</name>
+        <url>https://griddigit.eu/</url>
+    </organization>
+    <inceptionYear>2020</inceptionYear>
+    <description>
+        CimPal helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM.
+    </description>
 
     <modules>
         <module>CimPal-Core</module>

@@ -7,7 +7,10 @@ package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.converters.SHACLFromRDF;
+import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
+import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
+import eu.griddigit.cimpal.core.shacl_tools.ShaclFromXls;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
 import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofile;
@@ -18,14 +21,14 @@ import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import java.io.InputStream;
 
 import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
-import eu.griddigit.cimpal.main.model.SHACLValidationResult;
-import guru.nidi.graphviz.engine.Graphviz;
-import guru.nidi.graphviz.engine.Format;
+//import guru.nidi.graphviz.engine.Graphviz;
+//import guru.nidi.graphviz.engine.Format;
 
 import java.io.ByteArrayInputStream;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -44,12 +47,12 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
-import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
@@ -58,7 +61,6 @@ import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.topbraid.jenax.util.JenaUtil;
-import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import eu.griddigit.cimpal.main.util.ExcelTools;
@@ -81,7 +83,7 @@ import java.util.prefs.Preferences;
 import static eu.griddigit.cimpal.main.core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
-import static eu.griddigit.cimpal.main.core.RdfConvert.modelInheritance;
+import static eu.griddigit.cimpal.main.util.ExcelTools.CreateTemplateFromXMLQAR;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
@@ -125,10 +127,6 @@ public class MainController implements Initializable {
     public Button btnResetShaclOrganizer;
     public TextField fPrefixShaclOrganizer;
     public TextField fNSShaclOrganizer;
-    @FXML
-    private TableView tableViewBrowseID;
-    public TableColumn itemColumnBrowseModifyID;
-    public TableColumn valueColumnBrowseModifyID;
     @FXML
     private TextArea foutputWindow;
     @FXML
@@ -226,24 +224,6 @@ public class MainController implements Initializable {
     @FXML
     private CheckBox fcbStripPrefixes;
     @FXML
-    private TreeView treeViewConstraints;
-    //    @FXML
-//    private TreeView treeViewInstanceData;
-    @FXML
-    private TextField fPrefixGenerateTab;
-    @FXML
-    private TextField fURIGenerateTab;
-    @FXML
-    private TextField fshapesBaseURIDefineTab;
-    @FXML
-    private TextField fowlImportsDefineTab;
-    @FXML
-    private TableView tableViewBrowseModify;
-    @FXML
-    private TableColumn itemColumnBrowseModify;
-    @FXML
-    private TableColumn valueColumnBrowseModify;
-    @FXML
     private Tab tabConstraintsSourceCode;
     @FXML
     private ToggleButton btnShowSourceCodeDefineTab;
@@ -314,21 +294,9 @@ public class MainController implements Initializable {
     @FXML
     private CheckBox fcbRDFconvertFixPackage;
     @FXML
-    private TreeView InstanceDataBrowser;
-    @FXML
-    private ImageView IDgraph;
-    @FXML
-    private HBox IDhbox;
-    @FXML
-    private ImageView IDImageView;
-    @FXML
     private TextField fsXlsTemplatePath;
     @FXML
     private ChoiceBox fcbGenMethodOptions;
-    @FXML
-    private CheckBox fcbAddInstanceData;
-    @FXML
-    private Button fbtnRunGenerateInstance;
     @FXML
     private CheckBox fcbSortRDFGen;
     @FXML
@@ -373,6 +341,22 @@ public class MainController implements Initializable {
     private CheckBox cbRDFSSHACLdatatypesplit;
     @FXML
     private CheckBox hideEmptySheets;
+    @FXML
+    private TextField fPathTTLChangesExcelToTtl;
+    @FXML
+    private TextField fPathXLSChangesExcelToTtl;
+    @FXML
+    private Button btnRunExcelToTtl;
+    @FXML
+    private Button btnResetExcelToTtl;
+    @FXML
+    private ListView<String> ls_geni_rdfs;
+    @FXML
+    private ListView<String> ls_geni_instances;
+    @FXML
+    private Label label_geninfo;
+    @FXML
+    private TreeView<String> treeViewShaclFiles;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -382,6 +366,8 @@ public class MainController implements Initializable {
     public static int IDmapSelect;
     public static File rdfModelExcelShacl;
     public static File xlsFileExcelShacl;
+    public static File TtlChangesExcelToTtl;
+    public static File XlsChangesExcelToTtl;
     public static ArrayList<Object> compareResults;
     public static RDFCompareResult rdfCompareResult;
     public static List<String> rdfsCompareFiles;
@@ -411,10 +397,7 @@ public class MainController implements Initializable {
     private static Map<TreeItem, String> treeMapConstraints;
     private static Map<TreeItem, String> treeMapID;
     private static Map<String, TreeItem> treeMapConstraintsInverse;
-    public static Integer associationValueTypeOption;
-    public static Integer associationValueTypeOptionSingle;
     public static Integer shapesOnAbstractOption;
-    public static Integer exportInheritTree;
 
     public static TextArea foutputWindowVar;
     public static boolean excludeMRID;
@@ -433,23 +416,18 @@ public class MainController implements Initializable {
     public static Model unionmodelbaseprofilesshacl;
     public static Model unionmodelbaseprofilesshacl2nd;
     public static Model unionmodelbaseprofilesshacl3rd;
-    public static Model unionmodelbaseprofilesshaclinheritance;
-    public static Model unionmodelbaseprofilesshaclinheritance2nd;
-    public static Model unionmodelbaseprofilesshaclinheritance3rd;
+
     public static Model unionmodelbaseprofilesshaclinheritanceonly;
-    public static Model unionmodelbaseprofilesshaclinheritanceonly2nd;
-    public static Model unionmodelbaseprofilesshaclinheritanceonly3rd;
     public static String cim2URI;
     public static String cim3URI;
     public static String cimURI;
-    public static String cimPref;
-    public static String cim2Pref;
-    public static String cim3Pref;
+
     public static Model compareIDmodel1;
     public static Model compareIDmodel2;
-    public static boolean shaclURIdatatypeAsResource;
     public static boolean shaclSkipNcPropertyReference;
 
+    private static List<File> genRDFSFiles;
+    private static List<File> genInstanceFiles;
 
     public static Map<String, Model> InstanceModelMap;
     public static boolean treeID;
@@ -473,32 +451,11 @@ public class MainController implements Initializable {
         System.setOut(new PrintStream(out, true));
         System.setErr(new PrintStream(out, true));
         treeID = false;
-        treeViewConstraintsStatic = treeViewConstraints;
         treeViewIDStatic = treeViewInstanceData;
         foutputWindowVar = foutputWindow;
         //initialization of the Browse and Modify table - SHACL Shapes Browse
-        tableViewBrowseModify.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        tableViewBrowseModify.setEditable(false);
-        tableViewBrowseModify.setPlaceholder(new Label("No shape properties present"));
-
         Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
 
-        //set column 1
-        itemColumnBrowseModify.setCellValueFactory(new PropertyValueFactory<TableColumnsSetup, String>("column1"));
-        itemColumnBrowseModify.setCellFactory(cellFactory);
-        itemColumnBrowseModify.setOnEditCommit(
-                (EventHandler<TableColumn.CellEditEvent<TableColumnsSetup, String>>) t -> t.getTableView().getItems().get(
-                        t.getTablePosition().getRow()).setColumn1(t.getNewValue())
-        );
-
-        //set column 2
-        valueColumnBrowseModify.setCellValueFactory(new PropertyValueFactory<TableColumnsSetup, String>("column2"));
-        Callback<TableColumn, TableCell> cellFactoryC2 = p -> new TextAreaEditTableCell();
-        valueColumnBrowseModify.setCellFactory(cellFactoryC2);
-        valueColumnBrowseModify.setOnEditCommit(
-                (EventHandler<TableColumn.CellEditEvent<TableColumnsSetup, String>>) t -> t.getTableView().getItems().get(
-                        t.getTablePosition().getRow()).setColumn2(t.getNewValue())
-        );
 
         try {
             if (!Preferences.userRoot().nodeExists("CimPal")) {
@@ -655,6 +612,39 @@ public class MainController implements Initializable {
 
         //TODO: see how to have this default on the screen
         defaultShapesURI = "/Constraints";
+
+        ls_geni_rdfs.getItems().addListener((ListChangeListener<String>) c -> {
+            double maxWidth = 0;
+            Text helper = new Text();
+            helper.setFont(Font.font("System", 12));
+
+            for (String item : ls_geni_rdfs.getItems()) {
+                helper.setText(item);
+                double width = helper.getLayoutBounds().getWidth();
+                if (width > maxWidth) {
+                    maxWidth = width;
+                }
+            }
+
+            ls_geni_rdfs.setPrefWidth(Math.min(maxWidth + 40, 400));
+        });
+
+        ls_geni_instances.getItems().addListener((ListChangeListener<String>) c -> {
+            double maxWidth = 0;
+            Text helper = new Text();
+            helper.setFont(Font.font("System", 12));
+
+            for (String item : ls_geni_instances.getItems()) {
+                helper.setText(item);
+                double width = helper.getLayoutBounds().getWidth();
+                if (width > maxWidth) {
+                    maxWidth = width;
+                }
+            }
+
+            ls_geni_instances.setPrefWidth(Math.min(maxWidth + 40, 400));
+        });
+
 
     }
 
@@ -1054,6 +1044,37 @@ public class MainController implements Initializable {
     }
 
     @FXML
+    //action button RDF file Browse for Excel to SHACL
+    private void actionBrowseTtlChangesExcelToTtl() {
+        progressBar.setProgress(0);
+        //select file
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "TTL files", List.of("*.ttl"), "");
+        if (file.getFirst() != null) {// the file is selected
+            fPathTTLChangesExcelToTtl.setText(file.getFirst().toString());
+            MainController.TtlChangesExcelToTtl = file.getFirst();
+
+        } else {
+            fPathTTLChangesExcelToTtl.clear();
+        }
+    }
+
+    @FXML
+    //action button XLS file Browse for Excel to SHACL
+    private void actionBrowseXlsChangesExcelToTtl() {
+        progressBar.setProgress(0);
+        //select file
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "");
+
+        if (file.getFirst() != null) {// the file is selected
+            fPathXLSChangesExcelToTtl.setText(file.getFirst().toString());
+            MainController.XlsChangesExcelToTtl = file.getFirst();
+
+        } else {
+            fPathXLSChangesExcelToTtl.clear();
+        }
+    }
+
+    @FXML
     //action button Run in instance data comparison
     private void actionBtnRunIDcompare() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -1384,7 +1405,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action button Run in RDF comparison
-    private void actionBtnRunRDFcompare() throws FileNotFoundException {
+    private void actionBtnRunRDFcompare() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         Lang rdfSourceFormat1 = Lang.RDFXML;
@@ -1418,8 +1439,8 @@ public class MainController implements Initializable {
         List<File> modelFiles2 = new LinkedList<>();
         modelFiles2.add(MainController.rdfModel2);
 
-        Model model1 = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false);
-        Model model2Temp = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false);
+        Model model1 = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false, false).get("unionModel");
+        Model model2Temp = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false, false).get("unionModel");
 
         Model model2 = null;
         boolean error = false;
@@ -1576,7 +1597,7 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    private void actionBrowseShaclFilesValidator(ActionEvent actionEvent) {
+    private void actionBrowseShaclFilesTester(ActionEvent actionEvent) {
         selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
@@ -1588,10 +1609,12 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    private void actionBrowsePathForShaclValidator(ActionEvent actionEvent) {
+    private void actionBrowseFolderPathForShaclTester(ActionEvent actionEvent) {
         selectedFolder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom();
         if (selectedFolder != null) {
             fPathModelsForShaclValidator.setText(selectedFolder.toString());
+
+            GUIhelper.buildFileTree(selectedFolder, treeViewShaclFiles);
         }
     }
 
@@ -1604,32 +1627,28 @@ public class MainController implements Initializable {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     if (file.toString().endsWith(".zip")) {
-                        fileL.add(file.toFile()); // Convert Path to File and add to list
+                        fileL.add(file.toFile()); // Changed from new File(file.getFileName().toString())
                     }
                     return FileVisitResult.CONTINUE;
                 }
             });
         } catch (IOException e) {
-            e.printStackTrace();
+            foutputWindow.appendText(e.getMessage());
         }
 
+        if (!fileL.isEmpty()) {
+            ShaclAutoTester shaclAutoTester = new ShaclAutoTester(new ShaclAutoTesterCallback() {
+                @Override
+                public void updateProgress(double progress) {
+                    Platform.runLater(() -> progressBar.setProgress(progress));
+                }
 
-        if (!fileL.isEmpty()) {// the file is selected
-
-            Map<String, Model> shaclMap = InstanceDataFactory.modelLoad(selectedFile, "", Lang.TURTLE, true);
-            Model shaclModel = shaclMap.get("shacl");
-            Map<String, ValidationReport> reportMap = new HashMap<>();
-
-            for (File file : fileL) {
-                Map<String, Model> modelMap = InstanceDataFactory.modelLoad(new ArrayList<>(List.of(file)), "", Lang.RDFXML, false);
-                ValidationReport report = ShaclValidator.get().validate(shaclModel.getGraph(), modelMap.get("unionModel").getGraph());
-                reportMap.put(file.getName(), report);
-            }
-
-            reportMap.forEach((name, report) -> {
-                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report);
-                ExcelTools.exportSHACLValidationToExcel(validationResults, selectedFolder, FilenameUtils.removeExtension(name) + "_report.xlsx");
+                @Override
+                public void appendOutput(String message) {
+                    Platform.runLater(() -> foutputWindow.appendText(message));
+                }
             });
+            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL);
 
             progressBar.setProgress(1);
         } else {
@@ -1783,6 +1802,7 @@ public class MainController implements Initializable {
 
             try (OutputStream outInt1 = fileSaveDialog("Save XLSX for datatypes: RDFdatatypes", "Excel", "*.xlsx")) {
                 modeldatatype.write(outInt, RDFFormat.RDFXML.getLang().getLabel().toUpperCase(), "");
+
                 ExcelTools.exportToExcelMap(dataTypeMap, outInt1);
             }
 
@@ -1894,14 +1914,13 @@ public class MainController implements Initializable {
                         String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row + 1)).get(3).toString();
                         String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row + 2)).get(3).toString();
                         String fileID_3 = ((LinkedList<?>) inputXLSdata.get(row + 3)).get(3).toString();
-                        String fileID_EQBD = "urn:uuid:60076a01-df7a-0083-be02-d69cc8c050f6";
-                        String fileID_TPBD = "urn:uuid:3a558800-363d-4c12-9f73-f07142100d5e";
+                        String fileID_EQBD = "urn:uuid:1d663a7c-bea9-492f-8173-5ae1aaee33fe";
+                        String fileID_TPBD = "urn:uuid:181474c1-7754-45a3-b11e-a7588766e00d";
                         if (!processed.contains(timestamp + process + tso + version)) {
                             // Initialize Velocity engine
                             Properties properties = new Properties();
-                            properties.setProperty("resource.loader", "file");
-                            properties.setProperty("file.resource.loader.class", "org.apache.velocity.runtime.resource.loader.FileResourceLoader");
-                            properties.setProperty("file.resource.loader.path", "src/main/resources");
+                            properties.setProperty("resource.loader", "classpath");
+                            properties.setProperty("classpath.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
 
                             VelocityEngine velocityEngine = new VelocityEngine(properties);
                             velocityEngine.init();
@@ -1927,8 +1946,8 @@ public class MainController implements Initializable {
                             context.put("created", formattedNow);
                             context.put("schemeVersion", "2.0");
                             context.put("serviceProvider", "Global");
-                            context.put("rslVersion", "5.4.102");
-                            context.put("igmCreated", "2023-09-12T15:52:00Z");
+                            context.put("rslVersion", "6.1.030");
+                            context.put("igmCreated", "2025-11-17T11:42:21.000Z");
                             DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm'Z'");
                             LocalDateTime localDateTime = LocalDateTime.parse(timestamp, inputFormatter);
                             ZonedDateTime zonedDateTime = localDateTime.atZone(ZoneOffset.UTC);
@@ -1940,6 +1959,7 @@ public class MainController implements Initializable {
                             context.put("processType", process);
                             context.put("qualityIndicator", "Valid");
                             context.put("resources", resources);
+                            context.put("qarid", "urn:uuid:" + UUID.randomUUID());
 
                             // Merge data and template
                             StringWriter stringWriter = new StringWriter();
@@ -2157,9 +2177,9 @@ public class MainController implements Initializable {
             relativeURIs = fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
         }
 
-        if(sourceFormatString.equals("RDF Turtle (.ttl)")) {
+        if (sourceFormatString.equals("RDF Turtle (.ttl)")) {
             sourceFormat = RDFConvertOptions.RDFFormats.TURTLE;
-        } else if(sourceFormatString.equals("JSON-LD (.jsonld)")) {
+        } else if (sourceFormatString.equals("JSON-LD (.jsonld)")) {
             sourceFormat = RDFConvertOptions.RDFFormats.JSONLD;
         }
 
@@ -4118,42 +4138,23 @@ public class MainController implements Initializable {
         String dot = convertModelToDOT(model);
 
         // Render DOT string to a byte array
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try {
-            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+//        ByteArrayOutputStream out = new ByteArrayOutputStream();
+//        try {
+//            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
 
         // Load the image from the byte array
-        ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
-        Image image = new Image(in);
+//        ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
+//        Image image = new Image(in);
 //        ImageView imageView = new ImageView(image);
 //        IDhbox.getChildren().add(imageView);
 
         // Update the existing ImageView with the new image
-        IDImageView.setImage(image);
+//        IDImageView.setImage(image);
 
         // Zoom functionality
-        IDImageView.setOnScroll((ScrollEvent event) -> {
-            double delta = event.getDeltaY();
-            double scale = IDImageView.getScaleX() + delta / 100;
-            scale = Math.max(scale, 0.1); // Prevent scaling to zero or negative
-            IDImageView.setScaleX(scale);
-            IDImageView.setScaleY(scale);
-        });
-//
-        // Drag functionality
-        IDImageView.setOnMousePressed(event -> {
-            initialX = event.getSceneX() - IDImageView.getTranslateX();
-            initialY = event.getSceneY() - IDImageView.getTranslateY();
-        });
-
-        IDImageView.setOnMouseDragged(event -> {
-            IDImageView.setTranslateX(event.getSceneX() - initialX);
-            IDImageView.setTranslateY(event.getSceneY() - initialY);
-        });
-
 
 //
 //        // Render DOT string to a temporary file
@@ -4279,65 +4280,6 @@ public class MainController implements Initializable {
         return dot.toString();
     }
 
-    @FXML
-    //Action for button "Open" related to tab SHACL Shape Browser
-    private void actionBtnOpenShapeBrowser(ActionEvent actionEvent) {
-        progressBar.setProgress(0);
-
-        //select file
-        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
-
-        if (fileL != null) {// the file is selected
-            for (int m = 0; m < fileL.size(); m++) {
-                eu.griddigit.cimpal.main.util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
-                ArrayList<String> mpak1 = new ArrayList<>();
-                mpak1.add(FilenameUtils.getBaseName(((File) fileL.get(m)).getName())); // adds the name without the extension.
-                Map<String, String> prefixMap = ((Model) shapeModels.get(m)).getNsPrefixMap();
-                for (Object o : prefixMap.values()) {
-                    String value = o.toString();
-                    if (value.contains(defaultShapesURI) || value.toLowerCase().contains("constraints")) {
-                        mpak1.add(((Model) shapeModels.get(m)).getNsURIPrefix(value)); //reserved for the prefix of the profile/shapes
-                        mpak1.add(value); // reserved for the URI of the profile/shapes
-                        mpak1.add(value); // reserved for the baseURI of the shapes
-                        mpak1.add("");// reserved for the owl:imports
-                        break;
-                    }
-                }
-                shapeModelsNames.add(mpak1);
-            }
-            guiTreeDesignShapesInit(); //initializes the tree in the design shapes tab //Perhaps not forMalte
-        }
-    }
-
-    @FXML
-    //Action for button "Unload Shapes" related to tab SHACL Shape Browser
-    private void actionBrtUnloadInstanceData(ActionEvent actionEvent) {
-        progressBar.setProgress(0);
-        MainController.InstanceModelMap = null;
-        treeViewIDStatic.setRoot(null);
-        //fPrefixGenerateTab.clear();
-        //fURIGenerateTab.clear();
-        //fshapesBaseURIDefineTab.clear();
-        //fowlImportsDefineTab.clear();
-        fsourceDefineTab.clear();
-        tableViewBrowseID.getItems().clear();
-    }
-
-    @FXML
-    //Action for button "Unload Shapes" related to tab SHACL Shape Browser
-    private void actionBrtUnloadShapes(ActionEvent actionEvent) {
-        progressBar.setProgress(0);
-        MainController.shapeModels = null;
-        MainController.shapeModelsNames = null;
-        treeViewConstraints.setRoot(null);
-        fPrefixGenerateTab.clear();
-        fURIGenerateTab.clear();
-        fshapesBaseURIDefineTab.clear();
-        fowlImportsDefineTab.clear();
-        fsourceDefineTab.clear();
-        tableViewBrowseModify.getItems().clear();
-    }
-
 
     @FXML
     // action on button "Show/Hide source code" in the SHACL Shapes Browser
@@ -4348,77 +4290,6 @@ public class MainController implements Initializable {
             btnShowSourceCodeDefineTab.setText("Show");
             fsourceDefineTab.clear();
         }
-    }
-
-    //initializes the TreeView in the SHACL Shape Browser
-    private static void guiTreeDesignShapesInit() {
-
-        TreeItem<String> rootMain = treeViewConstraintsStatic.getRoot();
-        if (rootMain == null) {
-            //define the Treeview
-            rootMain = new CheckBoxTreeItem<>("Main root");
-            rootMain.setExpanded(true);
-            treeViewConstraintsStatic.setRoot(rootMain); // sets the root to the eu.griddigit.cimpal.gui object
-            treeViewConstraintsStatic.setShowRoot(false);
-            treeMapConstraints = new HashMap<>();
-            treeMapConstraintsInverse = new HashMap<>();
-        }
-        for (int sm = 0; sm < shapeModels.size(); sm++) {
-            Model shapeModel = (Model) shapeModels.get(sm);
-            String profileItemString = ((ArrayList<?>) shapeModelsNames.get(sm)).get(1).toString() + ":" + ((ArrayList<?>) shapeModelsNames.get(sm)).get(0).toString();
-            if (!treeMapConstraints.containsValue(profileItemString)) {
-                TreeItem<String> profileItem = new TreeItem<>(profileItemString);
-                rootMain.getChildren().add(profileItem);
-                treeMapConstraints.putIfAbsent(profileItem, profileItemString);
-                treeMapConstraintsInverse.putIfAbsent(profileItemString, profileItem);
-
-                //showing the PropertyGroup
-                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "PropertyGroup")); i.hasNext(); ) {
-                    Resource resItem = i.next();
-                    String propertyGroupItemString = resItem.getLocalName();
-                    String propertyGroupPrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
-                    TreeItem<String> propertyGroupItem = new TreeItem<>(propertyGroupPrefix + ":" + propertyGroupItemString); // level for the NodeShapes
-                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(propertyGroupItem);
-                }
-
-                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "SPARQLConstraint")); i.hasNext(); ) {
-                    Resource resItem = i.next();
-                    String sparqlItemString = resItem.getLocalName();
-                    String sparqlPrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
-                    TreeItem<String> sparqlItem = new TreeItem<>(sparqlPrefix + ":" + sparqlItemString); // level for the SPARQLConstraint
-                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(sparqlItem);
-                }
-
-                for (ResIterator i = shapeModel.listSubjectsWithProperty(RDF.type, shapeModel.getProperty(SH.NS, "NodeShape")); i.hasNext(); ) {
-                    Resource resItem = i.next();
-                    String nodeShapeItemString = resItem.getLocalName();
-                    String nodeShapePrefix = shapeModel.getNsURIPrefix(resItem.getNameSpace());
-                    TreeItem<String> nodeShapeItem = new TreeItem<>(nodeShapePrefix + ":" + nodeShapeItemString); // level for the NodeShapes
-                    treeMapConstraintsInverse.get(profileItemString).getChildren().add(nodeShapeItem);
-                    for (NodeIterator j = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "sparql")); j.hasNext(); ) { // this is if the NodeShape has sparqlConstraint
-                        RDFNode resItemObject = j.next();
-                        String sparqlConstraintPrefix = shapeModel.getNsURIPrefix(resItemObject.asResource().getNameSpace());
-                        TreeItem<String> sparqlConstraintItem = new TreeItem<>(sparqlConstraintPrefix + ":" + resItemObject.asResource().getLocalName()); // level for the sparqlConstraint
-                        nodeShapeItem.getChildren().add(sparqlConstraintItem);
-                    }
-                    for (NodeIterator j = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "property")); j.hasNext(); ) {
-                        RDFNode resItemObject = j.next();
-                        String propertyShapePrefix = shapeModel.getNsURIPrefix(resItemObject.asResource().getNameSpace());
-                        TreeItem<String> propertyShapeItem = new TreeItem<>(propertyShapePrefix + ":" + resItemObject.asResource().getLocalName()); // level for the PropertyShapes
-                        nodeShapeItem.getChildren().add(propertyShapeItem);
-                        for (NodeIterator sc = shapeModel.listObjectsOfProperty(resItem, shapeModel.getProperty(SH.NS, "sparql")); sc.hasNext(); ) { // this is if the PropertyShape has sparqlConstraint
-                            RDFNode resItemObjectSC = sc.next();
-                            String sparqlConstraintPrefix = shapeModel.getNsURIPrefix(resItemObjectSC.asResource().getNameSpace());
-                            TreeItem<String> sparqlConstraintItem = new TreeItem<>(sparqlConstraintPrefix + ":" + resItemObjectSC.asResource().getLocalName()); // level for the sparqlConstraint
-                            propertyShapeItem.getChildren().add(sparqlConstraintItem);
-                        }
-                    }
-                }
-            }
-        }
-        //treeViewConstraints.setCellFactory(CheckBoxTreeCell.<String>forTreeView()); //this sets checkbox in front
-        treeViewConstraintsStatic.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-
     }
 
     //initializes the TreeView in the Instance Data Browser
@@ -4640,350 +4511,9 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    //select action on the tree view Instance data
-    private void selectActionTreeItemID(MouseEvent mouseEvent) throws Exception {
-        //Initialisation GUI
-//        tableViewBrowseID.getItems().clear();
-//
-        Node node = mouseEvent.getPickResult().getIntersectedNode();
-        // Accept clicks only on node cells, and not on empty spaces of the TreeView
-        if (node instanceof Text || (node instanceof TreeCell && ((TreeCell) node).getText() != null)) {
-            ArrayList<Object> parentInfo = getParent(treeViewIDStatic); //returns a structure containing the profile parent, the tree level, the selected item
-
-//            ObservableList<TableColumnsSetup> tableData = tableViewBrowseID.getItems();
-//            tableViewBrowseID.setItems(tableData);
-
-        }
-
-        //    @FXML
-//    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
-//
-        //String uml = "@startuml\nAlice -> Bob: Hello\n@enduml";
-//        String uml = """
-//@startuml
-//!theme cerulean
-//skinparam class {
-//    BackgroundColor LightBlue
-//    ArrowColor DarkBlue
-//    BorderColor Black
-//}
-//class User {
-//    +String name
-//    +String email
-//}
-//class Order {
-//    +int id
-//    +Date date
-//}
-//User --> Order : places
-//@enduml
-//""";
-
-
-        String uml = """
-                @startuml
-                left to right direction
-                skinparam class {
-                    BackgroundColor LightBlue
-                    ArrowColor DarkBlue
-                    BorderColor Black
-                }
-                class User {
-                    +String name
-                    +String email
-                }
-                class Order {
-                    +int id
-                    +Date date
-                }
-                User --> Order : places
-                @enduml
-                """;
-//
-//        String uml = """
-//        @startuml
-//        !pragma svginteractive true
-//        actor User
-//        User -> (Login)
-//        @enduml
-//        """;
-//
-//        String svg = PlantUMLGenerator.generateDiagram(uml);
-//
-//        // Create a WebView to display the SVG
-//        //WebView webView = new WebView();
-//        IDgraph.getEngine().loadContent(svg, "text/html");
-
-
-        byte[] diagram = PlantUMLGenerator.generateDiagram(uml);
-
-        //Image image = new Image(new ByteArrayInputStream(diagram));
-        //IDgraph.setImage(diagram);
-
-        // Convert byte array to InputStream
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(diagram);
-
-// Create an Image from the InputStream
-        Image image = new Image(inputStream);
-
-// Set the Image to the ImageView
-        IDgraph.setImage(image);
-//        ImageView imageView = new ImageView(image);
-//        StackPane root = new StackPane(imageView);
-//        Scene scene = new Scene(root, 800, 600);
-//
-//        primaryStage.setTitle("PlantUML in JavaFX");
-//        primaryStage.setScene(scene);
-//        primaryStage.show()
-//
-//    }
-
-        // Zoom functionality
-        IDgraph.setOnScroll((ScrollEvent event) -> {
-            double delta = event.getDeltaY();
-            double scale = IDgraph.getScaleX() + delta / 100;
-            scale = Math.max(scale, 0.1); // Prevent scaling to zero or negative
-            IDgraph.setScaleX(scale);
-            IDgraph.setScaleY(scale);
-        });
-
-        // Drag functionality
-        IDgraph.setOnMousePressed(event -> {
-            initialX = event.getSceneX() - IDgraph.getTranslateX();
-            initialY = event.getSceneY() - IDgraph.getTranslateY();
-        });
-
-        IDgraph.setOnMouseDragged(event -> {
-            IDgraph.setTranslateX(event.getSceneX() - initialX);
-            IDgraph.setTranslateY(event.getSceneY() - initialY);
-        });
-
-    }
-
-
-    @FXML
-    //select action on the tree view SHACL Shapes
-    private void selectActionTreeItemConstraits(MouseEvent mouseEvent) throws IOException {
-        //Initialisation GUI
-        tableViewBrowseModify.getItems().clear();
-
-        fPrefixGenerateTab.setText(""); // namespace "Prefix"
-        fURIGenerateTab.setText(""); //namespace "URI"
-        fshapesBaseURIDefineTab.setText(""); //baseURI
-        fowlImportsDefineTab.setText(""); // "owl:imports"
-
-        Node node = mouseEvent.getPickResult().getIntersectedNode();
-        // Accept clicks only on node cells, and not on empty spaces of the TreeView
-        if (node instanceof Text || (node instanceof TreeCell && ((TreeCell) node).getText() != null)) {
-            //String name = (String) ((TreeItem)treeViewRDFS.getSelectionModel().getSelectedItem()).getValue();
-            ArrayList<Object> parentInfo = getParent(treeViewConstraints); //returns a structure containing the profile parent, the tree level, the selected item
-
-            int m = 0;
-            for (int i = 0; i < shapeModelsNames.size(); i++) {
-                //if (((ArrayList) shapeModelsNames.get(i)).get(0).equals(parentInfo.get(0))) {
-                if (parentInfo.get(0).equals(((ArrayList) shapeModelsNames.get(i)).get(1) + ":" + ((ArrayList) shapeModelsNames.get(i)).get(0))) {
-                    m = i;
-                }
-            }
-
-            Model shapeModel = (Model) shapeModels.get(m);
-            //selectedShapeModel=m; // used for the combobox constraints
-
-            String prefix = ((TreeItem<String>) parentInfo.get(2)).getValue().split(":", 2)[0];
-            // set namespace "Prefix"
-            fPrefixGenerateTab.setText(prefix);
-            String uri = shapeModel.getNsPrefixURI(prefix);
-            //set namespace "URI"
-            fURIGenerateTab.setText(uri);
-            //set baseURI
-            String baseURI = ((ArrayList) shapeModelsNames.get(m)).get(3).toString();
-            fshapesBaseURIDefineTab.setText(baseURI);
-            //set Owl:imports
-            int printSource = 0; //important for the printing of the source of the elements
-            if (((TreeView<String>) treeViewConstraints).getSelectionModel().getSelectedItems().get(0).getValue().equals(parentInfo.get(0))) {
-                //this is when the parent (the shape model/profile) is selected
-                String owlImports = ShaclTools.getOWLimports(shapeModel, uri);
-                fowlImportsDefineTab.setText(owlImports);
-
-                //set "As source code" for the whole shape model
-                if (btnShowSourceCodeDefineTab.isSelected()) {
-                    ByteArrayOutputStream os = new ByteArrayOutputStream();
-
-                    shapeModel.write(os, "TURTLE", baseURI);
-                    String stringForGui = os.toString("UTF-8");
-                    fsourceDefineTab.setText(stringForGui);
-                    os.close();
-                }
-                //fshapeTypeDefineTab.setText("Type: Shape model");
-                return;
-            } else {
-                //this is when other thing is selected is selected
-                //set "As source code" for the whole shape model
-                if (btnShowSourceCodeDefineTab.isSelected()) {// the button to show the source is selected
-                    printSource = 1;
-                }
-            }
-
-
-            String name = ((TreeItem<String>) parentInfo.get(2)).getValue().split(":", 2)[1];
-            // set "Shape IRI"
-            //fShapeIRIDefineTab.setText(((TreeItem<String>) parentInfo.get(2)).getValue());
-            Resource resItem = shapeModel.getResource(uri + name);
-            //selectedShapeResource=resItem; // used for the combobox constraints
-
-            //This is used for the printing of the source code
-            Model shapeModelPart = JenaUtil.createDefaultModel();
-            shapeModelPart.setNsPrefixes(shapeModel.getNsPrefixMap()); // set the same prefixes like the shapeModel
-            List<Statement> shapeModelPartStmt = new LinkedList<>();
-
-            //gives all statements related to the resource. 0 means that the resource trippe is not included
-            List<Statement> statementsList = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
-
-            ObservableList<TableColumnsSetup> tableData = tableViewBrowseModify.getItems();
-
-            ArrayList<String> shaclNodeShapeProperties = ShaclTools.getListShaclNodeShapeProperties();
-            ArrayList<String> shaclPropertyShapeProperties = ShaclTools.getListShaclPropertyShapeProperties();
-            ArrayList<String> shaclPropertyGroupProperties = ShaclTools.getListShaclPropertyGroupProperties();
-            ArrayList<String> shaclSPARQLConstraintProperties = ShaclTools.getListShaclSPARQLConstraintProperties();
-            ArrayList<String> shaclTypeProperties = ShaclTools.getListShacltypeProperties();
-
-
-            String ShapeType = "";
-            for (int stmt = 0; stmt < statementsList.size(); stmt++) {
-                if (stmt == 0) {
-                    ShapeType = statementsList.get(stmt).getObject().asResource().getLocalName();
-                    String propertyValue;
-                    String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
-                    String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
-                    propertyValue = propertyValuePrefix + ":" + propertyValueLN;
-                    shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                    tableData.add(new TableColumnsSetup("rdf:type",
-                            propertyValue, FXCollections.<String>observableArrayList(shaclTypeProperties)));
-                } else {
-                    if (!statementsList.get(stmt).getPredicate().equals(RDF.type)) {
-                        //if (!ShapeType.equals(statementsList.get(stmt).getObject().asResource().getLocalName())) {
-                        String propertyValue = "";
-                        String shapePropertyPrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getPredicate().getNameSpace());
-                        String shapePropertyLN = statementsList.get(stmt).getPredicate().getLocalName();
-
-                        if (statementsList.get(stmt).getObject().isResource()) {
-                            if (!statementsList.get(stmt).getObject().isAnon()) {
-                                String propertyValuePrefix = shapeModel.getNsURIPrefix(statementsList.get(stmt).getObject().asResource().getNameSpace());
-                                String propertyValueLN = statementsList.get(stmt).getObject().asResource().getLocalName();
-                                propertyValue = propertyValuePrefix + ":" + propertyValueLN;
-                                shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                            } else { //if the object is a blank node
-                                //it is assumed that this is a list, e.g. this works for sh:in and sh:or
-
-                                Resource list = statementsList.get(stmt).getObject().asResource();
-                                RDFList rdfList = list.as(RDFList.class);
-                                ExtendedIterator<RDFNode> items = rdfList.iterator();
-
-                                // add in the the blank node info for the source code
-                                Resource blankNode = shapeModelPart.getResource(statementsList.get(stmt).getSubject().getURI());
-                                RDFList orRDFlist = shapeModelPart.createList(rdfList.iterator());
-                                blankNode.addProperty(statementsList.get(stmt).getPredicate(), orRDFlist);
-
-                                int firstTime = 0;
-                                while (items.hasNext()) {
-                                    Resource item = items.next().asResource();
-
-                                    String propertyValuePrefix = shapeModel.getNsURIPrefix(item.getNameSpace());
-                                    String propertyValueLN = item.getLocalName();
-                                    if (firstTime == 0) {
-                                        propertyValue = propertyValuePrefix + ":" + propertyValueLN;
-
-                                        firstTime = 1;
-                                    } else {
-                                        propertyValue = propertyValue + " , " + propertyValuePrefix + ":" + propertyValueLN;
-                                    }
-                                }
-                            }
-                        } else if (statementsList.get(stmt).getObject().isLiteral()) {
-                            propertyValue = statementsList.get(stmt).getObject().asLiteral().getString();//TODO see if the datatype should be shown
-                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                        } else {
-                            propertyValue = statementsList.get(stmt).getObject().toString();
-                            shapeModelPartStmt.add(statementsList.get(stmt)); // add in the partial list for the source code
-                        }
-                        switch (ShapeType) {
-                            case "NodeShape":
-
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclNodeShapeProperties)));
-
-                                break;
-                            case "PropertyShape":
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyShapeProperties)));
-                                break;
-                            case "PropertyGroup":
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclPropertyGroupProperties)));
-                                break;
-                            case "SPARQLConstraint":
-                                tableData.add(new TableColumnsSetup(shapePropertyPrefix + ":" + shapePropertyLN,
-                                        propertyValue, FXCollections.<String>observableArrayList(shaclSPARQLConstraintProperties)));
-                                //TODO also for the rest
-                                break;
-                        }
-                        //}
-                    }
-                }
-            }
-            tableViewBrowseModify.setItems(tableData);
-
-
-            // set "As source code" this is when other thing is selected is selected
-            if (printSource == 1) {
-                ByteArrayOutputStream os = new ByteArrayOutputStream();
-                //LocationMapper.setGlobalLocationMapper(new LocationMapper());
-
-                //TODO see how to cut prefix information not to be printed
-
-                //List<Statement> result = ShaclTools.listShapeStatements(shapeModel, resItem, 1);
-                shapeModelPart.add(shapeModelPartStmt);
-
-                shapeModelPart.write(os, "TURTLE", baseURI);
-                String stringForGui = os.toString(StandardCharsets.UTF_8);
-                fsourceDefineTab.setText(stringForGui);
-                os.close();
-            }
-        }
-
-    }
-
-    //find parent in a tree view
-    private ArrayList<Object> getParent(TreeView<String> treeViewToProcess) {
-        int parentFound = 0;
-        String parentProfile = ""; // this is the name of the profile
-        TreeItem<String> selectedItem = treeViewToProcess.getSelectionModel().getSelectedItem();
-        TreeItem<String> selectedItemP = selectedItem;
-        int treeLevel = 0; //treeLevel=1 if it is the profile level; 2 if it is NodeShape level (for the constraints) or PropertyGroup;
-        // 3 is it is PropertyShape level (for the constraints); 4 is if there is a sparql constraint on the PropertyShape
-        while (parentFound == 0) {
-            if (selectedItemP.getParent().getValue() != null) {
-                if (selectedItemP.getParent().getValue().equals("Main root")) {
-                    parentProfile = selectedItemP.getValue();
-                    treeLevel++;
-                    parentFound = 1;
-                } else {
-                    selectedItemP = selectedItemP.getParent();
-                    treeLevel++;
-                }
-            }
-        }
-        ArrayList<Object> getParentInfo = new ArrayList<>();
-        getParentInfo.add(parentProfile);
-        getParentInfo.add(treeLevel);
-        getParentInfo.add(selectedItem);
-        return getParentInfo;
-    }
-
-    @FXML
     // //action for tab pane down - the tab pane with the source code
     private void actionTabConstraintsSourceCode() {
-        btnShowSourceCodeDefineTab.setDisable(!tabConstraintsSourceCode.isSelected() || treeViewConstraints.getRoot() == null);
+        btnShowSourceCodeDefineTab.setDisable(!tabConstraintsSourceCode.isSelected());
     }
 
 
@@ -5030,6 +4560,7 @@ public class MainController implements Initializable {
         shapesOnAbstractOption = 0;
         ArrayList<Object> shapeData = ShaclTools.constructShapeData(model, cimsNs, concreteNs);
 
+
         //select the xlsx file and read it
         ArrayList<Object> dataExcel = null;
         ArrayList<Object> configSheet = null;
@@ -5039,213 +4570,16 @@ public class MainController implements Initializable {
         dataExcel = ExcelTools.importXLSX(String.valueOf(MainController.xlsFileExcelShacl), 0);
         configSheet = ExcelTools.importXLSX(String.valueOf(MainController.xlsFileExcelShacl), "Config");
 
-        //TODO: this can be made with many additional options e.g. what to be added and in which model to be added. Now it is primitive to solve a simple task
-        //create a new Shapes model
-        Model shapeModel = JenaUtil.createDefaultModel();
-        //add the namespaces
-        if (configSheet.isEmpty()) { // if the config sheet is empty use the default namespaces
-            shapeModel.setNsPrefix("sh", SH.NS);
-            shapeModel.setNsPrefix("dash", DASH.NS);
-            shapeModel.setNsPrefix(MainController.prefs.get("prefixEU", ""), MainController.prefs.get("uriEU", ""));
-            shapeModel.setNsPrefix("cims", MainController.prefs.get("cimsNamespace", ""));
-            shapeModel.setNsPrefix("rdf", RDF.uri);
-            shapeModel.setNsPrefix("owl", OWL.NS);
-            shapeModel.setNsPrefix("cim", MainController.prefs.get("CIMnamespace", ""));
-            shapeModel.setNsPrefix("xsd", XSD.NS);
-            shapeModel.setNsPrefix("rdfs", RDFS.uri);
-            if (!MainController.prefs.get("prefixOther", "").isEmpty() && !MainController.prefs.get("uriOther", "").isEmpty()) {
-                shapeModel.setNsPrefix(MainController.prefs.get("prefixOther", ""), MainController.prefs.get("uriOther", ""));
-            }
-        } else {
-            for (int row = 1; row < configSheet.size(); row++) { //loop on the rows in the xlsx
-                String prefix = ((LinkedList<?>) configSheet.get(row)).get(0).toString();
-                String uri = ((LinkedList<?>) configSheet.get(row)).get(1).toString();
-                if (!prefix.isEmpty() && !uri.isEmpty()) {
-                    shapeModel.setNsPrefix(prefix, uri);
-                }
-            }
-        }
-
         String baseURI = fbaseURIShapeExcel.getText();
         String nsURIprofilePrefix = fPrefixExcelShape.getText();
         String nsURIprofile = fNSexcelShape.getText();
-        shapeModel.setNsPrefix(nsURIprofilePrefix, nsURIprofile);
 
-        //add the shapes in the model - i.e. check what is in the dataExcel and generate the Shapes out of it
-        //adding the PropertyGroup
-        String localNameGroup = "ValueConstraintsGroup";
-        ArrayList<Object> groupFeatures = new ArrayList<>();
-        /*
-         * groupFeatures structure
-         * 0 - name
-         * 1 - description
-         * 2 - the value for rdfs:label
-         * 3 - order
-         */
-        for (int i = 0; i < 4; i++) {
-            groupFeatures.add("");
-        }
-        groupFeatures.set(0, "ValueConstraints");
-        groupFeatures.set(1, "This group of validation rules relate to value constraints validation of properties(attributes).");
-        groupFeatures.set(2, "ValueConstraints");
-        groupFeatures.set(3, 0);
-
-        shapeModel = ShaclTools.addPropertyGroup(shapeModel, nsURIprofile, localNameGroup, groupFeatures);
-        boolean has = false;
-        for (int row = 1; row < dataExcel.size(); row++) { //loop on the rows in the xlsx
-            //String localName = ((LinkedList) dataExcel.get(row)).get(6).toString();// here map to "NodeShape" column
-            String attributeName = ((LinkedList<?>) dataExcel.get(row)).get(8).toString().trim(); //here map to "path" column
-            String attributeNameNoNamespace = attributeName.split("#", 2)[1].trim();
-            for (int classRDF = 0; classRDF < ((ArrayList<?>) shapeData.getFirst()).size(); classRDF++) { // this loops the concrete classes in the RDFS
-                for (int attr = 1; attr < ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(classRDF)).size(); attr++) { //this loops the attributes of a concrete class including the inherited
-                    if (((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(classRDF)).get(attr)).getFirst().equals("Attribute")) { //this is when the property is an attribute
-                        String className = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(classRDF)).getFirst()).get(2).toString(); // this is the name of the class
-                        String attributeNameRDFS = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(classRDF)).get(attr)).get(4).toString(); // this is the localName of the attribute
-
-
-                        if (attributeNameNoNamespace.equals(attributeNameRDFS)) {
-                            has = true;
-                            Resource propertyShapeResource = ResourceFactory.createResource(nsURIprofile + ((LinkedList<?>) dataExcel.get(row)).get(7).toString());
-                            if (!shapeModel.containsResource(propertyShapeResource)) { // creates only if it is missing
-
-                                //adding the PropertyShape
-                                Resource r = shapeModel.createResource(propertyShapeResource.toString());
-                                r.addProperty(RDF.type, SH.PropertyShape);
-
-                                //add the group
-                                RDFNode o1g = shapeModel.createResource(nsURIprofile + localNameGroup);
-                                r.addProperty(SH.group, o1g);
-
-                                //add the order
-                                RDFNode o1o = shapeModel.createTypedLiteral(row, XSDDatatype.XSDinteger.getURI());
-                                r.addProperty(SH.order, o1o);
-
-                                //add the message
-                                r.addProperty(SH.message, ((LinkedList<?>) dataExcel.get(row)).get(4).toString());
-
-                                // add the path
-                                RDFNode o5 = shapeModel.createResource(attributeName);
-                                r.addProperty(SH.path, o5);
-
-                                //add the name
-                                r.addProperty(SH.name, ((LinkedList<?>) dataExcel.get(row)).get(2).toString());
-
-                                //add description
-                                r.addProperty(SH.description, ((LinkedList<?>) dataExcel.get(row)).get(3).toString());
-
-                                //add severity
-                                RDFNode o8 = shapeModel.createResource(SH.NS + ((LinkedList<?>) dataExcel.get(row)).get(5).toString());
-                                r.addProperty(SH.severity, o8);
-
-                                //add columns Constraint 1/Value 1
-
-                                if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("minExclusive")) {
-                                    RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(10), XSDDatatype.XSDfloat.getURI());
-                                    r.addProperty(SH.minExclusive, constr1);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("maxExclusive")) {
-                                    RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(10), XSDDatatype.XSDfloat.getURI());
-                                    r.addProperty(SH.maxExclusive, constr1);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("maxInclusive")) {
-                                    RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(10), XSDDatatype.XSDfloat.getURI());
-                                    r.addProperty(SH.maxInclusive, constr1);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("minInclusive")) {
-                                    RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(10), XSDDatatype.XSDfloat.getURI());
-                                    r.addProperty(SH.minInclusive, constr1);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("maxLength")) {
-                                    RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(10), XSDDatatype.XSDinteger.getURI());
-                                    r.addProperty(SH.maxLength, constr1);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("minLength")) {
-                                    RDFNode constr1 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(10), XSDDatatype.XSDinteger.getURI());
-                                    r.addProperty(SH.minLength, constr1);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("equals")) {
-                                    String prefix = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[0];
-                                    String attribute = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[1];
-                                    RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                    r.addProperty(SH.equals, eq);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("disjoint")) {
-                                    String prefix = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[0];
-                                    String attribute = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[1];
-                                    RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                    r.addProperty(SH.disjoint, eq);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("lessThan")) {
-                                    String prefix = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[0];
-                                    String attribute = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[1];
-                                    RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                    r.addProperty(SH.lessThan, eq);
-                                } else if (((LinkedList<?>) dataExcel.get(row)).get(9).toString().equals("lessThanOrEquals")) {
-                                    String prefix = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[0];
-                                    String attribute = ((LinkedList<?>) dataExcel.get(row)).get(10).toString().split(":", 2)[1];
-                                    RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                    r.addProperty(SH.lessThanOrEquals, eq);
-                                }
-
-                                if (((LinkedList<?>) dataExcel.get(row)).size() == 13) {
-                                    //add columns Constraint 2/Value 2
-                                    if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("minExclusive")) {
-                                        RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
-                                        r.addProperty(SH.minExclusive, constr2);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("maxExclusive")) {
-                                        RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
-                                        r.addProperty(SH.maxExclusive, constr2);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("maxInclusive")) {
-                                        RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
-                                        r.addProperty(SH.maxInclusive, constr2);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("minInclusive")) {
-                                        RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(12), XSDDatatype.XSDfloat.getURI());
-                                        r.addProperty(SH.minInclusive, constr2);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("maxLength")) {
-                                        RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(12), XSDDatatype.XSDinteger.getURI());
-                                        r.addProperty(SH.maxLength, constr2);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("minLength")) {
-                                        RDFNode constr2 = shapeModel.createTypedLiteral(((LinkedList<?>) dataExcel.get(row)).get(12), XSDDatatype.XSDinteger.getURI());
-                                        r.addProperty(SH.minLength, constr2);
-
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("equals")) {
-                                        String prefix = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[0];
-                                        String attribute = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[1];
-                                        RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                        r.addProperty(SH.equals, eq);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("disjoint")) {
-                                        String prefix = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[0];
-                                        String attribute = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[1];
-                                        RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                        r.addProperty(SH.disjoint, eq);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("lessThan")) {
-                                        String prefix = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[0];
-                                        String attribute = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[1];
-                                        RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                        r.addProperty(SH.lessThan, eq);
-                                    } else if (((LinkedList<?>) dataExcel.get(row)).get(11).toString().equals("lessThanOrEquals")) {
-                                        String prefix = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[0];
-                                        String attribute = ((LinkedList<?>) dataExcel.get(row)).get(12).toString().split(":", 2)[1];
-                                        RDFNode eq = shapeModel.createResource(shapeModel.getNsPrefixURI(prefix) + attribute);
-                                        r.addProperty(SH.lessThanOrEquals, eq);
-                                    }
-                                }
-                            }
-
-                            //Adding of the NodeShape if it is not existing
-                            Resource nodeShapeResource = ResourceFactory.createResource(nsURIprofile + className);
-                            if (!shapeModel.containsResource(nodeShapeResource)) { // creates only if it is missing
-                                String classFullURI = ((ArrayList<?>) ((ArrayList<?>) ((ArrayList<?>) shapeData.getFirst()).get(classRDF)).getFirst()).getFirst().toString();
-                                shapeModel = ShaclTools.addNodeShape(shapeModel, nsURIprofile, className, classFullURI);
-                            }
-                            //add the property to the NodeShape
-                            RDFNode o = shapeModel.createResource(propertyShapeResource.toString());
-                            shapeModel.getResource(String.valueOf(nodeShapeResource)).addProperty(SH.property, o);
-
-                        }
-                    }
-                }
-            }
-            if (!has)
-                foutputWindow.appendText("Warning: the attribute " + attributeName + " is not found in the RDFS model and therefore it is skipped.\n");
-            has = false;
-        }
+        //generate the shapes
+        Model shapeModel = ShaclFromXls.generateShaclFromXls(prefs, dataExcel, configSheet, shapeData, nsURIprofilePrefix, nsURIprofile);
 
         //open the ChoiceDialog for the save file and save the file in different formats
         String titleSaveAs = "Save as for shape model: ";
-        File savedFile = ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
+        File savedFile = eu.griddigit.cimpal.main.core.ShaclTools.saveShapesFile(shapeModel, baseURI, 0, titleSaveAs);
 
         progressBar.setProgress(1);
     }
@@ -5381,18 +4715,14 @@ public class MainController implements Initializable {
         fcbSortRDFGen.setSelected(true);
         fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
         fcbGenMethodOptions.getSelectionModel().selectFirst();
-        fcbAddInstanceData.setSelected(false);
     }
 
 
-    @FXML
     private void checkInstanceData() {
-        if (fcbAddInstanceData.isSelected()) {
-            hideEmptySheets.setVisible(true);
+        if (!ls_geni_instances.getItems().isEmpty()) {
             hideEmptySheets.setDisable(false);
         }
-        if (!fcbAddInstanceData.isSelected()) {
-            hideEmptySheets.setVisible(false);
+        else {
             hideEmptySheets.setDisable(true);
             hideEmptySheets.setSelected(false);
         }
@@ -5404,42 +4734,208 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
-        boolean addInstanceData = fcbAddInstanceData.isSelected();
         boolean hide = hideEmptySheets.isSelected();
 
-        //open RDFS file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "Select RDF file(s) for template.");
-        List<File> iFileList = new ArrayList<>();
-        if (addInstanceData)
-            iFileList = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "XML file(s)", List.of("*.xml"), "Select XML file(s) for template.");
-
-        if (file != null || iFileList != null) {// the file is selected
+        if (genRDFSFiles != null || genInstanceFiles != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
 
-            CreateTemplateFromRDF(file, iFileList, selectedMethod, hide);
+            CreateTemplateFromRDF(genRDFSFiles, genInstanceFiles, selectedMethod, hide);
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
         }
     }
 
+    private void updateGenInfoLabel() {
+        String infoText = "Load RDFS and/or Instance data to generate template.";
+        if (genRDFSFiles != null && !genRDFSFiles.isEmpty()) {
+            if (genInstanceFiles != null && !genInstanceFiles.isEmpty()) {
+                infoText = "Template will be created based on RDFS files and populated with instance data.";
+            }
+            else {
+                infoText = "Empty template will be created based on RDFS files.";
+            }
+        }
+        else {
+            if (genInstanceFiles != null && !genInstanceFiles.isEmpty()) {
+                infoText = "Template will be created using only instance data information. Select RDFS files to create a more complete template!";
+            }
+        }
+        label_geninfo.setText(infoText);
+    }
+    @FXML
+    private void actionLoadRDFSGen(){
+        try {
+            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS files", List.of("*.rdf"), "Select RDF file(s) for template.");
+            ls_geni_rdfs.getItems().clear();
+            genRDFSFiles = file;
+            if (file != null) {// the file is selected
+                ObservableList<String> filenames = FXCollections.observableArrayList();
+                file.forEach(f -> filenames.add(f.getName()));
+                ls_geni_rdfs.setItems(filenames);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            updateGenInfoLabel();
+        }
+    }
+
+    @FXML
+    private void actionLoadInstanceDataGen(){
+        try {
+            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml"), "Select instance file(s) for template.");
+            ls_geni_instances.getItems().clear();
+            genInstanceFiles = file;
+            if (!file.isEmpty()) {// the file is selected
+                ObservableList<String> filenames = FXCollections.observableArrayList();
+                file.forEach(f -> filenames.add(f.getName()));
+                ls_geni_instances.setItems(filenames);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            updateGenInfoLabel();
+            checkInstanceData();
+        }
+    }
+
     private void actionHandleOptionsForGen(String selected) {
         switch (selected) {
             case "Old template (not maintained)":
-                fcbAddInstanceData.setDisable(true);
                 fcbSortRDFGen.setDisable(true);
                 fcbRDFsortOptionsGen.setDisable(true);
                 fcbStripPrefixesGen.setDisable(true);
                 fcbExportExtensionsGen.setDisable(true);
                 break;
             case "Advanced template":
-                fcbAddInstanceData.setDisable(false);
                 fcbSortRDFGen.setDisable(false);
                 fcbRDFsortOptionsGen.setDisable(false);
                 fcbStripPrefixesGen.setDisable(false);
                 fcbExportExtensionsGen.setDisable(false);
                 break;
         }
+    }
+
+    @FXML
+    public void actionBtnRunExcelToTtl(ActionEvent actionEvent) {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        try {
+            if (fPathXLSChangesExcelToTtl.getText().isBlank() || fPathTTLChangesExcelToTtl.getText().isBlank()) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setContentText("Please complete all fields.");
+                alert.setHeaderText(null);
+                alert.setTitle("Error - not all fields are filled in");
+                alert.showAndWait();
+                progressBar.setProgress(0);
+                return;
+            }
+
+            // 1) Read Excel
+            ArrayList<Object> dataExcel = ExcelTools.importXLSX(String.valueOf(MainController.XlsChangesExcelToTtl), 0);
+
+            // Simple header detection (exact match, case-sensitive like the applier):
+            int startRow = 0;
+            if (!dataExcel.isEmpty() && dataExcel.get(0) instanceof java.util.List<?> hdr) {
+                String c0 = hdr.size() > 0 ? String.valueOf(hdr.get(0)) : "";
+                String c1 = hdr.size() > 1 ? String.valueOf(hdr.get(1)) : "";
+                if (("Name".equals(c0) || "sh:name".equals(c0)) && ("Property".equals(c1) || "Property Type".equals(c1))) {
+                    startRow = 1;
+                }
+            }
+
+            // 2) Read TTL shapes model (single file)
+            java.util.List<File> modelFiles1 = new java.util.LinkedList<>();
+            modelFiles1.add(MainController.TtlChangesExcelToTtl);
+            Model model1 = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles1, null, Lang.TURTLE, true, false).get("shacl");
+
+            System.out.println("Loaded triples: " + model1.size());
+
+            // 3) Apply updates (mutates model1 in place; 'updated' == model1)
+            Model updated = eu.griddigit.cimpal.main.core.ShaclExcelApplier.applyPropsFromExcelSimple(model1, dataExcel, startRow);
+
+            // Ensure common prefixes (especially sh:) before saving
+            model1.setNsPrefix("sh", "http://www.w3.org/ns/shacl#");
+            model1.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+            model1.setNsPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
+            model1.setNsPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
+
+            // --- Optional debug roundtrip ---
+            if (false) {
+                File outRaw = new File("roundtrip_no_change.ttl");
+                try (FileOutputStream fos = new FileOutputStream(outRaw)) {
+                    RDFDataMgr.write(fos, updated, org.apache.jena.riot.Lang.TURTLE);
+                }
+                Model reread = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                try (java.io.FileInputStream in = new java.io.FileInputStream(outRaw)) {
+                    RDFDataMgr.read(reread, in, null, org.apache.jena.riot.Lang.TURTLE);
+                }
+                System.out.println("Isomorphic (loaded vs roundtrip)? " + model1.isIsomorphicWith(reread));
+            }
+            // --- end optional debug ---
+
+
+
+            // 4) Save-as
+            FileChooser fc = new FileChooser();
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Turtle (*.ttl)", "*.ttl"));
+            File out = fc.showSaveDialog(btnRunExcelToTtl.getScene().getWindow());
+            if (out != null) {
+                String saveBaseURI = null; // keep as given
+
+                try (OutputStream os = new FileOutputStream(out)) {
+                    RDFWriter.create()
+                            .base(saveBaseURI)                        // leave as null per your request
+                            .set(RIOT.symTurtleOmitBase, false)
+                            .set(RIOT.symTurtleIndentStyle, "wide")
+                            .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                            .set(RIOT.symTurtleMultilineLiterals, true)
+                            .lang(Lang.TURTLE)
+                            .source(updated)
+                            .output(os);
+                    System.out.println("Model saved successfully to " + out.getAbsolutePath());
+                } catch (IOException e) {
+                    System.err.println("Error saving model to file: " + e.getMessage());
+                }
+            }
+
+            System.out.println("Apply finished.");
+            progressBar.setProgress(1.0);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            progressBar.setProgress(0);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setContentText("Failed to apply changes: " + e.getMessage());
+            alert.setHeaderText(null);
+            alert.setTitle("Error");
+            alert.showAndWait();
+        }
+    }
+
+
+    @FXML
+    public void actionBtnResetExcelToTtl(ActionEvent actionEvent) {
+        fPathTTLChangesExcelToTtl.clear();
+        fPathXLSChangesExcelToTtl.clear();
+    }
+
+    @FXML
+    public void actionCreateQARTemplate(ActionEvent actionEvent) throws IOException {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        List<File> files = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "QAR models", List.of("*.xml", "*.zip"), "Select QAR models.");
+
+        if (files != null) {// the file is selected
+            CreateTemplateFromXMLQAR(files);
+            progressBar.setProgress(1);
+        } else {
+            progressBar.setProgress(0);
+        }
+
     }
 }
 

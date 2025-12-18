@@ -6,14 +6,19 @@
       "name": "Run CimPal GUI",
       "request": "launch",
       "mainClass": "eu.griddigit.cimpal.main.application.CimPal",
-      "vmArgs": "--add-modules javafx.controls,javafx.fxml"
+      "vmArgs": "--add-modules javafx.controls,javafx.fxml",
+      "console": "integratedTerminal",
+      "preLaunchTask": "maven: install"
+
     },
     {
       "type": "java",
       "name": "Run MainGUI (optional)",
       "request": "launch",
       "mainClass": "eu.griddigit.cimpal.main.application.MainGUI",
-      "vmArgs": "--add-modules javafx.controls,javafx.fxml"
+      "vmArgs": "--add-modules javafx.controls,javafx.fxml",
+      "console": "integratedTerminal",
+      "preLaunchTask": "maven: install"
     }
   ]
 }
