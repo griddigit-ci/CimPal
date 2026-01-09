@@ -1,6 +1,6 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
-import application.taskControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
 import javafx.stage.FileChooser;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;

@@ -1,6 +1,6 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
-import application.taskControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.RDF;
 import org.topbraid.shacl.vocabulary.SH;

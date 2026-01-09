@@ -1,9 +1,9 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
-import common.customWriter.CustomRDFFormat;
-import datagenerator.resources.BaseInstanceModel;
-import datagenerator.resources.RDFSProfile;
-import datagenerator.resources.UnzippedFiles;
+import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.RDFSProfile;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.UnzippedFiles;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Property;
