@@ -5,8 +5,8 @@
  */
 package eu.griddigit.cimpal.main.application.datagenerator;
 
-import application.taskControllers.WizardContext;
-import datagenerator.resources.UnzippedFiles;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.UnzippedFiles;
 import javafx.scene.control.Alert;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;

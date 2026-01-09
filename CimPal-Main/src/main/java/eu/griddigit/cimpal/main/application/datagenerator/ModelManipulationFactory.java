@@ -1,6 +1,6 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
-import application.taskControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
