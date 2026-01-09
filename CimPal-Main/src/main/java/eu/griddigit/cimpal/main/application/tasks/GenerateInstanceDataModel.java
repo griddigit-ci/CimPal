@@ -1,10 +1,10 @@
 package eu.griddigit.cimpal.main.application.tasks;
 
-import application.services.TaskStateUpdater;
-import application.taskControllers.WizardContext;
-import common.customWriter.CustomRDFFormat;
-import datagenerator.DataGeneratorModel;
-import datagenerator.resources.BaseInstanceModel;
+import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
+import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ResIterator;
@@ -13,7 +13,7 @@ import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import util.ExcelTools;
+import eu.griddigit.cimpal.main.util.ExcelTools;
 
 import java.io.File;
 import java.io.FileInputStream;

@@ -1,10 +1,10 @@
 package eu.griddigit.cimpal.main.application.tasks;
 
-import application.services.TaskStateUpdater;
-import application.taskControllers.WizardContext;
-import datagenerator.GuiHelper;
-import datagenerator.ShaclManipulationsService;
-import datagenerator.resources.BaseInstanceModel;
+import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.GuiHelper;
+import eu.griddigit.cimpal.main.application.datagenerator.ShaclManipulationsService;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.RDF;
 
