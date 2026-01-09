@@ -1,6 +1,6 @@
 package eu.griddigit.cimpal.main.application.services;
 
-import application.taskControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.layout.VBox;
 

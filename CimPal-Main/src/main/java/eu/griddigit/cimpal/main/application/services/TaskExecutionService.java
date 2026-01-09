@@ -1,7 +1,7 @@
 package eu.griddigit.cimpal.main.application.services;
 
-import application.taskControllers.WizardContext;
-import datagenerator.GuiHelper;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.GuiHelper;
 import javafx.concurrent.Task;
 
 import java.io.FileNotFoundException;

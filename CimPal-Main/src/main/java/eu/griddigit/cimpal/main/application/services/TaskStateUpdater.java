@@ -1,7 +1,7 @@
 package eu.griddigit.cimpal.main.application.services;
 
-import application.taskControllers.WizardContext;
-import application.tasks.SelectedTask;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import javafx.application.Platform;
 
 public class TaskStateUpdater {
