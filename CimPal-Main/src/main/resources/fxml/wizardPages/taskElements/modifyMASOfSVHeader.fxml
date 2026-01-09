@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane prefHeight="83.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.taskControllers.ModifyMASOfSVHeaderController">
+
+    <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="66.0" prefWidth="1180.0"
+                text="Modify MAS of SV Header">
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="47.0" prefWidth="714.0">
+            <Label layoutX="29.0" layoutY="12.0" text="New CGM MAS and SV:"/>
+            <TextField fx:id="newMASOfSVHeader" layoutX="180.0" layoutY="7.0" prefHeight="26.0" prefWidth="349.0"/>
+            <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="12.0" mnemonicParsing="false" selected="true"
+                      text="Save Result to Working Dir"/>
+        </AnchorPane>
+    </TitledPane>
+</AnchorPane>

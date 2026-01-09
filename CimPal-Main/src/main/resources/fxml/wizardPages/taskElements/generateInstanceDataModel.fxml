@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane prefHeight="121.0" prefWidth="1191.0" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.taskControllers.GenerateInstanceDataModelController">
+    <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="106.0" prefWidth="1180.0"
+                text="Generate Instance Data Model">
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="97.0" prefWidth="1178.0">
+            <Label layoutX="29.0" layoutY="12.0" text="Generate Instance Data Template File:"/>
+            <TextField fx:id="loadedInputFile" editable="false" layoutX="239.0" layoutY="7.0" prefHeight="26.0"
+                       prefWidth="550.0" HBox.hgrow="ALWAYS"/>
+            <Button layoutX="819.0" layoutY="6.0" mnemonicParsing="false" onAction="#actionBrowseDataTemplate"
+                    prefHeight="26.0" prefWidth="152.0" text="Browse"/>
+            <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="8.0" mnemonicParsing="false" selected="true"
+                      text="Save Result to Working Dir"/>
+            <Label layoutX="80.0" layoutY="50.0" minWidth="70.0" text="Format of generated model:"/>
+            <ChoiceBox fx:id="fcbGenDataFormat" layoutX="239.0" layoutY="47.0" minWidth="150.0"/>
+        </AnchorPane>
+    </TitledPane>
+</AnchorPane>

@@ -856,6 +856,40 @@
                         </AnchorPane>
                      </content>
                   </Tab>
+                  <Tab text="Task Wizard">
+                    <content>ű
+                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                         <VBox prefHeight="663.0" prefWidth="1200.0">
+                            <BorderPane fx:id="wizardBorderPane" prefHeight="656.0" prefWidth="1278.0">
+                               <top>
+                                  <HBox prefHeight="27.0" prefWidth="1264.0" BorderPane.alignment="CENTER">
+                                     <Button fx:id="wizardTaskSelectionButton" defaultButton="true" disable="false"
+                                             mnemonicParsing="false" text="Task Selection"/>
+                                     <Button fx:id="wizardTaskInputButton" disable="true" mnemonicParsing="false"
+                                             text="Task Input"/>
+                                     <Button fx:id="wizardTaskStatusButton" disable="true" mnemonicParsing="false"
+                                             text="Task Execution Status"/>
+                                  </HBox>
+                               </top>
+                               <center>
+                                  <fx:include fx:id="wizardPane" source="wizardPages/taskSelection.fxml"/>
+                               </center>
+                               <bottom>
+                                  <VBox spacing="10">
+                                     <HBox/>
+                                     <HBox prefHeight="0.0" prefWidth="1264.0" spacing="10">
+                                        <Label/>
+                                        <Button mnemonicParsing="false" onAction="#backWizardPane" text="Back"/>
+                                        <Button fx:id="forwardWizardButton" mnemonicParsing="false"
+                                                onAction="#forwardWizardPane" text="Next"/>
+                                     </HBox>
+                                  </VBox>
+                               </bottom>
+                            </BorderPane>
+                         </VBox>
+                      </AnchorPane>
+                    </content>
+                  </Tab>
                </TabPane>
             </HBox>
          </AnchorPane>

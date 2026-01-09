@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<AnchorPane prefHeight="133.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.taskControllers.MultiplyIGMFromConfigFileController">
+    <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="115.0" prefWidth="1180.0"
+                text="Multiply IGM from Config File">
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="73.0" prefWidth="714.0">
+            <Label layoutX="29.0" layoutY="12.0" text="IGM multiply config file:"/>
+            <Button layoutX="417.0" layoutY="7.0" mnemonicParsing="false" onAction="#actionBrowseMultiplyIGMFiles"
+                    prefHeight="26.0" prefWidth="100.0" text="Browse"/>
+            <TextField fx:id="eqbdId" layoutX="642.0" layoutY="7.0" prefHeight="26.0" prefWidth="222.0"/>
+            <TextField fx:id="tpbdId" layoutX="642.0" layoutY="50.0" prefHeight="26.0" prefWidth="220.0"/>
+
+            <TextArea fx:id="loadedXMLFile" disable="true" editable="false" layoutX="172.0" layoutY="7.0"
+                      prefHeight="69.0" prefWidth="222.0" HBox.hgrow="ALWAYS" wrapText="true">
+                <font>
+                    <Font name="Consolas" size="12.0"/>
+                </font>
+            </TextArea>
+            <CheckBox fx:id="persistentEQ" layoutX="417.0" layoutY="55.0" mnemonicParsing="false" prefHeight="18.0"
+                      prefWidth="100.0" text="Persistent EQ"/>
+            <Label layoutX="586.0" layoutY="12.0" text="EQBD ID:"/>
+            <Button layoutX="877.0" layoutY="7.0" mnemonicParsing="false" onAction="#browsEQBDFile"
+                    prefHeight="26.0" prefWidth="94.0" text="Browse"/>
+            <Label layoutX="587.0" layoutY="55.0" text="TPBD ID:"/>
+            <Button layoutX="877.0" layoutY="52.0" mnemonicParsing="false" onAction="#browsTPBDFile"
+                    prefHeight="26.0" prefWidth="94.0" text="Browse"/>
+            <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="12.0" mnemonicParsing="false" selected="true"
+                      text="Save Result to Working Dir"/>
+        </AnchorPane>
+    </TitledPane>
+</AnchorPane>

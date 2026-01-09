@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.control.cell.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane prefHeight="472.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.taskControllers.TaskStatusController">
+    <VBox prefHeight="471.0" prefWidth="854.0" spacing="10">
+        <ScrollPane prefHeight="409.0" prefWidth="854.0">
+            <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="200.0" prefWidth="200.0">
+                <TableView fx:id="tableForTaskStatus" prefHeight="403.0" prefWidth="855.0">
+                    <columns>
+                        <TableColumn prefWidth="89.1999779343605" style="-fx-alignment: CENTER;"
+                                     text="Order">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="order"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn prefWidth="333.0000305175781" text="Task">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="name"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn prefWidth="290.199951171875" style="-fx-alignment: CENTER;"
+                                     text="Status">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="status"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn prefWidth="137.199951171875" style="-fx-alignment: CENTER;"
+                                     text="Progress">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="info"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                    </columns>
+                </TableView>
+            </AnchorPane>
+        </ScrollPane>
+        <HBox prefHeight="64.0" prefWidth="654.0" spacing="10">
+            <Label/>
+            <Button mnemonicParsing="false" onAction="#cancelTasksExecution" text="Cancel"/>
+            <Button mnemonicParsing="false" onAction="#openOutputDirectory" text="Open Output Directory"/>
+            <Button mnemonicParsing="false" onAction="#resetExecution" text="New Execution"/>
+        </HBox>
+    </VBox>
+    <TextArea layoutX="882.0" layoutY="25.0" prefHeight="377.0" prefWidth="293.0" fx:id="executionOutput"/>
+    <Label layoutX="882.0" layoutY="6.0" prefHeight="18.0" prefWidth="138.0" text="Execution output:"/>
+</AnchorPane>
