@@ -1,13 +1,13 @@
 package eu.griddigit.cimpal.main.application.PssePFcompare;
 
-import application.taskControllers.CimPalWizardController;
-import application.taskControllers.WizardContext;
-import datagenerator.GuiHelper;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.GuiHelper;
 import javafx.stage.FileChooser;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import util.ExcelTools;
+import eu.griddigit.cimpal.main.util.ExcelTools;
 
 import java.io.File;
 import java.io.FileNotFoundException;

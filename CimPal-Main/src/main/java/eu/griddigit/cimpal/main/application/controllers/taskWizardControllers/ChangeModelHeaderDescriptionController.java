@@ -1,6 +1,6 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.tasks.ChangeModelHeaderDescription;
+import eu.griddigit.cimpal.main.application.tasks.ChangeModelHeaderDescription;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;

@@ -1,7 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.taskControllers.WizardContext;
-import application.tasks.MultiplyBaseModelNTimes;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.tasks.MultiplyBaseModelNTimes;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;

@@ -5,7 +5,7 @@
  */
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.taskControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;

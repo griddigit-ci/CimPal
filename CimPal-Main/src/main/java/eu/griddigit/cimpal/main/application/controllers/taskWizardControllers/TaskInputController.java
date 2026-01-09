@@ -1,7 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.services.TaskInputElementsFactory;
-import application.tasks.SelectedTask;
+import eu.griddigit.cimpal.main.application.services.TaskInputElementsFactory;
+import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;

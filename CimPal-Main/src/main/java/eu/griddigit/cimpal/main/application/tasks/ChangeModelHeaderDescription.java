@@ -1,10 +1,10 @@
 package eu.griddigit.cimpal.main.application.tasks;
 
-import application.services.TaskStateUpdater;
-import application.taskControllers.WizardContext;
-import application.tasks.ITask;
-import application.tasks.SelectedTask;
-import datagenerator.resources.BaseInstanceModel;
+import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.tasks.ITask;
+import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.rdf.model.Statement;

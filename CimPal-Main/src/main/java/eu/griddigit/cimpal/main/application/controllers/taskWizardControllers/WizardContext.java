@@ -1,11 +1,11 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.services.TaskStateUpdater;
-import application.tasks.*;
-import common.customWriter.CustomRDFFormat;
-import datagenerator.DataGeneratorModel;
-import datagenerator.ModelManipulationFactory;
-import datagenerator.resources.BaseInstanceModel;
+import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
+import eu.griddigit.cimpal.main.application.tasks.*;
+import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
+import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
+import eu.griddigit.cimpal.main.application.datagenerator.ModelManipulationFactory;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.TableView;
@@ -27,7 +27,7 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import static application.taskControllers.TaskInputController.getSaveInZip;
+import static eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.TaskInputController.getSaveInZip;
 
 public class WizardContext {
     // Static helper objects for singleton pattern implementation

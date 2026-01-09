@@ -1,5 +1,5 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
-import application.tasks.AddMRIDAndRDFID;
+import eu.griddigit.cimpal.main.application.tasks.AddMRIDAndRDFID;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;

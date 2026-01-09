@@ -1,8 +1,8 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.tasks.MultiplyCGMFromConfigXLS;
-import application.tasks.SelectedTask;
-import datagenerator.InstanceDataFactory;
+import eu.griddigit.cimpal.main.application.tasks.MultiplyCGMFromConfigXLS;
+import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
+import eu.griddigit.cimpal.main.application.datagenerator.InstanceDataFactory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;

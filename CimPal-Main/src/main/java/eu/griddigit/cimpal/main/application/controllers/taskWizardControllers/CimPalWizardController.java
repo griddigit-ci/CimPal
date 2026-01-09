@@ -5,10 +5,10 @@
  */
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import PssePFcompare.comparePssePF;
-import application.AboutController;
-import application.services.TaskExecutionService;
-import datagenerator.ExportFactory;
+import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
+import eu.griddigit.cimpal.main.application.AboutController;
+import eu.griddigit.cimpal.main.application.services.TaskExecutionService;
+import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;

@@ -1,7 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.taskControllers.WizardContext;
-import application.tasks.Rename;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.tasks.Rename;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;

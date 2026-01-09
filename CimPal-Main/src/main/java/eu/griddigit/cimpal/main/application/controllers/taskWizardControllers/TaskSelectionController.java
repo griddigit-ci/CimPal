@@ -1,11 +1,11 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
-import application.services.TaskDependenciesEnforcer;
-import application.tasks.GenerateInstanceDataModel;
-import application.tasks.SelectedTask;
+import eu.griddigit.cimpal.main.application.services.TaskDependenciesEnforcer;
+import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
+import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import datagenerator.DataGeneratorModel;
-import datagenerator.resources.SupportedRDFSProfiles;
+import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
