@@ -3,7 +3,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="133.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.taskControllers.MultiplyNTimesAndConnectController">
+<AnchorPane prefHeight="133.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.MultiplyNTimesAndConnectController">
     <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="115.0" prefWidth="1180.0"
                 text="Multiply Base Model N Times And Connect">
         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="73.0" prefWidth="714.0">

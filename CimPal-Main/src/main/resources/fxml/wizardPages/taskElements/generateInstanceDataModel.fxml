@@ -3,7 +3,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="121.0" prefWidth="1191.0" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.taskControllers.GenerateInstanceDataModelController">
+<AnchorPane prefHeight="121.0" prefWidth="1191.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.GenerateInstanceDataModelController">
     <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="106.0" prefWidth="1180.0"
                 text="Generate Instance Data Model">
         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="97.0" prefWidth="1178.0">

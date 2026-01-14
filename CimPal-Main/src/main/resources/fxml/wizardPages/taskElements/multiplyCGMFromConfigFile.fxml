@@ -8,7 +8,7 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.HBox?>
 
-<AnchorPane prefHeight="154.0" prefWidth="1200" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.taskControllers.MultiplyCGMFromConfigFileController">
+<AnchorPane prefHeight="154.0" prefWidth="1200" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.MultiplyCGMFromConfigFileController">
     <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="141.0" prefWidth="1180.0" text="Multiply CGM From Config File">
         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="98.0" prefWidth="1184.0">
             <Label layoutX="167.0" layoutY="12.0" text="Multiply CGM config XLS:" />

@@ -30,6 +30,7 @@
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.control.TreeView?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.VBox?>
@@ -57,6 +58,8 @@
          <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
          <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text=" Model transformation" />
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuPSSEPF" text="PSSE-PowerFactory compare" />
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />
@@ -858,35 +861,33 @@
                   </Tab>
                   <Tab text="Task Wizard">
                     <content>
-                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                         <VBox prefHeight="663.0" prefWidth="1200.0">
-                            <BorderPane fx:id="wizardBorderPane" prefHeight="656.0" prefWidth="1278.0">
-                               <top>
-                                  <HBox prefHeight="27.0" prefWidth="1264.0" BorderPane.alignment="CENTER">
-                                     <Button fx:id="wizardTaskSelectionButton" defaultButton="true" disable="false"
-                                             mnemonicParsing="false" text="Task Selection"/>
-                                     <Button fx:id="wizardTaskInputButton" disable="true" mnemonicParsing="false"
-                                             text="Task Input"/>
-                                     <Button fx:id="wizardTaskStatusButton" disable="true" mnemonicParsing="false"
-                                             text="Task Execution Status"/>
-                                  </HBox>
-                               </top>
-                               <center>
-                                  <fx:include fx:id="wizardPane" source="wizardPages/taskSelection.fxml"/>
-                               </center>
-                               <bottom>
-                                  <VBox spacing="10">
-                                     <HBox/>
-                                     <HBox prefHeight="0.0" prefWidth="1264.0" spacing="10">
-                                        <Label/>
-                                        <Button mnemonicParsing="false" onAction="#backWizardPane" text="Back"/>
-                                        <Button fx:id="forwardWizardButton" mnemonicParsing="false"
-                                                onAction="#forwardWizardPane" text="Next"/>
+                      <AnchorPane maxHeight="-Infinity" prefHeight="595.0">
+                           <children>
+                            <VBox maxHeight="201.0">
+                               <BorderPane fx:id="wizardBorderPane" maxHeight="210.0">
+                                  <top>
+                                     <HBox BorderPane.alignment="CENTER">
+                                        <Button fx:id="wizardTaskSelectionButton" defaultButton="true" disable="false" mnemonicParsing="false" text="Task Selection" />
+                                        <Button fx:id="wizardTaskInputButton" disable="true" mnemonicParsing="false" text="Task Input" />
+                                        <Button fx:id="wizardTaskStatusButton" disable="true" mnemonicParsing="false" text="Task Execution Status" />
                                      </HBox>
-                                  </VBox>
-                               </bottom>
-                            </BorderPane>
-                         </VBox>
+                                  </top>
+                                  <center>
+                                     <fx:include fx:id="wizardPane" source="wizardPages/taskSelection.fxml" />
+                                  </center>
+                                  <bottom>
+                                     <VBox spacing="10">
+                                        <HBox />
+                                        <HBox prefHeight="0.0" prefWidth="1264.0" spacing="10">
+                                           <Label />
+                                           <Button mnemonicParsing="false" onAction="#backWizardPane" text="Back" />
+                                           <Button fx:id="forwardWizardButton" mnemonicParsing="false" onAction="#forwardWizardPane" text="Next" />
+                                        </HBox>
+                                     </VBox>
+                                  </bottom>
+                               </BorderPane>
+                            </VBox>
+                           </children>
                       </AnchorPane>
                     </content>
                   </Tab>
