@@ -1,6 +1,6 @@
 package eu.griddigit.cimpal.main.application.PssePFcompare;
 
-import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.datagenerator.GuiHelper;
 import javafx.stage.FileChooser;
@@ -36,11 +36,11 @@ public class comparePssePF {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for nodes PSS/E", "*.xlsx"));
-        filechooser.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file = filechooser.showOpenDialog(null);
 
         if (file!=null) {// the file is selected
-            CimPalWizardController.prefs.put("LastWorkingFolder", file.getParent());
+            MainController.prefs.put("LastWorkingFolder", file.getParent());
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file.toString(),0);
 
@@ -62,13 +62,13 @@ public class comparePssePF {
         //select file
         FileChooser filechooser1 = new FileChooser();
         filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for nodes PowerFactory", "*.xlsx"));
-        filechooser1.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file1 = filechooser1.showOpenDialog(null);
 
         int countPF=0;
         int count1=0;
         if (file1!=null) {// the file is selected
-            CimPalWizardController.prefs.put("LastWorkingFolder", file1.getParent());
+            MainController.prefs.put("LastWorkingFolder", file1.getParent());
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file1.toString(),0);
 
@@ -138,11 +138,11 @@ public class comparePssePF {
         //select file
         FileChooser filechooser2 = new FileChooser();
         filechooser2.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for lines PSS/E", "*.xlsx"));
-        filechooser2.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser2.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file2 = filechooser2.showOpenDialog(null);
 
         if (file2!=null) {// the file is selected
-            CimPalWizardController.prefs.put("LastWorkingFolder", file2.getParent());
+            MainController.prefs.put("LastWorkingFolder", file2.getParent());
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file2.toString(),0);
 
@@ -203,12 +203,12 @@ public class comparePssePF {
         //select file
         FileChooser filechooser3 = new FileChooser();
         filechooser3.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for lines PowerFactory", "*.xlsx"));
-        filechooser3.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser3.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file3 = filechooser3.showOpenDialog(null);
 
         int countPFline=0;
         if (file3!=null) {// the file is selected
-            CimPalWizardController.prefs.put("LastWorkingFolder", file3.getParent());
+            MainController.prefs.put("LastWorkingFolder", file3.getParent());
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file3.toString(),0);
 
@@ -362,11 +362,11 @@ public class comparePssePF {
         //select file
         FileChooser filechooser4 = new FileChooser();
         filechooser4.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for trafo PSS/E", "*.xlsx"));
-        filechooser4.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser4.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file4 = filechooser4.showOpenDialog(null);
 
         if (file4!=null) {// the file is selected
-            CimPalWizardController.prefs.put("LastWorkingFolder", file4.getParent());
+            MainController.prefs.put("LastWorkingFolder", file4.getParent());
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file4.toString(),0);
 
@@ -427,12 +427,12 @@ public class comparePssePF {
         //select file
         FileChooser filechooser5 = new FileChooser();
         filechooser5.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for trafo PowerFactory", "*.xlsx"));
-        filechooser5.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser5.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         File file5 = filechooser5.showOpenDialog(null);
 
         int countPFtrafo=0;
         if (file5!=null) {// the file is selected
-            CimPalWizardController.prefs.put("LastWorkingFolder", file5.getParent());
+            MainController.prefs.put("LastWorkingFolder", file5.getParent());
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file5.toString(),0);
 
@@ -618,11 +618,11 @@ public class comparePssePF {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Result files", "*.xlsx"));
         filechooser.setInitialFileName(initialFileName);
-        filechooser.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
-            CimPalWizardController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);
@@ -723,11 +723,11 @@ public class comparePssePF {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Result files", "*.xlsx"));
         filechooser.setInitialFileName(initialFileName);
-        filechooser.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
-            CimPalWizardController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);
