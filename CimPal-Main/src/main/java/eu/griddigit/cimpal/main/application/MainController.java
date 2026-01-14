@@ -11,6 +11,9 @@ import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclFromXls;
+import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
 import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofile;
@@ -24,26 +27,19 @@ import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
 //import guru.nidi.graphviz.engine.Graphviz;
 //import guru.nidi.graphviz.engine.Format;
 
-import java.io.ByteArrayInputStream;
-
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
-import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
@@ -51,25 +47,19 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
-import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.topbraid.jenax.util.JenaUtil;
-import org.topbraid.shacl.vocabulary.SH;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import eu.griddigit.cimpal.main.util.ExcelTools;
-import eu.griddigit.cimpal.main.util.PlantUMLGenerator;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
@@ -100,6 +90,7 @@ import java.util.Properties;
 public class MainController implements Initializable {
 
     private GUIhelper guiHelper;
+    private eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController cimPalWizardController;
 
     public TabPane tabPaneConstraintsDetails;
     public Tab tabCreateCompleteSM1;
@@ -435,6 +426,19 @@ public class MainController implements Initializable {
     private double initialX;
     private double initialY;
 
+    // From CimPal - Data generator
+    private WizardContext wizardContext;
+    @FXML
+    private Button forwardWizardButton;
+    @FXML
+    private Button wizardTaskSelectionButton;
+    @FXML
+    private Button wizardTaskInputButton;
+    @FXML
+    private Button wizardTaskStatusButton;
+    @FXML
+    private BorderPane wizardBorderPane;
+
 
     public MainController() {
         guiHelper = new GUIhelper();
@@ -456,7 +460,6 @@ public class MainController implements Initializable {
         //initialization of the Browse and Modify table - SHACL Shapes Browse
         Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
 
-
         try {
             if (!Preferences.userRoot().nodeExists("CimPal")) {
                 prefs = Preferences.userRoot().node("CimPal");
@@ -468,6 +471,9 @@ public class MainController implements Initializable {
         } catch (BackingStoreException e) {
             e.printStackTrace();
         }
+
+        wizardContext = WizardContext.getInstance();
+        cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
 
         mainRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
         deviationRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
@@ -646,6 +652,149 @@ public class MainController implements Initializable {
         });
 
 
+    }
+    @FXML
+    public void forwardWizardPane(ActionEvent actionEvent) throws IOException {
+        //FXMLLoader currentController = new FXMLLoader(getClass().getResource(wizardContext.getCurrentWizardPane()));
+        //currentController.load();
+        //var controller = currentController.getController();
+        //var validInputs = wizardPaneController.validateInputs();
+
+        /*
+        switch (wizardContext.getCurrentWizardPaneIndex()) {
+            case 0:
+                validInputs = wizardPaneController.validateInputs();
+                break;
+            case 1:
+                TaskInputController controller2 = (TaskInputController) controller;
+                validInputs = controller2.validateInputs();
+                break;
+            default:
+                validInputs = true;
+        }
+        */
+        if (wizardContext.getCurrentController().validateInputs()) {
+            wizardContext.forwardWizardPane();
+
+            wizardBorderPane.setCenter(FXMLLoader.load(Objects.requireNonNull(getClass().getResource(wizardContext.getCurrentWizardPane()))));
+
+            this.updateWizardProgressButtons();
+        }
+
+    }
+
+    @FXML
+    public void backWizardPane(ActionEvent actionEvent) throws IOException {
+        wizardContext.backWizardPane();
+        wizardBorderPane.setCenter(FXMLLoader.load(Objects.requireNonNull(getClass().getResource(wizardContext.getCurrentWizardPane()))));
+        this.updateWizardProgressButtons();
+    }
+
+    private void updateWizardProgressButtons() {
+        switch (wizardContext.getCurrentWizardPaneIndex()) {
+            case 0:
+                wizardTaskSelectionButton.setDefaultButton(true);
+                wizardTaskSelectionButton.setDisable(false);
+                wizardTaskInputButton.setDefaultButton(false);
+                wizardTaskInputButton.setDisable(true);
+                wizardTaskStatusButton.setDefaultButton(false);
+                wizardTaskStatusButton.setDisable(true);
+                forwardWizardButton.setText("Next");
+                forwardWizardButton.setDisable(false);
+                break;
+            case 1:
+                wizardTaskSelectionButton.setDefaultButton(false);
+                wizardTaskSelectionButton.setDisable(true);
+                wizardTaskInputButton.setDefaultButton(true);
+                wizardTaskInputButton.setDisable(false);
+                wizardTaskStatusButton.setDefaultButton(false);
+                wizardTaskStatusButton.setDisable(true);
+                forwardWizardButton.setText("Execute");
+                forwardWizardButton.setDisable(false);
+                break;
+            case 2:
+                wizardTaskSelectionButton.setDefaultButton(false);
+                wizardTaskSelectionButton.setDisable(true);
+                wizardTaskInputButton.setDefaultButton(false);
+                wizardTaskInputButton.setDisable(true);
+                wizardTaskStatusButton.setDefaultButton(true);
+                wizardTaskStatusButton.setDisable(false);
+                forwardWizardButton.setDisable(true);
+                break;
+        }
+    }
+
+    @FXML
+    // action on menu PSSE-PowerFactory compare
+    private void actionMenuPSSEPF() throws FileNotFoundException {
+        comparePssePF.comparePssePFresults();
+    }
+
+    @FXML
+    // action on menu QoCDC 3.2.1 xml to Excel
+    private void actionMenuQoCDCxls() throws FileNotFoundException {
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select QoCDC xml", "*.xml"));
+        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder","")));
+        File file = filechooser.showOpenDialog(null);
+
+        if (file!=null) {// the file is selected
+            prefs.put("LastWorkingFolder", file.getParent());
+
+            Model model = ModelFactory.createDefaultModel();
+            InputStream inputStream = new FileInputStream(file.toString());
+            RDFDataMgr.read(model, inputStream, "http://entsoe.eu/CIM/Extensions/CGM-BP/2020", Lang.RDFXML);
+
+            List<String> ruleName = new LinkedList<>();
+            List<String> ruleSeverity = new LinkedList<>();
+            List<String> ruleLevel = new LinkedList<>();
+            List<String> ruleDescription = new LinkedList<>();
+            List<String> ruleMessage = new LinkedList<>();
+
+            Property propName = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.name");
+            Property propSeverity = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.severity");
+            Property propDescription = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.description");
+            Property propLevel = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.level");
+            Property propMessage = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.message");
+
+            List<Statement> ruleStmts = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule")).toList();
+            for (Statement ruleStmt : ruleStmts) {
+                if (model.contains(ruleStmt.getSubject(),propName)){
+                    ruleName.add(model.getRequiredProperty(ruleStmt.getSubject(),propName).getObject().toString());
+                }else{
+                    ruleName.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propSeverity)){
+                    ruleSeverity.add(model.getRequiredProperty(ruleStmt.getSubject(),propSeverity).getObject().toString());
+                }else{
+                    ruleSeverity.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propLevel)){
+                    ruleLevel.add(model.getRequiredProperty(ruleStmt.getSubject(),propLevel).getObject().toString());
+                }else{
+                    ruleLevel.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propDescription)){
+                    ruleDescription.add(model.getRequiredProperty(ruleStmt.getSubject(),propDescription).getObject().toString());
+                }else{
+                    ruleDescription.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propMessage)){
+                    ruleMessage.add(model.getRequiredProperty(ruleStmt.getSubject(),propMessage).getObject().toString());
+                }else{
+                    ruleMessage.add("NA");
+                }
+
+
+            }
+            ExportFactory.exportQoCDC(ruleName,ruleSeverity,ruleDescription,ruleMessage,ruleLevel,"QoCDC321","QoCDC321","Save QoCDC");
+
+
+        }
     }
 
 
