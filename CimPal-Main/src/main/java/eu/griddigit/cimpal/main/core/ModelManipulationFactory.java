@@ -211,7 +211,7 @@ public class ModelManipulationFactory {
     }
 
     //Model transformation method
-    public static void modelTransformation(List<File> fileOrigModelList, List<File>  fileSHACLTransList) throws IOException {
+    public static void modelTransformation(List<File> fileOrigModelList, List<File> fileSHACLTransList) throws IOException {
 
         // Load your data and shapes (SHACL rules)
 
@@ -269,7 +269,7 @@ public class ModelManipulationFactory {
 
         Model model1single = null;
         String baseIRI = "http://iec.ch/TC57/CIM100";
-        Map<String,Model> dataModelMap = new HashMap<>();
+        Map<String, Model> dataModelMap = new HashMap<>();
         Map<String, String> prefixMap = new HashMap<>();
 
         for (File item : fileOrigModelList) {
@@ -283,8 +283,8 @@ public class ModelManipulationFactory {
             }
             prefixMap.putAll(model1single.getNsPrefixMap());
             //get header ID
-            String headerID = model1single.listStatements(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).next().getSubject().getLocalName();
-            dataModelMap.put(headerID,model1single);
+            String headerID = model1single.listStatements(null, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).next().getSubject().getLocalName();
+            dataModelMap.put(headerID, model1single);
         }
 
 
@@ -314,7 +314,8 @@ public class ModelManipulationFactory {
         //Model rulesModel = eu.griddigit.cimpal.util.ModelFactory.modelLoad(fileSHACLTransList, null, rdfSourceFormat1, false);
 
         // Execute the rules and store inferences
-        Model inferredModel = ModelFactory.createDefaultModel();;
+        Model inferredModel = ModelFactory.createDefaultModel();
+        ;
         List<Map.Entry<String, Model>> entries = new ArrayList<>(dataModelMap.entrySet());
 
 // Process first entry separately if needed
@@ -345,8 +346,6 @@ public class ModelManipulationFactory {
         inferredModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
         inferredModel.setNsPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
         inferredModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-
-
 
 
         // save file
@@ -413,10 +412,9 @@ public class ModelManipulationFactory {
         saveProperties.put("useFileDialog", false);
 
 
-
     }
 
-        public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties, IOutputHandler outputHandler) throws IOException {
+    public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties, IOutputHandler outputHandler) throws IOException {
 
         //this is to load profile data - this is needed for the export
         //Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
@@ -634,7 +632,7 @@ public class ModelManipulationFactory {
                             throw new Exception("Couldn't find the sheet for class: " + className);
                     }
                     continue;
-                } else if (((LinkedList<?>) o).size() <=4)
+                } else if (((LinkedList<?>) o).size() <= 4)
                     continue;
 
                 // getting classes to print
@@ -653,8 +651,7 @@ public class ModelManipulationFactory {
                 if (headerClassName.isEmpty()) {
                     try {
                         headerClassName = ((LinkedList<?>) o).get(5).toString();
-                    }
-                    catch (IndexOutOfBoundsException e) {
+                    } catch (IndexOutOfBoundsException e) {
                         throw new NoSuchElementException("Missing header class name from config tab.");
                     }
                     if (!headerClassName.isEmpty()) {
@@ -776,9 +773,8 @@ public class ModelManipulationFactory {
                                 case "Literal" -> { //add literal
                                     String datatype;
                                     try {
-                                        datatype = ((LinkedList<?>) headerXlsData.get(3)).get(j).toString();
-                                    }
-                                    catch (IndexOutOfBoundsException e) {
+                                        datatype = resolveDatatype(((LinkedList<?>) headerXlsData.get(3)).get(j), object);
+                                    } catch (Exception e) {
                                         datatype = "string";
                                     }
                                     if (datatype.equalsIgnoreCase("float"))
@@ -866,7 +862,7 @@ public class ModelManipulationFactory {
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
 
-                    if (((LinkedList<?>) classXlsData.getFirst()).get(3).toString().equals("true")){
+                    if (((LinkedList<?>) classXlsData.getFirst()).get(3).toString().equals("true")) {
                         rdfAboutList.add(ResourceFactory.createResource(classWNS));
                     }
                     for (int j = 0; j < cols; j++) {
@@ -910,8 +906,7 @@ public class ModelManipulationFactory {
                                         String datatype;
                                         try {
                                             datatype = ((LinkedList<?>) classXlsData.get(3)).get(j).toString();
-                                        }
-                                        catch (Exception e){
+                                        } catch (Exception e) {
                                             datatype = "";
                                         }
                                         if (datatype.equalsIgnoreCase("float"))
@@ -919,7 +914,7 @@ public class ModelManipulationFactory {
                                         else if (datatype.equalsIgnoreCase("integer"))
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Math.round(Float.parseFloat(object))))));
                                         else
-                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                                     }
                                     case "LiteralLangEN" -> {
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
@@ -969,7 +964,7 @@ public class ModelManipulationFactory {
                             }
                         }
                     }
-                    if (model.listStatements(rdfidRes, null, (RDFNode)null).hasNext()) {
+                    if (model.listStatements(rdfidRes, null, (RDFNode) null).hasNext()) {
                         // If it has properties then add the primary class type
                         model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
                     }
@@ -1301,6 +1296,32 @@ public class ModelManipulationFactory {
 
         saveProperties.replace("filename", "ConvertedCommonData.xml");
         InstanceDataFactory.saveInstanceData(modelComData, saveProperties);
+    }
+
+    private static String resolveDatatype(Object datatypeCell, String value) {
+        String datatype = "string";
+        if (datatypeCell != null) {
+            String dt = datatypeCell.toString().trim();
+            if (!dt.isEmpty()) return dt;
+        }
+
+        if (value == null) return datatype;
+        String s = value.trim();
+        if (s.isEmpty()) return datatype;
+
+        // try to resolve from the value
+        try {
+            if (!s.contains(".") && !s.contains(",") && !s.toLowerCase(java.util.Locale.ROOT).contains("e")) {
+                Long.parseLong(s);
+                return "integer";
+            }
+
+            Double.parseDouble(s.replace(',', '.'));
+            return "float";
+        } catch (NumberFormatException e1) {
+            return datatype;
+        }
+
     }
 }
 
