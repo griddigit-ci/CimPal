@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
 public class ModelFactory {
 
@@ -58,7 +59,7 @@ public class ModelFactory {
                     streams = unzip(file);
                     format = Lang.RDFXML;
                 } else {
-                    streams = List.of(new FileInputStream(file));
+                    streams = List.of(new ByteArrayInputStream(new FileInputStream(file).readAllBytes()));
                     format = getLangFromExtension(ext, rdfSourceFormat);
                 }
 
@@ -199,36 +200,75 @@ public class ModelFactory {
     public static List<InputStream> unzip(File selectedFile) {
         List<InputStream> inputstreamlist = new LinkedList<>();
         zipfilesnames = new LinkedList<>();
-        InputStream inputStream = null;
-        try{
-            ZipFile zipFile = new ZipFile(selectedFile);
 
+        try {
+            ZipFile zipFile = new ZipFile(selectedFile);
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
-
-
-            while(entries.hasMoreElements()){
+            while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
 
-                    String destPath = selectedFile.getParent() + File.separator+ entry.getName();
+                String destPath = selectedFile.getParent() + File.separator + entry.getName();
+                if (!isValidDestPath(selectedFile.getParent(), destPath)) {
+                    throw new IOException("Final file output path is invalid: " + destPath);
+                }
 
-                    if(! isValidDestPath(selectedFile.getParent(), destPath)){
-                        throw new IOException("Final file output path is invalid: " + destPath);
-                    }
+                try (InputStream inputStream = zipFile.getInputStream(entry)) {
+                    byte[] content = inputStream.readAllBytes();
+                    String entryName = entry.getName();
+                    String ext = FilenameUtils.getExtension(entryName).toLowerCase();
 
-                    try{
-                        inputStream = zipFile.getInputStream(entry);
-                        inputstreamlist.add(inputStream);
-                        zipfilesnames.add(entry.getName());
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                    // Check if the entry is itself a ZIP file
+                    if (ext.equals("zip")) {
+                        // Recursively extract nested ZIP
+                        List<InputStream> nestedStreams = unzip(new ByteArrayInputStream(content));
+                        inputstreamlist.addAll(nestedStreams);
+                    } else {
+                        // Add non-ZIP file to the list
+                        inputstreamlist.add(new ByteArrayInputStream(content));
                     }
+                    zipfilesnames.add(entryName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        } catch(IOException e){
+            zipFile.close();
+        } catch (IOException e) {
             throw new RuntimeException("Error unzipping file " + selectedFile, e);
         }
+
         return inputstreamlist;
     }
+
+    public static List<InputStream> unzip(InputStream zipStream) {
+        List<InputStream> inputstreamlist = new LinkedList<>();
+
+        try (ZipInputStream zis = new ZipInputStream(zipStream)) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    zis.closeEntry();
+                    continue;
+                }
+
+                byte[] content = zis.readAllBytes();
+                String entryName = entry.getName();
+                String ext = FilenameUtils.getExtension(entryName).toLowerCase(Locale.ROOT);
+
+                if (ext.equals("zip")) {
+                    inputstreamlist.addAll(unzip(new ByteArrayInputStream(content)));
+                } else {
+                    inputstreamlist.add(new ByteArrayInputStream(content));
+                }
+                zis.closeEntry();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error unzipping input stream", e);
+        }
+
+        return inputstreamlist;
+    }
+
 
     private static boolean isValidDestPath(String targetDir, String destPathStr) {
         // validate the destination path of a ZipFile entry,
