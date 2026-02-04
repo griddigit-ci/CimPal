@@ -63,7 +63,7 @@ public class ShaclAutoTester {
     }
 
     public void runTestsInternal(List<File> selectedFile, File selectedFolder, List<File> fileL) throws IOException {
-        Map<String, Model> shaclMap = ModelFactory.modelLoad(selectedFile, "", Lang.TURTLE, true, false);
+        Map<String, Model> shaclMap = ModelFactory.modelLoad(selectedFile, "http://iec.ch/TC57/2013/CIM-schema-cim16", Lang.TURTLE, true, false);
         Model shaclModel = shaclMap.get("shacl");
         Map<String, SHACLRuleTestData> ruleTestDataMap = getRuleTestDataMap(selectedFolder, fileL);
 
