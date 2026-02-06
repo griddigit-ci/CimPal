@@ -63,33 +63,27 @@ public class ModelFactory {
                     format = getLangFromExtension(ext, rdfSourceFormat);
                 }
 
-                for (int i = 0; i < streams.size(); i++) {
-                    try (InputStream in = streams.get(i)) {
-                        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-                        RDFDataMgr.read(model, in, xmlBase, format);
+                streams.parallelStream().forEach(in -> {
+                    Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    RDFDataMgr.read(model, in, xmlBase, format);
 
-                        // Merge prefixes (deferred until after parallel loop)
-                        String keyword = getProfileKeyword(model);
-                        if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
-                        String key = buildModelKey(file, keyword, isZip, i, treeID);
+                    String keyword = getProfileKeyword(model);
+                    if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
+                    String key = buildModelKey(file, keyword, isZip, streams.indexOf(in), treeID);
 
-                        modelMap.put(key, model);
+                    modelMap.put(key, model);
 
-                        synchronized (unionLock) {
-                            unionModel.add(model);
-                            unionModel.setNsPrefixes(model);
-                        }
-                        if (!"FH".equals(keyword)) {
-                            synchronized (unionNoHeaderLock) {
-                                unionNoHeader.add(model);
-                                unionNoHeader.setNsPrefixes(model);
-                            }
-                        }
-
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                    synchronized (unionLock) {
+                        unionModel.add(model);
+                        unionModel.setNsPrefixes(model);
                     }
-                }
+                    if (!"FH".equals(keyword)) {
+                        synchronized (unionNoHeaderLock) {
+                            unionNoHeader.add(model);
+                            unionNoHeader.setNsPrefixes(model);
+                        }
+                    }
+                });
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
