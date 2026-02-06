@@ -49,11 +49,11 @@ public class ShaclAutoTester {
         }
     }
 
-    public void runTests(List<File> selectedFile, File selectedFolder, List<File> fileL) throws IOException {
+    public void runTests(List<File> selectedFile, File selectedFolder, List<File> fileL, boolean exportReports) throws IOException {
         // Run on a background thread
         Thread testThread = new Thread(() -> {
             try {
-                runTestsInternal(selectedFile, selectedFolder, fileL);
+                runTestsInternal(selectedFile, selectedFolder, fileL, exportReports);
             } catch (IOException e) {
                 appendOutput("Error during testing: " + e.getMessage() + "\n");
             }
@@ -62,7 +62,7 @@ public class ShaclAutoTester {
         testThread.start();
     }
 
-    public void runTestsInternal(List<File> selectedFile, File selectedFolder, List<File> fileL) throws IOException {
+    public void runTestsInternal(List<File> selectedFile, File selectedFolder, List<File> fileL, boolean exportReports) throws IOException {
         Map<String, Model> shaclMap = ModelFactory.modelLoad(selectedFile, "http://iec.ch/TC57/2013/CIM-schema-cim16", Lang.TURTLE, true, false);
         Model shaclModel = shaclMap.get("shacl");
         Map<String, SHACLRuleTestData> ruleTestDataMap = getRuleTestDataMap(selectedFolder, fileL);
@@ -85,11 +85,10 @@ public class ShaclAutoTester {
 
             for (File conformFile : testData.getConformFiles()) {
 
-                String filePath = conformFile.getAbsolutePath();
                 String cacheKey = conformFile.getName();
 
                 // Check if model is already loaded
-                Model dataModel = modelCache.get(filePath);
+                Model dataModel = modelCache.get(cacheKey);
                 try {
                     if (dataModel == null) {
                         Map<String, Model> modelMap = ModelFactory.modelLoad(
@@ -103,10 +102,8 @@ public class ShaclAutoTester {
                     continue;
                 }
                 // Check if validation is already done
-                report = validationCache.get(filePath);
+                report = validationCache.get(cacheKey);
                 try {
-
-
                     if (report == null) {
                         report = ShaclValidator.get().validate(
                                 shaclModel.getGraph(), dataModel.getGraph());
@@ -131,15 +128,16 @@ public class ShaclAutoTester {
                     appendOutput("WARNING: Triggered rule: " + ruleName +
                             " in conform model: " + conformFile.getName() + "\n");
                 }
-                ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getConformFolderPath()), FilenameUtils.removeExtension(conformFile.getName()) + "_report.xlsx");
+                if (exportReports) {
+                    ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getConformFolderPath()), FilenameUtils.removeExtension(conformFile.getName()) + "_report.xlsx");
+                }
             }
 
             for (File nonConformFile : testData.getNonConformFiles()) {
 
-                String filePath = nonConformFile.getAbsolutePath();
                 String cacheKey = nonConformFile.getName();
 
-                Model dataModel = modelCache.get(filePath);
+                Model dataModel = modelCache.get(cacheKey);
                 try {
                     if (dataModel == null) {
                         Map<String, Model> modelMap = ModelFactory.modelLoad(
@@ -152,7 +150,7 @@ public class ShaclAutoTester {
                     continue;
                 }
 
-                report = validationCache.get(filePath);
+                report = validationCache.get(cacheKey);
                 try {
                     if (report == null) {
                         report = ShaclValidator.get().validate(
@@ -177,8 +175,9 @@ public class ShaclAutoTester {
                     appendOutput("WARNING: Rule not triggered: " + ruleName +
                             " in non-conform model: " + nonConformFile.getName() + "\n");
                 }
-
-                ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getNonConformFolderPath()), FilenameUtils.removeExtension(nonConformFile.getName()) + "_report.xlsx");
+                if (exportReports) {
+                    ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getNonConformFolderPath()), FilenameUtils.removeExtension(nonConformFile.getName()) + "_report.xlsx");
+                }
             }
             i++;
         }

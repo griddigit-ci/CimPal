@@ -357,6 +357,8 @@ public class MainController implements Initializable {
     private Label label_geninfo;
     @FXML
     private TreeView<String> treeViewShaclFiles;
+    @FXML
+    private CheckBox cbExportReports;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -1648,7 +1650,7 @@ public class MainController implements Initializable {
                     Platform.runLater(() -> foutputWindow.appendText(message));
                 }
             });
-            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL);
+            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL, cbExportReports.isSelected());
 
             progressBar.setProgress(1);
         } else {
