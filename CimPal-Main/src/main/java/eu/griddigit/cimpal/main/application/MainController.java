@@ -2593,7 +2593,7 @@ public class MainController implements Initializable {
                     if (selectedProfile.equals(modelsNames.getModelName())) {
                         int issueFound = 0;
                         if (!fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
-                            modelsNames.setBaseUri(fPrefixCreateCompleteSMTab.getText());
+                            modelsNames.setNsPrefix(fPrefixCreateCompleteSMTab.getText());
                         } else if (fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.WARNING);
                             alert.setContentText("Please confirm that you would like to use a namespace with empty prefix.");
@@ -2608,7 +2608,7 @@ public class MainController implements Initializable {
                             }
                         }
                         if (!fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {//TODO: check if it is resource
-                            modelsNames.setNsPrefix(fURICreateCompleteSMTab.getText());
+                            modelsNames.setNsUri(fURICreateCompleteSMTab.getText());
                         } else if (fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add URI of the namespace.");
@@ -2618,7 +2618,7 @@ public class MainController implements Initializable {
                             issueFound = 1;
                         }
                         if (!fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {//TODO: check if it is resource
-                            modelsNames.setNsUri(fshapesBaseURICreateCompleteSMTab.getText());
+                            modelsNames.setBaseUri(fshapesBaseURICreateCompleteSMTab.getText());
                         } else if (fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add the base URI of the shapes model.");
