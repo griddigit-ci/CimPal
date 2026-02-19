@@ -3539,7 +3539,11 @@ public class MainController implements Initializable {
                     .shaclOutputFormat(RDFtoSHACLOptions.SerializationFormat.TURTLE)
                     .iOprefix(prefs.get("IOprefix", ""))
                     .iOuri(prefs.get("IOuri", ""))
-                    .cimsNamespace(prefs.get("cimsNamespace", ""));
+                    .cimsNamespace(prefs.get("cimsNamespace", ""))
+                    .shaclFlagCountDefaultURI(rdfsToShaclGuiMapBool.get("shaclflagCountDefaultURI"))
+                    .shaclFlagCount(rdfsToShaclGuiMapBool.get("shaclflagCount"))
+                    .shaclCommonURI(rdfsToShaclGuiMapStr.get("shaclCommonURI"))
+                    .shaclCommonPref(rdfsToShaclGuiMapStr.get("shaclCommonPref"));
 
             RDFtoSHACLOptions options = builder.build();
 

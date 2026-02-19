@@ -191,7 +191,6 @@ public class SHACLFromRDF {
                         shapeModel.setNsPrefix(baseTier3nsMap.get("cimPref"), baseTier3nsMap.get("cimURI"));
                     }
 
-                    // shapeModels.add(shapeModel); todo if needed store the shape models
                     // shapeModelsNames.add(RDFSmodelsNames.get(m));
                     //optimise prefixes, strip unused prefixes
                     //if (stripPrefixes){
