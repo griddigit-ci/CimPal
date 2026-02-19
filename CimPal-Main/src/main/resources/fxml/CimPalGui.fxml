@@ -702,12 +702,16 @@
                                     </HBox>
                                     <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
                                        <VBox.margin>
-                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                                          <Insets />
                                        </VBox.margin>
                                        <children>
                                           <Button fx:id="btnRunShaclValidator" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclValidator" text="Run" HBox.hgrow="ALWAYS" />
                                           <Button fx:id="btnResetShaclValidator" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetShaclValidator" text="Reset" />
+                                          <CheckBox fx:id="cbExportReports" mnemonicParsing="false" selected="true" text="Export model reports" />
                                        </children>
+                                       <padding>
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                                       </padding>
                                     </HBox>
                                  </children>
                               </VBox>

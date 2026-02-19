@@ -348,6 +348,8 @@ public class MainController implements Initializable {
     private Label label_geninfo;
     @FXML
     private TreeView<String> treeViewShaclFiles;
+    @FXML
+    private CheckBox cbExportReports;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -1797,7 +1799,7 @@ public class MainController implements Initializable {
                     Platform.runLater(() -> foutputWindow.appendText(message));
                 }
             });
-            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL);
+            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL, cbExportReports.isSelected());
 
             progressBar.setProgress(1);
         } else {
@@ -2740,7 +2742,7 @@ public class MainController implements Initializable {
                     if (selectedProfile.equals(modelsNames.getModelName())) {
                         int issueFound = 0;
                         if (!fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
-                            modelsNames.setBaseUri(fPrefixCreateCompleteSMTab.getText());
+                            modelsNames.setNsPrefix(fPrefixCreateCompleteSMTab.getText());
                         } else if (fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.WARNING);
                             alert.setContentText("Please confirm that you would like to use a namespace with empty prefix.");
@@ -2755,7 +2757,7 @@ public class MainController implements Initializable {
                             }
                         }
                         if (!fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {//TODO: check if it is resource
-                            modelsNames.setNsPrefix(fURICreateCompleteSMTab.getText());
+                            modelsNames.setNsUri(fURICreateCompleteSMTab.getText());
                         } else if (fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add URI of the namespace.");
@@ -2765,7 +2767,7 @@ public class MainController implements Initializable {
                             issueFound = 1;
                         }
                         if (!fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {//TODO: check if it is resource
-                            modelsNames.setNsUri(fshapesBaseURICreateCompleteSMTab.getText());
+                            modelsNames.setBaseUri(fshapesBaseURICreateCompleteSMTab.getText());
                         } else if (fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add the base URI of the shapes model.");
@@ -3686,7 +3688,11 @@ public class MainController implements Initializable {
                     .shaclOutputFormat(RDFtoSHACLOptions.SerializationFormat.TURTLE)
                     .iOprefix(prefs.get("IOprefix", ""))
                     .iOuri(prefs.get("IOuri", ""))
-                    .cimsNamespace(prefs.get("cimsNamespace", ""));
+                    .cimsNamespace(prefs.get("cimsNamespace", ""))
+                    .shaclFlagCountDefaultURI(rdfsToShaclGuiMapBool.get("shaclflagCountDefaultURI"))
+                    .shaclFlagCount(rdfsToShaclGuiMapBool.get("shaclflagCount"))
+                    .shaclCommonURI(rdfsToShaclGuiMapStr.get("shaclCommonURI"))
+                    .shaclCommonPref(rdfsToShaclGuiMapStr.get("shaclCommonPref"));
 
             RDFtoSHACLOptions options = builder.build();
 
