@@ -647,6 +647,8 @@ public class MainController implements Initializable {
             ls_geni_instances.setPrefWidth(Math.min(maxWidth + 40, 400));
         });
 
+        rdfConvertModelUnionDetailedFiles = new LinkedList<>();
+
 
     }
 
