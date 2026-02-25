@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane prefHeight="260.0" prefWidth="1200.0"
+            xmlns="http://javafx.com/javafx/25"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CgmesAddSwitchingDevicesController">
+
+    <TitledPane animated="false" collapsible="false"
+                layoutX="11.0" layoutY="8.0"
+                prefHeight="240.0" prefWidth="1180.0"
+                text="Add Switching Devices (mapping-based modification)">
+
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="220.0" prefWidth="1180.0">
+
+            <!-- Model input -->
+            <Label layoutX="29.0" layoutY="18.0" text="Input model (IGM/CGM):"/>
+            <TextField fx:id="tfModelInput" editable="false" layoutX="180.0" layoutY="12.0" prefHeight="26.0" prefWidth="587.0"/>
+            <Button layoutX="785.0" layoutY="12.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="120.0"
+                    text="Browse" onAction="#actionBrowseModelInput"/>
+
+            <!-- Standard -->
+            <Label layoutX="29.0" layoutY="54.0" text="Data exchange standard:"/>
+            <ChoiceBox fx:id="cbStandard" layoutX="180.0" layoutY="48.0" prefHeight="26.0" prefWidth="250.0"/>
+
+            <!-- Mapping -->
+            <Label layoutX="29.0" layoutY="90.0" text="Mapping file:"/>
+            <TextField fx:id="tfMappingFile" editable="false" layoutX="180.0" layoutY="84.0" prefHeight="26.0" prefWidth="587.0"/>
+            <Button layoutX="785.0" layoutY="84.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="120.0"
+                    text="Browse" onAction="#actionBrowseMappingFile"/>
+
+            <!-- Apply to -->
+            <Label layoutX="29.0" layoutY="132.0" text="Apply to:"/>
+            <CheckBox fx:id="cbApplyLines" layoutX="180.0" layoutY="128.0" mnemonicParsing="false" text="Lines"/>
+            <CheckBox fx:id="cbApplyPowerTransformer" layoutX="260.0" layoutY="128.0" mnemonicParsing="false" text="PowerTransformer"/>
+            <CheckBox fx:id="cbApplySyncMachine" layoutX="410.0" layoutY="128.0" mnemonicParsing="false" text="SynchronousMachine"/>
+
+            <CheckBox fx:id="cbOnlyForMappingEquipment" layoutX="180.0" layoutY="158.0" mnemonicParsing="false"
+                      text="Only for equipment in the mapping file"/>
+
+            <CheckBox fx:id="cbExportMappingFile" layoutX="180.0" layoutY="188.0" mnemonicParsing="false"
+                      text="Export mapping file"/>
+
+            <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="18.0" mnemonicParsing="false"
+                      selected="true" text="Save Result to Working Dir"/>
+        </AnchorPane>
+    </TitledPane>
+</AnchorPane>

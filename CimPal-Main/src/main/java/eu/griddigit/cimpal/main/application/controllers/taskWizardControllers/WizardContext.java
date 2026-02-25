@@ -97,6 +97,9 @@ public class WizardContext {
         var changeModelHeaderDescription = new ChangeModelHeaderDescription();
         var modifyMASOfSVHeader = new ModifyMASOfSVHeader();
         var generateInstanceDataModel = new GenerateInstanceDataModel();
+        var cgmesConvertIgm = new CgmesConvertIgm();
+        var cgmesConvertBoundary = new CgmesConvertBoundary();
+        var cgmesAddSwitchingDevices = new CgmesAddSwitchingDevices();
 
         this.taskElements = new HashMap<>();
         this.taskElements.put(regenerateRDFIDAndMRIDTask.getName(), regenerateRDFIDAndMRIDTask);
@@ -111,6 +114,9 @@ public class WizardContext {
         this.taskElements.put(changeModelHeaderDescription.getName(), changeModelHeaderDescription);
         this.taskElements.put(modifyMASOfSVHeader.getName(), modifyMASOfSVHeader);
         this.taskElements.put(generateInstanceDataModel.getName(), generateInstanceDataModel);
+        this.taskElements.put(cgmesConvertIgm.getName(), cgmesConvertIgm);
+        this.taskElements.put(cgmesConvertBoundary.getName(), cgmesConvertBoundary);
+        this.taskElements.put(cgmesAddSwitchingDevices.getName(), cgmesAddSwitchingDevices);
     }
 
     // Linear page index for wizard screens - at each index position is the respective page of the wizard

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane prefHeight="200.0" prefWidth="1200.0"
+            xmlns="http://javafx.com/javafx/25"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CgmesConvertBoundaryController">
+
+    <TitledPane animated="false" collapsible="false"
+                layoutX="11.0" layoutY="8.0"
+                prefHeight="180.0" prefWidth="1180.0"
+                text="CGMES 2.4 → 3.0: Convert Boundary dataset">
+
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="160.0" prefWidth="1180.0">
+
+            <Label layoutX="29.0" layoutY="18.0" text="Boundary dataset folder:"/>
+            <TextField fx:id="tfBoundaryFolder" editable="false" layoutX="180.0" layoutY="12.0" prefHeight="26.0" prefWidth="587.0"/>
+            <Button layoutX="785.0" layoutY="12.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="120.0"
+                    text="Browse" onAction="#actionBrowseBoundaryFolder"/>
+
+            <CheckBox fx:id="cbConvertToV3" layoutX="180.0" layoutY="58.0" mnemonicParsing="false"
+                      text="Convert CGMES v2.4 Boundary dataset to CGMES v3.0" selected="true"/>
+
+            <CheckBox fx:id="cbSplitBoundaryRef" layoutX="180.0" layoutY="88.0" mnemonicParsing="false"
+                      text="Split Boundary and Reference data (CGMES v3.0)"/>
+
+            <CheckBox fx:id="cbSplitPerTsoBorder" layoutX="180.0" layoutY="118.0" mnemonicParsing="false"
+                      text="Split Boundary part per TSO border (CGMES v3.0)"/>
+
+            <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="18.0" mnemonicParsing="false"
+                      selected="true" text="Save Result to Working Dir"/>
+
+        </AnchorPane>
+    </TitledPane>
+</AnchorPane>

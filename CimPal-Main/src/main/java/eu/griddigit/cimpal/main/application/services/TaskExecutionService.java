@@ -10,7 +10,7 @@ import java.util.HashMap;
 // Multithreading class to manage Tasks execution on a separate thread from the UI
 public class TaskExecutionService {
 
-    // Method that marks all non completed tasks with a Cancelled label on the status screen
+    // Method that marks all non completed tasks with a Canceled label on the status screen
     public void cancelExecutionOfSelectedTasks(WizardContext wizardContext) {
         wizardContext.getSelectedTasks().forEach((selectedTask) -> {
             if (selectedTask.getStatus() != "Completed") {
