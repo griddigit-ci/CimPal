@@ -10,6 +10,7 @@ import eu.griddigit.cimpal.core.converters.SHACLFromRDF;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
+import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
 import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofile;
@@ -1539,6 +1540,47 @@ public class MainController implements Initializable {
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
+        }
+    }
+
+    @FXML
+    public void actionZipFiles() {
+
+        progressBar.setProgress(0);
+        Model shaclRefModel = null;
+        shapeModels = null;
+
+        //select file
+        List<File> mappingCsvFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Validation mapping file", List.of( "*.csv"), "Mapping file");
+        File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the models parent folder");
+        File outPutBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips");
+
+
+        // --- validate chooser results ---
+        if (mappingCsvFile == null || mappingCsvFile.isEmpty() || mappingCsvFile.get(0) == null) {
+            // user cancelled
+            return;
+        }
+        if (modelsBaseDir == null || outPutBaseDir == null) {
+            // user cancelled
+            return;
+        }
+
+// One mapping file only, later can be extended to multiple
+        File mappingFile = mappingCsvFile.get(0);
+
+// --- call the zipper ---
+        try {
+            ValidationTools.buildZips(
+                    mappingFile.toPath(),
+                    modelsBaseDir.toPath(),
+                    outPutBaseDir.toPath()
+            );
+
+            // TODO: show success (Alert) or log
+        } catch (Exception ex) {
+            // TODO: show error (Alert) or log
+            ex.printStackTrace();
         }
     }
 
@@ -5443,5 +5485,7 @@ public class MainController implements Initializable {
                 break;
         }
     }
+
+
 }
 
