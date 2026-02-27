@@ -3,7 +3,7 @@
  * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
  * @authors Chavdar Ivanov, Merlin Bögershausen merlin.boegershausen@rwth-aachen.de (under MIT license)
  */
-package eu.griddigit.cimpal.main.util;
+package eu.griddigit.cimpal.core.utils;
 
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -36,14 +36,15 @@ public class DataTypeStreamRDF implements StreamRDF {
 
 
     public DataTypeStreamRDF(Graph graph, Map<String, RDFDatatype> dataTypeMap) {
-        this.graph=graph;
-        this.dataTypeMap=dataTypeMap;
-        }
+        this.graph = graph;
+        this.dataTypeMap = dataTypeMap;
+    }
 
     public Graph getGraph() {
         return graph;
     }
-    public Map getPrefixMapping() {
+
+    public Map<String, String> getPrefixMapping() {
         return this.prefixMapping;
     }
 
@@ -68,7 +69,7 @@ public class DataTypeStreamRDF implements StreamRDF {
             Literal typedLiteral = ResourceFactory.createTypedLiteral(literalValue, datatype);
             /* generate new triple */
             // Create new object node
-            Node objectNode = NodeFactory.createLiteral(typedLiteral.getLexicalForm(), typedLiteral.getDatatype());
+            Node objectNode = NodeFactory.createLiteralDT(typedLiteral.getLexicalForm(), typedLiteral.getDatatype());
             // Generate new triple
             triple = Triple.create(triple.getSubject(), triple.getPredicate(), objectNode);
         }

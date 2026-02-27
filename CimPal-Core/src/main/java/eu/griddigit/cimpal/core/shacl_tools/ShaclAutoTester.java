@@ -3,10 +3,12 @@ package eu.griddigit.cimpal.core.shacl_tools;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.SHACLRuleTestData;
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
+import eu.griddigit.cimpal.core.utils.DataTypeMapping;
 import eu.griddigit.cimpal.core.utils.ExcelTools;
 import eu.griddigit.cimpal.core.utils.ModelFactory;
 import eu.griddigit.cimpal.core.utils.ShaclTools;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.shacl.ShaclValidator;
@@ -14,14 +16,12 @@ import org.apache.jena.shacl.ValidationReport;
 import org.topbraid.shacl.vocabulary.SH;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ShaclAutoTester {
 
@@ -49,7 +49,7 @@ public class ShaclAutoTester {
         }
     }
 
-    public void runTests(List<File> selectedFile, File selectedFolder, List<File> fileL) throws IOException {
+    public void runTests(List<File> selectedFile, File selectedFolder, List<File> fileL, File datatypeMappingFile) throws IOException {
         Map<String, Model> shaclMap = ModelFactory.modelLoad(selectedFile, "", Lang.TURTLE, true, false);
         Model shaclModel = shaclMap.get("shacl");
         Map<String, SHACLRuleTestData> ruleTestDataMap = getRuleTestDataMap(selectedFolder, fileL);
@@ -58,6 +58,15 @@ public class ShaclAutoTester {
 
         Map<String, Model> modelCache = new HashMap<>();
         Map<String, ValidationReport> validationCache = new HashMap<>();
+        Map<String, RDFDatatype> dataTypeMap = new HashMap<>();
+
+        Properties properties = new Properties();
+        properties.load(new FileInputStream(datatypeMappingFile));
+        for (Object key : properties.keySet()) {
+            String value = properties.get(key).toString();
+            RDFDatatype valueRDFdatatype = DataTypeMapping.mapFromMapDefaultFile(value);
+            dataTypeMap.put(key.toString(), valueRDFdatatype);
+        }
 
         ValidationReport report;
         int i = 0;
@@ -78,8 +87,8 @@ public class ShaclAutoTester {
                 Model dataModel = modelCache.get(filePath);
                 try {
                     if (dataModel == null) {
-                        Map<String, Model> modelMap = ModelFactory.modelLoad(
-                                new ArrayList<>(List.of(conformFile)), "", Lang.RDFXML, false, false);
+                        Map<String, Model> modelMap = ModelFactory.modelLoadMultipleXMLmapping(
+                                new ArrayList<>(List.of(conformFile)), dataTypeMap,"http://iec.ch/TC57/2013/CIM-schema-cim16", Lang.RDFXML, false);
                         dataModel = modelMap.get("unionModel");
                         modelCache.put(filePath, dataModel);
                     }

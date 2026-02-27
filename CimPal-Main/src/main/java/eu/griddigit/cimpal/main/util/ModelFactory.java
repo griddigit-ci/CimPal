@@ -44,7 +44,7 @@ public class ModelFactory {
         Graph graph = GraphFactory.createDefaultGraph();
 
         // Create a StreamRDF for handling parsed triples and datatypes
-        DataTypeStreamRDF sink = new DataTypeStreamRDF(graph, dataTypeMap);
+        eu.griddigit.cimpal.core.utils.DataTypeStreamRDF sink = new eu.griddigit.cimpal.core.utils.DataTypeStreamRDF(graph, dataTypeMap);
 
         // Use RDFParser to parse the input stream
         RDFParser.create().source(inputStream).lang(Lang.RDFXML).base(xmlBase).parse(sink);
@@ -72,7 +72,7 @@ public class ModelFactory {
 
             // Create a Graph and StreamRDF for parsing
             Graph graph = GraphFactory.createDefaultGraph();
-            DataTypeStreamRDF sink = new DataTypeStreamRDF(graph, dataTypeMap);
+            eu.griddigit.cimpal.core.utils.DataTypeStreamRDF sink = new eu.griddigit.cimpal.core.utils.DataTypeStreamRDF(graph, dataTypeMap);
 
             // Use RDFParser to parse the file
             RDFParser.create().source(inputStream).lang(rdfSourceFormat).base(xmlBase).parse(sink);

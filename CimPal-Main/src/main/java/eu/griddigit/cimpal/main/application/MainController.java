@@ -67,6 +67,7 @@ import eu.griddigit.cimpal.main.util.PlantUMLGenerator;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -1601,7 +1602,7 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    private void actionBtnRunShaclValidator() throws IOException {
+    private void actionBtnRunShaclValidator() throws IOException, URISyntaxException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         List<File> fileL = new ArrayList<>();
         try {
@@ -1630,7 +1631,10 @@ public class MainController implements Initializable {
                     Platform.runLater(() -> foutputWindow.appendText(message));
                 }
             });
-            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL);
+            List<File> datatypeMapFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Select datatype map file", List.of("*.properties"), "");
+            if (datatypeMapFile != null && !datatypeMapFile.isEmpty()) {
+                shaclAutoTester.runTests(selectedFile, selectedFolder, fileL, datatypeMapFile.getFirst());
+            }
 
             progressBar.setProgress(1);
         } else {
