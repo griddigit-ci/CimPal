@@ -1,9 +1,13 @@
 package eu.griddigit.cimpal.core.utils;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.riot.RDFParser;
+import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.vocabulary.DCAT;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
@@ -107,6 +111,29 @@ public class ModelFactory {
 
         return result;
     }
+
+    //Loads model data with datatype mapping
+    public static Model modelLoadXMLmapping(InputStream inputStream, Map<String, RDFDatatype> dataTypeMap, String xmlBase) {
+        // Create a Graph to hold the parsed data
+        Graph graph = GraphFactory.createDefaultGraph();
+
+        // Create a StreamRDF for handling parsed triples and datatypes
+        DataTypeStreamRDF sink = new DataTypeStreamRDF(graph, dataTypeMap);
+
+        // Use RDFParser to parse the input stream
+        RDFParser.create().source(inputStream).lang(Lang.RDFXML).base(xmlBase).parse(sink);
+
+        // Obtain the parsed graph and create a Model from it
+        graph = sink.getGraph();
+        Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph);
+
+        // Set namespace prefixes based on the sink's prefix mapping
+        Map<String, String> prefixMapping = sink.getPrefixMapping();
+        model.setNsPrefixes(prefixMapping);
+
+        return model;
+    }
+
 
     private static Lang getLangFromExtension(String ext, Lang fallback) {
         return switch (ext) {
@@ -364,6 +391,7 @@ public class ModelFactory {
         }
         return false;
     }
+
 
     public static Model LoadSHACLSHACL() {
         Model shaclModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();

@@ -10,6 +10,7 @@ import eu.griddigit.cimpal.core.converters.SHACLFromRDF;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
+import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
@@ -460,7 +461,6 @@ public class MainController implements Initializable {
     //for the
     private double initialX;
     private double initialY;
-
 
     public MainController() {
         guiHelper = new GUIhelper();
@@ -1544,44 +1544,53 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    public void actionZipFiles() {
+    public void actionValidateByMapping() {
 
         progressBar.setProgress(0);
         Model shaclRefModel = null;
         shapeModels = null;
 
         //select file
+        //Mapping file should have 2 columns; in the first, each cell contains a list of files that should be zipped separated with ";"
+        //the second the ttl file that should validate it
         List<File> mappingCsvFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Validation mapping file", List.of( "*.csv"), "Mapping file");
-        File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the models parent folder");
-        File outPutBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips");
+        File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the models root folder");
+        File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips");
+        //Root is where the mapping file starts the path
+        File constraintsRoot = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select constraint's root folder");
 
+        String xmlBase = "http://iec.ch/TC57/CIM100";
 
         // --- validate chooser results ---
         if (mappingCsvFile == null || mappingCsvFile.isEmpty() || mappingCsvFile.get(0) == null) {
             // user cancelled
             return;
         }
-        if (modelsBaseDir == null || outPutBaseDir == null) {
+        if (modelsBaseDir == null || outputBaseDir == null) {
             // user cancelled
             return;
         }
 
-// One mapping file only, later can be extended to multiple
+        // One mapping file only, later can be extended to multiple
         File mappingFile = mappingCsvFile.get(0);
-
-// --- call the zipper ---
-        try {
-            ValidationTools.buildZips(
-                    mappingFile.toPath(),
-                    modelsBaseDir.toPath(),
-                    outPutBaseDir.toPath()
-            );
-
-            // TODO: show success (Alert) or log
-        } catch (Exception ex) {
-            // TODO: show error (Alert) or log
-            ex.printStackTrace();
-        }
+        new Thread(() -> {
+            try {
+                Map<String, RDFDatatype> dataTypeMap =
+                        CompleteDatatypeMapLoader.loadFromResource("/CompleteDatatypeMap_CIM17_CGMES3_v24.properties");
+                Path report = ValidationTools.validateByMapping(
+                        mappingFile.toPath(),
+                        modelsBaseDir.toPath(),
+                        constraintsRoot.toPath(),
+                        outputBaseDir.toPath(),
+                        4,
+                        dataTypeMap,
+                        xmlBase
+                );
+                System.out.println("Report saved to: " + report);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
     @FXML

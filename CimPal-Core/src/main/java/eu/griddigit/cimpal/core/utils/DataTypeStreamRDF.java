@@ -3,7 +3,7 @@
  * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
  * @authors Chavdar Ivanov, Merlin Bögershausen merlin.boegershausen@rwth-aachen.de (under MIT license)
  */
-package eu.griddigit.cimpal.main.util;
+package eu.griddigit.cimpal.core.utils;
 
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;

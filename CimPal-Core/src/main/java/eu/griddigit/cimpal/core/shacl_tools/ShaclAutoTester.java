@@ -105,7 +105,7 @@ public class ShaclAutoTester {
 
                 testData.addReport(conformFile.getName(), report, true);
 
-                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report);
+                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report, shaclModel);
 
                 boolean found = validationResults.stream()
                         .anyMatch(result -> shaclModel.getProperty(ResourceFactory.createResource(result.getSourceShape()), SH.name)
@@ -151,7 +151,7 @@ public class ShaclAutoTester {
 
                 testData.addReport(nonConformFile.getName(), report, false);
 
-                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report);
+                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report, shaclModel);
 
                 boolean found = validationResults.stream()
                         .anyMatch(result -> shaclModel.getProperty(ResourceFactory.createResource(result.getSourceShape()), SH.name)
