@@ -181,10 +181,11 @@ public class ValidationTools {
 
         String ttlName = row.ttl.trim();
         ValidationExcelWriter.CaseFolder caseFolder = categorizeForReport(row);
-        String datasetName = makeDatasetName(rowIdx, row);
 
         try {
             LinkedHashSet<Path> xmlFiles = resolveFilesForRow(row, modelsBaseDir);
+            String datasetName = makeDatasetName(xmlFiles);
+
             if (xmlFiles.isEmpty()) {
                 return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, null, false,
                         new IOException("No XML matched mapping tokens"));
@@ -196,14 +197,12 @@ public class ValidationTools {
                         new FileNotFoundException("TTL not found: " + ttlPath));
             }
 
-            // Shapes cached
             Model shapesModel = loadShapesWithLocalImports(ttlPath, constraintsRoot, shapesCache);
 
             if (shapesModel.size() < 200) {
                 System.err.println("[WARN] Shapes model seems too small (" + shapesModel.size() + " triples). Imports may not be loaded for: " + ttlPath);
             }
 
-            // Data model from XML files (base URI fix included)
             Model dataModel = loadRdfXmlFromFilesWithDatatypeMap(xmlFiles, dataTypeMap, xmlBase);
 
             System.out.println("[DBG][row " + rowIdx + "] xmlFiles=" + xmlFiles.size());
@@ -214,14 +213,15 @@ public class ValidationTools {
 
             ValidationReport report = ShaclValidator.get().validate(shapesModel.getGraph(), dataModel.getGraph());
 
-            // Extract enriched results here (you have shapesModel here!)
             List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results =
                     ShaclTools.extractSHACLValidationResults(report, shapesModel);
 
             return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, results, report.conforms(), null);
 
         } catch (Exception ex) {
-            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, null, false, ex);        }
+            String datasetName = "UNKNOWN";
+            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, null, false, ex);
+        }
     }
 
     // ---------------- mapping row → file list ----------------
@@ -294,7 +294,7 @@ public class ValidationTools {
 
         if (xml.contains("Instance/Grid/CGM")) return ValidationExcelWriter.CaseFolder.CGMES_CGM;
 
-        boolean hasBoundary = xml.contains("CommonData_and_Boundary_merged.xml");
+        boolean hasBoundary = xml.contains("Grid_CommonData_CGM-CD.xml");
         boolean hasEQ = xml.contains("EQ");
         boolean hasSSH = xml.contains("SSH");
         boolean hasTP = xml.contains("TP");
@@ -308,25 +308,40 @@ public class ValidationTools {
         return ValidationExcelWriter.CaseFolder.UNKNOWN;
     }
 
-    private static String makeDatasetName(int rowIdx, MappingRow row) {
-        String s = row.xmlInputsRaw == null ? "" : row.xmlInputsRaw.replace("\\", "/");
-
-        int igm = s.indexOf("IGM_");
-        if (igm >= 0) {
-            String sub = s.substring(igm);
-            String name = sub.split("[/;\\s]")[0];
-            return "row" + rowIdx + "__" + name;
+    private static String makeDatasetName(Collection<Path> xmlFiles) {
+        if (xmlFiles == null || xmlFiles.isEmpty()) {
+            return "UNKNOWN";
         }
 
-        int nc = s.indexOf("Instance/NetworkCode/");
-        if (nc >= 0) {
-            String sub = s.substring(nc + "Instance/NetworkCode/".length());
-            String name = sub.split("[/;\\s]")[0];
-            return "row" + rowIdx + "__NC_" + name;
+        List<String> paths = xmlFiles.stream()
+                .map(Path::toString)
+                .map(p -> p.replace("\\", "/"))
+                .sorted()
+                .toList();
+
+        // CGM
+        if (paths.stream().anyMatch(p -> p.contains("Instance/Grid/CGM"))) {
+            return "CGM";
         }
 
-        if (s.contains("Instance/Grid/CGM")) return "row" + rowIdx + "__CGM";
-        return "row" + rowIdx;
+        // IGM complete -> folder after Instance/Grid/
+        if (paths.size() > 1) {
+            for (String p : paths) {
+                int idx = p.indexOf("Instance/Grid/");
+                if (idx >= 0) {
+                    String sub = p.substring(idx + "Instance/Grid/".length());
+                    String[] segs = sub.split("/");
+                    if (segs.length > 0 && segs[0].startsWith("IGM_")) {
+                        return segs[0];
+                    }
+                }
+            }
+        }
+
+        // Single XML -> real XML filename
+        Path first = xmlFiles.iterator().next();
+        Path fileName = first.getFileName();
+        return fileName != null ? fileName.toString() : first.toString();
     }
 
     // ---------------- TTL resolution (ApplicationLibraryValidationConfigurations as root) ----------------
