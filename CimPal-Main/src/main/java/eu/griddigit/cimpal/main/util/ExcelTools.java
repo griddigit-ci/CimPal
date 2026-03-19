@@ -162,6 +162,101 @@ public class ExcelTools {
         return dataExcel;
     }
 
+    public static Map<String, List<String>> importXLSXToColumnMap(String fileName, int sheetNum) {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+
+        try (FileInputStream fis = new FileInputStream(fileName);
+             XSSFWorkbook book = new XSSFWorkbook(fis)) {
+
+            XSSFSheet sheet = book.getSheetAt(sheetNum);
+
+            if (sheet == null) {
+                System.err.println("Sheet No." + (sheetNum + 1) + " does not exist in the workbook.");
+                return result;
+            }
+
+            FormulaEvaluator evaluator = book.getCreationHelper().createFormulaEvaluator();
+            int firstRowNum = sheet.getFirstRowNum();
+            Row headerRow = sheet.getRow(firstRowNum);
+            if (headerRow == null) return result;
+
+            int colCount = headerRow.getLastCellNum();
+            if (colCount <= 0) return result;
+
+            Map<String, Integer> nameCounts = new HashMap<>();
+            List<String> headers = new ArrayList<>(colCount);
+
+            // Build unique headers
+            for (int c = 0; c < colCount; c++) {
+                Cell hCell = headerRow.getCell(c, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                String raw = (hCell == null) ? "" : readCellAsString(hCell, evaluator).trim();
+                String base = raw.isEmpty() ? "Column_" + (c + 1) : raw;
+
+                int n = nameCounts.getOrDefault(base, 0);
+                nameCounts.put(base, n + 1);
+
+                String unique = (n == 0) ? base : base + "_" + (n + 1);
+                headers.add(unique);
+                result.put(unique, new ArrayList<>());
+            }
+
+            // Each column is "open" until its first blank cell is found.
+            boolean[] columnOpen = new boolean[colCount];
+            Arrays.fill(columnOpen, true);
+
+            for (int r = firstRowNum + 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+
+                for (int c = 0; c < colCount; c++) {
+                    if (!columnOpen[c]) {
+                        continue; // This column already ended at a previous blank cell.
+                    }
+
+                    String value = "";
+                    if (row != null) {
+                        Cell cell = row.getCell(c, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                        if (cell != null) {
+                            value = readCellAsString(cell, evaluator).trim();
+                        }
+                    }
+
+                    if (value.isEmpty()) {
+                        columnOpen[c] = false; // Stop collecting values for this column.
+                        continue;
+                    }
+
+                    result.get(headers.get(c)).add(value);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    private static String readCellAsString(Cell cell, FormulaEvaluator evaluator) {
+        CellType type = cell.getCellType();
+        if (type == CellType.FORMULA) {
+            CellValue cv = evaluator.evaluate(cell);
+            if (cv == null) return "";
+            return switch (cv.getCellType()) {
+                case STRING -> cv.getStringValue();
+                case NUMERIC -> String.valueOf(cv.getNumberValue());
+                case BOOLEAN -> String.valueOf(cv.getBooleanValue());
+                default -> "";
+            };
+        }
+
+        return switch (type) {
+            case STRING -> cell.getStringCellValue();
+            case NUMERIC -> String.valueOf(cell.getNumericCellValue());
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            default -> "";
+        };
+    }
+
     //TODO delete this method and use the exportMapToExcel
     public static void exportToExcelMap(Map<String, RDFDatatype> dataTypeMap, OutputStream outputStream) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
@@ -923,6 +1018,39 @@ public class ExcelTools {
             }
         }
         return "";
+    }
+
+    public static Map<String, List<String>> ExcelDataToColumnMap(ArrayList<Object> sheetData) {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        if (sheetData == null || sheetData.isEmpty()) {
+            return result;
+        }
+
+        LinkedList<?> headerRow = (LinkedList<?>) sheetData.getFirst();
+        int colCount = headerRow.size();
+
+        Map<String, Integer> nameCounts = new HashMap<>();
+        List<String> headers = new ArrayList<>(colCount);
+
+        for (int c = 0; c < colCount; c++) {
+            String raw = headerRow.get(c) == null ? "" : headerRow.get(c).toString().trim();
+            String base = raw.isEmpty() ? "Column_" + (c + 1) : raw;
+            int n = nameCounts.getOrDefault(base, 0);
+            nameCounts.put(base, n + 1);
+
+            String unique = (n == 0) ? base : base + "_" + (n + 1);
+            headers.add(unique);
+            result.put(unique, new ArrayList<>());
+        }
+
+        for (int r =1; r < sheetData.size(); r++) {
+            LinkedList<?> row = (LinkedList<?>) sheetData.get(r);
+            for (int c = 0; c < colCount; c++) {
+                String v = (c < row.size() && row.get(c) != null) ? row.get(c).toString().trim() : "";
+                result.get(headers.get(c)).add(v);
+            }
+        }
+        return result;
     }
 
 }
