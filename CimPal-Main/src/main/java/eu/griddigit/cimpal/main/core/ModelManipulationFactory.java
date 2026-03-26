@@ -405,6 +405,40 @@ public class ModelManipulationFactory {
             saveProperties.put("rdfEnumList", rdfEnumList);
         }
 
+        //optimise prefixes, strip unused prefixes
+        //TODO for Mate/Beni, to define a method about strip prefixes and use this here and elsewhere we have this
+        if (stripPrefixes) {
+            Map<String, String> modelPrefMap = inferredModel.getNsPrefixMap();
+            LinkedList<String> uniqueNamespacesList = new LinkedList<>();
+            for (StmtIterator ns = inferredModel.listStatements(); ns.hasNext(); ) {
+                Statement stmtNS = ns.next();
+                if (!uniqueNamespacesList.contains(stmtNS.getSubject().getNameSpace())) {
+                    uniqueNamespacesList.add(stmtNS.getSubject().getNameSpace());
+                }
+                if (!uniqueNamespacesList.contains(stmtNS.getPredicate().getNameSpace())) {
+                    uniqueNamespacesList.add(stmtNS.getPredicate().getNameSpace());
+                }
+                if (stmtNS.getObject().isResource()) {
+                    if (!uniqueNamespacesList.contains(stmtNS.getObject().asResource().getNameSpace())) {
+                        uniqueNamespacesList.add(stmtNS.getObject().asResource().getNameSpace());
+                    }
+                }
+            }
+            LinkedList<Map.Entry<String, String>> entryToRemove = new LinkedList<>();
+            for (Map.Entry<String, String> entry : modelPrefMap.entrySet()) {
+                //String key = entry.getKey();
+                String value = entry.getValue();
+
+                // Check if either the key or value is present in uniqueNamespacesList
+                if (!uniqueNamespacesList.contains(value)) {
+                    entryToRemove.add(entry);
+                }
+            }
+            for (Map.Entry<String, String> entryTR : entryToRemove) {
+                inferredModel.removeNsPrefix(entryTR.getKey());
+            }
+        }
+
         String saveFilename = "TransformedModel";
         saveProperties.replace("filename", saveFilename + ".xml");
         saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
