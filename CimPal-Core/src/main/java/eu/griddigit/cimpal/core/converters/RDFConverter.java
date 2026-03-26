@@ -51,16 +51,21 @@ public class RDFConverter {
         if (!modelUnionFlagDetailed) {
             if (!modelUnionFlag && sourceFile != null) {
                 modelFiles.add(sourceFile);
-            } else {
+            } else if (modelUnionFlag && (modelUnionFiles != null && !modelUnionFiles.isEmpty())) {
                 modelFiles = modelUnionFiles;
+            }
+            else {
+                throw new IllegalStateException("No source file(s) provided. Please provide a source file.");
             }
         }
 
         Model model;
 
         if (modelUnionFlagDetailed) {
-            if (!modelUnionDetailedFiles.isEmpty())
+            if (modelUnionDetailedFiles != null && !modelUnionDetailedFiles.isEmpty())
                 modelFiles.addAll(modelUnionDetailedFiles);
+            else
+                throw new IllegalStateException("No source file(s) provided for detailed union. Please provide source files.");
 
             model = ModelFactory.createDefaultModel();
             Model modelOrig = ModelFactory.createDefaultModel();

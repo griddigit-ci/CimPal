@@ -653,6 +653,8 @@ public class MainController implements Initializable {
             ls_geni_instances.setPrefWidth(Math.min(maxWidth + 40, 400));
         });
 
+        rdfConvertModelUnionDetailedFiles = new LinkedList<>();
+
 
     }
     @FXML
@@ -2431,6 +2433,15 @@ public class MainController implements Initializable {
 
             rdfConverter.writeInheritanceModel(outInheritance);
         }
+
+        // Clear the static variables after conversion
+        fsourcePathTextField.clear();
+        fMainRdfPathTextField.clear();
+        fDeviationRdfPathTextField.clear();
+        fExtendedRdfPathTextField.clear();
+        MainController.rdfConvertModelUnionDetailedFiles.clear();
+        MainController.rdfConvertFile = null;
+        MainController.rdfConvertFileList.clear();
 
         progressBar.setProgress(1);
     }
