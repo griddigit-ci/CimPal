@@ -642,28 +642,67 @@ public class ExcelTools {
     private static String getHeaderClass(Map<String, List<List<RDFAttributeData>>> instanceClassData, List<String> classNames) {
         // Give the config a header class if instance data has the info if not than we pick from the RDFS class names
         String headerClass = "";
+        String[] priorityClasses = {"Dataset", "DifferenceSet", "FullModel", "DifferenceModel"};
+        
         if (instanceClassData != null) {
-            if (instanceClassData.containsKey("Dataset")) {
-                headerClass = "Dataset";
-            } else if (instanceClassData.containsKey("DifferenceSet")) {
-                headerClass = "DifferenceSet";
-            } else if (instanceClassData.containsKey("FullModel")) {
-                headerClass = "FullModel";
-            } else if (instanceClassData.containsKey("DifferenceModel")) {
-                headerClass = "DifferenceModel";
+            for (String priority : priorityClasses) {
+                String found = findClassKeyByLocalName(instanceClassData.keySet(), priority);
+                if (found != null) {
+                    headerClass = priority;  // Return the local name, not the full URI
+                    break;
+                }
             }
         } else {
-            if (classNames.contains("Dataset")) {
-                headerClass = "Dataset";
-            } else if (classNames.contains("DifferenceSet")) {
-                headerClass = "DifferenceSet";
-            } else if (classNames.contains("FullModel")) {
-                headerClass = "FullModel";
-            } else if (classNames.contains("DifferenceModel")) {
-                headerClass = "DifferenceModel";
+            for (String priority : priorityClasses) {
+                if (classNames.contains(priority)) {
+                    headerClass = priority;
+                    break;
+                }
+                // Try to find by local name
+                for (String className : classNames) {
+                    if (getLocalName(className).equals(priority)) {
+                        headerClass = priority;
+                        break;
+                    }
+                }
+                if (!headerClass.isEmpty()) {
+                    break;
+                }
             }
         }
         return headerClass;
+    }
+    
+    private static String findClassKeyByLocalName(Set<String> keys, String localName) {
+        // Try exact match first
+        if (keys.contains(localName)) {
+            return localName;
+        }
+        // Try to find by local name (handles URIs and prefixed names)
+        for (String key : keys) {
+            if (getLocalName(key).equals(localName)) {
+                return key;
+            }
+        }
+        return null;
+    }
+    
+    private static String getLocalName(String className) {
+        if (className == null || className.isBlank()) {
+            return className;
+        }
+        // Handle URI format (e.g., http://example.com#Dataset or http://example.com/Dataset)
+        if (className.contains("#")) {
+            return className.substring(className.lastIndexOf("#") + 1);
+        }
+        if (className.contains("/")) {
+            return className.substring(className.lastIndexOf("/") + 1);
+        }
+        // Handle prefixed format (e.g., nc:Dataset)
+        if (className.contains(":")) {
+            return className.substring(className.lastIndexOf(":") + 1);
+        }
+        return className;
     }
 
     private static void FillSheetWithInstanceData(XSSFWorkbook workbook, Map<String,
@@ -694,7 +733,7 @@ public class ExcelTools {
                     : classNameWithNS;
             String classDescr = classInfo != null
                     ? classInfo.getClsDescr()
-                    : "";
+                    : "false";
 
             XSSFSheet sheet = workbook.getSheet(sheetName);
 
