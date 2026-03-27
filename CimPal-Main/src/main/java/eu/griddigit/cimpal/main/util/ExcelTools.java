@@ -572,7 +572,7 @@ public class ExcelTools {
         }
 
         if (hasInstanceData) { // if instance data is available, fill the sheets with it
-            FillSheetWithInstanceData(workbook, instanceClassData, genDataInfos);
+            FillSheetWithInstanceData(workbook, instanceClassData, invertedPrefMap, genDataInfos);
         }
 
         //reordering sheets
@@ -666,7 +666,9 @@ public class ExcelTools {
         return headerClass;
     }
 
-    private static void FillSheetWithInstanceData(XSSFWorkbook workbook, Map<String, List<List<RDFAttributeData>>> instanceClassData,
+    private static void FillSheetWithInstanceData(XSSFWorkbook workbook, Map<String,
+                                                          List<List<RDFAttributeData>>> instanceClassData,
+                                                  Map<String,String> invertedPrefMap,
                                                   List<GenDataTemplateMapInfo> genDataInfos) {
         if (instanceClassData == null || instanceClassData.isEmpty()) {
             return;
@@ -678,10 +680,10 @@ public class ExcelTools {
         }
 
         CellStyle headerCellStyle = createHeaderStyle(workbook);
-        Map<String, String> emptyPrefixMap = new HashMap<>();
 
         for (Map.Entry<String, List<List<RDFAttributeData>>> classEntry : instanceClassData.entrySet()) {
-            String className = classEntry.getKey();
+            String classNameWithNS = classEntry.getKey();
+            String className = classNameWithNS.split("#", 2)[1];
             GenDataTemplateMapInfo classInfo = classInfoByName.get(className);
 
             String sheetName = classInfo != null
@@ -689,7 +691,7 @@ public class ExcelTools {
                     : getSheetNameFromClassName(className);
             String fullClassName = classInfo != null
                     ? classInfo.getFullClassName()
-                    : className;
+                    : classNameWithNS;
             String classDescr = classInfo != null
                     ? classInfo.getClsDescr()
                     : "";
@@ -702,7 +704,7 @@ public class ExcelTools {
                         fullClassName,
                         headerCellStyle,
                         workbook,
-                        emptyPrefixMap,
+                        invertedPrefMap,
                         true,
                         classDescr);
                 markClassNameCellRed(workbook, sheet);
@@ -884,7 +886,7 @@ public class ExcelTools {
 
         if (instanceClassData != null) {
             for (String xmlClassName : instanceClassData.keySet()) {
-                String xmlSheetName = getSheetNameFromClassName(xmlClassName);
+                String xmlSheetName = getSheetNameFromClassName(xmlClassName.split("#", 2)[1]);
                 if (seenSheetNames.add(xmlSheetName)) {
                     sheetClassNames.add(xmlSheetName);
                     classNames.add(xmlClassName);

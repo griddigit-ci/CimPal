@@ -161,7 +161,7 @@ public class ExportRDFSdescriptions {
                     // Only one type found
                     selectedType = typeObjects.getFirst();
                 }
-                String className = selectedType.toString().split("#")[1];
+                String className = selectedType.toString();
 
                 // Initialize storage for this class if it doesn't exist
                 classData.putIfAbsent(className, new LinkedList<>());
