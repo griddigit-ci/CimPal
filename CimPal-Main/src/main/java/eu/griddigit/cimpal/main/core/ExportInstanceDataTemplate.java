@@ -489,7 +489,11 @@ public class ExportInstanceDataTemplate {
 
         Map<String, String> prefMap = new HashMap<>();
 
-        if (file != null) {
+        if ( (file == null || file.isEmpty()) && (iFiles == null || iFiles.isEmpty())) {
+            throw new IllegalStateException("An RDFS or Instance file must be selected");
+        }
+
+        if (file != null && !file.isEmpty()) {
             for (File fil : file) {
                 Model model = ModelFactory.createDefaultModel(); // model is the rdf file
                 try {
@@ -611,7 +615,7 @@ public class ExportInstanceDataTemplate {
                 }
             }
         }
-        else if (iFiles != null){
+        else {
             for (File fil : iFiles) {
                 Model model = ModelFactory.createDefaultModel(); // model is the rdf file
                 try {
@@ -621,7 +625,7 @@ public class ExportInstanceDataTemplate {
                 }
 
                 Map<String, String> prefMapTemp = model.getNsPrefixMap();
-                prefMap.putAll(prefMapTemp);
+                prefMapTemp.forEach(prefMap::putIfAbsent);
 
                 ResIterator subjects = model.listSubjects();
                 while (subjects.hasNext()) {
@@ -688,9 +692,6 @@ public class ExportInstanceDataTemplate {
                     }
                 }
             }
-        }
-        else {
-            throw new IllegalStateException("An RDFS or Instance file must be selected");
         }
 
 
@@ -821,6 +822,10 @@ public class ExportInstanceDataTemplate {
         rdfsInfo.put("Multiplicity", rdfsItemMultiplicity);
         rdfsInfo.put("Datatype", rdfsItemAttrDatatype);
         rdfsInfo.put("Type", rdfsAttrOrAssocFlag);
+
+        if (iFiles == null){
+            iFiles = new ArrayList<>();
+        }
 
         int i = 0;
         do {

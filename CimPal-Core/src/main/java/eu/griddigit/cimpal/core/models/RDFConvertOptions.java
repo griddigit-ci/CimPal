@@ -298,8 +298,11 @@ public class RDFConvertOptions {
             if (sourceFormat == null) {
                 throw new IllegalStateException("sourceFormat must not be null");
             }
-            if (sourceFile == null && !modelUnionFlag) {
+            if (sourceFile == null && !modelUnionFlag && !modelUnionFlagDetailed) {
                 throw new IllegalStateException("sourceFile must not be null");
+            }
+            if (modelUnionFlag && (modelUnionFiles == null || modelUnionFiles.isEmpty())) {
+                throw new IllegalStateException("modelUnionFiles must not be null or empty when modelUnionFlag is true");
             }
             if (xmlBase == null) {
                 throw new IllegalStateException("xmlBase must not be null");
@@ -310,15 +313,8 @@ public class RDFConvertOptions {
             if (targetFormat == RDFFormats.RDFXML && rdfXmlFormat == null) {
                 throw new IllegalStateException("rdfXmlFormat must not be null when targetFormat is RDFXML");
             }
-            if (modelUnionFlagDetailed) {
-                if (modelUnionDetailedFiles == null || modelUnionDetailedFiles.isEmpty()) {
-                    throw new IllegalStateException("modelUnionDetailedFiles must not be null or empty when modelUnionFlagDetailed is true");
-                }
-                if (modelUnionFlag) {
-                    if (modelUnionFiles == null || modelUnionFiles.isEmpty()) {
-                        throw new IllegalStateException("modelUnionFiles must not be null or empty when modelUnionFlag is true");
-                    }
-                }
+            if (modelUnionFlagDetailed && (modelUnionDetailedFiles == null || modelUnionDetailedFiles.isEmpty())) {
+                throw new IllegalStateException("modelUnionDetailedFiles must not be null or empty when modelUnionFlagDetailed is true");
             }
 
             // settings for saving RDF

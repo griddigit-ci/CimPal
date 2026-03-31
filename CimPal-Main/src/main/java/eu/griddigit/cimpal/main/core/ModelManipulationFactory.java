@@ -405,6 +405,40 @@ public class ModelManipulationFactory {
             saveProperties.put("rdfEnumList", rdfEnumList);
         }
 
+        //optimise prefixes, strip unused prefixes
+        //TODO for Mate/Beni, to define a method about strip prefixes and use this here and elsewhere we have this
+        if (stripPrefixes) {
+            Map<String, String> modelPrefMap = inferredModel.getNsPrefixMap();
+            LinkedList<String> uniqueNamespacesList = new LinkedList<>();
+            for (StmtIterator ns = inferredModel.listStatements(); ns.hasNext(); ) {
+                Statement stmtNS = ns.next();
+                if (!uniqueNamespacesList.contains(stmtNS.getSubject().getNameSpace())) {
+                    uniqueNamespacesList.add(stmtNS.getSubject().getNameSpace());
+                }
+                if (!uniqueNamespacesList.contains(stmtNS.getPredicate().getNameSpace())) {
+                    uniqueNamespacesList.add(stmtNS.getPredicate().getNameSpace());
+                }
+                if (stmtNS.getObject().isResource()) {
+                    if (!uniqueNamespacesList.contains(stmtNS.getObject().asResource().getNameSpace())) {
+                        uniqueNamespacesList.add(stmtNS.getObject().asResource().getNameSpace());
+                    }
+                }
+            }
+            LinkedList<Map.Entry<String, String>> entryToRemove = new LinkedList<>();
+            for (Map.Entry<String, String> entry : modelPrefMap.entrySet()) {
+                //String key = entry.getKey();
+                String value = entry.getValue();
+
+                // Check if either the key or value is present in uniqueNamespacesList
+                if (!uniqueNamespacesList.contains(value)) {
+                    entryToRemove.add(entry);
+                }
+            }
+            for (Map.Entry<String, String> entryTR : entryToRemove) {
+                inferredModel.removeNsPrefix(entryTR.getKey());
+            }
+        }
+
         String saveFilename = "TransformedModel";
         saveProperties.replace("filename", saveFilename + ".xml");
         saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
@@ -608,63 +642,70 @@ public class ModelManipulationFactory {
         // getting the data from the config sheet
         XSSFSheet configSheet = book.getSheet("Config");
         if (configSheet != null) {
-            ArrayList<Object> inputXLSDataConfig = ExcelTools.importXLSX(xmlfile.toString(), book.getSheetIndex(configSheet));
-            inputXLSDataConfig.removeFirst();
-            for (Object o : inputXLSDataConfig) {
-                // getting namespaces
-                if (((LinkedList<?>) o).size() >= 3) {
-                    String yesno = ((LinkedList<?>) o).get(2).toString();
-                    if (yesno.equals("Yes")) {
-                        String pref = ((LinkedList<?>) o).get(0).toString();
-                        String ns = ((LinkedList<?>) o).get(1).toString();
+            Map<String, List<String>> configColumns = ExcelTools.importXLSXToColumnMap(xmlfile.toString(), book.getSheetIndex(configSheet));
+            List<List<String>> cols = new ArrayList<>(configColumns.values());
+
+            List<String> col1 = !cols.isEmpty() ? cols.get(0) : Collections.emptyList();
+            List<String> col2 = cols.size() > 1 ? cols.get(1) : Collections.emptyList();
+            List<String> col3 = cols.size() > 2 ? cols.get(2) : Collections.emptyList();
+            List<String> col5 = cols.size() > 4 ? cols.get(4) : Collections.emptyList();
+            List<String> col6 = cols.size() > 5 ? cols.get(5) : Collections.emptyList();
+
+            int nsRows = Math.min(col1.size(), Math.min(col2.size(), col3.size()));
+            for (int i = 0; i < nsRows; i++) {
+                String yesno = col3.get(i) == null ? "" : col3.get(i).trim();
+                if ("Yes".equalsIgnoreCase(yesno)) {
+                    String pref = col1.get(i) == null ? "" : col1.get(i).trim();
+                    String ns = col2.get(i) == null ? "" : col2.get(i).trim();
+                    if (!pref.isEmpty() && !ns.isEmpty()) {
                         prefMap.putIfAbsent(pref, ns);
                     }
                 }
-                if (((LinkedList<?>) o).size() == 1) {
-                    // getting classes to print when exceeding namespace rows
-                    String className = ((LinkedList<?>) o).getFirst().toString();
-                    if (!className.isEmpty()) {
-                        int classSheetIdx = book.getSheetIndex(className);
-                        if (classSheetIdx != -1) {
-                            // className = className.replace("|",":");
-                            classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
-                        } else
-                            throw new Exception("Couldn't find the sheet for class: " + className);
-                    }
-                    continue;
-                } else if (((LinkedList<?>) o).size() <= 4)
-                    continue;
+            }
 
-                // getting classes to print
-
-                String className = ((LinkedList<?>) o).get(4).toString();
+            Set<String> classNames = new LinkedHashSet<>();
+            for (String v : col5) {
+                String className = v == null ? "" : v.trim();
                 if (!className.isEmpty()) {
-                    int classSheetIdx = book.getSheetIndex(className);
-                    if (classSheetIdx != -1) {
-                        // className = className.replace("|",":");
-                        classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
-                    } else
-                        throw new Exception("Couldn't find the sheet for class: " + className);
-                }
-                // getting header class
-
-                if (headerClassName.isEmpty()) {
-                    try {
-                        headerClassName = ((LinkedList<?>) o).get(5).toString();
-                    } catch (IndexOutOfBoundsException e) {
-                        throw new NoSuchElementException("Missing header class name from config tab.");
-                    }
-                    if (!headerClassName.isEmpty()) {
-                        int headerSheetIdx = book.getSheetIndex(headerClassName);
-                        if (headerSheetIdx != -1)
-                            headerXlsData = ExcelTools.importXLSXnullSupport(xmlfile.toString(), headerSheetIdx);
-                        else
-                            throw new Exception("Couldn't find header class sheet.");
-                    }
+                    classNames.add(className);
                 }
             }
-            if (headerXlsData == null)
-                throw new Exception("Missing header class from config");
+
+            for (int i = nsRows; i < col1.size(); i++) {
+                String className = col1.get(i) == null ? "" : col1.get(i).trim();
+                if (!className.isEmpty()) {
+                    classNames.add(className);
+                }
+            }
+
+            for (String className : classNames) {
+                int classSheetIdx = book.getSheetIndex(className);
+                if (classSheetIdx != -1) {
+                    classesXlsData.putIfAbsent(className,
+                            ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
+                } else {
+                    throw new Exception("Couldn't find the sheet for class: " + className);
+                }
+            }
+
+            for (String v : col6) {
+                String candidate = v == null ? "" : v.trim();
+                if (!candidate.isEmpty()) {
+                    headerClassName = candidate;
+                    break;
+                }
+            }
+
+            if (headerClassName.isEmpty()) {
+                throw new NoSuchElementException("Missing header class name from config tab.");
+            }
+
+            int headerSheetIdx = book.getSheetIndex(headerClassName);
+            if (headerSheetIdx != -1) {
+                headerXlsData = ExcelTools.importXLSXnullSupport(xmlfile.toString(), headerSheetIdx);
+            } else {
+                throw new Exception("Couldn't find header class sheet.");
+            }
         } else {
             throw new Exception("Config sheet is missing from the xls data.");
         }
