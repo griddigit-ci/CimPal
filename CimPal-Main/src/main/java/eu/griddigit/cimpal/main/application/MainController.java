@@ -655,6 +655,7 @@ public class MainController implements Initializable {
         });
 
         rdfConvertModelUnionDetailedFiles = new LinkedList<>();
+        rdfConvertFileList = new LinkedList<>();
 
 
     }
