@@ -68,8 +68,8 @@ public class ManifestGenerator {
     private static final Resource DEFAULT_MEDIA_TYPE = ResourceFactory.createResource("http://www.iana.org/assignments/media-types/application/rdf+xml");
     private static final Resource DEFAULT_WAS_GENERATED_BY = ResourceFactory.createResource("https://energy.referencedata.eu/Test/Action/PlaceholderGeneration");
     private static final Resource DEFAULT_LICENSE = ResourceFactory.createResource("urn:placeholder:license");
-    private static final Resource DEFAULT_ACCESS_RIGHTS = ResourceFactory.createResource("urn:placeholder:accessRights");
-    private static final Resource DEFAULT_TYPE = ResourceFactory.createResource("urn:placeholder:type");
+    private static final Resource DEFAULT_ACCESS_RIGHTS = ResourceFactory.createResource("https://energy.referencedata.eu/Confidentiality/Public");
+    private static final Resource DEFAULT_TYPE = ResourceFactory.createResource("https://energy.referencedata.eu/type/CIM-PowerSystemModel");
     private static final Resource DEFAULT_SPATIAL = ResourceFactory.createResource("urn:placeholder:spatial");
     private static final Resource DEFAULT_PUBLISHER = ResourceFactory.createResource("urn:placeholder:publisher");
 
@@ -88,15 +88,8 @@ public class ManifestGenerator {
         Resource catalog = createCatalogResource(manifest);
         catalog.addProperty(RDF.type, DCAT_CATALOG);
         catalog.addProperty(DCTERMS_TITLE, "Manifest");
-        catalog.addProperty(DCTERMS_DESCRIPTION, plainLiteral("Placeholder description - update from source metadata.", "en"));
+        catalog.addProperty(DCTERMS_DESCRIPTION, plainLiteral("", "en"));
         catalog.addProperty(DCTERMS_IDENTIFIER, catalog.getLocalName());
-        catalog.addProperty(DCTERMS_ISSUED, nowLiteral());
-        catalog.addProperty(DCTERMS_LICENSE, DEFAULT_LICENSE);
-        catalog.addProperty(DCTERMS_PUBLISHER, DEFAULT_PUBLISHER);
-        catalog.addProperty(DCTERMS_RIGHTS, "Copyright");
-        catalog.addProperty(DCTERMS_RIGHTS_HOLDER, "PLACEHOLDER_RIGHTS_HOLDER");
-        catalog.addProperty(ADMS_VERSION_NOTES, plainLiteral("Placeholder version notes.", "en"));
-        catalog.addProperty(DCAT_VERSION, "PLACEHOLDER_VERSION");
 
         List<File> orderedFiles = sourceFiles == null || sourceFiles.isEmpty()
                 ? sourceModels.keySet().stream().map(File::new).toList()
@@ -221,13 +214,13 @@ public class ManifestGenerator {
         // Catalog inherits key governance metadata from generated datasets.
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_ACCESS_RIGHTS, List.of(DEFAULT_ACCESS_RIGHTS));
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_CONFORMS_TO, List.of(ResourceFactory.createResource("urn:placeholder:conformsTo")));
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_DESCRIPTION, List.of(plainLiteral("Placeholder description - update from source metadata.", "en")));
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_ISSUED, List.of(nowLiteral()));
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_LICENSE, List.of(DEFAULT_LICENSE));
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_PUBLISHER, List.of(DEFAULT_PUBLISHER));
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_RIGHTS, List.of(plainLiteral("Copyright")));
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_RIGHTS_HOLDER, List.of(plainLiteral("PLACEHOLDER_RIGHTS_HOLDER")));
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_SPATIAL, List.of(DEFAULT_SPATIAL));
+        copyCatalogFromDatasets(manifest, catalog, ADMS_VERSION_NOTES, List.of(plainLiteral("Placeholder version notes.", "en")));
         copyCatalogFromDatasets(manifest, catalog, DCAT_VERSION, List.of(plainLiteral("PLACEHOLDER_VERSION")));
 
         return manifest;
@@ -397,6 +390,11 @@ public class ManifestGenerator {
             }
         }
 
+        boolean hasConcreteValue = values.stream().anyMatch(v -> !isPlaceholderNode(v));
+        if (hasConcreteValue) {
+            values.removeIf(ManifestGenerator::isPlaceholderNode);
+        }
+
         if (values.isEmpty()) {
             values.addAll(fallbackValues);
         }
@@ -435,6 +433,21 @@ public class ManifestGenerator {
 
     private static Literal nowLiteral() {
         return ResourceFactory.createTypedLiteral(Instant.now().toString(), XSDDatatype.XSDdateTime);
+    }
+
+    private static boolean isPlaceholderNode(RDFNode node) {
+        if (node == null) {
+            return false;
+        }
+        if (node.isResource()) {
+            Resource r = node.asResource();
+            return r.isURIResource() && r.getURI().startsWith("urn:placeholder:");
+        }
+        if (node.isLiteral()) {
+            String text = node.asLiteral().getLexicalForm();
+            return text.startsWith("PLACEHOLDER_") || text.startsWith("Placeholder ");
+        }
+        return false;
     }
 
     private static List<RDFNode> compactAccessUrlValues(String rawAccessUrl, File sourceFile) {
