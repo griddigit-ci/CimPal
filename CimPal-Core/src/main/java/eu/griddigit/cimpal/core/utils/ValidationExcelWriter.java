@@ -2,8 +2,6 @@
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.shacl.ValidationReport;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -26,6 +24,7 @@ public class ValidationExcelWriter implements Closeable {
         CGMES_IGM_COMPLETE,
         CGMES_CGM,
         NC_SINGLE,
+        DANGLINGREFERENCE,
         UNKNOWN
     }
 

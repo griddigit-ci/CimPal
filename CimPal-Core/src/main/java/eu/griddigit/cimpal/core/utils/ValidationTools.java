@@ -286,24 +286,36 @@ public class ValidationTools {
     // ---------------- categorization + dataset naming ----------------
 
     private static ValidationExcelWriter.CaseFolder categorizeForReport(MappingRow row) {
-        String ttl = row.ttl == null ? "" : row.ttl;
-
-        if (ttl.startsWith("NC_")) return ValidationExcelWriter.CaseFolder.NC_SINGLE;
-
+        String ttl = row.ttl == null ? "" : row.ttl.trim();
         String xml = row.xmlInputsRaw == null ? "" : row.xmlInputsRaw.replace("\\", "/");
 
-        if (xml.contains("Instance/Grid/CGM")) return ValidationExcelWriter.CaseFolder.CGMES_CGM;
+        if (ttl.startsWith("NCP_v2-4-0/NC-v2-4-0_AP-Con-Complex-Common-SHACL.ttl")) {
+            return ValidationExcelWriter.CaseFolder.DANGLINGREFERENCE;
+        }
+        if (ttl.startsWith("NC_")) {
+            return ValidationExcelWriter.CaseFolder.NC_SINGLE;
+        }
 
+        boolean isCgmes = ttl.startsWith("CGMES_");
         boolean hasBoundary = xml.contains("Grid_CommonData_CGM-CD.xml");
         boolean hasEQ = xml.contains("EQ");
         boolean hasSSH = xml.contains("SSH");
         boolean hasTP = xml.contains("TP");
         boolean hasSV = xml.contains("SV");
+        boolean hasAE = xml.contains("AE");
 
-        if (ttl.startsWith("CGMES_") && hasBoundary && hasEQ && hasSSH && hasTP && hasSV) {
+        // More specific case first
+        if (isCgmes && hasBoundary && hasEQ && hasSSH && hasTP && hasSV && hasAE) {
+            return ValidationExcelWriter.CaseFolder.CGMES_CGM;
+        }
+
+        if (isCgmes && hasBoundary && hasEQ && hasSSH && hasTP && hasSV) {
             return ValidationExcelWriter.CaseFolder.CGMES_IGM_COMPLETE;
         }
-        if (ttl.startsWith("CGMES_")) return ValidationExcelWriter.CaseFolder.CGMES_SINGLE_PROFILE;
+
+        if (isCgmes) {
+            return ValidationExcelWriter.CaseFolder.CGMES_SINGLE_PROFILE;
+        }
 
         return ValidationExcelWriter.CaseFolder.UNKNOWN;
     }
