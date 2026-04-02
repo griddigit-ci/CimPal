@@ -105,11 +105,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 //get list of all triples of the rdf:type and these need to be sorted by object
                 Map<String, RDFNode> listObjectsMap = new TreeMap<>();
                 for (Statement stmt : listStatements) {
-                    if (sortRDFprefix.equals("true")) {
-                        listObjectsMap.put(model.getNsURIPrefix(stmt.getObject().asResource().getNameSpace()) + ":" + stmt.getObject().asResource().getLocalName(), stmt.getObject());
-                    } else {
-                        listObjectsMap.put(stmt.getObject().asResource().getLocalName(), stmt.getObject());
-                    }
+                    listObjectsMap.put(sortKey(model, stmt.getObject().asResource()), stmt.getObject());
 
                 }
                 Set<Map.Entry<String, RDFNode>> entries
@@ -133,11 +129,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 //get list of all triples of the rdf:type and these need to be sorted by subject
                 Map<String, Resource> listSubjectMap = new TreeMap<>();
                 for (Statement stmt : listStatements) {
-                    if (sortRDFprefix.equals("true")) {
-                        listSubjectMap.put(model.getNsURIPrefix(stmt.getSubject().getNameSpace()) + ":" + stmt.getSubject().getLocalName(), stmt.getSubject());
-                    } else {
-                        listSubjectMap.put(stmt.getSubject().getLocalName(), stmt.getSubject());
-                    }
+                    listSubjectMap.put(sortKey(model, stmt.getSubject()), stmt.getSubject());
 
                 }
                 Set<Map.Entry<String, Resource>> entries
@@ -162,6 +154,21 @@ public class CustomBasic extends CustomBaseXMLWriter {
             while (rIter.hasNext()) writeRDFStatements(model, rIter.nextResource(), writer);
         }
 
+    }
+
+    private String sortKey(Model model, Resource resource) {
+        if (resource.isAnon()) {
+            return "_:" + anonId(resource);
+        }
+
+        if (this.sortRDFprefix.equals("true")) {
+            String prefix = model.getNsURIPrefix(resource.getNameSpace());
+            if (prefix != null && !prefix.isEmpty()) {
+                return prefix + ":" + resource.getLocalName();
+            }
+        }
+
+        return resource.getLocalName();
     }
 
     protected void writeRDFTrailer(PrintWriter writer, String base) {
