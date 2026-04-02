@@ -60,6 +60,7 @@
          <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text=" Model transformation" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuPSSEPF" text="PSSE-PowerFactory compare" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
+         <MenuItem mnemonicParsing="false" onAction="#actionGenerateManifest" text="Generate Manifest" />
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />

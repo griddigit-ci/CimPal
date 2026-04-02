@@ -5,6 +5,7 @@ module CimPal.Core {
     exports eu.griddigit.cimpal.core.utils;
     exports eu.griddigit.cimpal.core.converters;
     exports eu.griddigit.cimpal.core.shacl_tools;
+    exports eu.griddigit.cimpal.core.generators;
 
     requires org.apache.jena.core;
     requires org.apache.jena.arq;

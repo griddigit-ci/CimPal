@@ -7,6 +7,7 @@ package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.converters.SHACLFromRDF;
+import eu.griddigit.cimpal.core.generators.ManifestGenerator;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
@@ -5102,6 +5103,62 @@ public class MainController implements Initializable {
             progressBar.setProgress(0);
         }
 
+    }
+
+    @FXML
+    public void actionGenerateManifest(ActionEvent actionEvent) {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        try {
+            List<File> selectedFiles = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                    false,
+                    "Model files",
+                    List.of("*.xml", "*.zip"),
+                    "Select model file(s) for manifest generation"
+            );
+
+            if (selectedFiles == null || selectedFiles.isEmpty()) {
+                progressBar.setProgress(0);
+                return;
+            }
+
+            Map<String, Model> loadedModels = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoadPerFiles(
+                    selectedFiles,
+                    "",
+                    Lang.RDFXML
+            );
+            if (loadedModels == null || loadedModels.isEmpty()) {
+                throw new IOException("Could not load selected file(s).");
+            }
+
+            File outputFile = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom(
+                    "Turtle file",
+                    List.of("*.ttl"),
+                    "Save manifest.ttl",
+                    "manifest.ttl"
+            );
+
+            if (outputFile == null) {
+                progressBar.setProgress(0);
+                return;
+            }
+
+            String accessUrl = selectedFiles.size() == 1 ? selectedFiles.getFirst().toURI().toString() : null;
+            ManifestGenerator.generateManifestTtl(loadedModels, selectedFiles, accessUrl, outputFile);
+
+            progressBar.setProgress(1);
+            Alert ok = new Alert(Alert.AlertType.INFORMATION);
+            ok.setTitle("Manifest generated");
+            ok.setHeaderText(null);
+            ok.setContentText("Manifest saved to:\n" + outputFile.getAbsolutePath() + "\n\nProcessed files: " + selectedFiles.size());
+            ok.showAndWait();
+        } catch (Exception e) {
+            progressBar.setProgress(0);
+            Alert err = new Alert(Alert.AlertType.ERROR);
+            err.setTitle("Manifest generation failed");
+            err.setHeaderText(null);
+            err.setContentText(e.getMessage());
+            err.showAndWait();
+        }
     }
 }
 
