@@ -419,7 +419,16 @@ public class RDFConverter {
             }
             case RDFConvertOptions.RDFFormats.TURTLE -> {
                 try (outputStream) {
-                    convertedModel.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
+                    //convertedModel.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
+                    RDFWriter.create()
+                            .base(xmlBase)
+                            .set(RIOT.symTurtleOmitBase, false)
+                            .set(RIOT.symTurtleIndentStyle, "wide")
+                            .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                            .set(RIOT.symTurtleMultilineLiterals, true)
+                            .lang(Lang.TURTLE)
+                            .source(convertedModel)
+                            .output(outputStream);
                 }
 
             }
