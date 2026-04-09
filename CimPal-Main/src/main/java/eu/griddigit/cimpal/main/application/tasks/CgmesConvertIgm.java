@@ -15,9 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import eu.griddigit.cimpal.core.converters.ModelManipulationFactory;
+import eu.griddigit.cimpal.main.application.CGMESConverter.ModelManipulationFactory;
 
-import static eu.griddigit.cimpal.core.converters.ModelManipulationFactory.LoadRDFS;
 
 public class CgmesConvertIgm implements ITask {
 
@@ -35,6 +34,17 @@ public class CgmesConvertIgm implements ITask {
         this.status = "Queued";
         this.info = "0%";
         this.taskUpdater = new TaskStateUpdater();
+    }
+
+    @Override
+    public void execute(SelectedTask parent) throws IOException {
+
+        WizardContext wizardContext = WizardContext.getInstance();
+        taskUpdater.updateState(parent,"Loading Base Data", "1%", wizardContext);
+
+        ModelManipulationFactory.ConvertCGMESv2v3(int keepExtensions, int eqOnly, int fixRegCont);
+
+        System.out.print("Conversion finished.\n");
     }
     private final List<Path> inputFiles = new ArrayList<>();
 
@@ -141,20 +151,5 @@ public class CgmesConvertIgm implements ITask {
         return false;
     }
 
-    @Override
-    public void execute(SelectedTask parent) throws IOException {
 
-        WizardContext wizardContext = WizardContext.getInstance();
-        taskUpdater.updateState(parent,"Loading Base Data", "1%", wizardContext);
-
-
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-
-
-        ModelManipulationFactory.ConvertBoundarySetCGMESv2v3();
-
-        System.out.print("Conversion finished.\n");
-        progressBar.setProgress(1);
-    }
 }

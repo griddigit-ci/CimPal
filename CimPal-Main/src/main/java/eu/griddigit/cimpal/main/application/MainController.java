@@ -411,6 +411,8 @@ public class MainController implements Initializable {
     public static Model unionmodelbaseprofilesshacl2nd;
     public static Model unionmodelbaseprofilesshacl3rd;
 
+    public static List<File> IDModel;
+
     public static Model unionmodelbaseprofilesshaclinheritanceonly;
     public static String cim2URI;
     public static String cim3URI;

@@ -1,5 +1,7 @@
 package eu.griddigit.cimpal.main.application.tasks;
 
+import eu.griddigit.cimpal.main.application.CGMESConverter.ModelManipulationFactory;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
 
 import java.io.IOException;
@@ -107,6 +109,10 @@ public class CgmesConvertBoundary implements ITask {
 
     @Override
     public void execute(SelectedTask parent) throws IOException {
-        // TODO: call Core boundary conversion service here
-    }
+        WizardContext wizardContext = WizardContext.getInstance();
+        taskUpdater.updateState(parent,"Loading Base Data", "1%", wizardContext);
+
+        ModelManipulationFactory.ConvertBoundarySetCGMESv2v3();
+
+        System.out.print("Conversion finished.\n");    }
 }
