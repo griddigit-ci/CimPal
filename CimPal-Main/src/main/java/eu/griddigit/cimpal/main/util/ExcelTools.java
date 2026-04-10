@@ -361,6 +361,10 @@ public class ExcelTools {
     }
 
     public static CellStyle createHeaderStyle(Workbook workbook) {
+        return createHeaderStyleWithColor(workbook, IndexedColors.SKY_BLUE);
+    }
+
+    public static CellStyle createHeaderStyleWithColor(Workbook workbook, IndexedColors color) {
         CellStyle style = workbook.createCellStyle();
         Font font = workbook.createFont();
         font.setBold(true);
@@ -368,18 +372,12 @@ public class ExcelTools {
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         style.setWrapText(true);
-        // Set fill foreground color
-        style.setFillForegroundColor(IndexedColors.SKY_BLUE.getIndex());
-
-        // Set fill pattern (solid fill)
+        style.setFillForegroundColor(color.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-
-        // Add border
         style.setBorderTop(BorderStyle.THIN);
         style.setBorderRight(BorderStyle.THIN);
         style.setBorderBottom(BorderStyle.THIN);
         style.setBorderLeft(BorderStyle.THIN);
-
         return style;
     }
 
@@ -429,7 +427,9 @@ public class ExcelTools {
                                           XSSFWorkbook workbook, boolean hide) {
 
         // Create cell style for header row
-        CellStyle headerCellStyle = createHeaderStyle(workbook);
+        CellStyle staticHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.SKY_BLUE);
+        CellStyle mandatoryHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_YELLOW);
+        CellStyle optionalHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_GREEN);
 
         List<GenDataTemplateMapInfo> genDataInfos = new ArrayList<>();
 
@@ -451,7 +451,7 @@ public class ExcelTools {
 
         String headerClass = getHeaderClass(instanceClassData, classNames);
 
-        AddConfigSheet(genDataInfos, prefMap, headerClass, headerCellStyle, workbook, instanceClassData);
+        AddConfigSheet(genDataInfos, prefMap, headerClass, staticHeaderCellStyle, workbook, instanceClassData);
 
         // Inverted HashMap
         HashMap<String, String> invertedPrefMap = new HashMap<>();
@@ -470,7 +470,8 @@ public class ExcelTools {
             sColN = classSheet.getRow(1).getLastCellNum();
         } else {
             classSheet = CreateTemplateSheetBase(sheetName,
-                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap, hasInstanceData, genDataInfos.getFirst().getClsDescr());
+                    genDataInfos.getFirst().getFullClassName(), staticHeaderCellStyle, mandatoryHeaderCellStyle,
+                    workbook, invertedPrefMap, hasInstanceData, genDataInfos.getFirst().getClsDescr());
         }
 
         int maxWidthInCharacters = 150; // Maximum desired width in characters
@@ -484,7 +485,8 @@ public class ExcelTools {
                     sColN = classSheet.getRow(1).getLastCellNum();
                 } else {
                     classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
-                            headerCellStyle, workbook, invertedPrefMap, hasInstanceData, genDataInfo.getClsDescr());
+                            staticHeaderCellStyle, mandatoryHeaderCellStyle,
+                            workbook, invertedPrefMap, hasInstanceData, genDataInfo.getClsDescr());
                     sColN = 1;
                 }
             }
@@ -493,18 +495,21 @@ public class ExcelTools {
             XSSFRow datatypeRow = classSheet.getRow(3);
             XSSFRow multiRow = classSheet.getRow(4);
             XSSFRow isExtensionRow = classSheet.getRow(5);
+            XSSFRow mappingRow = classSheet.getRow(6);
 
             XSSFCell attrCell = attrRow.createCell(sColN);
-            attrCell.setCellStyle(headerCellStyle);
+            attrCell.setCellStyle(mandatoryHeaderCellStyle);
             XSSFCell typeCell = typeRow.createCell(sColN);
-            typeCell.setCellStyle(headerCellStyle);
+            typeCell.setCellStyle(mandatoryHeaderCellStyle);
             XSSFCell datatypeCell = datatypeRow.createCell(sColN);
-            datatypeCell.setCellStyle(headerCellStyle);
+            datatypeCell.setCellStyle(optionalHeaderCellStyle);
             XSSFCell multiCell = multiRow.createCell(sColN);
-            multiCell.setCellStyle(headerCellStyle);
+            multiCell.setCellStyle(optionalHeaderCellStyle);
             XSSFCell isExtensionCell = isExtensionRow.createCell(sColN);
-            isExtensionCell.setCellStyle(headerCellStyle);
+            isExtensionCell.setCellStyle(optionalHeaderCellStyle);
             isExtensionCell.setCellValue("No");
+            XSSFCell mappingCell = mappingRow.createCell(sColN);
+            mappingCell.setCellStyle(optionalHeaderCellStyle);
 
             Resource propRes = ResourceFactory.createResource(genDataInfo.getProp());
             String propNameShort = genDataInfo.getProp();
@@ -718,8 +723,6 @@ public class ExcelTools {
             classInfoByName.putIfAbsent(info.getClassName(), info);
         }
 
-        CellStyle headerCellStyle = createHeaderStyle(workbook);
-
         for (Map.Entry<String, List<List<RDFAttributeData>>> classEntry : instanceClassData.entrySet()) {
             String classNameWithNS = classEntry.getKey();
             String className = classNameWithNS.split("#", 2)[1];
@@ -738,10 +741,13 @@ public class ExcelTools {
             XSSFSheet sheet = workbook.getSheet(sheetName);
 
             if (sheet == null) {
+                CellStyle staticHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.SKY_BLUE);
+                CellStyle mandatoryHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_YELLOW);
                 sheet = CreateTemplateSheetBase(
                         sheetName,
                         fullClassName,
-                        headerCellStyle,
+                        staticHeaderCellStyle,
+                        mandatoryHeaderCellStyle,
                         workbook,
                         invertedPrefMap,
                         true,
@@ -987,7 +993,9 @@ public class ExcelTools {
 
     }
 
-    private static XSSFSheet CreateTemplateSheetBase(String sheetName, String className, CellStyle headerCellStyle,
+    private static XSSFSheet CreateTemplateSheetBase(String sheetName, String className,
+                                                     CellStyle staticHeaderCellStyle,
+                                                     CellStyle mandatoryHeaderCellStyle,
                                                      XSSFWorkbook workbook, Map<String, String> invertedPrefMap,
                                                      boolean hasInstanceData, String classDescr) {
         XSSFSheet sheet = workbook.createSheet(sheetName);
@@ -996,7 +1004,7 @@ public class ExcelTools {
         XSSFRow firstRow = sheet.createRow(0);
         XSSFCell firstCell = firstRow.createCell(0);
         firstCell.setCellValue("Class");
-        firstCell.setCellStyle(headerCellStyle);
+        firstCell.setCellStyle(staticHeaderCellStyle);
         XSSFCell cellClass = firstRow.createCell(1);
         Resource classNameRes = ResourceFactory.createResource(className);
         String classNameShort = className;
@@ -1004,11 +1012,11 @@ public class ExcelTools {
             classNameShort = invertedPrefMap.get(classNameRes.getNameSpace()) + ":" + classNameRes.getLocalName();
         }
         cellClass.setCellValue(classNameShort);
-        cellClass.setCellStyle(headerCellStyle);
+        cellClass.setCellStyle(mandatoryHeaderCellStyle);
 
         XSSFCell cellClassDescAbout = firstRow.createCell(2);
         cellClassDescAbout.setCellValue("rdf:about");
-        cellClassDescAbout.setCellStyle(headerCellStyle);
+        cellClassDescAbout.setCellStyle(staticHeaderCellStyle);
 
         XSSFCell cellClassDesc = firstRow.createCell(3);
         if (classNameRes.getLocalName().equals("Dataset") || classNameRes.getLocalName().equals("DifferenceSet") || classNameRes.getLocalName().equals("FullModel") || classNameRes.getLocalName().equals("DifferenceModel")) {
@@ -1016,38 +1024,38 @@ public class ExcelTools {
         } else {
             cellClassDesc.setCellValue(classDescr);
         }
-        cellClassDesc.setCellStyle(headerCellStyle);
+        cellClassDesc.setCellStyle(mandatoryHeaderCellStyle);
 
         // Attribute row
         XSSFRow row = sheet.createRow(1);
         XSSFCell cell = row.createCell(0);
         cell.setCellValue("rdf:id"); // setting rdf:id in the first column
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Property type row
         row = sheet.createRow(2);
         cell = row.createCell(0);
         cell.setCellValue("Resource");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Datatype row
         row = sheet.createRow(3);
         cell = row.createCell(0);
         cell.setCellValue("Datatype");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Multiplicity row
         row = sheet.createRow(4);
         cell = row.createCell(0);
         cell.setCellValue("1..1");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Extension row
         row = sheet.createRow(5);
         cell = row.createCell(0);
         cell.setCellValue("IsExtension");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Mapping row
         row = sheet.createRow(6);
         cell = row.createCell(0);
         cell.setCellValue("Mapping");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
 
 
         return sheet;
