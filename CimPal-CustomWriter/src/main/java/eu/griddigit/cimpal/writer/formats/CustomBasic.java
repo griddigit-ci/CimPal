@@ -161,14 +161,19 @@ public class CustomBasic extends CustomBaseXMLWriter {
             return "_:" + anonId(resource);
         }
 
+        String localName = resource.getLocalName();
+        if (localName == null || localName.isBlank()) {
+            localName = resource.getURI();
+        }
+
         if (this.sortRDFprefix.equals("true")) {
             String prefix = model.getNsURIPrefix(resource.getNameSpace());
             if (prefix != null && !prefix.isEmpty()) {
-                return prefix + ":" + resource.getLocalName();
+                return prefix + ":" + localName;
             }
         }
 
-        return resource.getLocalName();
+        return localName;
     }
 
     protected void writeRDFTrailer(PrintWriter writer, String base) {
