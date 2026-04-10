@@ -2441,9 +2441,13 @@ public class MainController implements Initializable {
         fMainRdfPathTextField.clear();
         fDeviationRdfPathTextField.clear();
         fExtendedRdfPathTextField.clear();
-        MainController.rdfConvertModelUnionDetailedFiles.clear();
+        if (MainController.rdfConvertModelUnionDetailedFiles != null) {
+            MainController.rdfConvertModelUnionDetailedFiles.clear();
+        }
         MainController.rdfConvertFile = null;
-        MainController.rdfConvertFileList.clear();
+        if (MainController.rdfConvertFileList != null) {
+            MainController.rdfConvertFileList.clear();
+        }
 
         progressBar.setProgress(1);
     }
@@ -2486,9 +2490,13 @@ public class MainController implements Initializable {
         fMainRdfPathTextField.clear();
         fDeviationRdfPathTextField.clear();
         fExtendedRdfPathTextField.clear();
-        MainController.rdfConvertModelUnionDetailedFiles.clear();
+        if (MainController.rdfConvertModelUnionDetailedFiles != null) {
+            MainController.rdfConvertModelUnionDetailedFiles.clear();
+        }
         MainController.rdfConvertFile = null;
-        MainController.rdfConvertFileList.clear();
+        if (MainController.rdfConvertFileList != null) {
+            MainController.rdfConvertFileList.clear();
+        }
     }
 
     @FXML
