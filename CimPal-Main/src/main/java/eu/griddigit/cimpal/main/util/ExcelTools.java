@@ -894,6 +894,7 @@ public class ExcelTools {
                                        CellStyle headerCellStyle, XSSFWorkbook workbook,
                                        Map<String, List<List<RDFAttributeData>>> instanceClassData) {
         XSSFSheet configSheet = workbook.createSheet("Config");
+        CellStyle mandatoryHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_YELLOW);
         // Write header row
         XSSFRow headerRow = configSheet.createRow(0);
         XSSFCell hCell1 = headerRow.createCell(0);
@@ -983,9 +984,13 @@ public class ExcelTools {
                 row.createCell(4).setCellValue(sheetClassNames.get(rowN));
             }
 
-            // add header class if data exist
-            if (rowN == 0 && !headerClass.isEmpty()) {
-                row.createCell(5).setCellValue(headerClass);
+            // Header class is mandatory for generation; highlight the input cell even when auto-detection fails.
+            if (rowN == 0) {
+                XSSFCell headerClassCell = row.createCell(5);
+                if (!headerClass.isEmpty()) {
+                    headerClassCell.setCellValue(headerClass);
+                }
+                headerClassCell.setCellStyle(mandatoryHeaderCellStyle);
             }
 
             rowN++;
