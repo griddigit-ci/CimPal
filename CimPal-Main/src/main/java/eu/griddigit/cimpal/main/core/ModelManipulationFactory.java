@@ -744,13 +744,7 @@ public class ModelManipulationFactory {
         }
 
         // get which row contains the extension flags?
-        int isExtensionRow = -1;
-        for (int i = 0; i < headerXlsData.size(); i++) {
-            if (((LinkedList<?>) headerXlsData.get(i)).getFirst().equals("IsExtension")) {
-                isExtensionRow = i;
-                break;
-            }
-        }
+        int isExtensionRow = findRowIndexByFirstCell(headerXlsData, "IsExtension");
 
         if (headerXlsData.size() > dataStartFrom) {
 
@@ -777,8 +771,7 @@ public class ModelManipulationFactory {
                 for (int j = 0; j < headerCols; j++) {
                     if (j != rdfidCol && j < ((LinkedList<?>) headerXlsData.get(i)).size()) {
                         // Check if it is an extension
-                        if (isExtensionRow != -1 && !exportExtensions &&
-                                ((LinkedList<?>) headerXlsData.get(isExtensionRow)).get(j).toString().equals("Yes")) {
+                        if (!exportExtensions && isExtensionColumn(headerXlsData, isExtensionRow, j)) {
                             continue;
                         }
                         Object value = ((LinkedList<?>) headerXlsData.get(i)).get(j);
@@ -890,6 +883,7 @@ public class ModelManipulationFactory {
                 throw new Exception("Missing prefix in config for class: " + className + "\nMissing prefix: " + splitClassName[0]);
             }
 
+            int classIsExtensionRow = findRowIndexByFirstCell(classXlsData, "IsExtension");
             for (int i = dataStartFrom; i < classXlsData.size(); i++) { // loop on the rows/class instance
                 if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
                     String idxls = ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
@@ -909,8 +903,7 @@ public class ModelManipulationFactory {
                     for (int j = 0; j < cols; j++) {
                         if (j != rdfidCol && j < ((LinkedList<?>) classXlsData.get(i)).size()) {
                             // Check if it is an extension
-                            if (isExtensionRow != -1 && !exportExtensions &&
-                                    ((LinkedList<?>) classXlsData.get(isExtensionRow)).get(j).toString().equals("Yes")) {
+                            if (!exportExtensions && isExtensionColumn(classXlsData, classIsExtensionRow, j)) {
                                 continue;
                             }
                             Object value = ((LinkedList<?>) classXlsData.get(i)).get(j);
@@ -1363,6 +1356,38 @@ public class ModelManipulationFactory {
             return datatype;
         }
 
+    }
+
+    private static int findRowIndexByFirstCell(ArrayList<Object> xlsData, String label) {
+        if (xlsData == null || label == null) {
+            return -1;
+        }
+
+        for (int i = 0; i < xlsData.size(); i++) {
+            Object rowObj = xlsData.get(i);
+            if (!(rowObj instanceof LinkedList<?> row) || row.isEmpty()) {
+                continue;
+            }
+            Object first = row.getFirst();
+            if (first != null && label.equals(first.toString().trim())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isExtensionColumn(ArrayList<Object> xlsData, int extensionRow, int columnIndex) {
+        if (extensionRow < 0 || xlsData == null || extensionRow >= xlsData.size()) {
+            return false;
+        }
+
+        Object rowObj = xlsData.get(extensionRow);
+        if (!(rowObj instanceof LinkedList<?> row) || columnIndex < 0 || columnIndex >= row.size()) {
+            return false;
+        }
+
+        Object cell = row.get(columnIndex);
+        return cell != null && "Yes".equalsIgnoreCase(cell.toString().trim());
     }
 }
 
