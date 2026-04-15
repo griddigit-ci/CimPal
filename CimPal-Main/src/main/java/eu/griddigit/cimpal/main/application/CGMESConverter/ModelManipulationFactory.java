@@ -28,6 +28,7 @@ import eu.griddigit.cimpal.core.utils.ExcelTools;
 
 import java.io.*;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.util.*;
 
 public class ModelManipulationFactory {
@@ -67,12 +68,23 @@ public class ModelManipulationFactory {
     }
 
     //Convert CGMES v2.4 to CGMES v3.0
-    public static void ConvertCGMESv2v3(int keepExtensions, int eqOnly, int fixRegCont) throws IOException {
+    public static void ConvertCGMESv2v3(List<Path> inputFiles, boolean keepExtensions, boolean eqOnly, boolean fixRegCont) throws IOException {
 
 
         //Map<String, Map> loadDataMap= new HashMap<>();
         String xmlBase = "http://iec.ch/TC57/CIM100";
-        //String xmlBase = "";
+
+        List<File> files = inputFiles.stream()
+                .map(Path::toFile)
+                .toList();
+
+        Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(files, xmlBase, null);
+
+        Model modelEQ = baseInstanceModelMap.get("EQ");
+        Model modelSSH = baseInstanceModelMap.get("SSH");
+        Model modelSV = baseInstanceModelMap.get("SV");
+        Model modelTP = baseInstanceModelMap.get("TP");
+        Model modelTPBD = baseInstanceModelMap.get("TPBD");
 
         //set properties for the export
 
@@ -123,13 +135,7 @@ public class ModelManipulationFactory {
 //            }
 //        }
 
-        Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(MainController.IDModel, xmlBase, null);
 
-        Model modelEQ = baseInstanceModelMap.get("EQ");
-        Model modelSSH = baseInstanceModelMap.get("SSH");
-        Model modelSV = baseInstanceModelMap.get("SV");
-        Model modelTP = baseInstanceModelMap.get("TP");
-        Model modelTPBD = baseInstanceModelMap.get("TPBD");
 
         Map<String, Model> convertedModelMap = new HashMap<>();
 
@@ -141,14 +147,14 @@ public class ModelManipulationFactory {
 
         //check for extensions
 
-        if (keepExtensions == 1) {
+        if (keepExtensions) {
             Map<String, String> oldPrefix = modelEQ.getNsPrefixMap();
             for (Map.Entry<String, String> entry : oldPrefix.entrySet()) {
                 if (!entry.getKey().equals("cim") && !entry.getKey().equals("eu") && !entry.getKey().equals("entsoe") && !entry.getKey().equals("md") && !entry.getKey().equals("rfd")) {
                     convEQModel.setNsPrefix(entry.getKey(), entry.getValue());
                 }
             }
-            if (eqOnly == 0) {
+            if (!eqOnly) {
                 oldPrefix = modelSSH.getNsPrefixMap();
                 for (Map.Entry<String, String> entry : oldPrefix.entrySet()) {
                     if (!entry.getKey().equals("cim") && !entry.getKey().equals("eu") && !entry.getKey().equals("entsoe") && !entry.getKey().equals("md") && !entry.getKey().equals("rfd")) {
@@ -203,7 +209,7 @@ public class ModelManipulationFactory {
             }
         }
 
-        if (eqOnly == 0) {
+        if (!eqOnly) {
             //add header for SSH
             RDFNode sshMAS = null;
             headerRes = modelSSH.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#", "FullModel")).nextResource();
@@ -563,7 +569,7 @@ public class ModelManipulationFactory {
         excludeTPBDattributes.add("TopologicalNode.toEndIsoCode");
         excludeTPBDattributes.add("TopologicalNode.boundaryPoint");
 
-        if (eqOnly == 0) {
+        if (!eqOnly) {
             //convert SV
             for (StmtIterator c = modelSV.listStatements(null, RDF.type, (RDFNode) null); c.hasNext(); ) { // loop on all classes
                 Statement stmtC = c.next();
@@ -674,7 +680,7 @@ public class ModelManipulationFactory {
         if (modelEQ.listStatements(null, RDF.type, ResourceFactory.createProperty(cim16NS, "DCNode")).hasNext()) {
             hasDCN = 1;
         }
-        if (eqOnly == 0) {
+        if (!eqOnly) {
             // convert TN of TP
             for (StmtIterator c = modelTP.listStatements(null, RDF.type, (RDFNode) null); c.hasNext(); ) { // loop on all classes
                 Statement stmtC = c.next();
@@ -934,7 +940,7 @@ public class ModelManipulationFactory {
 
                 assert newSub != null;
                 //add Equipment.inservice to SSH
-                if (eqOnly == 0) {
+                if (!eqOnly) {
                     if (getEqInService.contains(className)) {
                         //if contains SvStatus add Equipment.inService with the same status
                         if (modelSV.contains(ResourceFactory.createResource(cim16NS + newSub.getLocalName()), ResourceFactory.createProperty(cim16NS, "SvStatus.inService"))) {
@@ -970,7 +976,7 @@ public class ModelManipulationFactory {
                 }
 
                 //add SvStatus.inservice to SV
-                if (eqOnly == 0) {
+                if (!eqOnly) {
                     if (getSvStInService.contains(className)) {
                         //if (!modelSV.contains(ResourceFactory.createResource(cim16NS+newSub.getLocalName()),ResourceFactory.createProperty(cim16NS, "SvStatus.inService"))) {
                         if (!modelSV.listStatements(null, ResourceFactory.createProperty(cim16NS, "SvStatus.ConductingEquipment"), ResourceFactory.createProperty(newSub.toString())).hasNext()) {
@@ -1048,7 +1054,7 @@ public class ModelManipulationFactory {
         }
 
         //fix RegulatingControl targers - voltage
-        if (fixRegCont == 1) {
+        if (fixRegCont) {
             List<Resource> processedRC = new LinkedList<>();
             for (StmtIterator rc = convEQModel.listStatements(null, RDF.type, ResourceFactory.createProperty(cim17NS,"RegulatingControl")); rc.hasNext(); ) { // loop on RegulatingControl classes
                 Statement stmtRC = rc.next();
@@ -1108,7 +1114,7 @@ public class ModelManipulationFactory {
 
         //add the model to the map
         convertedModelMap.put("EQ", convEQModel);
-        if (eqOnly == 0) {
+        if (!eqOnly) {
             convertedModelMap.put("SSH", convSSHModel);
             convertedModelMap.put("SV", convSVModel);
             convertedModelMap.put("TP", convTPModel);

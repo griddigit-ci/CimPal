@@ -2,10 +2,7 @@ package eu.griddigit.cimpal.main.application.tasks;
 
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
-import eu.griddigit.cimpal.main.core.InstanceDataFactory;
-import javafx.scene.control.ProgressIndicator;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.riot.Lang;
+
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -25,8 +22,13 @@ public class CgmesConvertIgm implements ITask {
         private String status;
         private String info;
         private TaskStateUpdater taskUpdater;
-        private String newHeaderDescription;
         private boolean saveResult;
+
+    private final List<Path> inputFiles = new ArrayList<>();
+
+    private boolean keepExtensions = false;
+    private boolean convertOnlyEq = false;
+    private boolean alignRegulatingControlTargets = false;
 
     public CgmesConvertIgm() {
         this.name = "CGMES 2.4 → 3.0: Convert IGM (multi-file selection";
@@ -35,22 +37,6 @@ public class CgmesConvertIgm implements ITask {
         this.info = "0%";
         this.taskUpdater = new TaskStateUpdater();
     }
-
-    @Override
-    public void execute(SelectedTask parent) throws IOException {
-
-        WizardContext wizardContext = WizardContext.getInstance();
-        taskUpdater.updateState(parent,"Loading Base Data", "1%", wizardContext);
-
-        ModelManipulationFactory.ConvertCGMESv2v3(int keepExtensions, int eqOnly, int fixRegCont);
-
-        System.out.print("Conversion finished.\n");
-    }
-    private final List<Path> inputFiles = new ArrayList<>();
-
-    private boolean keepExtensions = false;
-    private boolean convertOnlyEq = false;
-    private boolean alignRegulatingControlTargets = false;
 
     @Override
     public String getName() {
@@ -73,6 +59,27 @@ public class CgmesConvertIgm implements ITask {
         }
     }
 
+    @Override
+    public void execute(SelectedTask parent) throws Exception {
+        String validationError = validateInputs();
+        if (validationError != null) {
+            throw new IllegalStateException(validationError);
+        }
+
+        WizardContext wizardContext = WizardContext.getInstance();
+        taskUpdater.updateState(parent, "Running CGMES IGM conversion", "1%", wizardContext);
+
+        ModelManipulationFactory.ConvertCGMESv2v3(
+                inputFiles,
+                keepExtensions,
+                convertOnlyEq,
+                alignRegulatingControlTargets
+        );
+
+        this.status = "Conversion finished";
+        this.info = "100%";
+        taskUpdater.updateState(parent, this.status, this.info, wizardContext);
+    }
     public boolean isKeepExtensions() {
         return keepExtensions;
     }
