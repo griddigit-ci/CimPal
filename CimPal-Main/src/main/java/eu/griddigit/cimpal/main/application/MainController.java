@@ -1587,6 +1587,17 @@ public class MainController implements Initializable {
                         xmlBase
                 );
                 System.out.println("Report saved to: " + report);
+
+                List<Path> createdZips = ValidationTools.zipByMapping(
+                        mappingFile.toPath(),
+                        modelsBaseDir.toPath(),
+                        outputBaseDir.toPath()
+                );
+
+                System.out.println("Created zip count: " + createdZips.size());
+                for (Path zip : createdZips) {
+                    System.out.println("ZIP: " + zip);
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }

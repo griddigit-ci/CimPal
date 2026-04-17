@@ -283,6 +283,135 @@ public class ValidationTools {
         return m;
     }
 
+    // ---------------- zipping ----------------
+    public static List<Path> zipByMapping(Path mappingCsvPath,
+                                          Path modelsBaseDir,
+                                          Path outputBaseDir) throws IOException {
+
+        List<MappingRow> rows = readMappingCsv(mappingCsvPath);
+        Files.createDirectories(outputBaseDir);
+
+        // category -> datasetName -> files
+        Map<ValidationExcelWriter.CaseFolder, Map<String, LinkedHashSet<Path>>> grouped = new LinkedHashMap<>();
+
+        for (MappingRow row : rows) {
+            if (row.xmlInputsRaw == null || row.xmlInputsRaw.trim().isEmpty()) continue;
+            if (row.ttl == null || row.ttl.trim().isEmpty()) continue;
+
+            LinkedHashSet<Path> xmlFiles = resolveFilesForRow(row, modelsBaseDir);
+            if (xmlFiles.isEmpty()) continue;
+
+            ValidationExcelWriter.CaseFolder category = categorizeForReport(row);
+            String datasetName = makeDatasetName(xmlFiles);
+
+            grouped
+                    .computeIfAbsent(category, k -> new LinkedHashMap<>())
+                    .computeIfAbsent(datasetName, k -> new LinkedHashSet<>())
+                    .addAll(xmlFiles);
+        }
+
+        List<Path> createdZips = new ArrayList<>();
+
+        for (Map.Entry<ValidationExcelWriter.CaseFolder, Map<String, LinkedHashSet<Path>>> categoryEntry : grouped.entrySet()) {
+            ValidationExcelWriter.CaseFolder category = categoryEntry.getKey();
+
+            Path categoryDir = outputBaseDir.resolve(category.name());
+            Files.createDirectories(categoryDir);
+
+            for (Map.Entry<String, LinkedHashSet<Path>> datasetEntry : categoryEntry.getValue().entrySet()) {
+                String datasetName = datasetEntry.getKey();
+                LinkedHashSet<Path> files = datasetEntry.getValue();
+
+                String safeZipName = sanitizeZipFileName(datasetName) + ".zip";
+                Path zipPath = categoryDir.resolve(safeZipName);
+
+                createZipFromFiles(zipPath, modelsBaseDir, files);
+                createdZips.add(zipPath);
+            }
+        }
+
+        System.out.println("[INFO] Created " + createdZips.size() + " zip file(s) under " + outputBaseDir.toAbsolutePath());
+        return createdZips;
+    }
+
+    private static void createZipFromFiles(Path zipPath,
+                                           Path modelsBaseDir,
+                                           Collection<Path> files) throws IOException {
+
+        Path parent = zipPath.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        try (java.util.zip.ZipOutputStream zos =
+                     new java.util.zip.ZipOutputStream(Files.newOutputStream(zipPath))) {
+
+            Set<String> addedEntries = new HashSet<>();
+
+            List<Path> sortedFiles = files.stream()
+                    .filter(Files::isRegularFile)
+                    .sorted(Comparator.comparing(Path::toString))
+                    .toList();
+
+            for (Path file : sortedFiles) {
+                String entryName = toZipEntryName(modelsBaseDir, file);
+
+                // Avoid duplicate zip entries
+                if (!addedEntries.add(entryName)) {
+                    entryName = makeUniqueZipEntryName(entryName, addedEntries);
+                }
+
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(entryName);
+                zos.putNextEntry(entry);
+                Files.copy(file, zos);
+                zos.closeEntry();
+            }
+        }
+    }
+
+    private static String toZipEntryName(Path modelsBaseDir, Path file) {
+        try {
+            Path normalizedBase = modelsBaseDir.toAbsolutePath().normalize();
+            Path normalizedFile = file.toAbsolutePath().normalize();
+
+            if (normalizedFile.startsWith(normalizedBase)) {
+                return normalizedBase.relativize(normalizedFile).toString().replace("\\", "/");
+            }
+        } catch (Exception ignore) {
+            // fallback below
+        }
+
+        return file.getFileName().toString();
+    }
+
+    private static String makeUniqueZipEntryName(String originalName, Set<String> existingNames) {
+        int dot = originalName.lastIndexOf('.');
+        String base = (dot >= 0) ? originalName.substring(0, dot) : originalName;
+        String ext = (dot >= 0) ? originalName.substring(dot) : "";
+
+        int counter = 2;
+        String candidate;
+        do {
+            candidate = base + "_" + counter + ext;
+            counter++;
+        } while (!existingNames.add(candidate));
+
+        return candidate;
+    }
+
+    private static String sanitizeZipFileName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "UNKNOWN";
+        }
+
+        String cleaned = name.trim()
+                .replaceAll("[\\\\/:*?\"<>|]", "_")
+                .replaceAll("\\s+", "_");
+
+        return cleaned.isEmpty() ? "UNKNOWN" : cleaned;
+    }
+
+
     // ---------------- categorization + dataset naming ----------------
 
     private static ValidationExcelWriter.CaseFolder categorizeForReport(MappingRow row) {
@@ -302,10 +431,12 @@ public class ValidationTools {
         boolean hasSSH = xml.contains("SSH");
         boolean hasTP = xml.contains("TP");
         boolean hasSV = xml.contains("SV");
-        boolean hasAE = xml.contains("AE");
+        boolean hasSvedala = xml.contains("Svedala");
+        boolean hasBritheim = xml.contains("Britheim");
+        boolean hasMultipleCountry = (hasBritheim && hasSvedala);
 
         // More specific case first
-        if (isCgmes && hasBoundary && hasEQ && hasSSH && hasTP && hasSV && hasAE) {
+        if (isCgmes && hasBoundary && hasEQ && hasSSH && hasTP && hasSV && hasMultipleCountry) {
             return ValidationExcelWriter.CaseFolder.CGMES_CGM;
         }
 
@@ -355,6 +486,7 @@ public class ValidationTools {
         Path fileName = first.getFileName();
         return fileName != null ? fileName.toString() : first.toString();
     }
+
 
     // ---------------- TTL resolution (ApplicationLibraryValidationConfigurations as root) ----------------
 
