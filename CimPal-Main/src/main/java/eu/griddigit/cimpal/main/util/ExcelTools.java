@@ -9,8 +9,10 @@ package eu.griddigit.cimpal.main.util;
 import eu.griddigit.cimpal.main.model.GenDataTemplateMapInfo;
 import eu.griddigit.cimpal.main.model.RDFAttributeData;
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
+import org.apache.jena.riot.Lang;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.*;
@@ -160,6 +162,101 @@ public class ExcelTools {
         return dataExcel;
     }
 
+    public static Map<String, List<String>> importXLSXToColumnMap(String fileName, int sheetNum) {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+
+        try (FileInputStream fis = new FileInputStream(fileName);
+             XSSFWorkbook book = new XSSFWorkbook(fis)) {
+
+            XSSFSheet sheet = book.getSheetAt(sheetNum);
+
+            if (sheet == null) {
+                System.err.println("Sheet No." + (sheetNum + 1) + " does not exist in the workbook.");
+                return result;
+            }
+
+            FormulaEvaluator evaluator = book.getCreationHelper().createFormulaEvaluator();
+            int firstRowNum = sheet.getFirstRowNum();
+            Row headerRow = sheet.getRow(firstRowNum);
+            if (headerRow == null) return result;
+
+            int colCount = headerRow.getLastCellNum();
+            if (colCount <= 0) return result;
+
+            Map<String, Integer> nameCounts = new HashMap<>();
+            List<String> headers = new ArrayList<>(colCount);
+
+            // Build unique headers
+            for (int c = 0; c < colCount; c++) {
+                Cell hCell = headerRow.getCell(c, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                String raw = (hCell == null) ? "" : readCellAsString(hCell, evaluator).trim();
+                String base = raw.isEmpty() ? "Column_" + (c + 1) : raw;
+
+                int n = nameCounts.getOrDefault(base, 0);
+                nameCounts.put(base, n + 1);
+
+                String unique = (n == 0) ? base : base + "_" + (n + 1);
+                headers.add(unique);
+                result.put(unique, new ArrayList<>());
+            }
+
+            // Each column is "open" until its first blank cell is found.
+            boolean[] columnOpen = new boolean[colCount];
+            Arrays.fill(columnOpen, true);
+
+            for (int r = firstRowNum + 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+
+                for (int c = 0; c < colCount; c++) {
+                    if (!columnOpen[c]) {
+                        continue; // This column already ended at a previous blank cell.
+                    }
+
+                    String value = "";
+                    if (row != null) {
+                        Cell cell = row.getCell(c, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                        if (cell != null) {
+                            value = readCellAsString(cell, evaluator).trim();
+                        }
+                    }
+
+                    if (value.isEmpty()) {
+                        columnOpen[c] = false; // Stop collecting values for this column.
+                        continue;
+                    }
+
+                    result.get(headers.get(c)).add(value);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    private static String readCellAsString(Cell cell, FormulaEvaluator evaluator) {
+        CellType type = cell.getCellType();
+        if (type == CellType.FORMULA) {
+            CellValue cv = evaluator.evaluate(cell);
+            if (cv == null) return "";
+            return switch (cv.getCellType()) {
+                case STRING -> cv.getStringValue();
+                case NUMERIC -> String.valueOf(cv.getNumberValue());
+                case BOOLEAN -> String.valueOf(cv.getBooleanValue());
+                default -> "";
+            };
+        }
+
+        return switch (type) {
+            case STRING -> cell.getStringCellValue();
+            case NUMERIC -> String.valueOf(cell.getNumericCellValue());
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            default -> "";
+        };
+    }
+
     //TODO delete this method and use the exportMapToExcel
     public static void exportToExcelMap(Map<String, RDFDatatype> dataTypeMap, OutputStream outputStream) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
@@ -264,6 +361,10 @@ public class ExcelTools {
     }
 
     public static CellStyle createHeaderStyle(Workbook workbook) {
+        return createHeaderStyleWithColor(workbook, IndexedColors.SKY_BLUE);
+    }
+
+    public static CellStyle createHeaderStyleWithColor(Workbook workbook, IndexedColors color) {
         CellStyle style = workbook.createCellStyle();
         Font font = workbook.createFont();
         font.setBold(true);
@@ -271,18 +372,12 @@ public class ExcelTools {
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         style.setWrapText(true);
-        // Set fill foreground color
-        style.setFillForegroundColor(IndexedColors.SKY_BLUE.getIndex());
-
-        // Set fill pattern (solid fill)
+        style.setFillForegroundColor(color.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-
-        // Add border
         style.setBorderTop(BorderStyle.THIN);
         style.setBorderRight(BorderStyle.THIN);
         style.setBorderBottom(BorderStyle.THIN);
         style.setBorderLeft(BorderStyle.THIN);
-
         return style;
     }
 
@@ -332,7 +427,9 @@ public class ExcelTools {
                                           XSSFWorkbook workbook, boolean hide) {
 
         // Create cell style for header row
-        CellStyle headerCellStyle = createHeaderStyle(workbook);
+        CellStyle staticHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.SKY_BLUE);
+        CellStyle mandatoryHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_YELLOW);
+        CellStyle optionalHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_GREEN);
 
         List<GenDataTemplateMapInfo> genDataInfos = new ArrayList<>();
 
@@ -354,7 +451,7 @@ public class ExcelTools {
 
         String headerClass = getHeaderClass(instanceClassData, classNames);
 
-        AddConfigSheet(genDataInfos, prefMap, headerClass, headerCellStyle, workbook);
+        AddConfigSheet(genDataInfos, prefMap, headerClass, staticHeaderCellStyle, workbook, instanceClassData);
 
         // Inverted HashMap
         HashMap<String, String> invertedPrefMap = new HashMap<>();
@@ -373,7 +470,8 @@ public class ExcelTools {
             sColN = classSheet.getRow(1).getLastCellNum();
         } else {
             classSheet = CreateTemplateSheetBase(sheetName,
-                    genDataInfos.getFirst().getFullClassName(), headerCellStyle, workbook, invertedPrefMap, hasInstanceData, genDataInfos.getFirst().getClsDescr());
+                    genDataInfos.getFirst().getFullClassName(), staticHeaderCellStyle, mandatoryHeaderCellStyle,
+                    workbook, invertedPrefMap, hasInstanceData, genDataInfos.getFirst().getClsDescr());
         }
 
         int maxWidthInCharacters = 150; // Maximum desired width in characters
@@ -387,7 +485,8 @@ public class ExcelTools {
                     sColN = classSheet.getRow(1).getLastCellNum();
                 } else {
                     classSheet = CreateTemplateSheetBase(sheetName, genDataInfo.getFullClassName(),
-                            headerCellStyle, workbook, invertedPrefMap, hasInstanceData, genDataInfo.getClsDescr());
+                            staticHeaderCellStyle, mandatoryHeaderCellStyle,
+                            workbook, invertedPrefMap, hasInstanceData, genDataInfo.getClsDescr());
                     sColN = 1;
                 }
             }
@@ -396,18 +495,21 @@ public class ExcelTools {
             XSSFRow datatypeRow = classSheet.getRow(3);
             XSSFRow multiRow = classSheet.getRow(4);
             XSSFRow isExtensionRow = classSheet.getRow(5);
+            XSSFRow mappingRow = classSheet.getRow(6);
 
             XSSFCell attrCell = attrRow.createCell(sColN);
-            attrCell.setCellStyle(headerCellStyle);
+            attrCell.setCellStyle(mandatoryHeaderCellStyle);
             XSSFCell typeCell = typeRow.createCell(sColN);
-            typeCell.setCellStyle(headerCellStyle);
+            typeCell.setCellStyle(mandatoryHeaderCellStyle);
             XSSFCell datatypeCell = datatypeRow.createCell(sColN);
-            datatypeCell.setCellStyle(headerCellStyle);
+            datatypeCell.setCellStyle(optionalHeaderCellStyle);
             XSSFCell multiCell = multiRow.createCell(sColN);
-            multiCell.setCellStyle(headerCellStyle);
+            multiCell.setCellStyle(optionalHeaderCellStyle);
             XSSFCell isExtensionCell = isExtensionRow.createCell(sColN);
-            isExtensionCell.setCellStyle(headerCellStyle);
+            isExtensionCell.setCellStyle(optionalHeaderCellStyle);
             isExtensionCell.setCellValue("No");
+            XSSFCell mappingCell = mappingRow.createCell(sColN);
+            mappingCell.setCellStyle(optionalHeaderCellStyle);
 
             Resource propRes = ResourceFactory.createResource(genDataInfo.getProp());
             String propNameShort = genDataInfo.getProp();
@@ -475,7 +577,7 @@ public class ExcelTools {
         }
 
         if (hasInstanceData) { // if instance data is available, fill the sheets with it
-            FillSheetWithInstanceData(workbook, instanceClassData, genDataInfos);
+            FillSheetWithInstanceData(workbook, instanceClassData, invertedPrefMap, genDataInfos);
         }
 
         //reordering sheets
@@ -545,45 +647,115 @@ public class ExcelTools {
     private static String getHeaderClass(Map<String, List<List<RDFAttributeData>>> instanceClassData, List<String> classNames) {
         // Give the config a header class if instance data has the info if not than we pick from the RDFS class names
         String headerClass = "";
+        String[] priorityClasses = {"Dataset", "DifferenceSet", "FullModel", "DifferenceModel"};
+        
         if (instanceClassData != null) {
-            if (instanceClassData.containsKey("Dataset")) {
-                headerClass = "Dataset";
-            } else if (instanceClassData.containsKey("DifferenceSet")) {
-                headerClass = "DifferenceSet";
-            } else if (instanceClassData.containsKey("FullModel")) {
-                headerClass = "FullModel";
-            } else if (instanceClassData.containsKey("DifferenceModel")) {
-                headerClass = "DifferenceModel";
+            for (String priority : priorityClasses) {
+                String found = findClassKeyByLocalName(instanceClassData.keySet(), priority);
+                if (found != null) {
+                    headerClass = priority;  // Return the local name, not the full URI
+                    break;
+                }
             }
         } else {
-            if (classNames.contains("Dataset")) {
-                headerClass = "Dataset";
-            } else if (classNames.contains("DifferenceSet")) {
-                headerClass = "DifferenceSet";
-            } else if (classNames.contains("FullModel")) {
-                headerClass = "FullModel";
-            } else if (classNames.contains("DifferenceModel")) {
-                headerClass = "DifferenceModel";
+            for (String priority : priorityClasses) {
+                if (classNames.contains(priority)) {
+                    headerClass = priority;
+                    break;
+                }
+                // Try to find by local name
+                for (String className : classNames) {
+                    if (getLocalName(className).equals(priority)) {
+                        headerClass = priority;
+                        break;
+                    }
+                }
+                if (!headerClass.isEmpty()) {
+                    break;
+                }
             }
         }
         return headerClass;
     }
+    
+    private static String findClassKeyByLocalName(Set<String> keys, String localName) {
+        // Try exact match first
+        if (keys.contains(localName)) {
+            return localName;
+        }
+        // Try to find by local name (handles URIs and prefixed names)
+        for (String key : keys) {
+            if (getLocalName(key).equals(localName)) {
+                return key;
+            }
+        }
+        return null;
+    }
+    
+    private static String getLocalName(String className) {
+        if (className == null || className.isBlank()) {
+            return className;
+        }
+        // Handle URI format (e.g., http://example.com#Dataset or http://example.com/Dataset)
+        if (className.contains("#")) {
+            return className.substring(className.lastIndexOf("#") + 1);
+        }
+        if (className.contains("/")) {
+            return className.substring(className.lastIndexOf("/") + 1);
+        }
+        // Handle prefixed format (e.g., nc:Dataset)
+        if (className.contains(":")) {
+            return className.substring(className.lastIndexOf(":") + 1);
+        }
+        return className;
+    }
 
-    private static void FillSheetWithInstanceData(XSSFWorkbook workbook, Map<String, List<List<RDFAttributeData>>> instanceClassData,
+    private static void FillSheetWithInstanceData(XSSFWorkbook workbook, Map<String,
+                                                          List<List<RDFAttributeData>>> instanceClassData,
+                                                  Map<String,String> invertedPrefMap,
                                                   List<GenDataTemplateMapInfo> genDataInfos) {
-        List<String> classNames = genDataInfos.stream()
-                .map(GenDataTemplateMapInfo::getClassName)
-                .distinct()
-                .toList();
-        List<String> sheetClassNames = genDataInfos.stream()
-                .map(GenDataTemplateMapInfo::getSheetClassName)
-                .distinct()
-                .toList();
-        for (int i = 0; i < classNames.size(); i++) {
-            XSSFSheet sheet = workbook.getSheet(sheetClassNames.get(i));
-            String className = classNames.get(i);
+        if (instanceClassData == null || instanceClassData.isEmpty()) {
+            return;
+        }
 
-            List<List<RDFAttributeData>> dataInClass = instanceClassData.get(className);
+        Map<String, GenDataTemplateMapInfo> classInfoByName = new LinkedHashMap<>();
+        for (GenDataTemplateMapInfo info : genDataInfos) {
+            classInfoByName.putIfAbsent(info.getClassName(), info);
+        }
+
+        for (Map.Entry<String, List<List<RDFAttributeData>>> classEntry : instanceClassData.entrySet()) {
+            String classNameWithNS = classEntry.getKey();
+            String className = classNameWithNS.split("#", 2)[1];
+            GenDataTemplateMapInfo classInfo = classInfoByName.get(className);
+
+            String sheetName = classInfo != null
+                    ? classInfo.getSheetClassName()
+                    : getSheetNameFromClassName(className);
+            String fullClassName = classInfo != null
+                    ? classInfo.getFullClassName()
+                    : classNameWithNS;
+            String classDescr = classInfo != null
+                    ? classInfo.getClsDescr()
+                    : "false";
+
+            XSSFSheet sheet = workbook.getSheet(sheetName);
+
+            if (sheet == null) {
+                CellStyle staticHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.SKY_BLUE);
+                CellStyle mandatoryHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_YELLOW);
+                sheet = CreateTemplateSheetBase(
+                        sheetName,
+                        fullClassName,
+                        staticHeaderCellStyle,
+                        mandatoryHeaderCellStyle,
+                        workbook,
+                        invertedPrefMap,
+                        true,
+                        classDescr);
+                markClassNameCellRed(workbook, sheet);
+            }
+
+            List<List<RDFAttributeData>> dataInClass = classEntry.getValue();
 
             if (dataInClass == null)
                 continue;
@@ -591,9 +763,26 @@ public class ExcelTools {
             CellStyle headerStyleRed = createHeaderStyle(workbook);
             headerStyleRed.setFillForegroundColor(IndexedColors.RED.getIndex());
             CellStyle dataStyle = createDataStyle(workbook);
-            XSSFRow attrRow = sheet.getRow(1);
-            XSSFRow typeRow = sheet.getRow(2);
-            XSSFRow isExtensionRow = sheet.getRow(5);
+            XSSFRow attrRow = sheet.getRow(1) != null ? sheet.getRow(1) : sheet.createRow(1);
+            XSSFRow typeRow = sheet.getRow(2) != null ? sheet.getRow(2) : sheet.createRow(2);
+            XSSFRow isExtensionRow = sheet.getRow(5) != null ? sheet.getRow(5) : sheet.createRow(5);
+
+            if (attrRow.getCell(0) == null) {
+                XSSFCell attrCell = attrRow.createCell(0);
+                attrCell.setCellStyle(createHeaderStyle(workbook));
+                attrCell.setCellValue("rdf:id");
+            }
+            if (typeRow.getCell(0) == null) {
+                XSSFCell typeCell = typeRow.createCell(0);
+                typeCell.setCellStyle(createHeaderStyle(workbook));
+                typeCell.setCellValue("Resource");
+            }
+            if (isExtensionRow.getCell(0) == null) {
+                XSSFCell isExtensionCell = isExtensionRow.createCell(0);
+                isExtensionCell.setCellStyle(createHeaderStyle(workbook));
+                isExtensionCell.setCellValue("IsExtension");
+            }
+
             int rowNumber = 7;
 
             for (List<RDFAttributeData> attrList : dataInClass) { // looping through the class instances
@@ -604,6 +793,18 @@ public class ExcelTools {
                     continue;
                 }
                 int idCol = getCellNumber(attrRow, idAttribute.getFullName());
+                if (idCol == -1) {
+                    idCol = Math.max(attrRow.getLastCellNum(), 0);
+                    XSSFCell attrCell = attrRow.createCell(idCol);
+                    attrCell.setCellStyle(headerStyleRed);
+                    attrCell.setCellValue(idAttribute.getFullName());
+                    XSSFCell typeCell = typeRow.createCell(idCol);
+                    typeCell.setCellStyle(headerStyleRed);
+                    typeCell.setCellValue("Resource");
+                    XSSFCell isExtensionCell = isExtensionRow.createCell(idCol);
+                    isExtensionCell.setCellStyle(headerStyleRed);
+                    isExtensionCell.setCellValue("Yes");
+                }
                 int rowOffset = 0;
 
                 for (RDFAttributeData data : attrList) { // loop on every attribute (creating new rows in the xls)
@@ -611,7 +812,7 @@ public class ExcelTools {
                         continue;
                     int valueCol = getCellNumber(attrRow, data.getFullName());
                     if (valueCol == -1) {  // add a new attribute to the end of the row
-                        valueCol = attrRow.getLastCellNum();
+                        valueCol = Math.max(attrRow.getLastCellNum(), 0);
                         XSSFCell attrCell = attrRow.createCell(valueCol);
                         attrCell.setCellStyle(headerStyleRed);
                         attrCell.setCellValue(data.getFullName());
@@ -660,6 +861,23 @@ public class ExcelTools {
 
     }
 
+    private static String getSheetNameFromClassName(String className) {
+        String safeName = className == null ? "" : className.replaceAll("[:\\\\/?*\\[\\]]", "_").trim();
+        if (safeName.isEmpty()) {
+            return "UnknownClass";
+        }
+        return safeName.length() > 31 ? safeName.substring(0, 31) : safeName;
+    }
+
+    private static void markClassNameCellRed(XSSFWorkbook workbook, XSSFSheet sheet) {
+        XSSFRow classRow = sheet.getRow(0) != null ? sheet.getRow(0) : sheet.createRow(0);
+        XSSFCell classCell = classRow.getCell(1) != null ? classRow.getCell(1) : classRow.createCell(1);
+
+        CellStyle redClassStyle = createHeaderStyle(workbook);
+        redClassStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
+        classCell.setCellStyle(redClassStyle);
+    }
+
     private static int getCellNumber(XSSFRow attrRow, String attrName) {
         // Gives back the index of the column where the given attribute is found in the attributes row
         // if not found return -1
@@ -672,8 +890,11 @@ public class ExcelTools {
         return -1;
     }
 
-    private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String, String> prefMap, String headerClass, CellStyle headerCellStyle, XSSFWorkbook workbook) {
+    private static void AddConfigSheet(List<GenDataTemplateMapInfo> genDataInfos, Map<String, String> prefMap, String headerClass,
+                                       CellStyle headerCellStyle, XSSFWorkbook workbook,
+                                       Map<String, List<List<RDFAttributeData>>> instanceClassData) {
         XSSFSheet configSheet = workbook.createSheet("Config");
+        CellStyle mandatoryHeaderCellStyle = createHeaderStyleWithColor(workbook, IndexedColors.LIGHT_YELLOW);
         // Write header row
         XSSFRow headerRow = configSheet.createRow(0);
         XSSFCell hCell1 = headerRow.createCell(0);
@@ -697,25 +918,43 @@ public class ExcelTools {
         hCell5.setCellValue("Classes to print [Refer to the name of the tab]");
         hCell6.setCellValue("Header class");
 
-        List<String> sheetClassNames = genDataInfos.stream()
-                .map(GenDataTemplateMapInfo::getSheetClassName)
-                .distinct()
-                .toList();
-        List<String> classNames = new ArrayList<>(genDataInfos.stream()
-                .map(GenDataTemplateMapInfo::getFullClassName)
-                .distinct()
-                .toList());
+        List<String> sheetClassNames = new ArrayList<>();
+        List<String> classNames = new ArrayList<>();
+        Set<String> seenSheetNames = new HashSet<>();
 
-        Map<String, String> invertedPrefMap = prefMap.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+        for (GenDataTemplateMapInfo info : genDataInfos) {
+            String sheetName = info.getSheetClassName();
+            if (seenSheetNames.add(sheetName)) {
+                sheetClassNames.add(sheetName);
+                classNames.add(info.getFullClassName());
+            }
+        }
+
+        if (instanceClassData != null) {
+            for (String xmlClassName : instanceClassData.keySet()) {
+                String xmlSheetName = getSheetNameFromClassName(xmlClassName.split("#", 2)[1]);
+                if (seenSheetNames.add(xmlSheetName)) {
+                    sheetClassNames.add(xmlSheetName);
+                    classNames.add(xmlClassName);
+                }
+            }
+        }
+
+        Map<String, List<String>> invertedPrefMap = prefMap.entrySet().stream()
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getValue,
+                        Collectors.mapping(Map.Entry::getKey, Collectors.toList())
+                ));
 
         for (int i = 0; i < classNames.size(); i++) {
             String className = classNames.get(i);
             String[] parts = className.split("#", 2);
-            String prefix = invertedPrefMap.get(parts[0] + "#");
-            if (prefix != null) {
-                className = prefix + ":" + parts[1]; // Add prefix to class name
-                classNames.set(i, className); // Update the class name in the list
+            if (parts.length == 2) {
+                List<String> prefixes = invertedPrefMap.get(parts[0] + "#");
+                if (prefixes != null && !prefixes.isEmpty()) {
+                    className = prefixes.getFirst() + ":" + parts[1]; // Add prefix to class name
+                    classNames.set(i, className); // Update the class name in the list
+                }
             }
         }
 
@@ -745,9 +984,13 @@ public class ExcelTools {
                 row.createCell(4).setCellValue(sheetClassNames.get(rowN));
             }
 
-            // add header class if data exist
-            if (rowN == 0 && !headerClass.isEmpty()) {
-                row.createCell(5).setCellValue(headerClass);
+            // Header class is mandatory for generation; highlight the input cell even when auto-detection fails.
+            if (rowN == 0) {
+                XSSFCell headerClassCell = row.createCell(5);
+                if (!headerClass.isEmpty()) {
+                    headerClassCell.setCellValue(headerClass);
+                }
+                headerClassCell.setCellStyle(mandatoryHeaderCellStyle);
             }
 
             rowN++;
@@ -755,7 +998,9 @@ public class ExcelTools {
 
     }
 
-    private static XSSFSheet CreateTemplateSheetBase(String sheetName, String className, CellStyle headerCellStyle,
+    private static XSSFSheet CreateTemplateSheetBase(String sheetName, String className,
+                                                     CellStyle staticHeaderCellStyle,
+                                                     CellStyle mandatoryHeaderCellStyle,
                                                      XSSFWorkbook workbook, Map<String, String> invertedPrefMap,
                                                      boolean hasInstanceData, String classDescr) {
         XSSFSheet sheet = workbook.createSheet(sheetName);
@@ -764,7 +1009,7 @@ public class ExcelTools {
         XSSFRow firstRow = sheet.createRow(0);
         XSSFCell firstCell = firstRow.createCell(0);
         firstCell.setCellValue("Class");
-        firstCell.setCellStyle(headerCellStyle);
+        firstCell.setCellStyle(staticHeaderCellStyle);
         XSSFCell cellClass = firstRow.createCell(1);
         Resource classNameRes = ResourceFactory.createResource(className);
         String classNameShort = className;
@@ -772,11 +1017,11 @@ public class ExcelTools {
             classNameShort = invertedPrefMap.get(classNameRes.getNameSpace()) + ":" + classNameRes.getLocalName();
         }
         cellClass.setCellValue(classNameShort);
-        cellClass.setCellStyle(headerCellStyle);
+        cellClass.setCellStyle(mandatoryHeaderCellStyle);
 
         XSSFCell cellClassDescAbout = firstRow.createCell(2);
         cellClassDescAbout.setCellValue("rdf:about");
-        cellClassDescAbout.setCellStyle(headerCellStyle);
+        cellClassDescAbout.setCellStyle(staticHeaderCellStyle);
 
         XSSFCell cellClassDesc = firstRow.createCell(3);
         if (classNameRes.getLocalName().equals("Dataset") || classNameRes.getLocalName().equals("DifferenceSet") || classNameRes.getLocalName().equals("FullModel") || classNameRes.getLocalName().equals("DifferenceModel")) {
@@ -784,40 +1029,173 @@ public class ExcelTools {
         } else {
             cellClassDesc.setCellValue(classDescr);
         }
-        cellClassDesc.setCellStyle(headerCellStyle);
+        cellClassDesc.setCellStyle(mandatoryHeaderCellStyle);
 
         // Attribute row
         XSSFRow row = sheet.createRow(1);
         XSSFCell cell = row.createCell(0);
         cell.setCellValue("rdf:id"); // setting rdf:id in the first column
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Property type row
         row = sheet.createRow(2);
         cell = row.createCell(0);
         cell.setCellValue("Resource");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Datatype row
         row = sheet.createRow(3);
         cell = row.createCell(0);
         cell.setCellValue("Datatype");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Multiplicity row
         row = sheet.createRow(4);
         cell = row.createCell(0);
         cell.setCellValue("1..1");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Extension row
         row = sheet.createRow(5);
         cell = row.createCell(0);
         cell.setCellValue("IsExtension");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
         // Mapping row
         row = sheet.createRow(6);
         cell = row.createCell(0);
         cell.setCellValue("Mapping");
-        cell.setCellStyle(headerCellStyle);
+        cell.setCellStyle(staticHeaderCellStyle);
 
 
         return sheet;
     }
+
+    public static void CreateTemplateFromXMLQAR(List<File> files) throws IOException {
+        Map<String, Model> modelMap = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoadPerFiles(files, "http://griddigit.eu#", Lang.RDFXML);
+
+        // Create workbook
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        XSSFSheet sheet = workbook.createSheet("FileData");
+
+        // Create header style
+        CellStyle headerCellStyle = createHeaderStyle(workbook);
+        CellStyle dataCellStyle = createDataStyle(workbook);
+
+        // Create header row
+        XSSFRow headerRow = sheet.createRow(0);
+        String[] headers = {"FileName", "FileProfile", "MAS", "FileID"};
+        for (int i = 0; i < headers.length; i++) {
+            XSSFCell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerCellStyle);
+        }
+
+        // Process each model and extract data
+        int rowNum = 1;
+        for (Map.Entry<String, Model> entry : modelMap.entrySet()) {
+            String fileName = entry.getKey();
+            Model model = entry.getValue();
+
+            // Extract FileProfile from model (e.g., "EQ", "SSH", "SV", "TP")
+            String fileProfile = eu.griddigit.cimpal.core.utils.ModelFactory.getProfileKeyword(model);
+
+            // Query model for MAS and FileID
+            String mas = extractMAS(model);
+            String fileID = extractFileID(model);
+
+            // Create data row
+            XSSFRow dataRow = sheet.createRow(rowNum++);
+
+            XSSFCell fileNameCell = dataRow.createCell(0);
+            fileNameCell.setCellValue(fileName);
+            fileNameCell.setCellStyle(dataCellStyle);
+
+            XSSFCell profileCell = dataRow.createCell(1);
+            profileCell.setCellValue(fileProfile);
+            profileCell.setCellStyle(dataCellStyle);
+
+            XSSFCell masCell = dataRow.createCell(2);
+            masCell.setCellValue(mas);
+            masCell.setCellStyle(dataCellStyle);
+
+            XSSFCell fileIDCell = dataRow.createCell(3);
+            fileIDCell.setCellValue(fileID);
+            fileIDCell.setCellStyle(dataCellStyle);
+        }
+
+        // Auto-size columns
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        // Freeze header row
+        sheet.createFreezePane(0, 1);
+
+        // Add filter
+        sheet.setAutoFilter(new CellRangeAddress(0, rowNum - 1, 0, headers.length - 1));
+
+        // Save the file
+        saveExcelFile(workbook, "Save QAR template", "QAR_template.xlsx");
+    }
+
+    private static String extractMAS(Model model) {
+        // Query for md:Model.modelingAuthoritySet
+        String query = "PREFIX md: <http://iec.ch/TC57/61970-552/ModelDescription/1#> " +
+                "SELECT ?mas WHERE { ?model md:Model.modelingAuthoritySet ?mas }";
+
+        try (org.apache.jena.query.QueryExecution qexec =
+                     org.apache.jena.query.QueryExecutionFactory.create(query, model)) {
+            org.apache.jena.query.ResultSet results = qexec.execSelect();
+            if (results.hasNext()) {
+                return results.next().get("mas").toString();
+            }
+        }
+        return "";
+    }
+
+    private static String extractFileID(Model model) {
+        // Query for rdf:about or rdf:ID of the main model resource
+        String query = "PREFIX md: <http://iec.ch/TC57/61970-552/ModelDescription/1#> " +
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " +
+                "SELECT ?id WHERE { ?model rdf:type md:FullModel . BIND(str(?model) AS ?id) }";
+
+        try (org.apache.jena.query.QueryExecution qexec =
+                     org.apache.jena.query.QueryExecutionFactory.create(query, model)) {
+            org.apache.jena.query.ResultSet results = qexec.execSelect();
+            if (results.hasNext()) {
+                return results.next().get("id").toString();
+            }
+        }
+        return "";
+    }
+
+    public static Map<String, List<String>> ExcelDataToColumnMap(ArrayList<Object> sheetData) {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        if (sheetData == null || sheetData.isEmpty()) {
+            return result;
+        }
+
+        LinkedList<?> headerRow = (LinkedList<?>) sheetData.getFirst();
+        int colCount = headerRow.size();
+
+        Map<String, Integer> nameCounts = new HashMap<>();
+        List<String> headers = new ArrayList<>(colCount);
+
+        for (int c = 0; c < colCount; c++) {
+            String raw = headerRow.get(c) == null ? "" : headerRow.get(c).toString().trim();
+            String base = raw.isEmpty() ? "Column_" + (c + 1) : raw;
+            int n = nameCounts.getOrDefault(base, 0);
+            nameCounts.put(base, n + 1);
+
+            String unique = (n == 0) ? base : base + "_" + (n + 1);
+            headers.add(unique);
+            result.put(unique, new ArrayList<>());
+        }
+
+        for (int r =1; r < sheetData.size(); r++) {
+            LinkedList<?> row = (LinkedList<?>) sheetData.get(r);
+            for (int c = 0; c < colCount; c++) {
+                String v = (c < row.size() && row.get(c) != null) ? row.get(c).toString().trim() : "";
+                result.get(headers.get(c)).add(v);
+            }
+        }
+        return result;
+    }
+
 }

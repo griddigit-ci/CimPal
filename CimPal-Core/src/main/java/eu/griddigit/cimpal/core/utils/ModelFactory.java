@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
 public class ModelFactory {
 
@@ -62,37 +63,31 @@ public class ModelFactory {
                     streams = unzip(file);
                     format = Lang.RDFXML;
                 } else {
-                    streams = List.of(new FileInputStream(file));
+                    streams = List.of(new ByteArrayInputStream(new FileInputStream(file).readAllBytes()));
                     format = getLangFromExtension(ext, rdfSourceFormat);
                 }
 
-                for (int i = 0; i < streams.size(); i++) {
-                    try (InputStream in = streams.get(i)) {
-                        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-                        RDFDataMgr.read(model, in, xmlBase, format);
+                streams.parallelStream().forEach(in -> {
+                    Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    RDFDataMgr.read(model, in, xmlBase, format);
 
-                        // Merge prefixes (deferred until after parallel loop)
-                        String keyword = getProfileKeyword(model);
-                        if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
-                        String key = buildModelKey(file, keyword, isZip, i, treeID);
+                    String keyword = getProfileKeyword(model);
+                    if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
+                    String key = buildModelKey(file, keyword, isZip, streams.indexOf(in), treeID);
 
-                        modelMap.put(key, model);
+                    modelMap.put(key, model);
 
-                        synchronized (unionLock) {
-                            unionModel.add(model);
-                            unionModel.setNsPrefixes(model);
-                        }
-                        if (!"FH".equals(keyword)) {
-                            synchronized (unionNoHeaderLock) {
-                                unionNoHeader.add(model);
-                                unionNoHeader.setNsPrefixes(model);
-                            }
-                        }
-
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                    synchronized (unionLock) {
+                        unionModel.add(model);
+                        unionModel.setNsPrefixes(model);
                     }
-                }
+                    if (!"FH".equals(keyword)) {
+                        synchronized (unionNoHeaderLock) {
+                            unionNoHeader.add(model);
+                            unionNoHeader.setNsPrefixes(model);
+                        }
+                    }
+                });
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -134,6 +129,67 @@ public class ModelFactory {
         return model;
     }
 
+    public static Map<String, Model> modelLoadPerFiles(List<File> files, String xmlBase, Lang defaultLang) throws IOException {
+        ConcurrentMap<String, Model> result = new ConcurrentHashMap<>();
+
+        files.parallelStream().forEach(file -> {
+            try {
+                String ext = FilenameUtils.getExtension(file.getName()).toLowerCase(Locale.ROOT);
+                boolean isZip = "zip".equals(ext);
+
+                if (isZip) {
+                    try (ZipFile zipFile = new ZipFile(file)) {
+                        Path parentDir = file.getParentFile() != null
+                                ? file.getParentFile().toPath().toAbsolutePath()
+                                : Paths.get("").toAbsolutePath();
+
+                        // Collect all valid entries first
+                        List<ZipEntry> validEntries = new ArrayList<>();
+                        Enumeration<? extends ZipEntry> entries = zipFile.entries();
+                        while (entries.hasMoreElements()) {
+                            ZipEntry entry = entries.nextElement();
+                            if (!entry.isDirectory()) {
+                                validEntries.add(entry);
+                            }
+                        }
+
+                        // Process entries in parallel
+                        validEntries.parallelStream().forEach(entry -> {
+                            try {
+                                String entryName = entry.getName();
+                                Path destPath = parentDir.resolve(entryName).normalize();
+                                if (!destPath.startsWith(parentDir)) {
+                                    throw new IOException("Invalid zip entry path (possible zip-slip): " + entryName);
+                                }
+
+                                String entryExt = FilenameUtils.getExtension(entryName).toLowerCase(Locale.ROOT);
+                                Lang lang = getLangFromExtension(entryExt, defaultLang);
+
+                                try (InputStream in = zipFile.getInputStream(entry)) {
+                                    Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                                    RDFDataMgr.read(model, in, xmlBase, lang);
+                                    result.put(entryName, model);
+                                }
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                        });
+                    }
+                } else {
+                    Lang lang = getLangFromExtension(ext, defaultLang);
+                    try (InputStream in = new FileInputStream(file)) {
+                        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                        RDFDataMgr.read(model, in, xmlBase, lang);
+                        result.put(file.getName(), model);
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+
+        return new HashMap<>(result);
+    }
 
     private static Lang getLangFromExtension(String ext, Lang fallback) {
         return switch (ext) {
@@ -164,36 +220,75 @@ public class ModelFactory {
     public static List<InputStream> unzip(File selectedFile) {
         List<InputStream> inputstreamlist = new LinkedList<>();
         zipfilesnames = new LinkedList<>();
-        InputStream inputStream = null;
-        try{
-            ZipFile zipFile = new ZipFile(selectedFile);
 
+        try {
+            ZipFile zipFile = new ZipFile(selectedFile);
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
-
-
-            while(entries.hasMoreElements()){
+            while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
 
-                    String destPath = selectedFile.getParent() + File.separator+ entry.getName();
+                String destPath = selectedFile.getParent() + File.separator + entry.getName();
+                if (!isValidDestPath(selectedFile.getParent(), destPath)) {
+                    throw new IOException("Final file output path is invalid: " + destPath);
+                }
 
-                    if(! isValidDestPath(selectedFile.getParent(), destPath)){
-                        throw new IOException("Final file output path is invalid: " + destPath);
-                    }
+                try (InputStream inputStream = zipFile.getInputStream(entry)) {
+                    byte[] content = inputStream.readAllBytes();
+                    String entryName = entry.getName();
+                    String ext = FilenameUtils.getExtension(entryName).toLowerCase();
 
-                    try{
-                        inputStream = zipFile.getInputStream(entry);
-                        inputstreamlist.add(inputStream);
-                        zipfilesnames.add(entry.getName());
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                    // Check if the entry is itself a ZIP file
+                    if (ext.equals("zip")) {
+                        // Recursively extract nested ZIP
+                        List<InputStream> nestedStreams = unzip(new ByteArrayInputStream(content));
+                        inputstreamlist.addAll(nestedStreams);
+                    } else {
+                        // Add non-ZIP file to the list
+                        inputstreamlist.add(new ByteArrayInputStream(content));
                     }
+                    zipfilesnames.add(entryName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        } catch(IOException e){
+            zipFile.close();
+        } catch (IOException e) {
             throw new RuntimeException("Error unzipping file " + selectedFile, e);
         }
+
         return inputstreamlist;
     }
+
+    public static List<InputStream> unzip(InputStream zipStream) {
+        List<InputStream> inputstreamlist = new LinkedList<>();
+
+        try (ZipInputStream zis = new ZipInputStream(zipStream)) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    zis.closeEntry();
+                    continue;
+                }
+
+                byte[] content = zis.readAllBytes();
+                String entryName = entry.getName();
+                String ext = FilenameUtils.getExtension(entryName).toLowerCase(Locale.ROOT);
+
+                if (ext.equals("zip")) {
+                    inputstreamlist.addAll(unzip(new ByteArrayInputStream(content)));
+                } else {
+                    inputstreamlist.add(new ByteArrayInputStream(content));
+                }
+                zis.closeEntry();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error unzipping input stream", e);
+        }
+
+        return inputstreamlist;
+    }
+
 
     private static boolean isValidDestPath(String targetDir, String destPathStr) {
         // validate the destination path of a ZipFile entry,
