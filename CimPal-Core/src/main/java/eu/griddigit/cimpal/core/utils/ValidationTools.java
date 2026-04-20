@@ -284,6 +284,7 @@ public class ValidationTools {
     }
 
     // ---------------- zipping ----------------
+
     public static List<Path> zipByMapping(Path mappingCsvPath,
                                           Path modelsBaseDir,
                                           Path outputBaseDir) throws IOException {
@@ -291,10 +292,12 @@ public class ValidationTools {
         List<MappingRow> rows = readMappingCsv(mappingCsvPath);
         Files.createDirectories(outputBaseDir);
 
-        // category -> datasetName -> files
-        Map<ValidationExcelWriter.CaseFolder, Map<String, LinkedHashSet<Path>>> grouped = new LinkedHashMap<>();
+        List<Path> createdZips = new ArrayList<>();
 
+        int rowIdx = 0;
         for (MappingRow row : rows) {
+            rowIdx++;
+
             if (row.xmlInputsRaw == null || row.xmlInputsRaw.trim().isEmpty()) continue;
             if (row.ttl == null || row.ttl.trim().isEmpty()) continue;
 
@@ -302,40 +305,23 @@ public class ValidationTools {
             if (xmlFiles.isEmpty()) continue;
 
             ValidationExcelWriter.CaseFolder category = categorizeForReport(row);
-            String datasetName = makeDatasetName(xmlFiles);
-
-            grouped
-                    .computeIfAbsent(category, k -> new LinkedHashMap<>())
-                    .computeIfAbsent(datasetName, k -> new LinkedHashSet<>())
-                    .addAll(xmlFiles);
-        }
-
-        List<Path> createdZips = new ArrayList<>();
-
-        for (Map.Entry<ValidationExcelWriter.CaseFolder, Map<String, LinkedHashSet<Path>>> categoryEntry : grouped.entrySet()) {
-            ValidationExcelWriter.CaseFolder category = categoryEntry.getKey();
-
             Path categoryDir = outputBaseDir.resolve(category.name());
             Files.createDirectories(categoryDir);
 
-            for (Map.Entry<String, LinkedHashSet<Path>> datasetEntry : categoryEntry.getValue().entrySet()) {
-                String datasetName = datasetEntry.getKey();
-                LinkedHashSet<Path> files = datasetEntry.getValue();
+            String datasetName = makeDatasetName(xmlFiles);
+            String zipFileName = makeRowZipFileName(rowIdx, datasetName);
 
-                String safeZipName = sanitizeZipFileName(datasetName) + ".zip";
-                Path zipPath = categoryDir.resolve(safeZipName);
+            Path zipPath = categoryDir.resolve(zipFileName);
+            createSingleRowZip(zipPath, xmlFiles);
 
-                createZipFromFiles(zipPath, modelsBaseDir, files);
-                createdZips.add(zipPath);
-            }
+            createdZips.add(zipPath);
         }
 
         System.out.println("[INFO] Created " + createdZips.size() + " zip file(s) under " + outputBaseDir.toAbsolutePath());
         return createdZips;
     }
 
-    private static void createZipFromFiles(Path zipPath,
-                                           Path modelsBaseDir,
+    private static void createSingleRowZip(Path zipPath,
                                            Collection<Path> files) throws IOException {
 
         Path parent = zipPath.getParent();
@@ -346,19 +332,19 @@ public class ValidationTools {
         try (java.util.zip.ZipOutputStream zos =
                      new java.util.zip.ZipOutputStream(Files.newOutputStream(zipPath))) {
 
-            Set<String> addedEntries = new HashSet<>();
-
             List<Path> sortedFiles = files.stream()
                     .filter(Files::isRegularFile)
                     .sorted(Comparator.comparing(Path::toString))
                     .toList();
 
-            for (Path file : sortedFiles) {
-                String entryName = toZipEntryName(modelsBaseDir, file);
+            Set<String> usedNamesInZip = new HashSet<>();
 
-                // Avoid duplicate zip entries
-                if (!addedEntries.add(entryName)) {
-                    entryName = makeUniqueZipEntryName(entryName, addedEntries);
+            for (Path file : sortedFiles) {
+                String fileName = file.getFileName().toString();
+                String entryName = fileName;
+
+                if (!usedNamesInZip.add(entryName)) {
+                    entryName = makeUniqueFileName(entryName, usedNamesInZip);
                 }
 
                 java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(entryName);
@@ -369,22 +355,12 @@ public class ValidationTools {
         }
     }
 
-    private static String toZipEntryName(Path modelsBaseDir, Path file) {
-        try {
-            Path normalizedBase = modelsBaseDir.toAbsolutePath().normalize();
-            Path normalizedFile = file.toAbsolutePath().normalize();
-
-            if (normalizedFile.startsWith(normalizedBase)) {
-                return normalizedBase.relativize(normalizedFile).toString().replace("\\", "/");
-            }
-        } catch (Exception ignore) {
-            // fallback below
-        }
-
-        return file.getFileName().toString();
+    private static String makeRowZipFileName(int rowIdx, String datasetName) {
+        String base = (datasetName == null || datasetName.trim().isEmpty()) ? "UNKNOWN" : datasetName.trim();
+        return sanitizeZipFileName(String.format("row_%03d_%s.zip", rowIdx, base));
     }
 
-    private static String makeUniqueZipEntryName(String originalName, Set<String> existingNames) {
+    private static String makeUniqueFileName(String originalName, Set<String> existingNames) {
         int dot = originalName.lastIndexOf('.');
         String base = (dot >= 0) ? originalName.substring(0, dot) : originalName;
         String ext = (dot >= 0) ? originalName.substring(dot) : "";
@@ -411,7 +387,6 @@ public class ValidationTools {
         return cleaned.isEmpty() ? "UNKNOWN" : cleaned;
     }
 
-
     // ---------------- categorization + dataset naming ----------------
 
     private static ValidationExcelWriter.CaseFolder categorizeForReport(MappingRow row) {
@@ -436,7 +411,7 @@ public class ValidationTools {
         boolean hasMultipleCountry = (hasBritheim && hasSvedala);
 
         // More specific case first
-        if (isCgmes && hasBoundary && hasEQ && hasSSH && hasTP && hasSV && hasMultipleCountry) {
+        if (isCgmes && hasBoundary && hasEQ && hasMultipleCountry) {
             return ValidationExcelWriter.CaseFolder.CGMES_CGM;
         }
 

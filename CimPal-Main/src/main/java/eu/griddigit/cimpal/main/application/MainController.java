@@ -1555,7 +1555,7 @@ public class MainController implements Initializable {
         //the second the ttl file that should validate it
         List<File> mappingCsvFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Validation mapping file", List.of( "*.csv"), "Mapping file");
         File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the models root folder");
-        File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips");
+        File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips and report");
         //Root is where the mapping file starts the path
         File constraintsRoot = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select constraint's root folder");
 
