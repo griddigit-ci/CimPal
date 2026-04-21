@@ -7,6 +7,7 @@
 package eu.griddigit.cimpal.main.util;
 
 
+import eu.griddigit.cimpal.core.utils.DataTypeStreamRDF;
 import eu.griddigit.cimpal.main.application.MainController;
 import javafx.scene.control.Alert;
 import javafx.stage.DirectoryChooser;
