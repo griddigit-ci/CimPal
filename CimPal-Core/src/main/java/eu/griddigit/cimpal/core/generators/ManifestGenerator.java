@@ -486,9 +486,9 @@ public class ManifestGenerator {
 
         String safeFileName = fileName.replace("\\", "/").replace(" ", "%20");
         if (parentFolder == null || parentFolder.isBlank()) {
-            return "file://" + safeFileName;
+            return "file:" + safeFileName;
         }
         String safeParentFolder = parentFolder.replace("\\", "/").replace(" ", "%20");
-        return "file://" + safeParentFolder + "/" + safeFileName;
+        return "file:" + safeParentFolder + "/" + safeFileName;
     }
 }
