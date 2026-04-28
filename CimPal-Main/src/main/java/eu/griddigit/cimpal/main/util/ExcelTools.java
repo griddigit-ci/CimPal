@@ -13,6 +13,7 @@ import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.riot.Lang;
+import org.apache.jena.vocabulary.RDF;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.*;
@@ -807,22 +808,38 @@ public class ExcelTools {
                 }
                 int rowOffset = 0;
 
-                for (RDFAttributeData data : attrList) { // loop on every attribute (creating new rows in the xls)
-                    if (data.getName().equals("type"))
-                        continue;
+                for (RDFAttributeData data : attrList) {
+
                     int valueCol = getCellNumber(attrRow, data.getFullName());
-                    if (valueCol == -1) {  // add a new attribute to the end of the row
+
+                    if (valueCol == -1 && data.getName().equals("type")) {
+                        valueCol = getCellNumber(attrRow, "rdf:type");
+                    }
+
+                    if (valueCol == -1 && data.getName().equals("type")) {
+                        valueCol = getCellNumber(attrRow, RDF.type.getURI());
+                    }
+
+                    if (valueCol == -1) {
                         valueCol = Math.max(attrRow.getLastCellNum(), 0);
                         XSSFCell attrCell = attrRow.createCell(valueCol);
                         attrCell.setCellStyle(headerStyleRed);
-                        attrCell.setCellValue(data.getFullName());
+
+                        if (data.getName().equals("type")) {
+                            attrCell.setCellValue("rdf:type");
+                        } else {
+                            attrCell.setCellValue(data.getFullName());
+                        }
+
                         XSSFCell typeCell = typeRow.createCell(valueCol);
                         typeCell.setCellStyle(headerStyleRed);
                         typeCell.setCellValue(data.getTpe());
+
                         XSSFCell isExtensionCell = isExtensionRow.createCell(valueCol);
                         isExtensionCell.setCellStyle(headerStyleRed);
                         isExtensionCell.setCellValue("Yes");
                     }
+
                     XSSFCell valueCell = row.getCell(valueCol);
                     int currentRowOffset = 0;
                     while (valueCell != null) {
@@ -833,6 +850,7 @@ public class ExcelTools {
                         else
                             break;
                     }
+
                     if (currentRowOffset > rowOffset)
                         rowOffset = currentRowOffset;
 
@@ -840,7 +858,6 @@ public class ExcelTools {
                         valueCell = row.createCell(valueCol);
                         valueCell.setCellStyle(dataStyle);
                         valueCell.setCellValue(data.getValue());
-                    } else { // Already has data in the instance, so we make a new row for the new data for the same attribute
                         XSSFRow offsetRow = sheet.getRow(rowNumber + currentRowOffset);
                         if (offsetRow == null) {
                             offsetRow = sheet.createRow(rowNumber + currentRowOffset);
@@ -849,7 +866,6 @@ public class ExcelTools {
                         valueCell.setCellStyle(dataStyle);
                         valueCell.setCellValue(data.getValue());
 
-                        // Set the id to the first column of the new row
                         XSSFCell idCell = offsetRow.createCell(idCol);
                         idCell.setCellStyle(dataStyle);
                         idCell.setCellValue(idAttribute.getValue());

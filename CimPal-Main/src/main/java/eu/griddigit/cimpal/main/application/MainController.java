@@ -4917,7 +4917,7 @@ public class MainController implements Initializable {
         saveProperties.put("useFileDialog", true);
         saveProperties.put("fileFolder", "C:");
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "false"); //this is to only print the ID and not with namespace
         saveProperties.put("showXmlBaseDeclaration", "false");
         saveProperties.put("sortRDF", sortRDF);
         saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localNam

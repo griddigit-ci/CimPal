@@ -642,6 +642,7 @@ public class ExportInstanceDataTemplate {
                         }
 
                         RDFNode selectedType = null;
+
                         if (typeObjects.size() > 1) {
                             // Multiple types found
                             for (RDFNode typeObj : typeObjects) { // try to find a type that is in the concrete namespace
@@ -668,6 +669,13 @@ public class ExportInstanceDataTemplate {
                         while (properties.hasNext()) {
                             Statement property = properties.next();
                             String propertyName = property.getPredicate().getURI();
+
+                            boolean isRdfType = property.getPredicate().equals(RDF.type);
+                            boolean isSelectedType = isRdfType && property.getObject().equals(selectedType);
+
+                            if (isSelectedType) {
+                                continue;
+                            }
 
                             if (rdfsAttrAssoc.contains(propertyName) && rdfsClass.contains(classFullURI)) {
                                 continue;
@@ -843,7 +851,7 @@ public class ExportInstanceDataTemplate {
                             if (iFile != null) {
                                 Model model = ModelFactory.createDefaultModel();
                                 RDFDataMgr.read(model, new FileInputStream(iFile), "", Lang.RDFXML);
-                                instanceClassData = getRDFDataForClasses(model);
+                                instanceClassData = getRDFDataForClasses(model, rdfsClass);
                                 outFileName = iFile.getName()
                                         .replaceAll("(?i)\\.xml$", "")
                                         .trim();
