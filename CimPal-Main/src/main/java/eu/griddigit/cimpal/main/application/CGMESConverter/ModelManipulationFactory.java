@@ -7,6 +7,7 @@
 package eu.griddigit.cimpal.main.application.CGMESConverter;
 
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.writer.formats.*;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
@@ -2015,7 +2016,7 @@ public class ModelManipulationFactory {
                 saveProperties.put("rdfEnumList", rdfEnumList);
             }
 
-            if (MainController.ibBDconversion) {
+            if (SelectedTask.class.getName() == "CGMES 2.4 → 3.0: Convert Boundary dataset") {
                 saveProperties.replace("filename", entry.getKey());
             } else {
                 if (nameMap.size() != 0) {

@@ -1,10 +1,12 @@
 package eu.griddigit.cimpal.main.application.tasks;
 
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
+import eu.griddigit.cimpal.main.application.CGMESConverter.ModelManipulationFactory;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 public class CgmesAddSwitchingDevices implements ITask {
 
@@ -28,8 +30,8 @@ public class CgmesAddSwitchingDevices implements ITask {
         CGMES_2_4, CGMES_3_0
     }
 
-    private Path modelInput;     // IGM or CGM incl. boundary
-    private Path mappingFile;    // optional in some flows
+    private List<Path> modelInputFiles;     // IGM or CGM incl. boundary
+    private List<Path> mappingFiles;    // optional in some flows
 
     private DataExchangeStandard standard = DataExchangeStandard.CGMES_2_4;
 
@@ -61,20 +63,20 @@ public class CgmesAddSwitchingDevices implements ITask {
         return this.info;
     }
 
-    public Path getModelInput() {
-        return modelInput;
+    public List<Path> getModelInput() {
+        return modelInputFiles;
     }
 
-    public void setModelInput(Path modelInput) {
-        this.modelInput = modelInput;
+    public void setModelInput(List<Path> modelInput) {
+        this.modelInputFiles = modelInputFiles;
     }
 
-    public Path getMappingFile() {
-        return mappingFile;
+    public List<Path> getMappingFiles() {
+        return mappingFiles;
     }
 
-    public void setMappingFile(Path mappingFile) {
-        this.mappingFile = mappingFile;
+    public void setMappingFiles(List<Path> mappingFiles) {
+        this.mappingFiles = mappingFiles;
     }
 
     public DataExchangeStandard getStandard() {
@@ -136,11 +138,11 @@ public class CgmesAddSwitchingDevices implements ITask {
 
     @Override
     public String validateInputs() {
-        if (modelInput == null) {
+        if (modelInputFiles == null) {
             return "Input model is missing.";
         }
-        if (!Files.exists(modelInput)) {
-            return "Input model does not exist: " + modelInput;
+        if (!Files.exists(modelInputFiles.getFirst())) {
+            return "Input model does not exist: " + modelInputFiles;
         }
 
         // at least one apply option should be selected
@@ -149,19 +151,40 @@ public class CgmesAddSwitchingDevices implements ITask {
         }
 
         // mapping file rules (adjust if your workflow allows empty mapping)
-        if (mappingFile == null) {
+        if (mappingFiles == null) {
             return "Mapping file is missing.";
         }
-        if (!Files.exists(mappingFile)) {
-            return "Mapping file does not exist: " + mappingFile;
+        if (!Files.exists(mappingFiles.getFirst())) {
+            return "Mapping file does not exist: " + mappingFiles;
         }
 
         return null;
     }
 
     @Override
-    public void execute(eu.griddigit.cimpal.main.application.tasks.SelectedTask parent) throws IOException {
-        // TODO: call Core modification service here
+    public void execute(SelectedTask parent) throws Exception {
+        String validationError = validateInputs();
+        if (validationError != null) {
+            throw new IllegalStateException(validationError);
+        }
+
+        WizardContext wizardContext = WizardContext.getInstance();
+        taskUpdater.updateState(parent, "Running Add Switching Devices", "1%", wizardContext);
+
+        ModelManipulationFactory.ModifyIGM(
+                modelInputFiles,
+                mappingFiles,
+                standard,
+                applyLines,
+                applyPowerTransformer,
+                applySynchronousMachine,
+                onlyForEquipmentInMappingFile,
+                exportMappingFile
+        );
+
+        this.status = "Finished";
+        this.info = "100%";
+        taskUpdater.updateState(parent, this.status, this.info, wizardContext);
     }
 
 

@@ -40,7 +40,7 @@ public class CgmesAddSwitchingDevicesController {
         cbStandard.setValue(task.getStandard());
 
         if (task.getModelInput() != null) tfModelInput.setText(task.getModelInput().toString());
-        if (task.getMappingFile() != null) tfMappingFile.setText(task.getMappingFile().toString());
+        if (task.getMappingFiles() != null) tfMappingFile.setText(task.getMappingFiles().toString());
 
         cbApplyLines.setSelected(task.isApplyLines());
         cbApplyPowerTransformer.setSelected(task.isApplyPowerTransformer());
@@ -94,7 +94,7 @@ public class CgmesAddSwitchingDevicesController {
 
         Path p = f.toPath();
         tfMappingFile.setText(p.toString());
-        task.setMappingFile(p);
+        task.setMappingFiles(p);
     }
 
     private <T extends ITask> T getTaskFromContext(Class<T> clazz) {
