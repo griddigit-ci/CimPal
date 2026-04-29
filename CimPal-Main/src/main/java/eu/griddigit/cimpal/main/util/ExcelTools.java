@@ -726,7 +726,7 @@ public class ExcelTools {
 
         for (Map.Entry<String, List<List<RDFAttributeData>>> classEntry : instanceClassData.entrySet()) {
             String classNameWithNS = classEntry.getKey();
-            String className = classNameWithNS.split("#", 2)[1];
+            String className = getLocalNameFromUri(classNameWithNS);
             GenDataTemplateMapInfo classInfo = classInfoByName.get(className);
 
             String sheetName = classInfo != null
@@ -858,6 +858,7 @@ public class ExcelTools {
                         valueCell = row.createCell(valueCol);
                         valueCell.setCellStyle(dataStyle);
                         valueCell.setCellValue(data.getValue());
+                    } else {
                         XSSFRow offsetRow = sheet.getRow(rowNumber + currentRowOffset);
                         if (offsetRow == null) {
                             offsetRow = sheet.createRow(rowNumber + currentRowOffset);
@@ -948,7 +949,7 @@ public class ExcelTools {
 
         if (instanceClassData != null) {
             for (String xmlClassName : instanceClassData.keySet()) {
-                String xmlSheetName = getSheetNameFromClassName(xmlClassName.split("#", 2)[1]);
+                String xmlSheetName = getSheetNameFromClassName(getLocalNameFromUri(xmlClassName));
                 if (seenSheetNames.add(xmlSheetName)) {
                     sheetClassNames.add(xmlSheetName);
                     classNames.add(xmlClassName);
@@ -1213,5 +1214,21 @@ public class ExcelTools {
         }
         return result;
     }
+    private static String getLocalNameFromUri(String uri) {
+        if (uri == null || uri.isBlank()) {
+            return "";
+        }
 
+        int hashIndex = uri.lastIndexOf('#');
+        if (hashIndex >= 0 && hashIndex < uri.length() - 1) {
+            return uri.substring(hashIndex + 1);
+        }
+
+        int slashIndex = uri.lastIndexOf('/');
+        if (slashIndex >= 0 && slashIndex < uri.length() - 1) {
+            return uri.substring(slashIndex + 1);
+        }
+
+        return uri;
+    }
 }
