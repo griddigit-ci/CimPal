@@ -878,12 +878,123 @@ public class ExcelTools {
 
     }
 
-    private static String getSheetNameFromClassName(String className) {
+    public static String getSheetNameFromClassName(String className) {
         String safeName = className == null ? "" : className.replaceAll("[:\\\\/?*\\[\\]]", "_").trim();
         if (safeName.isEmpty()) {
             return "UnknownClass";
         }
-        return safeName.length() > 31 ? safeName.substring(0, 31) : safeName;
+        if (safeName.length() > 31) {
+            return intelligentTruncate(safeName);
+        }
+        return safeName;
+    }
+
+    /**
+     * Intelligently truncates sheet names while preserving distinctiveness.
+     * Uses camelCase boundaries to keep meaningful parts of the name.
+     * If truncation results in ambiguity, a hash suffix is added.
+     */
+    private static String intelligentTruncate(String name) {
+        if (name.length() <= 31) {
+            return name;
+        }
+
+        // Try to preserve camelCase word boundaries
+        // Extract meaningful parts: first word(s) + last word(s)
+        List<String> words = splitByCamelCase(name);
+
+        if (words.size() <= 1) {
+            // No camelCase found, use simple truncation with hash suffix
+            return simpleWithHash(name);
+        }
+
+        // Try to fit first and last words
+        String firstWord = words.getFirst();
+        String lastWord = words.getLast();
+
+        // If first + last word fits (with separator), use it
+        String combined = firstWord + lastWord;
+        if (combined.length() <= 31) {
+            return combined;
+        }
+
+        // If last word is distinctive enough, use first part + last word
+        if (lastWord.length() >= 8 && firstWord.length() + lastWord.length() + 2 <= 31) {
+            return firstWord + "_" + lastWord;
+        }
+
+        // Fall back to smart truncation with hash
+        return simpleWithHash(name);
+    }
+
+    /**
+     * Splits a camelCase string into individual words
+     */
+    private static List<String> splitByCamelCase(String name) {
+        List<String> words = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+
+        for (char c : name.toCharArray()) {
+            if (Character.isUpperCase(c) && current.length() > 0) {
+                words.add(current.toString());
+                current = new StringBuilder();
+            }
+            current.append(c);
+        }
+        if (current.length() > 0) {
+            words.add(current.toString());
+        }
+        return words;
+    }
+
+    /**
+     * Truncates name and adds a short hash suffix for uniqueness
+     */
+    private static String simpleWithHash(String name) {
+        // Use first 25 chars + 6 char hash (total = 31)
+        String prefix = name.substring(0, Math.min(25, name.length()));
+        String hash = Integer.toHexString(Math.abs(name.hashCode()));
+        if (hash.length() > 6) {
+            hash = hash.substring(0, 6);
+        } else {
+            hash = String.format("%06d", hash.hashCode() % 1000000);
+        }
+        return prefix + "_" + hash;
+    }
+
+    /**
+     * Ensures a sheet name is unique within the workbook.
+     * If the name already exists, appends a counter suffix.
+     */
+    public static String ensureUniqueSheetName(XSSFWorkbook workbook, String desiredName) {
+        if (workbook == null || desiredName == null) {
+            return desiredName;
+        }
+
+        // Check if the sheet already exists
+        if (workbook.getSheet(desiredName) == null) {
+            return desiredName;
+        }
+
+        // Generate unique name by appending counter
+        for (int i = 2; i <= 999; i++) {
+            String candidateName = desiredName;
+            String suffix = "_" + i;
+
+            // Adjust name length to stay under 31 chars
+            if (candidateName.length() + suffix.length() > 31) {
+                int maxPrefixLen = 31 - suffix.length();
+                candidateName = candidateName.substring(0, Math.min(maxPrefixLen, candidateName.length()));
+            }
+            candidateName = candidateName + suffix;
+
+            if (workbook.getSheet(candidateName) == null) {
+                return candidateName;
+            }
+        }
+
+        // Fallback: use hash-based name
+        return desiredName.substring(0, Math.min(20, desiredName.length())) + "_" + System.nanoTime() % 1000000;
     }
 
     private static void markClassNameCellRed(XSSFWorkbook workbook, XSSFSheet sheet) {
