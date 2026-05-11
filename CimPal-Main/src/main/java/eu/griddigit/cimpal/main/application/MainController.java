@@ -13,6 +13,7 @@ import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
+import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclFromXls;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
@@ -124,6 +125,7 @@ public class MainController implements Initializable {
     public Tab tabCreateCompleteSM2;
     public Button fbtnRunRDFConvert;
     public Tab tabOutputWindow;
+    public Tab tabSPARQLQuery;
     public Button btnResetIDComp;
     public Font x3;
     public Button btnResetRDFComp;
@@ -5247,239 +5249,10 @@ public class MainController implements Initializable {
 
     @FXML
     public void actionRunSPARQLQuery(ActionEvent actionEvent) {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-        File outputFile = null;
-
-        try {
-            // 1. Select SPARQL .rq file
-            FileChooser queryChooser = new FileChooser();
-            queryChooser.setTitle("Select SPARQL query file");
-            queryChooser.getExtensionFilters().add(
-                    new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql")
-            );
-
-            File queryFile = queryChooser.showOpenDialog(progressBar.getScene().getWindow());
-            if (queryFile == null) {
-                progressBar.setProgress(0);
-                return;
-            }
-
-            // 2. Select RDF model file
-//            FileChooser modelChooser = new FileChooser();
-//            modelChooser.setTitle("Select RDF model file");
-//            modelChooser.getExtensionFilters().add(
-//                    new FileChooser.ExtensionFilter("RDF files", "*.ttl", "*.rdf", "*.xml", "*.nt", "*.nq", "*.trig")
-//            );
-//
-//            File modelFile = modelChooser.showOpenDialog(progressBar.getScene().getWindow());
-//            if (modelFile == null) {
-//                progressBar.setProgress(0);
-//                return;
-//            }
-
-            List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
-
-            if (fileL != null) {// the file is selected
-
-                //MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
-                //fPathIDfile1.setText(fileL.toString());
-                MainController.IDModel1 = fileL;
-            } else {
-                //fPathIDfile1.clear();
-            }
-
-            // 3. Ask where to save XLSX
-            FileChooser saveChooser = new FileChooser();
-            saveChooser.setTitle("Save SPARQL results");
-            saveChooser.setInitialFileName("sparql-results.xlsx");
-            saveChooser.getExtensionFilters().add(
-                    new FileChooser.ExtensionFilter("Excel files", "*.xlsx")
-            );
-
-            outputFile = saveChooser.showSaveDialog(progressBar.getScene().getWindow());
-            if (outputFile == null) {
-                progressBar.setProgress(0);
-                return;
-            }
-
-            if (!outputFile.getName().toLowerCase().endsWith(".xlsx")) {
-                outputFile = new File(outputFile.getAbsolutePath() + ".xlsx");
-            }
-
-            // 4. Execute query and export
-            exportSparqlResultsToExcel(queryFile, fileL, outputFile);
-
-            progressBar.setProgress(1);
-
-            Alert ok = new Alert(Alert.AlertType.INFORMATION);
-            ok.setTitle("SPARQL query finished");
-            ok.setHeaderText(null);
-            assert fileL != null;
-            ok.setContentText(
-                    "SPARQL query saved to:\n" +
-                            outputFile.getAbsolutePath() +
-                            "\n\nProcessed files: " +
-                            fileL.size()
-            );
-            ok.showAndWait();
-
-        } catch (Exception e) {
-            progressBar.setProgress(0);
-            GUIhelper.showUserFriendlyError(
-                    "SPARQL query failed",
-                    "The SPARQL query could not be run.",
-                    e
-            );
-        }
-    }
-    private void exportSparqlResultsToExcel(
-            File queryFile,
-            List<File> modelFiles,
-            File outputFile
-    ) throws Exception {
-
-        String sparql = Files.readString(queryFile.toPath(), StandardCharsets.UTF_8);
-
-        //Model model = RDFDataMgr.loadModel(modelFile.getAbsolutePath());
-
-        Map<String, RDFDatatype> dataTypeMap = new HashMap<>();
-        String xmlBase = "http://iec.ch/TC57/2013/CIM-schema-cim16";// fPathIDmapXmlBase.getText();
-        Model model1single = null;
-        Map<String, Model> model1Structure = new HashMap<>();
-        Map<String, String> model1IDname = new HashMap<>();
-        Resource mdFullModelRes = ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
-        Resource mdDiffernceModelRes = ResourceFactory.createResource("http://iec.ch/TC57/61970-552/DifferenceModel/1#DifferenceModel");
-        Model model1 = ModelFactory.createDefaultModel();
-        Map<String, String> prefixMap = model1.getNsPrefixMap();
-
-        for (File item : MainController.IDModel1) {
-            if (item.getName().toLowerCase().endsWith(".zip")) {
-                //if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
-                    model1single = eu.griddigit.cimpal.main.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 3);
-                //} else {
-                //    model1single = eu.griddigit.cimpal.main.util.ModelFactory.unzip(item, dataTypeMap, xmlBase, 2);
-                //}
-            } else if (item.getName().toLowerCase().endsWith(".xml")) {
-                InputStream inputStream = new FileInputStream(item);
-                //if (fcbIDmap.getSelectionModel().getSelectedItem().toString().equals("No datatypes mapping")) {
-                    model1single = ModelFactory.createDefaultModel();
-                    RDFDataMgr.read(model1single, inputStream, xmlBase, Lang.RDFXML);
-                //} else {
-                //    model1single = eu.griddigit.cimpal.main.util.ModelFactory.modelLoadXMLmapping(inputStream, dataTypeMap, xmlBase);
-                //}
-            }
-            prefixMap.putAll(model1single.getNsPrefixMap());
-            model1.add(model1single);
-            String model1ID = "";
-            if (model1single.listStatements(null, RDF.type, mdFullModelRes).hasNext()) {
-                model1ID = model1single.listStatements(null, RDF.type, mdFullModelRes).nextStatement().getSubject().getLocalName();
-            } else if (model1single.listStatements(null, RDF.type, mdDiffernceModelRes).hasNext()) {
-                model1ID = model1single.listStatements(null, RDF.type, mdDiffernceModelRes).nextStatement().getSubject().getLocalName();
-            }
-            model1Structure.put(model1ID, model1single);
-            model1IDname.put(model1ID, item.toString().toLowerCase());
-        }
-        model1.setNsPrefixes(prefixMap);
-
-
-
-
-        Query query = QueryFactory.create(sparql);
-
-        if (!query.isSelectType()) {
-            throw new IllegalArgumentException("Only SELECT SPARQL queries can be exported to Excel.");
-        }
-
-        try (
-                QueryExecution qe = QueryExecutionFactory.create(query, model1);
-                Workbook workbook = new XSSFWorkbook()
-        ) {
-            ResultSet resultSet = qe.execSelect();
-            List<String> columns = resultSet.getResultVars();
-
-            Sheet sheet = workbook.createSheet("SPARQL Results");
-
-            createHeaderRow(sheet, columns);
-            fillDataRows(sheet, resultSet, columns, model1);
-            autoSizeColumns(sheet, columns.size());
-
-            try (FileOutputStream out = new FileOutputStream(outputFile)) {
-                workbook.write(out);
-            }
+        if (tabPaneConstraintsDetails != null && tabSPARQLQuery != null) {
+            tabPaneConstraintsDetails.getSelectionModel().select(tabSPARQLQuery);
         }
     }
 
-    private void createHeaderRow(Sheet sheet, List<String> columns) {
-        Row header = sheet.createRow(0);
-
-        CellStyle headerStyle = sheet.getWorkbook().createCellStyle();
-        org.apache.poi.ss.usermodel.Font font = sheet.getWorkbook().createFont();
-        font.setBold(true);
-        headerStyle.setFont(font);
-
-        for (int i = 0; i < columns.size(); i++) {
-            Cell cell = header.createCell(i);
-            cell.setCellValue(columns.get(i));
-            cell.setCellStyle(headerStyle);
-        }
-    }
-
-    private void fillDataRows(
-            Sheet sheet,
-            ResultSet resultSet,
-            List<String> columns,
-            Model model
-    ) {
-        int rowIndex = 1;
-
-        while (resultSet.hasNext()) {
-            QuerySolution solution = resultSet.nextSolution();
-            Row row = sheet.createRow(rowIndex++);
-
-            for (int colIndex = 0; colIndex < columns.size(); colIndex++) {
-                String varName = columns.get(colIndex);
-                RDFNode node = solution.get(varName);
-
-                Cell cell = row.createCell(colIndex);
-                cell.setCellValue(toExcelValue(node, model));
-            }
-        }
-    }
-
-
-    private String toExcelValue(RDFNode node, Model model) {
-        if (node == null) {
-            return "";
-        }
-
-        // Literals (strings, numbers, booleans)
-        if (node.isLiteral()) {
-            Literal literal = node.asLiteral();
-            Object value = literal.getValue();
-            return value == null ? literal.getString() : value.toString();
-        }
-
-        // Resources (URIs and blank nodes)
-        if (node.isResource()) {
-            Resource resource = node.asResource();
-
-            // URI → use prefix if available
-            if (resource.isURIResource()) {
-                return model.shortForm(resource.getURI());
-            }
-
-            // Blank node → keep default representation
-            return resource.toString();
-        }
-
-        return node.toString();
-    }
-
-    private void autoSizeColumns(Sheet sheet, int columnCount) {
-        for (int i = 0; i < columnCount; i++) {
-            sheet.autoSizeColumn(i);
-        }
-    }
 }
 

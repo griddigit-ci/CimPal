@@ -899,6 +899,11 @@
                       </AnchorPane>
                     </content>
                   </Tab>
+                  <Tab fx:id="tabSPARQLQuery" text="SPARQL Query">
+                    <content>
+                      <fx:include fx:id="sparqlQueryTab" source="sparqlQueryTab.fxml" />
+                    </content>
+                  </Tab>
                </TabPane>
             </HBox>
          </AnchorPane>
