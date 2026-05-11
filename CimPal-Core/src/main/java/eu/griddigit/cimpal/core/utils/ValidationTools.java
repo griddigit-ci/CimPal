@@ -22,6 +22,12 @@ import org.apache.jena.vocabulary.OWL;
 
 public class ValidationTools {
 
+    private static final String XML_REPORT_PREFIX =
+            "C:\\GitHub\\relicapgrid\\Instance\\";
+
+    private static final String CONSTRAINT_REPORT_PREFIX =
+            "C:\\SHACL-Constraints\\ApplicationLibraryValidationConfigurations\\";
+
     private ValidationTools() { }
 
     public static class MappingRow {
@@ -109,7 +115,8 @@ public class ValidationTools {
                     writer.appendError(
                             ValidationExcelWriter.CaseFolder.UNKNOWN,
                             "UNKNOWN_ROW",
-                            "UNKNOWN_TTL",
+                            "UNKNOWN_XML",
+                            "UNKNOWN_CONSTRAINT",
                             new Exception(ex)
                     );
                     continue;
@@ -120,13 +127,13 @@ public class ValidationTools {
 
                 if (r.error != null) {
                     err++;
-                    writer.appendError(sheet, r.datasetName, r.ttlName, r.error);
+                    writer.appendError(sheet, r.datasetName, r.xmlFiles, r.constraintFile, r.error);
                     errorModels.add(r.datasetName);
 
                 } else {
                     if (r.conforms) ok++; else { fail++; nonConforms.add(r.datasetName); }
 
-                    writer.appendExcelBlock(sheet, r.datasetName, r.ttlName, r.results);
+                    writer.appendValidation(sheet, r.datasetName, r.xmlFiles, r.constraintFile, r.results, r.conforms);
                 }
             }
 
@@ -150,6 +157,8 @@ public class ValidationTools {
         final ValidationExcelWriter.CaseFolder caseFolder;
         final String datasetName;
         final String ttlName;
+        final String xmlFiles;
+        final String constraintFile;
         final List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results;
         final boolean conforms;
         final Exception error;
@@ -158,6 +167,8 @@ public class ValidationTools {
                              ValidationExcelWriter.CaseFolder caseFolder,
                              String datasetName,
                              String ttlName,
+                             String xmlFiles,
+                             String constraintFile,
                              List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results,
                              boolean conforms,
                              Exception error) {
@@ -165,6 +176,8 @@ public class ValidationTools {
             this.caseFolder = caseFolder;
             this.datasetName = datasetName;
             this.ttlName = ttlName;
+            this.xmlFiles = xmlFiles;
+            this.constraintFile = constraintFile;
             this.results = results;
             this.conforms = conforms;
             this.error = error;
@@ -182,18 +195,24 @@ public class ValidationTools {
         String ttlName = row.ttl.trim();
         ValidationExcelWriter.CaseFolder caseFolder = categorizeForReport(row);
 
+        String xmlFilesText = row.xmlInputsRaw;
+        String constraintFileText = trimReportPath(ttlName, CONSTRAINT_REPORT_PREFIX);
+        String datasetName = "UNKNOWN";
+
         try {
             LinkedHashSet<Path> xmlFiles = resolveFilesForRow(row, modelsBaseDir);
-            String datasetName = makeDatasetName(xmlFiles);
+            datasetName = makeDatasetName(xmlFiles);
+            xmlFilesText = formatPaths(xmlFiles);
 
             if (xmlFiles.isEmpty()) {
-                return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, null, false,
+                return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, null, false,
                         new IOException("No XML matched mapping tokens"));
             }
 
             Path ttlPath = resolveTtlPath(constraintsRoot, ttlName);
+            constraintFileText = trimReportPath(ttlPath.toString(), CONSTRAINT_REPORT_PREFIX);
             if (!Files.exists(ttlPath)) {
-                return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, null, false,
+                return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, null, false,
                         new FileNotFoundException("TTL not found: " + ttlPath));
             }
 
@@ -216,11 +235,10 @@ public class ValidationTools {
             List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results =
                     ShaclTools.extractSHACLValidationResults(report, shapesModel);
 
-            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, results, report.conforms(), null);
+            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, results, report.conforms(), null);
 
         } catch (Exception ex) {
-            String datasetName = "UNKNOWN";
-            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, null, false, ex);
+            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, null, false, ex);
         }
     }
 
@@ -424,6 +442,30 @@ public class ValidationTools {
         }
 
         return ValidationExcelWriter.CaseFolder.UNKNOWN;
+    }
+
+    private static String formatPaths(Collection<Path> paths) {
+        if (paths == null || paths.isEmpty()) return "";
+        return paths.stream()
+                .filter(Objects::nonNull)
+                .map(Path::toString)
+                .map(p -> trimReportPath(p, XML_REPORT_PREFIX))
+                .sorted()
+                .reduce((a, b) -> a + "; " + b)
+                .orElse("");
+    }
+
+    private static String trimReportPath(String path, String prefixToRemove) {
+        if (path == null) return "";
+
+        String normalizedPath = path.replace("\\", "/").trim();
+        String normalizedPrefix = prefixToRemove.replace("\\", "/").trim();
+
+        if (normalizedPath.startsWith(normalizedPrefix)) {
+            return normalizedPath.substring(normalizedPrefix.length());
+        }
+
+        return normalizedPath;
     }
 
     private static String makeDatasetName(Collection<Path> xmlFiles) {

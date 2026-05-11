@@ -1,8 +1,8 @@
-// ValidationExcelWriter.java
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.Closeable;
@@ -28,44 +28,121 @@ public class ValidationExcelWriter implements Closeable {
         UNKNOWN
     }
 
-    // Valimate-style header
-    private static final String[] HEADER = new String[]{
-            "Focus node", "Path", "Value", "Source", "Constraint Component", "Details",
+    private static final String STATISTICS_SHEET_NAME = "Validation statistics";
+
+    // Raw validation data: one header per sheet, no blank rows, no per-validation statistic rows.
+    // The old Details column was intentionally removed.
+    private static final String[] RAW_HEADER = new String[]{
+            "XML files", "Constraint file",
+            "Focus node", "Path", "Value", "Source", "Constraint Component",
             "Message", "Severity", "Description", "Order", "Name", "Group"
+    };
+
+    // One row per validation. Process errors also go here.
+    private static final String[] STATISTICS_HEADER = new String[]{
+            "Case folder", "Dataset", "XML files", "Constraint file",
+            "All", "Warnings", "Infos", "Violations", "Conforms", "Validation error"
     };
 
     private final Workbook wb;
     private final Map<CaseFolder, Sheet> sheetByCase = new EnumMap<>(CaseFolder.class);
     private final Map<CaseFolder, Integer> nextRowByCase = new EnumMap<>(CaseFolder.class);
+    private final Sheet statisticsSheet;
+    private int nextStatisticsRow = 1;
 
     public ValidationExcelWriter() {
         this.wb = new XSSFWorkbook();
+
+        CellStyle headerStyle = createHeaderStyle(wb);
+
         for (CaseFolder cf : CaseFolder.values()) {
             Sheet s = wb.createSheet(cf.name());
             sheetByCase.put(cf, s);
-            nextRowByCase.put(cf, 0);
-            // No global header/title rows — MicroGrid format is per-dataset blocks
+            nextRowByCase.put(cf, 1);
+            writeHeader(s, RAW_HEADER, headerStyle);
+            s.setAutoFilter(new CellRangeAddress(0, 0, 0, RAW_HEADER.length - 1));
+            s.createFreezePane(0, 1);
         }
+
+        statisticsSheet = wb.createSheet(STATISTICS_SHEET_NAME);
+        writeHeader(statisticsSheet, STATISTICS_HEADER, headerStyle);
+        statisticsSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, STATISTICS_HEADER.length - 1));
+        statisticsSheet.createFreezePane(0, 1);
     }
 
     /**
-     * Valimate-style block writer:
-     *  Row A: "ModelName TTLName #All Violations Warnings> Infos>" (+ error count in col 3)
-     *  Row B: "# <violations> <warnings> <infos>"
-     *  Row C: fixed header columns
-     *  Row D..: one row per SHACL result
-     *
-     * datasetName + ttlName are stored in "Name" and "Group" columns on the counts row
-     * so you can identify the block easily.
+     * Appends raw SHACL result rows to the selected case sheet.
+     * No section headers and no blank separator rows are written, so the sheet remains filterable.
      */
-    public void appendExcelBlock(CaseFolder cf,
+    public void appendValidation(CaseFolder cf,
                                  String datasetName,
-                                 String ttlName,
-                                 List<SHACLValidationResult> results) {
+                                 String xmlFiles,
+                                 String constraintFile,
+                                 List<SHACLValidationResult> results,
+                                 boolean conforms) {
+
+        writeStatisticsRow(cf, datasetName, xmlFiles, constraintFile, results, conforms, null);
+
+        if (results == null || results.isEmpty()) {
+            return;
+        }
 
         Sheet s = sheetByCase.get(cf);
         int r = nextRowByCase.get(cf);
 
+        for (SHACLValidationResult res : results) {
+            Row dr = s.createRow(r++);
+            dr.createCell(0).setCellValue(safe(xmlFiles));
+            dr.createCell(1).setCellValue(safe(constraintFile));
+            dr.createCell(2).setCellValue(safe(res.getFocusNode()));
+            dr.createCell(3).setCellValue(safe(res.getPath()));
+            dr.createCell(4).setCellValue(safe(res.getValue()));
+            dr.createCell(5).setCellValue(safe(res.getSourceShape()));
+            dr.createCell(6).setCellValue(safe(res.getConstraintComponent()));
+            dr.createCell(7).setCellValue(safe(res.getMessage()));
+            dr.createCell(8).setCellValue(safe(res.getSeverity()));
+            dr.createCell(9).setCellValue(safe(res.getDescription()));
+            dr.createCell(10).setCellValue(safe(res.getOrder()));
+            dr.createCell(11).setCellValue(safe(res.getName()));
+            dr.createCell(12).setCellValue(safe(res.getGroup()));
+        }
+
+        nextRowByCase.put(cf, r);
+    }
+
+    /** Backward-compatible entry point. Prefer appendValidation(...). */
+    public void appendExcelBlock(CaseFolder cf,
+                                 String datasetName,
+                                 String ttlName,
+                                 List<SHACLValidationResult> results) {
+        appendValidation(cf, datasetName, datasetName, ttlName, results, false);
+    }
+
+    /** Backward-compatible entry point. Prefer appendValidation(...). */
+    public void append(CaseFolder cf, String datasetName, String ttlName, List<SHACLValidationResult> results) {
+        appendExcelBlock(cf, datasetName, ttlName, results);
+    }
+
+    public void appendError(CaseFolder cf,
+                            String datasetName,
+                            String xmlFiles,
+                            String constraintFile,
+                            Exception error) {
+        writeStatisticsRow(cf, datasetName, xmlFiles, constraintFile, null, false, safeThrowable(error));
+    }
+
+    /** Backward-compatible entry point. Prefer appendError(cf, datasetName, xmlFiles, constraintFile, error). */
+    public void appendError(CaseFolder cf, String datasetName, String ttlName, Exception error) {
+        appendError(cf, datasetName, datasetName, ttlName, error);
+    }
+
+    private void writeStatisticsRow(CaseFolder cf,
+                                    String datasetName,
+                                    String xmlFiles,
+                                    String constraintFile,
+                                    List<SHACLValidationResult> results,
+                                    boolean conforms,
+                                    String validationError) {
         int vio = 0, warn = 0, info = 0;
 
         if (results != null) {
@@ -77,102 +154,28 @@ public class ValidationExcelWriter implements Closeable {
             }
         }
 
-        // Row A: dataset + ttl + labels
-        Row first = s.createRow(r++);
-        first.createCell(0).setCellValue(datasetName == null ? "" : datasetName);
-        first.createCell(1).setCellValue(ttlName == null ? "" : ttlName);
-        first.createCell(2).setCellValue("All");
-        first.createCell(3).setCellValue("Warnings");
-        first.createCell(4).setCellValue("Infos");
-        first.createCell(5).setCellValue("Violations");
-
-        // Row B: counts
         int all = warn + vio + info;
-        Row counts = s.createRow(r++);
-        counts.createCell(2).setCellValue("# " + all);
-        counts.createCell(3).setCellValue(warn);
-        counts.createCell(4).setCellValue(info);
-        counts.createCell(5).setCellValue(vio);
-
-        // Row C: header row
-        Row hdr = s.createRow(r++);
-        for (int c = 0; c < HEADER.length; c++) {
-            hdr.createCell(c).setCellValue(HEADER[c]);
-        }
-
-        // Row D..: details (if no results, still create no rows)
-        if (results != null) {
-            for (SHACLValidationResult res : results) {
-                Row dr = s.createRow(r++);
-                dr.createCell(0).setCellValue(safe(res.getFocusNode()));
-                dr.createCell(1).setCellValue(safe(res.getPath()));
-                dr.createCell(2).setCellValue(safe(res.getValue()));
-                dr.createCell(3).setCellValue(safe(res.getSourceShape()));
-                dr.createCell(4).setCellValue(safe(res.getConstraintComponent()));
-                dr.createCell(5).setCellValue(safe(res.getDetails()));
-                dr.createCell(6).setCellValue(safe(res.getMessage()));
-                dr.createCell(7).setCellValue(safe(res.getSeverity()));
-                dr.createCell(8).setCellValue(safe(res.getDescription()));
-                dr.createCell(9).setCellValue(safe(res.getOrder()));
-                dr.createCell(10).setCellValue(safe(res.getName()));
-                dr.createCell(11).setCellValue(safe(res.getGroup()));
-            }
-        }
-
-        r++; // blank line between datasets
-        nextRowByCase.put(cf, r);
-    }
-
-    public void append(CaseFolder cf, String datasetName, String ttlName, List<SHACLValidationResult> results) {
-        appendExcelBlock(cf, datasetName, ttlName, results);
-    }
-
-    public void appendError(CaseFolder cf, String datasetName, String ttlName, Exception error) {
-        Sheet s = sheetByCase.get(cf);
-        int r = nextRowByCase.get(cf);
-
-        // Row A
-        Row first = s.createRow(r++);
-        first.createCell(0).setCellValue(datasetName == null ? "" : datasetName);
-        first.createCell(1).setCellValue(ttlName == null ? "" : ttlName);
-        first.createCell(2).setCellValue("All");
-        first.createCell(3).setCellValue("Warnings");
-        first.createCell(4).setCellValue("Infos");
-        first.createCell(5).setCellValue("Violations");
-
-        // Row B (all zeros)
-        Row counts = s.createRow(r++);
-        counts.createCell(2).setCellValue("# 0");
-        counts.createCell(3).setCellValue(0);
-        counts.createCell(4).setCellValue(0);
-        counts.createCell(5).setCellValue(0);
-
-        // Row C header
-        Row hdr = s.createRow(r++);
-        for (int c = 0; c < HEADER.length; c++) hdr.createCell(c).setCellValue(HEADER[c]);
-
-        // One detail row with the exception
-        Row dr = s.createRow(r++);
-        dr.createCell(6).setCellValue(safeThrowable(error));
-        dr.createCell(7).setCellValue("ERROR");
-
-        r++;
-        nextRowByCase.put(cf, r);
+        Row row = statisticsSheet.createRow(nextStatisticsRow++);
+        row.createCell(0).setCellValue(cf == null ? CaseFolder.UNKNOWN.name() : cf.name());
+        row.createCell(1).setCellValue(safe(datasetName));
+        row.createCell(2).setCellValue(safe(xmlFiles));
+        row.createCell(3).setCellValue(safe(constraintFile));
+        row.createCell(4).setCellValue(all);
+        row.createCell(5).setCellValue(warn);
+        row.createCell(6).setCellValue(info);
+        row.createCell(7).setCellValue(vio);
+        row.createCell(8).setCellValue(conforms && validationError == null);
+        row.createCell(9).setCellValue(safe(validationError));
     }
 
     public Path saveTo(Path outputBaseDir) throws IOException {
         Files.createDirectories(outputBaseDir);
 
-        // autosize 12 columns
         for (CaseFolder cf : CaseFolder.values()) {
             Sheet s = sheetByCase.get(cf);
-            for (int c = 0; c < 12; c++) {
-                try {
-                    s.autoSizeColumn(c);
-                } catch (Exception ignore) {
-                }
-            }
+            autosize(s, RAW_HEADER.length);
         }
+        autosize(statisticsSheet, STATISTICS_HEADER.length);
 
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         Path out = outputBaseDir.resolve("validation_report__" + ts + ".xlsx");
@@ -188,6 +191,46 @@ public class ValidationExcelWriter implements Closeable {
         wb.close();
     }
 
+    private static void writeHeader(Sheet sheet, String[] header, CellStyle headerStyle) {
+        Row hdr = sheet.createRow(0);
+        for (int c = 0; c < header.length; c++) {
+            Cell cell = hdr.createCell(c);
+            cell.setCellValue(header[c]);
+            cell.setCellStyle(headerStyle);
+        }
+    }
+
+    private static CellStyle createHeaderStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setWrapText(true);
+        style.setFillForegroundColor(IndexedColors.SKY_BLUE.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        return style;
+    }
+
+    private static void autosize(Sheet sheet, int columnCount) {
+        for (int c = 0; c < columnCount; c++) {
+            try {
+                sheet.autoSizeColumn(c);
+                int width = sheet.getColumnWidth(c);
+                int maxWidth = 80 * 256;
+                if (width > maxWidth) {
+                    sheet.setColumnWidth(c, maxWidth);
+                }
+            } catch (Exception ignore) {
+            }
+        }
+    }
+
     private static String safe(String s) {
         if (s == null) return "";
         if ("None".equalsIgnoreCase(s)) return "";
@@ -195,6 +238,7 @@ public class ValidationExcelWriter implements Closeable {
     }
 
     private static String safeThrowable(Throwable t) {
+        if (t == null) return "";
         String m = t.getMessage();
         if (m == null || m.isBlank()) return t.getClass().getName();
         return t.getClass().getName() + ": " + m;
