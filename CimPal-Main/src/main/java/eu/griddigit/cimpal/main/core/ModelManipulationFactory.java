@@ -772,10 +772,10 @@ public class ModelManipulationFactory {
 
             Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
 
-            System.out.println("HEADER rdf:id cell row=" + (dataStartFrom + 1)
-                    + ", col=" + (rdfidCol + 1)
-                    + ", value=[" + headIdXls + "]");
-            System.out.println("HEADER resource URI=[" + headRdfid + "]");
+//            System.out.println("HEADER rdf:id cell row=" + (dataStartFrom + 1)
+//                    + ", col=" + (rdfidCol + 1)
+//                    + ", value=[" + headIdXls + "]");
+//            System.out.println("HEADER resource URI=[" + headRdfid + "]");
 
             // put header data into the model
             // add header class
@@ -1038,16 +1038,16 @@ public class ModelManipulationFactory {
                                     }
                                 }
                             }
-                            System.out.println("---- SUBJECTS BEFORE SAVE ----");
-                            ResIterator debugSubjects = model.listSubjects();
-                            while (debugSubjects.hasNext()) {
-                                Resource s = debugSubjects.next();
-                                if (s.isURIResource()) {
-                                    System.out.println("SUBJECT=[" + s.getURI() + "]");
-                                } else {
-                                    System.out.println("SUBJECT=[blank node]");
-                                }
-                            }
+//                            System.out.println("---- SUBJECTS BEFORE SAVE ----");
+//                            ResIterator debugSubjects = model.listSubjects();
+//                            while (debugSubjects.hasNext()) {
+//                                Resource s = debugSubjects.next();
+//                                if (s.isURIResource()) {
+//                                    System.out.println("SUBJECT=[" + s.getURI() + "]");
+//                                } else {
+//                                    System.out.println("SUBJECT=[blank node]");
+//                                }
+//                            }
                         }
 
                     if (model.listStatements(rdfidRes, null, (RDFNode) null).hasNext()) {
