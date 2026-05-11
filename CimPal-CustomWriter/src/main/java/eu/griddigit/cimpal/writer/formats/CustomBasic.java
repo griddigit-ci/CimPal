@@ -433,24 +433,48 @@ public class CustomBasic extends CustomBaseXMLWriter {
      * null.
      */
     protected Statement getType(Resource r) {
-        Statement rslt;
+        List<Statement> typeStatements = new ArrayList<>();
         try {
             if (r instanceof Statement) {
-                rslt = ((Statement) r).getStatementProperty(RDF.type);
-                if (rslt == null || (!rslt.getObject().equals(RDF.Statement)))
+                Statement rslt = ((Statement) r).getStatementProperty(RDF.type);
+                if (rslt == null || (!rslt.getObject().equals(RDF.Statement))) {
                     throw new IllegalArgumentException("Statement type problem for resource " + r.getURI());
+                }
+                typeStatements.add(rslt);
             } else {
-                rslt = r.getRequiredProperty(RDF.type);
+                StmtIterator it = r.listProperties(RDF.type);
+                while (it.hasNext()) {
+                    typeStatements.add(it.nextStatement());
+                }
             }
         } catch (PropertyNotFoundException rdfe) {
-            if (r instanceof Statement)
+            if (r instanceof Statement) {
                 throw new IllegalArgumentException("Statement type problem for resource " + r.getURI());
-            rslt = null;
-        }
-        if (rslt == null || isOKType(rslt.getObject()) == -1)
+            }
             return null;
+        }
 
-        return rslt;
+        if (typeStatements.isEmpty()) {
+            return null;
+        }
+
+        if (types != null && types.length > 0) {
+            for (Resource preferredType : types) {
+                for (Statement stmt : typeStatements) {
+                    if (preferredType.equals(stmt.getObject()) && isOKType(stmt.getObject()) != -1) {
+                        return stmt;
+                    }
+                }
+            }
+        }
+
+        for (Statement stmt : typeStatements) {
+            if (isOKType(stmt.getObject()) != -1) {
+                return stmt;
+            }
+        }
+
+        return null;
     }
 
     /**

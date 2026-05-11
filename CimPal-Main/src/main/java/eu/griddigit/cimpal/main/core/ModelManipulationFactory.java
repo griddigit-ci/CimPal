@@ -713,6 +713,7 @@ public class ModelManipulationFactory {
         Model model = ModelFactory.createDefaultModel();
         model.setNsPrefixes(prefMap);
         List<String> modelProfileURIs = new LinkedList<>(); // to be used for the profile URI data store
+        Set<Resource> prettyTypes = new LinkedHashSet<>();
 
         // Add header class
         int headerCols = ((LinkedList<?>) headerXlsData.get(1)).size();
@@ -792,6 +793,7 @@ public class ModelManipulationFactory {
             headerSheetName = ResourceFactory.createResource(headerClassWNS).getLocalName();
 
             model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
+            prettyTypes.add(ResourceFactory.createResource(headerClassWNS));
 
             rdfAboutList.add(ResourceFactory.createResource(headerClassWNS));
 
@@ -912,6 +914,7 @@ public class ModelManipulationFactory {
             try {
                 classPrefix = prefMap.get(splitClassName[0]);
                 classWNS = classPrefix + splitClassName[1];
+                prettyTypes.add(ResourceFactory.createResource(classWNS));
             } catch (NullPointerException e) {
                 throw new Exception("Missing prefix in config for class: " + className + "\nMissing prefix: " + splitClassName[0]);
             }
@@ -1111,6 +1114,10 @@ public class ModelManipulationFactory {
             saveProperties.replace("rdfEnumList", rdfEnumList);
         } else {
             saveProperties.put("rdfEnumList", rdfEnumList);
+        }
+
+        if (!prettyTypes.isEmpty()) {
+            saveProperties.put("prettyTypes", prettyTypes.toArray(Resource[]::new));
         }
 
         String saveFilename = xmlfile.getName()
