@@ -21,15 +21,16 @@
             <Insets bottom="8.0" left="8.0" right="8.0" top="8.0" />
          </padding>
          <children>
-            <HBox spacing="8.0">
-               <children>
-                  <Button mnemonicParsing="false" onAction="#actionSelectModelFiles" text="Select model files..." />
-                  <Button mnemonicParsing="false" onAction="#actionLoadQuery" text="Load query..." />
-                  <Button mnemonicParsing="false" onAction="#actionSaveQuery" text="Save query..." />
-                  <Button mnemonicParsing="false" onAction="#actionClearQuery" text="Clear" />
-                  <Button defaultButton="true" mnemonicParsing="false" onAction="#actionRunQuery" text="Run query" />
-               </children>
-            </HBox>
+             <HBox spacing="8.0">
+                <children>
+                   <Button mnemonicParsing="false" onAction="#actionSelectModelFiles" text="Select model files..." />
+                   <Button mnemonicParsing="false" onAction="#actionLoadQuery" text="Load query..." />
+                   <Button mnemonicParsing="false" onAction="#actionSaveQuery" text="Save query..." />
+                   <Button mnemonicParsing="false" onAction="#actionSaveAsQuery" text="Save as..." />
+                   <Button mnemonicParsing="false" onAction="#actionClearQuery" text="Clear" />
+                   <Button defaultButton="true" mnemonicParsing="false" onAction="#actionRunQuery" text="Run query" />
+                </children>
+             </HBox>
             <HBox spacing="8.0">
                <children>
                   <Label text="Model files:" />

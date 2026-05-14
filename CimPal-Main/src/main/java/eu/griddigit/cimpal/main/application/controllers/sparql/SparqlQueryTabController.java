@@ -142,6 +142,43 @@ public class SparqlQueryTabController implements Initializable {
     }
 
     @FXML
+    private void actionSaveAsQuery(ActionEvent actionEvent) {
+        try {
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("Save SPARQL query as");
+            chooser.setInitialFileName("query.rq");
+            chooser.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql"),
+                    new FileChooser.ExtensionFilter("All files", "*.*")
+            );
+            File targetFile = chooser.showSaveDialog(txtSparqlQuery.getScene().getWindow());
+            if (targetFile == null) {
+                return;
+            }
+
+            String queryText = txtSparqlQuery.getText();
+            if (queryText == null || queryText.isBlank()) {
+                setStatus("Nothing to save.");
+                return;
+            }
+
+            if (!targetFile.getName().toLowerCase().endsWith(".rq") && !targetFile.getName().toLowerCase().endsWith(".sparql")) {
+                targetFile = new File(targetFile.getAbsolutePath() + ".rq");
+            }
+
+            Files.writeString(targetFile.toPath(), queryText, StandardCharsets.UTF_8);
+            setCurrentQueryFile(targetFile);
+            setStatus("Saved query as " + targetFile.getName() + ".");
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError(
+                    "Save as failed",
+                    "The SPARQL query could not be saved.",
+                    e
+            );
+        }
+    }
+
+    @FXML
     private void actionClearQuery(ActionEvent actionEvent) {
         txtSparqlQuery.clear();
         setCurrentQueryFile(null);
