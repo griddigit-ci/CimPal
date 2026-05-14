@@ -6,11 +6,15 @@ import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.util.ModelFactory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import org.apache.jena.rdf.model.Model;
 
 import java.io.File;
@@ -158,22 +162,6 @@ public class SparqlQueryTabController implements Initializable {
                 return;
             }
 
-            File outputFile = ModelFactory.fileSaveCustom(
-                    "Excel file",
-                    List.of("*.xlsx"),
-                    "Save SPARQL results",
-                    "sparql-results.xlsx"
-            );
-
-            if (outputFile == null) {
-                setStatus("SPARQL query export was cancelled.");
-                return;
-            }
-
-            if (!outputFile.getName().toLowerCase().endsWith(".xlsx")) {
-                outputFile = new File(outputFile.getAbsolutePath() + ".xlsx");
-            }
-
             setStatus("Loading RDF models...");
             Model combinedModel = eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(selectedModelFiles, DEFAULT_XML_BASE);
             if (combinedModel == null || combinedModel.isEmpty()) {
@@ -181,24 +169,41 @@ public class SparqlQueryTabController implements Initializable {
             }
 
             setStatus("Running SPARQL query...");
-            SparqlTools.executeSparqlQueryToExcelFile(queryText, combinedModel, outputFile);
+            SparqlTools.QueryResults results = SparqlTools.executeSparqlQuery(queryText, combinedModel);
 
-            setStatus("SPARQL results saved to " + outputFile.getName() + ".");
-            Alert ok = new Alert(Alert.AlertType.INFORMATION);
-            ok.setTitle("SPARQL query finished");
-            ok.setHeaderText(null);
-            ok.setContentText(
-                    "SPARQL query saved to:\n" +
-                            outputFile.getAbsolutePath() +
-                            "\n\nProcessed files: " +
-                            selectedModelFiles.size()
-            );
-            ok.showAndWait();
+            setStatus("SPARQL query completed: " + results.rows.size() + " result(s).");
+
+            // Open results window
+            showResultsWindow(results);
         } catch (Exception e) {
             setStatus("SPARQL query failed.");
             GUIhelper.showUserFriendlyError(
                     "SPARQL query failed",
                     "The SPARQL query could not be run. Review the details and send them to support if needed.",
+                    e
+            );
+        }
+    }
+
+    private void showResultsWindow(SparqlTools.QueryResults results) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/sparqlResultsWindow.fxml"));
+            Parent root = loader.load();
+
+            SparqlResultsWindowController controller = loader.getController();
+
+            Stage stage = new Stage();
+            stage.setTitle("SPARQL Query Results");
+            stage.setScene(new Scene(root));
+            stage.setWidth(1200);
+            stage.setHeight(600);
+
+            controller.setResults(results, stage);
+            stage.show();
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError(
+                    "Results window failed",
+                    "Could not open the results display window.",
                     e
             );
         }

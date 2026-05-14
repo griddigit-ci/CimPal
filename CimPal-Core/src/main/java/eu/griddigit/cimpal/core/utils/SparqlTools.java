@@ -218,4 +218,94 @@ public class SparqlTools {
             sheet.autoSizeColumn(i);
         }
     }
+
+    /**
+     * Data class to hold SPARQL query results
+     */
+    public static class QueryResults {
+        public final List<String> columns;
+        public final List<Map<String, String>> rows;
+
+        public QueryResults(List<String> columns, List<Map<String, String>> rows) {
+            this.columns = columns;
+            this.rows = rows;
+        }
+    }
+
+    /**
+     * Executes a SPARQL SELECT query and returns results without saving to file.
+     *
+     * @param sparqlQuery SPARQL query text
+     * @param model The RDF model to query against (already loaded)
+     * @return QueryResults containing columns and data rows
+     * @throws Exception if query execution fails
+     */
+    public static QueryResults executeSparqlQuery(
+            String sparqlQuery,
+            Model model
+    ) throws Exception {
+
+        if (model == null || model.isEmpty()) {
+            throw new IllegalArgumentException("Model cannot be null or empty");
+        }
+
+        if (sparqlQuery == null || sparqlQuery.isBlank()) {
+            throw new IllegalArgumentException("SPARQL query cannot be empty");
+        }
+
+        Query query = QueryFactory.create(sparqlQuery);
+
+        if (!query.isSelectType()) {
+            throw new IllegalArgumentException("Only SELECT SPARQL queries are supported.");
+        }
+
+        try (QueryExecution queryExecution = QueryExecutionFactory.create(query, model)) {
+            ResultSet resultSet = queryExecution.execSelect();
+            List<String> columns = resultSet.getResultVars();
+            List<Map<String, String>> rows = new ArrayList<>();
+
+            while (resultSet.hasNext()) {
+                QuerySolution solution = resultSet.nextSolution();
+                Map<String, String> row = new LinkedHashMap<>();
+
+                for (String varName : columns) {
+                    RDFNode node = solution.get(varName);
+                    row.put(varName, nodeToExcelValue(node, model));
+                }
+                rows.add(row);
+            }
+
+            return new QueryResults(columns, rows);
+        }
+    }
+
+    /**
+     * Exports QueryResults to an Excel file.
+     *
+     * @param results The QueryResults to export
+     * @param outputFile Output Excel file path
+     * @throws Exception if Excel export fails
+     */
+    public static void exportResultsToExcel(QueryResults results, File outputFile) throws Exception {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("SPARQL Results");
+            createHeaderRow(sheet, results.columns);
+
+            int rowIndex = 1;
+            for (Map<String, String> row : results.rows) {
+                Row excelRow = sheet.createRow(rowIndex++);
+                for (int colIndex = 0; colIndex < results.columns.size(); colIndex++) {
+                    Cell cell = excelRow.createCell(colIndex);
+                    String value = row.get(results.columns.get(colIndex));
+                    cell.setCellValue(value != null ? value : "");
+                }
+            }
+
+            autoSizeColumns(sheet, results.columns.size());
+
+            try (FileOutputStream fileOutput = new FileOutputStream(outputFile)) {
+                workbook.write(fileOutput);
+            }
+        }
+    }
 }
