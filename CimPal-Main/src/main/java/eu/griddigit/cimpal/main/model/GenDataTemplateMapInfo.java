@@ -1,5 +1,7 @@
 package eu.griddigit.cimpal.main.model;
 
+import eu.griddigit.cimpal.main.util.ExcelTools;
+
 public class GenDataTemplateMapInfo {
     private String className;
     private String fullClassName;
@@ -20,31 +22,9 @@ public class GenDataTemplateMapInfo {
         this.clsDescr = classDescription;
     }
 
-    private static String shortenName(String input) {
-        // Split the input string into words based on uppercase letters
-        String[] words = input.split("(?=[A-Z])");
-
-        StringBuilder shortName = new StringBuilder();
-
-        for (String word : words) {
-            if (word.length() >= 3) {
-                shortName.append(word, 0, 3); // Take first three letters
-            } else {
-                shortName.append(word); // Take full word if less than 3 letters
-            }
-        }
-
-        // Ensure the name is at most 31 characters long (Excel sheet name limit)
-        return shortName.length() > 31 ? shortName.substring(0, 31) : shortName.toString();
-    }
-
     public String getSheetClassName() {
-        String output = className;
-        if (output.length() > 30)
-        {
-            output = shortenName(output);
-        }
-        return output;
+        // Use the intelligent truncation from ExcelTools
+        return ExcelTools.getSheetNameFromClassName(className);
     }
 
     public String getClassName() {

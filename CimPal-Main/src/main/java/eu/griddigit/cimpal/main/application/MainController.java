@@ -13,6 +13,7 @@ import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
+import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclFromXls;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
@@ -56,6 +57,7 @@ import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.vocabulary.*;
+import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import eu.griddigit.cimpal.main.util.ExcelTools;
@@ -90,6 +92,26 @@ import java.util.List;
 import java.util.Properties;
 
 
+
+import javafx.scene.control.Alert;
+import javafx.scene.control.ProgressIndicator;
+
+
+import org.apache.jena.query.*;
+import org.apache.jena.rdf.model.*;
+import org.apache.jena.riot.RDFDataMgr;
+
+import org.apache.poi.ss.usermodel.*;
+
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+
+
+
+
 public class MainController implements Initializable {
 
     private GUIhelper guiHelper;
@@ -103,6 +125,7 @@ public class MainController implements Initializable {
     public Tab tabCreateCompleteSM2;
     public Button fbtnRunRDFConvert;
     public Tab tabOutputWindow;
+    public Tab tabSPARQLQuery;
     public Button btnResetIDComp;
     public Font x3;
     public Button btnResetRDFComp;
@@ -476,7 +499,7 @@ public class MainController implements Initializable {
                 prefs = Preferences.userRoot().node("CimPal");
             }
         } catch (BackingStoreException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Preferences error", "Preferences could not be loaded. Please review details and send them to support.", e);
         }
 
         wizardContext = WizardContext.getInstance();
@@ -824,7 +847,7 @@ public class MainController implements Initializable {
             try {
                 RDFDataMgr.read(model, new FileInputStream(file.getFirst()), Lang.RDFXML);
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                GUIhelper.showUserFriendlyError("RDFS loading error", "The selected RDFS file could not be opened.", e);
                 progressBar.setProgress(0);
             }
             rdfsDescriptions(model);
@@ -847,7 +870,7 @@ public class MainController implements Initializable {
             try {
                 RDFDataMgr.read(model, new FileInputStream(file.getFirst()), "", Lang.RDFXML);
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                GUIhelper.showUserFriendlyError("RDF loading error", "The selected RDF file could not be opened.", e);
                 progressBar.setProgress(0);
             }
             exportRDFToExcel(model);
@@ -963,7 +986,7 @@ public class MainController implements Initializable {
                     RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
                     listModels.add(model);
                 } catch (FileNotFoundException e) {
-                    e.printStackTrace();
+                    GUIhelper.showUserFriendlyError("RDFS loading error", "One of the selected RDFS files could not be opened.", e);
                     progressBar.setProgress(0);
                 }
             }
@@ -1449,7 +1472,7 @@ public class MainController implements Initializable {
                             guiRdfDiffResultsStage.showAndWait();
 
                         } catch (IOException e) {
-                            e.printStackTrace();
+                                    GUIhelper.showUserFriendlyError("Comparison view error", "The comparison result window could not be opened.", e);
                         }
                     }
                 } else {
@@ -1547,7 +1570,7 @@ public class MainController implements Initializable {
                         guiRdfDiffResultsStage.showAndWait();
 
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        GUIhelper.showUserFriendlyError("Comparison view error", "The comparison result window could not be opened.", e);
                     }
                 }
             } else {
@@ -1690,7 +1713,7 @@ public class MainController implements Initializable {
                 progressBar.setProgress(1);
                 guiRdfDiffResultsStage.showAndWait();
             } catch (IOException e) {
-                e.printStackTrace();
+                GUIhelper.showUserFriendlyError("Comparison view error", "The RDFS comparison result window could not be opened.", e);
             }
         } else {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -2048,7 +2071,7 @@ public class MainController implements Initializable {
             guiPrefStage.showAndWait();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Preferences window error", "The Preferences window could not be opened.", e);
         }
     }
 
@@ -2068,7 +2091,7 @@ public class MainController implements Initializable {
             guiAboutStage.showAndWait();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("About window error", "The About window could not be opened.", e);
         }
     }
 
@@ -2203,7 +2226,7 @@ public class MainController implements Initializable {
                                 writer.write(xmlContent);
                                 //System.out.println("XML file saved successfully!");
                             } catch (IOException e) {
-                                e.printStackTrace();
+                                GUIhelper.showUserFriendlyError("File write error", "A generated XML file could not be saved.", e);
                             }
                         }
                         processed.add(timestamp + process + tso + version);
@@ -2720,7 +2743,7 @@ public class MainController implements Initializable {
         try {
             RDFDataMgr.read(model, new FileInputStream(this.selectedFile.get(m).toString()), Lang.RDFXML);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Profile loading error", "A selected profile file could not be opened.", e);
         }
 
         this.models.add(model);
@@ -2739,7 +2762,7 @@ public class MainController implements Initializable {
         try {
             RDFDataMgr.read(model, new FileInputStream(this.selectedFile.get(m).toString()), Lang.RDFXML);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("RDFS loading error", "A selected RDFS file could not be opened.", e);
         }
 
         RDFSmodels.add(model);
@@ -4793,7 +4816,7 @@ public class MainController implements Initializable {
         try {
             RDFDataMgr.read(model, new FileInputStream(MainController.rdfModelExcelShacl), Lang.RDFXML);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("RDFS loading error", "The RDFS file for shape construction could not be opened.", e);
         }
         shaclNodataMap = 1; // as no mapping is to be used for this task
         String cimsNs = MainController.prefs.get("cimsNamespace", "");
@@ -4919,7 +4942,7 @@ public class MainController implements Initializable {
         saveProperties.put("useFileDialog", true);
         saveProperties.put("fileFolder", "C:");
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "false"); //this is to only print the ID and not with namespace
         saveProperties.put("showXmlBaseDeclaration", "false");
         saveProperties.put("sortRDF", sortRDF);
         saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localNam
@@ -5016,7 +5039,7 @@ public class MainController implements Initializable {
                 ls_geni_rdfs.setItems(filenames);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("RDFS selection error", "The selected RDFS file list could not be loaded.", e);
         }
         finally {
             updateGenInfoLabel();
@@ -5035,7 +5058,7 @@ public class MainController implements Initializable {
                 ls_geni_instances.setItems(filenames);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Instance selection error", "The selected instance file list could not be loaded.", e);
         }
         finally {
             updateGenInfoLabel();
@@ -5147,13 +5170,8 @@ public class MainController implements Initializable {
             progressBar.setProgress(1.0);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Apply changes error", "The changes could not be applied. Please review details.", e);
             progressBar.setProgress(0);
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setContentText("Failed to apply changes: " + e.getMessage());
-            alert.setHeaderText(null);
-            alert.setTitle("Error");
-            alert.showAndWait();
         }
     }
 
@@ -5227,12 +5245,16 @@ public class MainController implements Initializable {
             ok.showAndWait();
         } catch (Exception e) {
             progressBar.setProgress(0);
-            Alert err = new Alert(Alert.AlertType.ERROR);
-            err.setTitle("Manifest generation failed");
-            err.setHeaderText(null);
-            err.setContentText(e.getMessage());
-            err.showAndWait();
+            GUIhelper.showUserFriendlyError("Manifest generation failed", "The manifest could not be generated. Please review details and share them with support.", e);
         }
     }
+
+    @FXML
+    public void actionRunSPARQLQuery(ActionEvent actionEvent) {
+        if (tabPaneConstraintsDetails != null && tabSPARQLQuery != null) {
+            tabPaneConstraintsDetails.getSelectionModel().select(tabSPARQLQuery);
+        }
+    }
+
 }
 

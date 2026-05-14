@@ -191,6 +191,24 @@ public class ModelFactory {
         return new HashMap<>(result);
     }
 
+    /**
+     * Loads a list of RDF files into a single combined model for SPARQL execution.
+     * Supports both plain XML/RDF files and ZIP archives via {@link #modelLoadPerFiles(List, String, Lang)}.
+     */
+    public static Model loadCombinedModelForSparql(List<File> files, String xmlBase) throws IOException {
+        Map<String, Model> loadedModels = modelLoadPerFiles(files, xmlBase, Lang.RDFXML);
+        Model combinedModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Map<String, String> prefixMap = combinedModel.getNsPrefixMap();
+
+        for (Model model : loadedModels.values()) {
+            prefixMap.putAll(model.getNsPrefixMap());
+            combinedModel.add(model);
+        }
+
+        combinedModel.setNsPrefixes(prefixMap);
+        return combinedModel;
+    }
+
     private static Lang getLangFromExtension(String ext, Lang fallback) {
         return switch (ext) {
             case "rdf", "xml" -> Lang.RDFXML;

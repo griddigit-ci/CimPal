@@ -7,19 +7,27 @@ package eu.griddigit.cimpal.main.gui;
 
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.interfaces.IOutputHandler;
+import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.scene.control.*;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.util.Pair;
 import org.apache.jena.rdf.model.Model;
 
 import java.io.File;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 import static eu.griddigit.cimpal.main.application.MainController.foutputWindowVar;
 
 public class GUIhelper implements IOutputHandler {
+
+    private static final String GENERIC_ERROR_MESSAGE = "An unexpected error occurred. You can review and copy the technical details for support.";
 
     public static Alert expandableAlert(String title, String header, String contextText, String labelText, String detailsText) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
@@ -55,6 +63,69 @@ public class GUIhelper implements IOutputHandler {
         alert.getDialogPane().setExpandableContent(expContent);
 
         return alert;
+    }
+
+    public static void showUserFriendlyError(String title, String userMessage, Throwable throwable) {
+        Runnable showDialog = () -> createErrorAlert(title, userMessage, throwable).showAndWait();
+        if (Platform.isFxApplicationThread()) {
+            showDialog.run();
+        } else {
+            Platform.runLater(showDialog);
+        }
+    }
+
+    public static void showUserFriendlyError(String title, Throwable throwable) {
+        showUserFriendlyError(title, GENERIC_ERROR_MESSAGE, throwable);
+    }
+
+    private static Alert createErrorAlert(String title, String userMessage, Throwable throwable) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title == null || title.isBlank() ? "Error" : title);
+        alert.setHeaderText("Something went wrong");
+        alert.setContentText(userMessage == null || userMessage.isBlank() ? GENERIC_ERROR_MESSAGE : userMessage);
+
+        ButtonType copyDetailsButtonType = new ButtonType("Copy details", ButtonBar.ButtonData.LEFT);
+        alert.getButtonTypes().setAll(copyDetailsButtonType, ButtonType.OK);
+
+        String technicalDetails = buildTechnicalDetails(throwable);
+        Label label = new Label("Technical details (for support):");
+        TextArea textArea = new TextArea(technicalDetails);
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setMaxWidth(Double.MAX_VALUE);
+        textArea.setMaxHeight(Double.MAX_VALUE);
+        GridPane.setVgrow(textArea, Priority.ALWAYS);
+        GridPane.setHgrow(textArea, Priority.ALWAYS);
+
+        GridPane expContent = new GridPane();
+        expContent.setMaxWidth(Double.MAX_VALUE);
+        expContent.add(label, 0, 0);
+        expContent.add(textArea, 0, 1);
+
+        alert.getDialogPane().setExpandableContent(expContent);
+        alert.getDialogPane().setExpanded(false);
+
+        Button copyButton = (Button) alert.getDialogPane().lookupButton(copyDetailsButtonType);
+        copyButton.addEventFilter(ActionEvent.ACTION, event -> {
+            ClipboardContent clipboardContent = new ClipboardContent();
+            clipboardContent.putString(technicalDetails);
+            Clipboard.getSystemClipboard().setContent(clipboardContent);
+            copyButton.setText("Copied");
+            event.consume();
+        });
+
+        return alert;
+    }
+
+    private static String buildTechnicalDetails(Throwable throwable) {
+        if (throwable == null) {
+            return "No technical details are available.";
+        }
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        throwable.printStackTrace(printWriter);
+        printWriter.flush();
+        return stringWriter.toString();
     }
 //    public static Dialog<HashMap<String, String>> choiceDialog2Choices(String title, String header, String choiceLabelText1, String nameComboBox1, String[] choiceText1, String choiceLabelText2, String nameComboBox2, String[] choiceText2, String choiceLabelText3, String nameComboBox3, String[] choiceText3, String resultTextField, String nameLabelText){
 //        Dialog<HashMap<String, String>> dialog = new Dialog<>();

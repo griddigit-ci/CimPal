@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.application.Preloader;
@@ -68,7 +69,7 @@ public class MainGUI extends Application {
 
 
         } catch (Exception e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Application startup error", "CimPal could not start correctly. Please check the technical details and share them with support.", e);
         }
     }
 
@@ -80,6 +81,9 @@ public class MainGUI extends Application {
 
     public static void main(String[] args) {
         //Application.launch(args);
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) ->
+                GUIhelper.showUserFriendlyError("Unexpected application error", throwable)
+        );
         System.setProperty("javafx.preloader", "eu.griddigit.cimpal.main.preload.PreloadApp");
         Application.launch(MainGUI.class, args);
     }

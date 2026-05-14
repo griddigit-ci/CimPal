@@ -18,7 +18,6 @@ public class ManifestGenerator {
     private static final String NS_ADMS = "http://www.w3.org/ns/adms#";
     private static final String NS_CIM = "https://cim.ucaiug.io/ns#";
     private static final String NS_DCAT = "http://www.w3.org/ns/dcat#";
-    private static final String NS_DATACIM = "https://cim4.eu/ns/datacim#";
     private static final String NS_DCTERMS = "http://purl.org/dc/terms/";
     private static final String NS_EU = "https://cim.ucaiug.io/ns/eu#";
     private static final String NS_NC = "https://cim4.eu/ns/nc#";
@@ -262,7 +261,6 @@ public class ManifestGenerator {
         model.setNsPrefix("adms", NS_ADMS);
         model.setNsPrefix("cim", NS_CIM);
         model.setNsPrefix("dcat", NS_DCAT);
-        model.setNsPrefix("datacim", NS_DATACIM);
         model.setNsPrefix("dcterms", NS_DCTERMS);
         model.setNsPrefix("eu", NS_EU);
         model.setNsPrefix("nc", NS_NC);
@@ -488,9 +486,9 @@ public class ManifestGenerator {
 
         String safeFileName = fileName.replace("\\", "/").replace(" ", "%20");
         if (parentFolder == null || parentFolder.isBlank()) {
-            return "file://" + safeFileName;
+            return "file:" + safeFileName;
         }
         String safeParentFolder = parentFolder.replace("\\", "/").replace(" ", "%20");
-        return "file://" + safeParentFolder + "/" + safeFileName;
+        return "file:" + safeParentFolder + "/" + safeFileName;
     }
 }

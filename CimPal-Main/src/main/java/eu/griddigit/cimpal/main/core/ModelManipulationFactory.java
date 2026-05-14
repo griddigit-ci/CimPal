@@ -713,6 +713,7 @@ public class ModelManipulationFactory {
         Model model = ModelFactory.createDefaultModel();
         model.setNsPrefixes(prefMap);
         List<String> modelProfileURIs = new LinkedList<>(); // to be used for the profile URI data store
+        Set<Resource> prettyTypes = new LinkedHashSet<>();
 
         // Add header class
         int headerCols = ((LinkedList<?>) headerXlsData.get(1)).size();
@@ -746,10 +747,35 @@ public class ModelManipulationFactory {
         // get which row contains the extension flags?
         int isExtensionRow = findRowIndexByFirstCell(headerXlsData, "IsExtension");
 
+        String headerSheetName = "";
+
         if (headerXlsData.size() > dataStartFrom) {
 
-            String headRdfid = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(rdfidCol).toString();
+
+
+            Object headIdObj = ((LinkedList<?>) headerXlsData.get(dataStartFrom)).get(rdfidCol);
+
+            if (headIdObj == null || headIdObj.toString().trim().isEmpty()) {
+                throw new Exception("Header rdf:id value is empty at row " + (dataStartFrom + 1)
+                        + ", column " + (rdfidCol + 1)
+                        + ". Expected value from A8.");
+            }
+
+            String headIdXls = headIdObj.toString().trim();
+
+            String headRdfid;
+            if (headIdXls.startsWith("http") || headIdXls.startsWith("urn:uuid:")) {
+                headRdfid = headIdXls;
+            } else {
+                headRdfid = xmlBase + "#" + headIdXls;
+            }
+
             Resource headRdfidRes = ResourceFactory.createResource(headRdfid);
+
+//            System.out.println("HEADER rdf:id cell row=" + (dataStartFrom + 1)
+//                    + ", col=" + (rdfidCol + 1)
+//                    + ", value=[" + headIdXls + "]");
+//            System.out.println("HEADER resource URI=[" + headRdfid + "]");
 
             // put header data into the model
             // add header class
@@ -763,7 +789,11 @@ public class ModelManipulationFactory {
             } catch (NullPointerException e) {
                 throw new Exception("Missing prefix in config for class: " + headerClassName + "\nMissing prefix: " + splitClassName[0]);
             }
+
+            headerSheetName = ResourceFactory.createResource(headerClassWNS).getLocalName();
+
             model.add(ResourceFactory.createStatement(headRdfidRes, RDF.type, ResourceFactory.createProperty(headerClassWNS)));
+            prettyTypes.add(ResourceFactory.createResource(headerClassWNS));
 
             rdfAboutList.add(ResourceFactory.createResource(headerClassWNS));
 
@@ -852,7 +882,12 @@ public class ModelManipulationFactory {
         }
 
         // put other classes into the model
+
         for (Map.Entry<String, ArrayList<Object>> entry : classesXlsData.entrySet()) {
+            if (entry.getKey().equals(headerSheetName)) {
+                continue;
+            }
+
             ArrayList<Object> classXlsData = entry.getValue();
             String className;
             try {
@@ -879,22 +914,29 @@ public class ModelManipulationFactory {
             try {
                 classPrefix = prefMap.get(splitClassName[0]);
                 classWNS = classPrefix + splitClassName[1];
+                prettyTypes.add(ResourceFactory.createResource(classWNS));
             } catch (NullPointerException e) {
                 throw new Exception("Missing prefix in config for class: " + className + "\nMissing prefix: " + splitClassName[0]);
             }
 
             int classIsExtensionRow = findRowIndexByFirstCell(classXlsData, "IsExtension");
             for (int i = dataStartFrom; i < classXlsData.size(); i++) { // loop on the rows/class instance
-                if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
-                    String idxls = ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
-                    String rdfid;
-                    if (idxls.startsWith("urn:uuid")) {
-                        rdfid = idxls;
-                    } else {
-                        rdfid = xmlBase + "#" + idxls;
-                    }
+                Object idObj = ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol);
 
-                    Resource rdfidRes = ResourceFactory.createResource(rdfid);
+                if (idObj == null || idObj.toString().trim().isEmpty()) {
+                    continue;
+                }
+
+                String idxls = idObj.toString().trim();
+
+                String rdfid;
+                if (idxls.startsWith("http") || idxls.startsWith("urn:uuid")) {
+                    rdfid = idxls;
+                } else {
+                    rdfid = xmlBase + "#" + idxls;
+                }
+
+                Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
 
                     if (((LinkedList<?>) classXlsData.getFirst()).get(3).toString().equals("true")) {
@@ -955,7 +997,7 @@ public class ModelManipulationFactory {
                                     }
                                     case "Resource" -> { //add resource
                                         if (object.startsWith("http") || object.startsWith("urn:uuid:")) {
-                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(object)));
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(object)));
                                         } else if (!object.contains("http") && object.contains(":")) {
                                             String[] objSplit = object.split(":", 2);
                                             String prefixUri;
@@ -969,7 +1011,7 @@ public class ModelManipulationFactory {
                                             }
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(prefixUri + objData)));
                                         } else {
-                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createProperty(xmlBase + "#" + object)));
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createResource(xmlBase + "#" + object)));
                                         }
                                     }
                                     case "Enumeration" -> { //add enum
@@ -996,8 +1038,18 @@ public class ModelManipulationFactory {
                                     }
                                 }
                             }
+//                            System.out.println("---- SUBJECTS BEFORE SAVE ----");
+//                            ResIterator debugSubjects = model.listSubjects();
+//                            while (debugSubjects.hasNext()) {
+//                                Resource s = debugSubjects.next();
+//                                if (s.isURIResource()) {
+//                                    System.out.println("SUBJECT=[" + s.getURI() + "]");
+//                                } else {
+//                                    System.out.println("SUBJECT=[blank node]");
+//                                }
+//                            }
                         }
-                    }
+
                     if (model.listStatements(rdfidRes, null, (RDFNode) null).hasNext()) {
                         // If it has properties then add the primary class type
                         model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
@@ -1062,6 +1114,10 @@ public class ModelManipulationFactory {
             saveProperties.replace("rdfEnumList", rdfEnumList);
         } else {
             saveProperties.put("rdfEnumList", rdfEnumList);
+        }
+
+        if (!prettyTypes.isEmpty()) {
+            saveProperties.put("prettyTypes", prettyTypes.toArray(Resource[]::new));
         }
 
         String saveFilename = xmlfile.getName()
