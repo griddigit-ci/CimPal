@@ -2307,16 +2307,16 @@ public class MainController implements Initializable {
         if (fcbRDFconvertModelUnion.isSelected()) {
             fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
-            if (fileL != null) {// the file is selected
+            if (!fileL.isEmpty()) {// the file is selected
                 fsourcePathTextField.setText(fileL.toString());
-                MainController.rdfConvertFileList = fileL;
+                MainController.rdfConvertFileList = new LinkedList<>(fileL);
             } else {
                 fsourcePathTextField.clear();
             }
         } else {
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
-            if (file.getFirst() != null) {// the file is selected
+            if (!file.isEmpty()) {// the file is selected
                 //MainController.prefs.put("LastWorkingFolder", file.getParent());
                 fsourcePathTextField.setText(file.getFirst().toString());
                 MainController.rdfConvertFile = file.getFirst();
@@ -2527,11 +2527,11 @@ public class MainController implements Initializable {
         fMainRdfPathTextField.clear();
         fDeviationRdfPathTextField.clear();
         fExtendedRdfPathTextField.clear();
-        if (MainController.rdfConvertModelUnionDetailedFiles != null) {
+        if (!MainController.rdfConvertModelUnionDetailedFiles.isEmpty()) {
             MainController.rdfConvertModelUnionDetailedFiles.clear();
         }
         MainController.rdfConvertFile = null;
-        if (MainController.rdfConvertFileList != null) {
+        if (!MainController.rdfConvertFileList.isEmpty()) {
             MainController.rdfConvertFileList.clear();
         }
 
