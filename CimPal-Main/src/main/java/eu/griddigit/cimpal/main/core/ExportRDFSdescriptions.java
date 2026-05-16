@@ -122,8 +122,8 @@ public class ExportRDFSdescriptions {
         exportDesciption(rdfsItem,rdfsItemDescription,"RDFS descriptions","RDFSdescription","Save descriptions from RDFS", rdfsItemMultiplicity, rdfsItemtype, rdfsItemAssociationUsed, rdfsStereotype, rdfsConcreteClass);
     }
 
-    public static Map<String, List<List<RDFAttributeData>>> getRDFDataForClasses(Model model) {
         // Map to store data for each class (sheet name -> List of Maps for rows)
+    public static Map<String, List<List<RDFAttributeData>>> getRDFDataForClasses(Model model, List<String> templateClasses) {
         Map<String, List<List<RDFAttributeData>>> classData = new LinkedHashMap<>();
 
         // Parse all subjects in the RDF model
@@ -145,13 +145,13 @@ public class ExportRDFSdescriptions {
                 RDFNode selectedType = null;
                 if (typeObjects.size() > 1) {
                     // Multiple types found
-                    for (RDFNode typeObj : typeObjects) { // try to find a type that is in the concrete namespace
-                        if (classData.containsKey(typeObj.toString().split("#")[1])) {
+                    for (RDFNode typeObj : typeObjects) {
+                        if (templateClasses.contains(typeObj.toString())) {
                             selectedType = typeObj;
                             break;
                         }
                     }
-                    if (selectedType == null) { // No matching type found, prompt user to select
+                    if (selectedType == null) {
                         selectedType = showTypeSelectionDialog(subject, typeObjects);
                         if (selectedType == null) {
                             selectedType = typeObjects.getFirst();
@@ -161,12 +161,10 @@ public class ExportRDFSdescriptions {
                     // Only one type found
                     selectedType = typeObjects.getFirst();
                 }
-                String className = selectedType.toString().split("#")[1];
 
-                // Initialize storage for this class if it doesn't exist
+                String className = selectedType.toString();
                 classData.putIfAbsent(className, new LinkedList<>());
 
-                // Collect attributes for the current subject (row)
                 List<RDFAttributeData> rowData = new ArrayList<>();
                 // Add the subject URI as a special column (e.g., "Subject")
                 String[] splitSubjectUri = subject.getURI().split("#", -1);
@@ -175,35 +173,76 @@ public class ExportRDFSdescriptions {
                 StmtIterator properties = subject.listProperties();
                 while (properties.hasNext()) {
                     Statement property = properties.next();
-                    // Get the prefix and local name of the property
-                    //String propertyUri = property.getPredicate().getURI();
-                    String prefix = model.getNsURIPrefix(property.getPredicate().getNameSpace());
-                    String propertyName = property.getPredicate().getLocalName();
 
-                    // Determine and format the property value
+                    boolean isRdfType = property.getPredicate().equals(RDF.type);
+                    boolean isSelectedType = isRdfType && property.getObject().equals(selectedType);
+
+                    if (isSelectedType) {
+                        continue;
+                    }
+
+                    String prefix;
+                    String propertyName;
+
+                    if (property.getPredicate().equals(RDF.type)) {
+                        prefix = property.getPredicate().getNameSpace();
+                        propertyName = property.getPredicate().getLocalName();
+                    } else {
+                        prefix = model.getNsURIPrefix(property.getPredicate().getNameSpace());
+                        propertyName = property.getPredicate().getLocalName();
+                    }
+
                     RDFNode object = property.getObject();
                     String propertyValue;
                     String tpe;
                     if (object.isResource()) {
-                        // If the object is a resource (URI), format it as prefix:localname
-                        //String objectUri = object.toString();
-                        String objectNs = object.asResource().getNameSpace();
-                        String objectPrefix = model.getNsURIPrefix(objectNs);
-                        propertyValue = (objectPrefix != null ? objectPrefix + ":" : (objectNs.startsWith("file://") ? "" : objectNs)) + object.asResource().getLocalName();
+                        if (property.getPredicate().equals(RDF.type)) {
+                            propertyValue = object.asResource().getURI();
+                        } else {
+                            String objectNs = object.asResource().getNameSpace();
+                            String objectPrefix = model.getNsURIPrefix(objectNs);
+                            propertyValue = (objectPrefix != null ? objectPrefix + ":" : (objectNs.startsWith("file://") ? "" : objectNs)) + object.asResource().getLocalName();
+                        }
                         tpe = "Resource";
                     } else {
-                        // Otherwise, just use the literal value
                         propertyValue = object.toString();
                         tpe = "Literal";
                     }
-                    rowData.add(new RDFAttributeData(prefix != null ? prefix : "", propertyName, propertyValue, tpe));
-                }
+                    if (property.getPredicate().equals(RDF.type)) {
+                        rowData.add(new RDFAttributeData(
+                                property.getPredicate().getNameSpace(),
+                                property.getPredicate().getLocalName(),
+                                propertyValue,
+                                tpe
+                        ));
+                    } else {
+                        rowData.add(new RDFAttributeData(prefix != null ? prefix : "", propertyName, propertyValue, tpe));
+                    }                }
 
-                // Add the row data to the corresponding class
                 classData.get(className).add(rowData);
             }
         }
         return classData;
+    }
+
+    public static Map<String, List<List<RDFAttributeData>>> getRDFDataForClasses(Model model) {
+        List<String> modelClasses = new ArrayList<>();
+
+        ResIterator subjects = model.listSubjects();
+        while (subjects.hasNext()) {
+            Resource subject = subjects.next();
+
+            StmtIterator typeStatements = model.listStatements(subject, RDF.type, (RDFNode) null);
+            while (typeStatements.hasNext()) {
+                RDFNode typeObj = typeStatements.nextStatement().getObject();
+
+                if (typeObj.isResource() && !modelClasses.contains(typeObj.toString())) {
+                    modelClasses.add(typeObj.toString());
+                }
+            }
+        }
+
+        return getRDFDataForClasses(model, modelClasses);
     }
 
     private static RDFNode showTypeSelectionDialog(Resource subject, List<RDFNode> typeObjects) {

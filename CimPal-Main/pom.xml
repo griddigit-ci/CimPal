@@ -158,7 +158,7 @@
                                 <path>%JAVA_HOME%;%PATH%</path>
                                 <requiresJdk>false</requiresJdk>
                                 <requires64Bit>false</requires64Bit>
-                                <minVersion>23</minVersion>
+                                <minVersion>25</minVersion>
                             </jre>
                             <versionInfo>
                                 <fileVersion>${cimpal.version}</fileVersion>

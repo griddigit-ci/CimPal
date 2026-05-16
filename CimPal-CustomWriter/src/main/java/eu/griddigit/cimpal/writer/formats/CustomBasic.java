@@ -105,11 +105,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 //get list of all triples of the rdf:type and these need to be sorted by object
                 Map<String, RDFNode> listObjectsMap = new TreeMap<>();
                 for (Statement stmt : listStatements) {
-                    if (sortRDFprefix.equals("true")) {
-                        listObjectsMap.put(model.getNsURIPrefix(stmt.getObject().asResource().getNameSpace()) + ":" + stmt.getObject().asResource().getLocalName(), stmt.getObject());
-                    } else {
-                        listObjectsMap.put(stmt.getObject().asResource().getLocalName(), stmt.getObject());
-                    }
+                    listObjectsMap.put(sortKey(model, stmt.getObject().asResource()), stmt.getObject());
 
                 }
                 Set<Map.Entry<String, RDFNode>> entries
@@ -133,11 +129,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 //get list of all triples of the rdf:type and these need to be sorted by subject
                 Map<String, Resource> listSubjectMap = new TreeMap<>();
                 for (Statement stmt : listStatements) {
-                    if (sortRDFprefix.equals("true")) {
-                        listSubjectMap.put(model.getNsURIPrefix(stmt.getSubject().getNameSpace()) + ":" + stmt.getSubject().getLocalName(), stmt.getSubject());
-                    } else {
-                        listSubjectMap.put(stmt.getSubject().getLocalName(), stmt.getSubject());
-                    }
+                    listSubjectMap.put(sortKey(model, stmt.getSubject()), stmt.getSubject());
 
                 }
                 Set<Map.Entry<String, Resource>> entries
@@ -162,6 +154,26 @@ public class CustomBasic extends CustomBaseXMLWriter {
             while (rIter.hasNext()) writeRDFStatements(model, rIter.nextResource(), writer);
         }
 
+    }
+
+    private String sortKey(Model model, Resource resource) {
+        if (resource.isAnon()) {
+            return "_:" + anonId(resource);
+        }
+
+        String localName = resource.getLocalName();
+        if (localName == null || localName.isBlank()) {
+            localName = resource.getURI();
+        }
+
+        if (this.sortRDFprefix.equals("true")) {
+            String prefix = model.getNsURIPrefix(resource.getNameSpace());
+            if (prefix != null && !prefix.isEmpty()) {
+                return prefix + ":" + localName;
+            }
+        }
+
+        return localName;
     }
 
     protected void writeRDFTrailer(PrintWriter writer, String base) {
@@ -421,24 +433,48 @@ public class CustomBasic extends CustomBaseXMLWriter {
      * null.
      */
     protected Statement getType(Resource r) {
-        Statement rslt;
+        List<Statement> typeStatements = new ArrayList<>();
         try {
             if (r instanceof Statement) {
-                rslt = ((Statement) r).getStatementProperty(RDF.type);
-                if (rslt == null || (!rslt.getObject().equals(RDF.Statement)))
+                Statement rslt = ((Statement) r).getStatementProperty(RDF.type);
+                if (rslt == null || (!rslt.getObject().equals(RDF.Statement))) {
                     throw new IllegalArgumentException("Statement type problem for resource " + r.getURI());
+                }
+                typeStatements.add(rslt);
             } else {
-                rslt = r.getRequiredProperty(RDF.type);
+                StmtIterator it = r.listProperties(RDF.type);
+                while (it.hasNext()) {
+                    typeStatements.add(it.nextStatement());
+                }
             }
         } catch (PropertyNotFoundException rdfe) {
-            if (r instanceof Statement)
+            if (r instanceof Statement) {
                 throw new IllegalArgumentException("Statement type problem for resource " + r.getURI());
-            rslt = null;
-        }
-        if (rslt == null || isOKType(rslt.getObject()) == -1)
+            }
             return null;
+        }
 
-        return rslt;
+        if (typeStatements.isEmpty()) {
+            return null;
+        }
+
+        if (types != null && types.length > 0) {
+            for (Resource preferredType : types) {
+                for (Statement stmt : typeStatements) {
+                    if (preferredType.equals(stmt.getObject()) && isOKType(stmt.getObject()) != -1) {
+                        return stmt;
+                    }
+                }
+            }
+        }
+
+        for (Statement stmt : typeStatements) {
+            if (isOKType(stmt.getObject()) != -1) {
+                return stmt;
+            }
+        }
+
+        return null;
     }
 
     /**

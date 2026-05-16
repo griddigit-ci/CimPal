@@ -1,9 +1,13 @@
 package eu.griddigit.cimpal.core.utils;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.graph.Graph;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.riot.RDFParser;
+import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.vocabulary.DCAT;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
@@ -17,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
 public class ModelFactory {
 
@@ -58,37 +63,31 @@ public class ModelFactory {
                     streams = unzip(file);
                     format = Lang.RDFXML;
                 } else {
-                    streams = List.of(new FileInputStream(file));
+                    streams = List.of(new ByteArrayInputStream(new FileInputStream(file).readAllBytes()));
                     format = getLangFromExtension(ext, rdfSourceFormat);
                 }
 
-                for (int i = 0; i < streams.size(); i++) {
-                    try (InputStream in = streams.get(i)) {
-                        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-                        RDFDataMgr.read(model, in, xmlBase, format);
+                streams.parallelStream().forEach(in -> {
+                    Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+                    RDFDataMgr.read(model, in, xmlBase, format);
 
-                        // Merge prefixes (deferred until after parallel loop)
-                        String keyword = getProfileKeyword(model);
-                        if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
-                        String key = buildModelKey(file, keyword, isZip, i, treeID);
+                    String keyword = getProfileKeyword(model);
+                    if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
+                    String key = buildModelKey(file, keyword, isZip, streams.indexOf(in), treeID);
 
-                        modelMap.put(key, model);
+                    modelMap.put(key, model);
 
-                        synchronized (unionLock) {
-                            unionModel.add(model);
-                            unionModel.setNsPrefixes(model);
-                        }
-                        if (!"FH".equals(keyword)) {
-                            synchronized (unionNoHeaderLock) {
-                                unionNoHeader.add(model);
-                                unionNoHeader.setNsPrefixes(model);
-                            }
-                        }
-
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                    synchronized (unionLock) {
+                        unionModel.add(model);
+                        unionModel.setNsPrefixes(model);
                     }
-                }
+                    if (!"FH".equals(keyword)) {
+                        synchronized (unionNoHeaderLock) {
+                            unionNoHeader.add(model);
+                            unionNoHeader.setNsPrefixes(model);
+                        }
+                    }
+                });
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -106,6 +105,28 @@ public class ModelFactory {
         }
 
         return result;
+    }
+
+    //Loads model data with datatype mapping
+    public static Model modelLoadXMLmapping(InputStream inputStream, Map<String, RDFDatatype> dataTypeMap, String xmlBase) {
+        // Create a Graph to hold the parsed data
+        Graph graph = GraphFactory.createDefaultGraph();
+
+        // Create a StreamRDF for handling parsed triples and datatypes
+        DataTypeStreamRDF sink = new DataTypeStreamRDF(graph, dataTypeMap);
+
+        // Use RDFParser to parse the input stream
+        RDFParser.create().source(inputStream).lang(Lang.RDFXML).base(xmlBase).parse(sink);
+
+        // Obtain the parsed graph and create a Model from it
+        graph = sink.getGraph();
+        Model model = org.apache.jena.rdf.model.ModelFactory.createModelForGraph(graph);
+
+        // Set namespace prefixes based on the sink's prefix mapping
+        Map<String, String> prefixMapping = sink.getPrefixMapping();
+        model.setNsPrefixes(prefixMapping);
+
+        return model;
     }
 
     public static Map<String, Model> modelLoadPerFiles(List<File> files, String xmlBase, Lang defaultLang) throws IOException {
@@ -170,6 +191,24 @@ public class ModelFactory {
         return new HashMap<>(result);
     }
 
+    /**
+     * Loads a list of RDF files into a single combined model for SPARQL execution.
+     * Supports both plain XML/RDF files and ZIP archives via {@link #modelLoadPerFiles(List, String, Lang)}.
+     */
+    public static Model loadCombinedModelForSparql(List<File> files, String xmlBase) throws IOException {
+        Map<String, Model> loadedModels = modelLoadPerFiles(files, xmlBase, Lang.RDFXML);
+        Model combinedModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Map<String, String> prefixMap = combinedModel.getNsPrefixMap();
+
+        for (Model model : loadedModels.values()) {
+            prefixMap.putAll(model.getNsPrefixMap());
+            combinedModel.add(model);
+        }
+
+        combinedModel.setNsPrefixes(prefixMap);
+        return combinedModel;
+    }
+
     private static Lang getLangFromExtension(String ext, Lang fallback) {
         return switch (ext) {
             case "rdf", "xml" -> Lang.RDFXML;
@@ -199,36 +238,75 @@ public class ModelFactory {
     public static List<InputStream> unzip(File selectedFile) {
         List<InputStream> inputstreamlist = new LinkedList<>();
         zipfilesnames = new LinkedList<>();
-        InputStream inputStream = null;
-        try{
-            ZipFile zipFile = new ZipFile(selectedFile);
 
+        try {
+            ZipFile zipFile = new ZipFile(selectedFile);
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
-
-
-            while(entries.hasMoreElements()){
+            while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
 
-                    String destPath = selectedFile.getParent() + File.separator+ entry.getName();
+                String destPath = selectedFile.getParent() + File.separator + entry.getName();
+                if (!isValidDestPath(selectedFile.getParent(), destPath)) {
+                    throw new IOException("Final file output path is invalid: " + destPath);
+                }
 
-                    if(! isValidDestPath(selectedFile.getParent(), destPath)){
-                        throw new IOException("Final file output path is invalid: " + destPath);
-                    }
+                try (InputStream inputStream = zipFile.getInputStream(entry)) {
+                    byte[] content = inputStream.readAllBytes();
+                    String entryName = entry.getName();
+                    String ext = FilenameUtils.getExtension(entryName).toLowerCase();
 
-                    try{
-                        inputStream = zipFile.getInputStream(entry);
-                        inputstreamlist.add(inputStream);
-                        zipfilesnames.add(entry.getName());
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                    // Check if the entry is itself a ZIP file
+                    if (ext.equals("zip")) {
+                        // Recursively extract nested ZIP
+                        List<InputStream> nestedStreams = unzip(new ByteArrayInputStream(content));
+                        inputstreamlist.addAll(nestedStreams);
+                    } else {
+                        // Add non-ZIP file to the list
+                        inputstreamlist.add(new ByteArrayInputStream(content));
                     }
+                    zipfilesnames.add(entryName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        } catch(IOException e){
+            zipFile.close();
+        } catch (IOException e) {
             throw new RuntimeException("Error unzipping file " + selectedFile, e);
         }
+
         return inputstreamlist;
     }
+
+    public static List<InputStream> unzip(InputStream zipStream) {
+        List<InputStream> inputstreamlist = new LinkedList<>();
+
+        try (ZipInputStream zis = new ZipInputStream(zipStream)) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    zis.closeEntry();
+                    continue;
+                }
+
+                byte[] content = zis.readAllBytes();
+                String entryName = entry.getName();
+                String ext = FilenameUtils.getExtension(entryName).toLowerCase(Locale.ROOT);
+
+                if (ext.equals("zip")) {
+                    inputstreamlist.addAll(unzip(new ByteArrayInputStream(content)));
+                } else {
+                    inputstreamlist.add(new ByteArrayInputStream(content));
+                }
+                zis.closeEntry();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error unzipping input stream", e);
+        }
+
+        return inputstreamlist;
+    }
+
 
     private static boolean isValidDestPath(String targetDir, String destPathStr) {
         // validate the destination path of a ZipFile entry,
@@ -426,6 +504,7 @@ public class ModelFactory {
         }
         return false;
     }
+
 
     public static Model LoadSHACLSHACL() {
         Model shaclModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();

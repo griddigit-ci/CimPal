@@ -489,7 +489,11 @@ public class ExportInstanceDataTemplate {
 
         Map<String, String> prefMap = new HashMap<>();
 
-        if (file != null) {
+        if ( (file == null || file.isEmpty()) && (iFiles == null || iFiles.isEmpty())) {
+            throw new IllegalStateException("An RDFS or Instance file must be selected");
+        }
+
+        if (file != null && !file.isEmpty()) {
             for (File fil : file) {
                 Model model = ModelFactory.createDefaultModel(); // model is the rdf file
                 try {
@@ -611,7 +615,7 @@ public class ExportInstanceDataTemplate {
                 }
             }
         }
-        else if (iFiles != null){
+        else {
             for (File fil : iFiles) {
                 Model model = ModelFactory.createDefaultModel(); // model is the rdf file
                 try {
@@ -621,7 +625,7 @@ public class ExportInstanceDataTemplate {
                 }
 
                 Map<String, String> prefMapTemp = model.getNsPrefixMap();
-                prefMap.putAll(prefMapTemp);
+                prefMapTemp.forEach(prefMap::putIfAbsent);
 
                 ResIterator subjects = model.listSubjects();
                 while (subjects.hasNext()) {
@@ -638,6 +642,7 @@ public class ExportInstanceDataTemplate {
                         }
 
                         RDFNode selectedType = null;
+
                         if (typeObjects.size() > 1) {
                             // Multiple types found
                             for (RDFNode typeObj : typeObjects) { // try to find a type that is in the concrete namespace
@@ -657,13 +662,20 @@ public class ExportInstanceDataTemplate {
                             selectedType = typeObjects.getFirst();
                         }
 
-                        String localName = selectedType.toString().split("#", 2)[1];
                         String classFullURI = selectedType.toString();
+                        String localName = getLocalNameFromUri(classFullURI);
 
                         StmtIterator properties = subject.listProperties();
                         while (properties.hasNext()) {
                             Statement property = properties.next();
                             String propertyName = property.getPredicate().getURI();
+
+                            boolean isRdfType = property.getPredicate().equals(RDF.type);
+                            boolean isSelectedType = isRdfType && property.getObject().equals(selectedType);
+
+                            if (isSelectedType) {
+                                continue;
+                            }
 
                             if (rdfsAttrAssoc.contains(propertyName) && rdfsClass.contains(classFullURI)) {
                                 continue;
@@ -678,19 +690,15 @@ public class ExportInstanceDataTemplate {
 
                             RDFNode object = property.getObject();
                             if (object.isResource()) {
-                                // If the object is a resource (URI)
                                 rdfsAttrOrAssocFlag.add("Resource");
                             } else {
-                                // Otherwise, just use the literal value
                                 rdfsAttrOrAssocFlag.add("Literal");
                             }
+
                         }
                     }
                 }
             }
-        }
-        else {
-            throw new IllegalStateException("An RDFS or Instance file must be selected");
         }
 
 
@@ -822,6 +830,10 @@ public class ExportInstanceDataTemplate {
         rdfsInfo.put("Datatype", rdfsItemAttrDatatype);
         rdfsInfo.put("Type", rdfsAttrOrAssocFlag);
 
+        if (iFiles == null){
+            iFiles = new ArrayList<>();
+        }
+
         int i = 0;
         do {
             try (XSSFWorkbook workbook = new XSSFWorkbook()) {
@@ -838,7 +850,7 @@ public class ExportInstanceDataTemplate {
                             if (iFile != null) {
                                 Model model = ModelFactory.createDefaultModel();
                                 RDFDataMgr.read(model, new FileInputStream(iFile), "", Lang.RDFXML);
-                                instanceClassData = getRDFDataForClasses(model);
+                                instanceClassData = getRDFDataForClasses(model, rdfsClass);
                                 outFileName = iFile.getName()
                                         .replaceAll("(?i)\\.xml$", "")
                                         .trim();
@@ -858,9 +870,27 @@ public class ExportInstanceDataTemplate {
         } while (iFiles.size() > i);
     }
 
+    private static String getLocalNameFromUri(String uri) {
+        if (uri == null || uri.isBlank()) {
+            return "";
+        }
+
+        int hashIndex = uri.lastIndexOf('#');
+        if (hashIndex >= 0 && hashIndex < uri.length() - 1) {
+            return uri.substring(hashIndex + 1);
+        }
+
+        int slashIndex = uri.lastIndexOf('/');
+        if (slashIndex >= 0 && slashIndex < uri.length() - 1) {
+            return uri.substring(slashIndex + 1);
+        }
+
+        return uri;
+    }
+
     private static RDFNode showTypeSelectionDialog(Resource subject, List<RDFNode> typeObjects) {
         String[] options = typeObjects.stream()
-                .map(type -> type.toString().split("#")[1]) // Get local names
+                .map(type -> getLocalNameFromUri(type.toString()))
                 .toArray(String[]::new);
 
         String message = "Subject: " + subject.getLocalName() + "\nMultiple RDF types found. Select the primary one:";

@@ -7,10 +7,17 @@ package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.converters.SHACLFromRDF;
+import eu.griddigit.cimpal.core.generators.ManifestGenerator;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
+import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
+import eu.griddigit.cimpal.core.utils.ValidationTools;
+import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclFromXls;
+import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
 import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofile;
@@ -24,26 +31,19 @@ import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
 //import guru.nidi.graphviz.engine.Graphviz;
 //import guru.nidi.graphviz.engine.Format;
 
-import java.io.ByteArrayInputStream;
-
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
-import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
@@ -51,25 +51,20 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
-import org.apache.jena.util.iterator.ExtendedIterator;
 import org.apache.jena.vocabulary.*;
+import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.topbraid.jenax.util.JenaUtil;
-import org.topbraid.shacl.vocabulary.SH;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import eu.griddigit.cimpal.main.util.ExcelTools;
-import eu.griddigit.cimpal.main.util.PlantUMLGenerator;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
@@ -97,9 +92,30 @@ import java.util.List;
 import java.util.Properties;
 
 
+
+import javafx.scene.control.Alert;
+import javafx.scene.control.ProgressIndicator;
+
+
+import org.apache.jena.query.*;
+import org.apache.jena.rdf.model.*;
+import org.apache.jena.riot.RDFDataMgr;
+
+import org.apache.poi.ss.usermodel.*;
+
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+
+
+
+
 public class MainController implements Initializable {
 
     private GUIhelper guiHelper;
+    private eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController cimPalWizardController;
 
     public TabPane tabPaneConstraintsDetails;
     public Tab tabCreateCompleteSM1;
@@ -109,6 +125,7 @@ public class MainController implements Initializable {
     public Tab tabCreateCompleteSM2;
     public Button fbtnRunRDFConvert;
     public Tab tabOutputWindow;
+    public Tab tabSPARQLQuery;
     public Button btnResetIDComp;
     public Font x3;
     public Button btnResetRDFComp;
@@ -357,6 +374,8 @@ public class MainController implements Initializable {
     private Label label_geninfo;
     @FXML
     private TreeView<String> treeViewShaclFiles;
+    @FXML
+    private CheckBox cbExportReports;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -435,6 +454,19 @@ public class MainController implements Initializable {
     private double initialX;
     private double initialY;
 
+    // From CimPal - Data generator
+    private WizardContext wizardContext;
+    @FXML
+    private Button forwardWizardButton;
+    @FXML
+    private Button wizardTaskSelectionButton;
+    @FXML
+    private Button wizardTaskInputButton;
+    @FXML
+    private Button wizardTaskStatusButton;
+    @FXML
+    private BorderPane wizardBorderPane;
+
 
     public MainController() {
         guiHelper = new GUIhelper();
@@ -456,7 +488,6 @@ public class MainController implements Initializable {
         //initialization of the Browse and Modify table - SHACL Shapes Browse
         Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
 
-
         try {
             if (!Preferences.userRoot().nodeExists("CimPal")) {
                 prefs = Preferences.userRoot().node("CimPal");
@@ -466,8 +497,11 @@ public class MainController implements Initializable {
                 prefs = Preferences.userRoot().node("CimPal");
             }
         } catch (BackingStoreException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Preferences error", "Preferences could not be loaded. Please review details and send them to support.", e);
         }
+
+        wizardContext = WizardContext.getInstance();
+        cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
 
         mainRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
         deviationRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
@@ -645,7 +679,153 @@ public class MainController implements Initializable {
             ls_geni_instances.setPrefWidth(Math.min(maxWidth + 40, 400));
         });
 
+        rdfConvertModelUnionDetailedFiles = new LinkedList<>();
+        rdfConvertFileList = new LinkedList<>();
 
+
+    }
+    @FXML
+    public void forwardWizardPane(ActionEvent actionEvent) throws IOException {
+        //FXMLLoader currentController = new FXMLLoader(getClass().getResource(wizardContext.getCurrentWizardPane()));
+        //currentController.load();
+        //var controller = currentController.getController();
+        //var validInputs = wizardPaneController.validateInputs();
+
+        /*
+        switch (wizardContext.getCurrentWizardPaneIndex()) {
+            case 0:
+                validInputs = wizardPaneController.validateInputs();
+                break;
+            case 1:
+                TaskInputController controller2 = (TaskInputController) controller;
+                validInputs = controller2.validateInputs();
+                break;
+            default:
+                validInputs = true;
+        }
+        */
+        if (wizardContext.getCurrentController().validateInputs()) {
+            wizardContext.forwardWizardPane();
+
+            wizardBorderPane.setCenter(FXMLLoader.load(Objects.requireNonNull(getClass().getResource(wizardContext.getCurrentWizardPane()))));
+
+            this.updateWizardProgressButtons();
+        }
+
+    }
+
+    @FXML
+    public void backWizardPane(ActionEvent actionEvent) throws IOException {
+        wizardContext.backWizardPane();
+        wizardBorderPane.setCenter(FXMLLoader.load(Objects.requireNonNull(getClass().getResource(wizardContext.getCurrentWizardPane()))));
+        this.updateWizardProgressButtons();
+    }
+
+    private void updateWizardProgressButtons() {
+        switch (wizardContext.getCurrentWizardPaneIndex()) {
+            case 0:
+                wizardTaskSelectionButton.setDefaultButton(true);
+                wizardTaskSelectionButton.setDisable(false);
+                wizardTaskInputButton.setDefaultButton(false);
+                wizardTaskInputButton.setDisable(true);
+                wizardTaskStatusButton.setDefaultButton(false);
+                wizardTaskStatusButton.setDisable(true);
+                forwardWizardButton.setText("Next");
+                forwardWizardButton.setDisable(false);
+                break;
+            case 1:
+                wizardTaskSelectionButton.setDefaultButton(false);
+                wizardTaskSelectionButton.setDisable(true);
+                wizardTaskInputButton.setDefaultButton(true);
+                wizardTaskInputButton.setDisable(false);
+                wizardTaskStatusButton.setDefaultButton(false);
+                wizardTaskStatusButton.setDisable(true);
+                forwardWizardButton.setText("Execute");
+                forwardWizardButton.setDisable(false);
+                break;
+            case 2:
+                wizardTaskSelectionButton.setDefaultButton(false);
+                wizardTaskSelectionButton.setDisable(true);
+                wizardTaskInputButton.setDefaultButton(false);
+                wizardTaskInputButton.setDisable(true);
+                wizardTaskStatusButton.setDefaultButton(true);
+                wizardTaskStatusButton.setDisable(false);
+                forwardWizardButton.setDisable(true);
+                break;
+        }
+    }
+
+    @FXML
+    // action on menu PSSE-PowerFactory compare
+    private void actionMenuPSSEPF() throws FileNotFoundException {
+        comparePssePF.comparePssePFresults();
+    }
+
+    @FXML
+    // action on menu QoCDC 3.2.1 xml to Excel
+    private void actionMenuQoCDCxls() throws FileNotFoundException {
+        FileChooser filechooser = new FileChooser();
+        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select QoCDC xml", "*.xml"));
+        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder","")));
+        File file = filechooser.showOpenDialog(null);
+
+        if (file!=null) {// the file is selected
+            prefs.put("LastWorkingFolder", file.getParent());
+
+            Model model = ModelFactory.createDefaultModel();
+            InputStream inputStream = new FileInputStream(file.toString());
+            RDFDataMgr.read(model, inputStream, "http://entsoe.eu/CIM/Extensions/CGM-BP/2020", Lang.RDFXML);
+
+            List<String> ruleName = new LinkedList<>();
+            List<String> ruleSeverity = new LinkedList<>();
+            List<String> ruleLevel = new LinkedList<>();
+            List<String> ruleDescription = new LinkedList<>();
+            List<String> ruleMessage = new LinkedList<>();
+
+            Property propName = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.name");
+            Property propSeverity = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.severity");
+            Property propDescription = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.description");
+            Property propLevel = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.level");
+            Property propMessage = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.message");
+
+            List<Statement> ruleStmts = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule")).toList();
+            for (Statement ruleStmt : ruleStmts) {
+                if (model.contains(ruleStmt.getSubject(),propName)){
+                    ruleName.add(model.getRequiredProperty(ruleStmt.getSubject(),propName).getObject().toString());
+                }else{
+                    ruleName.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propSeverity)){
+                    ruleSeverity.add(model.getRequiredProperty(ruleStmt.getSubject(),propSeverity).getObject().toString());
+                }else{
+                    ruleSeverity.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propLevel)){
+                    ruleLevel.add(model.getRequiredProperty(ruleStmt.getSubject(),propLevel).getObject().toString());
+                }else{
+                    ruleLevel.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propDescription)){
+                    ruleDescription.add(model.getRequiredProperty(ruleStmt.getSubject(),propDescription).getObject().toString());
+                }else{
+                    ruleDescription.add("NA");
+                }
+
+                if (model.contains(ruleStmt.getSubject(),propMessage)){
+                    ruleMessage.add(model.getRequiredProperty(ruleStmt.getSubject(),propMessage).getObject().toString());
+                }else{
+                    ruleMessage.add("NA");
+                }
+
+
+            }
+            ExportFactory.exportQoCDC(ruleName,ruleSeverity,ruleDescription,ruleMessage,ruleLevel,"QoCDC321","QoCDC321","Save QoCDC");
+
+
+        }
     }
 
 
@@ -665,7 +845,7 @@ public class MainController implements Initializable {
             try {
                 RDFDataMgr.read(model, new FileInputStream(file.getFirst()), Lang.RDFXML);
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                GUIhelper.showUserFriendlyError("RDFS loading error", "The selected RDFS file could not be opened.", e);
                 progressBar.setProgress(0);
             }
             rdfsDescriptions(model);
@@ -688,7 +868,7 @@ public class MainController implements Initializable {
             try {
                 RDFDataMgr.read(model, new FileInputStream(file.getFirst()), "", Lang.RDFXML);
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                GUIhelper.showUserFriendlyError("RDF loading error", "The selected RDF file could not be opened.", e);
                 progressBar.setProgress(0);
             }
             exportRDFToExcel(model);
@@ -804,7 +984,7 @@ public class MainController implements Initializable {
                     RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
                     listModels.add(model);
                 } catch (FileNotFoundException e) {
-                    e.printStackTrace();
+                    GUIhelper.showUserFriendlyError("RDFS loading error", "One of the selected RDFS files could not be opened.", e);
                     progressBar.setProgress(0);
                 }
             }
@@ -1290,7 +1470,7 @@ public class MainController implements Initializable {
                             guiRdfDiffResultsStage.showAndWait();
 
                         } catch (IOException e) {
-                            e.printStackTrace();
+                                    GUIhelper.showUserFriendlyError("Comparison view error", "The comparison result window could not be opened.", e);
                         }
                     }
                 } else {
@@ -1388,7 +1568,7 @@ public class MainController implements Initializable {
                         guiRdfDiffResultsStage.showAndWait();
 
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        GUIhelper.showUserFriendlyError("Comparison view error", "The comparison result window could not be opened.", e);
                     }
                 }
             } else {
@@ -1531,7 +1711,7 @@ public class MainController implements Initializable {
                 progressBar.setProgress(1);
                 guiRdfDiffResultsStage.showAndWait();
             } catch (IOException e) {
-                e.printStackTrace();
+                GUIhelper.showUserFriendlyError("Comparison view error", "The RDFS comparison result window could not be opened.", e);
             }
         } else {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -1558,6 +1738,67 @@ public class MainController implements Initializable {
         } else {
             progressBar.setProgress(0);
         }
+    }
+
+    @FXML
+    public void actionValidateByMapping() {
+
+        progressBar.setProgress(0);
+        Model shaclRefModel = null;
+        shapeModels = null;
+
+        //select file
+        //Mapping file should have 2 columns; in the first, each cell contains a list of files that should be zipped separated with ";"
+        //the second the ttl file that should validate it
+        List<File> mappingCsvFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Validation mapping file", List.of( "*.csv"), "Mapping file");
+        File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the models root folder");
+        File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips and report");
+        //Root is where the mapping file starts the path
+        File constraintsRoot = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select constraint's root folder");
+
+        String xmlBase = "http://iec.ch/TC57/CIM100";
+
+        // --- validate chooser results ---
+        if (mappingCsvFile == null || mappingCsvFile.isEmpty() || mappingCsvFile.get(0) == null) {
+            // user cancelled
+            return;
+        }
+        if (modelsBaseDir == null || outputBaseDir == null) {
+            // user cancelled
+            return;
+        }
+
+        // One mapping file only, later can be extended to multiple
+        File mappingFile = mappingCsvFile.get(0);
+        new Thread(() -> {
+            try {
+                Map<String, RDFDatatype> dataTypeMap =
+                        CompleteDatatypeMapLoader.loadFromResource("/CompleteDatatypeMap_CIM17_CGMES3_v24.properties");
+                Path report = ValidationTools.validateByMapping(
+                        mappingFile.toPath(),
+                        modelsBaseDir.toPath(),
+                        constraintsRoot.toPath(),
+                        outputBaseDir.toPath(),
+                        4,
+                        dataTypeMap,
+                        xmlBase
+                );
+                System.out.println("Report saved to: " + report);
+
+                List<Path> createdZips = ValidationTools.zipByMapping(
+                        mappingFile.toPath(),
+                        modelsBaseDir.toPath(),
+                        outputBaseDir.toPath()
+                );
+
+                System.out.println("Created zip count: " + createdZips.size());
+                for (Path zip : createdZips) {
+                    System.out.println("ZIP: " + zip);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
     @FXML
@@ -1648,7 +1889,7 @@ public class MainController implements Initializable {
                     Platform.runLater(() -> foutputWindow.appendText(message));
                 }
             });
-            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL);
+            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL, cbExportReports.isSelected());
 
             progressBar.setProgress(1);
         } else {
@@ -1828,7 +2069,7 @@ public class MainController implements Initializable {
             guiPrefStage.showAndWait();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Preferences window error", "The Preferences window could not be opened.", e);
         }
     }
 
@@ -1848,7 +2089,7 @@ public class MainController implements Initializable {
             guiAboutStage.showAndWait();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("About window error", "The About window could not be opened.", e);
         }
     }
 
@@ -1983,7 +2224,7 @@ public class MainController implements Initializable {
                                 writer.write(xmlContent);
                                 //System.out.println("XML file saved successfully!");
                             } catch (IOException e) {
-                                e.printStackTrace();
+                                GUIhelper.showUserFriendlyError("File write error", "A generated XML file could not be saved.", e);
                             }
                         }
                         processed.add(timestamp + process + tso + version);
@@ -2066,16 +2307,16 @@ public class MainController implements Initializable {
         if (fcbRDFconvertModelUnion.isSelected()) {
             fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
-            if (fileL != null) {// the file is selected
+            if (!fileL.isEmpty()) {// the file is selected
                 fsourcePathTextField.setText(fileL.toString());
-                MainController.rdfConvertFileList = fileL;
+                MainController.rdfConvertFileList = new LinkedList<>(fileL);
             } else {
                 fsourcePathTextField.clear();
             }
         } else {
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
-            if (file.getFirst() != null) {// the file is selected
+            if (!file.isEmpty()) {// the file is selected
                 //MainController.prefs.put("LastWorkingFolder", file.getParent());
                 fsourcePathTextField.setText(file.getFirst().toString());
                 MainController.rdfConvertFile = file.getFirst();
@@ -2281,6 +2522,19 @@ public class MainController implements Initializable {
             rdfConverter.writeInheritanceModel(outInheritance);
         }
 
+        // Clear the static variables after conversion
+        fsourcePathTextField.clear();
+        fMainRdfPathTextField.clear();
+        fDeviationRdfPathTextField.clear();
+        fExtendedRdfPathTextField.clear();
+        if (!MainController.rdfConvertModelUnionDetailedFiles.isEmpty()) {
+            MainController.rdfConvertModelUnionDetailedFiles.clear();
+        }
+        MainController.rdfConvertFile = null;
+        if (!MainController.rdfConvertFileList.isEmpty()) {
+            MainController.rdfConvertFileList.clear();
+        }
+
         progressBar.setProgress(1);
     }
 
@@ -2322,9 +2576,13 @@ public class MainController implements Initializable {
         fMainRdfPathTextField.clear();
         fDeviationRdfPathTextField.clear();
         fExtendedRdfPathTextField.clear();
-        MainController.rdfConvertModelUnionDetailedFiles.clear();
+        if (MainController.rdfConvertModelUnionDetailedFiles != null) {
+            MainController.rdfConvertModelUnionDetailedFiles.clear();
+        }
         MainController.rdfConvertFile = null;
-        MainController.rdfConvertFileList.clear();
+        if (MainController.rdfConvertFileList != null) {
+            MainController.rdfConvertFileList.clear();
+        }
     }
 
     @FXML
@@ -2483,7 +2741,7 @@ public class MainController implements Initializable {
         try {
             RDFDataMgr.read(model, new FileInputStream(this.selectedFile.get(m).toString()), Lang.RDFXML);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Profile loading error", "A selected profile file could not be opened.", e);
         }
 
         this.models.add(model);
@@ -2502,7 +2760,7 @@ public class MainController implements Initializable {
         try {
             RDFDataMgr.read(model, new FileInputStream(this.selectedFile.get(m).toString()), Lang.RDFXML);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("RDFS loading error", "A selected RDFS file could not be opened.", e);
         }
 
         RDFSmodels.add(model);
@@ -2591,7 +2849,7 @@ public class MainController implements Initializable {
                     if (selectedProfile.equals(modelsNames.getModelName())) {
                         int issueFound = 0;
                         if (!fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
-                            modelsNames.setBaseUri(fPrefixCreateCompleteSMTab.getText());
+                            modelsNames.setNsPrefix(fPrefixCreateCompleteSMTab.getText());
                         } else if (fPrefixCreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.WARNING);
                             alert.setContentText("Please confirm that you would like to use a namespace with empty prefix.");
@@ -2606,7 +2864,7 @@ public class MainController implements Initializable {
                             }
                         }
                         if (!fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {//TODO: check if it is resource
-                            modelsNames.setNsPrefix(fURICreateCompleteSMTab.getText());
+                            modelsNames.setNsUri(fURICreateCompleteSMTab.getText());
                         } else if (fURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefNsDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add URI of the namespace.");
@@ -2616,7 +2874,7 @@ public class MainController implements Initializable {
                             issueFound = 1;
                         }
                         if (!fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {//TODO: check if it is resource
-                            modelsNames.setNsUri(fshapesBaseURICreateCompleteSMTab.getText());
+                            modelsNames.setBaseUri(fshapesBaseURICreateCompleteSMTab.getText());
                         } else if (fshapesBaseURICreateCompleteSMTab.getText().isEmpty() && !cbApplyDefBaseURIDesignTab.isSelected()) {
                             Alert alert = new Alert(Alert.AlertType.ERROR);
                             alert.setContentText("Please add the base URI of the shapes model.");
@@ -3537,7 +3795,11 @@ public class MainController implements Initializable {
                     .shaclOutputFormat(RDFtoSHACLOptions.SerializationFormat.TURTLE)
                     .iOprefix(prefs.get("IOprefix", ""))
                     .iOuri(prefs.get("IOuri", ""))
-                    .cimsNamespace(prefs.get("cimsNamespace", ""));
+                    .cimsNamespace(prefs.get("cimsNamespace", ""))
+                    .shaclFlagCountDefaultURI(rdfsToShaclGuiMapBool.get("shaclflagCountDefaultURI"))
+                    .shaclFlagCount(rdfsToShaclGuiMapBool.get("shaclflagCount"))
+                    .shaclCommonURI(rdfsToShaclGuiMapStr.get("shaclCommonURI"))
+                    .shaclCommonPref(rdfsToShaclGuiMapStr.get("shaclCommonPref"));
 
             RDFtoSHACLOptions options = builder.build();
 
@@ -4552,7 +4814,7 @@ public class MainController implements Initializable {
         try {
             RDFDataMgr.read(model, new FileInputStream(MainController.rdfModelExcelShacl), Lang.RDFXML);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("RDFS loading error", "The RDFS file for shape construction could not be opened.", e);
         }
         shaclNodataMap = 1; // as no mapping is to be used for this task
         String cimsNs = MainController.prefs.get("cimsNamespace", "");
@@ -4678,7 +4940,7 @@ public class MainController implements Initializable {
         saveProperties.put("useFileDialog", true);
         saveProperties.put("fileFolder", "C:");
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "false"); //this is to only print the ID and not with namespace
         saveProperties.put("showXmlBaseDeclaration", "false");
         saveProperties.put("sortRDF", sortRDF);
         saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localNam
@@ -4775,7 +5037,7 @@ public class MainController implements Initializable {
                 ls_geni_rdfs.setItems(filenames);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("RDFS selection error", "The selected RDFS file list could not be loaded.", e);
         }
         finally {
             updateGenInfoLabel();
@@ -4794,7 +5056,7 @@ public class MainController implements Initializable {
                 ls_geni_instances.setItems(filenames);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Instance selection error", "The selected instance file list could not be loaded.", e);
         }
         finally {
             updateGenInfoLabel();
@@ -4906,13 +5168,8 @@ public class MainController implements Initializable {
             progressBar.setProgress(1.0);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            GUIhelper.showUserFriendlyError("Apply changes error", "The changes could not be applied. Please review details.", e);
             progressBar.setProgress(0);
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setContentText("Failed to apply changes: " + e.getMessage());
-            alert.setHeaderText(null);
-            alert.setTitle("Error");
-            alert.showAndWait();
         }
     }
 
@@ -4937,5 +5194,65 @@ public class MainController implements Initializable {
         }
 
     }
+
+    @FXML
+    public void actionGenerateManifest(ActionEvent actionEvent) {
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        try {
+            List<File> selectedFiles = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                    false,
+                    "Model files",
+                    List.of("*.xml", "*.zip"),
+                    "Select model file(s) for manifest generation"
+            );
+
+            if (selectedFiles == null || selectedFiles.isEmpty()) {
+                progressBar.setProgress(0);
+                return;
+            }
+
+            Map<String, Model> loadedModels = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoadPerFiles(
+                    selectedFiles,
+                    "",
+                    Lang.RDFXML
+            );
+            if (loadedModels == null || loadedModels.isEmpty()) {
+                throw new IOException("Could not load selected file(s).");
+            }
+
+            File outputFile = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom(
+                    "Turtle file",
+                    List.of("*.ttl"),
+                    "Save manifest.ttl",
+                    "manifest.ttl"
+            );
+
+            if (outputFile == null) {
+                progressBar.setProgress(0);
+                return;
+            }
+
+            String accessUrl = selectedFiles.size() == 1 ? selectedFiles.getFirst().toURI().toString() : null;
+            ManifestGenerator.generateManifestTtl(loadedModels, selectedFiles, accessUrl, outputFile);
+
+            progressBar.setProgress(1);
+            Alert ok = new Alert(Alert.AlertType.INFORMATION);
+            ok.setTitle("Manifest generated");
+            ok.setHeaderText(null);
+            ok.setContentText("Manifest saved to:\n" + outputFile.getAbsolutePath() + "\n\nProcessed files: " + selectedFiles.size());
+            ok.showAndWait();
+        } catch (Exception e) {
+            progressBar.setProgress(0);
+            GUIhelper.showUserFriendlyError("Manifest generation failed", "The manifest could not be generated. Please review details and share them with support.", e);
+        }
+    }
+
+    @FXML
+    public void actionRunSPARQLQuery(ActionEvent actionEvent) {
+        if (tabPaneConstraintsDetails != null && tabSPARQLQuery != null) {
+            tabPaneConstraintsDetails.getSelectionModel().select(tabSPARQLQuery);
+        }
+    }
+
 }
 
