@@ -2,13 +2,13 @@ package eu.griddigit.cimpal.core.converters;
 
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.sparql.util.Context;
-import org.apache.jena.vocabulary.DCAT;
-import org.apache.jena.vocabulary.OWL2;
-import org.apache.jena.vocabulary.RDF;
-import org.apache.jena.vocabulary.RDFS;
+import org.apache.jena.vocabulary.*;
+import org.topbraid.shacl.vocabulary.SH;
 
 import java.io.*;
 import java.util.*;
@@ -48,11 +48,13 @@ public class RDFConverter {
             default -> throw new IllegalStateException("Unexpected value: " + sourceFormat);
         };
         List<File> modelFiles = new LinkedList<File>();
+        boolean keepHeaders = true;
         if (!modelUnionFlagDetailed) {
             if (!modelUnionFlag && sourceFile != null) {
                 modelFiles.add(sourceFile);
             } else if (modelUnionFlag && (modelUnionFiles != null && !modelUnionFiles.isEmpty())) {
                 modelFiles = modelUnionFiles;
+                keepHeaders = keepOntologyHeaders();
             }
             else {
                 throw new IllegalStateException("No source file(s) provided. Please provide a source file.");
@@ -313,8 +315,108 @@ public class RDFConverter {
             model.add(stmtToAddPackage);
         }
 
+        //Clean duplicates on the owl;Ontology sh:declare namespaces
+        model = removeDuplicateShDeclareBlankNodes(model);
+
+        //remove ontology headers
+        if (!keepHeaders) {
+            List<Statement> statementsToDelete = new LinkedList<>();
+
+            for (StmtIterator i = model.listStatements(null, RDF.type, OWL2.Ontology); i.hasNext(); ) {
+                Statement stmt = i.next();
+                if (!model.listStatements(stmt.getSubject(), SH.declare, (RDFNode) null).hasNext()) {
+                    statementsToDelete.addAll(model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList());
+                }
+            }
+
+            model.remove(statementsToDelete);
+        }
+
         this.convertedModel = model;
 
+    }
+
+    public static Model removeDuplicateShDeclareBlankNodes(Model model) {
+        Map<String, Resource> seen = new LinkedHashMap<>();
+        List<Statement> linksToRemove = new ArrayList<>();
+        List<Statement> blankNodeFactsToRemove = new ArrayList<>();
+
+        StmtIterator it = model.listStatements(null, SH.declare, (RDFNode) null);
+
+        while (it.hasNext()) {
+            Statement link = it.nextStatement();
+            RDFNode obj = link.getObject();
+
+            if (!obj.isResource() || !obj.asResource().isAnon()) {
+                continue;
+            }
+
+            Resource bnode = obj.asResource();
+            String signature = signatureOfBlankNode(model, bnode, new HashSet<>());
+
+            Resource canonical = seen.get(signature);
+
+            if (canonical == null) {
+                seen.put(signature, bnode);
+            } else {
+                // Remove the duplicate sh:declare link
+                linksToRemove.add(link);
+
+                // Remove statements describing the duplicate blank node
+                model.listStatements(bnode, null, (RDFNode) null)
+                        .forEachRemaining(blankNodeFactsToRemove::add);
+            }
+        }
+
+        model.remove(linksToRemove);
+        model.remove(blankNodeFactsToRemove);
+        return model;
+    }
+
+    private static String signatureOfBlankNode(
+            Model model,
+            Resource r,
+            Set<Resource> visited
+    ) {
+        if (!r.isAnon()) {
+            return "<" + r.getURI() + ">";
+        }
+
+        if (!visited.add(r)) {
+            return "_:cycle";
+        }
+
+        List<String> parts = new ArrayList<>();
+
+        StmtIterator it = model.listStatements(r, null, (RDFNode) null);
+        while (it.hasNext()) {
+            Statement st = it.nextStatement();
+
+            String p = st.getPredicate().getURI();
+            RDFNode o = st.getObject();
+
+            String oSig;
+            if (o.isLiteral()) {
+                Literal lit = o.asLiteral();
+                oSig = "\"" + lit.getLexicalForm() + "\""
+                        + "^^" + lit.getDatatypeURI()
+                        + "@" + lit.getLanguage();
+            } else if (o.isResource()) {
+                Resource or = o.asResource();
+                oSig = or.isAnon()
+                        ? signatureOfBlankNode(model, or, visited)
+                        : "<" + or.getURI() + ">";
+            } else {
+                oSig = o.toString();
+            }
+
+            parts.add(p + "=" + oSig);
+        }
+
+        Collections.sort(parts);
+        visited.remove(r);
+
+        return "[" + String.join(";", parts) + "]";
     }
 
     public void writeConvertedModel(OutputStream outputStream) throws IOException {
@@ -455,5 +557,23 @@ public class RDFConverter {
         try (outputStream) {
             modelInheritance.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
         }
+    }
+
+    public static boolean keepOntologyHeaders() {
+
+        Alert alert = new Alert(
+                Alert.AlertType.CONFIRMATION,
+                "Do you want to keep ontology headers in the merged model?",
+                ButtonType.YES,
+                ButtonType.NO
+        );
+
+        alert.setTitle("Headers");
+        alert.setHeaderText("Ontology Headers");
+
+        Optional<ButtonType> result = alert.showAndWait();
+
+        return result.isPresent()
+                && result.get() == ButtonType.YES;
     }
 }
