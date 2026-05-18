@@ -32,6 +32,7 @@ public class RDFConvertOptions {
     private final boolean stripPrefixes;
     private final String convertInstanceData;
     private final boolean modelUnionFixPackage;
+    private final boolean keepOntologyHeaders;
 
     // private constructor takes the Builder
     private RDFConvertOptions(Builder b) {
@@ -57,6 +58,7 @@ public class RDFConvertOptions {
         this.stripPrefixes = b.stripPrefixes;
         this.convertInstanceData = b.convertInstanceData;
         this.modelUnionFixPackage = b.modelUnionFixPackage;
+        this.keepOntologyHeaders = b.keepOntologyHeaders;
     }
 
     // static entry-point for the builder
@@ -152,6 +154,10 @@ public class RDFConvertOptions {
         return modelUnionFixPackage;
     }
 
+    public boolean isKeepOntologyHeaders() {
+        return keepOntologyHeaders;
+    }
+
 
     // ============ the Builder ============
 
@@ -176,9 +182,10 @@ public class RDFConvertOptions {
         private boolean modelUnionFlagDetailed = false;
         private String sortRDF = null;
         private String rdfSortOptions = null;
-        private boolean stripPrefixes = false;
-        private String convertInstanceData = null;
-        private boolean modelUnionFixPackage = false;
+         private boolean stripPrefixes = false;
+         private String convertInstanceData = null;
+         private boolean modelUnionFixPackage = false;
+         private boolean keepOntologyHeaders = true;
 
         public Builder sourceFile(File sourceFile) {
             this.sourceFile = sourceFile;
@@ -288,6 +295,11 @@ public class RDFConvertOptions {
 
         public Builder modelUnionFixPackage(boolean on) {
             this.modelUnionFixPackage = on;
+            return this;
+        }
+
+        public Builder keepOntologyHeaders(boolean keep) {
+            this.keepOntologyHeaders = keep;
             return this;
         }
 

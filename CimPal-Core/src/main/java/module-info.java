@@ -16,5 +16,4 @@ module CimPal.Core {
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
     requires java.prefs;
-    requires javafx.controls;
 }

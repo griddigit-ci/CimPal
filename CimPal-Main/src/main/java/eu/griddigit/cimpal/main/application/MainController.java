@@ -2460,6 +2460,22 @@ public class MainController implements Initializable {
 
         boolean addowl = fcbRDFConveraddowl.isSelected();
         boolean modelUnionFixPackage = fcbRDFconvertFixPackage.isSelected();
+        boolean keepOntologyHeaders = true;
+
+        // Ask only when this setting is relevant for standard model-union conversion.
+        if (modelUnionFlag && !modelUnionFlagDetailed) {
+            Alert alert = new Alert(
+                    Alert.AlertType.CONFIRMATION,
+                    "Do you want to keep ontology headers in the merged model?",
+                    ButtonType.YES,
+                    ButtonType.NO
+            );
+            alert.setTitle("Headers");
+            alert.setHeaderText("Ontology Headers");
+
+            Optional<ButtonType> result = alert.showAndWait();
+            keepOntologyHeaders = result.isPresent() && result.get() == ButtonType.YES;
+        }
 
         // Create RDFConvertOptions object
         RDFConvertOptions.Builder builder = RDFConvertOptions.builder()
@@ -2484,7 +2500,8 @@ public class MainController implements Initializable {
                 .rdfSortOptions(rdfSortOptions)
                 .stripPrefixes(stripPrefixes)
                 .convertInstanceData(convertInstanceData)
-                .modelUnionFixPackage(modelUnionFixPackage);
+                .modelUnionFixPackage(modelUnionFixPackage)
+                .keepOntologyHeaders(keepOntologyHeaders);
 
         RDFConvertOptions options = builder.build();
 

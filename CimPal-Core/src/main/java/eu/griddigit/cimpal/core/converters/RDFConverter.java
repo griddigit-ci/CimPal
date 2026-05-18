@@ -2,8 +2,6 @@ package eu.griddigit.cimpal.core.converters;
 
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.sparql.util.Context;
@@ -48,13 +46,12 @@ public class RDFConverter {
             default -> throw new IllegalStateException("Unexpected value: " + sourceFormat);
         };
         List<File> modelFiles = new LinkedList<File>();
-        boolean keepHeaders = true;
+        boolean keepHeaders = options.isKeepOntologyHeaders();
         if (!modelUnionFlagDetailed) {
             if (!modelUnionFlag && sourceFile != null) {
                 modelFiles.add(sourceFile);
             } else if (modelUnionFlag && (modelUnionFiles != null && !modelUnionFiles.isEmpty())) {
                 modelFiles = modelUnionFiles;
-                keepHeaders = keepOntologyHeaders();
             }
             else {
                 throw new IllegalStateException("No source file(s) provided. Please provide a source file.");
@@ -557,23 +554,5 @@ public class RDFConverter {
         try (outputStream) {
             modelInheritance.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
         }
-    }
-
-    public static boolean keepOntologyHeaders() {
-
-        Alert alert = new Alert(
-                Alert.AlertType.CONFIRMATION,
-                "Do you want to keep ontology headers in the merged model?",
-                ButtonType.YES,
-                ButtonType.NO
-        );
-
-        alert.setTitle("Headers");
-        alert.setHeaderText("Ontology Headers");
-
-        Optional<ButtonType> result = alert.showAndWait();
-
-        return result.isPresent()
-                && result.get() == ButtonType.YES;
     }
 }
