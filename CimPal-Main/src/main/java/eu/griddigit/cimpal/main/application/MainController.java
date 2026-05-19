@@ -156,9 +156,15 @@ public class MainController implements Initializable {
     private Button btnRunRDFcompare;
     @FXML
     private TabPane tabPaneDown;
+    @FXML
+    private SplitPane mainSplitPane;
+    @FXML
+    private TitledPane outputSourceContainer;
     public static Preferences prefs;
     @FXML
     private CheckBox cbShowUnionModelOnly;
+
+    private double outputSourceDividerPosition = 0.8146067415730337;
 
     @FXML
     private Button btnConstructShacl;
@@ -502,6 +508,33 @@ public class MainController implements Initializable {
 
         wizardContext = WizardContext.getInstance();
         cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
+
+        Platform.runLater(() -> {
+            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
+                outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+                mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, oldValue, newValue) -> {
+                    if (outputSourceContainer == null || outputSourceContainer.isExpanded()) {
+                        outputSourceDividerPosition = newValue.doubleValue();
+                    }
+                });
+            }
+
+            if (outputSourceContainer != null) {
+                outputSourceContainer.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
+                    if (!isExpanded) {
+                        if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
+                            outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+                        }
+                    } else {
+                        Platform.runLater(() -> {
+                            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
+                                mainSplitPane.setDividerPosition(0, outputSourceDividerPosition);
+                            }
+                        });
+                    }
+                });
+            }
+        });
 
         mainRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
         deviationRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
