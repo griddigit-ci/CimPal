@@ -1,37 +1,30 @@
 package eu.griddigit.cimpal.main.application.tasks;
 
+import eu.griddigit.cimpal.main.application.CGMESConverter.ModelManipulationFactory;
+import eu.griddigit.cimpal.main.application.CGMESConverter.requests.AddSwitchingDevicesRequest;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
-import eu.griddigit.cimpal.main.application.CGMESConverter.ModelManipulationFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 public class CgmesAddSwitchingDevices implements ITask {
 
-
-    private String name;
-    private String pathToFXML;
+    private final String name;
+    private final String pathToFXML;
     private String status;
     private String info;
-    private TaskStateUpdater taskUpdater;
-    private String newHeaderDescription;
+    private final TaskStateUpdater taskUpdater;
     private boolean saveResult;
 
-    public CgmesAddSwitchingDevices() {
-        this.name = "Add Switching Devices (mapping-based modification)";
-        this.pathToFXML = "/fxml/wizardPages/taskElements/cgmesAddSwitchingDevices.fxml";
-        this.status = "Queued";
-        this.info = "0%";
-        this.taskUpdater = new TaskStateUpdater();
-    }
     public enum DataExchangeStandard {
         CGMES_2_4, CGMES_3_0
     }
 
-    private List<Path> modelInputFiles;     // IGM or CGM incl. boundary
-    private List<Path> mappingFiles;    // optional in some flows
+    private final List<Path> modelInputFiles = new ArrayList<>();
+    private Path mappingFile;
 
     private DataExchangeStandard standard = DataExchangeStandard.CGMES_2_4;
 
@@ -42,41 +35,60 @@ public class CgmesAddSwitchingDevices implements ITask {
     private boolean onlyForEquipmentInMappingFile = false;
     private boolean exportMappingFile = false;
 
+    public CgmesAddSwitchingDevices() {
+        this.name = "Add Switching Devices";
+        this.pathToFXML = "/fxml/wizardPages/taskElements/cgmesAddSwitchingDevices.fxml";
+        this.status = "Queued";
+        this.info = "0%";
+        this.taskUpdater = new TaskStateUpdater();
+    }
 
     @Override
     public String getName() {
-        return this.name;
+        return name;
     }
 
     @Override
     public String getPathToFXMLComponent() {
-        return this.pathToFXML;
+        return pathToFXML;
     }
 
     @Override
     public String getStatus() {
-        return this.status;
+        return status;
     }
 
     @Override
     public String getInfo() {
-        return this.info;
+        return info;
     }
 
-    public List<Path> getModelInput() {
+    @Override
+    public boolean getSaveResult() {
+        return saveResult;
+    }
+
+    public void setSaveResult(boolean saveResult) {
+        this.saveResult = saveResult;
+    }
+
+    public List<Path> getModelInputFiles() {
         return modelInputFiles;
     }
 
-    public void setModelInput(List<Path> modelInput) {
-        this.modelInputFiles = modelInputFiles;
+    public void setModelInputFiles(List<Path> files) {
+        modelInputFiles.clear();
+        if (files != null) {
+            modelInputFiles.addAll(files);
+        }
     }
 
-    public List<Path> getMappingFiles() {
-        return mappingFiles;
+    public Path getMappingFile() {
+        return mappingFile;
     }
 
-    public void setMappingFiles(List<Path> mappingFiles) {
-        this.mappingFiles = mappingFiles;
+    public void setMappingFile(Path mappingFile) {
+        this.mappingFile = mappingFile;
     }
 
     public DataExchangeStandard getStandard() {
@@ -128,34 +140,26 @@ public class CgmesAddSwitchingDevices implements ITask {
     }
 
     @Override
-    public boolean getSaveResult() {
-        return saveResult;
-    }
-
-    public void setSaveResult(boolean saveResult) {
-        this.saveResult = saveResult;
-    }
-
-    @Override
     public String validateInputs() {
-        if (modelInputFiles == null) {
-            return "Input model is missing.";
+        if (modelInputFiles.isEmpty()) {
+            return "Input model files are missing.";
         }
-        if (!Files.exists(modelInputFiles.getFirst())) {
-            return "Input model does not exist: " + modelInputFiles;
+        for (Path p : modelInputFiles) {
+            if (p == null || !Files.exists(p)) {
+                return "Input model file does not exist: " + p;
+            }
         }
 
-        // at least one apply option should be selected
         if (!applyLines && !applyPowerTransformer && !applySynchronousMachine) {
-            return "Select at least one 'Apply to' option (Lines / PowerTransformer / SynchronousMachine).";
+            return "Select at least one 'Apply to' option.";
         }
 
-        // mapping file rules (adjust if your workflow allows empty mapping)
-        if (mappingFiles == null) {
-            return "Mapping file is missing.";
+        if ((onlyForEquipmentInMappingFile || exportMappingFile) && mappingFile == null) {
+            return "Mapping file is required for the selected options.";
         }
-        if (!Files.exists(mappingFiles.getFirst())) {
-            return "Mapping file does not exist: " + mappingFiles;
+
+        if (mappingFile != null && !Files.exists(mappingFile)) {
+            return "Mapping file does not exist: " + mappingFile;
         }
 
         return null;
@@ -169,23 +173,27 @@ public class CgmesAddSwitchingDevices implements ITask {
         }
 
         WizardContext wizardContext = WizardContext.getInstance();
-        taskUpdater.updateState(parent, "Running Add Switching Devices", "1%", wizardContext);
+        this.status = "Running";
+        this.info = "1%";
+        taskUpdater.updateState(parent, this.status, this.info, wizardContext);
 
-        ModelManipulationFactory.ModifyIGM(
-                modelInputFiles,
-                mappingFiles,
+        AddSwitchingDevicesRequest request = new AddSwitchingDevicesRequest(
+                List.copyOf(modelInputFiles),
+                mappingFile,
                 standard,
+                mappingFile != null,
                 applyLines,
                 applyPowerTransformer,
                 applySynchronousMachine,
+                exportMappingFile,
                 onlyForEquipmentInMappingFile,
-                exportMappingFile
+                saveResult
         );
+
+        ModelManipulationFactory.modifyIGM(request, parent, wizardContext);
 
         this.status = "Finished";
         this.info = "100%";
         taskUpdater.updateState(parent, this.status, this.info, wizardContext);
     }
-
-
 }

@@ -26,6 +26,9 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import eu.griddigit.cimpal.core.utils.ExcelTools;
+import eu.griddigit.cimpal.main.application.CGMESConverter.requests.AddSwitchingDevicesRequest;
+import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
 
 import java.io.*;
 import java.net.URISyntaxException;
@@ -2213,22 +2216,44 @@ public class ModelManipulationFactory {
 
 
     //Modify IGM
-    public static void ModifyIGM(Map<String, Map> loadDataMap,String cgmesVersion,boolean impMap,boolean applyAllCondEq,boolean applyLine,boolean applyTrafo,boolean applySynMach,boolean expMap, boolean applyEQmap) throws IOException {
-        String xmlBase ="";
+    public static void modifyIGM(
+            AddSwitchingDevicesRequest request,
+            SelectedTask selectedTask,
+            WizardContext wizardContext
+    ) throws IOException {
+
+        String cgmesVersion = request.cgmesVersionString();
+
+        String xmlBase = "";
         String cimns = "";
         if (cgmesVersion.equals("CGMESv3.0")) {
             xmlBase = "http://iec.ch/TC57/CIM100";
             cimns = "http://iec.ch/TC57/CIM100#";
-        }else if(cgmesVersion.equals("CGMESv2.4")){
+        } else if (cgmesVersion.equals("CGMESv2.4")) {
             xmlBase = "http://iec.ch/TC57/2013/CIM-schema-cim16";
             cimns = "http://iec.ch/TC57/2013/CIM-schema-cim16#";
         }
 
-        //put the xls map to graph
+        boolean impMap = request.importMappingFile();
+        boolean applyLine = request.applyLines();
+        boolean applyTrafo = request.applyPowerTransformer();
+        boolean applySynMach = request.applySynchronousMachine();
+        boolean expMap = request.exportMappingFile();
+        boolean applyEQmap = request.onlyForEquipmentInMappingFile();
 
+        List<File> modelFiles = request.modelInputFiles().stream()
+                .map(Path::toFile)
+                .toList();
 
-        if (impMap){
-            //create empty graph
+        Path mappingPath = request.mappingFile();
+
+        TaskStateUpdater taskUpdater = new TaskStateUpdater();
+        if (selectedTask != null && wizardContext != null) {
+            taskUpdater.updateState(selectedTask, "Loading input model", "5%", wizardContext);
+        }
+
+        // put the xls map to graph
+        if (impMap && mappingPath != null) {
             mapModel = ModelFactory.createDefaultModel();
 
             List<String> prop_names = Arrays.asList(
@@ -2256,56 +2281,56 @@ public class ModelManipulationFactory {
                     "topologicalNodeMRID",
                     "connectivityNodeMRID"
             );
-            for (File file : MainController.MappingMapFile) {
-                // load MainController.MappingMapFile - this is the xls mapping file that user selects
-                try (FileInputStream fis = new FileInputStream(file);
-                    Workbook workbook = WorkbookFactory.create(fis)) {
-                    for (int sheetIndex = 0; sheetIndex < workbook.getNumberOfSheets(); sheetIndex++) {
-                        //Sheet sheet = workbook.getSheetAt(sheetIndex);
-                        String sheetName = workbook.getSheetName(sheetIndex);
-                        if (sheetName.equals("Mapping")) {
-                            ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file, sheetIndex);
-                            //loop on the file and store the data in the graph mapModel
 
-                            for (int i = 1; i < inputXLSdata.size(); i++) {
-                                LinkedList<?> row = (LinkedList<?>) inputXLSdata.get(i);
-                                Resource subject = ResourceFactory.createResource(cimns + row.get(1).toString());
-                                RDFNode object = ResourceFactory.createResource(cimns + row.getFirst().toString());
-                                Statement stmt = ResourceFactory.createStatement(subject, RDF.type, object);
-                                mapModel.add(stmt);
-                                int k = 0;
-                                for (int j = 2; j < row.size(); j++) {
-                                    object = ResourceFactory.createPlainLiteral(row.get(j).toString());
-                                    Property predicate = ResourceFactory.createProperty(cimns + prop_names.get(k));
-                                    stmt = ResourceFactory.createStatement(subject, predicate, object);
-                                    mapModel.add(stmt);
-                                    k++;
-                                }
-                            }
-                        }else if (sheetName.equals("TN-CN Mapping")) {
-                            ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file, sheetIndex);
-                            //loop on the file and store the data in the graph mapModel
+            File file = mappingPath.toFile();
+            try (FileInputStream fis = new FileInputStream(file);
+                 Workbook workbook = WorkbookFactory.create(fis)) {
 
-                            for (int i = 1; i < inputXLSdata.size(); i++) {
-                                LinkedList<?> row = (LinkedList<?>) inputXLSdata.get(i);
-                                Resource subject = ResourceFactory.createResource(cimns + row.getFirst().toString());
-                                RDFNode object = ResourceFactory.createResource(cimns + "TopologicalNode");
-                                Statement stmt = ResourceFactory.createStatement(subject, RDF.type, object);
+                for (int sheetIndex = 0; sheetIndex < workbook.getNumberOfSheets(); sheetIndex++) {
+                    String sheetName = workbook.getSheetName(sheetIndex);
+
+                    if (sheetName.equals("Mapping")) {
+                        ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file, sheetIndex);
+
+                        for (int i = 1; i < inputXLSdata.size(); i++) {
+                            LinkedList<?> row = (LinkedList<?>) inputXLSdata.get(i);
+                            Resource subject = ResourceFactory.createResource(cimns + row.get(1).toString());
+                            RDFNode object = ResourceFactory.createResource(cimns + row.getFirst().toString());
+                            Statement stmt = ResourceFactory.createStatement(subject, RDF.type, object);
+                            mapModel.add(stmt);
+
+                            int k = 0;
+                            for (int j = 2; j < row.size(); j++) {
+                                object = ResourceFactory.createPlainLiteral(row.get(j).toString());
+                                Property predicate = ResourceFactory.createProperty(cimns + prop_names.get(k));
+                                stmt = ResourceFactory.createStatement(subject, predicate, object);
                                 mapModel.add(stmt);
-                                Property predicate = ResourceFactory.createProperty(cimns + "connectivityNodeMRID");
-                                object = ResourceFactory.createPlainLiteral(row.get(1).toString());
-                                Statement stmt1 = ResourceFactory.createStatement(subject, predicate, object);
-                                mapModel.add(stmt1);
+                                k++;
                             }
                         }
+                    } else if (sheetName.equals("TN-CN Mapping")) {
+                        ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file, sheetIndex);
+
+                        for (int i = 1; i < inputXLSdata.size(); i++) {
+                            LinkedList<?> row = (LinkedList<?>) inputXLSdata.get(i);
+                            Resource subject = ResourceFactory.createResource(cimns + row.getFirst().toString());
+                            RDFNode object = ResourceFactory.createResource(cimns + "TopologicalNode");
+                            Statement stmt = ResourceFactory.createStatement(subject, RDF.type, object);
+                            mapModel.add(stmt);
+
+                            Property predicate = ResourceFactory.createProperty(cimns + "connectivityNodeMRID");
+                            object = ResourceFactory.createPlainLiteral(row.get(1).toString());
+                            Statement stmt1 = ResourceFactory.createStatement(subject, predicate, object);
+                            mapModel.add(stmt1);
+                        }
                     }
-                }catch (Exception e) {
-                    e.printStackTrace();
                 }
+            } catch (Exception e) {
+                throw new IOException("Failed to read mapping file: " + file, e);
             }
         }
 
-        Map<String,List> expMapToXls = new HashMap<>();
+        Map<String, List> expMapToXls = new HashMap<>();
         if (expMap) {
             List Element_type = new ArrayList<>();
             List Element_ID = new ArrayList<>();
@@ -2332,37 +2357,34 @@ public class ModelManipulationFactory {
             List Breaker_3_ID_Terminal_2_ID = new ArrayList<>();
             List TopologicalNode_main_ID = new ArrayList<>();
             List ConnectivityNode_main_ID = new ArrayList<>();
-            expMapToXls.put("Element_type",Element_type);
-            expMapToXls.put("Element_ID",Element_ID);
-            expMapToXls.put("ConnectivityNode_1_ID",ConnectivityNode_1_ID);
-            expMapToXls.put("ConnectivityNode_2_ID",ConnectivityNode_2_ID);
-            expMapToXls.put("ConnectivityNode_3_ID",ConnectivityNode_3_ID);
-            expMapToXls.put("ConnectivityNode_4_ID",ConnectivityNode_4_ID);
-            expMapToXls.put("ConnectivityNode_5_ID",ConnectivityNode_5_ID);
-            expMapToXls.put("ConnectivityNode_6_ID",ConnectivityNode_6_ID);
-            expMapToXls.put("TopologicalNode_1_ID",TopologicalNode_1_ID);
-            expMapToXls.put("TopologicalNode_2_ID",TopologicalNode_2_ID);
-            expMapToXls.put("TopologicalNode_3_ID",TopologicalNode_3_ID);
-            expMapToXls.put("TopologicalNode_4_ID",TopologicalNode_4_ID);
-            expMapToXls.put("TopologicalNode_5_ID",TopologicalNode_5_ID);
-            expMapToXls.put("TopologicalNode_6_ID",TopologicalNode_6_ID);
-            expMapToXls.put("Breaker_1_ID",Breaker_1_ID);
-            expMapToXls.put("Breaker_1_Terminal_1_ID",Breaker_1_Terminal_1_ID);
-            expMapToXls.put("Breaker_1_Terminal_2_ID",Breaker_1_Terminal_2_ID);
-            expMapToXls.put("Breaker_2_ID",Breaker_2_ID);
-            expMapToXls.put("Breaker_2_ID_Terminal_1_ID",Breaker_2_ID_Terminal_1_ID);
-            expMapToXls.put("Breaker_2_ID_Terminal_2_ID",Breaker_2_ID_Terminal_2_ID);
-            expMapToXls.put("Breaker_3_ID",Breaker_3_ID);
-            expMapToXls.put("Breaker_3_ID_Terminal_1_ID",Breaker_3_ID_Terminal_1_ID);
-            expMapToXls.put("Breaker_3_ID_Terminal_2_ID",Breaker_3_ID_Terminal_2_ID);
-            expMapToXls.put("TopologicalNode_main_ID",TopologicalNode_main_ID);
-            expMapToXls.put("ConnectivityNode_main_ID",ConnectivityNode_main_ID);
+            expMapToXls.put("Element_type", Element_type);
+            expMapToXls.put("Element_ID", Element_ID);
+            expMapToXls.put("ConnectivityNode_1_ID", ConnectivityNode_1_ID);
+            expMapToXls.put("ConnectivityNode_2_ID", ConnectivityNode_2_ID);
+            expMapToXls.put("ConnectivityNode_3_ID", ConnectivityNode_3_ID);
+            expMapToXls.put("ConnectivityNode_4_ID", ConnectivityNode_4_ID);
+            expMapToXls.put("ConnectivityNode_5_ID", ConnectivityNode_5_ID);
+            expMapToXls.put("ConnectivityNode_6_ID", ConnectivityNode_6_ID);
+            expMapToXls.put("TopologicalNode_1_ID", TopologicalNode_1_ID);
+            expMapToXls.put("TopologicalNode_2_ID", TopologicalNode_2_ID);
+            expMapToXls.put("TopologicalNode_3_ID", TopologicalNode_3_ID);
+            expMapToXls.put("TopologicalNode_4_ID", TopologicalNode_4_ID);
+            expMapToXls.put("TopologicalNode_5_ID", TopologicalNode_5_ID);
+            expMapToXls.put("TopologicalNode_6_ID", TopologicalNode_6_ID);
+            expMapToXls.put("Breaker_1_ID", Breaker_1_ID);
+            expMapToXls.put("Breaker_1_Terminal_1_ID", Breaker_1_Terminal_1_ID);
+            expMapToXls.put("Breaker_1_Terminal_2_ID", Breaker_1_Terminal_2_ID);
+            expMapToXls.put("Breaker_2_ID", Breaker_2_ID);
+            expMapToXls.put("Breaker_2_ID_Terminal_1_ID", Breaker_2_ID_Terminal_1_ID);
+            expMapToXls.put("Breaker_2_ID_Terminal_2_ID", Breaker_2_ID_Terminal_2_ID);
+            expMapToXls.put("Breaker_3_ID", Breaker_3_ID);
+            expMapToXls.put("Breaker_3_ID_Terminal_1_ID", Breaker_3_ID_Terminal_1_ID);
+            expMapToXls.put("Breaker_3_ID_Terminal_2_ID", Breaker_3_ID_Terminal_2_ID);
+            expMapToXls.put("TopologicalNode_main_ID", TopologicalNode_main_ID);
+            expMapToXls.put("ConnectivityNode_main_ID", ConnectivityNode_main_ID);
         }
 
-        //set properties for the export
-
         Map<String, Object> saveProperties = new HashMap<>();
-
         saveProperties.put("filename", "test");
         saveProperties.put("showXmlDeclaration", "true");
         saveProperties.put("showDoctypeDeclaration", "false");
@@ -2371,13 +2393,12 @@ public class ModelManipulationFactory {
         saveProperties.put("showXmlEncoding", "true");
         saveProperties.put("xmlBase", xmlBase);
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-        //saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
+        saveProperties.put("useAboutRules", true);
+        saveProperties.put("useEnumRules", true);
         saveProperties.put("useFileDialog", false);
         saveProperties.put("fileFolder", "C:");
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "true");
         saveProperties.put("showXmlBaseDeclaration", "false");
         Set<Resource> rdfAboutList = LoadRDFAbout(xmlBase, cgmesVersion);
         Set<Resource> rdfEnumList = LoadRDFEnum(xmlBase, cgmesVersion);
@@ -2389,29 +2410,27 @@ public class ModelManipulationFactory {
         saveProperties.put("fileExtension", "*.xml");
         saveProperties.put("fileDialogTitle", "Save RDF XML for");
         saveProperties.put("sortRDF", "true");
-        saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-        //RDFFormat rdfFormat=RDFFormat.RDFXML;
-        //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
-        //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
+        saveProperties.put("sortRDFprefix", "false");
 
-
-        //TODO to be improved what file names should be assigned. Now it takes same names
         nameMap = new HashMap<>();
-        for (File item : MainController.IDModel) {
-            if (item.toString().contains("_EQ")) {
-                nameMap.put("EQ", item.getName());
-            } else if (item.toString().contains("_SSH")) {
-                nameMap.put("SSH", item.getName());
-            } else if (item.toString().contains("_SV")) {
-                nameMap.put("SV", item.getName());
-            } else if (item.toString().contains("_TP")) {
-                nameMap.put("TP", item.getName());
+        for (File item : modelFiles) {
+            String n = item.getName();
+            if (n.contains("_EQ") && !n.contains("_EQBD") && !n.contains("_EQ_BD")) {
+                nameMap.put("EQ", n);
+            } else if (n.contains("_SSH")) {
+                nameMap.put("SSH", n);
+            } else if (n.contains("_SV")) {
+                nameMap.put("SV", n);
+            } else if (n.contains("_TP") && !n.contains("_TPBD") && !n.contains("_TP_BD")) {
+                nameMap.put("TP", n);
+            } else if (n.contains("_EQBD") || n.contains("_EQ_BD")) {
+                nameMap.put("EQBD", n);
+            } else if (n.contains("_TPBD") || n.contains("_TP_BD")) {
+                nameMap.put("TPBD", n);
             }
         }
 
-        Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(MainController.IDModel, xmlBase, null);
+        Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(modelFiles, xmlBase, null);
 
         Model modelEQ = baseInstanceModelMap.get("EQ");
         Model modelSSH = baseInstanceModelMap.get("SSH");
@@ -2420,58 +2439,67 @@ public class ModelManipulationFactory {
         Model modelTPBD = baseInstanceModelMap.get("TPBD");
         Model modelEQBD = baseInstanceModelMap.get("EQBD");
 
+        if (selectedTask != null && wizardContext != null) {
+            taskUpdater.updateState(selectedTask, "Preparing model modification", "15%", wizardContext);
+        }
+
         Map<String, Model> modifiedModelMap = new HashMap<>();
 
-        //create the new models
         Model modEQModel = createSimilarModel(modelEQ);
         Model modSSHModel = createSimilarModel(modelSSH);
         Model modSVModel = createSimilarModel(modelSV);
         Model modTPModel = createSimilarModel(modelTP);
-        //do the modification
+
         modEQModel.add(modelEQ);
         modSSHModel.add(modelSSH);
         modSVModel.add(modelSV);
         modTPModel.add(modelTP);
 
-        //update header to refer to Operation profile - only for CGMES v2.4
-        if (!cgmesVersion.equals("CGMESv3.0") ) {// because for CGMES v3 there is no need to add 0 voltage
-            Resource headerRes = modEQModel.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).next();
-            modEQModel.add(ResourceFactory.createStatement(headerRes, ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.profile"), ResourceFactory.createPlainLiteral("http://entsoe.eu/CIM/EquipmentOperation/3/1")));
+        if (!cgmesVersion.equals("CGMESv3.0")) {
+            Resource headerRes = modEQModel
+                    .listSubjectsWithProperty(RDF.type,
+                            ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"))
+                    .next();
+            modEQModel.add(ResourceFactory.createStatement(
+                    headerRes,
+                    ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.profile"),
+                    ResourceFactory.createPlainLiteral("http://entsoe.eu/CIM/EquipmentOperation/3/1")
+            ));
         }
 
-        //add ConnectivityNode for each TopologicalNode in case there is no and link the Terminal
-        Map<String,String> mapIDs = null;
-        RDFNode TopologicalNode = ResourceFactory.createProperty(cimns,"TopologicalNode");
-        RDFNode ConnectivityNode = ResourceFactory.createProperty(cimns,"ConnectivityNode");
+        Map<String, String> mapIDs = null;
+        RDFNode TopologicalNode = ResourceFactory.createProperty(cimns, "TopologicalNode");
+        RDFNode ConnectivityNode = ResourceFactory.createProperty(cimns, "ConnectivityNode");
         Property mrid = ResourceFactory.createProperty("http://iec.ch/TC57/CIM100#IdentifiedObject.mRID");
-        Property ioname = ResourceFactory.createProperty(cimns,"IdentifiedObject.name");
-        Property termToCN = ResourceFactory.createProperty(cimns,"Terminal.ConnectivityNode");
-        Property termToTN = ResourceFactory.createProperty(cimns,"Terminal.TopologicalNode");
-        Property cnToTN = ResourceFactory.createProperty(cimns,"ConnectivityNode.TopologicalNode");
+        Property ioname = ResourceFactory.createProperty(cimns, "IdentifiedObject.name");
+        Property termToCN = ResourceFactory.createProperty(cimns, "Terminal.ConnectivityNode");
+        Property termToTN = ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode");
+        Property cnToTN = ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode");
         Property cncncontainer = ResourceFactory.createProperty(cimns, "ConnectivityNode.ConnectivityNodeContainer");
         Property tncncontainer = ResourceFactory.createProperty(cimns, "TopologicalNode.ConnectivityNodeContainer");
+
         List TopologicalNode_main_ID = List.of();
         List ConnectivityNode_main_ID = List.of();
         if (expMap) {
             TopologicalNode_main_ID = expMapToXls.get("TopologicalNode_main_ID");
             ConnectivityNode_main_ID = expMapToXls.get("ConnectivityNode_main_ID");
         }
-        for (StmtIterator s = modTPModel.listStatements(null,RDF.type,TopologicalNode); s.hasNext();) {
+
+        for (StmtIterator s = modTPModel.listStatements(null, RDF.type, TopologicalNode); s.hasNext(); ) {
             Statement stmt = s.next();
             if (!modTPModel.listStatements(null, cnToTN, stmt.getSubject()).hasNext()) {
-                //List<String> ids = GenerateUUID();
-
-                List<String> ids = new LinkedList<>();
+                List<String> ids;
                 if (impMap) {
                     mapIDs = GetMapIDs(stmt);
                     try {
                         String id = mapIDs.get("connectivityNodeMRID");
+                        ids = new LinkedList<>();
                         ids.add(id.split("_", 2)[1]);
                         ids.add(id);
-                    }catch (Exception e){
+                    } catch (Exception e) {
                         ids = GenerateUUID();
                     }
-                }else{
+                } else {
                     ids = GenerateUUID();
                 }
 
@@ -2482,97 +2510,97 @@ public class ModelManipulationFactory {
 
                 Resource cnRes = ResourceFactory.createResource(cimns + ids.get(1));
                 modEQModel.add(ResourceFactory.createStatement(cnRes, RDF.type, ConnectivityNode));
-                modEQModel.add(ResourceFactory.createStatement(cnRes, ResourceFactory.createProperty("http://griddigit.eu/ext#","ConnectivityNode.isMain"), ResourceFactory.createPlainLiteral("true")));
+                modEQModel.add(ResourceFactory.createStatement(
+                        cnRes,
+                        ResourceFactory.createProperty("http://griddigit.eu/ext#", "ConnectivityNode.isMain"),
+                        ResourceFactory.createPlainLiteral("true")
+                ));
                 if (cgmesVersion.equals("CGMESv3.0")) {
                     modEQModel.add(ResourceFactory.createStatement(cnRes, mrid, ResourceFactory.createPlainLiteral(ids.getFirst())));
                 }
-                modEQModel.add(ResourceFactory.createStatement(cnRes, ioname, ResourceFactory.createPlainLiteral("new node"))); // add a default name
+                modEQModel.add(ResourceFactory.createStatement(cnRes, ioname, ResourceFactory.createPlainLiteral("new node")));
                 modTPModel.add(ResourceFactory.createStatement(cnRes, RDF.type, ConnectivityNode));
                 modTPModel.add(ResourceFactory.createStatement(cnRes, cnToTN, stmt.getSubject()));
+
                 RDFNode tnContainer;
                 if (modTPModel.listStatements(stmt.getSubject(), tncncontainer, (RDFNode) null).hasNext()) {
                     tnContainer = modTPModel.listStatements(stmt.getSubject(), tncncontainer, (RDFNode) null).next().getObject();
-                } else if (modelTPBD.listStatements(stmt.getSubject(), tncncontainer, (RDFNode) null).hasNext()) {
+                } else if (modelTPBD != null && modelTPBD.listStatements(stmt.getSubject(), tncncontainer, (RDFNode) null).hasNext()) {
                     tnContainer = modelTPBD.listStatements(stmt.getSubject(), tncncontainer, (RDFNode) null).next().getObject();
                 } else {
                     tnContainer = ResourceFactory.createProperty(cimns, "_NoContainer");
-                    //TODO issue warning
                 }
                 modEQModel.add(ResourceFactory.createStatement(cnRes, cncncontainer, tnContainer));
 
-//                if (stmt.getSubject().getLocalName().equals("_f34cd840-dac6-5f69-a445-345313b7bd6f")){
-//                    int k=1;
-//                }
-                //get all terminals of topologicalNode
                 List<Statement> TerminalList = modTPModel.listStatements(null, termToTN, stmt.getSubject()).toList();
-                for (Statement term : TerminalList){
+                for (Statement term : TerminalList) {
                     modEQModel.add(ResourceFactory.createStatement(term.getSubject().asResource(), termToCN, ResourceFactory.createProperty(cnRes.toString())));
                 }
+
                 if (expMap) {
-                    expMapToXls.replace("TopologicalNode_main_ID",TopologicalNode_main_ID);
-                    expMapToXls.replace("ConnectivityNode_main_ID",ConnectivityNode_main_ID);
+                    expMapToXls.replace("TopologicalNode_main_ID", TopologicalNode_main_ID);
+                    expMapToXls.replace("ConnectivityNode_main_ID", ConnectivityNode_main_ID);
                 }
             }
         }
-        //solve the problems with terminals connecting to the boundary nodes
-        for (StmtIterator s = modelTPBD.listStatements(null,RDF.type,TopologicalNode); s.hasNext();) {
-            Statement stmt = s.next();
-            //get all terminals of topologicalNode
-            List<Statement> TerminalList = modTPModel.listStatements(null, termToTN, stmt.getSubject()).toList();
-            // get boundary CN
-            Resource boundaryCN = modelTPBD.listStatements(null, cnToTN, stmt.getSubject()).next().getSubject();
-            for (Statement term : TerminalList){
-                modEQModel.add(ResourceFactory.createStatement(term.getSubject().asResource(), termToCN, boundaryCN));
-            }
-        }
 
-        //check for association ControlArea.EnergyArea for CGMES v2.4
-        if (!cgmesVersion.equals("CGMESv3.0") ) {//
-            Resource controlAreaRes = modEQModel.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty(cimns,"ControlArea")).next();
-            //find EnergyArea
-            Resource loadAreaRes = null;
-            if (modEQModel.listStatements(null, RDF.type, ResourceFactory.createProperty(cimns,"LoadArea")).hasNext()){
-                List<Statement> loadAreaList = modEQModel.listStatements(null, RDF.type, ResourceFactory.createProperty(cimns,"LoadArea")).toList();
-                loadAreaRes = loadAreaList.getFirst().getSubject();
-            }else{
-                //TODO do warning that energy area is missing or create it...
-            }
-            if (!modEQModel.listStatements(controlAreaRes, ResourceFactory.createProperty(cimns,"ControlArea.EnergyArea"), (RDFNode) null).hasNext()){
-                modEQModel.add(ResourceFactory.createStatement(controlAreaRes, ResourceFactory.createProperty(cimns,"ControlArea.EnergyArea"), loadAreaRes));
-            }
-        }
-
-
-        if (applyLine){
-            //find all ACLineSegments
-            //for each of the line segments, add 2 breakers
-            RDFNode aclinesegment = ResourceFactory.createProperty(cimns,"ACLineSegment");
-            for (StmtIterator s = modEQModel.listStatements(null,RDF.type,aclinesegment); s.hasNext();){
+        if (modelTPBD != null) {
+            for (StmtIterator s = modelTPBD.listStatements(null, RDF.type, TopologicalNode); s.hasNext(); ) {
                 Statement stmt = s.next();
-                if (applyEQmap) {//only look at the xls map
-                    if (!mapModel.listStatements(stmt.getSubject(),RDF.type,aclinesegment).hasNext()) {// not in the map then skip the rest
-                        continue;
-                    }
+                List<Statement> TerminalList = modTPModel.listStatements(null, termToTN, stmt.getSubject()).toList();
+                if (!modelTPBD.listStatements(null, cnToTN, stmt.getSubject()).hasNext()) {
+                    continue;
                 }
-                //check if there is Line container. If yes, do a check if there are Lines with more than 1 segment and issue a warning
-                // if not process the line segments
+                Resource boundaryCN = modelTPBD.listStatements(null, cnToTN, stmt.getSubject()).next().getSubject();
+                for (Statement term : TerminalList) {
+                    modEQModel.add(ResourceFactory.createStatement(term.getSubject().asResource(), termToCN, boundaryCN));
+                }
+            }
+        }
 
-                // get the ID of the Line if there is a line
+        if (!cgmesVersion.equals("CGMESv3.0")) {
+            if (modEQModel.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty(cimns, "ControlArea")).hasNext()) {
+                Resource controlAreaRes = modEQModel.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty(cimns, "ControlArea")).next();
+                Resource loadAreaRes = null;
+                if (modEQModel.listStatements(null, RDF.type, ResourceFactory.createProperty(cimns, "LoadArea")).hasNext()) {
+                    List<Statement> loadAreaList = modEQModel.listStatements(null, RDF.type, ResourceFactory.createProperty(cimns, "LoadArea")).toList();
+                    loadAreaRes = loadAreaList.getFirst().getSubject();
+                }
+                if (loadAreaRes != null && !modEQModel.listStatements(controlAreaRes, ResourceFactory.createProperty(cimns, "ControlArea.EnergyArea"), (RDFNode) null).hasNext()) {
+                    modEQModel.add(ResourceFactory.createStatement(controlAreaRes, ResourceFactory.createProperty(cimns, "ControlArea.EnergyArea"), loadAreaRes));
+                }
+            }
+        }
+
+        if (selectedTask != null && wizardContext != null) {
+            taskUpdater.updateState(selectedTask, "Applying equipment modifications", "40%", wizardContext);
+        }
+
+        if (applyLine) {
+            RDFNode aclinesegment = ResourceFactory.createProperty(cimns, "ACLineSegment");
+            for (StmtIterator s = modEQModel.listStatements(null, RDF.type, aclinesegment); s.hasNext(); ) {
+                Statement stmt = s.next();
+                if (applyEQmap && (mapModel == null || !mapModel.listStatements(stmt.getSubject(), RDF.type, aclinesegment).hasNext())) {
+                    continue;
+                }
+
                 List<Statement> LineList;
                 if (modEQModel.listStatements(stmt.getSubject(), ResourceFactory.createProperty(cimns, "Equipment.EquipmentContainer"), (RDFNode) null).hasNext()) {
                     Statement LineStmt = modEQModel.listStatements(stmt.getSubject(), ResourceFactory.createProperty(cimns, "Equipment.EquipmentContainer"), (RDFNode) null).next();
                     LineList = modEQModel.listStatements(null, ResourceFactory.createProperty(cimns, "Equipment.EquipmentContainer"), LineStmt.getSubject()).toList();
                     if (LineList.size() > 1) {
-                        //TODO not supported case, todo the warning
-                        //more than one segment in a Line - print warning
                         continue;
                     }
                 } else {
-                    //this is the case where there is no Line container for a given ACLineSegment
                     LineList = new LinkedList<>();
                     LineList.add(stmt);
                 }
-                Map<String, Object> breakerLineMap = AddBreakerLine(LineList, modelEQ, modelTP, modelSV, modelSSH, modEQModel, modSSHModel, modSVModel, modTPModel, cimns, cgmesVersion, modelTPBD, expMapToXls, expMap, impMap);
+
+                Map<String, Object> breakerLineMap = AddBreakerLine(
+                        LineList, modelEQ, modelTP, modelSV, modelSSH,
+                        modEQModel, modSSHModel, modSVModel, modTPModel,
+                        cimns, cgmesVersion, modelTPBD, expMapToXls, expMap, impMap
+                );
                 modEQModel = (Model) breakerLineMap.get("modEQModel");
                 modTPModel = (Model) breakerLineMap.get("modTPModel");
                 modSVModel = (Model) breakerLineMap.get("modSVModel");
@@ -2580,38 +2608,22 @@ public class ModelManipulationFactory {
             }
         }
 
-        if (applyTrafo){
-            //find all PowerTransformers - only 2 winding power transformers here
-            //for each of the PowerTransformer segments add 2 breakers
-            RDFNode powerTransformer = ResourceFactory.createProperty(cimns,"PowerTransformer");
-            for (StmtIterator s = modEQModel.listStatements(null,RDF.type,powerTransformer); s.hasNext();){
+        if (applyTrafo) {
+            RDFNode powerTransformer = ResourceFactory.createProperty(cimns, "PowerTransformer");
+            for (StmtIterator s = modEQModel.listStatements(null, RDF.type, powerTransformer); s.hasNext(); ) {
                 Statement stmt = s.next();
-                if (applyEQmap) {//only look at the xls map
-                    if (!mapModel.listStatements(stmt.getSubject(),RDF.type,powerTransformer).hasNext()) {// not in the map then skip the rest
-                        continue;
-                    }
+                if (applyEQmap && (mapModel == null || !mapModel.listStatements(stmt.getSubject(), RDF.type, powerTransformer).hasNext())) {
+                    continue;
                 }
-//                //check if there is Line container. If yes, do a check if there are Lines with more than 1 segment and issue a warning
-//                // if not process the line segments
-//
-//                // get the ID of the Line if there is a line
-//                List<Statement> LineList;
-//                if (modEQModel.listStatements(stmt.getSubject(), ResourceFactory.createProperty(cimns, "Equipment.EquipmentContainer"), (RDFNode) null).hasNext()) {
-//                    Statement LineStmt = modEQModel.listStatements(stmt.getSubject(), ResourceFactory.createProperty(cimns, "Equipment.EquipmentContainer"), (RDFNode) null).next();
-//                    LineList = modEQModel.listStatements(null, ResourceFactory.createProperty(cimns, "Equipment.EquipmentContainer"), LineStmt.getSubject()).toList();
-//                    if (LineList.size() > 1) {
-//                        //TODO not supported case, todo the warning
-//                        //more than one segment in a Line - print warning
-//                        continue;
-//                    }
-//                } else {
-//                    //this is the case where there is no Line container for a given ACLineSegment
-//                    LineList = new LinkedList<>();
-//                    LineList.add(stmt);
-//                }
+
                 List<Statement> trafoList = new LinkedList<>();
                 trafoList.add(stmt);
-                Map<String, Object> breakerLineMap = AddBreakerTrafo(trafoList, modelEQ, modelTP, modelSV, modelSSH, modEQModel, modSSHModel, modSVModel, modTPModel, cimns, cgmesVersion, modelTPBD, expMapToXls, expMap, impMap);
+
+                Map<String, Object> breakerLineMap = AddBreakerTrafo(
+                        trafoList, modelEQ, modelTP, modelSV, modelSSH,
+                        modEQModel, modSSHModel, modSVModel, modTPModel,
+                        cimns, cgmesVersion, modelTPBD, expMapToXls, expMap, impMap
+                );
                 modEQModel = (Model) breakerLineMap.get("modEQModel");
                 modTPModel = (Model) breakerLineMap.get("modTPModel");
                 modSVModel = (Model) breakerLineMap.get("modSVModel");
@@ -2619,97 +2631,81 @@ public class ModelManipulationFactory {
             }
         }
 
-        if (applySynMach){
-            // find all SynchronousMachines
-            //for each of the machine add 1 breaker
-            RDFNode syncmachine = ResourceFactory.createProperty(cimns,"SynchronousMachine");
-            for (StmtIterator s = modEQModel.listStatements(null,RDF.type,syncmachine); s.hasNext();){
+        if (applySynMach) {
+            RDFNode syncmachine = ResourceFactory.createProperty(cimns, "SynchronousMachine");
+            for (StmtIterator s = modEQModel.listStatements(null, RDF.type, syncmachine); s.hasNext(); ) {
                 Statement stmt = s.next();
-                if (applyEQmap) {//only look at the xls map
-                    if (!mapModel.listStatements(stmt.getSubject(),RDF.type,syncmachine).hasNext()) {// not in the map then skip the rest
-                        continue;
-                    }
+                if (applyEQmap && (mapModel == null || !mapModel.listStatements(stmt.getSubject(), RDF.type, syncmachine).hasNext())) {
+                    continue;
                 }
 
-                // do the routine for cases when there is one ACLineSegment in a Line
-                Map<String,Object> breakerLineMap = AddBreakerSynchronousMachine(stmt,modelEQ,modelTP,modelSV,modelSSH,modEQModel,modSSHModel, modSVModel,modTPModel,cimns,cgmesVersion, modelTPBD,expMapToXls,expMap,impMap);
+                Map<String, Object> breakerLineMap = AddBreakerSynchronousMachine(
+                        stmt, modelEQ, modelTP, modelSV, modelSSH,
+                        modEQModel, modSSHModel, modSVModel, modTPModel,
+                        cimns, cgmesVersion, modelTPBD, expMapToXls, expMap, impMap
+                );
                 modEQModel = (Model) breakerLineMap.get("modEQModel");
                 modTPModel = (Model) breakerLineMap.get("modTPModel");
                 modSVModel = (Model) breakerLineMap.get("modSVModel");
                 modSSHModel = (Model) breakerLineMap.get("modSSHModel");
-
             }
         }
 
-        // check for missing associations Terminal.TopologicalNode
-        for (StmtIterator t = modEQModel.listStatements(null, ResourceFactory.createProperty(cimns, "Terminal.ConnectivityNode"), (RDFNode) null); t.hasNext(); ) { // loop on Terminal classes
+        if (selectedTask != null && wizardContext != null) {
+            taskUpdater.updateState(selectedTask, "Repairing terminal associations", "80%", wizardContext);
+        }
+
+        for (StmtIterator t = modEQModel.listStatements(null, ResourceFactory.createProperty(cimns, "Terminal.ConnectivityNode"), (RDFNode) null); t.hasNext(); ) {
             Statement stmtT = t.next();
             modTPModel.add(ResourceFactory.createStatement(stmtT.getSubject(), RDF.type, ResourceFactory.createProperty(cimns, "Terminal")));
             Resource tnRes = null;
-            if (modTPModel.listStatements(stmtT.getObject().asResource(), ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"),(RDFNode) null).hasNext()) {
-                tnRes = modTPModel.getRequiredProperty(stmtT.getObject().asResource(), ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode")).getResource(); 
-            }else if (modelTPBD.listStatements(stmtT.getObject().asResource(), ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"),(RDFNode) null).hasNext()){
+            if (modTPModel.listStatements(stmtT.getObject().asResource(), ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"), (RDFNode) null).hasNext()) {
+                tnRes = modTPModel.getRequiredProperty(stmtT.getObject().asResource(), ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode")).getResource();
+            } else if (modelTPBD != null && modelTPBD.listStatements(stmtT.getObject().asResource(), ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"), (RDFNode) null).hasNext()) {
                 tnRes = modelTPBD.getRequiredProperty(stmtT.getObject().asResource(), ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode")).getResource();
             }
-            
-            modTPModel.add(ResourceFactory.createStatement(stmtT.getSubject(), ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"), tnRes));
+
+            if (tnRes != null) {
+                modTPModel.add(ResourceFactory.createStatement(stmtT.getSubject(), ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"), tnRes));
+            }
         }
 
-        // check for missing associations Terminal.TopologicalNode by looking at the original
-        for (StmtIterator t = modTPModel.listStatements(null, RDF.type, ResourceFactory.createProperty(cimns, "Terminal")); t.hasNext(); ) { // loop on Terminal classes
+        for (StmtIterator t = modTPModel.listStatements(null, RDF.type, ResourceFactory.createProperty(cimns, "Terminal")); t.hasNext(); ) {
             Statement stmtT = t.next();
-            if(!modTPModel.listStatements(stmtT.getSubject(),ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"),(RDFNode) null).hasNext()) {
-                //get from the original
-                if (modelTP.listStatements(stmtT.getSubject(),ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"),(RDFNode) null).hasNext()){
-                    Resource tnRes = modelTP.listStatements(stmtT.getSubject(),ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"),(RDFNode) null).next().getObject().asResource();
+            if (!modTPModel.listStatements(stmtT.getSubject(), ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"), (RDFNode) null).hasNext()) {
+                if (modelTP.listStatements(stmtT.getSubject(), ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"), (RDFNode) null).hasNext()) {
+                    Resource tnRes = modelTP.listStatements(stmtT.getSubject(), ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"), (RDFNode) null).next().getObject().asResource();
                     modTPModel.add(ResourceFactory.createStatement(stmtT.getSubject(), ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"), tnRes));
                 }
             }
         }
 
-//        // check for missing associations Terminal.ConnectivityNode
-//        for (StmtIterator t = modTPModel.listStatements(null, ResourceFactory.createProperty(cimns, "Terminal.TopologicalNode"), (RDFNode) null); t.hasNext(); ) { // loop on Terminal classes
-//            Statement stmtT = t.next();
-//            if(!modEQModel.listStatements(stmtT.getSubject(),ResourceFactory.createProperty(cimns, "Terminal.ConnectivityNode"),(RDFNode) null).hasNext()) {
-//                modEQModel.add(ResourceFactory.createStatement(stmtT.getSubject(), RDF.type, ResourceFactory.createProperty(cimns, "Terminal")));
-//                Resource cnRes = null;
-//                if (modTPModel.listStatements(null, ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"), stmtT.getObject().asResource()).hasNext()) {
-//                    cnRes = modTPModel.listStatements(null, ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"), stmtT.getObject().asResource()).next().getSubject().asResource();
-//                } else if (modelTPBD.listStatements(null, ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"), stmtT.getObject().asResource()).hasNext()) {
-//                    cnRes = modelTPBD.listStatements(null, ResourceFactory.createProperty(cimns, "ConnectivityNode.TopologicalNode"), stmtT.getObject().asResource()).next().getSubject().asResource();
-//                }
-//
-//                modEQModel.add(ResourceFactory.createStatement(stmtT.getSubject(), ResourceFactory.createProperty(cimns, "Terminal.ConnectivityNode"), cnRes));
-//            }
-//        }
-
-
-
-        //Delete the custom extension
         List<Statement> stmpToDelete = new LinkedList<>();
-        for (StmtIterator s = modEQModel.listStatements(null,ResourceFactory.createProperty("http://griddigit.eu/ext#","ConnectivityNode.isMain"), ResourceFactory.createPlainLiteral("true")); s.hasNext();) {
+        for (StmtIterator s = modEQModel.listStatements(null, ResourceFactory.createProperty("http://griddigit.eu/ext#", "ConnectivityNode.isMain"), ResourceFactory.createPlainLiteral("true")); s.hasNext(); ) {
             Statement stmt = s.next();
             stmpToDelete.add(stmt);
         }
         modEQModel.remove(stmpToDelete);
 
-        //modTPModel.listStatements(ResourceFactory.createProperty("http://res.eu#NA"),RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/2013/CIM-schema-cim16#ConnectivityNode")).toList()
-        //add the model to the map
         modifiedModelMap.put("EQ", modEQModel);
         modifiedModelMap.put("SSH", modSSHModel);
         modifiedModelMap.put("SV", modSVModel);
         modifiedModelMap.put("TP", modTPModel);
 
-        //save
+        if (selectedTask != null && wizardContext != null) {
+            taskUpdater.updateState(selectedTask, "Saving modified model", "90%", wizardContext);
+        }
+
         saveInstanceModelData(modifiedModelMap, saveProperties, cgmesVersion);
-        if (expMap){
+
+        if (expMap) {
             exportMapping(expMapToXls);
         }
 
-
-
+        if (selectedTask != null && wizardContext != null) {
+            taskUpdater.updateState(selectedTask, "Finished", "100%", wizardContext);
+        }
     }
-
     //Modify CGM
     public static void ModifyCGM(Map<String, Map> loadDataMap,String cgmesVersion,boolean impMap,boolean applyAllCondEq,boolean applyLine,boolean applyTrafo,boolean applySynMach,boolean expMap) {
 

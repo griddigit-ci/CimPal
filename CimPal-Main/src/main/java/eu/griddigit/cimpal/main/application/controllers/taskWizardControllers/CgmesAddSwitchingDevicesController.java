@@ -14,6 +14,8 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class CgmesAddSwitchingDevicesController {
 
@@ -27,20 +29,22 @@ public class CgmesAddSwitchingDevicesController {
     @FXML private CheckBox cbApplySyncMachine;
     @FXML private CheckBox cbOnlyForMappingEquipment;
     @FXML private CheckBox cbExportMappingFile;
-
     @FXML private CheckBox saveResult;
 
     private CgmesAddSwitchingDevices task;
 
     @FXML
     public void initialize() {
-        task = getTaskFromContext(CgmesAddSwitchingDevices.class);
+        WizardContext ctx = WizardContext.getInstance();
+        if (ctx == null || ctx.getSelectedTasks() == null) return;
+
+        task = findTask(ctx, CgmesAddSwitchingDevices.class);
 
         cbStandard.setItems(FXCollections.observableArrayList(CgmesAddSwitchingDevices.DataExchangeStandard.values()));
         cbStandard.setValue(task.getStandard());
 
-        if (task.getModelInput() != null) tfModelInput.setText(task.getModelInput().toString());
-        if (task.getMappingFiles() != null) tfMappingFile.setText(task.getMappingFiles().toString());
+        refreshModelInputSummary();
+        refreshMappingFileSummary();
 
         cbApplyLines.setSelected(task.isApplyLines());
         cbApplyPowerTransformer.setSelected(task.isApplyPowerTransformer());
@@ -66,17 +70,17 @@ public class CgmesAddSwitchingDevicesController {
         FileChooser fc = new FileChooser();
         fc.setTitle("Select input model (IGM/CGM including boundary)");
         fc.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("RDF/XML", "*.xml", "*.rdf"),
+                new FileChooser.ExtensionFilter("Instance files", "*.xml", "*.rdf", "*.zip"),
                 new FileChooser.ExtensionFilter("All files", "*.*")
         );
 
         Stage stage = (Stage) tfModelInput.getScene().getWindow();
-        File f = fc.showOpenDialog(stage);
-        if (f == null) return;
+        List<File> files = fc.showOpenMultipleDialog(stage);
+        if (files == null || files.isEmpty()) return;
 
-        Path p = f.toPath();
-        tfModelInput.setText(p.toString());
-        task.setModelInput(p);
+        List<Path> paths = files.stream().map(File::toPath).toList();
+        task.setModelInputFiles(paths);
+        refreshModelInputSummary();
     }
 
     @FXML
@@ -84,7 +88,7 @@ public class CgmesAddSwitchingDevicesController {
         FileChooser fc = new FileChooser();
         fc.setTitle("Select mapping file");
         fc.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("Mapping files", "*.xls", "*.xlsx", "*.csv", "*.json", "*.ttl"),
+                new FileChooser.ExtensionFilter("Excel file", "*.xlsx"),
                 new FileChooser.ExtensionFilter("All files", "*.*")
         );
 
@@ -92,21 +96,38 @@ public class CgmesAddSwitchingDevicesController {
         File f = fc.showOpenDialog(stage);
         if (f == null) return;
 
-        Path p = f.toPath();
-        tfMappingFile.setText(p.toString());
-        task.setMappingFiles(p);
+        task.setMappingFile(f.toPath());
+        refreshMappingFileSummary();
     }
 
-    private <T extends ITask> T getTaskFromContext(Class<T> clazz) {
-        // Adjust this method to your actual WizardContext API.
-        WizardContext ctx = WizardContext.getInstance();
-        List<SelectedTask> selected = ctx.getSelectedTasks();
-
-        for (SelectedTask st : selected) {
-            if (clazz.isInstance(st.getTask())) {
-                return clazz.cast(st.getTask());
-            }
+    private void refreshModelInputSummary() {
+        List<Path> files = task.getModelInputFiles();
+        if (files == null || files.isEmpty()) {
+            tfModelInput.setText("");
+            return;
         }
-        throw new IllegalStateException("Task not found in context: " + clazz.getSimpleName());
+        if (files.size() <= 3) {
+            tfModelInput.setText(files.stream()
+                    .map(p -> p.getFileName().toString())
+                    .collect(Collectors.joining("; ")));
+        } else {
+            tfModelInput.setText(files.size() + " files selected");
+        }
+    }
+
+    private void refreshMappingFileSummary() {
+        Path p = task.getMappingFile();
+        tfMappingFile.setText(p == null ? "" : p.getFileName().toString());
+    }
+
+    private static <T extends ITask> T findTask(WizardContext ctx, Class<T> clazz) {
+        return ctx.getSelectedTasks().stream()
+                .map(SelectedTask::getTask)
+                .filter(Objects::nonNull)
+                .filter(clazz::isInstance)
+                .map(clazz::cast)
+                .findFirst()
+                .orElseThrow(() ->
+                        new IllegalStateException("Task not found in WizardContext: " + clazz.getSimpleName()));
     }
 }
