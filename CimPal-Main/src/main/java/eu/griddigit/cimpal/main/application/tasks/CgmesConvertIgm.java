@@ -31,7 +31,7 @@ public class CgmesConvertIgm implements ITask {
     private boolean alignRegulatingControlTargets = false;
 
     public CgmesConvertIgm() {
-        this.name = "CGMES 2.4 → 3.0: Convert IGM (multi-file selection";
+        this.name = "CGMES 2.4 → 3.0: Convert IGM (multi-file selection)";
         this.pathToFXML = "/fxml/wizardPages/taskElements/cgmesConvertIgm.fxml";
         this.status = "Queued";
         this.info = "0%";

@@ -74,27 +74,30 @@ public class TaskInputController  implements Initializable, IController {
     }
 
     public boolean validateInputs() {
-        var valid = true;
-        var message = "";
-        var hasSaveInterimTaskResult = false;
+        boolean valid = true;
+        StringBuilder message = new StringBuilder();
+        boolean hasSaveInterimTaskResult = false;
 
         for (SelectedTask selectedTask : context.getSelectedTasks()) {
-                message = message + selectedTask.getTask().validateInputs();
-                hasSaveInterimTaskResult = hasSaveInterimTaskResult  ||  selectedTask.getTask().getSaveResult();
+            String taskValidationMessage = selectedTask.getTask().validateInputs();
+            if (taskValidationMessage != null && !taskValidationMessage.isBlank()) {
+                message.append(taskValidationMessage).append("\n");
+            }
+            hasSaveInterimTaskResult = hasSaveInterimTaskResult || selectedTask.getTask().getSaveResult();
         }
 
-        if ( hasSaveInterimTaskResult && context.getWorkingDirectory() == null) {
-            message = message + "Please Select Working Directory!\n";
+        if (hasSaveInterimTaskResult && context.getWorkingDirectory() == null) {
+            message.append("Please Select Working Directory!\n");
         }
 
         if (context.getOutputDirectory() == null) {
-            message = message + "Please Select Output Directory!\n";
+            message.append("Please Select Output Directory!\n");
         }
 
         if (!message.isEmpty()) {
             valid = false;
             Alert alert = new Alert(Alert.AlertType.ERROR);
-            TextArea area = new TextArea(message);
+            TextArea area = new TextArea(message.toString());
             area.setWrapText(true);
             area.setEditable(false);
             alert.setContentText("Please input the described below input fields!");
@@ -104,6 +107,7 @@ public class TaskInputController  implements Initializable, IController {
             alert.setTitle("Error - violation of input parameters.");
             alert.showAndWait();
         }
+
         return valid;
     }
 

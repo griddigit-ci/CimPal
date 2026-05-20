@@ -1,8 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.services.TaskDependenciesEnforcer;
-import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
-import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
+import eu.griddigit.cimpal.main.application.tasks.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
@@ -215,12 +214,21 @@ public class TaskSelectionController implements Initializable, IController {
     public boolean validateInputs() {
         var validInputs = true;
         var message = "";
+        boolean onlyNoNeedBaseInstanceTasks =
+                !context.getSelectedTasks().isEmpty()
+                        && context.getSelectedTasks().stream()
+                        .map(selectedTask -> selectedTask.getTask().getClass())
+                        .allMatch(taskClass ->
+                                taskClass == CgmesConvertIgm.class
+                                        || taskClass == CgmesConvertBoundary.class
+                                        || taskClass == CgmesAddSwitchingDevices.class
+                        );
 
         if (fieldTextProfileIDG.getText().isEmpty()) {
             message = message + "RDF Profile files not selected! \n";
         }
 
-        if (baseInstanceModelFilesPaths.getText().isEmpty() && (!context.getSelectedTasks().isEmpty() && context.getSelectedTasks().getFirst().getTask().getClass() != GenerateInstanceDataModel.class) ) {
+        if (baseInstanceModelFilesPaths.getText().isEmpty() && (!context.getSelectedTasks().isEmpty() && context.getSelectedTasks().getFirst().getTask().getClass() != GenerateInstanceDataModel.class) && !onlyNoNeedBaseInstanceTasks ) {
             message = message + "Select Generate Instance DataModel Task first, or choose Instance Model files! \n";
         }
 

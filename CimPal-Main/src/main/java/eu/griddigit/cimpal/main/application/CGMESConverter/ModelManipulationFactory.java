@@ -82,6 +82,7 @@ public class ModelManipulationFactory {
                 .map(Path::toFile)
                 .toList();
 
+        nameMap = new HashMap<>();
         Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(files, xmlBase, null);
 
         Model modelEQ = baseInstanceModelMap.get("EQ");
