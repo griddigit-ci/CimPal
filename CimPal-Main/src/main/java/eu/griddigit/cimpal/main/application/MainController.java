@@ -156,9 +156,15 @@ public class MainController implements Initializable {
     private Button btnRunRDFcompare;
     @FXML
     private TabPane tabPaneDown;
+    @FXML
+    private SplitPane mainSplitPane;
+    @FXML
+    private TitledPane outputSourceContainer;
     public static Preferences prefs;
     @FXML
     private CheckBox cbShowUnionModelOnly;
+
+    private double outputSourceDividerPosition = 0.8146067415730337;
 
     @FXML
     private Button btnConstructShacl;
@@ -504,6 +510,33 @@ public class MainController implements Initializable {
 
         wizardContext = WizardContext.getInstance();
         cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
+
+        Platform.runLater(() -> {
+            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
+                outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+                mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, oldValue, newValue) -> {
+                    if (outputSourceContainer == null || outputSourceContainer.isExpanded()) {
+                        outputSourceDividerPosition = newValue.doubleValue();
+                    }
+                });
+            }
+
+            if (outputSourceContainer != null) {
+                outputSourceContainer.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
+                    if (!isExpanded) {
+                        if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
+                            outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+                        }
+                    } else {
+                        Platform.runLater(() -> {
+                            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
+                                mainSplitPane.setDividerPosition(0, outputSourceDividerPosition);
+                            }
+                        });
+                    }
+                });
+            }
+        });
 
         mainRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
         deviationRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
@@ -2309,16 +2342,16 @@ public class MainController implements Initializable {
         if (fcbRDFconvertModelUnion.isSelected()) {
             fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
-            if (fileL != null) {// the file is selected
+            if (!fileL.isEmpty()) {// the file is selected
                 fsourcePathTextField.setText(fileL.toString());
-                MainController.rdfConvertFileList = fileL;
+                MainController.rdfConvertFileList = new LinkedList<>(fileL);
             } else {
                 fsourcePathTextField.clear();
             }
         } else {
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
 
-            if (file.getFirst() != null) {// the file is selected
+            if (!file.isEmpty()) {// the file is selected
                 //MainController.prefs.put("LastWorkingFolder", file.getParent());
                 fsourcePathTextField.setText(file.getFirst().toString());
                 MainController.rdfConvertFile = file.getFirst();
@@ -2462,6 +2495,22 @@ public class MainController implements Initializable {
 
         boolean addowl = fcbRDFConveraddowl.isSelected();
         boolean modelUnionFixPackage = fcbRDFconvertFixPackage.isSelected();
+        boolean keepOntologyHeaders = true;
+
+        // Ask only when this setting is relevant for standard model-union conversion.
+        if (modelUnionFlag && !modelUnionFlagDetailed) {
+            Alert alert = new Alert(
+                    Alert.AlertType.CONFIRMATION,
+                    "Do you want to keep ontology headers in the merged model?",
+                    ButtonType.YES,
+                    ButtonType.NO
+            );
+            alert.setTitle("Headers");
+            alert.setHeaderText("Ontology Headers");
+
+            Optional<ButtonType> result = alert.showAndWait();
+            keepOntologyHeaders = result.isPresent() && result.get() == ButtonType.YES;
+        }
 
         // Create RDFConvertOptions object
         RDFConvertOptions.Builder builder = RDFConvertOptions.builder()
@@ -2486,7 +2535,8 @@ public class MainController implements Initializable {
                 .rdfSortOptions(rdfSortOptions)
                 .stripPrefixes(stripPrefixes)
                 .convertInstanceData(convertInstanceData)
-                .modelUnionFixPackage(modelUnionFixPackage);
+                .modelUnionFixPackage(modelUnionFixPackage)
+                .keepOntologyHeaders(keepOntologyHeaders);
 
         RDFConvertOptions options = builder.build();
 
@@ -2529,11 +2579,11 @@ public class MainController implements Initializable {
         fMainRdfPathTextField.clear();
         fDeviationRdfPathTextField.clear();
         fExtendedRdfPathTextField.clear();
-        if (MainController.rdfConvertModelUnionDetailedFiles != null) {
+        if (!MainController.rdfConvertModelUnionDetailedFiles.isEmpty()) {
             MainController.rdfConvertModelUnionDetailedFiles.clear();
         }
         MainController.rdfConvertFile = null;
-        if (MainController.rdfConvertFileList != null) {
+        if (!MainController.rdfConvertFileList.isEmpty()) {
             MainController.rdfConvertFileList.clear();
         }
 
@@ -5255,6 +5305,7 @@ public class MainController implements Initializable {
             tabPaneConstraintsDetails.getSelectionModel().select(tabSPARQLQuery);
         }
     }
+
 
 }
 
