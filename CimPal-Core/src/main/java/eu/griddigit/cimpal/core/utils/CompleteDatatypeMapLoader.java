@@ -46,6 +46,7 @@ public final class CompleteDatatypeMapLoader {
 
             return out;
         }
+
     }
 
     private static String extractDatatypeUri(String raw) {
