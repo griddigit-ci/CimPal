@@ -47,7 +47,7 @@ public class ManifestGenerator {
     private static final Property ADMS_VERSION_NOTES = ResourceFactory.createProperty(NS_ADMS, "versionNotes");
 
     private static final Property DCAT_ACCESS_URL = ResourceFactory.createProperty(NS_DCAT, "accessURL");
-    private static final Property DCAT_DISTRIBUTION_OF = ResourceFactory.createProperty(NS_DCAT, "distributionOf");
+    private static final Property DCAT_DISTRIBUTION_OF = ResourceFactory.createProperty(NS_DCAT, "isDistributionOf");
     private static final Property DCAT_DATASET_PROPERTY = ResourceFactory.createProperty(NS_DCAT, "dataset");
     private static final Property DCAT_IS_VERSION_OF = ResourceFactory.createProperty(NS_DCAT, "isVersionOf");
     private static final Property DCAT_MEDIA_TYPE = ResourceFactory.createProperty(NS_DCAT, "mediaType");
