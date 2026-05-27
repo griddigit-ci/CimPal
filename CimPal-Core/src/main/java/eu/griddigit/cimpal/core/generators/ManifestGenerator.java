@@ -91,8 +91,13 @@ public class ManifestGenerator {
         catalog.addProperty(DCTERMS_IDENTIFIER, catalog.getLocalName());
 
         List<File> orderedFiles = sourceFiles == null || sourceFiles.isEmpty()
-                ? sourceModels.keySet().stream().map(File::new).toList()
-                : sourceFiles;
+                ? sourceModels.keySet().stream()
+                    .sorted()
+                    .map(File::new)
+                    .toList()
+                : sourceFiles.stream()
+                    .sorted(Comparator.comparing(File::getAbsolutePath))
+                    .toList();
 
         for (int i = 0; i < orderedFiles.size(); i++) {
             File sourceFile = orderedFiles.get(i);
@@ -359,6 +364,7 @@ public class ManifestGenerator {
         while (it.hasNext()) {
             values.add(it.next().getObject());
         }
+        values.sort(Comparator.comparing(RDFNode::toString));
         return values;
     }
 
@@ -376,16 +382,28 @@ public class ManifestGenerator {
 
     private static void copyCatalogFromDatasets(Model manifest, Resource catalog, Property property, List<RDFNode> fallbackValues) {
         LinkedHashSet<RDFNode> values = new LinkedHashSet<>();
+
+        // Collect and sort datasets for deterministic ordering
+        List<Resource> datasets = new ArrayList<>();
         StmtIterator dsIt = manifest.listStatements(catalog, DCAT_DATASET_PROPERTY, (RDFNode) null);
         while (dsIt.hasNext()) {
             RDFNode dsNode = dsIt.next().getObject();
-            if (!dsNode.isResource()) {
-                continue;
+            if (dsNode.isResource()) {
+                datasets.add(dsNode.asResource());
             }
-            StmtIterator vIt = manifest.listStatements(dsNode.asResource(), property, (RDFNode) null);
+        }
+        datasets.sort(Comparator.comparing(Resource::toString));
+
+        // Process datasets in sorted order
+        for (Resource dataset : datasets) {
+            List<RDFNode> dsValues = new ArrayList<>();
+            StmtIterator vIt = manifest.listStatements(dataset, property, (RDFNode) null);
             while (vIt.hasNext()) {
-                values.add(vIt.next().getObject());
+                dsValues.add(vIt.next().getObject());
             }
+            // Sort values for deterministic ordering
+            dsValues.sort(Comparator.comparing(RDFNode::toString));
+            values.addAll(dsValues);
         }
 
         boolean hasConcreteValue = values.stream().anyMatch(v -> !isPlaceholderNode(v));
