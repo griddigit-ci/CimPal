@@ -322,7 +322,7 @@ public class ManifestGenerator {
     private static void copyBest(Resource subject, Property property, List<RDFNode>... candidateLists) {
         List<RDFNode> values = firstNonEmpty(candidateLists);
         for (RDFNode value : values) {
-            subject.addProperty(property, value);
+            subject.addProperty(property, normalizeNode(value));
         }
     }
 
@@ -339,7 +339,7 @@ public class ManifestGenerator {
     @SafeVarargs
     private static RDFNode coalesceNode(List<RDFNode>... candidateLists) {
         List<RDFNode> first = firstNonEmpty(candidateLists);
-        return first.isEmpty() ? null : first.getFirst();
+        return first.isEmpty() ? null : normalizeNode(first.getFirst());
     }
 
     @SafeVarargs
@@ -362,7 +362,7 @@ public class ManifestGenerator {
         List<RDFNode> values = new ArrayList<>();
         StmtIterator it = model.listStatements(subject, property, (RDFNode) null);
         while (it.hasNext()) {
-            values.add(it.next().getObject());
+            values.add(normalizeNode(it.next().getObject()));
         }
         values.sort(Comparator.comparing(RDFNode::toString));
         return values;
@@ -373,7 +373,7 @@ public class ManifestGenerator {
         if (keyword == null || keyword.isBlank()) {
             return List.of();
         }
-        return List.of(ResourceFactory.createPlainLiteral(keyword));
+        return List.of(plainLiteral(keyword));
     }
 
     private static Resource createCatalogResource(Model manifest) {
@@ -399,7 +399,7 @@ public class ManifestGenerator {
             List<RDFNode> dsValues = new ArrayList<>();
             StmtIterator vIt = manifest.listStatements(dataset, property, (RDFNode) null);
             while (vIt.hasNext()) {
-                dsValues.add(vIt.next().getObject());
+                dsValues.add(normalizeNode(vIt.next().getObject()));
             }
             // Sort values for deterministic ordering
             dsValues.sort(Comparator.comparing(RDFNode::toString));
@@ -440,11 +440,11 @@ public class ManifestGenerator {
     }
 
     private static Literal plainLiteral(String value) {
-        return ResourceFactory.createPlainLiteral(value);
+        return ResourceFactory.createPlainLiteral(value == null ? null : value.trim());
     }
 
     private static Literal plainLiteral(String value, String lang) {
-        return ResourceFactory.createLangLiteral(value, lang);
+        return ResourceFactory.createLangLiteral(value == null ? null : value.trim(), lang);
     }
 
     private static Literal nowLiteral() {
@@ -466,6 +466,34 @@ public class ManifestGenerator {
         return false;
     }
 
+    private static RDFNode normalizeNode(RDFNode node) {
+        if (node == null) {
+            return null;
+        }
+        if (node.isLiteral()) {
+            Literal literal = node.asLiteral();
+            String lexicalForm = literal.getLexicalForm();
+            String trimmed = lexicalForm == null ? null : lexicalForm.trim();
+            if (literal.getLanguage() != null && !literal.getLanguage().isBlank()) {
+                return ResourceFactory.createLangLiteral(trimmed, literal.getLanguage());
+            }
+            if (literal.getDatatype() != null) {
+                return ResourceFactory.createTypedLiteral(trimmed, literal.getDatatype());
+            }
+            return ResourceFactory.createPlainLiteral(trimmed);
+        }
+        if (node.isURIResource()) {
+            Resource resource = node.asResource();
+            String uri = resource.getURI();
+            if (uri == null) {
+                return node;
+            }
+            String trimmed = uri.trim();
+            return trimmed.equals(uri) ? node : ResourceFactory.createResource(trimmed);
+        }
+        return node;
+    }
+
     private static List<RDFNode> compactAccessUrlValues(String rawAccessUrl, File sourceFile) {
         String compact = compactAccessUrl(rawAccessUrl, sourceFile);
         if (compact == null || compact.isBlank()) {
@@ -478,9 +506,17 @@ public class ManifestGenerator {
         String parentFolder = null;
         String fileName = null;
 
-        if (rawAccessUrl != null && !rawAccessUrl.isBlank()) {
+        String raw = rawAccessUrl;
+        if (raw != null) {
+            raw = raw.trim();
+            if (raw.startsWith("file://") && !raw.startsWith("file:///")) {
+                raw = "file:" + raw.substring(7);
+            }
+        }
+
+        if (raw != null && !raw.isBlank()) {
             try {
-                URI uri = URI.create(rawAccessUrl.trim());
+                URI uri = URI.create(raw);
                 if ("file".equalsIgnoreCase(uri.getScheme())) {
                     Path p = Path.of(uri);
                     fileName = p.getFileName() != null ? p.getFileName().toString() : null;
