@@ -132,7 +132,7 @@ public class ManifestGenerator {
             copyBest(dataset, DCTERMS_IDENTIFIER,
                     values(sourceModel, datasetHeader, DCTERMS_IDENTIFIER),
                     List.of(ResourceFactory.createPlainLiteral(dataset.getLocalName())));
-            copyBest(dataset, DCTERMS_ISSUED,
+            copyBestAsDateTime(dataset, DCTERMS_ISSUED,
                     values(sourceModel, datasetHeader, DCTERMS_ISSUED),
                     values(sourceModel, fullModelHeader, MD_MODEL_CREATED));
             copyBest(dataset, DCTERMS_LICENSE,
@@ -166,7 +166,7 @@ public class ManifestGenerator {
             copyBest(dataset, DCAT.keyword,
                     values(sourceModel, datasetHeader, DCAT.keyword),
                     keywordFromModel(sourceModel));
-            copyBest(dataset, DCAT.startDate,
+            copyBestAsDateTime(dataset, DCAT.startDate,
                     values(sourceModel, datasetHeader, DCAT.startDate),
                     values(sourceModel, fullModelHeader, MD_MODEL_SCENARIO_TIME));
             copyBest(dataset, DCAT.endDate,
@@ -199,11 +199,11 @@ public class ManifestGenerator {
             );
             distribution.addProperty(DCAT_MEDIA_TYPE, mediaTypeRes);
 
-            copyBest(distribution, PROV_GENERATED_AT_TIME,
+            copyBestAsDateTimeStamp(distribution, PROV_GENERATED_AT_TIME,
                     values(sourceModel, distributionFromDataset(sourceModel, datasetHeader), PROV_GENERATED_AT_TIME),
                     values(sourceModel, datasetHeader, PROV_GENERATED_AT_TIME),
                     values(sourceModel, fullModelHeader, MD_MODEL_CREATED),
-                    List.of(nowLiteral()));
+                    List.of(nowDateTimeStampLiteral()));
 
             RDFNode generatedBy = coalesceNode(
                     values(sourceModel, distributionFromDataset(sourceModel, datasetHeader), PROV_WAS_GENERATED_BY),
@@ -323,6 +323,33 @@ public class ManifestGenerator {
         List<RDFNode> values = firstNonEmpty(candidateLists);
         for (RDFNode value : values) {
             subject.addProperty(property, normalizeNode(value));
+        }
+    }
+
+    @SafeVarargs
+    private static void copyBestAsDateTime(Resource subject, Property property, List<RDFNode>... candidateLists) {
+        copyBestAsDatatype(subject, property, XSDDatatype.XSDdateTime, candidateLists);
+    }
+
+    @SafeVarargs
+    private static void copyBestAsDateTimeStamp(Resource subject, Property property, List<RDFNode>... candidateLists) {
+        copyBestAsDatatype(subject, property, XSDDatatype.XSDdateTimeStamp, candidateLists);
+    }
+
+    @SafeVarargs
+    private static void copyBestAsDatatype(Resource subject, Property property, XSDDatatype datatype, List<RDFNode>... candidateLists) {
+        List<RDFNode> values = firstNonEmpty(candidateLists);
+        for (RDFNode value : values) {
+            RDFNode normalized = normalizeNode(value);
+            if (normalized == null) {
+                continue;
+            }
+            if (normalized.isLiteral()) {
+                String lexical = normalized.asLiteral().getLexicalForm();
+                subject.addProperty(property, ResourceFactory.createTypedLiteral(lexical, datatype));
+                continue;
+            }
+            subject.addProperty(property, normalized);
         }
     }
 
@@ -449,6 +476,10 @@ public class ManifestGenerator {
 
     private static Literal nowLiteral() {
         return ResourceFactory.createTypedLiteral(Instant.now().toString(), XSDDatatype.XSDdateTime);
+    }
+
+    private static Literal nowDateTimeStampLiteral() {
+        return ResourceFactory.createTypedLiteral(Instant.now().toString(), XSDDatatype.XSDdateTimeStamp);
     }
 
     private static boolean isPlaceholderNode(RDFNode node) {
