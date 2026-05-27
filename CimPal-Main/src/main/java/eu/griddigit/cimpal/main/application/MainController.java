@@ -1805,8 +1805,8 @@ public class MainController implements Initializable {
         File mappingFile = mappingCsvFile.get(0);
         new Thread(() -> {
             try {
-                Map<String, RDFDatatype> dataTypeMap =
-                        CompleteDatatypeMapLoader.loadFromResource("/CompleteDatatypeMap_CIM17_CGMES3_v24.properties");
+                Map<String, RDFDatatype> dataTypeMap = CompleteDatatypeMapLoader.loadFromResource("/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties");
+                //                Map<String, RDFDatatype> dataTypeMap = CompleteDatatypeMapLoader.loadFromResource("/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties");
                 Path report = ValidationTools.validateByMapping(
                         mappingFile.toPath(),
                         modelsBaseDir.toPath(),
