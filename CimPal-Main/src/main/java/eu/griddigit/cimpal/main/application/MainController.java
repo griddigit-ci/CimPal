@@ -1780,33 +1780,58 @@ public class MainController implements Initializable {
         Model shaclRefModel = null;
         shapeModels = null;
 
-        //select file
-        //Mapping file should have 2 columns; in the first, each cell contains a list of files that should be zipped separated with ";"
-        //the second the ttl file that should validate it
-        List<File> mappingCsvFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Validation mapping file", List.of( "*.csv"), "Mapping file");
+        List<File> mappingCsvFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                true,
+                "Validation mapping file",
+                List.of("*.csv"),
+                "Mapping file"
+        );
+
         File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the models root folder");
         File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips and report");
-        //Root is where the mapping file starts the path
         File constraintsRoot = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select constraint's root folder");
 
         String xmlBase = "http://iec.ch/TC57/CIM100";
 
-        // --- validate chooser results ---
         if (mappingCsvFile == null || mappingCsvFile.isEmpty() || mappingCsvFile.get(0) == null) {
-            // user cancelled
             return;
         }
-        if (modelsBaseDir == null || outputBaseDir == null) {
-            // user cancelled
+        if (modelsBaseDir == null || outputBaseDir == null || constraintsRoot == null) {
             return;
         }
 
-        // One mapping file only, later can be extended to multiple
+        // --- let user choose datatype map ---
+        ChoiceDialog<String> datatypeMapDialog = new ChoiceDialog<>(
+                "CGMES 3.0 / NC 2.4",
+                List.of(
+                        "CGMES 3.0 / NC 2.4",
+                        "CGMES 2.4 / NC 2.2"
+                )
+        );
+
+        datatypeMapDialog.setTitle("Select datatype map");
+        datatypeMapDialog.setHeaderText("Choose datatype map for validation");
+        datatypeMapDialog.setContentText("Datatype map:");
+
+        Optional<String> selectedDatatypeMap = datatypeMapDialog.showAndWait();
+
+        if (selectedDatatypeMap.isEmpty()) {
+            return;
+        }
+
+        String datatypeMapResource = switch (selectedDatatypeMap.get()) {
+            case "CGMES 2.4 / NC 2.2" -> "/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties";
+            case "CGMES 3.0 / NC 2.4" -> "/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties";
+            default -> throw new IllegalStateException("Unknown datatype map: " + selectedDatatypeMap.get());
+        };
+
         File mappingFile = mappingCsvFile.get(0);
+
         new Thread(() -> {
             try {
-                Map<String, RDFDatatype> dataTypeMap = CompleteDatatypeMapLoader.loadFromResource("/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties");
-                //                Map<String, RDFDatatype> dataTypeMap = CompleteDatatypeMapLoader.loadFromResource("/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties");
+                Map<String, RDFDatatype> dataTypeMap =
+                        CompleteDatatypeMapLoader.loadFromResource(datatypeMapResource);
+
                 Path report = ValidationTools.validateByMapping(
                         mappingFile.toPath(),
                         modelsBaseDir.toPath(),
@@ -1816,6 +1841,7 @@ public class MainController implements Initializable {
                         dataTypeMap,
                         xmlBase
                 );
+
                 System.out.println("Report saved to: " + report);
 
                 List<Path> createdZips = ValidationTools.zipByMapping(
@@ -1828,6 +1854,7 @@ public class MainController implements Initializable {
                 for (Path zip : createdZips) {
                     System.out.println("ZIP: " + zip);
                 }
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
