@@ -50,7 +50,7 @@ public class ValidationExcelWriter implements Closeable {
     // One row per unique Source over the whole report.
     // Count shows how many validation results used that Source.
     private static final String[] STATISTICS_CONSTRAINT_HEADER = new String[]{
-            "Source", "Count", "Constraint Component", "Message", "Severity",
+            "Path", "Source", "Count", "Constraint Component", "Message", "Severity",
             "Description", "Order", "Name", "Group"
     };
 
@@ -194,6 +194,7 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         ConstraintStatisticKey key = new ConstraintStatisticKey(
+                safe(res.getPath()),
                 safe(res.getSourceShape()),
                 safe(res.getConstraintComponent()),
                 safe(res.getMessage()),
@@ -213,15 +214,16 @@ public class ValidationExcelWriter implements Closeable {
         for (Map.Entry<ConstraintStatisticKey, Integer> entry : constraintStatistics.entrySet()) {
             ConstraintStatisticKey key = entry.getKey();
             Row row = statisticsConstraintSheet.createRow(r++);
-            row.createCell(0).setCellValue(key.source);
-            row.createCell(1).setCellValue(entry.getValue());
-            row.createCell(2).setCellValue(key.constraintComponent);
-            row.createCell(3).setCellValue(key.message);
-            row.createCell(4).setCellValue(key.severity);
-            row.createCell(5).setCellValue(key.description);
-            row.createCell(6).setCellValue(key.order);
-            row.createCell(7).setCellValue(key.name);
-            row.createCell(8).setCellValue(key.group);
+            row.createCell(0).setCellValue(key.path);
+            row.createCell(1).setCellValue(key.source);
+            row.createCell(2).setCellValue(entry.getValue());
+            row.createCell(3).setCellValue(key.constraintComponent);
+            row.createCell(4).setCellValue(key.message);
+            row.createCell(5).setCellValue(key.severity);
+            row.createCell(6).setCellValue(key.description);
+            row.createCell(7).setCellValue(key.order);
+            row.createCell(8).setCellValue(key.name);
+            row.createCell(9).setCellValue(key.group);
         }
     }
 
@@ -343,6 +345,7 @@ public class ValidationExcelWriter implements Closeable {
     }
 
     private static class ConstraintStatisticKey {
+        private final String path;
         private final String source;
         private final String constraintComponent;
         private final String message;
@@ -352,7 +355,8 @@ public class ValidationExcelWriter implements Closeable {
         private final String name;
         private final String group;
 
-        private ConstraintStatisticKey(String source,
+        private ConstraintStatisticKey(String path,
+                                       String source,
                                        String constraintComponent,
                                        String message,
                                        String severity,
@@ -360,7 +364,7 @@ public class ValidationExcelWriter implements Closeable {
                                        String order,
                                        String name,
                                        String group) {
-
+            this.path = path;
             this.source = source;
             this.constraintComponent = constraintComponent;
             this.message = message;
