@@ -274,49 +274,7 @@
                         </HBox>
                      </AnchorPane>
                   </Tab>
-                  <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison">
-                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                        <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                           <HBox spacing="10.0">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="140.0" text="RDF file A (Model A):" wrapText="true" />
-                              <TextField fx:id="fPathRdffile1" editable="false" HBox.hgrow="ALWAYS" />
-                              <Button mnemonicParsing="false" onAction="#actionBrowseRDFfile1" text="Browse" />
-                           </HBox>
-                           <HBox spacing="10.0">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="140.0" text="RDF file B (Model B):" wrapText="true" />
-                              <TextField fx:id="fPathRdffile2" editable="false" HBox.hgrow="ALWAYS" />
-                              <Button mnemonicParsing="false" onAction="#actionBrowseRDFfile2" text="Browse" />
-                           </HBox>
-                           <HBox spacing="10.0">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="140.0" text="RDF scope and format:" wrapText="true" />
-                              <ChoiceBox fx:id="fcbRDFSformat" minWidth="400.0" />
-                              <CheckBox fx:id="fcbRDFcompareCimVersion" mnemonicParsing="false" text="Assume same CIM namespace">
-                                 <HBox.margin>
-                                    <Insets left="30.0" />
-                                 </HBox.margin>
-                              </CheckBox>
-                              <CheckBox fx:id="fcbRDFcompareProfileNS" mnemonicParsing="false" text="Assume same Profile/Ontology namespace for prefix: " />
-                              <TextField fx:id="fPrefixRDFCompare" HBox.hgrow="ALWAYS" />
-                           </HBox>
-                           <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
-                              <VBox.margin>
-                                 <Insets bottom="5.0" right="5.0" />
-                              </VBox.margin>
-                              <Button fx:id="btnRunRDFcompare" disable="true" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunRDFcompare" text="Run" HBox.hgrow="ALWAYS" />
-                              <Button fx:id="btnResetRDFComp" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetRDFComp" text="Reset" />
-                           </HBox>
-                        </VBox>
-                     </AnchorPane>
-                  </Tab>
+                   <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
                   <Tab fx:id="tabCreateCompleteSM11" text="Excel to SHACL">
                      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                         <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">

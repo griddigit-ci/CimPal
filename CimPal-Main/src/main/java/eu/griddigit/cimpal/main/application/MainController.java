@@ -17,6 +17,7 @@ import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclFromXls;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.controllers.RDFComparisonController;
 import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
@@ -128,7 +129,6 @@ public class MainController implements Initializable {
     public Tab tabSPARQLQuery;
     public Button btnResetIDComp;
     public Font x3;
-    public Button btnResetRDFComp;
     @FXML
     public TreeView treeViewInstanceData;
     public TextField fPrefixGenerateTab1;
@@ -148,12 +148,7 @@ public class MainController implements Initializable {
     private TextArea foutputWindow;
     @FXML
     private ProgressBar progressBar;
-    @FXML
-    private TextField fPathRdffile1;
-    @FXML
-    private TextField fPathRdffile2;
-    @FXML
-    private Button btnRunRDFcompare;
+
     @FXML
     private TabPane tabPaneDown;
     @FXML
@@ -172,8 +167,6 @@ public class MainController implements Initializable {
     private CheckBox cbApplyDefNsDesignTab;
     @FXML
     private ChoiceBox fselectDatatypeMapDefineConstraints;
-    @FXML
-    private ChoiceBox fcbRDFSformat;
     @FXML
     private TreeView<String> treeViewProfileConstraints;
     @FXML
@@ -286,12 +279,7 @@ public class MainController implements Initializable {
     private CheckBox fcbIDcompSolutionOverview;
     @FXML
     private CheckBox fcbIDcompShowDetails;
-    @FXML
-    private CheckBox fcbRDFcompareCimVersion;
-    @FXML
-    private CheckBox fcbRDFcompareProfileNS;
-    @FXML
-    private TextField fPrefixRDFCompare;
+
     @FXML
     private CheckBox cbRDFSSHACLoptionDescr;
     @FXML
@@ -566,13 +554,7 @@ public class MainController implements Initializable {
                 "Per profile" //	the save option will be asked after every shacl file i.e. per profile.
         );
 
-        fcbRDFSformat.getItems().addAll(
-                "RDFS (augmented) by CimSyntaxGen",
-                "RDFS (augmented) by CimSyntaxGen with CIMTool",
-                "Universal method inlc. SHACL Shapes"
 
-        );
-        fcbRDFSformat.getSelectionModel().selectLast();
 
         fcbRDFSformatShapes.getItems().addAll(
                 "RDFS (augmented, v2020) by CimSyntaxGen",
@@ -673,7 +655,6 @@ public class MainController implements Initializable {
         fcbIDmap.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBIDmap());
 
         //Adding action to the choice box
-        fcbRDFSformat.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBfcbRDFSformat());
 
         fcbGenMethodOptions.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionHandleOptionsForGen(newV.toString()));
 
@@ -715,8 +696,64 @@ public class MainController implements Initializable {
         rdfConvertModelUnionDetailedFiles = new LinkedList<>();
         rdfConvertFileList = new LinkedList<>();
 
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFComparisonTab.fxml"));
+            tabCreateCompleteSM1.setContent(loader.load());
+            RDFComparisonController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("RDF comparison tab error", "The RDF comparison tab could not be loaded.", e);
+        }
+
 
     }
+
+    // ============ Progress Bar Control Methods ============
+
+    /**
+     * Sets the progress bar value (0.0 to 1.0, or use ProgressIndicator.INDETERMINATE_PROGRESS)
+     */
+    public void setProgressBarValue(double progress) {
+        Platform.runLater(() -> progressBar.setProgress(progress));
+    }
+
+    /**
+     * Sets the progress bar to indeterminate state (animated)
+     */
+    public void setProgressBarIndeterminate() {
+        Platform.runLater(() -> progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS));
+    }
+
+    /**
+     * Sets the progress bar to 0 (empty)
+     */
+    public void resetProgressBar() {
+        Platform.runLater(() -> progressBar.setProgress(0));
+    }
+
+    /**
+     * Sets the progress bar to 1 (full)
+     */
+    public void completeProgressBar() {
+        Platform.runLater(() -> progressBar.setProgress(1));
+    }
+
+    /**
+     * Gets the current progress bar value
+     */
+    public double getProgressBarValue() {
+        return progressBar.getProgress();
+    }
+
+    /**
+     * Gets the ProgressBar control (advanced use)
+     */
+    public ProgressBar getProgressBar() {
+        return progressBar;
+    }
+
+    // ============ End Progress Bar Control Methods ============
+
     @FXML
     public void forwardWizardPane(ActionEvent actionEvent) throws IOException {
         //FXMLLoader currentController = new FXMLLoader(getClass().getResource(wizardContext.getCurrentWizardPane()));
@@ -1059,15 +1096,7 @@ public class MainController implements Initializable {
         Platform.exit(); // Exit the eu.griddigit.cimpal.application
     }
 
-    @FXML
-    //Action for button "Reset" related to the RDFS Comparison
-    private void actionBtnResetRDFComp() {
-        fPathRdffile1.clear();
-        fPathRdffile2.clear();
-        btnRunRDFcompare.setDisable(true);
-        progressBar.setProgress(0);
 
-    }
 
     @FXML
     //Action for button "Reset" related to the Instance data Comparison
@@ -1102,58 +1131,6 @@ public class MainController implements Initializable {
         fNSexcelShape.clear();
         progressBar.setProgress(0);
 
-    }
-
-    @FXML
-    //action button Browse for RDFS comparison - file 1
-    private void actionBrowseRDFfile1() {
-        progressBar.setProgress(0);
-        List<File> file = null;
-        if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
-                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool")) {
-            //select file 1
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
-        } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
-        } else return;
-
-        if (!file.isEmpty() && file.getFirst() != null) {// the file is selected
-
-            fPathRdffile1.setText(file.getFirst().toString());
-            MainController.rdfModel1 = file.getFirst();
-            if (!fPathRdffile2.getText().isEmpty()) {
-                btnRunRDFcompare.setDisable(false);
-            }
-        } else {
-            fPathRdffile1.clear();
-            btnRunRDFcompare.setDisable(true);
-        }
-    }
-
-    @FXML
-    //action button Browse for RDFS comparison - file 2
-    private void actionBrowseRDFfile2() {
-        progressBar.setProgress(0);
-        List<File> file = null;
-        if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
-                fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool")) {
-            //select file 2
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
-        } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
-        } else return;
-
-        if (!file.isEmpty() && file.getFirst() != null) {// the file is selected
-            fPathRdffile2.setText(file.getFirst().toString());
-            MainController.rdfModel2 = file.getFirst();
-            if (!fPathRdffile1.getText().isEmpty()) {
-                btnRunRDFcompare.setDisable(false);
-            }
-
-        } else {
-            fPathRdffile2.clear();
-            btnRunRDFcompare.setDisable(true);
-        }
     }
 
     @FXML
@@ -1615,147 +1592,6 @@ public class MainController implements Initializable {
         progressBar.setProgress(1);
 
     }
-
-    @FXML
-    //action button Run in RDF comparison
-    private void actionBtnRunRDFcompare() throws IOException {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-        Lang rdfSourceFormat1 = Lang.RDFXML;
-        Lang rdfSourceFormat2 = Lang.RDFXML;
-        switch (fcbRDFSformat.getSelectionModel().getSelectedItem().toString()) {
-            case "RDFS (augmented) by CimSyntaxGen":
-            case "RDFS (augmented) by CimSyntaxGen with CIMTool":
-            case "RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen":
-                rdfSourceFormat1 = Lang.RDFXML;
-                rdfSourceFormat2 = Lang.RDFXML;
-                break;
-
-            case "Universal method inlc. SHACL Shapes":
-                if (MainController.rdfModel1.getName().endsWith(".ttl")) {
-                    rdfSourceFormat1 = Lang.TURTLE;
-                } else if (MainController.rdfModel1.getName().endsWith(".rdf")) {
-                    rdfSourceFormat1 = Lang.RDFXML;
-                }
-                if (MainController.rdfModel2.getName().endsWith(".ttl")) {
-                    rdfSourceFormat2 = Lang.TURTLE;
-                } else if (MainController.rdfModel2.getName().endsWith(".rdf")) {
-                    rdfSourceFormat2 = Lang.RDFXML;
-                }
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + fcbRDFSformat.getSelectionModel().getSelectedItem().toString());
-        }
-
-        List<File> modelFiles1 = new LinkedList<>();
-        modelFiles1.add(MainController.rdfModel1);
-        List<File> modelFiles2 = new LinkedList<>();
-        modelFiles2.add(MainController.rdfModel2);
-
-        Model model1 = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles1, null, rdfSourceFormat1, false, false).get("unionModel");
-        Model model2Temp = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles2, null, rdfSourceFormat2, false, false).get("unionModel");
-
-        Model model2 = null;
-        boolean error = false;
-        if (fcbRDFcompareCimVersion.isSelected() && !fcbRDFcompareProfileNS.isSelected()) {//rename cim namespace in the second model
-            model2 = CompareFactory.renameNamespaceURIresources(model2Temp, "cim", model1.getNsPrefixURI("cim"));
-        } else if (!fcbRDFcompareCimVersion.isSelected() && fcbRDFcompareProfileNS.isSelected()) {//rename only profile namespace in the second model
-            String prefixProfile = fPrefixRDFCompare.getText();
-            String profileURI = model1.getNsPrefixURI(prefixProfile);
-            if (profileURI != null) {
-                model2 = CompareFactory.renameNamespaceURIresources(model2Temp, prefixProfile, profileURI);
-            } else {
-                String profilePrefixURI = CompareFactory.getProfileURI(model2Temp);
-                if (profilePrefixURI != null) {
-                    model2 = CompareFactory.renameNamespaceURIresources(model2Temp, profilePrefixURI, model1.getNsPrefixURI(profilePrefixURI));
-                } else {
-                    error = true;
-                }
-            }
-
-        } else if (fcbRDFcompareCimVersion.isSelected() && fcbRDFcompareProfileNS.isSelected()) {//rename both cim namespace and profile namespace in the second model
-            model2 = CompareFactory.renameNamespaceURIresources(model2Temp, "cim", model1.getNsPrefixURI("cim"));
-            String prefixProfile = fPrefixRDFCompare.getText();
-            String profileURI = model1.getNsPrefixURI(prefixProfile);
-            if (profileURI != null) {
-                model2 = CompareFactory.renameNamespaceURIresources(model2, prefixProfile, profileURI);
-            } else {
-                String profilePrefixURI = CompareFactory.getProfileURI(model2);
-                if (profilePrefixURI != null) {
-                    model2 = CompareFactory.renameNamespaceURIresources(model2, profilePrefixURI, model1.getNsPrefixURI(profilePrefixURI));
-                } else {
-                    error = true;
-                }
-            }
-
-        } else {// no rename
-            model2 = model2Temp;
-        }
-
-
-        if (error) {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setContentText("No header in the file and the profile namespace prefix is not declared.");
-            alert.setHeaderText(null);
-            alert.setTitle("Error");
-            alert.showAndWait();
-            return;
-        }
-
-        rdfsCompareFiles = new LinkedList<>();
-        rdfsCompareFiles.add(MainController.rdfModel1.getName());
-        rdfsCompareFiles.add(MainController.rdfModel2.getName());
-
-        IRDFComparator IRDFComparator = null;
-
-        switch (fcbRDFSformat.getSelectionModel().getSelectedItem().toString()) {
-            case "RDFS (augmented) by CimSyntaxGen":
-                IRDFComparator = new ComparisonIRDFSprofile();
-                break;
-            case "RDFS (augmented) by CimSyntaxGen with CIMTool":
-                IRDFComparator = new ComparisonIRDFSprofileCIMTool();
-                break;
-            case "Universal method inlc. SHACL Shapes":
-                IRDFComparator = new ComparisonSHACLshapes();
-                break;
-            default:
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setContentText("Unexpected RDFS format selected.");
-                alert.setHeaderText(null);
-                alert.setTitle("Error");
-                alert.showAndWait();
-                progressBar.setProgress(0);
-                return;
-        }
-
-        rdfCompareResult = IRDFComparator.compare(model1, model2);
-
-        if (!rdfCompareResult.hasDifference()) {
-
-            try {
-                Stage guiRdfDiffResultsStage = new Stage();
-                //Scene for the menu RDF differences
-                Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
-                Scene rdfDiffscene = new Scene(rootRDFdiff);
-                guiRdfDiffResultsStage.setScene(rdfDiffscene);
-                guiRdfDiffResultsStage.setTitle("Comparison RDFS profiles");
-                guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
-                rdfDiffResultController.initData(guiRdfDiffResultsStage);
-                progressBar.setProgress(1);
-                guiRdfDiffResultsStage.showAndWait();
-            } catch (IOException e) {
-                GUIhelper.showUserFriendlyError("Comparison view error", "The RDFS comparison result window could not be opened.", e);
-            }
-        } else {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setContentText("The two models are identical if the CIM namespace would be the same.");
-            alert.setHeaderText(null);
-            alert.setTitle("Information");
-            progressBar.setProgress(1);
-            alert.showAndWait();
-        }
-    }
-
 
     @FXML
     // action on menu Convert Reference data to Common data
@@ -2772,35 +2608,6 @@ public class MainController implements Initializable {
         } else {
             fBTbrowseIDmap.setDisable(false);
             fPathIDmap.clear();
-        }
-
-    }
-
-    //Action for choice box "RDF scope and format" related to RDF comparison
-    private void actionCBfcbRDFSformat() {
-
-        progressBar.setProgress(0);
-        if (!fcbRDFSformat.getSelectionModel().isSelected(-1)) {
-            if (fcbRDFSformat.getSelectionModel().getSelectedItem().toString().equals("RDFS IEC 61970-501:Ed2 (CD) by CimSyntaxGen") ||
-                    fcbRDFSformat.getSelectionModel().getSelectedItem().toString().equals("Universal method inlc. SHACL Shapes")) {
-                fcbRDFcompareCimVersion.setDisable(false);
-                fcbRDFcompareProfileNS.setDisable(false);
-                fPrefixRDFCompare.setDisable(false);
-            } else {
-                fcbRDFcompareCimVersion.setDisable(true);
-                fcbRDFcompareCimVersion.setSelected(false);
-                fcbRDFcompareProfileNS.setDisable(true);
-                fcbRDFcompareProfileNS.setSelected(false);
-                fPrefixRDFCompare.setDisable(true);
-                fPrefixRDFCompare.clear();
-            }
-        } else {
-            fcbRDFcompareCimVersion.setDisable(true);
-            fcbRDFcompareCimVersion.setSelected(false);
-            fcbRDFcompareProfileNS.setDisable(true);
-            fcbRDFcompareProfileNS.setSelected(false);
-            fPrefixRDFCompare.setDisable(true);
-            fPrefixRDFCompare.clear();
         }
 
     }
