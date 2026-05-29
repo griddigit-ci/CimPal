@@ -769,8 +769,7 @@ public class ValidationTools {
         if (paths == null || paths.isEmpty()) return "";
         return paths.stream()
                 .filter(Objects::nonNull)
-                .map(Path::toString)
-                .map(p -> trimReportPath(p, XML_REPORT_PREFIX))
+                .map(p -> trimReportPath(p.toString(), XML_REPORT_PREFIX))
                 .sorted()
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("");
@@ -780,10 +779,14 @@ public class ValidationTools {
         if (path == null) return "";
 
         String normalizedPath = path.replace("\\", "/").trim();
-        String normalizedPrefix = prefixToRemove.replace("\\", "/").trim();
 
-        if (normalizedPath.startsWith(normalizedPrefix)) {
-            return normalizedPath.substring(normalizedPrefix.length());
+        while (normalizedPath.endsWith("/") && normalizedPath.length() > 1) {
+            normalizedPath = normalizedPath.substring(0, normalizedPath.length() - 1);
+        }
+
+        int slash = normalizedPath.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < normalizedPath.length()) {
+            return normalizedPath.substring(slash + 1);
         }
 
         return normalizedPath;

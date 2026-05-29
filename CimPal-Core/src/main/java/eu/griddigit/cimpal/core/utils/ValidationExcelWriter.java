@@ -13,9 +13,11 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public class ValidationExcelWriter implements Closeable {
 
@@ -29,6 +31,7 @@ public class ValidationExcelWriter implements Closeable {
     }
 
     private static final String STATISTICS_SHEET_NAME = "Validation statistics";
+    private static final String STATISTICS_CONSTRAINT_SHEET_NAME = "StatisticsConstraint";
 
     // Raw validation data: one header per sheet, no blank rows, no per-validation statistic rows.
     // The old Details column was intentionally removed.
@@ -40,14 +43,23 @@ public class ValidationExcelWriter implements Closeable {
 
     // One row per validation. Process errors also go here.
     private static final String[] STATISTICS_HEADER = new String[]{
-            "Case folder", "Dataset", "XML files", "Constraint file",
+            "XML files", "Constraint file",
             "All", "Warnings", "Infos", "Violations", "Conforms", "Validation error"
+    };
+
+    // One row per unique Source over the whole report.
+    // Count shows how many validation results used that Source.
+    private static final String[] STATISTICS_CONSTRAINT_HEADER = new String[]{
+            "Source", "Count", "Constraint Component", "Message", "Severity",
+            "Description", "Order", "Name", "Group"
     };
 
     private final Workbook wb;
     private final Map<CaseFolder, Sheet> sheetByCase = new EnumMap<>(CaseFolder.class);
     private final Map<CaseFolder, Integer> nextRowByCase = new EnumMap<>(CaseFolder.class);
+    private final Map<ConstraintStatisticKey, Integer> constraintStatistics = new LinkedHashMap<>();
     private final Sheet statisticsSheet;
+    private final Sheet statisticsConstraintSheet;
     private int nextStatisticsRow = 1;
 
     public ValidationExcelWriter() {
@@ -68,6 +80,11 @@ public class ValidationExcelWriter implements Closeable {
         writeHeader(statisticsSheet, STATISTICS_HEADER, headerStyle);
         statisticsSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, STATISTICS_HEADER.length - 1));
         statisticsSheet.createFreezePane(0, 1);
+
+        statisticsConstraintSheet = wb.createSheet(STATISTICS_CONSTRAINT_SHEET_NAME);
+        writeHeader(statisticsConstraintSheet, STATISTICS_CONSTRAINT_HEADER, headerStyle);
+        statisticsConstraintSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, STATISTICS_CONSTRAINT_HEADER.length - 1));
+        statisticsConstraintSheet.createFreezePane(0, 1);
     }
 
     /**
@@ -81,7 +98,10 @@ public class ValidationExcelWriter implements Closeable {
                                  List<SHACLValidationResult> results,
                                  boolean conforms) {
 
-        writeStatisticsRow(cf, datasetName, xmlFiles, constraintFile, results, conforms, null);
+        String reportXmlFiles = toReportFileNames(xmlFiles);
+        String reportConstraintFile = toReportFileNames(constraintFile);
+
+        writeStatisticsRow(cf, datasetName, reportXmlFiles, reportConstraintFile, results, conforms, null);
 
         if (results == null || results.isEmpty()) {
             return;
@@ -91,9 +111,11 @@ public class ValidationExcelWriter implements Closeable {
         int r = nextRowByCase.get(cf);
 
         for (SHACLValidationResult res : results) {
+            addConstraintStatistic(res);
+
             Row dr = s.createRow(r++);
-            dr.createCell(0).setCellValue(safe(xmlFiles));
-            dr.createCell(1).setCellValue(safe(constraintFile));
+            dr.createCell(0).setCellValue(reportXmlFiles);
+            dr.createCell(1).setCellValue(reportConstraintFile);
             dr.createCell(2).setCellValue(safe(res.getFocusNode()));
             dr.createCell(3).setCellValue(safe(res.getPath()));
             dr.createCell(4).setCellValue(safe(res.getValue()));
@@ -128,7 +150,7 @@ public class ValidationExcelWriter implements Closeable {
                             String xmlFiles,
                             String constraintFile,
                             Exception error) {
-        writeStatisticsRow(cf, datasetName, xmlFiles, constraintFile, null, false, safeThrowable(error));
+        writeStatisticsRow(cf, datasetName, toReportFileNames(xmlFiles), toReportFileNames(constraintFile), null, false, safeThrowable(error));
     }
 
     /** Backward-compatible entry point. Prefer appendError(cf, datasetName, xmlFiles, constraintFile, error). */
@@ -156,26 +178,64 @@ public class ValidationExcelWriter implements Closeable {
 
         int all = warn + vio + info;
         Row row = statisticsSheet.createRow(nextStatisticsRow++);
-        row.createCell(0).setCellValue(cf == null ? CaseFolder.UNKNOWN.name() : cf.name());
-        row.createCell(1).setCellValue(safe(datasetName));
-        row.createCell(2).setCellValue(safe(xmlFiles));
-        row.createCell(3).setCellValue(safe(constraintFile));
-        row.createCell(4).setCellValue(all);
-        row.createCell(5).setCellValue(warn);
-        row.createCell(6).setCellValue(info);
-        row.createCell(7).setCellValue(vio);
-        row.createCell(8).setCellValue(conforms && validationError == null);
-        row.createCell(9).setCellValue(safe(validationError));
+        row.createCell(0).setCellValue(safe(xmlFiles));
+        row.createCell(1).setCellValue(safe(constraintFile));
+        row.createCell(2).setCellValue(all);
+        row.createCell(3).setCellValue(warn);
+        row.createCell(4).setCellValue(info);
+        row.createCell(5).setCellValue(vio);
+        row.createCell(6).setCellValue(conforms && validationError == null);
+        row.createCell(7).setCellValue(safe(validationError));
+    }
+
+    private void addConstraintStatistic(SHACLValidationResult res) {
+        if (res == null) {
+            return;
+        }
+
+        ConstraintStatisticKey key = new ConstraintStatisticKey(
+                safe(res.getSourceShape()),
+                safe(res.getConstraintComponent()),
+                safe(res.getMessage()),
+                safe(res.getSeverity()),
+                safe(res.getDescription()),
+                safe(res.getOrder()),
+                safe(res.getName()),
+                safe(res.getGroup())
+        );
+
+        constraintStatistics.merge(key, 1, Integer::sum);
+    }
+
+    private void writeConstraintStatisticsRows() {
+        int r = 1;
+
+        for (Map.Entry<ConstraintStatisticKey, Integer> entry : constraintStatistics.entrySet()) {
+            ConstraintStatisticKey key = entry.getKey();
+            Row row = statisticsConstraintSheet.createRow(r++);
+            row.createCell(0).setCellValue(key.source);
+            row.createCell(1).setCellValue(entry.getValue());
+            row.createCell(2).setCellValue(key.constraintComponent);
+            row.createCell(3).setCellValue(key.message);
+            row.createCell(4).setCellValue(key.severity);
+            row.createCell(5).setCellValue(key.description);
+            row.createCell(6).setCellValue(key.order);
+            row.createCell(7).setCellValue(key.name);
+            row.createCell(8).setCellValue(key.group);
+        }
     }
 
     public Path saveTo(Path outputBaseDir) throws IOException {
         Files.createDirectories(outputBaseDir);
+
+        writeConstraintStatisticsRows();
 
         for (CaseFolder cf : CaseFolder.values()) {
             Sheet s = sheetByCase.get(cf);
             autosize(s, RAW_HEADER.length);
         }
         autosize(statisticsSheet, STATISTICS_HEADER.length);
+        autosize(statisticsConstraintSheet, STATISTICS_CONSTRAINT_HEADER.length);
 
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         Path out = outputBaseDir.resolve("validation_report__" + ts + ".xlsx");
@@ -242,5 +302,87 @@ public class ValidationExcelWriter implements Closeable {
         String m = t.getMessage();
         if (m == null || m.isBlank()) return t.getClass().getName();
         return t.getClass().getName() + ": " + m;
+    }
+
+    private static String toReportFileNames(String value) {
+        String s = safe(value).trim();
+        if (s.isEmpty()) return "";
+
+        String[] parts = s.split(";");
+        StringBuilder out = new StringBuilder();
+
+        for (String part : parts) {
+            String cleaned = fileNameOnly(part);
+            if (cleaned.isEmpty()) continue;
+
+            if (out.length() > 0) {
+                out.append("; ");
+            }
+            out.append(cleaned);
+        }
+
+        return out.length() == 0 ? fileNameOnly(s) : out.toString();
+    }
+
+    private static String fileNameOnly(String value) {
+        String s = safe(value).trim();
+        if (s.isEmpty()) return "";
+
+        s = s.replace("\\", "/");
+
+        while (s.endsWith("/") && s.length() > 1) {
+            s = s.substring(0, s.length() - 1);
+        }
+
+        int slash = s.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < s.length()) {
+            return s.substring(slash + 1);
+        }
+
+        return s;
+    }
+
+    private static class ConstraintStatisticKey {
+        private final String source;
+        private final String constraintComponent;
+        private final String message;
+        private final String severity;
+        private final String description;
+        private final String order;
+        private final String name;
+        private final String group;
+
+        private ConstraintStatisticKey(String source,
+                                       String constraintComponent,
+                                       String message,
+                                       String severity,
+                                       String description,
+                                       String order,
+                                       String name,
+                                       String group) {
+
+            this.source = source;
+            this.constraintComponent = constraintComponent;
+            this.message = message;
+            this.severity = severity;
+            this.description = description;
+            this.order = order;
+            this.name = name;
+            this.group = group;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof ConstraintStatisticKey)) return false;
+            ConstraintStatisticKey that = (ConstraintStatisticKey) o;
+            return Objects.equals(source, that.source);
+
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(source);
+        }
     }
 }
