@@ -8,6 +8,7 @@ module CimPal.Main {
     exports eu.griddigit.cimpal.main.model;
     exports eu.griddigit.cimpal.main.interfaces;
     exports eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
+    opens eu.griddigit.cimpal.main.application.controllers;
     exports eu.griddigit.cimpal.main.application.PssePFcompare;
     exports eu.griddigit.cimpal.main.application.tasks;
     opens eu.griddigit.cimpal.main.application.tasks;
