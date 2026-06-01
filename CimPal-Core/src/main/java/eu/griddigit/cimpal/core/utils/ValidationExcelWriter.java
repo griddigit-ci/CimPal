@@ -50,6 +50,7 @@ public class ValidationExcelWriter implements Closeable {
     // One row per unique Source over the whole report.
     // Count shows how many validation results used that Source.
     private static final String[] STATISTICS_CONSTRAINT_HEADER = new String[]{
+            "XML files", "Constraint file",
             "Path", "Source", "Count", "Constraint Component", "Message", "Severity",
             "Description", "Order", "Name", "Group"
     };
@@ -111,7 +112,7 @@ public class ValidationExcelWriter implements Closeable {
         int r = nextRowByCase.get(cf);
 
         for (SHACLValidationResult res : results) {
-            addConstraintStatistic(res);
+            addConstraintStatistic(reportXmlFiles, reportConstraintFile, res);
 
             Row dr = s.createRow(r++);
             dr.createCell(0).setCellValue(reportXmlFiles);
@@ -188,12 +189,16 @@ public class ValidationExcelWriter implements Closeable {
         row.createCell(7).setCellValue(safe(validationError));
     }
 
-    private void addConstraintStatistic(SHACLValidationResult res) {
+    private void addConstraintStatistic(String xmlFiles,
+                                        String constraintFile,
+                                        SHACLValidationResult res) {
         if (res == null) {
             return;
         }
 
         ConstraintStatisticKey key = new ConstraintStatisticKey(
+                safe(xmlFiles),
+                safe(constraintFile),
                 safe(res.getPath()),
                 safe(res.getSourceShape()),
                 safe(res.getConstraintComponent()),
@@ -214,16 +219,18 @@ public class ValidationExcelWriter implements Closeable {
         for (Map.Entry<ConstraintStatisticKey, Integer> entry : constraintStatistics.entrySet()) {
             ConstraintStatisticKey key = entry.getKey();
             Row row = statisticsConstraintSheet.createRow(r++);
-            row.createCell(0).setCellValue(key.path);
-            row.createCell(1).setCellValue(key.source);
-            row.createCell(2).setCellValue(entry.getValue());
-            row.createCell(3).setCellValue(key.constraintComponent);
-            row.createCell(4).setCellValue(key.message);
-            row.createCell(5).setCellValue(key.severity);
-            row.createCell(6).setCellValue(key.description);
-            row.createCell(7).setCellValue(key.order);
-            row.createCell(8).setCellValue(key.name);
-            row.createCell(9).setCellValue(key.group);
+            row.createCell(0).setCellValue(key.xmlFiles);
+            row.createCell(1).setCellValue(key.constraintFile);
+            row.createCell(2).setCellValue(key.path);
+            row.createCell(3).setCellValue(key.source);
+            row.createCell(4).setCellValue(entry.getValue());
+            row.createCell(5).setCellValue(key.constraintComponent);
+            row.createCell(6).setCellValue(key.message);
+            row.createCell(7).setCellValue(key.severity);
+            row.createCell(8).setCellValue(key.description);
+            row.createCell(9).setCellValue(key.order);
+            row.createCell(10).setCellValue(key.name);
+            row.createCell(11).setCellValue(key.group);
         }
     }
 
@@ -345,6 +352,8 @@ public class ValidationExcelWriter implements Closeable {
     }
 
     private static class ConstraintStatisticKey {
+        private final String xmlFiles;
+        private final String constraintFile;
         private final String path;
         private final String source;
         private final String constraintComponent;
@@ -355,7 +364,9 @@ public class ValidationExcelWriter implements Closeable {
         private final String name;
         private final String group;
 
-        private ConstraintStatisticKey(String path,
+        private ConstraintStatisticKey(String xmlFiles,
+                                       String constraintFile,
+                                       String path,
                                        String source,
                                        String constraintComponent,
                                        String message,
@@ -364,6 +375,8 @@ public class ValidationExcelWriter implements Closeable {
                                        String order,
                                        String name,
                                        String group) {
+            this.xmlFiles = xmlFiles;
+            this.constraintFile = constraintFile;
             this.path = path;
             this.source = source;
             this.constraintComponent = constraintComponent;
@@ -380,13 +393,13 @@ public class ValidationExcelWriter implements Closeable {
             if (this == o) return true;
             if (!(o instanceof ConstraintStatisticKey)) return false;
             ConstraintStatisticKey that = (ConstraintStatisticKey) o;
-            return Objects.equals(source, that.source);
-
+            return Objects.equals(source, that.source)
+                    && Objects.equals(constraintFile, that.constraintFile);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(source);
+            return Objects.hash(source, constraintFile);
         }
     }
 }
