@@ -49,6 +49,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -970,7 +971,35 @@ public class MainController implements Initializable {
                 singleFile = true;
             }
 
-            ExportSHACLInformation.exportCompleteSHACLInformation(singleFile, file);
+            ChoiceDialog<String> dialog = new ChoiceDialog<>(
+                    "EA Import Format",
+                    Arrays.asList(
+                            "Complete SHACL Predicate Export",
+                            "EA Import Format"
+                    )
+            );
+
+            dialog.setTitle("Export SHACL information");
+            dialog.setHeaderText("Choose SHACL export type");
+            dialog.setContentText("Export mode:");
+
+            Optional<String> result = dialog.showAndWait();
+
+            if (result.isEmpty()) {
+                return;
+            }
+
+            switch (result.get()) {
+
+                case "Complete SHACL Predicate Export":
+                    ExportSHACLInformation.exportCompleteSHACLInformation(singleFile, file);
+                    break;
+
+                case "EA Import Format":
+                    ExportSHACLInformation.exportSHACLForEAImport(singleFile, file);
+                    break;
+            }
+
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
@@ -4272,6 +4301,10 @@ public class MainController implements Initializable {
         fPathXLSfileForShacl.clear();
         MainController.inputXLS = null;
         selectedFile = null;
+    }
+    @FXML
+    private void actionRestoreTtlFromConstraintCsv() {
+            ShaclTools.restoreTtlFromConstraintCsv();
     }
 
     @FXML

@@ -64,6 +64,8 @@
          <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
          <MenuItem mnemonicParsing="false" onAction="#actionGenerateManifest" text="Generate Manifest" />
          <MenuItem mnemonicParsing="false" onAction="#actionRunSPARQLQuery" text="Run SPARQL Query" />
+         <MenuItem mnemonicParsing="false" onAction="#actionRestoreTtlFromConstraintCsv" text="Restore ttl from constraint csv" />
+
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />
