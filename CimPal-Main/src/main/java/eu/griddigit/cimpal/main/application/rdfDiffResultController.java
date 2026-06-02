@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.core.models.RDFCompareResult;
 import eu.griddigit.cimpal.main.gui.RDFcomparisonResultModel;
 import eu.griddigit.cimpal.main.gui.TextAreaEditTableCell;
 import eu.griddigit.cimpal.core.models.RDFCompareResultEntry;
@@ -44,7 +45,9 @@ public class rdfDiffResultController implements Initializable {
     @FXML
     private Label labelModelB;
 
-    public static Stage guiRdfDiffResultsStage;
+    private Stage guiRdfDiffResultsStage;
+    private RDFCompareResult rdfCompareResult;
+    private List<String> compareFiles;
 
     public rdfDiffResultController() {
 
@@ -54,8 +57,6 @@ public class rdfDiffResultController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         tableViewResults.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY);
         tableViewResults.setPlaceholder(new Label("No comparison details available"));
-
-
 
         //add callback - the table is not editable, but it is necessary in order to get the wrap text and text area
         Callback<TableColumn, TableCell> cellFactory = p -> new TextAreaEditTableCell();
@@ -70,18 +71,31 @@ public class rdfDiffResultController implements Initializable {
         cValueModelA.setCellFactory(cellFactory);
         cValueModelB.setCellValueFactory( new PropertyValueFactory<RDFcomparisonResultModel, String>( "valueModelB" ) );
         cValueModelB.setCellFactory(cellFactory);
+    }
 
+    /**
+     * Initialize the result view with given data. Call this after loading the FXML and before showing the stage.
+     */
+    public void initData(Stage stage, RDFCompareResult result, List<String> files) {
+        this.guiRdfDiffResultsStage = stage;
+        this.rdfCompareResult = result;
+        this.compareFiles = files;
+
+        // populate table now that we have data
         ObservableList<RDFcomparisonResultModel> tableResultsData= tableViewResults.getItems();
 
-        List<RDFCompareResultEntry> rdfCompareResultEntries = MainController.rdfCompareResult.getEntries();
-
-        for (RDFCompareResultEntry result : rdfCompareResultEntries) {
-            tableResultsData.add(new RDFcomparisonResultModel(result.getItem(), result.getRdfType(), result.getProperty(),
-                    result.getValueModelA(), result.getValueModelB()));
+        if (rdfCompareResult != null) {
+            List<RDFCompareResultEntry> rdfCompareResultEntries = rdfCompareResult.getEntries();
+            for (RDFCompareResultEntry resultEntry : rdfCompareResultEntries) {
+                tableResultsData.add(new RDFcomparisonResultModel(resultEntry.getItem(), resultEntry.getRdfType(), resultEntry.getProperty(),
+                        resultEntry.getValueModelA(), resultEntry.getValueModelB()));
+            }
         }
 
-        labelModelA.setText(MainController.rdfsCompareFiles.get(0));
-        labelModelB.setText(MainController.rdfsCompareFiles.get(1));
+        if (compareFiles != null && compareFiles.size() >= 2) {
+            labelModelA.setText(compareFiles.get(0));
+            labelModelB.setText(compareFiles.get(1));
+        }
 
         tableViewResults.setItems(tableResultsData);
         tableViewResults.getSelectionModel().selectFirst();
@@ -99,8 +113,8 @@ public class rdfDiffResultController implements Initializable {
         guiRdfDiffResultsStage.close();
     }
 
-    //used for the cancel button on the add shapes GUI
+    // kept for compatibility (not used) - prefer using the instance initData(stage,result,files)
     public static void initData(Stage stage) {
-        guiRdfDiffResultsStage=stage;
+        // no-op to avoid breaking existing callers; prefer loader.getController().initData(...)
     }
 }

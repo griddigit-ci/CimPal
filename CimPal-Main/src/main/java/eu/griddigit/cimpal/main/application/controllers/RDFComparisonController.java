@@ -260,9 +260,9 @@ public class RDFComparisonController implements Initializable {
             return;
         }
 
-        MainController.rdfsCompareFiles = new LinkedList<>();
-        MainController.rdfsCompareFiles.add(MainController.rdfModel1.getName());
-        MainController.rdfsCompareFiles.add(MainController.rdfModel2.getName());
+        List<String> compareFiles = new LinkedList<>();
+        compareFiles.add(MainController.rdfModel1.getName());
+        compareFiles.add(MainController.rdfModel2.getName());
 
         IRDFComparator rdfComparator;
         switch (fcbRDFSformat.getSelectionModel().getSelectedItem()) {
@@ -285,17 +285,19 @@ public class RDFComparisonController implements Initializable {
                 return;
         }
 
-        MainController.rdfCompareResult = rdfComparator.compare(model1, model2);
+        RDFCompareResult rdfCompareResult = rdfComparator.compare(model1, model2);
 
-        if (!MainController.rdfCompareResult.hasDifference()) {
+        if (!rdfCompareResult.hasDifference()) {
             try {
                 Stage guiRdfDiffResultsStage = new Stage();
-                Parent rootRDFdiff = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
+                FXMLLoader loader = new FXMLLoader(Objects.requireNonNull(getClass().getResource("/fxml/rdfDiffResult.fxml")));
+                Parent rootRDFdiff = loader.load();
+                rdfDiffResultController controller = loader.getController();
                 Scene rdfDiffscene = new Scene(rootRDFdiff);
                 guiRdfDiffResultsStage.setScene(rdfDiffscene);
                 guiRdfDiffResultsStage.setTitle("Comparison RDFS profiles");
                 guiRdfDiffResultsStage.initModality(Modality.APPLICATION_MODAL);
-                rdfDiffResultController.initData(guiRdfDiffResultsStage);
+                controller.initData(guiRdfDiffResultsStage, rdfCompareResult, compareFiles);
                 setProgressBar(1);
                 guiRdfDiffResultsStage.showAndWait();
             } catch (IOException e) {
