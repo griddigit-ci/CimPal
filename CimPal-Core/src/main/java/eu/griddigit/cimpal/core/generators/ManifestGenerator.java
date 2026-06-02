@@ -66,11 +66,12 @@ public class ManifestGenerator {
 
     private static final Resource DEFAULT_MEDIA_TYPE = ResourceFactory.createResource("http://www.iana.org/assignments/media-types/application/rdf+xml");
     private static final Resource DEFAULT_WAS_GENERATED_BY = ResourceFactory.createResource("https://energy.referencedata.eu/Test/Action/PlaceholderGeneration");
-    private static final Resource DEFAULT_LICENSE = ResourceFactory.createResource("urn:placeholder:license");
+    private static final Resource DEFAULT_LICENSE = ResourceFactory.createResource("http://example.org/license");
     private static final Resource DEFAULT_ACCESS_RIGHTS = ResourceFactory.createResource("https://energy.referencedata.eu/Confidentiality/Public");
     private static final Resource DEFAULT_TYPE = ResourceFactory.createResource("https://energy.referencedata.eu/type/CIM-PowerSystemModel");
     private static final Resource DEFAULT_SPATIAL = ResourceFactory.createResource("urn:placeholder:spatial");
-    private static final Resource DEFAULT_PUBLISHER = ResourceFactory.createResource("urn:placeholder:publisher");
+    private static final Resource DEFAULT_PUBLISHER = ResourceFactory.createResource("http://example.org/publisher");
+    private static final Resource DEFAULT_ACCESS_URL = ResourceFactory.createResource("http://example.org/resource");
 
     private ManifestGenerator() {
         // Utility class
@@ -120,10 +121,10 @@ public class ManifestGenerator {
             distribution.addProperty(DCAT_DISTRIBUTION_OF, dataset);
 
             // NCP terms are copied directly; CGMES md:* fields are mapped into their closest manifest terms.
-            copyBest(dataset, DCTERMS_ACCESS_RIGHTS,
+            copyBestAsResource(dataset, DCTERMS_ACCESS_RIGHTS,
                     values(sourceModel, datasetHeader, DCTERMS_ACCESS_RIGHTS),
                     List.of(DEFAULT_ACCESS_RIGHTS));
-            copyBest(dataset, DCTERMS_CONFORMS_TO,
+            copyBestAsResource(dataset, DCTERMS_CONFORMS_TO,
                     values(sourceModel, datasetHeader, DCTERMS_CONFORMS_TO),
                     values(sourceModel, fullModelHeader, MD_MODEL_PROFILE));
             copyBest(dataset, DCTERMS_DESCRIPTION,
@@ -135,10 +136,10 @@ public class ManifestGenerator {
             copyBestAsDateTime(dataset, DCTERMS_ISSUED,
                     values(sourceModel, datasetHeader, DCTERMS_ISSUED),
                     values(sourceModel, fullModelHeader, MD_MODEL_CREATED));
-            copyBest(dataset, DCTERMS_LICENSE,
+            copyBestAsResource(dataset, DCTERMS_LICENSE,
                     values(sourceModel, datasetHeader, DCTERMS_LICENSE),
                     List.of(DEFAULT_LICENSE));
-            copyBest(dataset, DCTERMS_PUBLISHER,
+            copyBestAsResource(dataset, DCTERMS_PUBLISHER,
                     values(sourceModel, datasetHeader, DCTERMS_PUBLISHER),
                     values(sourceModel, fullModelHeader, MD_MODEL_MODELING_AUTHORITY_SET),
                     List.of(DEFAULT_PUBLISHER));
@@ -175,7 +176,7 @@ public class ManifestGenerator {
                     values(sourceModel, datasetHeader, DCAT_VERSION),
                     values(sourceModel, fullModelHeader, MD_MODEL_VERSION));
 
-            copyBest(distribution, DCTERMS_CONFORMS_TO,
+            copyBestAsResource(distribution, DCTERMS_CONFORMS_TO,
                     values(sourceModel, distributionFromDataset(sourceModel, datasetHeader), DCTERMS_CONFORMS_TO),
                     values(sourceModel, datasetHeader, DCTERMS_CONFORMS_TO),
                     values(sourceModel, fullModelHeader, MD_MODEL_PROFILE));
@@ -187,7 +188,8 @@ public class ManifestGenerator {
             Resource accessUrlRes = coalesceResource(
                     values(sourceModel, distributionFromDataset(sourceModel, datasetHeader), DCAT_ACCESS_URL),
                     i == 0 ? compactAccessUrlValues(accessUrl, sourceFile) : List.of(),
-                    compactAccessUrlValues(null, sourceFile)
+                    compactAccessUrlValues(null, sourceFile),
+                    List.of(DEFAULT_ACCESS_URL)
             );
             if (accessUrlRes != null) {
                 distribution.addProperty(DCAT_ACCESS_URL, accessUrlRes);
@@ -216,16 +218,16 @@ public class ManifestGenerator {
         }
 
         // Catalog inherits key governance metadata from generated datasets.
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_ACCESS_RIGHTS, List.of(DEFAULT_ACCESS_RIGHTS));
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_CONFORMS_TO, List.of(ResourceFactory.createResource("urn:placeholder:conformsTo")));
+        copyCatalogFromDatasets(manifest, catalog, DCTERMS_ACCESS_RIGHTS, List.of(DEFAULT_ACCESS_RIGHTS), true);
+        copyCatalogFromDatasets(manifest, catalog, DCTERMS_CONFORMS_TO, List.of(ResourceFactory.createResource("urn:placeholder:conformsTo")), true);
         copyCatalogFromDatasets(manifest, catalog, DCTERMS_ISSUED, List.of(nowLiteral()));
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_LICENSE, List.of(DEFAULT_LICENSE));
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_PUBLISHER, List.of(DEFAULT_PUBLISHER));
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_RIGHTS, List.of(plainLiteral("Copyright")));
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_RIGHTS_HOLDER, List.of(plainLiteral("PLACEHOLDER_RIGHTS_HOLDER")));
-        copyCatalogFromDatasets(manifest, catalog, DCTERMS_SPATIAL, List.of(DEFAULT_SPATIAL));
-        copyCatalogFromDatasets(manifest, catalog, ADMS_VERSION_NOTES, List.of(plainLiteral("Placeholder version notes.", "en")));
-        copyCatalogFromDatasets(manifest, catalog, DCAT_VERSION, List.of(plainLiteral("PLACEHOLDER_VERSION")));
+        copyCatalogFromDatasets(manifest, catalog, DCTERMS_LICENSE, List.of(DEFAULT_LICENSE), true);
+        copyCatalogFromDatasets(manifest, catalog, DCTERMS_PUBLISHER, List.of(DEFAULT_PUBLISHER), true);
+         copyCatalogFromDatasets(manifest, catalog, DCTERMS_RIGHTS, List.of(plainLiteral("Copyright")));
+         copyCatalogFromDatasets(manifest, catalog, DCTERMS_RIGHTS_HOLDER, List.of(plainLiteral("PLACEHOLDER_RIGHTS_HOLDER")));
+         copyCatalogFromDatasets(manifest, catalog, DCTERMS_SPATIAL, List.of(DEFAULT_SPATIAL));
+         copyCatalogFromDatasets(manifest, catalog, ADMS_VERSION_NOTES, List.of(plainLiteral("Placeholder version notes.", "en")));
+         copyCatalogFromDatasets(manifest, catalog, DCAT_VERSION, List.of(plainLiteral("PLACEHOLDER_VERSION")));
 
         return manifest;
     }
@@ -337,6 +339,26 @@ public class ManifestGenerator {
     }
 
     @SafeVarargs
+    private static void copyBestAsResource(Resource subject, Property property, List<RDFNode>... candidateLists) {
+        List<RDFNode> values = firstNonEmpty(candidateLists);
+        for (RDFNode value : values) {
+            RDFNode normalized = normalizeNode(value);
+            if (normalized == null) {
+                continue;
+            }
+            if (normalized.isLiteral()) {
+                String lexical = normalized.asLiteral().getLexicalForm();
+                if (lexical != null && !lexical.isBlank()) {
+                    // Convert string literals that look like URIs to Resources
+                    subject.addProperty(property, ResourceFactory.createResource(lexical));
+                }
+                continue;
+            }
+            subject.addProperty(property, normalized);
+        }
+    }
+
+    @SafeVarargs
     private static void copyBestAsDatatype(Resource subject, Property property, XSDDatatype datatype, List<RDFNode>... candidateLists) {
         List<RDFNode> values = firstNonEmpty(candidateLists);
         for (RDFNode value : values) {
@@ -408,6 +430,10 @@ public class ManifestGenerator {
     }
 
     private static void copyCatalogFromDatasets(Model manifest, Resource catalog, Property property, List<RDFNode> fallbackValues) {
+        copyCatalogFromDatasets(manifest, catalog, property, fallbackValues, false);
+    }
+
+    private static void copyCatalogFromDatasets(Model manifest, Resource catalog, Property property, List<RDFNode> fallbackValues, boolean convertToResource) {
         LinkedHashSet<RDFNode> values = new LinkedHashSet<>();
 
         // Collect and sort datasets for deterministic ordering
@@ -426,7 +452,15 @@ public class ManifestGenerator {
             List<RDFNode> dsValues = new ArrayList<>();
             StmtIterator vIt = manifest.listStatements(dataset, property, (RDFNode) null);
             while (vIt.hasNext()) {
-                dsValues.add(normalizeNode(vIt.next().getObject()));
+                RDFNode nodeValue = vIt.next().getObject();
+                if (convertToResource && nodeValue.isLiteral()) {
+                    String lexical = nodeValue.asLiteral().getLexicalForm();
+                    if (lexical != null && !lexical.isBlank()) {
+                        dsValues.add(ResourceFactory.createResource(lexical));
+                    }
+                } else {
+                    dsValues.add(normalizeNode(nodeValue));
+                }
             }
             // Sort values for deterministic ordering
             dsValues.sort(Comparator.comparing(RDFNode::toString));
@@ -446,6 +480,8 @@ public class ManifestGenerator {
             catalog.addProperty(property, value);
         }
     }
+
+    // ...existing code...
 
     private static Model resolveModel(Map<String, Model> sourceModels, File sourceFile) {
         if (sourceModels == null || sourceModels.isEmpty() || sourceFile == null) {
