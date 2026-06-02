@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.main.core;
 
 import javafx.scene.control.ChoiceDialog;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -25,8 +26,18 @@ import org.apache.jena.vocabulary.*;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import eu.griddigit.cimpal.main.util.PropertyHolder;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.layout.VBox;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -5286,6 +5297,580 @@ public class ShaclTools {
         }
 
         return ResourceFactory.createStatement(subjRes,pred,obj);
+    }
+
+    public static void restoreTtlFromConstraintCsv() {
+        List<File> csvFiles = chooseConstraintCsvFiles();
+        if (csvFiles == null || csvFiles.isEmpty()) {
+            showInfo("Restore TTL from CSV", "No CSV file was selected.");
+            return;
+        }
+
+        File outputFolder = chooseTtlOutputFolder();
+        if (outputFolder == null) {
+            showInfo("Restore TTL from CSV", "No output folder was selected.");
+            return;
+        }
+
+        Dialog<Void> progressDialog = new Dialog<>();
+        progressDialog.setTitle("Restore TTL from constraint CSV");
+        progressDialog.setHeaderText("Restoring TTL files...");
+
+        ProgressBar progressBar = new ProgressBar(0);
+        progressBar.setPrefWidth(420);
+
+        Label statusLabel = new Label("Starting...");
+        statusLabel.setWrapText(true);
+
+        VBox box = new VBox(10, statusLabel, progressBar);
+        box.setPrefWidth(450);
+
+        progressDialog.getDialogPane().setContent(box);
+        progressDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        Task<List<RestoreResult>> task = new Task<>() {
+            @Override
+            protected List<RestoreResult> call() {
+                List<RestoreResult> results = new ArrayList<>();
+
+                int total = csvFiles.size();
+
+                for (int i = 0; i < total; i++) {
+                    File csvFile = csvFiles.get(i);
+
+                    updateMessage("Reading CSV " + (i + 1) + " of " + total + ":\n" + csvFile.getName());
+                    updateProgress(i, total);
+
+                    try {
+                        RestoreResult result = restoreTtlFromSingleCsv(csvFile, outputFolder);
+                        results.add(result);
+
+                        updateMessage(
+                                "Created " + result.ttlFilesCreated + " TTL file(s) from " + csvFile.getName()
+                                        + "\nRows read: " + result.csvRowsRead
+                                        + ", payload rows written: " + result.payloadRowsWritten
+                        );
+
+                    } catch (Exception e) {
+                        RestoreResult failed = RestoreResult.failed(csvFile, e);
+                        results.add(failed);
+                        updateMessage("Failed: " + csvFile.getName() + "\n" + e.getMessage());
+                        e.printStackTrace();
+                    }
+
+                    updateProgress(i + 1, total);
+                }
+
+                return results;
+            }
+        };
+
+        progressBar.progressProperty().bind(task.progressProperty());
+        statusLabel.textProperty().bind(task.messageProperty());
+
+        task.setOnSucceeded(e -> {
+            progressDialog.close();
+
+            List<RestoreResult> results = task.getValue();
+
+            int csvCount = results.size();
+            int ttlFiles = 0;
+            int csvRows = 0;
+            int payloadRows = 0;
+            int failed = 0;
+
+            StringBuilder details = new StringBuilder();
+
+            for (RestoreResult r : results) {
+                if (r.failed) {
+                    failed++;
+                    details.append("FAILED: ")
+                            .append(r.csvFile.getName())
+                            .append(" - ")
+                            .append(r.errorMessage)
+                            .append("\n");
+                } else {
+                    ttlFiles += r.ttlFilesCreated;
+                    csvRows += r.csvRowsRead;
+                    payloadRows += r.payloadRowsWritten;
+
+                    details.append("OK: ")
+                            .append(r.csvFile.getName())
+                            .append(" -> ")
+                            .append(r.ttlFilesCreated)
+                            .append(" TTL file(s), ")
+                            .append(r.csvRowsRead)
+                            .append(" CSV row(s), ")
+                            .append(r.payloadRowsWritten)
+                            .append(" payload block(s)")
+                            .append("\n");
+                }
+            }
+
+            showInfo(
+                    "Restore TTL from CSV complete",
+                    "CSV files processed: " + csvCount
+                            + "\nTTL files created: " + ttlFiles
+                            + "\nCSV rows read: " + csvRows
+                            + "\nPayload blocks written: " + payloadRows
+                            + "\nFailed files: " + failed
+                            + "\n\n" + details
+            );
+        });
+
+        task.setOnFailed(e -> {
+            progressDialog.close();
+
+            Throwable ex = task.getException();
+            if (ex != null) {
+                ex.printStackTrace();
+                showError("Restore TTL from CSV failed", ex.getMessage());
+            } else {
+                showError("Restore TTL from CSV failed", "Unknown error.");
+            }
+        });
+
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        thread.start();
+
+        progressDialog.setOnCloseRequest(event -> {
+            if (task.isRunning()) {
+                task.cancel();
+            }
+        });
+
+        progressDialog.showAndWait();
+    }
+
+    private static class RestoreResult {
+        File csvFile;
+        int csvRowsRead;
+        int payloadRowsWritten;
+        int ttlFilesCreated;
+        boolean failed;
+        String errorMessage;
+
+        static RestoreResult failed(File csvFile, Exception e) {
+            RestoreResult r = new RestoreResult();
+            r.csvFile = csvFile;
+            r.failed = true;
+            r.errorMessage = e == null ? "Unknown error" : e.getMessage();
+            return r;
+        }
+    }
+
+    private static List<File> chooseConstraintCsvFiles() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select constraint CSV file(s)");
+
+        fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("CSV files (*.csv)", "*.csv")
+        );
+
+        return fileChooser.showOpenMultipleDialog(null);
+    }
+
+    private static File chooseTtlOutputFolder() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select output folder for restored TTL files");
+        return directoryChooser.showDialog(null);
+    }
+
+    public static RestoreResult restoreTtlFromSingleCsv(File csvFile, File outputFolder) throws IOException {
+        RestoreResult result = new RestoreResult();
+        result.csvFile = csvFile;
+
+        CsvTable csv = readCsvTable(csvFile);
+        result.csvRowsRead = csv.rows.size();
+
+        if (csv.rows.isEmpty()) {
+            return result;
+        }
+
+        if (!csv.headerIndex.containsKey("payload")) {
+            throw new IOException("CSV has no Payload column: " + csvFile.getAbsolutePath());
+        }
+
+        Map<String, List<CsvRow>> rowsBySourceFile = new LinkedHashMap<>();
+
+        String defaultSourceFile = findHeaderSourceFile(csv, csvFile);
+
+        for (CsvRow row : csv.rows) {
+            String payload = getPayloadFromRow(row);
+
+            if (payload == null || payload.trim().isEmpty()) {
+                continue;
+            }
+
+            String sourceFile = row.get("SourceFile");
+
+            if (sourceFile == null || sourceFile.trim().isEmpty()) {
+                sourceFile = defaultSourceFile;
+            }
+
+            sourceFile = normalizeTtlFileName(sourceFile);
+
+            rowsBySourceFile
+                    .computeIfAbsent(sourceFile, k -> new ArrayList<>())
+                    .add(row);
+        }
+
+        for (Map.Entry<String, List<CsvRow>> entry : rowsBySourceFile.entrySet()) {
+            String sourceFile = entry.getKey();
+            List<CsvRow> rows = entry.getValue();
+
+            File outFile = new File(outputFolder, sourceFile);
+
+            int writtenBlocks = writeTtlFileFromRows(outFile, rows);
+
+            result.ttlFilesCreated++;
+            result.payloadRowsWritten += writtenBlocks;
+        }
+
+        return result;
+    }
+
+    private static int writeTtlFileFromRows(File outFile, List<CsvRow> rows) throws IOException {
+        List<String> headerPayloads = new ArrayList<>();
+        List<String> shapePayloads = new ArrayList<>();
+
+        LinkedHashSet<String> seenPayloads = new LinkedHashSet<>();
+
+        for (CsvRow row : rows) {
+            String payload = normalizePayloadForTtl(getPayloadFromRow(row));
+            if (payload.trim().isEmpty()) {
+                continue;
+            }
+
+            if (!seenPayloads.add(payload)) {
+                continue;
+            }
+
+            if (isHeaderRow(row)) {
+                headerPayloads.add(payload);
+            } else {
+                shapePayloads.add(payload);
+            }
+        }
+
+        int writtenBlocks = 0;
+
+        try (BufferedWriter writer = Files.newBufferedWriter(outFile.toPath(), StandardCharsets.UTF_8)) {
+            for (String header : headerPayloads) {
+                writer.write(header);
+                writer.newLine();
+                writer.newLine();
+                writtenBlocks++;
+            }
+
+            for (String shape : shapePayloads) {
+                writer.write(shape);
+                writer.newLine();
+                writer.newLine();
+                writtenBlocks++;
+            }
+        }
+
+        return writtenBlocks;
+    }
+
+    private static String findHeaderSourceFile(CsvTable csv, File csvFile) {
+        for (CsvRow row : csv.rows) {
+            if (isHeaderRow(row)) {
+                String sourceFile = row.get("SourceFile");
+
+                if (sourceFile != null && !sourceFile.trim().isEmpty()) {
+                    return normalizeTtlFileName(sourceFile);
+                }
+
+                String constraintName = row.get("ConstraintName");
+                if (constraintName == null || constraintName.trim().isEmpty()) {
+                    constraintName = row.get("Constraint Name");
+                }
+
+                String prefix = "SHACL:Header::";
+                if (constraintName != null && constraintName.startsWith(prefix)) {
+                    return normalizeTtlFileName(constraintName.substring(prefix.length()));
+                }
+            }
+        }
+
+        return normalizeTtlFileName(stripExtension(csvFile.getName()) + ".ttl");
+    }
+
+    private static void showInfo(String title, String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        });
+    }
+
+    private static void showError(String title, String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        });
+    }
+
+    private static boolean isHeaderRow(CsvRow row) {
+        String payloadKind = row.get("PayloadKind");
+        if (payloadKind != null && payloadKind.trim().equalsIgnoreCase("Header")) {
+            return true;
+        }
+
+        String id = row.get("PropertyShape/NodeShape ID");
+        if (id != null && id.trim().equalsIgnoreCase("__HEADER__")) {
+            return true;
+        }
+
+        String constraintName = row.get("ConstraintName");
+        if (constraintName != null && constraintName.trim().startsWith("SHACL:Header")) {
+            return true;
+        }
+
+        String constraintName2 = row.get("Constraint Name");
+        return constraintName2 != null && constraintName2.trim().startsWith("SHACL:Header");
+    }
+
+    private static String getPayloadFromRow(CsvRow row) {
+        String payload = row.get("Payload");
+
+        if (payload != null && !payload.trim().isEmpty()) {
+            return payload;
+        }
+
+        /*
+         * Backward compatibility:
+         * Some EA export versions stored the raw TTL notes here
+         * because the export script still extracted @@PAYLOAD markers.
+         */
+        String notesWithoutPayload = row.get("NotesWithoutPayload");
+
+        if (notesWithoutPayload != null && !notesWithoutPayload.trim().isEmpty()) {
+            return notesWithoutPayload;
+        }
+
+        return "";
+    }
+
+    private static String normalizePayloadForTtl(String payload) {
+        if (payload == null) {
+            return "";
+        }
+
+        String p = payload.replace("\r\n", "\n").replace("\r", "\n");
+
+        return p.trim();
+    }
+
+    private static class CsvTable {
+        Map<String, Integer> headerIndex = new LinkedHashMap<>();
+        List<String> headers = new ArrayList<>();
+        List<CsvRow> rows = new ArrayList<>();
+    }
+
+    private static class CsvRow {
+        private final CsvTable table;
+        private final List<String> values;
+
+        CsvRow(CsvTable table, List<String> values) {
+            this.table = table;
+            this.values = values;
+        }
+
+        String get(String columnName) {
+            if (columnName == null) {
+                return "";
+            }
+
+            Integer idx = table.headerIndex.get(columnName.trim().toLowerCase());
+
+            if (idx == null) {
+                return "";
+            }
+
+            if (idx < 0 || idx >= values.size()) {
+                return "";
+            }
+
+            return values.get(idx);
+        }
+    }
+
+    private static CsvTable readCsvTable(File csvFile) throws IOException {
+        CsvTable table = new CsvTable();
+
+        List<String> records = readCsvRecords(csvFile);
+
+        if (records.isEmpty()) {
+            return table;
+        }
+
+        List<String> headers = parseCsvRecord(removeBom(records.get(0)));
+        table.headers.addAll(headers);
+
+        for (int i = 0; i < headers.size(); i++) {
+            table.headerIndex.put(headers.get(i).trim().toLowerCase(), i);
+        }
+
+        for (int r = 1; r < records.size(); r++) {
+            String record = records.get(r);
+
+            if (record == null || record.trim().isEmpty()) {
+                continue;
+            }
+
+            List<String> values = parseCsvRecord(record);
+
+            while (values.size() < headers.size()) {
+                values.add("");
+            }
+
+            table.rows.add(new CsvRow(table, values));
+        }
+
+        return table;
+    }
+
+    private static List<String> readCsvRecords(File csvFile) throws IOException {
+        List<String> records = new ArrayList<>();
+
+        try (BufferedReader reader = Files.newBufferedReader(csvFile.toPath(), StandardCharsets.UTF_8)) {
+            String line;
+            StringBuilder record = new StringBuilder();
+
+            while ((line = reader.readLine()) != null) {
+                if (record.length() > 0) {
+                    record.append("\n");
+                }
+
+                record.append(line);
+
+                if (isCsvRecordComplete(record.toString())) {
+                    records.add(record.toString());
+                    record.setLength(0);
+                }
+            }
+
+            if (record.length() > 0) {
+                records.add(record.toString());
+            }
+        }
+
+        return records;
+    }
+
+    private static boolean isCsvRecordComplete(String record) {
+        boolean inQuotes = false;
+
+        for (int i = 0; i < record.length(); i++) {
+            char c = record.charAt(i);
+
+            if (c == '"') {
+                if (inQuotes && i + 1 < record.length() && record.charAt(i + 1) == '"') {
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            }
+        }
+
+        return !inQuotes;
+    }
+
+    private static List<String> parseCsvRecord(String record) {
+        List<String> values = new ArrayList<>();
+
+        StringBuilder cur = new StringBuilder();
+        boolean inQuotes = false;
+
+        for (int i = 0; i < record.length(); i++) {
+            char c = record.charAt(i);
+
+            if (inQuotes) {
+                if (c == '"') {
+                    if (i + 1 < record.length() && record.charAt(i + 1) == '"') {
+                        cur.append('"');
+                        i++;
+                    } else {
+                        inQuotes = false;
+                    }
+                } else {
+                    cur.append(c);
+                }
+            } else {
+                if (c == '"') {
+                    inQuotes = true;
+                } else if (c == ',') {
+                    values.add(cur.toString());
+                    cur.setLength(0);
+                } else {
+                    cur.append(c);
+                }
+            }
+        }
+
+        values.add(cur.toString());
+
+        return values;
+    }
+
+    private static String removeBom(String s) {
+        if (s == null) {
+            return "";
+        }
+
+        if (s.startsWith("\uFEFF")) {
+            return s.substring(1);
+        }
+
+        if (s.startsWith("ï»¿")) {
+            return s.substring(3);
+        }
+
+        return s;
+    }
+
+    private static String normalizeTtlFileName(String sourceFile) {
+        String s = sourceFile.trim();
+
+        s = s.replace("\\", "/");
+
+        int slash = s.lastIndexOf("/");
+        if (slash >= 0) {
+            s = s.substring(slash + 1);
+        }
+
+        if (!s.toLowerCase().endsWith(".ttl")) {
+            s = stripExtension(s) + ".ttl";
+        }
+
+        return s;
+    }
+
+    private static String stripExtension(String name) {
+        if (name == null || name.isEmpty()) {
+            return "restored";
+        }
+
+        int slash = Math.max(name.lastIndexOf("\\"), name.lastIndexOf("/"));
+        if (slash >= 0) {
+            name = name.substring(slash + 1);
+        }
+
+        int dot = name.lastIndexOf(".");
+        if (dot > 0) {
+            return name.substring(0, dot);
+        }
+
+        return name;
     }
 
 }
