@@ -103,7 +103,7 @@ public class rdfDiffResultController implements Initializable {
 
     @FXML
     private void actionBtnExportResult(ActionEvent actionEvent) throws IOException {
-        export(tableViewResults,"RDFS comparison results","RDFScomparisonResult","Save RDFS comparison result");
+        export(tableViewResults,"RDFS comparison results","RDFScomparisonResult","Save RDFS comparison result", compareFiles);
         //RDFDataMgr.write(System.out, AddShapesController.reportResource.getModel(), RDFFormat.TURTLE);
 
     }

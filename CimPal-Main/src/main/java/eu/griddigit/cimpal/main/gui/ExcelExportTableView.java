@@ -7,8 +7,8 @@
 package eu.griddigit.cimpal.main.gui;
 
 
-import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.util.ModelFactory;
+import eu.griddigit.cimpal.main.application.MainController;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TableColumn;
 
@@ -30,20 +30,19 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.prefs.Preferences;
 
 public class ExcelExportTableView {
 
-    public static void export(TableView<RDFcomparisonResultModel> tableView, String sheetname, String initialFileName, String title) throws IOException {
+    public static void export(TableView<RDFcomparisonResultModel> tableView, String sheetname, String initialFileName, String title, List<String> compareFiles) throws IOException {
         try (SXSSFWorkbook workbook = new SXSSFWorkbook()) {
             workbook.setCompressTempFiles(true);
 
             // Create the sheet
-            Sheet sheet = workbook.createSheet(sheetname);
+            SXSSFSheet sheet = workbook.createSheet(sheetname);
 
             // Track all columns for auto-sizing
-            if (sheet instanceof SXSSFSheet) {
-                ((SXSSFSheet) sheet).trackAllColumnsForAutoSizing();
-            }
+            sheet.trackAllColumnsForAutoSizing();
 
             // Create reusable styles
             CellStyle headerCellStyle = createHeaderStyle(workbook);
@@ -55,7 +54,7 @@ public class ExcelExportTableView {
                 TableColumn<RDFcomparisonResultModel, ?> column = tableView.getColumns().get(colIndex);
                 String columnTitle = column.getText();
                 Cell headerCell = headerRow.createCell(colIndex);
-                headerCell.setCellValue(processHeaderTitle(columnTitle));
+                headerCell.setCellValue(processHeaderTitle(columnTitle, compareFiles));
                 headerCell.setCellStyle(headerCellStyle);
             }
 
@@ -76,7 +75,7 @@ public class ExcelExportTableView {
             }
 
             // Auto-size columns
-            autoSizeColumns(sheet, tableView.getColumns().size(), 120);
+            autoSizeColumns(sheet, tableView.getColumns().size());
 
             // Freeze top row
             sheet.createFreezePane(0, 1);
@@ -86,12 +85,16 @@ public class ExcelExportTableView {
             sheet.setAutoFilter(CellRangeAddress.valueOf(filterRange));
 
             // Save to file
-            File saveFile = ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"), title, "");
+            File saveFile = ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"), title, initialFileName);
             if (saveFile != null) {
                 try (FileOutputStream outputStream = new FileOutputStream(saveFile)) {
                     workbook.write(outputStream);
                 }
-                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+                if (MainController.prefs != null) {
+                    MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+                } else {
+                    Preferences.userNodeForPackage(ExcelExportTableView.class).put("LastWorkingFolder", saveFile.getParent());
+                }
             }
         }
     }
@@ -105,13 +108,13 @@ public class ExcelExportTableView {
             // Handle various types of objects
             case Number number ->
                 // For numeric values, return the number as a string
-                    cellValue.toString();
+                    number.toString();
             case Boolean b ->
                 // For boolean values, return "true" or "false"
-                    b ? "true" : "false";
+                    b.toString();
             case String s ->
                 // For string values, return the value directly
-                    cellValue.toString();
+                    s;
             default ->
                 // Default option: convert to string using `toString`
                     cellValue.toString();
@@ -119,17 +122,19 @@ public class ExcelExportTableView {
 
     }
 
-    private static String processHeaderTitle(String columnTitle) {
+    private static String processHeaderTitle(String columnTitle, List<String> compareFiles) {
         // Handle null or empty column titles
         if (columnTitle == null || columnTitle.trim().isEmpty()) {
             return "Untitled Column"; // Default fallback title
         }
 
         // Special cases for specific column titles
-        if ("Value Model A".equals(columnTitle)) {
-            return columnTitle + ": " + MainController.rdfsCompareFiles.getFirst();
-        } else if ("Value Model B".equals(columnTitle)) {
-            return columnTitle + ": " + MainController.rdfsCompareFiles.get(1);
+        if (compareFiles != null && compareFiles.size() >= 2) {
+            if ("Value Model A".equals(columnTitle)) {
+                return columnTitle + ": " + compareFiles.getFirst();
+            } else if ("Value Model B".equals(columnTitle)) {
+                return columnTitle + ": " + compareFiles.get(1);
+            }
         }
 
         // Return title without modification for general cases
@@ -138,7 +143,8 @@ public class ExcelExportTableView {
 
 
     // Auto-sizing columns logic - ensure max width is respected
-    private static void autoSizeColumns(Sheet sheet, int columnCount, int maxWidthInCharacters) {
+    private static void autoSizeColumns(Sheet sheet, int columnCount) {
+        final int maxWidthInCharacters = 120;
         final int defaultCharacterWidth = 256; // Default width of one character in Excel units
         for (int colIndex = 0; colIndex < columnCount; colIndex++) {
             sheet.autoSizeColumn(colIndex);
@@ -151,10 +157,7 @@ public class ExcelExportTableView {
             }
         }
     }
-//
-//
-//
-//
+
 //    public static void export(TableView<T> tableView, String sheetname, String initialFileName, String title) {
 //
 //        SXSSFWorkbook workbook = new SXSSFWorkbook();
