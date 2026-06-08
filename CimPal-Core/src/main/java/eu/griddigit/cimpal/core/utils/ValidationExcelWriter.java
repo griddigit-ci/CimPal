@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,14 +37,14 @@ public class ValidationExcelWriter implements Closeable {
     // Raw validation data: one header per sheet, no blank rows, no per-validation statistic rows.
     // The old Details column was intentionally removed.
     private static final String[] RAW_HEADER = new String[]{
-            "XML files", "Constraint file",
+            "XML files", "Constraint file", "Dataset",
             "Focus node", "Path", "Value", "Source", "Constraint Component",
             "Message", "Severity", "Description", "Order", "Name", "Group"
     };
 
     // One row per validation. Process errors also go here.
     private static final String[] STATISTICS_HEADER = new String[]{
-            "XML files", "Constraint file",
+            "XML files", "Constraint file", "Dataset",
             "All", "Warnings", "Infos", "Violations", "Conforms", "Validation error"
     };
 
@@ -101,8 +102,9 @@ public class ValidationExcelWriter implements Closeable {
 
         String reportXmlFiles = toReportFileNames(xmlFiles);
         String reportConstraintFile = toReportFileNames(constraintFile);
+        String reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
 
-        writeStatisticsRow(cf, datasetName, reportXmlFiles, reportConstraintFile, results, conforms, null);
+        writeStatisticsRow(cf, datasetName, reportXmlFiles, reportConstraintFile, reportDataset, results, conforms, null);
 
         if (results == null || results.isEmpty()) {
             return;
@@ -117,17 +119,18 @@ public class ValidationExcelWriter implements Closeable {
             Row dr = s.createRow(r++);
             dr.createCell(0).setCellValue(reportXmlFiles);
             dr.createCell(1).setCellValue(reportConstraintFile);
-            dr.createCell(2).setCellValue(safe(res.getFocusNode()));
-            dr.createCell(3).setCellValue(safe(res.getPath()));
-            dr.createCell(4).setCellValue(safe(res.getValue()));
-            dr.createCell(5).setCellValue(safe(res.getSourceShape()));
-            dr.createCell(6).setCellValue(safe(res.getConstraintComponent()));
-            dr.createCell(7).setCellValue(safe(res.getMessage()));
-            dr.createCell(8).setCellValue(safe(res.getSeverity()));
-            dr.createCell(9).setCellValue(safe(res.getDescription()));
-            dr.createCell(10).setCellValue(safe(res.getOrder()));
-            dr.createCell(11).setCellValue(safe(res.getName()));
-            dr.createCell(12).setCellValue(safe(res.getGroup()));
+            dr.createCell(2).setCellValue(reportDataset);
+            dr.createCell(3).setCellValue(safe(res.getFocusNode()));
+            dr.createCell(4).setCellValue(safe(res.getPath()));
+            dr.createCell(5).setCellValue(safe(res.getValue()));
+            dr.createCell(6).setCellValue(safe(res.getSourceShape()));
+            dr.createCell(7).setCellValue(safe(res.getConstraintComponent()));
+            dr.createCell(8).setCellValue(safe(res.getMessage()));
+            dr.createCell(9).setCellValue(safe(res.getSeverity()));
+            dr.createCell(10).setCellValue(safe(res.getDescription()));
+            dr.createCell(11).setCellValue(safe(res.getOrder()));
+            dr.createCell(12).setCellValue(safe(res.getName()));
+            dr.createCell(13).setCellValue(safe(res.getGroup()));
         }
 
         nextRowByCase.put(cf, r);
@@ -151,8 +154,11 @@ public class ValidationExcelWriter implements Closeable {
                             String xmlFiles,
                             String constraintFile,
                             Exception error) {
-        writeStatisticsRow(cf, datasetName, toReportFileNames(xmlFiles), toReportFileNames(constraintFile), null, false, safeThrowable(error));
-    }
+        String reportXmlFiles = toReportFileNames(xmlFiles);
+        String reportConstraintFile = toReportFileNames(constraintFile);
+        String reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
+
+        writeStatisticsRow(cf, datasetName, reportXmlFiles, reportConstraintFile, reportDataset, null, false, safeThrowable(error));    }
 
     /** Backward-compatible entry point. Prefer appendError(cf, datasetName, xmlFiles, constraintFile, error). */
     public void appendError(CaseFolder cf, String datasetName, String ttlName, Exception error) {
@@ -163,6 +169,7 @@ public class ValidationExcelWriter implements Closeable {
                                     String datasetName,
                                     String xmlFiles,
                                     String constraintFile,
+                                    String reportDataset,
                                     List<SHACLValidationResult> results,
                                     boolean conforms,
                                     String validationError) {
@@ -181,12 +188,13 @@ public class ValidationExcelWriter implements Closeable {
         Row row = statisticsSheet.createRow(nextStatisticsRow++);
         row.createCell(0).setCellValue(safe(xmlFiles));
         row.createCell(1).setCellValue(safe(constraintFile));
-        row.createCell(2).setCellValue(all);
-        row.createCell(3).setCellValue(warn);
-        row.createCell(4).setCellValue(info);
-        row.createCell(5).setCellValue(vio);
-        row.createCell(6).setCellValue(conforms && validationError == null);
-        row.createCell(7).setCellValue(safe(validationError));
+        row.createCell(2).setCellValue(safe(reportDataset));
+        row.createCell(3).setCellValue(all);
+        row.createCell(4).setCellValue(warn);
+        row.createCell(5).setCellValue(info);
+        row.createCell(6).setCellValue(vio);
+        row.createCell(7).setCellValue(conforms && validationError == null);
+        row.createCell(8).setCellValue(safe(validationError));
     }
 
     private void addConstraintStatistic(String xmlFiles,
@@ -331,6 +339,65 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         return out.length() == 0 ? fileNameOnly(s) : out.toString();
+    }
+
+    private static String toReportDataset(String xmlFiles, String constraintFile) {
+        String constraint = safe(constraintFile);
+
+        if (constraint.replace(" ", "").toLowerCase(Locale.ROOT).contains("danglingreference")) {
+            return "Dangling References (other)";
+        }
+
+        LinkedHashSet<String> profiles = new LinkedHashSet<>();
+
+        addProfileIfPresent(profiles, xmlFiles, "EQ");
+        addProfileIfPresent(profiles, xmlFiles, "TP");
+        addProfileIfPresent(profiles, xmlFiles, "SSH");
+        addProfileIfPresent(profiles, xmlFiles, "SV");
+
+        addProfileIfPresent(profiles, xmlFiles, "AP");
+        addProfileIfPresent(profiles, xmlFiles, "PS");
+        addProfileIfPresent(profiles, xmlFiles, "AS");
+        addProfileIfPresent(profiles, xmlFiles, "CO");
+        addProfileIfPresent(profiles, xmlFiles, "ER");
+        addProfileIfPresent(profiles, xmlFiles, "IAM");
+        addProfileIfPresent(profiles, xmlFiles, "RA");
+        addProfileIfPresent(profiles, xmlFiles, "RAS");
+        addProfileIfPresent(profiles, xmlFiles, "OP");
+        addProfileIfPresent(profiles, xmlFiles, "SAR");
+        addProfileIfPresent(profiles, xmlFiles, "SSI");
+        addProfileIfPresent(profiles, xmlFiles, "SIS");
+
+        if (profiles.isEmpty()) {
+            addProfileIfPresent(profiles, constraintFile, "EQ");
+            addProfileIfPresent(profiles, constraintFile, "TP");
+            addProfileIfPresent(profiles, constraintFile, "SSH");
+            addProfileIfPresent(profiles, constraintFile, "SV");
+
+            addProfileIfPresent(profiles, constraintFile, "AP");
+            addProfileIfPresent(profiles, constraintFile, "AE");
+            addProfileIfPresent(profiles, constraintFile, "PS");
+            addProfileIfPresent(profiles, constraintFile, "CO");
+            addProfileIfPresent(profiles, constraintFile, "ER");
+            addProfileIfPresent(profiles, constraintFile, "IAM");
+            addProfileIfPresent(profiles, constraintFile, "RAS");
+            addProfileIfPresent(profiles, constraintFile, "OP");
+            addProfileIfPresent(profiles, constraintFile, "SAR");
+            addProfileIfPresent(profiles, constraintFile, "SSI");
+            addProfileIfPresent(profiles, constraintFile, "SIS");
+        }
+
+        return String.join(", ", profiles);
+    }
+
+    private static void addProfileIfPresent(LinkedHashSet<String> profiles, String value, String profile) {
+        String normalized = safe(value)
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", "_");
+
+        if (("_" + normalized + "_").contains("_" + profile + "_")) {
+            profiles.add(profile);
+        }
     }
 
     private static String fileNameOnly(String value) {
