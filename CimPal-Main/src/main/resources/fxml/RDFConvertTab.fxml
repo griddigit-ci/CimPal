@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<?import javafx.geometry.Insets?>
+<AnchorPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFConvertController"
+            prefHeight="180.0" prefWidth="200.0">
+    <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+        <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+            <HBox spacing="10.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <Label minWidth="90.0" text="Source:" wrapText="true" />
+                <TextField fx:id="fsourcePathTextField" editable="false" HBox.hgrow="ALWAYS" />
+                <Button mnemonicParsing="false" onAction="#actionBrowseRDFConvert" text="Browse" />
+                <Label minWidth="70.0" text="Format:" />
+                <ChoiceBox fx:id="fsourceFormatChoiceBox" minWidth="150.0" HBox.hgrow="ALWAYS" />
+            </HBox>
+            <HBox spacing="20.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <Label minWidth="90.0" text="Operations options:" wrapText="true" />
+                <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" text="Union model" wrapText="true" />
+                <CheckBox fx:id="fcbRDFconvertModelUnionDetailed" mnemonicParsing="false" text="Union model detailed" wrapText="true" />
+                <CheckBox fx:id="fcbRDFconvertFixPackage" mnemonicParsing="false" text="Fix RDFS Package Assignment" wrapText="true" />
+                <CheckBox fx:id="fcbRDFConvertInheritanceOnly" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceOnly" text="Process only inheritance related properties" wrapText="true" />
+                <CheckBox fx:id="fcbRDFConverInheritanceList" disable="true" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceList" text="Generate inheritance list in Turtle" wrapText="true" />
+                <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" text="Inherited members - only concrete classes" wrapText="true" />
+                <CheckBox fx:id="fcbRDFConveraddowl" mnemonicParsing="false" text="Add OWL" wrapText="true" />
+            </HBox>
+            <HBox fx:id="mainRdfBox" layoutX="10.0" layoutY="50.0" spacing="20.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0"/>
+                </padding>
+                <Label minWidth="90.0" text="Main RDF file:" wrapText="true"/>
+                <TextField fx:id="fMainRdfPathTextField" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseMainRDF" text="Browse"/>
+            </HBox>
+            <HBox fx:id="deviationRdfBox" layoutX="10.0" layoutY="99.0" spacing="20.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0"/>
+                </padding>
+                <Label minWidth="90.0" text="Deviation RDF file:" wrapText="true"/>
+                <TextField fx:id="fDeviationRdfPathTextField" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseDeviationRDF" text="Browse"/>
+            </HBox>
+            <HBox fx:id="extRdfBox" spacing="20.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0"/>
+                </padding>
+                <Label minWidth="90.0" text="Extended RDF file:" wrapText="true"/>
+                <TextField fx:id="fExtendedRdfPathTextField" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseExtendedRDF" text="Browse"/>
+            </HBox>
+            <HBox spacing="10.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0"/>
+                </padding>
+                <Label minWidth="90.0" text="Source type::" wrapText="true"/>
+                <CheckBox fx:id="fcbRDFconvertInstanceData" mnemonicParsing="false"
+                          text="Instance data (serialisation according to IEC 61970-552 and CGMES)"/>
+            </HBox>
+            <HBox spacing="10.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <Label minWidth="90.0" text="Target format:" wrapText="true" />
+                <ChoiceBox fx:id="ftargetFormatChoiceBox" minWidth="250.0" HBox.hgrow="ALWAYS" />
+            </HBox>
+            <HBox spacing="10.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <Label minWidth="90.0" text="Options:" />
+                <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+                    <HBox />
+                </VBox>
+            </HBox>
+            <HBox spacing="10.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <Label minWidth="90.0" text="xml base:" wrapText="true" />
+                <TextField fx:id="frdfConvertXmlBase" HBox.hgrow="ALWAYS" />
+            </HBox>
+            <HBox spacing="10.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <CheckBox fx:id="fcbShowXMLDeclaration" disable="true" minWidth="150.0" mnemonicParsing="false" selected="true" text="Show Xml declaration" />
+                <CheckBox fx:id="fcbShowDoctypeDeclaration" disable="true" minWidth="170.0" mnemonicParsing="false" text="Show Doctype declaration" />
+                <Label minWidth="50.0" text="Tab:" />
+                <TextField fx:id="fRDFconvertTab" disable="true" text="2" />
+                <Label text="Relative URIs: " />
+                <ChoiceBox fx:id="fcbRelativeURIs" disable="true" prefWidth="200.0" />
+                <Label text="RDF format: " />
+                <ChoiceBox fx:id="fcbRDFformat" disable="true" prefWidth="200.0" />
+            </HBox>
+            <HBox spacing="10.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <Label minWidth="50.0" text="Sorting options:" />
+                <CheckBox fx:id="fcbSortRDF" disable="true" minWidth="150.0" mnemonicParsing="false" selected="true" text="Sort alphabetically">
+                    <HBox.margin>
+                        <Insets left="10.0" />
+                    </HBox.margin>
+                </CheckBox>
+                <Label text="Sorting options:" />
+                <ChoiceBox fx:id="fcbRDFsortOptions" disable="true" prefWidth="200.0" />
+                <CheckBox fx:id="fcbStripPrefixes" disable="true" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
+            </HBox>
+            <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                <VBox.margin>
+                    <Insets bottom="5.0" right="5.0" />
+                </VBox.margin>
+                <Button fx:id="fbtnRunRDFConvert" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunRDFConvert" text="Convert" HBox.hgrow="ALWAYS" />
+                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtResetRDFConvert" text="Reset" />
+            </HBox>
+        </VBox>
+    </HBox>
+</AnchorPane>
