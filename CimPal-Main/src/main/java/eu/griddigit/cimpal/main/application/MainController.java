@@ -136,6 +136,8 @@ public class MainController implements Initializable {
     private double outputSourceDividerPosition = 0.8146067415730337;
 
     @FXML
+    private Tab tabTaskWizard;
+    @FXML
     private Tab tabGenerateInstanceData;
     @FXML
     private Tab tabSHACLTester;
@@ -215,19 +217,6 @@ public class MainController implements Initializable {
     private double initialX;
     private double initialY;
 
-    // From CimPal - Data generator
-    private WizardContext wizardContext;
-    @FXML
-    private Button forwardWizardButton;
-    @FXML
-    private Button wizardTaskSelectionButton;
-    @FXML
-    private Button wizardTaskInputButton;
-    @FXML
-    private Button wizardTaskStatusButton;
-    @FXML
-    private BorderPane wizardBorderPane;
-
 
     public MainController() {
         guiHelper = new GUIhelper();
@@ -261,7 +250,6 @@ public class MainController implements Initializable {
             GUIhelper.showUserFriendlyError("Preferences error", "Preferences could not be loaded. Please review details and send them to support.", e);
         }
 
-        wizardContext = WizardContext.getInstance();
         cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
 
         Platform.runLater(() -> {
@@ -368,6 +356,15 @@ public class MainController implements Initializable {
             GUIhelper.showUserFriendlyError("Generate Instance Data tab error", "The Generate Instance Data tab could not be loaded.", e);
         }
 
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/TaskWizardTab.fxml"));
+            tabTaskWizard.setContent(loader.load());
+            TaskWizardController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("Task Wizard tab error", "The Task Wizard tab could not be loaded.", e);
+        }
+
 
     }
 
@@ -416,77 +413,6 @@ public class MainController implements Initializable {
     }
 
     // ============ End Progress Bar Control Methods ============
-
-    @FXML
-    public void forwardWizardPane(ActionEvent actionEvent) throws IOException {
-        //FXMLLoader currentController = new FXMLLoader(getClass().getResource(wizardContext.getCurrentWizardPane()));
-        //currentController.load();
-        //var controller = currentController.getController();
-        //var validInputs = wizardPaneController.validateInputs();
-
-        /*
-        switch (wizardContext.getCurrentWizardPaneIndex()) {
-            case 0:
-                validInputs = wizardPaneController.validateInputs();
-                break;
-            case 1:
-                TaskInputController controller2 = (TaskInputController) controller;
-                validInputs = controller2.validateInputs();
-                break;
-            default:
-                validInputs = true;
-        }
-        */
-        if (wizardContext.getCurrentController().validateInputs()) {
-            wizardContext.forwardWizardPane();
-
-            wizardBorderPane.setCenter(FXMLLoader.load(Objects.requireNonNull(getClass().getResource(wizardContext.getCurrentWizardPane()))));
-
-            this.updateWizardProgressButtons();
-        }
-
-    }
-
-    @FXML
-    public void backWizardPane(ActionEvent actionEvent) throws IOException {
-        wizardContext.backWizardPane();
-        wizardBorderPane.setCenter(FXMLLoader.load(Objects.requireNonNull(getClass().getResource(wizardContext.getCurrentWizardPane()))));
-        this.updateWizardProgressButtons();
-    }
-
-    private void updateWizardProgressButtons() {
-        switch (wizardContext.getCurrentWizardPaneIndex()) {
-            case 0:
-                wizardTaskSelectionButton.setDefaultButton(true);
-                wizardTaskSelectionButton.setDisable(false);
-                wizardTaskInputButton.setDefaultButton(false);
-                wizardTaskInputButton.setDisable(true);
-                wizardTaskStatusButton.setDefaultButton(false);
-                wizardTaskStatusButton.setDisable(true);
-                forwardWizardButton.setText("Next");
-                forwardWizardButton.setDisable(false);
-                break;
-            case 1:
-                wizardTaskSelectionButton.setDefaultButton(false);
-                wizardTaskSelectionButton.setDisable(true);
-                wizardTaskInputButton.setDefaultButton(true);
-                wizardTaskInputButton.setDisable(false);
-                wizardTaskStatusButton.setDefaultButton(false);
-                wizardTaskStatusButton.setDisable(true);
-                forwardWizardButton.setText("Execute");
-                forwardWizardButton.setDisable(false);
-                break;
-            case 2:
-                wizardTaskSelectionButton.setDefaultButton(false);
-                wizardTaskSelectionButton.setDisable(true);
-                wizardTaskInputButton.setDefaultButton(false);
-                wizardTaskInputButton.setDisable(true);
-                wizardTaskStatusButton.setDefaultButton(true);
-                wizardTaskStatusButton.setDisable(false);
-                forwardWizardButton.setDisable(true);
-                break;
-        }
-    }
 
     @FXML
     // action on menu PSSE-PowerFactory compare
