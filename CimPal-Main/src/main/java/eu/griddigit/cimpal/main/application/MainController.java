@@ -121,15 +121,6 @@ public class MainController implements Initializable {
     public TextField fshapesBaseURIDefineTab1;
     public TextField fURIGenerateTab1;
     public TextField fowlImportsDefineTab1;
-    // Shacl organizer
-    @FXML
-    public TextField fPathShaclFilesToOrganize;
-    public TextField fPathXLSfileForShacl;
-    public TextField fbaseURIShacl;
-    public Button btnRunShaclOrganizer;
-    public Button btnResetShaclOrganizer;
-    public TextField fPrefixShaclOrganizer;
-    public TextField fNSShaclOrganizer;
     @FXML
     private TextArea foutputWindow;
     @FXML
@@ -147,6 +138,8 @@ public class MainController implements Initializable {
 
     private double outputSourceDividerPosition = 0.8146067415730337;
 
+    @FXML
+    private Tab tabSHACLOrganizer;
     @FXML
     private Tab tabRDFStoSHACL;
     @FXML
@@ -433,6 +426,15 @@ public class MainController implements Initializable {
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("RDF Convert tab error", "The RDF Convert tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SHACLOrganizerTab.fxml"));
+            tabSHACLOrganizer.setContent(loader.load());
+            SHACLOrganizerController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("SHACL Organizer tab error", "The SHACL Organizer tab could not be loaded.", e);
         }
 
 
@@ -2364,47 +2366,6 @@ public class MainController implements Initializable {
         MainController.shaclNodataMap = shaclNodataMap;
     }
 
-    public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
-        selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
-        if (selectedFile != null) {
-            StringBuilder paths = new StringBuilder();
-            for (int m = 0; m < selectedFile.size(); m++) {
-                paths.append(", ").append(selectedFile.get(m).toString());
-            }
-            fPathShaclFilesToOrganize.setText(paths.toString());
-        }
-    }
-
-    public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
-
-        if (!file.isEmpty()) {
-            MainController.inputXLS = file;
-            fPathXLSfileForShacl.setText(file.getFirst().toString());
-        }
-    }
-
-    public void actionBtnRunShaclOrganizer(ActionEvent actionEvent) throws IOException {
-        progressBar.setProgress(0);
-        if (selectedFile != null) {
-            for (int m = 0; m < selectedFile.size(); m++) {
-                eu.griddigit.cimpal.main.util.ModelFactory.shapeModelLoad(m, selectedFile);
-            }
-        }
-        ArrayList<Object> inputXLSdata;
-        inputXLSdata = ExcelTools.importXLSX(inputXLS.getFirst().toString(), 0);
-
-        ShaclTools.splitShaclPerXlsInput(inputXLSdata);
-
-        progressBar.setProgress(1);
-    }
-
-    public void actionBtnResetShaclOrganizer(ActionEvent actionEvent) {
-        fPathShaclFilesToOrganize.clear();
-        fPathXLSfileForShacl.clear();
-        MainController.inputXLS = null;
-        selectedFile = null;
-    }
     @FXML
     private void actionRestoreTtlFromConstraintCsv() {
             ShaclTools.restoreTtlFromConstraintCsv();

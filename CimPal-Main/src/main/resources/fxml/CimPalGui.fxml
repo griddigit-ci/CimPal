@@ -81,57 +81,7 @@
                   <Tab fx:id="tabExcelToSHACL" text="Excel to SHACL"/>
                   <Tab fx:id="tabRDFConvert" text="RDF Convert"/>
                   <Tab fx:id="tabInstanceDataComparison" text="Instance Data Comparison"/>
-                  <Tab text="SHACL Organizer">
-                     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                        <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                           <HBox spacing="10.0">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
-                              <TextField fx:id="fPathShaclFilesToOrganize" editable="false" HBox.hgrow="ALWAYS" />
-                              <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesToOrganize" text="Browse" />
-                           </HBox>
-                           <HBox spacing="10.0">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="90.0" text="Excel template file:" wrapText="true" />
-                              <TextField fx:id="fPathXLSfileForShacl" editable="false" HBox.hgrow="ALWAYS" />
-                              <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShacl" text="Browse" />
-                           </HBox>
-                           <HBox spacing="10.0" visible="false">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="90.0" text="Base URI - Shape graph:" wrapText="true" />
-                              <TextField fx:id="fbaseURIShacl" HBox.hgrow="ALWAYS" />
-                           </HBox>
-                           <HBox spacing="10.0" visible="false">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="90.0" text="Namespace information for the resulted Shape graph:" wrapText="true" />
-                           </HBox>
-                           <HBox spacing="10.0" visible="false">
-                              <padding>
-                                 <Insets left="5.0" right="5.0" top="5.0" />
-                              </padding>
-                              <Label minWidth="90.0" text="Prefix:" wrapText="true" />
-                              <TextField fx:id="fPrefixShaclOrganizer" prefWidth="70.0" />
-                              <Label minWidth="90.0" text="Namespace:" wrapText="true" />
-                              <TextField fx:id="fNSShaclOrganizer" HBox.hgrow="ALWAYS" />
-                           </HBox>
-                           <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
-                              <VBox.margin>
-                                 <Insets bottom="5.0" right="5.0" />
-                              </VBox.margin>
-                              <Button fx:id="btnRunShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunShaclOrganizer" text="Run" HBox.hgrow="ALWAYS" />
-                              <Button fx:id="btnResetShaclOrganizer" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetShaclOrganizer" text="Reset" />
-                           </HBox>
-                        </VBox>
-                     </AnchorPane>
-                  </Tab>
+                  <Tab fx:id="tabSHACLOrganizer" text="SHACL Organizer"/>
                   <Tab text="SHACL tester">
                      <content>
                         <AnchorPane>
