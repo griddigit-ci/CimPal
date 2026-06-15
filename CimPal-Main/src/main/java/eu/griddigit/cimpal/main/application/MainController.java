@@ -139,6 +139,8 @@ public class MainController implements Initializable {
     private double outputSourceDividerPosition = 0.8146067415730337;
 
     @FXML
+    private Tab tabSHACLTester;
+    @FXML
     private Tab tabSHACLOrganizer;
     @FXML
     private Tab tabRDFStoSHACL;
@@ -161,10 +163,6 @@ public class MainController implements Initializable {
     @FXML
     private CheckBox fcbExportExtensionsGen;
     @FXML
-    private TextField fPathShaclFilesValidator;
-    @FXML
-    private TextField fPathModelsForShaclValidator;
-    @FXML
     private ChoiceBox fcb_giVersion;
     @FXML
     private CheckBox hideEmptySheets;
@@ -174,10 +172,6 @@ public class MainController implements Initializable {
     private ListView<String> ls_geni_instances;
     @FXML
     private Label label_geninfo;
-    @FXML
-    private TreeView<String> treeViewShaclFiles;
-    @FXML
-    private CheckBox cbExportReports;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -191,8 +185,6 @@ public class MainController implements Initializable {
     public static File XlsChangesExcelToTtl;
     public static RDFCompareResult rdfCompareResult;
     public static List<String> rdfsCompareFiles;
-    private List<File> selectedFile;
-    private File selectedFolder;
 
     private ArrayList<Object> models;
     private ArrayList<Object> modelsNames;
@@ -435,6 +427,15 @@ public class MainController implements Initializable {
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("SHACL Organizer tab error", "The SHACL Organizer tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SHACLTesterTab.fxml"));
+            tabSHACLTester.setContent(loader.load());
+            SHACLTesterController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("SHACL Tester tab error", "The SHACL Tester tab could not be loaded.", e);
         }
 
 
@@ -997,72 +998,6 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    private void actionBrowseShaclFilesTester(ActionEvent actionEvent) {
-        selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
-        if (selectedFile != null) {
-            StringBuilder paths = new StringBuilder();
-            for (File file : selectedFile) {
-                paths.append(", ").append(file.toString());
-            }
-            fPathShaclFilesValidator.setText(paths.toString());
-        }
-    }
-
-    @FXML
-    private void actionBrowseFolderPathForShaclTester(ActionEvent actionEvent) {
-        selectedFolder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom();
-        if (selectedFolder != null) {
-            fPathModelsForShaclValidator.setText(selectedFolder.toString());
-
-            GUIhelper.buildFileTree(selectedFolder, treeViewShaclFiles);
-        }
-    }
-
-    @FXML
-    private void actionBtnRunShaclValidator() throws IOException {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-        List<File> fileL = new ArrayList<>();
-        try {
-            Files.walkFileTree(selectedFolder.toPath(), EnumSet.noneOf(FileVisitOption.class), 3, new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (file.toString().endsWith(".zip")) {
-                        fileL.add(file.toFile()); // Changed from new File(file.getFileName().toString())
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException e) {
-            foutputWindow.appendText(e.getMessage());
-        }
-
-        if (!fileL.isEmpty()) {
-            ShaclAutoTester shaclAutoTester = new ShaclAutoTester(new ShaclAutoTesterCallback() {
-                @Override
-                public void updateProgress(double progress) {
-                    Platform.runLater(() -> progressBar.setProgress(progress));
-                }
-
-                @Override
-                public void appendOutput(String message) {
-                    Platform.runLater(() -> foutputWindow.appendText(message));
-                }
-            });
-            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL, cbExportReports.isSelected());
-
-            progressBar.setProgress(1);
-        } else {
-            progressBar.setProgress(0);
-        }
-    }
-
-    public void actionBtnResetShaclValidator(ActionEvent actionEvent) {
-        fPathShaclFilesValidator.clear();
-        fPathModelsForShaclValidator.clear();
-        selectedFile = null;
-    }
-
-    @FXML
     // action on menu Generation of instance data based on xls template
     private void actionMenuInstanceDataGenxls() throws IOException {
 
@@ -1394,25 +1329,6 @@ public class MainController implements Initializable {
 
         progressBar.setProgress(1);
 
-    }
-
-    //Loads model data
-    private void modelLoad(int m) {
-
-        if (m == 0) {
-            this.models = new ArrayList<>(); // this is a collection of models (rdf profiles) that are imported
-            this.modelsNames = new ArrayList<>(); // this is a collection of the name of the profile packages
-            //modelsOnt =new ArrayList<>();
-        }
-        Model model = ModelFactory.createDefaultModel(); // model is the rdf file
-        //for the text of ontology model
-        try {
-            RDFDataMgr.read(model, new FileInputStream(this.selectedFile.get(m).toString()), Lang.RDFXML);
-        } catch (FileNotFoundException e) {
-            GUIhelper.showUserFriendlyError("Profile loading error", "A selected profile file could not be opened.", e);
-        }
-
-        this.models.add(model);
     }
 
     //@FXML
