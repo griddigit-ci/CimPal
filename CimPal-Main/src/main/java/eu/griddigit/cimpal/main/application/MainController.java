@@ -83,7 +83,6 @@ import java.util.List;
 import java.util.Properties;
 
 
-
 import javafx.scene.control.Alert;
 import javafx.scene.control.ProgressIndicator;
 
@@ -94,8 +93,6 @@ import org.apache.jena.riot.RDFDataMgr;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
-
-
 
 
 public class MainController implements Initializable {
@@ -139,6 +136,8 @@ public class MainController implements Initializable {
     private double outputSourceDividerPosition = 0.8146067415730337;
 
     @FXML
+    private Tab tabGenerateInstanceData;
+    @FXML
     private Tab tabSHACLTester;
     @FXML
     private Tab tabSHACLOrganizer;
@@ -150,28 +149,6 @@ public class MainController implements Initializable {
     private ToggleButton btnShowSourceCodeDefineTab;
     @FXML
     private TextArea fsourceDefineTab;
-    @FXML
-    private TextField fsXlsTemplatePath;
-    @FXML
-    private ChoiceBox fcbGenMethodOptions;
-    @FXML
-    private CheckBox fcbSortRDFGen;
-    @FXML
-    private ChoiceBox fcbRDFsortOptionsGen;
-    @FXML
-    private CheckBox fcbStripPrefixesGen;
-    @FXML
-    private CheckBox fcbExportExtensionsGen;
-    @FXML
-    private ChoiceBox fcb_giVersion;
-    @FXML
-    private CheckBox hideEmptySheets;
-    @FXML
-    private ListView<String> ls_geni_rdfs;
-    @FXML
-    private ListView<String> ls_geni_instances;
-    @FXML
-    private Label label_geninfo;
 
     public static File rdfModel1;
     public static File rdfModel2;
@@ -231,9 +208,6 @@ public class MainController implements Initializable {
 
 
     public static boolean shaclSkipNcPropertyReference;
-
-    private static List<File> genRDFSFiles;
-    private static List<File> genInstanceFiles;
 
     public static Map<String, Model> InstanceModelMap;
     public static boolean treeID;
@@ -317,63 +291,10 @@ public class MainController implements Initializable {
             }
         });
 
-        fcb_giVersion.getItems().addAll(
-                "IEC 61970-600-1&2 (CGMES 3.0.0)",
-                "IEC TS 61970-600-1&2 (CGMES 2.4.15)",
-                "Other"
-        );
-        fcb_giVersion.getSelectionModel().selectFirst();
-
-        fcbRDFsortOptionsGen.getItems().addAll(
-                "Sorting by local name",
-                "Sorting by prefix"
-        );
-        fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
-
-        fcbGenMethodOptions.getItems().addAll(
-                "Old template (not maintained)",
-                "Advanced template"
-        );
-        fcbGenMethodOptions.getSelectionModel().select(1);
-
-        //Adding action to the choice box
-
-        fcbGenMethodOptions.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionHandleOptionsForGen(newV.toString()));
 
         //TODO: see how to have this default on the screen
         defaultShapesURI = "/Constraints";
 
-        ls_geni_rdfs.getItems().addListener((ListChangeListener<String>) c -> {
-            double maxWidth = 0;
-            Text helper = new Text();
-            helper.setFont(Font.font("System", 12));
-
-            for (String item : ls_geni_rdfs.getItems()) {
-                helper.setText(item);
-                double width = helper.getLayoutBounds().getWidth();
-                if (width > maxWidth) {
-                    maxWidth = width;
-                }
-            }
-
-            ls_geni_rdfs.setPrefWidth(Math.min(maxWidth + 40, 400));
-        });
-
-        ls_geni_instances.getItems().addListener((ListChangeListener<String>) c -> {
-            double maxWidth = 0;
-            Text helper = new Text();
-            helper.setFont(Font.font("System", 12));
-
-            for (String item : ls_geni_instances.getItems()) {
-                helper.setText(item);
-                double width = helper.getLayoutBounds().getWidth();
-                if (width > maxWidth) {
-                    maxWidth = width;
-                }
-            }
-
-            ls_geni_instances.setPrefWidth(Math.min(maxWidth + 40, 400));
-        });
 
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFComparisonTab.fxml"));
@@ -436,6 +357,15 @@ public class MainController implements Initializable {
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("SHACL Tester tab error", "The SHACL Tester tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/GenerateInstanceDataTab.fxml"));
+            tabGenerateInstanceData.setContent(loader.load());
+            GenerateInstanceDataController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("Generate Instance Data tab error", "The Generate Instance Data tab could not be loaded.", e);
         }
 
 
@@ -569,10 +499,10 @@ public class MainController implements Initializable {
     private void actionMenuQoCDCxls() throws FileNotFoundException {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select QoCDC xml", "*.xml"));
-        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder","")));
+        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder", "")));
         File file = filechooser.showOpenDialog(null);
 
-        if (file!=null) {// the file is selected
+        if (file != null) {// the file is selected
             prefs.put("LastWorkingFolder", file.getParent());
 
             Model model = ModelFactory.createDefaultModel();
@@ -585,47 +515,47 @@ public class MainController implements Initializable {
             List<String> ruleDescription = new LinkedList<>();
             List<String> ruleMessage = new LinkedList<>();
 
-            Property propName = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.name");
-            Property propSeverity = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.severity");
-            Property propDescription = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.description");
-            Property propLevel = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.level");
-            Property propMessage = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020","#UMLRestrictionRule.message");
+            Property propName = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.name");
+            Property propSeverity = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.severity");
+            Property propDescription = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.description");
+            Property propLevel = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.level");
+            Property propMessage = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.message");
 
             List<Statement> ruleStmts = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule")).toList();
             for (Statement ruleStmt : ruleStmts) {
-                if (model.contains(ruleStmt.getSubject(),propName)){
-                    ruleName.add(model.getRequiredProperty(ruleStmt.getSubject(),propName).getObject().toString());
-                }else{
+                if (model.contains(ruleStmt.getSubject(), propName)) {
+                    ruleName.add(model.getRequiredProperty(ruleStmt.getSubject(), propName).getObject().toString());
+                } else {
                     ruleName.add("NA");
                 }
 
-                if (model.contains(ruleStmt.getSubject(),propSeverity)){
-                    ruleSeverity.add(model.getRequiredProperty(ruleStmt.getSubject(),propSeverity).getObject().toString());
-                }else{
+                if (model.contains(ruleStmt.getSubject(), propSeverity)) {
+                    ruleSeverity.add(model.getRequiredProperty(ruleStmt.getSubject(), propSeverity).getObject().toString());
+                } else {
                     ruleSeverity.add("NA");
                 }
 
-                if (model.contains(ruleStmt.getSubject(),propLevel)){
-                    ruleLevel.add(model.getRequiredProperty(ruleStmt.getSubject(),propLevel).getObject().toString());
-                }else{
+                if (model.contains(ruleStmt.getSubject(), propLevel)) {
+                    ruleLevel.add(model.getRequiredProperty(ruleStmt.getSubject(), propLevel).getObject().toString());
+                } else {
                     ruleLevel.add("NA");
                 }
 
-                if (model.contains(ruleStmt.getSubject(),propDescription)){
-                    ruleDescription.add(model.getRequiredProperty(ruleStmt.getSubject(),propDescription).getObject().toString());
-                }else{
+                if (model.contains(ruleStmt.getSubject(), propDescription)) {
+                    ruleDescription.add(model.getRequiredProperty(ruleStmt.getSubject(), propDescription).getObject().toString());
+                } else {
                     ruleDescription.add("NA");
                 }
 
-                if (model.contains(ruleStmt.getSubject(),propMessage)){
-                    ruleMessage.add(model.getRequiredProperty(ruleStmt.getSubject(),propMessage).getObject().toString());
-                }else{
+                if (model.contains(ruleStmt.getSubject(), propMessage)) {
+                    ruleMessage.add(model.getRequiredProperty(ruleStmt.getSubject(), propMessage).getObject().toString());
+                } else {
                     ruleMessage.add("NA");
                 }
 
 
             }
-            ExportFactory.exportQoCDC(ruleName,ruleSeverity,ruleDescription,ruleMessage,ruleLevel,"QoCDC321","QoCDC321","Save QoCDC");
+            ExportFactory.exportQoCDC(ruleName, ruleSeverity, ruleDescription, ruleMessage, ruleLevel, "QoCDC321", "QoCDC321", "Save QoCDC");
 
 
         }
@@ -2284,201 +2214,9 @@ public class MainController implements Initializable {
 
     @FXML
     private void actionRestoreTtlFromConstraintCsv() {
-            ShaclTools.restoreTtlFromConstraintCsv();
+        ShaclTools.restoreTtlFromConstraintCsv();
     }
 
-    @FXML
-    //action button Browse for Xls template for instance data generation
-    private void actionBrowseXlsTemplate() {
-        progressBar.setProgress(0);
-        //select xls file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Xls template", List.of("*.xlsx"), "Browse for xls template");
-
-        if (file != null) {// the file is selected
-
-            //MainController.prefs.put("LastWorkingFolder", fileL.get(0).getParent());
-            fsXlsTemplatePath.setText(file.getFirst().toString());
-            MainController.inputXLS = file;
-        }
-    }
-
-    @FXML
-    private void actionBtnRunGenerateInstance() throws Exception {
-        progressBar.setProgress(0);
-
-        String xmlBase = "";
-        switch (fcb_giVersion.getSelectionModel().getSelectedItem().toString()) {
-            case "IEC 61970-600-1&2 (CGMES 3.0.0)":
-                xmlBase = "http://iec.ch/TC57/CIM100";
-                break;
-            case "IEC TS 61970-600-1&2 (CGMES 2.4.15)":
-                xmlBase = "http://iec.ch/TC57/2013/CIM-schema-cim16";
-                break;
-            case "Other":
-                xmlBase = "https://cim.ucaiug.io/ns";
-                break;
-            default:
-                break;
-        }
-        Map<String, Object> saveProperties = new HashMap<>();
-        boolean sortRDF = fcbSortRDFGen.isSelected();
-        boolean sortPrefix = fcbRDFsortOptionsGen.getSelectionModel().getSelectedItem().toString().equals("Sorting by prefix");
-        boolean stripPrefixes = fcbStripPrefixesGen.isSelected();
-        boolean exportExtensions = fcbExportExtensionsGen.isSelected();
-
-        saveProperties.put("filename", "test");
-        saveProperties.put("showXmlDeclaration", "true");
-        saveProperties.put("showDoctypeDeclaration", "false");
-        saveProperties.put("tab", "2");
-        saveProperties.put("relativeURIs", "same-document");
-        saveProperties.put("showXmlEncoding", "true");
-        saveProperties.put("xmlBase", xmlBase);
-        saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-        saveProperties.put("useFileDialog", true);
-        saveProperties.put("fileFolder", "C:");
-        saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "false"); //this is to only print the ID and not with namespace
-        saveProperties.put("showXmlBaseDeclaration", "false");
-        saveProperties.put("sortRDF", sortRDF);
-        saveProperties.put("sortRDFprefix", sortPrefix); // if true the sorting is on the prefix, if false on the localNam
-
-        saveProperties.put("putHeaderOnTop", true);
-        saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
-        saveProperties.put("extensionName", "RDF XML");
-        saveProperties.put("fileExtension", "*.xml");
-        saveProperties.put("fileDialogTitle", "Save RDF XML for");
-
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-        String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
-        switch (selectedMethod) {
-            case "Old template (not maintained)":
-                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties, guiHelper);
-                break;
-            case "Advanced template":
-                for (File file : inputXLS) {
-                    ModelManipulationFactory.generateDataFromXlsV2(xmlBase, file, saveProperties, stripPrefixes, exportExtensions);
-                }
-                break;
-        }
-
-        progressBar.setProgress(1);
-    }
-
-    @FXML
-    private void actionBtnResetGenerateInstance() {
-        progressBar.setProgress(0);
-        MainController.inputXLS = null;
-        fsXlsTemplatePath.clear();
-        fcb_giVersion.getSelectionModel().selectFirst();
-        fcbSortRDFGen.setSelected(true);
-        fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
-        fcbGenMethodOptions.getSelectionModel().selectFirst();
-    }
-
-
-    private void checkInstanceData() {
-        if (!ls_geni_instances.getItems().isEmpty()) {
-            hideEmptySheets.setDisable(false);
-        }
-        else {
-            hideEmptySheets.setDisable(true);
-            hideEmptySheets.setSelected(false);
-        }
-    }
-
-
-    @FXML
-    private void actionCreateXlsTemplate() throws FileNotFoundException {
-        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-        String selectedMethod = fcbGenMethodOptions.getSelectionModel().getSelectedItem().toString();
-        boolean hide = hideEmptySheets.isSelected();
-
-        if (genRDFSFiles != null || genInstanceFiles != null) {// the file is selected
-            shaclNodataMap = 1; // as no mapping is to be used for this task
-
-            CreateTemplateFromRDF(genRDFSFiles, genInstanceFiles, selectedMethod, hide);
-            progressBar.setProgress(1);
-        } else {
-            progressBar.setProgress(0);
-        }
-    }
-
-    private void updateGenInfoLabel() {
-        String infoText = "Load RDFS and/or Instance data to generate template.";
-        if (genRDFSFiles != null && !genRDFSFiles.isEmpty()) {
-            if (genInstanceFiles != null && !genInstanceFiles.isEmpty()) {
-                infoText = "Template will be created based on RDFS files and populated with instance data.";
-            }
-            else {
-                infoText = "Empty template will be created based on RDFS files.";
-            }
-        }
-        else {
-            if (genInstanceFiles != null && !genInstanceFiles.isEmpty()) {
-                infoText = "Template will be created using only instance data information. Select RDFS files to create a more complete template!";
-            }
-        }
-        label_geninfo.setText(infoText);
-    }
-    @FXML
-    private void actionLoadRDFSGen(){
-        try {
-            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS files", List.of("*.rdf"), "Select RDF file(s) for template.");
-            ls_geni_rdfs.getItems().clear();
-            genRDFSFiles = file;
-            if (file != null) {// the file is selected
-                ObservableList<String> filenames = FXCollections.observableArrayList();
-                file.forEach(f -> filenames.add(f.getName()));
-                ls_geni_rdfs.setItems(filenames);
-            }
-        } catch (Exception e) {
-            GUIhelper.showUserFriendlyError("RDFS selection error", "The selected RDFS file list could not be loaded.", e);
-        }
-        finally {
-            updateGenInfoLabel();
-        }
-    }
-
-    @FXML
-    private void actionLoadInstanceDataGen(){
-        try {
-            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml"), "Select instance file(s) for template.");
-            ls_geni_instances.getItems().clear();
-            genInstanceFiles = file;
-            if (!file.isEmpty()) {// the file is selected
-                ObservableList<String> filenames = FXCollections.observableArrayList();
-                file.forEach(f -> filenames.add(f.getName()));
-                ls_geni_instances.setItems(filenames);
-            }
-        } catch (Exception e) {
-            GUIhelper.showUserFriendlyError("Instance selection error", "The selected instance file list could not be loaded.", e);
-        }
-        finally {
-            updateGenInfoLabel();
-            checkInstanceData();
-        }
-    }
-
-    private void actionHandleOptionsForGen(String selected) {
-        switch (selected) {
-            case "Old template (not maintained)":
-                fcbSortRDFGen.setDisable(true);
-                fcbRDFsortOptionsGen.setDisable(true);
-                fcbStripPrefixesGen.setDisable(true);
-                fcbExportExtensionsGen.setDisable(true);
-                break;
-            case "Advanced template":
-                fcbSortRDFGen.setDisable(false);
-                fcbRDFsortOptionsGen.setDisable(false);
-                fcbStripPrefixesGen.setDisable(false);
-                fcbExportExtensionsGen.setDisable(false);
-                break;
-        }
-    }
 
     @FXML
     public void actionCreateQARTemplate(ActionEvent actionEvent) throws IOException {
