@@ -85,11 +85,7 @@
                   <Tab fx:id="tabSHACLTester" text="SHACL tester"/>
                   <Tab fx:id="tabGenerateInstanceData" text="Generate Instance data"/>
                   <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
-                  <Tab fx:id="tabSPARQLQuery" text="SPARQL Query">
-                    <content>
-                      <fx:include fx:id="sparqlQueryTab" source="sparqlQueryTab.fxml" />
-                    </content>
-                  </Tab>
+                  <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
                </TabPane>
             </HBox>
          </AnchorPane>

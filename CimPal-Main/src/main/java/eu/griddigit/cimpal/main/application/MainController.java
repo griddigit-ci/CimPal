@@ -5,16 +5,13 @@
  */
 package eu.griddigit.cimpal.main.application;
 
-import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.generators.ManifestGenerator;
-import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.*;
-import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.*;
-import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.controllers.sparql.SparqlQueryTabController;
 import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
@@ -26,9 +23,6 @@ import java.io.InputStream;
 //import guru.nidi.graphviz.engine.Format;
 
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -36,10 +30,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
-import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -57,7 +48,6 @@ import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -66,7 +56,6 @@ import java.util.*;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
-import static eu.griddigit.cimpal.main.core.ExportInstanceDataTemplate.CreateTemplateFromRDF;
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
 import static eu.griddigit.cimpal.main.util.ExcelTools.CreateTemplateFromXMLQAR;
@@ -92,7 +81,6 @@ import org.apache.jena.riot.RDFDataMgr;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.nio.file.Files;
 
 
 public class MainController implements Initializable {
@@ -363,6 +351,15 @@ public class MainController implements Initializable {
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("Task Wizard tab error", "The Task Wizard tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SparqlQueryTab.fxml"));
+            tabSPARQLQuery.setContent(loader.load());
+            SparqlQueryTabController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("SPARQL Query tab error", "The SPARQL Query tab could not be loaded.", e);
         }
 
 
