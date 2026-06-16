@@ -7,6 +7,11 @@ module CimPal.Main {
     exports eu.griddigit.cimpal.main.application;
     exports eu.griddigit.cimpal.main.model;
     exports eu.griddigit.cimpal.main.interfaces;
+    exports eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
+    exports eu.griddigit.cimpal.main.application.PssePFcompare;
+    exports eu.griddigit.cimpal.main.application.tasks;
+    opens eu.griddigit.cimpal.main.application.tasks;
+    opens eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
     opens eu.griddigit.cimpal.main.application;
     opens eu.griddigit.cimpal.main.preload;
     opens eu.griddigit.cimpal.main.gui;
@@ -37,13 +42,13 @@ module CimPal.Main {
     requires org.apache.poi.ooxml;
     requires org.apache.poi.ooxml.schemas;
     requires java.prefs;
-    requires com.fasterxml.jackson.annotation;
+//    requires com.fasterxml.jackson.annotation;
     requires com.fasterxml.jackson.core;
     requires com.fasterxml.jackson.databind;
     requires org.apache.jena.iri;
     requires net.sourceforge.plantuml;
-    requires guru.nidi.graphviz;
-    requires com.fasterxml.jackson.dataformat.xml;
+//    requires guru.nidi.graphviz;
+//    requires com.fasterxml.jackson.dataformat.xml;
     requires velocity.engine.core;
     requires org.apache.jena.shacl;
     requires CimPal.Core;

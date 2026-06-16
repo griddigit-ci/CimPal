@@ -191,7 +191,6 @@ public class SHACLFromRDF {
                         shapeModel.setNsPrefix(baseTier3nsMap.get("cimPref"), baseTier3nsMap.get("cimURI"));
                     }
 
-                    // shapeModels.add(shapeModel); todo if needed store the shape models
                     // shapeModelsNames.add(RDFSmodelsNames.get(m));
                     //optimise prefixes, strip unused prefixes
                     //if (stripPrefixes){
@@ -442,6 +441,7 @@ public class SHACLFromRDF {
                         .set(RIOT.symTurtleOmitBase, false)
                         .set(RIOT.symTurtleIndentStyle, "wide")
                         .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                        .set(RIOT.symTurtleMultilineLiterals, true)
                         .lang(Lang.TURTLE)
                         .source(shapeModel)
                         .output(outputStream);
@@ -457,7 +457,7 @@ public class SHACLFromRDF {
         Map<String, Model> baseTierMap = new HashMap<>();
 
         if (basefiles != null) {
-            Model basemodel = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, true, false).get("unionModel");
+            Model basemodel = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, false, false).get("unionModel");
             var inheritanceResult = eu.griddigit.cimpal.core.utils.ModelFactory.generateInheritanceModels(basemodel, true, true);
             baseTierMap.put("unionmodelbaseprofilesshacl", basemodel);
             baseTierMap.put("unionmodelbaseprofilesshaclinheritance", inheritanceResult.processedModel);

@@ -211,7 +211,7 @@ public class ModelManipulationFactory {
     }
 
     //Model transformation method
-    public static void modelTransformation(List<File> fileOrigModelList, List<File>  fileSHACLTransList) throws IOException {
+    public static void modelTransformation(List<File> fileOrigModelList, List<File> fileSHACLTransList) throws IOException {
 
         // Load your data and shapes (SHACL rules)
 
@@ -269,7 +269,7 @@ public class ModelManipulationFactory {
 
         Model model1single = null;
         String baseIRI = "http://iec.ch/TC57/CIM100";
-        Map<String,Model> dataModelMap = new HashMap<>();
+        Map<String, Model> dataModelMap = new HashMap<>();
         Map<String, String> prefixMap = new HashMap<>();
 
         for (File item : fileOrigModelList) {
@@ -283,8 +283,8 @@ public class ModelManipulationFactory {
             }
             prefixMap.putAll(model1single.getNsPrefixMap());
             //get header ID
-            String headerID = model1single.listStatements(null,RDF.type,ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).next().getSubject().getLocalName();
-            dataModelMap.put(headerID,model1single);
+            String headerID = model1single.listStatements(null, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).next().getSubject().getLocalName();
+            dataModelMap.put(headerID, model1single);
         }
 
 
@@ -314,7 +314,8 @@ public class ModelManipulationFactory {
         //Model rulesModel = eu.griddigit.cimpal.util.ModelFactory.modelLoad(fileSHACLTransList, null, rdfSourceFormat1, false);
 
         // Execute the rules and store inferences
-        Model inferredModel = ModelFactory.createDefaultModel();;
+        Model inferredModel = ModelFactory.createDefaultModel();
+        ;
         List<Map.Entry<String, Model>> entries = new ArrayList<>(dataModelMap.entrySet());
 
 // Process first entry separately if needed
@@ -345,8 +346,6 @@ public class ModelManipulationFactory {
         inferredModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
         inferredModel.setNsPrefix("xsd", "http://www.w3.org/2001/XMLSchema#");
         inferredModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-
-
 
 
         // save file
@@ -406,6 +405,40 @@ public class ModelManipulationFactory {
             saveProperties.put("rdfEnumList", rdfEnumList);
         }
 
+        //optimise prefixes, strip unused prefixes
+        //TODO for Mate/Beni, to define a method about strip prefixes and use this here and elsewhere we have this
+        if (stripPrefixes) {
+            Map<String, String> modelPrefMap = inferredModel.getNsPrefixMap();
+            LinkedList<String> uniqueNamespacesList = new LinkedList<>();
+            for (StmtIterator ns = inferredModel.listStatements(); ns.hasNext(); ) {
+                Statement stmtNS = ns.next();
+                if (!uniqueNamespacesList.contains(stmtNS.getSubject().getNameSpace())) {
+                    uniqueNamespacesList.add(stmtNS.getSubject().getNameSpace());
+                }
+                if (!uniqueNamespacesList.contains(stmtNS.getPredicate().getNameSpace())) {
+                    uniqueNamespacesList.add(stmtNS.getPredicate().getNameSpace());
+                }
+                if (stmtNS.getObject().isResource()) {
+                    if (!uniqueNamespacesList.contains(stmtNS.getObject().asResource().getNameSpace())) {
+                        uniqueNamespacesList.add(stmtNS.getObject().asResource().getNameSpace());
+                    }
+                }
+            }
+            LinkedList<Map.Entry<String, String>> entryToRemove = new LinkedList<>();
+            for (Map.Entry<String, String> entry : modelPrefMap.entrySet()) {
+                //String key = entry.getKey();
+                String value = entry.getValue();
+
+                // Check if either the key or value is present in uniqueNamespacesList
+                if (!uniqueNamespacesList.contains(value)) {
+                    entryToRemove.add(entry);
+                }
+            }
+            for (Map.Entry<String, String> entryTR : entryToRemove) {
+                inferredModel.removeNsPrefix(entryTR.getKey());
+            }
+        }
+
         String saveFilename = "TransformedModel";
         saveProperties.replace("filename", saveFilename + ".xml");
         saveProperties.put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
@@ -413,10 +446,9 @@ public class ModelManipulationFactory {
         saveProperties.put("useFileDialog", false);
 
 
-
     }
 
-        public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties, IOutputHandler outputHandler) throws IOException {
+    public static void generateDataFromXls(String xmlBase, Map<String, Object> saveProperties, IOutputHandler outputHandler) throws IOException {
 
         //this is to load profile data - this is needed for the export
         //Map<String, Map> loadDataMap = ModelManipulationFactory.loadDataForIGMMulDateTime(xmlBase, profileModelUnionFlag, instanceModelUnionFlag, inputData, shaclModelUnionFlag);
@@ -610,64 +642,70 @@ public class ModelManipulationFactory {
         // getting the data from the config sheet
         XSSFSheet configSheet = book.getSheet("Config");
         if (configSheet != null) {
-            ArrayList<Object> inputXLSDataConfig = ExcelTools.importXLSX(xmlfile.toString(), book.getSheetIndex(configSheet));
-            inputXLSDataConfig.removeFirst();
-            for (Object o : inputXLSDataConfig) {
-                // getting namespaces
-                if (((LinkedList<?>) o).size() >= 3) {
-                    String yesno = ((LinkedList<?>) o).get(2).toString();
-                    if (yesno.equals("Yes")) {
-                        String pref = ((LinkedList<?>) o).get(0).toString();
-                        String ns = ((LinkedList<?>) o).get(1).toString();
+            Map<String, List<String>> configColumns = ExcelTools.importXLSXToColumnMap(xmlfile.toString(), book.getSheetIndex(configSheet));
+            List<List<String>> cols = new ArrayList<>(configColumns.values());
+
+            List<String> col1 = !cols.isEmpty() ? cols.get(0) : Collections.emptyList();
+            List<String> col2 = cols.size() > 1 ? cols.get(1) : Collections.emptyList();
+            List<String> col3 = cols.size() > 2 ? cols.get(2) : Collections.emptyList();
+            List<String> col5 = cols.size() > 4 ? cols.get(4) : Collections.emptyList();
+            List<String> col6 = cols.size() > 5 ? cols.get(5) : Collections.emptyList();
+
+            int nsRows = Math.min(col1.size(), Math.min(col2.size(), col3.size()));
+            for (int i = 0; i < nsRows; i++) {
+                String yesno = col3.get(i) == null ? "" : col3.get(i).trim();
+                if ("Yes".equalsIgnoreCase(yesno)) {
+                    String pref = col1.get(i) == null ? "" : col1.get(i).trim();
+                    String ns = col2.get(i) == null ? "" : col2.get(i).trim();
+                    if (!pref.isEmpty() && !ns.isEmpty()) {
                         prefMap.putIfAbsent(pref, ns);
                     }
                 }
-                if (((LinkedList<?>) o).size() == 1) {
-                    // getting classes to print when exceeding namespace rows
-                    String className = ((LinkedList<?>) o).getFirst().toString();
-                    if (!className.isEmpty()) {
-                        int classSheetIdx = book.getSheetIndex(className);
-                        if (classSheetIdx != -1) {
-                            // className = className.replace("|",":");
-                            classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
-                        } else
-                            throw new Exception("Couldn't find the sheet for class: " + className);
-                    }
-                    continue;
-                } else if (((LinkedList<?>) o).size() <=4)
-                    continue;
+            }
 
-                // getting classes to print
-
-                String className = ((LinkedList<?>) o).get(4).toString();
+            Set<String> classNames = new LinkedHashSet<>();
+            for (String v : col5) {
+                String className = v == null ? "" : v.trim();
                 if (!className.isEmpty()) {
-                    int classSheetIdx = book.getSheetIndex(className);
-                    if (classSheetIdx != -1) {
-                        // className = className.replace("|",":");
-                        classesXlsData.putIfAbsent(className, ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
-                    } else
-                        throw new Exception("Couldn't find the sheet for class: " + className);
-                }
-                // getting header class
-
-                if (headerClassName.isEmpty()) {
-                    try {
-                        headerClassName = ((LinkedList<?>) o).get(5).toString();
-                    }
-                    catch (IndexOutOfBoundsException e) {
-                        throw new NoSuchElementException("Missing header class name from config tab.");
-                    }
-                    if (!headerClassName.isEmpty()) {
-                        int headerSheetIdx = book.getSheetIndex(headerClassName);
-                        if (headerSheetIdx != -1)
-                            headerXlsData = ExcelTools.importXLSXnullSupport(xmlfile.toString(), headerSheetIdx);
-                        else
-                            throw new Exception("Couldn't find header class sheet.");
-                    }
+                    classNames.add(className);
                 }
             }
-            if (headerXlsData == null)
-                throw new Exception("Missing header class from config");
+
+            for (int i = nsRows; i < col1.size(); i++) {
+                String className = col1.get(i) == null ? "" : col1.get(i).trim();
+                if (!className.isEmpty()) {
+                    classNames.add(className);
+                }
+            }
+
+            for (String className : classNames) {
+                int classSheetIdx = book.getSheetIndex(className);
+                if (classSheetIdx != -1) {
+                    classesXlsData.putIfAbsent(className,
+                            ExcelTools.importXLSXnullSupport(xmlfile.toString(), classSheetIdx));
+                } else {
+                    throw new Exception("Couldn't find the sheet for class: " + className);
+                }
+            }
+
+            for (String v : col6) {
+                String candidate = v == null ? "" : v.trim();
+                if (!candidate.isEmpty()) {
+                    headerClassName = candidate;
+                    break;
+                }
+            }
+
+            if (headerClassName.isEmpty()) {
+                throw new NoSuchElementException("Missing header class name from config tab.");
+            }
+
+            int headerSheetIdx = book.getSheetIndex(headerClassName);
+            if (headerSheetIdx != -1) {
+                headerXlsData = ExcelTools.importXLSXnullSupport(xmlfile.toString(), headerSheetIdx);
+            } else {
+                throw new Exception("Couldn't find header class sheet.");
+            }
         } else {
             throw new Exception("Config sheet is missing from the xls data.");
         }
@@ -706,13 +744,7 @@ public class ModelManipulationFactory {
         }
 
         // get which row contains the extension flags?
-        int isExtensionRow = -1;
-        for (int i = 0; i < headerXlsData.size(); i++) {
-            if (((LinkedList<?>) headerXlsData.get(i)).getFirst().equals("IsExtension")) {
-                isExtensionRow = i;
-                break;
-            }
-        }
+        int isExtensionRow = findRowIndexByFirstCell(headerXlsData, "IsExtension");
 
         if (headerXlsData.size() > dataStartFrom) {
 
@@ -739,8 +771,7 @@ public class ModelManipulationFactory {
                 for (int j = 0; j < headerCols; j++) {
                     if (j != rdfidCol && j < ((LinkedList<?>) headerXlsData.get(i)).size()) {
                         // Check if it is an extension
-                        if (isExtensionRow != -1 && !exportExtensions &&
-                                ((LinkedList<?>) headerXlsData.get(isExtensionRow)).get(j).toString().equals("Yes")) {
+                        if (!exportExtensions && isExtensionColumn(headerXlsData, isExtensionRow, j)) {
                             continue;
                         }
                         Object value = ((LinkedList<?>) headerXlsData.get(i)).get(j);
@@ -776,9 +807,8 @@ public class ModelManipulationFactory {
                                 case "Literal" -> { //add literal
                                     String datatype;
                                     try {
-                                        datatype = ((LinkedList<?>) headerXlsData.get(3)).get(j).toString();
-                                    }
-                                    catch (IndexOutOfBoundsException e) {
+                                        datatype = resolveDatatype(((LinkedList<?>) headerXlsData.get(3)).get(j), object);
+                                    } catch (Exception e) {
                                         datatype = "string";
                                     }
                                     if (datatype.equalsIgnoreCase("float"))
@@ -853,6 +883,7 @@ public class ModelManipulationFactory {
                 throw new Exception("Missing prefix in config for class: " + className + "\nMissing prefix: " + splitClassName[0]);
             }
 
+            int classIsExtensionRow = findRowIndexByFirstCell(classXlsData, "IsExtension");
             for (int i = dataStartFrom; i < classXlsData.size(); i++) { // loop on the rows/class instance
                 if (((LinkedList<?>) classXlsData.get(i)).get(rdfidCol) != null) {
                     String idxls = ((LinkedList<?>) classXlsData.get(i)).get(rdfidCol).toString();
@@ -866,14 +897,13 @@ public class ModelManipulationFactory {
                     Resource rdfidRes = ResourceFactory.createResource(rdfid);
 
 
-                    if (((LinkedList<?>) classXlsData.getFirst()).get(3).toString().equals("true")){
+                    if (((LinkedList<?>) classXlsData.getFirst()).get(3).toString().equals("true")) {
                         rdfAboutList.add(ResourceFactory.createResource(classWNS));
                     }
                     for (int j = 0; j < cols; j++) {
                         if (j != rdfidCol && j < ((LinkedList<?>) classXlsData.get(i)).size()) {
                             // Check if it is an extension
-                            if (isExtensionRow != -1 && !exportExtensions &&
-                                    ((LinkedList<?>) classXlsData.get(isExtensionRow)).get(j).toString().equals("Yes")) {
+                            if (!exportExtensions && isExtensionColumn(classXlsData, classIsExtensionRow, j)) {
                                 continue;
                             }
                             Object value = ((LinkedList<?>) classXlsData.get(i)).get(j);
@@ -910,8 +940,7 @@ public class ModelManipulationFactory {
                                         String datatype;
                                         try {
                                             datatype = ((LinkedList<?>) classXlsData.get(3)).get(j).toString();
-                                        }
-                                        catch (Exception e){
+                                        } catch (Exception e) {
                                             datatype = "";
                                         }
                                         if (datatype.equalsIgnoreCase("float"))
@@ -919,7 +948,7 @@ public class ModelManipulationFactory {
                                         else if (datatype.equalsIgnoreCase("integer"))
                                             model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(String.valueOf(Math.round(Float.parseFloat(object))))));
                                         else
-                                        model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
+                                            model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createPlainLiteral(object)));
                                     }
                                     case "LiteralLangEN" -> {
                                         model.add(ResourceFactory.createStatement(rdfidRes, propertyURIProp, ResourceFactory.createLangLiteral(object, "en")));
@@ -969,7 +998,7 @@ public class ModelManipulationFactory {
                             }
                         }
                     }
-                    if (model.listStatements(rdfidRes, null, (RDFNode)null).hasNext()) {
+                    if (model.listStatements(rdfidRes, null, (RDFNode) null).hasNext()) {
                         // If it has properties then add the primary class type
                         model.add(ResourceFactory.createStatement(rdfidRes, RDF.type, ResourceFactory.createProperty(classWNS)));
                     }
@@ -1301,6 +1330,64 @@ public class ModelManipulationFactory {
 
         saveProperties.replace("filename", "ConvertedCommonData.xml");
         InstanceDataFactory.saveInstanceData(modelComData, saveProperties);
+    }
+
+    private static String resolveDatatype(Object datatypeCell, String value) {
+        String datatype = "string";
+        if (datatypeCell != null) {
+            String dt = datatypeCell.toString().trim();
+            if (!dt.isEmpty()) return dt;
+        }
+
+        if (value == null) return datatype;
+        String s = value.trim();
+        if (s.isEmpty()) return datatype;
+
+        // try to resolve from the value
+        try {
+            if (!s.contains(".") && !s.contains(",") && !s.toLowerCase(java.util.Locale.ROOT).contains("e")) {
+                Long.parseLong(s);
+                return "integer";
+            }
+
+            Double.parseDouble(s.replace(',', '.'));
+            return "float";
+        } catch (NumberFormatException e1) {
+            return datatype;
+        }
+
+    }
+
+    private static int findRowIndexByFirstCell(ArrayList<Object> xlsData, String label) {
+        if (xlsData == null || label == null) {
+            return -1;
+        }
+
+        for (int i = 0; i < xlsData.size(); i++) {
+            Object rowObj = xlsData.get(i);
+            if (!(rowObj instanceof LinkedList<?> row) || row.isEmpty()) {
+                continue;
+            }
+            Object first = row.getFirst();
+            if (first != null && label.equals(first.toString().trim())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isExtensionColumn(ArrayList<Object> xlsData, int extensionRow, int columnIndex) {
+        if (extensionRow < 0 || xlsData == null || extensionRow >= xlsData.size()) {
+            return false;
+        }
+
+        Object rowObj = xlsData.get(extensionRow);
+        if (!(rowObj instanceof LinkedList<?> row) || columnIndex < 0 || columnIndex >= row.size()) {
+            return false;
+        }
+
+        Object cell = row.get(columnIndex);
+        return cell != null && "Yes".equalsIgnoreCase(cell.toString().trim());
     }
 }
 

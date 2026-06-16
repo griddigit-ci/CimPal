@@ -1,0 +1,13 @@
+{
+  "Change Model Header Description": [],
+  "Delete Required Properties": [],
+  "Make Non-Conform Datatypes": [],
+  "Modify MAS of SV Header": [],
+  "Multiply and connect": [],
+  "Multiply base model N times": [],
+  "Multiply CGM from Config xls": ["Multiply CGM from Config xls"],
+  "Multiply IGM from Config xls": ["Multiply CGM from Config xls"],
+  "Regenerate rdf:ID and mRID": ["Replaces mRID with rdf:ID"],
+  "Rename": ["Multiply CGM from Config xls"],
+  "Replaces mRID with rdf:ID": []
+}

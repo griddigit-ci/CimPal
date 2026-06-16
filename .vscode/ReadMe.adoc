@@ -13,9 +13,9 @@ This guide explains how to build, run, and develop CimPal using **Visual Studio 
 
 Make sure the following are installed and configured:
 
-=== 1. Java JDK 21
+=== 1. Java JDK 25
 
-Download from https://jdk.java.net/21/ or via your package manager.
+Download from https://jdk.java.net/25/ or via your package manager.
 
 Verify:
 
@@ -24,7 +24,7 @@ Verify:
 java -version
 ----
 
-Set `JAVA_HOME` to point to JDK 21.
+Set `JAVA_HOME` to point to JDK 25.
 
 === 2. Apache Maven 3.9+
 
@@ -97,7 +97,11 @@ mvn clean package
 Run from terminal:
 [source,cmd]
 ----
-mvn compile exec:java
+# Clean and install all modules to your local Maven repository
+mvn clean install -DskipTests
+
+# Then run the main application
+mvn exec:java -pl CimPal-Main
 ----
 
 This uses Maven's classpath resolution to launch:

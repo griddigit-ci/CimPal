@@ -5195,7 +5195,7 @@ public class ShaclTools {
                             .set(RIOT.symTurtleOmitBase, false)
                             .set(RIOT.symTurtleIndentStyle, "wide")
                             .set(RIOT.symTurtleDirectiveStyle, "rdf10")
-                            .set(RIOT.multilineLiterals, true)
+                            .set(RIOT.symTurtleMultilineLiterals, true)
                             .lang(Lang.TURTLE)
                             .source(shaclModelToSave)
                             .output(out);

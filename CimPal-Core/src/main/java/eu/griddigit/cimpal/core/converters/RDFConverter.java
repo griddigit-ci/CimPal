@@ -51,16 +51,21 @@ public class RDFConverter {
         if (!modelUnionFlagDetailed) {
             if (!modelUnionFlag && sourceFile != null) {
                 modelFiles.add(sourceFile);
-            } else {
+            } else if (modelUnionFlag && (modelUnionFiles != null && !modelUnionFiles.isEmpty())) {
                 modelFiles = modelUnionFiles;
+            }
+            else {
+                throw new IllegalStateException("No source file(s) provided. Please provide a source file.");
             }
         }
 
         Model model;
 
         if (modelUnionFlagDetailed) {
-            if (!modelUnionDetailedFiles.isEmpty())
+            if (modelUnionDetailedFiles != null && !modelUnionDetailedFiles.isEmpty())
                 modelFiles.addAll(modelUnionDetailedFiles);
+            else
+                throw new IllegalStateException("No source file(s) provided for detailed union. Please provide source files.");
 
             model = ModelFactory.createDefaultModel();
             Model modelOrig = ModelFactory.createDefaultModel();
@@ -414,7 +419,16 @@ public class RDFConverter {
             }
             case RDFConvertOptions.RDFFormats.TURTLE -> {
                 try (outputStream) {
-                    convertedModel.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
+                    //convertedModel.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
+                    RDFWriter.create()
+                            .base(xmlBase)
+                            .set(RIOT.symTurtleOmitBase, false)
+                            .set(RIOT.symTurtleIndentStyle, "wide")
+                            .set(RIOT.symTurtleDirectiveStyle, "rdf10")
+                            .set(RIOT.symTurtleMultilineLiterals, true)
+                            .lang(Lang.TURTLE)
+                            .source(convertedModel)
+                            .output(outputStream);
                 }
 
             }
