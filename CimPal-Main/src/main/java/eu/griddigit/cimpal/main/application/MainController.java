@@ -1695,192 +1695,6 @@ public class MainController implements Initializable {
 //            alert.showAndWait();
 //        }
 //    }
-    @FXML
-    //Action for button "Load Data" related to tab Instance Data Browser
-    private void actionBtnLoadInstanceData(ActionEvent actionEvent) throws IOException {
-        progressBar.setProgress(0);
-        treeID = true;
-
-        //select file
-        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
-        String xmlBase = "http://griddigit.eu#";
-
-        InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null, false);
-
-        guiTreeInstanceDataInit(); //initializes the tree
-    }
-
-    @FXML
-    //Action for button "Load Data" related to tab Instance Data Browser
-    private void actionBtnLoadInstanceData1(ActionEvent actionEvent) throws IOException {
-        progressBar.setProgress(0);
-        treeID = true;
-
-        //select file
-        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
-        String xmlBase = "http://griddigit.eu#";
-
-        InstanceModelMap = InstanceDataFactory.modelLoad(fileL, xmlBase, null, false);
-
-        //guiTreeInstanceDataInit(); //initializes the tree
-//        Pane root = new Pane();
-//        Scene scene = new Scene(root, 800, 600);
-//
-//        Model model = ModelFactory.createDefaultModel();
-//        InputStream in = FileManager.get().open(RDF_FILE);
-//        if (in == null) {
-//            throw new IllegalArgumentException("File: " + RDF_FILE + " not found");
-//        }
-//        model.read(in, null);
-
-        Model model = InstanceModelMap.get("unionModel");
-        //String dot = convertModelToDOT(model);
-
-
-        String dot = convertModelToDOT(model);
-
-        // Render DOT string to a byte array
-//        ByteArrayOutputStream out = new ByteArrayOutputStream();
-//        try {
-//            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
-
-        // Load the image from the byte array
-//        ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
-//        Image image = new Image(in);
-//        ImageView imageView = new ImageView(image);
-//        IDhbox.getChildren().add(imageView);
-
-        // Update the existing ImageView with the new image
-//        IDImageView.setImage(image);
-
-        // Zoom functionality
-
-//
-//        // Render DOT string to a temporary file
-//        File tempFile = File.createTempFile("graph", ".png");
-//        try (OutputStream out = new FileOutputStream(tempFile)) {
-//            Graphviz.fromString(dot).render(Format.PNG).toOutputStream(out);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
-//        // Load the image from the temporary file
-//        Image image = new Image(tempFile.toURI().toString());
-//        ImageView imageView = new ImageView(image);
-//        IDhbox.getChildren().add(imageView);
-//        StmtIterator iter = model.listStatements();
-//
-//        while (iter.hasNext()) {
-//            Statement stmt = iter.nextStatement();
-//            Resource subject = stmt.getSubject();
-//            Property predicate = stmt.getPredicate();
-//            RDFNode object = stmt.getObject();
-//
-//            graph.addVertex(subject.toString());
-//            graph.addVertex(object.toString());
-//            graph.addEdge(subject.toString(), object.toString());
-//        }
-//
-//        mxGraph.getModel().beginUpdate();
-//        try {
-//            for (String vertex : graph.vertexSet()) {
-//                mxGraph.insertVertex(parent, null, vertex, 0, 0, 80, 30);
-//            }
-//            for (DefaultEdge edge : graph.edgeSet()) {
-//                mxGraph.insertEdge(parent, null, "", graph.getEdgeSource(edge), graph.getEdgeTarget(edge));
-//            }
-//        } finally {
-//            mxGraph.getModel().endUpdate();
-//        }
-//
-//        mxCircleLayout layout = new mxCircleLayout(mxGraph);
-//        layout.execute(mxGraph.getDefaultParent());
-//
-//        mxGraphComponent graphComponent = new mxGraphComponent(mxGraph);
-//        hbox.getChildren().add(graphComponent);
-//
-
-
-//        Map<Resource, Rectangle> nodeMap = new HashMap<>();
-//        double x = 0.1; // Relative x position (10% of the width)
-//        double y = 0.1; // Relative y position (10% of the height)
-//
-//        // Create rectangles for each RDF subject
-//        for (Resource resource : model.listSubjects().toList()) {
-//            StringBuilder attributes = new StringBuilder(resource.getLocalName() + "\n");
-//
-//            StmtIterator iter = resource.listProperties();
-//            while (iter.hasNext()) {
-//                Statement stmt = iter.nextStatement();
-//                Property predicate = stmt.getPredicate();
-//                RDFNode object = stmt.getObject();
-//                attributes.append(predicate.getLocalName()).append(": ").append(object.toString()).append("\n");
-//            }
-//
-//            Rectangle rect = new Rectangle();
-//            rect.setFill(Color.LIGHTBLUE);
-//            Text text = new Text(attributes.toString());
-//            IDhbox.getChildren().addAll(rect, text);
-//            nodeMap.put(resource, rect);
-//
-//            // Set layout bounds after adding to the scene
-//            double finalY = y;
-//            rect.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
-//                rect.setX(IDhbox.getWidth() * x);
-//                rect.setY(IDhbox.getHeight() * finalY);
-//                rect.setWidth(IDhbox.getWidth() * 0.2); // 20% of the width
-//                rect.setHeight(IDhbox.getHeight() * 0.1); // 10% of the height
-//                text.setX(rect.getX() + 10);
-//                text.setY(rect.getY() + 25);
-//            });
-//
-//            y += 0.15; // Move down by 15% of the height for the next rectangle
-//        }
-//
-//        // Create lines for relationships
-//        for (Statement stmt : model.listStatements().toList()) {
-//            Resource subject = stmt.getSubject();
-//            RDFNode object = stmt.getObject();
-//            if (object.isResource() && nodeMap.containsKey(subject) && nodeMap.containsKey(object.asResource())) {
-//                Rectangle subjectRect = nodeMap.get(subject);
-//                Rectangle objectRect = nodeMap.get(object.asResource());
-//                Line line = new Line();
-//                IDhbox.getChildren().add(line);
-//
-//                // Set line positions after layout bounds are known
-//                subjectRect.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
-//                    Bounds subjectBounds = subjectRect.getBoundsInParent();
-//                    Bounds objectBounds = objectRect.getBoundsInParent();
-//                    line.setStartX(subjectBounds.getMinX() + subjectBounds.getWidth() / 2);
-//                    line.setStartY(subjectBounds.getMinY() + subjectBounds.getHeight() / 2);
-//                    line.setEndX(objectBounds.getMinX() + objectBounds.getWidth() / 2);
-//                    line.setEndY(objectBounds.getMinY() + objectBounds.getHeight() / 2);
-//                });
-//            }
-//        }
-//
-//
-//
-
-////        primaryStage.setTitle("RDF Visualizer");
-////        primaryStage.setScene(scene);
-////        primaryStage.show();
-
-    }
-
-    public static String convertModelToDOT(Model model) {
-        StringBuilder dot = new StringBuilder("digraph G {\n");
-        model.listStatements().forEachRemaining(statement -> {
-            String subject = statement.getSubject().toString();
-            String predicate = statement.getPredicate().toString();
-            String object = statement.getObject().toString();
-            dot.append(String.format("\"%s\" -> \"%s\" [label=\"%s\"];\n", subject, object, predicate));
-        });
-        dot.append("}");
-        return dot.toString();
-    }
 
 
     @FXML
@@ -1892,75 +1706,6 @@ public class MainController implements Initializable {
             btnShowSourceCodeDefineTab.setText("Show");
             fsourceDefineTab.clear();
         }
-    }
-
-    //initializes the TreeView in the Instance Data Browser
-    public void guiTreeInstanceDataInit() {
-
-        TreeItem<String> rootMain = treeViewIDStatic.getRoot();
-        if (rootMain == null) {
-            //define the Treeview
-            //rootMain = new CheckBoxTreeItem<>("Main root");
-            rootMain = new TreeItem<>("Main root");
-            rootMain.setExpanded(true);
-            //treeViewInstanceData.setShowExpandable(true);
-            treeViewIDStatic.setRoot(rootMain); // sets the root to the eu.griddigit.cimpal.gui object
-            treeViewIDStatic.setShowRoot(false);
-            treeMapID = new HashMap<>();
-            //treeMapConstraintsInverse = new HashMap<>();
-
-        }
-        LinkedList<String> tvlevel1 = new LinkedList<>();
-        for (Map.Entry<String, Model> entry : InstanceModelMap.entrySet()) {
-            String key = entry.getKey();
-            tvlevel1.add(key);
-        }
-        Collections.sort(tvlevel1);
-        TaggedTreeItem<String> tItem;
-        if (cbShowUnionModelOnly.isSelected()) {
-            tItem = new TaggedTreeItem<>("Union Model");
-            rootMain.getChildren().add(tItem);
-            treeMapID.putIfAbsent(tItem, "unionModel");
-            tItem.setTag("fileOrModel");
-
-            LinkedList<String> classList = InstanceDataFactory.getClassesForTree(InstanceModelMap.get("unionModel"));
-            for (String i : classList) {
-                TaggedTreeItem<String> cItem = new TaggedTreeItem<>(i);
-                tItem.getChildren().add(cItem);
-                cItem.setTag("classType");
-            }
-        } else {
-            tItem = new TaggedTreeItem<>("Union Model");
-            rootMain.getChildren().add(tItem);
-            treeMapID.putIfAbsent(tItem, "unionModel");
-            tItem.setTag("fileOrModel");
-
-            LinkedList<String> classList = InstanceDataFactory.getClassesForTree(InstanceModelMap.get("unionModel"));
-            for (String i : classList) {
-                TaggedTreeItem<String> cItem = new TaggedTreeItem<>(i);
-                tItem.getChildren().add(cItem);
-                cItem.setTag("classType");
-            }
-
-            for (String key : tvlevel1) {
-                if (!treeMapID.containsValue(key) && !key.equals("modelUnionWithoutHeader") && !key.equals("unionModel")) {
-                    tItem = new TaggedTreeItem<>(key.split(".xml\\|", 2)[0]);
-                    rootMain.getChildren().add(tItem);
-                    treeMapID.putIfAbsent(tItem, key);
-                    tItem.setTag("fileOrModel");
-
-                    classList = InstanceDataFactory.getClassesForTree(InstanceModelMap.get(key));
-                    for (String i : classList) {
-                        TaggedTreeItem<String> cItem = new TaggedTreeItem<>(i);
-                        tItem.getChildren().add(cItem);
-                        cItem.setTag("classType");
-                    }
-                }
-            }
-        }
-
-        treeViewIDStatic.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-
     }
 
     //set expand in the Instance data tree view
@@ -1986,8 +1731,8 @@ public class MainController implements Initializable {
                     }
                 }
                 for (TreeItem<String> ti : expandedItem.getChildren()) {
-                    String tiName = ti.getValue().toString();
-                    LinkedList<String> classInstance = InstanceDataFactory.getClassInstancesForTree(selectedModel, tiName);
+                    String tiName = ti.getValue();
+                    LinkedList<String> classInstance = InstanceDataFactory.getClassInstancesForTree(Objects.requireNonNull(selectedModel), tiName);
 
                     for (String i : classInstance) {
                         TaggedTreeItem<String> cInstanceItem = new TaggedTreeItem<>(i);
@@ -2015,7 +1760,7 @@ public class MainController implements Initializable {
                     }
                 }
                 for (TreeItem<String> ti : expandedItem.getChildren()) {
-                    String tiName = ti.getValue().toString();
+                    String tiName = ti.getValue();
                     LinkedList<String> classProperty = InstanceDataFactory.getClassPropertiesForTree(selectedModel, expandedItem.getValue(), tiName);
 
                     for (String i : classProperty) {
@@ -2044,7 +1789,7 @@ public class MainController implements Initializable {
                     }
                 }
                 for (TreeItem<String> ti : expandedItem.getChildren()) {
-                    String tiName = ti.getValue().toString();
+                    String tiName = ti.getValue();
                     String classInstance = InstanceDataFactory.getPropertiesRefClassForTree(selectedModel, expandedItem.getValue(), expandedItem.getParent().getValue(), tiName);
 
                     TaggedTreeItem<String> classItem = new TaggedTreeItem<>(classInstance);
@@ -2073,7 +1818,7 @@ public class MainController implements Initializable {
                 for (TreeItem<String> ti : expandedItem.getChildren()) {
                     String tiName = ti.getValue();
                     String className = null;
-                    if (selectedModel.listStatements(ResourceFactory.createResource("http://griddigit.eu#" + tiName.split("\\|", 2)[1]), RDF.type, (RDFNode) null).hasNext()) {
+                    if (Objects.requireNonNull(selectedModel).listStatements(ResourceFactory.createResource("http://griddigit.eu#" + tiName.split("\\|", 2)[1]), RDF.type, (RDFNode) null).hasNext()) {
                         Statement typeStmt = selectedModel.listStatements(ResourceFactory.createResource("http://griddigit.eu#" + tiName.split("\\|", 2)[1]), RDF.type, (RDFNode) null).next();
                         className = selectedModel.getNsURIPrefix(typeStmt.getObject().asResource().getNameSpace()) + ":" + typeStmt.getObject().asResource().getLocalName();
                     }
