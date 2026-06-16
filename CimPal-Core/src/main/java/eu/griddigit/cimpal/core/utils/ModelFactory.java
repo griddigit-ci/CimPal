@@ -39,8 +39,17 @@ public class ModelFactory {
     }
 
     //Loads one or many models
+    // Backwards-compatible overload: default considerCimDiff = false
     public static Map<String, Model> modelLoad(
             List<File> files, String xmlBase, Lang rdfSourceFormat, boolean isSHACL, boolean treeID) throws IOException {
+        return modelLoad(files, xmlBase, rdfSourceFormat, isSHACL, treeID, false);
+    }
+
+    /**
+     * Loads one or many models (threaded). Optionally applies CIM diff prefix normalization.
+     */
+    public static Map<String, Model> modelLoad(
+            List<File> files, String xmlBase, Lang rdfSourceFormat, boolean isSHACL, boolean treeID, boolean considerCimDiff) throws IOException {
 
         // Thread-safe map for individual models
         ConcurrentMap<String, Model> modelMap = new ConcurrentHashMap<>();
@@ -96,6 +105,43 @@ public class ModelFactory {
 
         // Post-process final models
         Map<String, Model> result = new HashMap<>(modelMap);
+
+        // Optionally apply CIM prefix normalization used by other loader overload
+        if (considerCimDiff) {
+            Map<String, String> prefixMap = unionModel.getNsPrefixMap();
+            String cim2URI = prefixMap.get("cim");
+            if (cim2URI != null && !cim2URI.isEmpty()) {
+                // remove generic prefix and replace with versioned prefix
+                unionModel.removeNsPrefix("cim");
+                String cim2Pref = switch (cim2URI) {
+                    case "http://iec.ch/TC57/2013/CIM-schema-cim16#",
+                         "https://iec.ch/TC57/2013/CIM-schema-cim16#" -> "cim16";
+                    case "http://iec.ch/TC57/CIM100#", "https://iec.ch/TC57/CIM100#" -> "cim17";
+                    case "http://cim.ucaiug.io/ns#", "https://cim.ucaiug.io/ns#" -> "cim18";
+                    default -> null;
+                };
+                if (cim2Pref != null) {
+                    unionModel.setNsPrefix(cim2Pref, cim2URI);
+                }
+            }
+
+            // Also apply to union without header
+            Map<String, String> prefixMapNoHeader = unionNoHeader.getNsPrefixMap();
+            String cim2URINoHeader = prefixMapNoHeader.get("cim");
+            if (cim2URINoHeader != null && !cim2URINoHeader.isEmpty()) {
+                unionNoHeader.removeNsPrefix("cim");
+                String cim2Pref2 = switch (cim2URINoHeader) {
+                    case "http://iec.ch/TC57/2013/CIM-schema-cim16#",
+                         "https://iec.ch/TC57/2013/CIM-schema-cim16#" -> "cim16";
+                    case "http://iec.ch/TC57/CIM100#", "https://iec.ch/TC57/CIM100#" -> "cim17";
+                    case "http://cim.ucaiug.io/ns#", "https://cim.ucaiug.io/ns#" -> "cim18";
+                    default -> null;
+                };
+                if (cim2Pref2 != null) {
+                    unionNoHeader.setNsPrefix(cim2Pref2, cim2URINoHeader);
+                }
+            }
+        }
 
         if (isSHACL) {
             Model shaclModel = ShapeFactory.createShapeModelWithOwlImport(unionModel);
@@ -271,6 +317,24 @@ public class ModelFactory {
         });
 
         return new HashMap<>(result);
+    }
+
+    /**
+     * Loads a list of RDF files into a single combined model for SPARQL execution.
+     * Supports both plain XML/RDF files and ZIP archives via {@link #modelLoadPerFiles(List, String, Lang)}.
+     */
+    public static Model loadCombinedModelForSparql(List<File> files, String xmlBase) throws IOException {
+        Map<String, Model> loadedModels = modelLoadPerFiles(files, xmlBase, Lang.RDFXML);
+        Model combinedModel = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        Map<String, String> prefixMap = combinedModel.getNsPrefixMap();
+
+        for (Model model : loadedModels.values()) {
+            prefixMap.putAll(model.getNsPrefixMap());
+            combinedModel.add(model);
+        }
+
+        combinedModel.setNsPrefixes(prefixMap);
+        return combinedModel;
     }
 
     private static Lang getLangFromExtension(String ext, Lang fallback) {

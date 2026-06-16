@@ -457,7 +457,7 @@ public class SHACLFromRDF {
         Map<String, Model> baseTierMap = new HashMap<>();
 
         if (basefiles != null) {
-            Model basemodel = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, false, false).get("unionModel");
+            Model basemodel = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(basefiles, "", Lang.RDFXML, false, false, true).get("unionModel");
             var inheritanceResult = eu.griddigit.cimpal.core.utils.ModelFactory.generateInheritanceModels(basemodel, true, true);
             baseTierMap.put("unionmodelbaseprofilesshacl", basemodel);
             baseTierMap.put("unionmodelbaseprofilesshaclinheritance", inheritanceResult.processedModel);
@@ -714,7 +714,7 @@ public class SHACLFromRDF {
             shapeModel = addPropertyGroup(shapeModel, commonNSuri, localNameGroup, groupFeatures);
 
             //add NodeShape
-            shapeModel = addNodeShapeProfileClassCount(shapeModel, commonNSuri, "ClassCount-node", commonNSuri + "ClassCount");
+            shapeModel = addNodeShapeProfileClassCount(shapeModel, commonNSuri, "ClassCount-node", "http://www.w3.org/ns/dcat#Dataset", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
 
             //create the property shape
             RDFNode pc = shapeModel.createResource(commonNSuri + "ClassCount-property");
@@ -1954,7 +1954,7 @@ public class SHACLFromRDF {
     }
 
     //add a NodeShape to a shape model including all necessary properties for Class Count check
-    private Model addNodeShapeProfileClassCount(Model shapeModel, String nsURIprofile, String localName, String classFullURI) {
+    private Model addNodeShapeProfileClassCount(Model shapeModel, String nsURIprofile, String localName, String classFullURI1, String classFullURI2) {
         /*shapeModel - is the shape model
          * nsURIprofile - is the namespace of the NodeShape
          * localName - is the name of the NodeShape
@@ -1974,8 +1974,10 @@ public class SHACLFromRDF {
         //creates property sh:targetClass
         //Property p1 = shapeModel.createProperty(shaclURI, "targetClass");
         //creates the object which is the CIM class
-        RDFNode o1 = shapeModel.createResource(classFullURI);
-        r.addProperty(SH.targetNode, o1);
+        RDFNode o1 = shapeModel.createResource(classFullURI1);
+        r.addProperty(SH.targetClass, o1);
+        RDFNode o2 = shapeModel.createResource(classFullURI2);
+        r.addProperty(SH.targetClass, o2);
         //up to here this defines e.g. sh:targetClass cim:GeographicalRegion ;
 
         return shapeModel;

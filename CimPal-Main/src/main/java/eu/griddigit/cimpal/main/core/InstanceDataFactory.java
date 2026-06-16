@@ -185,6 +185,25 @@ public class InstanceDataFactory {
         String extensionName=saveProperties.get("extensionName").toString();
         String fileExtension=saveProperties.get("fileExtension").toString();
         String fileDialogTitle=saveProperties.get("fileDialogTitle").toString();
+        Resource[] prettyTypes = null;
+
+        Object prettyTypesObj = saveProperties.get("prettyTypes");
+        if (prettyTypesObj instanceof Resource[] resources && resources.length > 0) {
+            prettyTypes = resources;
+        } else if (prettyTypesObj instanceof Collection<?> collection && !collection.isEmpty()) {
+            prettyTypes = collection.stream()
+                    .filter(Resource.class::isInstance)
+                    .map(Resource.class::cast)
+                    .toArray(Resource[]::new);
+        }
+
+        if ((prettyTypes == null || prettyTypes.length == 0) && headerClassResource != null && !headerClassResource.isBlank()) {
+            prettyTypes = new Resource[]{ResourceFactory.createResource(headerClassResource)};
+        }
+
+        if (putHeaderOnTop && (prettyTypes == null || prettyTypes.length == 0)) {
+            prettyTypes = buildPrettyTypesFallback(instanceDataModel, headerClassResource);
+        }
 
         //save file
         OutputStream outXML=null;
@@ -206,8 +225,8 @@ public class InstanceDataFactory {
                     //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
                     //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
                     //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
-                    if (putHeaderOnTop) {
-                        properties.put("prettyTypes", new Resource[]{ResourceFactory.createResource(headerClassResource)});
+                    if (putHeaderOnTop && prettyTypes != null && prettyTypes.length > 0) {
+                        properties.put("prettyTypes", prettyTypes);
                     }
                     properties.put("xmlbase", xmlBase);
                     properties.put("tab", tab);
@@ -413,6 +432,27 @@ public class InstanceDataFactory {
         }
         Collections.sort(classPropList);
         return classPropList;
+    }
+
+    private static Resource[] buildPrettyTypesFallback(Model model, String headerClassResource) {
+        LinkedHashSet<Resource> orderedTypes = new LinkedHashSet<>();
+
+        if (headerClassResource != null && !headerClassResource.isBlank()) {
+            orderedTypes.add(ResourceFactory.createResource(headerClassResource));
+        }
+
+        if (model != null) {
+            StmtIterator typeStatements = model.listStatements(null, RDF.type, (RDFNode) null);
+            while (typeStatements.hasNext()) {
+                Statement stmt = typeStatements.nextStatement();
+                RDFNode obj = stmt.getObject();
+                if (obj.isResource()) {
+                    orderedTypes.add(obj.asResource());
+                }
+            }
+        }
+
+        return orderedTypes.toArray(Resource[]::new);
     }
 
     public static String  getPropertiesRefClassForTree(Model model, String classInstance, String classTypeProp, String classProp) {

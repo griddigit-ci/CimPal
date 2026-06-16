@@ -60,19 +60,41 @@ public class DataTypeStreamRDF implements StreamRDF {
     }
 
     private Triple dataTypeTriple(Triple triple) {
-        //If the triple contains a literal, this is extracted and datype applied, otherwise the original triple is returned
-        if (triple.getMatchObject().isLiteral()) {// only apply typing of object is literal
-            /* determine datatype, use xsd:string as default */
-            RDFDatatype datatype = dataTypeMap.getOrDefault(triple.getPredicate().toString(), XSDDatatype.XSDstring);
-            /* generate typed literal */
+        // If the triple contains a literal, this is extracted and datatype applied,
+        // otherwise the original triple is returned.
+        if (triple.getObject().isLiteral()) {
+
+            // NEW: preserve language-tagged literals, e.g. dcterms:description xml:lang="en"
+            String lang = triple.getObject().getLiteralLanguage();
+            if (lang != null && !lang.isEmpty()) {
+                return triple;
+            }
+
+            // Keep your old behavior for everything else
+            RDFDatatype datatype = dataTypeMap.getOrDefault(
+                    triple.getPredicate().toString(),
+                    XSDDatatype.XSDstring
+            );
+
             String literalValue = triple.getObject().getLiteralLexicalForm();
-            Literal typedLiteral = ResourceFactory.createTypedLiteral(literalValue, datatype);
-            /* generate new triple */
-            // Create new object node
-            Node objectNode = NodeFactory.createLiteralDT(typedLiteral.getLexicalForm(), typedLiteral.getDatatype());
-            // Generate new triple
-            triple = Triple.create(triple.getSubject(), triple.getPredicate(), objectNode);
+
+            Literal typedLiteral = ResourceFactory.createTypedLiteral(
+                    literalValue,
+                    datatype
+            );
+
+            Node objectNode = NodeFactory.createLiteral(
+                    typedLiteral.getLexicalForm(),
+                    typedLiteral.getDatatype()
+            );
+
+            triple = Triple.create(
+                    triple.getSubject(),
+                    triple.getPredicate(),
+                    objectNode
+            );
         }
+
         return triple;
     }
 

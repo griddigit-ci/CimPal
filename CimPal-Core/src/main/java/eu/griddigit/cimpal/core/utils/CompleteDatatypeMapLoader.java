@@ -46,21 +46,29 @@ public final class CompleteDatatypeMapLoader {
 
             return out;
         }
+
     }
 
     private static String extractDatatypeUri(String raw) {
         if (raw == null) return null;
 
-        // Expect: Datatype[<URI> -> class ...]
         int lb = raw.indexOf('[');
-        int arrow = raw.indexOf("->");
-        if (lb < 0 || arrow < 0 || arrow <= lb) return null;
+        if (lb < 0) return null;
 
-        String uri = raw.substring(lb + 1, arrow).trim();
+        int rb = raw.indexOf(']', lb + 1);
 
-        // Just in case, remove a trailing ']' if the format is different
-        if (uri.endsWith("]")) uri = uri.substring(0, uri.length() - 1).trim();
+        String inside;
+        if (rb > lb) {
+            inside = raw.substring(lb + 1, rb).trim();
+        } else {
+            inside = raw.substring(lb + 1).trim();
+        }
 
-        return uri;
+        int arrow = inside.indexOf("->");
+        if (arrow >= 0) {
+            inside = inside.substring(0, arrow).trim();
+        }
+
+        return inside.isBlank() ? null : inside;
     }
 }
