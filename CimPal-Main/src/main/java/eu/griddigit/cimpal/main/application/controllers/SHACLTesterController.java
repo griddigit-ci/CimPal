@@ -111,7 +111,7 @@ public class SHACLTesterController implements Initializable {
                     mainController.appendText(message);
                 }
             });
-            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL, cbExportReports.isSelected());
+            shaclAutoTester.runTests(selectedFile, selectedFolder, fileL, cbExportReports.isSelected(), null); // todo add datatype Mapping file import
 
             setProgressBar(1);
         } else {
