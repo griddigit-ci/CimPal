@@ -63,43 +63,50 @@
                </TabPane>
             </HBox>
          </AnchorPane>
-         <TitledPane fx:id="outputSourceContainer" animated="false" expanded="true" text="Output &amp; Source Code">
-                <content>
-                   <BorderPane minHeight="0.0" minWidth="0.0">
-                      <left>
-                         <VBox alignment="TOP_CENTER" spacing="10.0">
-                            <padding>
-                               <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
-                            </padding>
-                            <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBtnClear" text="Clear" wrapText="true" />
-                            <ToggleButton fx:id="btnShowSourceCodeDefineTab" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBtnShowSourceCodeShacl" text="Show" wrapText="true">
-                               <tooltip>
-                                  <Tooltip text="Show or hide the source code of the constraints." />
-                               </tooltip>
-                            </ToggleButton>
-                         </VBox>
-                      </left>
-                      <center>
-                         <TabPane fx:id="tabPaneDown" minHeight="0.0" minWidth="0.0" side="BOTTOM" tabClosingPolicy="UNAVAILABLE" BorderPane.alignment="CENTER">
-                            <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
-                               <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                                  <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                     <TextArea fx:id="foutputWindow" wrapText="true" />
-                                  </ScrollPane>
-                               </AnchorPane>
-                            </Tab>
-                            <Tab fx:id="tabConstraintsSourceCode" closable="false" onSelectionChanged="#actionTabConstraintsSourceCode" text="Source code">
-                               <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                                  <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                     <TextArea fx:id="fsourceDefineTab" editable="false" wrapText="true" />
-                                  </ScrollPane>
-                               </AnchorPane>
-                            </Tab>
-                         </TabPane>
-                      </center>
-                   </BorderPane>
-                </content>
-             </TitledPane>
+         <TitledPane fx:id="outputSourceContainer" animated="false" text="Output &amp; Source Code">
+            <BorderPane minHeight="0.0" minWidth="0.0">
+               <left>
+                  <VBox alignment="TOP_CENTER" spacing="10.0">
+                     <padding>
+                        <Insets bottom="3.0" left="3.0" right="3.0" top="3.0"/>
+                     </padding>
+                     <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBtnClear"
+                             text="Clear" wrapText="true"/>
+                     <ToggleButton fx:id="btnShowSourceCodeDefineTab" maxWidth="1.7976931348623157E308"
+                                   mnemonicParsing="false" onAction="#actionBtnShowSourceCodeShacl" text="Show"
+                                   wrapText="true">
+                        <tooltip>
+                           <Tooltip text="Show or hide the source code of the constraints."/>
+                        </tooltip>
+                     </ToggleButton>
+                  </VBox>
+               </left>
+               <center>
+                  <TabPane fx:id="tabPaneDown" minHeight="0.0" minWidth="0.0" side="BOTTOM"
+                           tabClosingPolicy="UNAVAILABLE" BorderPane.alignment="CENTER">
+                     <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                           <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true"
+                                       AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
+                                       AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                              <TextArea fx:id="foutputWindow" wrapText="true"/>
+                           </ScrollPane>
+                        </AnchorPane>
+                     </Tab>
+                     <Tab fx:id="tabConstraintsSourceCode" closable="false"
+                          onSelectionChanged="#actionTabConstraintsSourceCode" text="Source code">
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                           <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true"
+                                       AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
+                                       AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                              <TextArea fx:id="fsourceDefineTab" editable="false" wrapText="true"/>
+                           </ScrollPane>
+                        </AnchorPane>
+                     </Tab>
+                  </TabPane>
+               </center>
+            </BorderPane>
+         </TitledPane>
       </SplitPane>
    </AnchorPane>
    <HBox id="HBox" alignment="CENTER_LEFT" prefHeight="20.0" prefWidth="1280.0" spacing="5.0" VBox.vgrow="NEVER">

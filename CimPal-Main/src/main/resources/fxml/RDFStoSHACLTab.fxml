@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.*?>
-<?import java.util.*?>
-<?import javafx.scene.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
@@ -117,12 +114,10 @@
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0"/>
                 </padding>
-                <children>
-                    <CheckBox fx:id="cbRDFSSHACLabstract" disable="true" mnemonicParsing="false"
-                              text="Generate shapes for local properties of concrete and abstract classes, i.e. do not trace inferitance when generating"/>
-                    <CheckBox fx:id="cbRDFSSHACLinheritTree" disable="true" mnemonicParsing="false"
-                              text="Export inheritance tree"/>
-                </children>
+                <CheckBox fx:id="cbRDFSSHACLabstract" disable="true" mnemonicParsing="false"
+                          text="Generate shapes for local properties of concrete and abstract classes, i.e. do not trace inferitance when generating"/>
+                <CheckBox fx:id="cbRDFSSHACLinheritTree" disable="true" mnemonicParsing="false"
+                          text="Export inheritance tree"/>
             </HBox>
             <HBox spacing="10.0">
                 <padding>
@@ -153,19 +148,17 @@
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0"/>
                 </padding>
-                <children>
-                    <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles2nd" disable="true" mnemonicParsing="false"
-                              text="Consider 2nd set of related profiles for cross profile value type shapes"/>
-                    <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles3rd" disable="true" mnemonicParsing="false"
-                              text="Consider 3rd set of related profiles for cross profile value type shapes">
-                        <HBox.margin>
-                            <Insets left="20.0"/>
-                        </HBox.margin>
-                    </CheckBox>
-                </children>
                 <VBox.margin>
                     <Insets left="30.0"/>
                 </VBox.margin>
+                <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles2nd" disable="true" mnemonicParsing="false"
+                          text="Consider 2nd set of related profiles for cross profile value type shapes"/>
+                <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles3rd" disable="true" mnemonicParsing="false"
+                          text="Consider 3rd set of related profiles for cross profile value type shapes">
+                    <HBox.margin>
+                        <Insets left="20.0"/>
+                    </HBox.margin>
+                </CheckBox>
             </HBox>
             <HBox spacing="10.0">
                 <padding>
