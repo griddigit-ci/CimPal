@@ -20,7 +20,7 @@ import org.apache.jena.shared.*;
 import org.apache.jena.util.CharEncoding;
 import org.apache.jena.util.FileUtils;
 import org.apache.jena.util.SystemUtils;
-import org.apache.jena.util.XMLChar;
+import org.apache.jena.util.XML10Char;
 import org.apache.jena.vocabulary.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -170,7 +170,7 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
 
     private String longAnonId(Resource r) {
         String rid = r.getId().toString();
-        return XMLChar.isValidNCName(rid) ? rid : escapedId(rid);
+        return XML10Char.isValidNCName(rid) ? rid : escapedId(rid);
     }
 
     /**
@@ -362,7 +362,7 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
     String tag(String namespace, String local, int type, boolean localIsQname) {
         String prefix = ns.get(namespace);
         if (type != FAST && type != FASTATTR) {
-            if ((!localIsQname) && !XMLChar.isValidNCName(local))
+            if ((!localIsQname) && !XML10Char.isValidNCName(local))
                 return splitTag(namespace + local, type);
             if (namespace.equals(RDFNS)) {
                 // Description, ID, nodeID, about, aboutEach, aboutEachPrefix, li
@@ -575,7 +575,7 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
         for (int i = 0; i < id.length(); i++) {
             char ch = id.charAt(i);
             if (ch != ESCAPE
-                    && (i == 0 ? XMLChar.isNCNameStart(ch) : XMLChar.isNCName(ch))) {
+                    && (i == 0 ? XML10Char.isNCNameStart(ch) : XML10Char.isNCName(ch))) {
                 result.append(ch);
             } else {
                 escape(result, ch);
@@ -864,7 +864,7 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
             return true;
         if (prefix.toLowerCase().startsWith("xml"))
             logger.warn("Namespace prefix '" + prefix + "' is reserved by XML.");
-        else if (!XMLChar.isValidNCName(prefix))
+        else if (!XML10Char.isValidNCName(prefix))
             logger.warn("'" + prefix + "' is not a legal namespace prefix.");
         else if (jenaNamespace.matcher(prefix).matches())
             logger.warn("Namespace prefix '" + prefix + "' is reserved by Jena.");

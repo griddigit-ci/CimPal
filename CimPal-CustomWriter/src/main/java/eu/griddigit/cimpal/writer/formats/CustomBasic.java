@@ -389,7 +389,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
     protected void writeLiteral(Literal l, PrintWriter writer) {
         String lang = l.getLanguage();
         String form = l.getLexicalForm();
-        boolean isXML = XMLLiteralType.theXMLLiteralType.equals(l.getDatatype()); // new
+        boolean isXML = XMLLiteralType.rdfXMLLiteral.equals(l.getDatatype()); // new
         String var10001;
         if (Util.isLangString(l)) {
             //writer.print(" xml:lang=" + attributeQuoted(lang));

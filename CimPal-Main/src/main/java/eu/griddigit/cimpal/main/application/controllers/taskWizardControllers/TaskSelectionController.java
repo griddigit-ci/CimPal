@@ -3,7 +3,6 @@ package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 import eu.griddigit.cimpal.main.application.services.TaskDependenciesEnforcer;
 import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
 import javafx.application.Platform;
@@ -67,8 +66,6 @@ public class TaskSelectionController implements Initializable, IController {
     public void initialize(URL url, ResourceBundle resourceBundle) {
         try {
             taskSelectionController = new TaskDependenciesEnforcer();
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (URISyntaxException e) {
