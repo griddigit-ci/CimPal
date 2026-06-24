@@ -170,7 +170,7 @@ public class ManifestGenerator {
             copyBestAsDateTime(dataset, DCAT.startDate,
                     values(sourceModel, datasetHeader, DCAT.startDate),
                     values(sourceModel, fullModelHeader, MD_MODEL_SCENARIO_TIME));
-            copyBest(dataset, DCAT.endDate,
+            copyBestAsDateTime(dataset, DCAT.endDate,
                     values(sourceModel, datasetHeader, DCAT.endDate));
             copyBest(dataset, DCAT_VERSION,
                     values(sourceModel, datasetHeader, DCAT_VERSION),
