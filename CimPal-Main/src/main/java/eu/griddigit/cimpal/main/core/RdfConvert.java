@@ -257,7 +257,10 @@ public class RdfConvert {
                 mainModel.setNsPrefix("entsoe", m.getNsPrefixURI("entsoe"));
             } else if (m.getNsPrefixURI("eu") != null) {
                 mainModel.setNsPrefix("eu", m.getNsPrefixURI("eu"));
+            } else if (m.getNsPrefixURI("nc") != null) {
+                mainModel.setNsPrefix("nc", m.getNsPrefixURI("nc"));
             }
+
 
             // Process Description and Enumeration
             if (m.listSubjectsWithProperty(stereotype, "Description").hasNext()) {
