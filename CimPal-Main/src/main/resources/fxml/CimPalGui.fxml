@@ -33,12 +33,12 @@
          <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
          <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text=" Model transformation" />
          <MenuItem mnemonicParsing="false" onAction="#actionValidateByMapping" text="Validate by mapping file" />
-
          <MenuItem mnemonicParsing="false" onAction="#actionMenuPSSEPF" text="PSSE-PowerFactory compare" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
          <MenuItem mnemonicParsing="false" onAction="#actionGenerateManifest" text="Generate Manifest" />
          <MenuItem mnemonicParsing="false" onAction="#actionRunSPARQLQuery" text="Run SPARQL Query" />
          <MenuItem mnemonicParsing="false" onAction="#actionRestoreTtlFromConstraintCsv" text="Restore ttl from constraint csv" />
+         <MenuItem mnemonicParsing="false" onAction="#actionPopulateMissingAttributes" text="Populate missing attributes" />
 
       </Menu>
       <Menu mnemonicParsing="false" text="Help">

@@ -7,6 +7,7 @@ package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.core.generators.ManifestGenerator;
 import eu.griddigit.cimpal.core.models.*;
+import eu.griddigit.cimpal.core.utils.AttributeInjector;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
@@ -57,6 +58,8 @@ import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
+import static eu.griddigit.cimpal.main.core.ModelManipulationFactory.LoadRDFAbout;
+import static eu.griddigit.cimpal.main.core.ModelManipulationFactory.LoadRDFEnum;
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
 import static eu.griddigit.cimpal.main.util.ExcelTools.CreateTemplateFromXMLQAR;
 
@@ -1957,6 +1960,125 @@ public class MainController implements Initializable {
     public void actionRunSPARQLQuery(ActionEvent actionEvent) {
         if (tabPaneConstraintsDetails != null && tabSPARQLQuery != null) {
             tabPaneConstraintsDetails.getSelectionModel().select(tabSPARQLQuery);
+        }
+    }
+
+    @FXML
+    public void actionPopulateMissingAttributes(ActionEvent actionEvent) {
+
+        try {
+            List<File> selectedModelFiles = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                    false,
+                    "Model files",
+                    List.of("*.xml", "*.zip"),
+                    "Select model file(s) to populate missing attributes"
+            );
+
+            List<File> selectedExcelFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                    true,
+                    "Template file",
+                    List.of("*.xlsx"),
+                    "Select excel template file with missing attributes"
+            );
+
+            if (selectedModelFiles == null || selectedModelFiles.isEmpty()) {
+                progressBar.setProgress(0);
+                GUIhelper.showUserFriendlyError("Model files not selected", "Please select one or more model files to populate missing attributes.", null);
+                return;
+            }
+
+            if (selectedExcelFile == null || selectedExcelFile.isEmpty()) {
+                progressBar.setProgress(0);
+                GUIhelper.showUserFriendlyError("Excel template file not selected", "Please select an excel template file with missing attributes to populate the models.", null);
+                return;
+            }
+
+            File outputFolder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
+                    "Output folder"
+            );
+
+            if (outputFolder == null) {
+                progressBar.setProgress(0);
+                GUIhelper.showUserFriendlyError("Output folder not selected", "Please select an output folder to save the populated models.", null);
+                return;
+            }
+            ArrayList<Object> xlsData = ExcelTools.importXLSX(selectedExcelFile.getFirst().getAbsolutePath(), "ClassAttributes");
+
+            Map<String, Map<String, String>> classAttributesMap = null;
+
+            String xmlBase = "https://cim.ucaiug.io/ns#";
+
+            progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+            for (File selectedFile : selectedModelFiles) {
+                Model model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(List.of(selectedFile), xmlBase, Lang.RDFXML, false, false)
+                        .get("unionModel");
+
+                if (classAttributesMap == null) {
+                    classAttributesMap = AttributeInjector.getClassAttributesMap(xlsData, model.getNsPrefixMap());
+                }
+
+                Model extendedModel = AttributeInjector.injectAttributes(model, classAttributesMap);
+
+                Map<String, Object> saveProperties = new HashMap<>();
+
+                saveProperties.put("filename", selectedFile.getName());
+                saveProperties.put("showXmlDeclaration", "true");
+                saveProperties.put("showDoctypeDeclaration", "false");
+                saveProperties.put("tab", "2");
+                saveProperties.put("relativeURIs", "same-document");
+                saveProperties.put("showXmlEncoding", "true");
+                saveProperties.put("xmlBase", xmlBase);
+                saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
+                saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
+                saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
+                saveProperties.put("useFileDialog", false);
+                saveProperties.put("fileDialogTitle", "");
+                saveProperties.put("fileFolder", outputFolder.getAbsolutePath());
+                saveProperties.put("dozip", false);
+                saveProperties.put("instanceData", "false"); //this is to only print the ID and not with namespace
+                saveProperties.put("showXmlBaseDeclaration", "false");
+                saveProperties.put("sortRDF", "true");
+                saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
+                saveProperties.put("putHeaderOnTop", true);
+                saveProperties.put("headerClassResource", AttributeInjector.getModelHeader(model));
+                saveProperties.put("extensionName", "RDF XML");
+                saveProperties.put("fileExtension", "*.xml");
+
+                Set<Resource> rdfAboutList = new HashSet<>();
+                Set<Resource> rdfEnumList = new HashSet<>();
+
+                String keyword = model.listStatements(null, ResourceFactory.createProperty("http://www.w3.org/ns/dcat#keyword"), (RDFNode) null)
+                        .toList()
+                        .stream()
+                        .map(stmt -> stmt.getObject().asLiteral().getString().toLowerCase())
+                        .findFirst()
+                        .orElse(null);
+                if ((boolean) saveProperties.get("useAboutRules")) {
+                    rdfAboutList = LoadRDFAbout(xmlBase, keyword);
+                    rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
+                }
+                if ((boolean) saveProperties.get("useEnumRules")) {
+                    rdfEnumList = LoadRDFEnum(xmlBase, keyword);
+                }
+                if (saveProperties.containsKey("rdfAboutList")) {
+                    saveProperties.replace("rdfAboutList", rdfAboutList);
+                } else {
+                    saveProperties.put("rdfAboutList", rdfAboutList);
+                }
+                if (saveProperties.containsKey("rdfEnumList")) {
+                    saveProperties.replace("rdfEnumList", rdfEnumList);
+                } else {
+                    saveProperties.put("rdfEnumList", rdfEnumList);
+                }
+
+                InstanceDataFactory.saveInstanceData(extendedModel, saveProperties);
+            }
+
+            progressBar.setProgress(1);
+        } catch (Exception e) {
+            progressBar.setProgress(0);
+            GUIhelper.showUserFriendlyError("Populate missing attributes failed", "The operation could not be completed. Please review details and share them with support.", e);
         }
     }
 
