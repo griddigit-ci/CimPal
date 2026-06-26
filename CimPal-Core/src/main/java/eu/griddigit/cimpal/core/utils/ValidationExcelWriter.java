@@ -12,13 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.EnumMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 public class ValidationExcelWriter implements Closeable {
 
@@ -34,24 +28,42 @@ public class ValidationExcelWriter implements Closeable {
     private static final String STATISTICS_SHEET_NAME = "Validation statistics";
     private static final String STATISTICS_CONSTRAINT_SHEET_NAME = "StatisticsConstraint";
 
+    private static final String TIMESTAMP_OVERVIEW_SHEET_NAME = "TimestampOverview";
+    private static final String TIMESTAMP_CONSTRAINT_SHEET_NAME = "TopConstraints";
+    private static final String INPUT_COMPLETENESS_SHEET_NAME = "InputCompleteness";
+    private static final boolean AUTO_SIZE_COLUMNS = false;
+
+    private static final String[] TIMESTAMP_OVERVIEW_HEADER = new String[]{
+            "Country", "Timestamp", "Report file",
+            "Validation count", "Conform validations", "Non-conform validations", "Validation errors",
+            "Total results", "Violations", "Warnings", "Infos", "Worst severity", "Check priority"
+    };
+
+    private static final String[] TIMESTAMP_CONSTRAINT_HEADER = new String[]{
+            "Country", "Timestamp", "Report file",
+            "Constraint file", "Source", "Constraint Component", "Message", "Severity", "Count"
+    };
+
+    private static final String[] INPUT_COMPLETENESS_HEADER = new String[]{
+            "Country", "Timestamp", "Profile", "Expected count", "Actual count", "Status", "Files", "Message"
+    };
+
     // Raw validation data: one header per sheet, no blank rows, no per-validation statistic rows.
     // The old Details column was intentionally removed.
     private static final String[] RAW_HEADER = new String[]{
-            "XML files", "Constraint file", "Dataset",
+            "Dataset", "XML files", "Constraint file",
             "Focus node", "Path", "Value", "Source", "Constraint Component",
             "Message", "Severity", "Description", "Order", "Name", "Group"
     };
 
-    // One row per validation. Process errors also go here.
     private static final String[] STATISTICS_HEADER = new String[]{
-            "XML files", "Constraint file", "Dataset",
+            "Case folder", "Dataset", "XML files", "Constraint file",
             "All", "Warnings", "Infos", "Violations", "Conforms", "Validation error"
     };
 
-    // One row per unique Source over the whole report.
-    // Count shows how many validation results used that Source.
+    // One row per unique constraint over the whole report.
+    // Count shows how many validation results used that same constraint information.
     private static final String[] STATISTICS_CONSTRAINT_HEADER = new String[]{
-            "XML files", "Constraint file",
             "Path", "Source", "Count", "Constraint Component", "Message", "Severity",
             "Description", "Order", "Name", "Group"
     };
@@ -64,10 +76,45 @@ public class ValidationExcelWriter implements Closeable {
     private final Sheet statisticsConstraintSheet;
     private int nextStatisticsRow = 1;
 
+    private final boolean timestampedSummaryMode;
+    private Sheet timestampOverviewSheet;
+    private Sheet timestampConstraintSheet;
+    private Sheet inputCompletenessSheet;
+    private int nextTimestampOverviewRow = 1;
+    private int nextInputCompletenessRow = 1;
+
+    private final Map<TimestampConstraintKey, Integer> timestampConstraintStatistics = new LinkedHashMap<>();
+
     public ValidationExcelWriter() {
+        this(false);
+    }
+
+    private ValidationExcelWriter(boolean timestampedSummaryMode) {
+        this.timestampedSummaryMode = timestampedSummaryMode;
         this.wb = new XSSFWorkbook();
 
         CellStyle headerStyle = createHeaderStyle(wb);
+
+        if (timestampedSummaryMode) {
+            timestampOverviewSheet = wb.createSheet(TIMESTAMP_OVERVIEW_SHEET_NAME);
+            writeHeader(timestampOverviewSheet, TIMESTAMP_OVERVIEW_HEADER, headerStyle);
+            timestampOverviewSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TIMESTAMP_OVERVIEW_HEADER.length - 1));
+            timestampOverviewSheet.createFreezePane(0, 1);
+
+            timestampConstraintSheet = wb.createSheet(TIMESTAMP_CONSTRAINT_SHEET_NAME);
+            writeHeader(timestampConstraintSheet, TIMESTAMP_CONSTRAINT_HEADER, headerStyle);
+            timestampConstraintSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TIMESTAMP_CONSTRAINT_HEADER.length - 1));
+            timestampConstraintSheet.createFreezePane(0, 1);
+
+            inputCompletenessSheet = wb.createSheet(INPUT_COMPLETENESS_SHEET_NAME);
+            writeHeader(inputCompletenessSheet, INPUT_COMPLETENESS_HEADER, headerStyle);
+            inputCompletenessSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, INPUT_COMPLETENESS_HEADER.length - 1));
+            inputCompletenessSheet.createFreezePane(0, 1);
+
+            statisticsSheet = null;
+            statisticsConstraintSheet = null;
+            return;
+        }
 
         for (CaseFolder cf : CaseFolder.values()) {
             Sheet s = wb.createSheet(cf.name());
@@ -89,6 +136,10 @@ public class ValidationExcelWriter implements Closeable {
         statisticsConstraintSheet.createFreezePane(0, 1);
     }
 
+    public static ValidationExcelWriter createTimestampedSummaryWriter() {
+        return new ValidationExcelWriter(true);
+    }
+
     /**
      * Appends raw SHACL result rows to the selected case sheet.
      * No section headers and no blank separator rows are written, so the sheet remains filterable.
@@ -102,9 +153,12 @@ public class ValidationExcelWriter implements Closeable {
 
         String reportXmlFiles = toReportFileNames(xmlFiles);
         String reportConstraintFile = toReportFileNames(constraintFile);
-        String reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
+        String reportDataset = safe(datasetName);
 
-        writeStatisticsRow(cf, datasetName, reportXmlFiles, reportConstraintFile, reportDataset, results, conforms, null);
+        if (reportDataset.isBlank()) {
+            reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
+        }
+        writeStatisticsRow(cf, reportDataset, reportXmlFiles, reportConstraintFile, results, conforms, null);
 
         if (results == null || results.isEmpty()) {
             return;
@@ -117,9 +171,9 @@ public class ValidationExcelWriter implements Closeable {
             addConstraintStatistic(reportXmlFiles, reportConstraintFile, res);
 
             Row dr = s.createRow(r++);
-            dr.createCell(0).setCellValue(reportXmlFiles);
-            dr.createCell(1).setCellValue(reportConstraintFile);
-            dr.createCell(2).setCellValue(reportDataset);
+            dr.createCell(0).setCellValue(reportDataset);
+            dr.createCell(1).setCellValue(reportXmlFiles);
+            dr.createCell(2).setCellValue(reportConstraintFile);
             dr.createCell(3).setCellValue(safe(res.getFocusNode()));
             dr.createCell(4).setCellValue(safe(res.getPath()));
             dr.createCell(5).setCellValue(safe(res.getValue()));
@@ -134,6 +188,74 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         nextRowByCase.put(cf, r);
+    }
+
+    private static String toReportDataset(String xmlFiles, String constraintFile) {
+        String constraint = safe(constraintFile);
+
+        if (constraint.replace(" ", "").toLowerCase(Locale.ROOT).contains("danglingreference")) {
+            return "Dangling References (other)";
+        }
+
+        LinkedHashSet<String> profiles = new LinkedHashSet<>();
+
+        addProfileIfPresent(profiles, xmlFiles, "EQ");
+        addProfileIfPresent(profiles, xmlFiles, "TP");
+        addProfileIfPresent(profiles, xmlFiles, "SSH");
+        addProfileIfPresent(profiles, xmlFiles, "SV");
+
+        addProfileIfPresent(profiles, xmlFiles, "AE");
+        addProfileIfPresent(profiles, xmlFiles, "AP");
+        addProfileIfPresent(profiles, xmlFiles, "PS");
+        addProfileIfPresent(profiles, xmlFiles, "AS");
+        addProfileIfPresent(profiles, xmlFiles, "CO");
+        addProfileIfPresent(profiles, xmlFiles, "ER");
+        addProfileIfPresent(profiles, xmlFiles, "IAM");
+        addProfileIfPresent(profiles, xmlFiles, "RA");
+        addProfileIfPresent(profiles, xmlFiles, "RAS");
+        addProfileIfPresent(profiles, xmlFiles, "OP");
+        addProfileIfPresent(profiles, xmlFiles, "SAR");
+        addProfileIfPresent(profiles, xmlFiles, "SSI");
+        addProfileIfPresent(profiles, xmlFiles, "SIS");
+
+        if (profiles.isEmpty()) {
+            addProfileIfPresent(profiles, constraintFile, "EQ");
+            addProfileIfPresent(profiles, constraintFile, "TP");
+            addProfileIfPresent(profiles, constraintFile, "SSH");
+            addProfileIfPresent(profiles, constraintFile, "SV");
+
+            addProfileIfPresent(profiles, constraintFile, "AE");
+            addProfileIfPresent(profiles, constraintFile, "AP");
+            addProfileIfPresent(profiles, constraintFile, "PS");
+            addProfileIfPresent(profiles, constraintFile, "AS");
+            addProfileIfPresent(profiles, constraintFile, "CO");
+            addProfileIfPresent(profiles, constraintFile, "ER");
+            addProfileIfPresent(profiles, constraintFile, "IAM");
+            addProfileIfPresent(profiles, constraintFile, "RA");
+            addProfileIfPresent(profiles, constraintFile, "RAS");
+            addProfileIfPresent(profiles, constraintFile, "OP");
+            addProfileIfPresent(profiles, constraintFile, "SAR");
+            addProfileIfPresent(profiles, constraintFile, "SSI");
+            addProfileIfPresent(profiles, constraintFile, "SIS");
+        }
+
+        return String.join(", ", profiles);
+    }
+
+    private static void addProfileIfPresent(LinkedHashSet<String> profiles, String value, String profile) {
+        String normalized = safe(value)
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", "_");
+
+        String p = safe(profile).toUpperCase(Locale.ROOT);
+
+        if (normalized.isBlank() || p.isBlank()) {
+            return;
+        }
+
+        if (normalized.matches(".*(^|_)" + java.util.regex.Pattern.quote(p) + "([0-9]+)?($|_).*")) {
+            profiles.add(profile);
+        }
     }
 
     /** Backward-compatible entry point. Prefer appendValidation(...). */
@@ -154,11 +276,16 @@ public class ValidationExcelWriter implements Closeable {
                             String xmlFiles,
                             String constraintFile,
                             Exception error) {
+
         String reportXmlFiles = toReportFileNames(xmlFiles);
         String reportConstraintFile = toReportFileNames(constraintFile);
-        String reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
+        String reportDataset = safe(datasetName);
 
-        writeStatisticsRow(cf, datasetName, reportXmlFiles, reportConstraintFile, reportDataset, null, false, safeThrowable(error));    }
+        if (reportDataset.isBlank()) {
+            reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
+        }
+        writeStatisticsRow(cf, reportDataset, reportXmlFiles, reportConstraintFile, null, false, safeThrowable(error));
+    }
 
     /** Backward-compatible entry point. Prefer appendError(cf, datasetName, xmlFiles, constraintFile, error). */
     public void appendError(CaseFolder cf, String datasetName, String ttlName, Exception error) {
@@ -166,10 +293,9 @@ public class ValidationExcelWriter implements Closeable {
     }
 
     private void writeStatisticsRow(CaseFolder cf,
-                                    String datasetName,
-                                    String xmlFiles,
-                                    String constraintFile,
                                     String reportDataset,
+                                    String reportXmlFiles,
+                                    String reportConstraintFile,
                                     List<SHACLValidationResult> results,
                                     boolean conforms,
                                     String validationError) {
@@ -185,18 +311,19 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         int all = warn + vio + info;
-        Row row = statisticsSheet.createRow(nextStatisticsRow++);
-        row.createCell(0).setCellValue(safe(xmlFiles));
-        row.createCell(1).setCellValue(safe(constraintFile));
-        row.createCell(2).setCellValue(safe(reportDataset));
-        row.createCell(3).setCellValue(all);
-        row.createCell(4).setCellValue(warn);
-        row.createCell(5).setCellValue(info);
-        row.createCell(6).setCellValue(vio);
-        row.createCell(7).setCellValue(conforms && validationError == null);
-        row.createCell(8).setCellValue(safe(validationError));
-    }
 
+        Row row = statisticsSheet.createRow(nextStatisticsRow++);
+        row.createCell(0).setCellValue(cf == null ? "" : cf.name());
+        row.createCell(1).setCellValue(safe(reportDataset));
+        row.createCell(2).setCellValue(safe(reportXmlFiles));
+        row.createCell(3).setCellValue(safe(reportConstraintFile));
+        row.createCell(4).setCellValue(all);
+        row.createCell(5).setCellValue(warn);
+        row.createCell(6).setCellValue(info);
+        row.createCell(7).setCellValue(vio);
+        row.createCell(8).setCellValue(conforms && validationError == null);
+        row.createCell(9).setCellValue(safe(validationError));
+    }
     private void addConstraintStatistic(String xmlFiles,
                                         String constraintFile,
                                         SHACLValidationResult res) {
@@ -205,8 +332,6 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         ConstraintStatisticKey key = new ConstraintStatisticKey(
-                safe(xmlFiles),
-                safe(constraintFile),
                 safe(res.getPath()),
                 safe(res.getSourceShape()),
                 safe(res.getConstraintComponent()),
@@ -227,33 +352,49 @@ public class ValidationExcelWriter implements Closeable {
         for (Map.Entry<ConstraintStatisticKey, Integer> entry : constraintStatistics.entrySet()) {
             ConstraintStatisticKey key = entry.getKey();
             Row row = statisticsConstraintSheet.createRow(r++);
-            row.createCell(0).setCellValue(key.xmlFiles);
-            row.createCell(1).setCellValue(key.constraintFile);
-            row.createCell(2).setCellValue(key.path);
-            row.createCell(3).setCellValue(key.source);
-            row.createCell(4).setCellValue(entry.getValue());
-            row.createCell(5).setCellValue(key.constraintComponent);
-            row.createCell(6).setCellValue(key.message);
-            row.createCell(7).setCellValue(key.severity);
-            row.createCell(8).setCellValue(key.description);
-            row.createCell(9).setCellValue(key.order);
-            row.createCell(10).setCellValue(key.name);
-            row.createCell(11).setCellValue(key.group);
+            row.createCell(0).setCellValue(key.path);
+            row.createCell(1).setCellValue(key.source);
+            row.createCell(2).setCellValue(entry.getValue());
+            row.createCell(3).setCellValue(key.constraintComponent);
+            row.createCell(4).setCellValue(key.message);
+            row.createCell(5).setCellValue(key.severity);
+            row.createCell(6).setCellValue(key.description);
+            row.createCell(7).setCellValue(key.order);
+            row.createCell(8).setCellValue(key.name);
+            row.createCell(9).setCellValue(key.group);
         }
     }
 
     public Path saveTo(Path outputBaseDir) throws IOException {
         Files.createDirectories(outputBaseDir);
 
+        if (timestampedSummaryMode) {
+            writeTimestampConstraintStatisticsRows();
+
+            autosize(timestampOverviewSheet, TIMESTAMP_OVERVIEW_HEADER.length);
+            autosize(timestampConstraintSheet, TIMESTAMP_CONSTRAINT_HEADER.length);
+            autosize(inputCompletenessSheet, INPUT_COMPLETENESS_HEADER.length);
+
+            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            Path out = outputBaseDir.resolve("timestamped_validation_summary__" + ts + ".xlsx");
+
+            try (OutputStream os = Files.newOutputStream(out)) {
+                wb.write(os);
+            }
+            return out;
+        }
+
         writeConstraintStatisticsRows();
 
-        for (CaseFolder cf : CaseFolder.values()) {
-            Sheet s = sheetByCase.get(cf);
-            autosize(s, RAW_HEADER.length);
-        }
-        autosize(statisticsSheet, STATISTICS_HEADER.length);
-        autosize(statisticsConstraintSheet, STATISTICS_CONSTRAINT_HEADER.length);
+        if (AUTO_SIZE_COLUMNS) {
+            for (CaseFolder cf : CaseFolder.values()) {
+                Sheet s = sheetByCase.get(cf);
+                autosize(s, RAW_HEADER.length);
+            }
 
+            autosize(statisticsSheet, STATISTICS_HEADER.length);
+            autosize(statisticsConstraintSheet, STATISTICS_CONSTRAINT_HEADER.length);
+        }
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         Path out = outputBaseDir.resolve("validation_report__" + ts + ".xlsx");
 
@@ -341,65 +482,6 @@ public class ValidationExcelWriter implements Closeable {
         return out.length() == 0 ? fileNameOnly(s) : out.toString();
     }
 
-    private static String toReportDataset(String xmlFiles, String constraintFile) {
-        String constraint = safe(constraintFile);
-
-        if (constraint.replace(" ", "").toLowerCase(Locale.ROOT).contains("danglingreference")) {
-            return "Dangling References (other)";
-        }
-
-        LinkedHashSet<String> profiles = new LinkedHashSet<>();
-
-        addProfileIfPresent(profiles, xmlFiles, "EQ");
-        addProfileIfPresent(profiles, xmlFiles, "TP");
-        addProfileIfPresent(profiles, xmlFiles, "SSH");
-        addProfileIfPresent(profiles, xmlFiles, "SV");
-
-        addProfileIfPresent(profiles, xmlFiles, "AP");
-        addProfileIfPresent(profiles, xmlFiles, "PS");
-        addProfileIfPresent(profiles, xmlFiles, "AS");
-        addProfileIfPresent(profiles, xmlFiles, "CO");
-        addProfileIfPresent(profiles, xmlFiles, "ER");
-        addProfileIfPresent(profiles, xmlFiles, "IAM");
-        addProfileIfPresent(profiles, xmlFiles, "RA");
-        addProfileIfPresent(profiles, xmlFiles, "RAS");
-        addProfileIfPresent(profiles, xmlFiles, "OP");
-        addProfileIfPresent(profiles, xmlFiles, "SAR");
-        addProfileIfPresent(profiles, xmlFiles, "SSI");
-        addProfileIfPresent(profiles, xmlFiles, "SIS");
-
-        if (profiles.isEmpty()) {
-            addProfileIfPresent(profiles, constraintFile, "EQ");
-            addProfileIfPresent(profiles, constraintFile, "TP");
-            addProfileIfPresent(profiles, constraintFile, "SSH");
-            addProfileIfPresent(profiles, constraintFile, "SV");
-
-            addProfileIfPresent(profiles, constraintFile, "AP");
-            addProfileIfPresent(profiles, constraintFile, "AE");
-            addProfileIfPresent(profiles, constraintFile, "PS");
-            addProfileIfPresent(profiles, constraintFile, "CO");
-            addProfileIfPresent(profiles, constraintFile, "ER");
-            addProfileIfPresent(profiles, constraintFile, "IAM");
-            addProfileIfPresent(profiles, constraintFile, "RAS");
-            addProfileIfPresent(profiles, constraintFile, "OP");
-            addProfileIfPresent(profiles, constraintFile, "SAR");
-            addProfileIfPresent(profiles, constraintFile, "SSI");
-            addProfileIfPresent(profiles, constraintFile, "SIS");
-        }
-
-        return String.join(", ", profiles);
-    }
-
-    private static void addProfileIfPresent(LinkedHashSet<String> profiles, String value, String profile) {
-        String normalized = safe(value)
-                .toUpperCase(Locale.ROOT)
-                .replaceAll("[^A-Z0-9]+", "_");
-
-        if (("_" + normalized + "_").contains("_" + profile + "_")) {
-            profiles.add(profile);
-        }
-    }
-
     private static String fileNameOnly(String value) {
         String s = safe(value).trim();
         if (s.isEmpty()) return "";
@@ -419,8 +501,6 @@ public class ValidationExcelWriter implements Closeable {
     }
 
     private static class ConstraintStatisticKey {
-        private final String xmlFiles;
-        private final String constraintFile;
         private final String path;
         private final String source;
         private final String constraintComponent;
@@ -431,9 +511,7 @@ public class ValidationExcelWriter implements Closeable {
         private final String name;
         private final String group;
 
-        private ConstraintStatisticKey(String xmlFiles,
-                                       String constraintFile,
-                                       String path,
+        private ConstraintStatisticKey(String path,
                                        String source,
                                        String constraintComponent,
                                        String message,
@@ -442,8 +520,6 @@ public class ValidationExcelWriter implements Closeable {
                                        String order,
                                        String name,
                                        String group) {
-            this.xmlFiles = xmlFiles;
-            this.constraintFile = constraintFile;
             this.path = path;
             this.source = source;
             this.constraintComponent = constraintComponent;
@@ -460,13 +536,213 @@ public class ValidationExcelWriter implements Closeable {
             if (this == o) return true;
             if (!(o instanceof ConstraintStatisticKey)) return false;
             ConstraintStatisticKey that = (ConstraintStatisticKey) o;
-            return Objects.equals(source, that.source)
-                    && Objects.equals(constraintFile, that.constraintFile);
+            return Objects.equals(path, that.path)
+                    && Objects.equals(source, that.source)
+                    && Objects.equals(constraintComponent, that.constraintComponent);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(source, constraintFile);
+            return Objects.hash(path, source, constraintComponent);
+        }
+    }
+
+        //Aggregated report helpers
+        //
+        //
+        //
+
+    public void appendTimestampOverview(String country,
+                                        String timestamp,
+                                        Path reportPath,
+                                        int validationCount,
+                                        int conformCount,
+                                        int nonConformCount,
+                                        int errorCount,
+                                        int totalResults,
+                                        int violationCount,
+                                        int warningCount,
+                                        int infoCount) {
+        ensureTimestampedSummaryMode();
+
+        String worstSeverity = "";
+        if (violationCount > 0) {
+            worstSeverity = "Violation";
+        } else if (warningCount > 0) {
+            worstSeverity = "Warning";
+        } else if (infoCount > 0) {
+            worstSeverity = "Info";
+        } else if (errorCount > 0) {
+            worstSeverity = "Validation error";
+        }
+
+        String priority;
+        if (errorCount > 0) {
+            priority = "Open - validation errors";
+        } else if (violationCount > 0) {
+            priority = "Open - violations";
+        } else if (warningCount > 0) {
+            priority = "Maybe check - warnings";
+        } else {
+            priority = "Probably OK";
+        }
+
+        Row row = timestampOverviewSheet.createRow(nextTimestampOverviewRow++);
+        row.createCell(0).setCellValue(safe(country));
+        row.createCell(1).setCellValue(safe(timestamp));
+        row.createCell(2).setCellValue(reportPath == null ? "" : reportPath.getFileName().toString());
+        row.createCell(3).setCellValue(validationCount);
+        row.createCell(4).setCellValue(conformCount);
+        row.createCell(5).setCellValue(nonConformCount);
+        row.createCell(6).setCellValue(errorCount);
+        row.createCell(7).setCellValue(totalResults);
+        row.createCell(8).setCellValue(violationCount);
+        row.createCell(9).setCellValue(warningCount);
+        row.createCell(10).setCellValue(infoCount);
+        row.createCell(11).setCellValue(worstSeverity);
+        row.createCell(12).setCellValue(priority);
+    }
+
+    public void collectTimestampConstraintStatistics(String country,
+                                                     String timestamp,
+                                                     Path reportPath,
+                                                     String constraintFile,
+                                                     List<SHACLValidationResult> results) {
+        ensureTimestampedSummaryMode();
+
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+
+        String reportConstraintFile = toReportFileNames(constraintFile);
+        String reportFile = reportPath == null ? "" : reportPath.getFileName().toString();
+
+        for (SHACLValidationResult res : results) {
+            if (res == null) {
+                continue;
+            }
+
+            TimestampConstraintKey key = new TimestampConstraintKey(
+                    safe(country),
+                    safe(timestamp),
+                    reportFile,
+                    reportConstraintFile,
+                    safe(res.getSourceShape()),
+                    safe(res.getConstraintComponent()),
+                    safe(res.getMessage()),
+                    safe(res.getSeverity())
+            );
+
+            timestampConstraintStatistics.merge(key, 1, Integer::sum);
+        }
+    }
+
+    private void writeTimestampConstraintStatisticsRows() {
+        if (!timestampedSummaryMode || timestampConstraintSheet == null) {
+            return;
+        }
+
+        int r = 1;
+
+        for (Map.Entry<TimestampConstraintKey, Integer> entry : timestampConstraintStatistics.entrySet()) {
+            TimestampConstraintKey key = entry.getKey();
+
+            Row row = timestampConstraintSheet.createRow(r++);
+            row.createCell(0).setCellValue(key.country);
+            row.createCell(1).setCellValue(key.timestamp);
+            row.createCell(2).setCellValue(key.reportFile);
+            row.createCell(3).setCellValue(key.constraintFile);
+            row.createCell(4).setCellValue(key.source);
+            row.createCell(5).setCellValue(key.constraintComponent);
+            row.createCell(6).setCellValue(key.message);
+            row.createCell(7).setCellValue(key.severity);
+            row.createCell(8).setCellValue(entry.getValue());
+        }
+    }
+
+    public void appendInputCompleteness(String country,
+                                        String timestamp,
+                                        String profile,
+                                        int expectedCount,
+                                        int actualCount,
+                                        String files,
+                                        String message) {
+        ensureTimestampedSummaryMode();
+
+        String status;
+        if (actualCount == expectedCount) {
+            status = "OK";
+        } else if (actualCount == 0) {
+            status = "Missing";
+        } else if (actualCount < expectedCount) {
+            status = "Too few";
+        } else {
+            status = "Too many";
+        }
+
+        Row row = inputCompletenessSheet.createRow(nextInputCompletenessRow++);
+        row.createCell(0).setCellValue(safe(country));
+        row.createCell(1).setCellValue(safe(timestamp));
+        row.createCell(2).setCellValue(safe(profile));
+        row.createCell(3).setCellValue(expectedCount);
+        row.createCell(4).setCellValue(actualCount);
+        row.createCell(5).setCellValue(status);
+        row.createCell(6).setCellValue(toReportFileNames(files));
+        row.createCell(7).setCellValue(safe(message));
+    }
+
+    private void ensureTimestampedSummaryMode() {
+        if (!timestampedSummaryMode) {
+            throw new IllegalStateException("This method can only be used with createTimestampedSummaryWriter().");
+        }
+    }
+
+    private static class TimestampConstraintKey {
+        private final String country;
+        private final String timestamp;
+        private final String reportFile;
+        private final String constraintFile;
+        private final String source;
+        private final String constraintComponent;
+        private final String message;
+        private final String severity;
+
+        private TimestampConstraintKey(String country,
+                                       String timestamp,
+                                       String reportFile,
+                                       String constraintFile,
+                                       String source,
+                                       String constraintComponent,
+                                       String message,
+                                       String severity) {
+            this.country = country;
+            this.timestamp = timestamp;
+            this.reportFile = reportFile;
+            this.constraintFile = constraintFile;
+            this.source = source;
+            this.constraintComponent = constraintComponent;
+            this.message = message;
+            this.severity = severity;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof TimestampConstraintKey)) return false;
+            TimestampConstraintKey that = (TimestampConstraintKey) o;
+            return Objects.equals(country, that.country)
+                    && Objects.equals(timestamp, that.timestamp)
+                    && Objects.equals(reportFile, that.reportFile)
+                    && Objects.equals(constraintFile, that.constraintFile)
+                    && Objects.equals(source, that.source)
+                    && Objects.equals(constraintComponent, that.constraintComponent)
+                    && Objects.equals(message, that.message)
+                    && Objects.equals(severity, that.severity);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(country, timestamp, reportFile, constraintFile, source, constraintComponent, message, severity);
         }
     }
 }

@@ -743,20 +743,50 @@ public class MainController implements Initializable {
                 "Mapping file"
         );
 
-        File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the models root folder");
-        File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select the output folder of zips and report");
-        File constraintsRoot = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select constraint's root folder");
-
-        String xmlBase = "http://iec.ch/TC57/CIM100";
-
         if (mappingCsvFile == null || mappingCsvFile.isEmpty() || mappingCsvFile.get(0) == null) {
             return;
         }
+
+        ChoiceDialog<String> workflowDialog = new ChoiceDialog<>(
+                "Validate by mapping file",
+                List.of(
+                        "Validate by mapping file",
+                        "Validate by timestamped mapping"
+                )
+        );
+
+        workflowDialog.setTitle("Select validation workflow");
+        workflowDialog.setHeaderText("Choose which validation workflow to run");
+        workflowDialog.setContentText("Workflow:");
+
+        Optional<String> selectedWorkflow = workflowDialog.showAndWait();
+
+        if (selectedWorkflow.isEmpty()) {
+            return;
+        }
+
+        boolean runTimestampedWorkflow = "Validate by timestamped mapping".equals(selectedWorkflow.get());
+
+        File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
+                runTimestampedWorkflow
+                        ? "Select the timestamped input root folder"
+                        : "Select the models root folder"
+        );
+
+        File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
+                "Select the output folder of zips and report"
+        );
+
+        File constraintsRoot = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
+                "Select constraint's root folder"
+        );
+
+        String xmlBase = "http://iec.ch/TC57/CIM100";
+
         if (modelsBaseDir == null || outputBaseDir == null || constraintsRoot == null) {
             return;
         }
 
-        // --- let user choose datatype map ---
         ChoiceDialog<String> datatypeMapDialog = new ChoiceDialog<>(
                 "CGMES 3.0 / NC 2.4",
                 List.of(
@@ -782,33 +812,54 @@ public class MainController implements Initializable {
         };
 
         File mappingFile = mappingCsvFile.get(0);
+        File selectedModelsBaseDir = modelsBaseDir;
+        File selectedOutputBaseDir = outputBaseDir;
+        File selectedConstraintsRoot = constraintsRoot;
 
         new Thread(() -> {
             try {
                 Map<String, RDFDatatype> dataTypeMap =
                         CompleteDatatypeMapLoader.loadFromResource(datatypeMapResource);
 
-                Path report = ValidationTools.validateByMapping(
-                        mappingFile.toPath(),
-                        modelsBaseDir.toPath(),
-                        constraintsRoot.toPath(),
-                        outputBaseDir.toPath(),
-                        4,
-                        dataTypeMap,
-                        xmlBase
-                );
+                if (runTimestampedWorkflow) {
+                    List<Path> reports = ValidationTools.validateByTimestampedMapping(
+                            mappingFile.toPath(),
+                            selectedModelsBaseDir.toPath(),
+                            selectedConstraintsRoot.toPath(),
+                            selectedOutputBaseDir.toPath(),
+                            2,
+                            dataTypeMap,
+                            xmlBase
+                    );
 
-                System.out.println("Report saved to: " + report);
+                    System.out.println("Created report count: " + reports.size());
+                    for (Path report : reports) {
+                        System.out.println("Report saved to: " + report);
+                    }
 
-                List<Path> createdZips = ValidationTools.zipByMapping(
-                        mappingFile.toPath(),
-                        modelsBaseDir.toPath(),
-                        outputBaseDir.toPath()
-                );
+                } else {
+                    Path report = ValidationTools.validateByMapping(
+                            mappingFile.toPath(),
+                            selectedModelsBaseDir.toPath(),
+                            selectedConstraintsRoot.toPath(),
+                            selectedOutputBaseDir.toPath(),
+                            4,
+                            dataTypeMap,
+                            xmlBase
+                    );
 
-                System.out.println("Created zip count: " + createdZips.size());
-                for (Path zip : createdZips) {
-                    System.out.println("ZIP: " + zip);
+                    System.out.println("Report saved to: " + report);
+
+                    List<Path> createdZips = ValidationTools.zipByMapping(
+                            mappingFile.toPath(),
+                            selectedModelsBaseDir.toPath(),
+                            selectedOutputBaseDir.toPath()
+                    );
+
+                    System.out.println("Created zip count: " + createdZips.size());
+                    for (Path zip : createdZips) {
+                        System.out.println("ZIP: " + zip);
+                    }
                 }
 
             } catch (IOException e) {
