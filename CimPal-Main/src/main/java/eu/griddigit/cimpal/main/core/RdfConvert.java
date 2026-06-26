@@ -255,7 +255,7 @@ public class RdfConvert {
             mainModel.setNsPrefix("cim", m.getNsPrefixURI("cim"));
             if (m.getNsPrefixURI("entsoe") != null) {
                 mainModel.setNsPrefix("entsoe", m.getNsPrefixURI("entsoe"));
-            } else {
+            } else if (m.getNsPrefixURI("eu") != null) {
                 mainModel.setNsPrefix("eu", m.getNsPrefixURI("eu"));
             }
 
