@@ -45,7 +45,17 @@ public class ValidationExcelWriter implements Closeable {
     };
 
     private static final String[] INPUT_COMPLETENESS_HEADER = new String[]{
-            "Country", "Timestamp", "Profile", "Expected count", "Actual count", "Status", "Files", "Message"
+            "Country",
+            "Timestamp",
+            "Mapping row",
+            "Constraint file",
+            "Requested input",
+            "Expected file count",
+            "Resolved file count",
+            "Status",
+            "Resolved files",
+            "Missing input",
+            "Message"
     };
 
     // Raw validation data: one header per sheet, no blank rows, no per-validation statistic rows.
@@ -662,33 +672,29 @@ public class ValidationExcelWriter implements Closeable {
 
     public void appendInputCompleteness(String country,
                                         String timestamp,
-                                        String profile,
-                                        int expectedCount,
-                                        int actualCount,
-                                        String files,
+                                        int mappingRow,
+                                        String constraintFile,
+                                        String requestedInput,
+                                        int expectedFileCount,
+                                        int resolvedFileCount,
+                                        String status,
+                                        String resolvedFiles,
+                                        String missingInput,
                                         String message) {
         ensureTimestampedSummaryMode();
-
-        String status;
-        if (actualCount == expectedCount) {
-            status = "OK";
-        } else if (actualCount == 0) {
-            status = "Missing";
-        } else if (actualCount < expectedCount) {
-            status = "Too few";
-        } else {
-            status = "Too many";
-        }
 
         Row row = inputCompletenessSheet.createRow(nextInputCompletenessRow++);
         row.createCell(0).setCellValue(safe(country));
         row.createCell(1).setCellValue(safe(timestamp));
-        row.createCell(2).setCellValue(safe(profile));
-        row.createCell(3).setCellValue(expectedCount);
-        row.createCell(4).setCellValue(actualCount);
-        row.createCell(5).setCellValue(status);
-        row.createCell(6).setCellValue(toReportFileNames(files));
-        row.createCell(7).setCellValue(safe(message));
+        row.createCell(2).setCellValue(mappingRow);
+        row.createCell(3).setCellValue(toReportFileNames(constraintFile));
+        row.createCell(4).setCellValue(safe(requestedInput));
+        row.createCell(5).setCellValue(expectedFileCount);
+        row.createCell(6).setCellValue(resolvedFileCount);
+        row.createCell(7).setCellValue(safe(status));
+        row.createCell(8).setCellValue(toReportFileNames(resolvedFiles));
+        row.createCell(9).setCellValue(safe(missingInput));
+        row.createCell(10).setCellValue(safe(message));
     }
 
     private void ensureTimestampedSummaryMode() {

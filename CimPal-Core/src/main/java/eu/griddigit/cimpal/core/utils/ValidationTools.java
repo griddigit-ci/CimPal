@@ -31,6 +31,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+
 public class ValidationTools {
 
 
@@ -164,7 +167,7 @@ public class ValidationTools {
                         printMemory("before timestamp run "
                                 + inputGroup.name + " " + timestampGroup.timestamp);
 
-                        List<ResolvedMappingRow> resolvedRows =
+                        ResolvedRowsAndInputChecks resolved =
                                 buildResolvedRowsForTimestampKeepingPairings(
                                         mappingRows,
                                         tsoIndex,
@@ -172,52 +175,24 @@ public class ValidationTools {
                                         constraintsRoot
                                 );
 
+                        List<ResolvedMappingRow> resolvedRows = resolved.resolvedRows;
+
+                        appendMappingRowInputChecks(
+                                summaryWriter,
+                                resolved.inputChecks
+                        );
+
+                        appendMappingRowInputChecks(
+                                allCountriesSummaryWriter,
+                                resolved.inputChecks
+                        );
+
                         if (resolvedRows.isEmpty()) {
                             logWarn("No resolved validation rows for inputGroup="
                                     + inputGroup.name + " timestamp=" + timestampGroup.timestamp);
 
-                            appendTimestampInputCompleteness(
-                                    summaryWriter,
-                                    inputGroup.name,
-                                    timestampGroup
-                            );
-
-                            appendTimestampInputCompleteness(
-                                    allCountriesSummaryWriter,
-                                    inputGroup.name,
-                                    timestampGroup
-                            );
-
                             continue;
                         }
-
-                        logTimestampReportInputs(
-                                inputGroup.name,
-                                timestampGroup.timestamp,
-                                resolvedRows
-                        );
-
-                        for (ResolvedMappingRow resolvedRow : resolvedRows) {
-                            logInfo("RESOLVED_ROW_CHECK"
-                                    + " inputGroup=" + inputGroup.name
-                                    + " timestamp=" + timestampGroup.timestamp
-                                    + " row=" + resolvedRow.rowIdx
-                                    + " ttl=" + resolvedRow.ttlName
-                                    + " xmlCount=" + (resolvedRow.xmlFiles == null ? 0 : resolvedRow.xmlFiles.size())
-                                    + " xmlFilesText=" + resolvedRow.xmlFilesText);
-                        }
-
-                        appendTimestampInputCompleteness(
-                                summaryWriter,
-                                inputGroup.name,
-                                timestampGroup
-                        );
-
-                        appendTimestampInputCompleteness(
-                                allCountriesSummaryWriter,
-                                inputGroup.name,
-                                timestampGroup
-                        );
 
                         Map<Path, Model> timestampXmlModelCache = new ConcurrentHashMap<>();
 
@@ -1979,33 +1954,6 @@ public class ValidationTools {
         return false;
     }
 
-    private static void logTimestampReportInputs(String country,
-                                                 String timestamp,
-                                                 List<ResolvedMappingRow> resolvedRows) {
-        logInfo("REPORT_INPUTS_BEGIN country=" + country
-                + " timestamp=" + timestamp
-                + " rowCount=" + (resolvedRows == null ? 0 : resolvedRows.size()));
-
-        if (resolvedRows == null) {
-            logInfo("REPORT_INPUTS_END country=" + country + " timestamp=" + timestamp);
-            return;
-        }
-
-        for (ResolvedMappingRow row : resolvedRows) {
-            List<Path> xmlFiles = row.xmlFiles == null ? List.of() : row.xmlFiles;
-
-            logInfo("REPORT_INPUT row=" + row.rowIdx
-                    + " country=" + country
-                    + " timestamp=" + timestamp
-                    + " caseFolder=" + row.caseFolder
-                    + " ttl=" + row.ttlName
-                    + " xmlCount=" + xmlFiles.size()
-                    + " xmlFiles=" + formatPaths(xmlFiles));
-        }
-
-        logInfo("REPORT_INPUTS_END country=" + country + " timestamp=" + timestamp);
-    }
-
     private static TsoFileIndex buildSingleInputGroupIndex(String inputGroupName,
                                                            List<XmlFileMetadata> metadata) {
         TsoFileIndex index = new TsoFileIndex(inputGroupName);
@@ -2073,11 +2021,12 @@ public class ValidationTools {
         return index;
     }
 
-    private static List<ResolvedMappingRow> buildResolvedRowsForTimestampKeepingPairings(List<MappingRow> mappingRows,
-                                                                                         TsoFileIndex tsoIndex,
-                                                                                         TimestampGroup timestampGroup,
-                                                                                         Path constraintsRoot) {
-        List<ResolvedMappingRow> out = new ArrayList<>();
+    private static ResolvedRowsAndInputChecks buildResolvedRowsForTimestampKeepingPairings(List<MappingRow> mappingRows,
+                                                                                           TsoFileIndex tsoIndex,
+                                                                                           TimestampGroup timestampGroup,
+                                                                                           Path constraintsRoot) {
+        List<ResolvedMappingRow> resolvedRows = new ArrayList<>();
+        List<MappingRowInputCheck> inputChecks = new ArrayList<>();
 
         int rowIdx = 0;
 
@@ -2089,27 +2038,71 @@ public class ValidationTools {
                 continue;
             }
 
-            List<String> missingProfiles = findMissingRequiredProfiles(
+            String ttlName = row.ttl.trim();
+
+            String constraintFileText = trimReportPath(
+                    resolveTtlPath(constraintsRoot, ttlName).toString(),
+                    CONSTRAINT_REPORT_PREFIX
+            );
+
+            String requestedInput = cleanRequestedInputForReport(row.xmlInputsRaw);
+
+            InputResolution resolution = resolveInputForMappingRow(
                     row,
                     tsoIndex,
                     timestampGroup
             );
 
-            if (!missingProfiles.isEmpty()) {
+            String resolvedFilesText = formatPaths(resolution.xmlFiles);
+            String missingInputText = String.join("; ", resolution.missingInputs);
+
+            String status;
+            String message;
+
+            if (!resolution.missingInputs.isEmpty()) {
+                if (resolution.onlyCountrySpecificMissing) {
+                    status = "Missing - country-specific input";
+                    message = "The mapping row requests input for another country or region. This skip can be expected if the row is intentionally country-specific.";
+                } else {
+                    status = "Missing input";
+                    message = "One or more required inputs from the mapping row were not resolved for this country and timestamp.";
+                }
+            } else if (resolution.xmlFiles.size() > resolution.expectedFileCount) {
+                status = "Too many files";
+                message = "More XML files were resolved than requested mapping tokens. Check duplicate files or broad token matching.";
+            } else {
+                status = "OK";
+                message = "All requested inputs were resolved.";
+            }
+
+            inputChecks.add(new MappingRowInputCheck(
+                    tsoIndex.tso,
+                    timestampGroup.timestamp,
+                    rowIdx,
+                    constraintFileText,
+                    requestedInput,
+                    resolution.expectedFileCount,
+                    resolution.xmlFiles.size(),
+                    status,
+                    resolvedFilesText,
+                    missingInputText,
+                    message
+            ));
+
+            if (!resolution.missingInputs.isEmpty()) {
                 logWarn("PRECHECK_SKIP validation row"
                         + " row=" + rowIdx
                         + " inputGroup=" + tsoIndex.tso
                         + " timestamp=" + timestampGroup.timestamp
-                        + " missingProfiles=" + String.join(",", missingProfiles)
+                        + " missingInput=" + missingInputText
+                        + " status=" + status
                         + " xmlInputsRaw=" + row.xmlInputsRaw
                         + " ttl=" + row.ttl);
 
                 continue;
             }
 
-            List<Path> xmlFiles = resolveXmlFilesForMappingRowPair(row, tsoIndex, timestampGroup);
-
-            if (xmlFiles.isEmpty()) {
+            if (resolution.xmlFiles.isEmpty()) {
                 logWarn("No XML files resolved for mapping row pair"
                         + " row=" + rowIdx
                         + " inputGroup=" + tsoIndex.tso
@@ -2120,22 +2113,16 @@ public class ValidationTools {
                 continue;
             }
 
-            String ttlName = row.ttl.trim();
-
-            String constraintFileText = trimReportPath(
-                    resolveTtlPath(constraintsRoot, ttlName).toString(),
-                    CONSTRAINT_REPORT_PREFIX
-            );
-
-            String xmlFilesText = formatPaths(xmlFiles);
             String datasetName = makeTimestampedDatasetName(
                     tsoIndex.tso,
                     timestampGroup.timestamp,
                     row.xmlInputsRaw,
-                    xmlFiles
-            );            ValidationExcelWriter.CaseFolder caseFolder = categorizeForReport(row);
+                    resolution.xmlFiles
+            );
 
-            out.add(new ResolvedMappingRow(
+            ValidationExcelWriter.CaseFolder caseFolder = categorizeForReport(row);
+
+            resolvedRows.add(new ResolvedMappingRow(
                     rowIdx,
                     row,
                     caseFolder,
@@ -2143,52 +2130,119 @@ public class ValidationTools {
                     timestampGroup.timestamp,
                     datasetName,
                     ttlName,
-                    xmlFiles,
-                    xmlFilesText,
+                    resolution.xmlFiles,
+                    resolvedFilesText,
                     constraintFileText
             ));
         }
 
-        return out;
+        return new ResolvedRowsAndInputChecks(resolvedRows, inputChecks);
     }
 
-    private static List<Path> resolveXmlFilesForMappingRowPair(MappingRow row,
-                                                               TsoFileIndex tsoIndex,
-                                                               TimestampGroup timestampGroup) {
-        LinkedHashSet<Path> out = new LinkedHashSet<>();
+    private static InputResolution resolveInputForMappingRow(MappingRow row,
+                                                             TsoFileIndex tsoIndex,
+                                                             TimestampGroup timestampGroup) {
+        LinkedHashSet<Path> resolvedFiles = new LinkedHashSet<>();
+        List<String> missingInputs = new ArrayList<>();
 
         List<String> tokens = parseXmlInputs(row.xmlInputsRaw);
 
-        for (String token : tokens) {
-            List<String> requestedProfiles = detectProfilesFromMappingToken(token);
+        boolean sawMissing = false;
+        boolean sawNonCountrySpecificMissing = false;
 
-            if (requestedProfiles.isEmpty()) {
-                logWarn("No profile detected from mapping token"
-                        + " inputGroup=" + tsoIndex.tso
-                        + " timestamp=" + timestampGroup.timestamp
-                        + " token=" + token
-                        + " ttl=" + row.ttl);
+        for (String token : tokens) {
+            String requestedToken = cleanInputTokenForReport(token);
+
+            if (requestedToken.isBlank()) {
                 continue;
             }
 
-            for (String profile : requestedProfiles) {
-                if (BOUNDARY_PROFILES.contains(profile) || STATIC_PROFILES.contains(profile)) {
-                    out.addAll(filterFilesByToken(tsoIndex.staticFiles(profile), token));
-                    continue;
-                }
+            if (isCountrySpecificToken(token) && !isCountrySpecificTokenApplicable(token, tsoIndex.tso)) {
+                missingInputs.add(requestedToken);
+                sawMissing = true;
+                continue;
+            }
 
-                if (TIMESTAMPED_PROFILES.contains(profile)) {
-                    out.addAll(filterFilesByToken(timestampGroup.timestampFiles(profile), token));
-                    continue;
-                }
+            List<Path> tokenFiles = resolveXmlFilesForSingleMappingToken(
+                    token,
+                    row,
+                    tsoIndex,
+                    timestampGroup
+            );
 
-                logWarn("Profile from mapping token is not configured"
-                        + " profile=" + profile
-                        + " token=" + token);
+            if (tokenFiles.isEmpty()) {
+                missingInputs.add(requestedToken);
+                sawMissing = true;
+
+                if (!isCountrySpecificToken(token)) {
+                    sawNonCountrySpecificMissing = true;
+                }
+            } else {
+                resolvedFiles.addAll(tokenFiles);
             }
         }
 
+        boolean onlyCountrySpecificMissing = sawMissing && !sawNonCountrySpecificMissing;
+
+        return new InputResolution(
+                new ArrayList<>(resolvedFiles),
+                missingInputs,
+                onlyCountrySpecificMissing,
+                tokens.size()
+        );
+    }
+
+
+    private static List<Path> resolveXmlFilesForSingleMappingToken(String token,
+                                                                   MappingRow row,
+                                                                   TsoFileIndex tsoIndex,
+                                                                   TimestampGroup timestampGroup) {
+        LinkedHashSet<Path> out = new LinkedHashSet<>();
+
+        List<String> requestedProfiles = detectProfilesFromMappingToken(token);
+
+        if (requestedProfiles.isEmpty()) {
+            logWarn("No profile detected from mapping token"
+                    + " inputGroup=" + tsoIndex.tso
+                    + " timestamp=" + timestampGroup.timestamp
+                    + " token=" + token
+                    + " ttl=" + row.ttl);
+            return List.of();
+        }
+
+        for (String profile : requestedProfiles) {
+            if (BOUNDARY_PROFILES.contains(profile) || STATIC_PROFILES.contains(profile)) {
+                out.addAll(filterFilesByToken(tsoIndex.staticFiles(profile), token));
+                continue;
+            }
+
+            if (TIMESTAMPED_PROFILES.contains(profile)) {
+                out.addAll(filterFilesByToken(timestampGroup.timestampFiles(profile), token));
+                continue;
+            }
+
+            logWarn("Profile from mapping token is not configured"
+                    + " profile=" + profile
+                    + " token=" + token);
+        }
+
         return new ArrayList<>(out);
+    }
+
+    private static String cleanRequestedInputForReport(String xmlInputsRaw) {
+        List<String> tokens = parseXmlInputs(xmlInputsRaw);
+
+        return tokens.stream()
+                .map(ValidationTools::cleanInputTokenForReport)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.joining("; "));
+    }
+
+    private static String cleanInputTokenForReport(String token) {
+        return cleanToken(token)
+                .replace("{", "")
+                .replace("}", "")
+                .trim();
     }
 
     private static List<String> detectProfilesFromMappingToken(String token) {
@@ -2205,6 +2259,49 @@ public class ValidationTools {
         }
 
         return profiles;
+    }
+
+    private static boolean isCountrySpecificToken(String token) {
+        return !countrySpecificOwner(token).isBlank();
+    }
+
+    private static boolean isCountrySpecificTokenApplicable(String token, String inputGroupName) {
+        String owner = countrySpecificOwner(token);
+
+        if (owner.isBlank()) {
+            return true;
+        }
+
+        String group = safe(inputGroupName)
+                .toUpperCase(Locale.ROOT)
+                .replace("-", "")
+                .replace("_", "");
+
+        if (owner.equals("RTE")) {
+            return group.equals("RTE") || group.equals("RTEFRANCE");
+        }
+
+        return group.equals(owner);
+    }
+
+    private static String countrySpecificOwner(String token) {
+        String s = cleanInputTokenForReport(token)
+                .toUpperCase(Locale.ROOT)
+                .replace("-", "_");
+
+        if (s.startsWith("REE_")) {
+            return "REE";
+        }
+
+        if (s.startsWith("REN_")) {
+            return "REN";
+        }
+
+        if (s.startsWith("RTEFRANCE_") || s.startsWith("RTE_")) {
+            return "RTE";
+        }
+
+        return "";
     }
 
     private static String makeTimestampedDatasetName(String tso,
@@ -2605,7 +2702,53 @@ public class ValidationTools {
     }
 
     private static String readTimestampFromFileName(String fileName) {
+        String renSsiTimestamp = readRenSsiHourTimestampFromFileName(fileName);
+
+        if (!renSsiTimestamp.isBlank()) {
+            return renSsiTimestamp;
+        }
+
         return extractTimestampFromText(fileName);
+    }
+
+    private static String readRenSsiHourTimestampFromFileName(String fileName) {
+        String s = safe(fileName).trim();
+
+        Pattern pattern = Pattern.compile(
+                "(?i)(\\d{8})_REN_CGM_I\\d+_H(\\d{1,2})_SSI\\d+.*"
+        );
+
+        Matcher matcher = pattern.matcher(s);
+
+        if (!matcher.find()) {
+            return "";
+        }
+
+        String datePart = matcher.group(1);
+        int marketHour;
+
+        try {
+            marketHour = Integer.parseInt(matcher.group(2));
+        } catch (NumberFormatException ex) {
+            return "";
+        }
+
+        if (marketHour < 1 || marketHour > 24) {
+            return "";
+        }
+
+        try {
+            LocalDate date = LocalDate.parse(datePart, DateTimeFormatter.BASIC_ISO_DATE);
+
+            return date
+                    .atStartOfDay(ZoneOffset.UTC)
+                    .plusHours(marketHour - 3L)
+                    .toInstant()
+                    .toString();
+
+        } catch (Exception ex) {
+            return "";
+        }
     }
 
     private static String normalizeTimestamp(String raw) {
@@ -3290,16 +3433,10 @@ public class ValidationTools {
     private static LinkedHashSet<String> detectProfilesFromMappingInput(String xmlInputsRaw) {
         LinkedHashSet<String> profiles = new LinkedHashSet<>();
 
-        String raw = safe(xmlInputsRaw);
+        List<String> tokens = parseXmlInputs(xmlInputsRaw);
 
-        if (raw.isBlank()) {
-            return profiles;
-        }
-
-        for (String profile : ALL_INPUT_PROFILES_ORDERED) {
-            if (containsProfileToken(raw, profile)) {
-                profiles.add(profile);
-            }
+        for (String token : tokens) {
+            profiles.addAll(detectProfilesFromMappingToken(token));
         }
 
         return profiles;
@@ -3438,23 +3575,25 @@ public class ValidationTools {
         );
     }
 
-    private static void appendTimestampInputCompleteness(ValidationExcelWriter summaryWriter,
-                                                         String country,
-                                                         TimestampGroup timestampGroup) {
-        for (String profile : TIMESTAMPED_PROFILES) {
-            List<Path> files = timestampGroup.timestampFiles(profile);
-            int actualCount = files == null ? 0 : files.size();
+    private static void appendMappingRowInputChecks(ValidationExcelWriter summaryWriter,
+                                                    List<MappingRowInputCheck> checks) {
+        if (checks == null || checks.isEmpty()) {
+            return;
+        }
 
+        for (MappingRowInputCheck check : checks) {
             summaryWriter.appendInputCompleteness(
-                    country,
-                    timestampGroup.timestamp,
-                    profile,
-                    1,
-                    actualCount,
-                    formatPaths(files),
-                    actualCount == 0
-                            ? "Missing timestamped profile for this timestamp"
-                            : "Timestamped profile found"
+                    check.country,
+                    check.timestamp,
+                    check.mappingRow,
+                    check.constraintFile,
+                    check.requestedInput,
+                    check.expectedFileCount,
+                    check.resolvedFileCount,
+                    check.status,
+                    check.resolvedFiles,
+                    check.missingInput,
+                    check.message
             );
         }
     }
@@ -3507,4 +3646,71 @@ public class ValidationTools {
             return ts;
         }
     }
+
+    private static class MappingRowInputCheck {
+        final String country;
+        final String timestamp;
+        final int mappingRow;
+        final String constraintFile;
+        final String requestedInput;
+        final int expectedFileCount;
+        final int resolvedFileCount;
+        final String status;
+        final String resolvedFiles;
+        final String missingInput;
+        final String message;
+
+        MappingRowInputCheck(String country,
+                             String timestamp,
+                             int mappingRow,
+                             String constraintFile,
+                             String requestedInput,
+                             int expectedFileCount,
+                             int resolvedFileCount,
+                             String status,
+                             String resolvedFiles,
+                             String missingInput,
+                             String message) {
+            this.country = country;
+            this.timestamp = timestamp;
+            this.mappingRow = mappingRow;
+            this.constraintFile = constraintFile;
+            this.requestedInput = requestedInput;
+            this.expectedFileCount = expectedFileCount;
+            this.resolvedFileCount = resolvedFileCount;
+            this.status = status;
+            this.resolvedFiles = resolvedFiles;
+            this.missingInput = missingInput;
+            this.message = message;
+        }
+    }
+
+    private static class ResolvedRowsAndInputChecks {
+        final List<ResolvedMappingRow> resolvedRows;
+        final List<MappingRowInputCheck> inputChecks;
+
+        ResolvedRowsAndInputChecks(List<ResolvedMappingRow> resolvedRows,
+                                   List<MappingRowInputCheck> inputChecks) {
+            this.resolvedRows = resolvedRows;
+            this.inputChecks = inputChecks;
+        }
+    }
+
+    private static class InputResolution {
+        final List<Path> xmlFiles;
+        final List<String> missingInputs;
+        final boolean onlyCountrySpecificMissing;
+        final int expectedFileCount;
+
+        InputResolution(List<Path> xmlFiles,
+                        List<String> missingInputs,
+                        boolean onlyCountrySpecificMissing,
+                        int expectedFileCount) {
+            this.xmlFiles = xmlFiles;
+            this.missingInputs = missingInputs;
+            this.onlyCountrySpecificMissing = onlyCountrySpecificMissing;
+            this.expectedFileCount = expectedFileCount;
+        }
+    }
+
 }
