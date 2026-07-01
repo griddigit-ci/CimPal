@@ -99,61 +99,71 @@ public class CustomBasic extends CustomBaseXMLWriter {
 
     protected void writeRDFStatements(Model model, PrintWriter writer) {
         writePleasingRDFStatements(model, writer);
+
         if (this.sortRDF.equals("true")) {
-            Set<Statement> listStatements = model.listStatements(null, RDF.type, (RDFNode) null).toSet();
-            if (this.instanceData.equals("true")) {
-                //get list of all triples of the rdf:type and these need to be sorted by object
-                Map<String, RDFNode> listObjectsMap = new TreeMap<>();
-                for (Statement stmt : listStatements) {
-                    listObjectsMap.put(sortKey(model, stmt.getObject().asResource()), stmt.getObject());
+            List<Resource> subjects = getSortedSubjects(model);
 
+            Set<Resource> writtenSubjects = new HashSet<>();
+
+            for (Resource subject : subjects) {
+                if (!writtenSubjects.contains(subject)) {
+                    writeRDFStatements(model, subject, writer);
+                    writtenSubjects.add(subject);
                 }
-                Set<Map.Entry<String, RDFNode>> entries
-                        = listObjectsMap.entrySet();
-                Set<Resource> writenStatements = new HashSet<>();
-                for (Map.Entry<String, RDFNode> entry : entries) {
-
-                    StmtIterator stmtIter = model.listStatements(null, null, entry.getValue());
-                    while (stmtIter.hasNext()) {
-                        Statement nextStatement = stmtIter.nextStatement();
-                        //writePredicate(nextStatement, writer);
-                        if (!writenStatements.contains(nextStatement.getSubject())) {
-                            writeRDFStatements(model, nextStatement.getSubject(), writer);
-                            writenStatements.add(nextStatement.getSubject());
-                        }
-                    }
-                }
-                //writeRDFStatements(model, entry.getValue(), writer);
-
-            } else {
-                //get list of all triples of the rdf:type and these need to be sorted by subject
-                Map<String, Resource> listSubjectMap = new TreeMap<>();
-                for (Statement stmt : listStatements) {
-                    listSubjectMap.put(sortKey(model, stmt.getSubject()), stmt.getSubject());
-
-                }
-                Set<Map.Entry<String, Resource>> entries
-                        = listSubjectMap.entrySet();
-                Set<Resource> writenStatements = new HashSet<>();
-                for (Map.Entry<String, Resource> entry : entries) {
-
-                    StmtIterator stmtIter = model.listStatements(entry.getValue(), null,(RDFNode) null);
-                    while (stmtIter.hasNext()) {
-                        Statement nextStatement = stmtIter.nextStatement();
-                        //writePredicate(nextStatement, writer);
-                        if (!writenStatements.contains(nextStatement.getSubject())) {
-                            writeRDFStatements(model, nextStatement.getSubject(), writer);
-                            writenStatements.add(nextStatement.getSubject());
-                        }
-                    }
-                }
-                //writeRDFStatements(model, entry.getValue(), writer);
             }
         } else {
             ResIterator rIter = model.listSubjects();
-            while (rIter.hasNext()) writeRDFStatements(model, rIter.nextResource(), writer);
+            while (rIter.hasNext()) {
+                writeRDFStatements(model, rIter.nextResource(), writer);
+            }
+        }
+    }
+
+    private List<Resource> getSortedSubjects(Model model) {
+        Set<Resource> subjectSet = new HashSet<>();
+
+        ResIterator subjectIter = model.listSubjects();
+        while (subjectIter.hasNext()) {
+            subjectSet.add(subjectIter.nextResource());
         }
 
+        List<Resource> subjects = new ArrayList<>(subjectSet);
+
+        if (this.instanceData.equals("true")) {
+            subjects.sort(
+                    Comparator.comparing(subject -> sortKey(model, subject))
+            );
+        } else {
+            subjects.sort(
+                    Comparator
+                            .comparing((Resource subject) -> getTypeSortKey(model, subject))
+                            .thenComparing(subject -> sortKey(model, subject))
+            );
+        }
+
+        return subjects;
+    }
+
+    private String getTypeSortKey(Model model, Resource subject) {
+        List<String> typeKeys = new ArrayList<>();
+
+        StmtIterator typeIter = model.listStatements(subject, RDF.type, (RDFNode) null);
+
+        while (typeIter.hasNext()) {
+            RDFNode typeNode = typeIter.nextStatement().getObject();
+
+            if (typeNode.isResource()) {
+                typeKeys.add(sortKey(model, typeNode.asResource()));
+            }
+        }
+
+        if (typeKeys.isEmpty()) {
+            return "zzzzzzzzzz";
+            // Untyped rdf:Description resources go after typed resources.
+        }
+
+        Collections.sort(typeKeys);
+        return typeKeys.getFirst();
     }
 
     private String sortKey(Model model, Resource resource) {
@@ -410,7 +420,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                 writer.print(" " + var10001 + "=" + this.substitutedAttribute(dt));
             }
         }
-            //end new
+        //end new
 
 //        } else if (isWellFormedXML(l) && !blockLiterals) {
 //            // RDF XML Literals inline.
