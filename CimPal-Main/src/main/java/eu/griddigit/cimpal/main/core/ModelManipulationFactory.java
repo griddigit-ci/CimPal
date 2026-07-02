@@ -77,7 +77,7 @@ public class ModelManipulationFactory {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
-        } else if (xmlBase.equals("https://cim.ucaiug.io/ns#")) {
+        } else if (xmlBase.equals("https://cim.ucaiug.io/ns")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/NCP_v2.4_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
@@ -106,7 +106,7 @@ public class ModelManipulationFactory {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
-        } else if (xmlBase.equals("https://cim.ucaiug.io/ns#")) {
+        } else if (xmlBase.equals("https://cim.ucaiug.io/ns")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/NCP_v2.4_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
@@ -144,7 +144,7 @@ public class ModelManipulationFactory {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
-        } else if (xmlBase.equals("https://cim.ucaiug.io/ns#")) {
+        } else if (xmlBase.equals("https://cim.ucaiug.io/ns")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/NCP_v2.4_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
@@ -198,7 +198,7 @@ public class ModelManipulationFactory {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
-        } else if (xmlBase.equals("https://cim.ucaiug.io/ns#")) {
+        } else if (xmlBase.equals("https://cim.ucaiug.io/ns")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/NCP_v2.4_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
@@ -227,7 +227,7 @@ public class ModelManipulationFactory {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
-        } else if (xmlBase.equals("https://cim.ucaiug.io/ns#")) {
+        } else if (xmlBase.equals("https://cim.ucaiug.io/ns")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/NCP_v2.4_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {
@@ -265,7 +265,7 @@ public class ModelManipulationFactory {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v3.0.0_RDFSSerialisation.ttl");
         } else if (xmlBase.equals("http://iec.ch/TC57/2013/CIM-schema-cim16")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/CGMES_v2.4.15_RDFSSerialisation.ttl");
-        } else if (xmlBase.equals("https://cim.ucaiug.io/ns#")) {
+        } else if (xmlBase.equals("https://cim.ucaiug.io/ns")) {
             inputStream = InstanceDataFactory.class.getResourceAsStream("/serialization/NCP_v2.4_RDFSSerialisation.ttl");
         }
         if (inputStream != null) {

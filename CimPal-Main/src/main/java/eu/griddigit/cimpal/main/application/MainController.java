@@ -2057,13 +2057,20 @@ public class MainController implements Initializable {
 
             Map<String, Map<String, String>> classAttributesMap = null;
 
-            String xmlBase = "https://cim.ucaiug.io/ns#";
+            String xmlBase = "https://cim.ucaiug.io/ns";
 
             progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
             for (File selectedFile : selectedModelFiles) {
                 Model model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(List.of(selectedFile), xmlBase, Lang.RDFXML, false, false)
                         .get("unionModel");
+
+                String cimNamespace = model.getNsPrefixURI("cim");
+                if (cimNamespace != null) {
+                    xmlBase = cimNamespace.endsWith("#")
+                            ? cimNamespace.substring(0, cimNamespace.length() - 1)
+                            : cimNamespace;
+                }
 
                 if (classAttributesMap == null) {
                     classAttributesMap = AttributeInjector.getClassAttributesMap(xlsData, model.getNsPrefixMap());
