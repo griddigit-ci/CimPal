@@ -14,6 +14,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import org.apache.poi.xddf.usermodel.chart.*;
+import org.apache.poi.xssf.usermodel.XSSFChart;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+
 public class ValidationExcelWriter implements Closeable {
 
     public enum CaseFolder {
@@ -32,6 +38,9 @@ public class ValidationExcelWriter implements Closeable {
     private static final String TIMESTAMP_CONSTRAINT_SHEET_NAME = "TopConstraints";
     private static final String INPUT_COMPLETENESS_SHEET_NAME = "InputCompleteness";
     private static final boolean AUTO_SIZE_COLUMNS = false;
+
+    private static final String VALIDATION_RESULTS_SHEET_NAME = "Validation results";
+    private static final String CHARTS_SHEET_NAME = "Charts";
 
     private static final String[] TIMESTAMP_OVERVIEW_HEADER = new String[]{
             "Country", "Timestamp", "Report file",
@@ -67,20 +76,21 @@ public class ValidationExcelWriter implements Closeable {
     };
 
     private static final String[] STATISTICS_HEADER = new String[]{
-            "Case folder", "Dataset", "XML files", "Constraint file",
+            "Dataset", "XML files", "Constraint file",
             "All", "Warnings", "Infos", "Violations", "Conforms", "Validation error"
     };
 
     // One row per unique constraint over the whole report.
     // Count shows how many validation results used that same constraint information.
     private static final String[] STATISTICS_CONSTRAINT_HEADER = new String[]{
-            "Path", "Source", "Count", "Constraint Component", "Message", "Severity",
+            "Dataset", "Path", "Source", "Count", "Constraint Component", "Message", "Severity",
             "Description", "Order", "Name", "Group"
     };
 
     private final Workbook wb;
-    private final Map<CaseFolder, Sheet> sheetByCase = new EnumMap<>(CaseFolder.class);
-    private final Map<CaseFolder, Integer> nextRowByCase = new EnumMap<>(CaseFolder.class);
+    private Sheet validationResultsSheet;
+    private Sheet chartsSheet;
+    private int nextValidationResultsRow = 1;
     private final Map<ConstraintStatisticKey, Integer> constraintStatistics = new LinkedHashMap<>();
     private final Sheet statisticsSheet;
     private final Sheet statisticsConstraintSheet;
@@ -126,14 +136,10 @@ public class ValidationExcelWriter implements Closeable {
             return;
         }
 
-        for (CaseFolder cf : CaseFolder.values()) {
-            Sheet s = wb.createSheet(cf.name());
-            sheetByCase.put(cf, s);
-            nextRowByCase.put(cf, 1);
-            writeHeader(s, RAW_HEADER, headerStyle);
-            s.setAutoFilter(new CellRangeAddress(0, 0, 0, RAW_HEADER.length - 1));
-            s.createFreezePane(0, 1);
-        }
+        validationResultsSheet = wb.createSheet(VALIDATION_RESULTS_SHEET_NAME);
+        writeHeader(validationResultsSheet, RAW_HEADER, headerStyle);
+        validationResultsSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, RAW_HEADER.length - 1));
+        validationResultsSheet.createFreezePane(0, 1);
 
         statisticsSheet = wb.createSheet(STATISTICS_SHEET_NAME);
         writeHeader(statisticsSheet, STATISTICS_HEADER, headerStyle);
@@ -144,6 +150,8 @@ public class ValidationExcelWriter implements Closeable {
         writeHeader(statisticsConstraintSheet, STATISTICS_CONSTRAINT_HEADER, headerStyle);
         statisticsConstraintSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, STATISTICS_CONSTRAINT_HEADER.length - 1));
         statisticsConstraintSheet.createFreezePane(0, 1);
+
+        chartsSheet = wb.createSheet(CHARTS_SHEET_NAME);
     }
 
     public static ValidationExcelWriter createTimestampedSummaryWriter() {
@@ -174,12 +182,11 @@ public class ValidationExcelWriter implements Closeable {
             return;
         }
 
-        Sheet s = sheetByCase.get(cf);
-        int r = nextRowByCase.get(cf);
+        Sheet s = validationResultsSheet;
+        int r = nextValidationResultsRow;
 
         for (SHACLValidationResult res : results) {
-            addConstraintStatistic(reportXmlFiles, reportConstraintFile, res);
-
+            addConstraintStatistic(reportDataset, reportXmlFiles, reportConstraintFile, res);
             Row dr = s.createRow(r++);
             dr.createCell(0).setCellValue(reportDataset);
             dr.createCell(1).setCellValue(reportXmlFiles);
@@ -197,8 +204,7 @@ public class ValidationExcelWriter implements Closeable {
             dr.createCell(13).setCellValue(safe(res.getGroup()));
         }
 
-        nextRowByCase.put(cf, r);
-    }
+        nextValidationResultsRow = r;    }
 
     private static String toReportDataset(String xmlFiles, String constraintFile) {
         String constraint = safe(constraintFile);
@@ -323,18 +329,19 @@ public class ValidationExcelWriter implements Closeable {
         int all = warn + vio + info;
 
         Row row = statisticsSheet.createRow(nextStatisticsRow++);
-        row.createCell(0).setCellValue(cf == null ? "" : cf.name());
-        row.createCell(1).setCellValue(safe(reportDataset));
-        row.createCell(2).setCellValue(safe(reportXmlFiles));
-        row.createCell(3).setCellValue(safe(reportConstraintFile));
-        row.createCell(4).setCellValue(all);
-        row.createCell(5).setCellValue(warn);
-        row.createCell(6).setCellValue(info);
-        row.createCell(7).setCellValue(vio);
-        row.createCell(8).setCellValue(conforms && validationError == null);
-        row.createCell(9).setCellValue(safe(validationError));
+        row.createCell(0).setCellValue(safe(reportDataset));
+        row.createCell(1).setCellValue(safe(reportXmlFiles));
+        row.createCell(2).setCellValue(safe(reportConstraintFile));
+        row.createCell(3).setCellValue(all);
+        row.createCell(4).setCellValue(warn);
+        row.createCell(5).setCellValue(info);
+        row.createCell(6).setCellValue(vio);
+        row.createCell(7).setCellValue(conforms && validationError == null);
+        row.createCell(8).setCellValue(safe(validationError));
     }
-    private void addConstraintStatistic(String xmlFiles,
+
+    private void addConstraintStatistic(String dataset,
+                                        String xmlFiles,
                                         String constraintFile,
                                         SHACLValidationResult res) {
         if (res == null) {
@@ -342,6 +349,7 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         ConstraintStatisticKey key = new ConstraintStatisticKey(
+                safe(dataset),
                 safe(res.getPath()),
                 safe(res.getSourceShape()),
                 safe(res.getConstraintComponent()),
@@ -361,17 +369,19 @@ public class ValidationExcelWriter implements Closeable {
 
         for (Map.Entry<ConstraintStatisticKey, Integer> entry : constraintStatistics.entrySet()) {
             ConstraintStatisticKey key = entry.getKey();
+
             Row row = statisticsConstraintSheet.createRow(r++);
-            row.createCell(0).setCellValue(key.path);
-            row.createCell(1).setCellValue(key.source);
-            row.createCell(2).setCellValue(entry.getValue());
-            row.createCell(3).setCellValue(key.constraintComponent);
-            row.createCell(4).setCellValue(key.message);
-            row.createCell(5).setCellValue(key.severity);
-            row.createCell(6).setCellValue(key.description);
-            row.createCell(7).setCellValue(key.order);
-            row.createCell(8).setCellValue(key.name);
-            row.createCell(9).setCellValue(key.group);
+            row.createCell(0).setCellValue(key.dataset);
+            row.createCell(1).setCellValue(key.path);
+            row.createCell(2).setCellValue(key.source);
+            row.createCell(3).setCellValue(entry.getValue());
+            row.createCell(4).setCellValue(key.constraintComponent);
+            row.createCell(5).setCellValue(key.message);
+            row.createCell(6).setCellValue(key.severity);
+            row.createCell(7).setCellValue(key.description);
+            row.createCell(8).setCellValue(key.order);
+            row.createCell(9).setCellValue(key.name);
+            row.createCell(10).setCellValue(key.group);
         }
     }
 
@@ -395,15 +405,16 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         writeConstraintStatisticsRows();
+        writeChartsSheet();
 
         if (AUTO_SIZE_COLUMNS) {
-            for (CaseFolder cf : CaseFolder.values()) {
-                Sheet s = sheetByCase.get(cf);
-                autosize(s, RAW_HEADER.length);
-            }
-
+            autosize(validationResultsSheet, RAW_HEADER.length);
             autosize(statisticsSheet, STATISTICS_HEADER.length);
             autosize(statisticsConstraintSheet, STATISTICS_CONSTRAINT_HEADER.length);
+
+            if (chartsSheet != null) {
+                autosize(chartsSheet, 4);
+            }
         }
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         Path out = outputBaseDir.resolve("validation_report__" + ts + ".xlsx");
@@ -520,8 +531,10 @@ public class ValidationExcelWriter implements Closeable {
         private final String order;
         private final String name;
         private final String group;
+        private final String dataset;
 
-        private ConstraintStatisticKey(String path,
+        private ConstraintStatisticKey(String dataset,
+                                       String path,
                                        String source,
                                        String constraintComponent,
                                        String message,
@@ -530,6 +543,7 @@ public class ValidationExcelWriter implements Closeable {
                                        String order,
                                        String name,
                                        String group) {
+            this.dataset = dataset;
             this.path = path;
             this.source = source;
             this.constraintComponent = constraintComponent;
@@ -750,5 +764,243 @@ public class ValidationExcelWriter implements Closeable {
         public int hashCode() {
             return Objects.hash(country, timestamp, reportFile, constraintFile, source, constraintComponent, message, severity);
         }
+    }
+
+    private void writeChartsSheet() {
+        if (chartsSheet == null || statisticsSheet == null) {
+            return;
+        }
+
+        Row header = chartsSheet.createRow(0);
+        header.createCell(0).setCellValue("Dataset");
+        header.createCell(1).setCellValue("Warnings");
+        header.createCell(2).setCellValue("Infos");
+        header.createCell(3).setCellValue("Violations");
+
+        int outRow = 1;
+
+        for (int r = 1; r < nextStatisticsRow; r++) {
+            Row statsRow = statisticsSheet.getRow(r);
+
+            if (statsRow == null) {
+                continue;
+            }
+
+            String dataset = getString(statsRow, 0);
+            double warnings = getNumeric(statsRow, 4);
+            double infos = getNumeric(statsRow, 5);
+            double violations = getNumeric(statsRow, 6);
+
+            double total = warnings + infos + violations;
+
+            if (dataset.isBlank() || total == 0) {
+                continue;
+            }
+
+            Row row = chartsSheet.createRow(outRow++);
+            row.createCell(0).setCellValue(dataset);
+            row.createCell(1).setCellValue(warnings);
+            row.createCell(2).setCellValue(infos);
+            row.createCell(3).setCellValue(violations);
+        }
+
+        if (outRow <= 1) {
+            return;
+        }
+
+        chartsSheet.createFreezePane(0, 1);
+
+        for (int c = 0; c < 4; c++) {
+            chartsSheet.autoSizeColumn(c);
+        }
+
+        createTotalHitsChart((XSSFSheet) chartsSheet, outRow - 1);
+        createDistributedHitsChart((XSSFSheet) chartsSheet, outRow - 1);
+    }
+
+
+    private static String getString(Row row, int cellIndex) {
+        if (row == null) {
+            return "";
+        }
+
+        Cell cell = row.getCell(cellIndex);
+
+        if (cell == null) {
+            return "";
+        }
+
+        if (cell.getCellType() == CellType.STRING) {
+            return safe(cell.getStringCellValue());
+        }
+
+        if (cell.getCellType() == CellType.NUMERIC) {
+            return String.valueOf(cell.getNumericCellValue());
+        }
+
+        return "";
+    }
+
+    private static double getNumeric(Row row, int cellIndex) {
+        if (row == null) {
+            return 0;
+        }
+
+        Cell cell = row.getCell(cellIndex);
+
+        if (cell == null) {
+            return 0;
+        }
+
+        if (cell.getCellType() == CellType.NUMERIC) {
+            return cell.getNumericCellValue();
+        }
+
+        if (cell.getCellType() == CellType.STRING) {
+            try {
+                return Double.parseDouble(cell.getStringCellValue());
+            } catch (NumberFormatException ignore) {
+                return 0;
+            }
+        }
+
+        return 0;
+    }
+
+    private void createTotalHitsChart(XSSFSheet sheet, int lastDataRow) {
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+
+        XSSFClientAnchor anchor = drawing.createAnchor(
+                0, 0, 0, 0,
+                5, 1, 20, 22
+        );
+
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText("June 2026 Analysis - Total Number of Hits");
+        chart.setTitleOverlay(false);
+
+        XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+        bottomAxis.setTitle("Datasets");
+
+        XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
+        leftAxis.setTitle("Number of triggered constraints");
+        leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+
+        XDDFDataSource<String> categories =
+                XDDFDataSourcesFactory.fromStringCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 0, 0)
+                );
+
+        XDDFNumericalDataSource<Double> warnings =
+                XDDFDataSourcesFactory.fromNumericCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 1, 1)
+                );
+
+        XDDFNumericalDataSource<Double> infos =
+                XDDFDataSourcesFactory.fromNumericCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 2, 2)
+                );
+
+        XDDFNumericalDataSource<Double> violations =
+                XDDFDataSourcesFactory.fromNumericCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 3, 3)
+                );
+
+        XDDFBarChartData data = (XDDFBarChartData) chart.createData(
+                ChartTypes.BAR,
+                bottomAxis,
+                leftAxis
+        );
+
+        data.setBarDirection(BarDirection.COL);
+        data.setBarGrouping(BarGrouping.STACKED);
+        data.setVaryColors(false);
+
+        XDDFBarChartData.Series warningsSeries =
+                (XDDFBarChartData.Series) data.addSeries(categories, warnings);
+        warningsSeries.setTitle("Warnings", null);
+
+        XDDFBarChartData.Series infosSeries =
+                (XDDFBarChartData.Series) data.addSeries(categories, infos);
+        infosSeries.setTitle("Infos", null);
+
+        XDDFBarChartData.Series violationsSeries =
+                (XDDFBarChartData.Series) data.addSeries(categories, violations);
+        violationsSeries.setTitle("Violations", null);
+
+        chart.plot(data);
+    }
+
+    private void createDistributedHitsChart(XSSFSheet sheet, int lastDataRow) {
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+
+        XSSFClientAnchor anchor = drawing.createAnchor(
+                0, 0, 0, 0,
+                5, 24, 20, 45
+        );
+
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText("June 2026 Analysis - Total Distributed Number of Hits");
+        chart.setTitleOverlay(false);
+
+        XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+        bottomAxis.setTitle("Datasets");
+
+        XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
+        leftAxis.setTitle("Total distribution of the number of triggered constraints");
+        leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+        leftAxis.setNumberFormat("0%");
+
+        XDDFDataSource<String> categories =
+                XDDFDataSourcesFactory.fromStringCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 0, 0)
+                );
+
+        XDDFNumericalDataSource<Double> warnings =
+                XDDFDataSourcesFactory.fromNumericCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 1, 1)
+                );
+
+        XDDFNumericalDataSource<Double> infos =
+                XDDFDataSourcesFactory.fromNumericCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 2, 2)
+                );
+
+        XDDFNumericalDataSource<Double> violations =
+                XDDFDataSourcesFactory.fromNumericCellRange(
+                        sheet,
+                        new CellRangeAddress(1, lastDataRow, 3, 3)
+                );
+
+        XDDFBarChartData data = (XDDFBarChartData) chart.createData(
+                ChartTypes.BAR,
+                bottomAxis,
+                leftAxis
+        );
+
+        data.setBarDirection(BarDirection.COL);
+        data.setBarGrouping(BarGrouping.PERCENT_STACKED);
+        data.setVaryColors(false);
+
+        XDDFBarChartData.Series warningsSeries =
+                (XDDFBarChartData.Series) data.addSeries(categories, warnings);
+        warningsSeries.setTitle("Warnings", null);
+
+        XDDFBarChartData.Series infosSeries =
+                (XDDFBarChartData.Series) data.addSeries(categories, infos);
+        infosSeries.setTitle("Infos", null);
+
+        XDDFBarChartData.Series violationsSeries =
+                (XDDFBarChartData.Series) data.addSeries(categories, violations);
+        violationsSeries.setTitle("Violations", null);
+
+        chart.plot(data);
     }
 }

@@ -1843,7 +1843,7 @@ public class ValidationTools {
                         + " -> using metadata");
             }
 
-            return new TimestampDetection(normalizeTimestampToHour(metadataTimestamp), "METADATA_HOUR");        }
+            return new TimestampDetection(normalizeTimestampToReportTime(metadataTimestamp), "METADATA_HOUR");        }
 
         if (!filenameTimestamp.isBlank()) {
             String sameHourMetadataTimestamp = mapFilenameTimestampToSameHourMetadataTimestamp(
@@ -1858,7 +1858,7 @@ public class ValidationTools {
                         + " filenameTimestamp=" + filenameTimestamp
                         + " metadataTimestamp=" + sameHourMetadataTimestamp);
 
-                return new TimestampDetection(normalizeTimestampToHour(sameHourMetadataTimestamp), "FILENAME_MAPPED_TO_SAME_HOUR_METADATA");            }
+                return new TimestampDetection(normalizeTimestampToReportTime(sameHourMetadataTimestamp), "FILENAME_MAPPED_TO_SAME_HOUR_METADATA");            }
 
             String mappedMetadataTimestamp = filenameToMetadataTimestamp.get(filenameTimestamp);
 
@@ -1869,7 +1869,7 @@ public class ValidationTools {
                         + " filenameTimestamp=" + filenameTimestamp
                         + " metadataTimestamp=" + mappedMetadataTimestamp);
 
-                return new TimestampDetection(normalizeTimestampToHour(mappedMetadataTimestamp), "FILENAME_MAPPED_TO_METADATA_HOUR");            }
+                return new TimestampDetection(normalizeTimestampToReportTime(mappedMetadataTimestamp), "FILENAME_MAPPED_TO_METADATA_HOUR");            }
 
             logWarn("No metadata timestamp found and filename timestamp could not be mapped"
                     + " inputGroup=" + inputGroupName
@@ -1877,7 +1877,7 @@ public class ValidationTools {
                     + " filenameTimestamp=" + filenameTimestamp
                     + " -> using filename timestamp");
 
-            return new TimestampDetection(normalizeTimestampToHour(filenameTimestamp), "FILENAME_HOUR");
+            return new TimestampDetection(normalizeTimestampToReportTime(filenameTimestamp), "FILENAME_HOUR");
         }
 
         return new TimestampDetection("", "NONE");
@@ -2743,6 +2743,7 @@ public class ValidationTools {
             return date
                     .atStartOfDay(ZoneOffset.UTC)
                     .plusHours(marketHour - 3L)
+                    .plusMinutes(marketHour - 3L)
                     .toInstant()
                     .toString();
 
@@ -3614,7 +3615,7 @@ public class ValidationTools {
                 return "";
             }
 
-            java.time.ZonedDateTime sameHour = zdt.withMinute(0).withSecond(0).withNano(0);
+            java.time.ZonedDateTime sameHour = zdt.withMinute(30).withSecond(0).withNano(0);
             String candidate = sameHour.toInstant().toString();
 
             return metadataTimestamps.contains(candidate) ? candidate : "";
@@ -3624,7 +3625,7 @@ public class ValidationTools {
         }
     }
 
-    private static String normalizeTimestampToHour(String timestamp) {
+    private static String normalizeTimestampToReportTime(String timestamp) {
         String ts = safe(timestamp);
 
         if (ts.isBlank()) {
@@ -3636,7 +3637,7 @@ public class ValidationTools {
 
             return instant
                     .atZone(java.time.ZoneOffset.UTC)
-                    .withMinute(0)
+                    .withMinute(30)
                     .withSecond(0)
                     .withNano(0)
                     .toInstant()
