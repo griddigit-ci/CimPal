@@ -2056,6 +2056,8 @@ public class ValidationTools {
             String resolvedFilesText = formatPaths(resolution.xmlFiles);
             String missingInputText = String.join("; ", resolution.missingInputs);
 
+            boolean willRunValidation = shouldRunValidationWithResolvedInputs(resolution);
+
             String status;
             String message;
 
@@ -2063,9 +2065,12 @@ public class ValidationTools {
                 if (resolution.onlyCountrySpecificMissing) {
                     status = "Missing - country-specific input";
                     message = "The mapping row requests input for another country or region. This skip can be expected if the row is intentionally country-specific.";
+                } else if (willRunValidation) {
+                    status = "Partial input - validation executed";
+                    message = "Some requested inputs were missing, but at least one XML file was resolved and the validation was executed with the available files.";
                 } else {
-                    status = "Missing input";
-                    message = "One or more required inputs from the mapping row were not resolved for this country and timestamp.";
+                    status = "Missing input - skipped";
+                    message = "One or more required inputs from the mapping row were not resolved, and no partial validation was executed.";
                 }
             } else if (resolution.xmlFiles.size() > resolution.expectedFileCount) {
                 status = "Too many files";
@@ -2089,28 +2094,31 @@ public class ValidationTools {
                     message
             ));
 
-            if (!resolution.missingInputs.isEmpty()) {
+            if (!willRunValidation) {
                 logWarn("PRECHECK_SKIP validation row"
                         + " row=" + rowIdx
                         + " inputGroup=" + tsoIndex.tso
                         + " timestamp=" + timestampGroup.timestamp
                         + " missingInput=" + missingInputText
                         + " status=" + status
+                        + " resolvedXmlCount=" + resolution.xmlFiles.size()
+                        + " expectedFileCount=" + resolution.expectedFileCount
                         + " xmlInputsRaw=" + row.xmlInputsRaw
                         + " ttl=" + row.ttl);
 
                 continue;
             }
 
-            if (resolution.xmlFiles.isEmpty()) {
-                logWarn("No XML files resolved for mapping row pair"
+            if (!resolution.missingInputs.isEmpty()) {
+                logWarn("PRECHECK_PARTIAL_RUN validation row"
                         + " row=" + rowIdx
                         + " inputGroup=" + tsoIndex.tso
                         + " timestamp=" + timestampGroup.timestamp
+                        + " missingInput=" + missingInputText
+                        + " resolvedXmlCount=" + resolution.xmlFiles.size()
+                        + " expectedFileCount=" + resolution.expectedFileCount
                         + " xmlInputsRaw=" + row.xmlInputsRaw
                         + " ttl=" + row.ttl);
-
-                continue;
             }
 
             String datasetName = makeTimestampedDatasetName(
@@ -2147,8 +2155,10 @@ public class ValidationTools {
 
         List<String> tokens = parseXmlInputs(row.xmlInputsRaw);
 
-        boolean sawMissing = false;
-        boolean sawNonCountrySpecificMissing = false;
+        boolean sawRealMissing = false;
+        boolean sawOtherCountrySpecificMissing = false;
+
+        int expectedFileCount = 0;
 
         for (String token : tokens) {
             String requestedToken = cleanInputTokenForReport(token);
@@ -2157,9 +2167,20 @@ public class ValidationTools {
                 continue;
             }
 
-            if (isCountrySpecificToken(token) && !isCountrySpecificTokenApplicable(token, tsoIndex.tso)) {
+            boolean countrySpecific = isCountrySpecificToken(token);
+            boolean applicable = isCountrySpecificTokenApplicable(token, tsoIndex.tso);
+
+            List<String> requestedProfiles = detectProfilesFromMappingToken(token);
+
+            if (requestedProfiles.isEmpty()) {
+                expectedFileCount++;
+            } else {
+                expectedFileCount += requestedProfiles.size();
+            }
+
+            if (countrySpecific && !applicable) {
                 missingInputs.add(requestedToken);
-                sawMissing = true;
+                sawOtherCountrySpecificMissing = true;
                 continue;
             }
 
@@ -2172,24 +2193,43 @@ public class ValidationTools {
 
             if (tokenFiles.isEmpty()) {
                 missingInputs.add(requestedToken);
-                sawMissing = true;
-
-                if (!isCountrySpecificToken(token)) {
-                    sawNonCountrySpecificMissing = true;
-                }
+                sawRealMissing = true;
             } else {
                 resolvedFiles.addAll(tokenFiles);
             }
         }
 
-        boolean onlyCountrySpecificMissing = sawMissing && !sawNonCountrySpecificMissing;
+        boolean onlyCountrySpecificMissing =
+                sawOtherCountrySpecificMissing
+                        && !sawRealMissing
+                        && resolvedFiles.isEmpty();
 
         return new InputResolution(
                 new ArrayList<>(resolvedFiles),
                 missingInputs,
                 onlyCountrySpecificMissing,
-                tokens.size()
+                expectedFileCount
         );
+    }
+
+    private static boolean shouldRunValidationWithResolvedInputs(InputResolution resolution) {
+        if (resolution == null) {
+            return false;
+        }
+
+        if (resolution.xmlFiles == null || resolution.xmlFiles.isEmpty()) {
+            return false;
+        }
+
+        if (resolution.missingInputs == null || resolution.missingInputs.isEmpty()) {
+            return true;
+        }
+
+        if (resolution.onlyCountrySpecificMissing) {
+            return false;
+        }
+
+        return resolution.expectedFileCount > 1;
     }
 
 
@@ -2357,7 +2397,7 @@ public class ValidationTools {
             return List.of();
         }
 
-        if (isAnyLogicalProfileToken(token)) {
+        if (isAnyLogicalProfileToken(token) || isCountrySpecificLogicalProfileToken(token)) {
             return candidates;
         }
 
@@ -2381,9 +2421,9 @@ public class ValidationTools {
                     + " token=" + token
                     + " filePattern=" + filePattern
                     + " candidateCount=" + candidates.size()
-                    + " -> using all candidates for detected profile");
+                    + " -> returning no files");
 
-            return candidates;
+            return List.of();
         }
 
         return out;
@@ -3443,30 +3483,6 @@ public class ValidationTools {
         return profiles;
     }
 
-    private static List<String> findMissingRequiredProfiles(MappingRow row,
-                                                            TsoFileIndex tsoIndex,
-                                                            TimestampGroup timestampGroup) {
-        List<String> missing = new ArrayList<>();
-
-        LinkedHashSet<String> requiredProfiles = detectProfilesFromMappingInput(row.xmlInputsRaw);
-
-        for (String profile : requiredProfiles) {
-            List<Path> files;
-
-            if (TIMESTAMPED_PROFILES.contains(profile)) {
-                files = timestampGroup.timestampFiles(profile);
-            } else {
-                files = tsoIndex.staticFiles(profile);
-            }
-
-            if (files == null || files.isEmpty()) {
-                missing.add(profile);
-            }
-        }
-
-        return missing;
-    }
-
     private static String sanitizePathPart(String value) {
         String s = safe(value).trim();
 
@@ -3714,4 +3730,18 @@ public class ValidationTools {
         }
     }
 
+
+    private static boolean isCountrySpecificLogicalProfileToken(String token) {
+        String s = cleanInputTokenForReport(token)
+                .toUpperCase(Locale.ROOT)
+                .replace("-", "_");
+
+        for (String profile : ALL_INPUT_PROFILES_ORDERED) {
+            if (s.endsWith("_" + profile)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
