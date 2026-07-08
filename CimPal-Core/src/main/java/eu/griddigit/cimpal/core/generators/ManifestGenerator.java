@@ -24,6 +24,7 @@ public class ManifestGenerator {
     private static final String NS_PROV = "http://www.w3.org/ns/prov#";
     private static final String NS_RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
     private static final String NS_MD = "http://iec.ch/TC57/61970-552/ModelDescription/1#";
+    private static final String NS_XSD = "http://www.w3.org/2001/XMLSchema#";
 
     private static final Resource MD_FULL_MODEL = ResourceFactory.createResource(NS_MD + "FullModel");
     private static final Resource DCAT_CATALOG = ResourceFactory.createResource(NS_DCAT + "Catalog");
@@ -273,6 +274,7 @@ public class ManifestGenerator {
         model.setNsPrefix("nc", NS_NC);
         model.setNsPrefix("prov", NS_PROV);
         model.setNsPrefix("rdf", NS_RDF);
+        model.setNsPrefix("xsd", NS_XSD);
     }
 
     private static Resource findHeader(Model model, Resource type) {
