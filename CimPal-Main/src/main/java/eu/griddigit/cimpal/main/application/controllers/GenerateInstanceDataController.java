@@ -209,12 +209,42 @@ public class GenerateInstanceDataController implements Initializable {
     @FXML
     private void actionBtnResetGenerateInstance() {
         resetProgressBar();
+
+        // Reset file references
         inputXLS = null;
+        genRDFSFiles = null;
+        genInstanceFiles = null;
+
+        // Reset list views
+        ls_geni_rdfs.getItems().clear();
+        ls_geni_instances.getItems().clear();
+
+        // Reset XLS template path
         fsXlsTemplatePath.clear();
+
+        // Reset method option
+        fcbGenMethodOptions.getSelectionModel().select("Advanced template");
+
+        // Reset version
         fcb_giVersion.getSelectionModel().selectFirst();
+
+        // Reset sorting/export options
         fcbSortRDFGen.setSelected(true);
         fcbRDFsortOptionsGen.getSelectionModel().selectFirst();
-        fcbGenMethodOptions.getSelectionModel().selectFirst();
+        fcbStripPrefixesGen.setSelected(true);
+        fcbExportExtensionsGen.setSelected(true);
+
+        // Reset hide empty sheets
+        hideEmptySheets.setSelected(false);
+        hideEmptySheets.setDisable(true);
+
+        // Reset information label
+        label_geninfo.setText("Load RDFS and/or Instance data to generate template.");
+
+        // Re-apply enabled/disabled state based on selected method
+        actionHandleOptionsForGen(
+                fcbGenMethodOptions.getSelectionModel().getSelectedItem()
+        );
     }
 
 
@@ -282,16 +312,27 @@ public class GenerateInstanceDataController implements Initializable {
     @FXML
     private void actionLoadInstanceDataGen() {
         try {
-            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml"), "Select instance file(s) for template.");
+            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                    false,
+                    "Instance files",
+                    List.of("*.xml"),
+                    "Select instance file(s) for template."
+            );
+
             ls_geni_instances.getItems().clear();
             genInstanceFiles = file;
-            if (!file.isEmpty()) {// the file is selected
+
+            if (file != null && !file.isEmpty()) {
                 ObservableList<String> filenames = FXCollections.observableArrayList();
                 file.forEach(f -> filenames.add(f.getName()));
                 ls_geni_instances.setItems(filenames);
             }
         } catch (Exception e) {
-            GUIhelper.showUserFriendlyError("Instance selection error", "The selected instance file list could not be loaded.", e);
+            GUIhelper.showUserFriendlyError(
+                    "Instance selection error",
+                    "The selected instance file list could not be loaded.",
+                    e
+            );
         } finally {
             updateGenInfoLabel();
             checkInstanceData();
