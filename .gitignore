@@ -1,6 +1,7 @@
 # Created by .ignore support plugin (hsz.mobi)
 .qodo
 /target/
+target/
 
 # Logs
 *.log

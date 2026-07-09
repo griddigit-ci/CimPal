@@ -60,6 +60,7 @@
                   <Tab fx:id="tabGenerateInstanceData" text="Generate Instance data"/>
                   <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
                   <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
+                  <Tab fx:id="tabValidationByMapping" text="Validation by Mapping"/>
                </TabPane>
             </HBox>
          </AnchorPane>

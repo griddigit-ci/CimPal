@@ -143,6 +143,9 @@ public class MainController implements Initializable {
     @FXML
     private TextArea fsourceDefineTab;
 
+    @FXML
+    private Tab tabValidationByMapping;
+
     public static File rdfModel1;
     public static File rdfModel2;
     public static List<File> IDModel1;
@@ -365,7 +368,30 @@ public class MainController implements Initializable {
             GUIhelper.showUserFriendlyError("SPARQL Query tab error", "The SPARQL Query tab could not be loaded.", e);
         }
 
+        initializeValidationByMappingTab();
 
+    }
+
+    private void initializeValidationByMappingTab() {
+        try {
+            URL fxmlUrl = getClass().getResource("/fxml/ValidationByMapping.fxml");
+
+            if (fxmlUrl == null) {
+                throw new IOException("FXML not found: /fxml/ValidationByMapping.fxml");
+            }
+
+            FXMLLoader loader = new FXMLLoader(fxmlUrl);
+            Parent root = loader.load();
+
+            tabValidationByMapping.setContent(root);
+
+        } catch (Exception e) {
+            GUIhelper.showUserFriendlyError(
+                    "Validation by Mapping tab error",
+                    "The Validation by Mapping tab could not be loaded.",
+                    e
+            );
+        }
     }
 
     // ============ Progress Bar Control Methods ============
@@ -731,141 +757,12 @@ public class MainController implements Initializable {
 
     @FXML
     public void actionValidateByMapping() {
-
-        progressBar.setProgress(0);
-        Model shaclRefModel = null;
-        shapeModels = null;
-
-        List<File> mappingCsvFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
-                true,
-                "Validation mapping file",
-                List.of("*.csv"),
-                "Mapping file"
-        );
-
-        if (mappingCsvFile == null || mappingCsvFile.isEmpty() || mappingCsvFile.get(0) == null) {
+        if (tabPaneConstraintsDetails == null || tabValidationByMapping == null) {
+            System.err.println("[ERROR] Validation by Mapping tab is not initialized.");
             return;
         }
 
-        ChoiceDialog<String> workflowDialog = new ChoiceDialog<>(
-                "Validate by mapping file",
-                List.of(
-                        "Validate by mapping file",
-                        "Validate by timestamped mapping"
-                )
-        );
-
-        workflowDialog.setTitle("Select validation workflow");
-        workflowDialog.setHeaderText("Choose which validation workflow to run");
-        workflowDialog.setContentText("Workflow:");
-
-        Optional<String> selectedWorkflow = workflowDialog.showAndWait();
-
-        if (selectedWorkflow.isEmpty()) {
-            return;
-        }
-
-        boolean runTimestampedWorkflow = "Validate by timestamped mapping".equals(selectedWorkflow.get());
-
-        File modelsBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
-                runTimestampedWorkflow
-                        ? "Select the timestamped input root folder"
-                        : "Select the models root folder"
-        );
-
-        File outputBaseDir = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
-                "Select the output folder of zips and report"
-        );
-
-        File constraintsRoot = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
-                "Select constraint's root folder"
-        );
-
-        String xmlBase = "http://iec.ch/TC57/CIM100";
-
-        if (modelsBaseDir == null || outputBaseDir == null || constraintsRoot == null) {
-            return;
-        }
-
-        ChoiceDialog<String> datatypeMapDialog = new ChoiceDialog<>(
-                "CGMES 3.0 / NC 2.4",
-                List.of(
-                        "CGMES 3.0 / NC 2.4",
-                        "CGMES 2.4 / NC 2.2"
-                )
-        );
-
-        datatypeMapDialog.setTitle("Select datatype map");
-        datatypeMapDialog.setHeaderText("Choose datatype map for validation");
-        datatypeMapDialog.setContentText("Datatype map:");
-
-        Optional<String> selectedDatatypeMap = datatypeMapDialog.showAndWait();
-
-        if (selectedDatatypeMap.isEmpty()) {
-            return;
-        }
-
-        String datatypeMapResource = switch (selectedDatatypeMap.get()) {
-            case "CGMES 2.4 / NC 2.2" -> "/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties";
-            case "CGMES 3.0 / NC 2.4" -> "/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties";
-            default -> throw new IllegalStateException("Unknown datatype map: " + selectedDatatypeMap.get());
-        };
-
-        File mappingFile = mappingCsvFile.get(0);
-        File selectedModelsBaseDir = modelsBaseDir;
-        File selectedOutputBaseDir = outputBaseDir;
-        File selectedConstraintsRoot = constraintsRoot;
-
-        new Thread(() -> {
-            try {
-                Map<String, RDFDatatype> dataTypeMap =
-                        CompleteDatatypeMapLoader.loadFromResource(datatypeMapResource);
-
-                if (runTimestampedWorkflow) {
-                    List<Path> reports = ValidationTools.validateByTimestampedMapping(
-                            mappingFile.toPath(),
-                            selectedModelsBaseDir.toPath(),
-                            selectedConstraintsRoot.toPath(),
-                            selectedOutputBaseDir.toPath(),
-                            2,
-                            dataTypeMap,
-                            xmlBase
-                    );
-
-                    System.out.println("Created report count: " + reports.size());
-                    for (Path report : reports) {
-                        System.out.println("Report saved to: " + report);
-                    }
-
-                } else {
-                    Path report = ValidationTools.validateByMapping(
-                            mappingFile.toPath(),
-                            selectedModelsBaseDir.toPath(),
-                            selectedConstraintsRoot.toPath(),
-                            selectedOutputBaseDir.toPath(),
-                            4,
-                            dataTypeMap,
-                            xmlBase
-                    );
-
-                    System.out.println("Report saved to: " + report);
-
-                    List<Path> createdZips = ValidationTools.zipByMapping(
-                            mappingFile.toPath(),
-                            selectedModelsBaseDir.toPath(),
-                            selectedOutputBaseDir.toPath()
-                    );
-
-                    System.out.println("Created zip count: " + createdZips.size());
-                    for (Path zip : createdZips) {
-                        System.out.println("ZIP: " + zip);
-                    }
-                }
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
+        tabPaneConstraintsDetails.getSelectionModel().select(tabValidationByMapping);
     }
 
     @FXML
