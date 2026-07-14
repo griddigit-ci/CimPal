@@ -297,7 +297,7 @@ public class MainController implements Initializable {
         }
 
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFStoSHACLtab.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFStoSHACLTab.fxml"));
             tabRDFStoSHACL.setContent(loader.load());
             RDFStoSHACLController controller = loader.getController();
             controller.setMainController(this);
