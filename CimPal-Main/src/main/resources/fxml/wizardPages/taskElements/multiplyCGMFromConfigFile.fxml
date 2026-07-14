@@ -13,7 +13,7 @@
         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="98.0" prefWidth="1184.0">
             <Label layoutX="167.0" layoutY="12.0" text="Multiply CGM config XLS:" />
             <TextField fx:id="loadedXMLFile" editable="false" layoutX="308.0" layoutY="7.0" prefHeight="26.0" prefWidth="434.0" HBox.hgrow="ALWAYS" />
-            <Button disable="false" layoutX="753.0" layoutY="7.0" mnemonicParsing="false" onAction="#actionBrowseMultiplyCGMFiles" prefHeight="26.0" prefWidth="152.0" text="Browse" />
+            <Button layoutX="753.0" layoutY="7.0" mnemonicParsing="false" onAction="#actionBrowseMultiplyCGMFiles" prefHeight="26.0" prefWidth="152.0" text="Browse" />
             <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="12.0" mnemonicParsing="false" selected="true" text="Save Result to Working Dir" />
             <CheckBox fx:id="persistentEQflag" layoutX="14.0" layoutY="12.0" mnemonicParsing="false" prefHeight="18.0" prefWidth="168.0" text="Persistent EQ" />
             <CheckBox fx:id="useGeneratedMasFile" layoutX="14.0" layoutY="46.0" mnemonicParsing="false" prefHeight="18.0" prefWidth="168.0" text="Use generated MAS" />

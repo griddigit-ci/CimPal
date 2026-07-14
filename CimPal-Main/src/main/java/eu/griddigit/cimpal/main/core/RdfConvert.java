@@ -255,9 +255,12 @@ public class RdfConvert {
             mainModel.setNsPrefix("cim", m.getNsPrefixURI("cim"));
             if (m.getNsPrefixURI("entsoe") != null) {
                 mainModel.setNsPrefix("entsoe", m.getNsPrefixURI("entsoe"));
-            } else {
+            } else if (m.getNsPrefixURI("eu") != null) {
                 mainModel.setNsPrefix("eu", m.getNsPrefixURI("eu"));
+            } else if (m.getNsPrefixURI("nc") != null) {
+                mainModel.setNsPrefix("nc", m.getNsPrefixURI("nc"));
             }
+
 
             // Process Description and Enumeration
             if (m.listSubjectsWithProperty(stereotype, "Description").hasNext()) {

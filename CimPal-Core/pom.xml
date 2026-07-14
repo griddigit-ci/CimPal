@@ -53,6 +53,20 @@
             <groupId>org.apache.jena</groupId>
             <artifactId>jena-csv</artifactId>
             <version>3.9.0</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>jena-cmds</artifactId>
+                    <groupId>org.apache.jena</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>slf4j-api</artifactId>
+                    <groupId>org.slf4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>apache-jena-libs</artifactId>
+                    <groupId>org.apache.jena</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.jena</groupId>
@@ -72,7 +86,7 @@
         <dependency>
             <groupId>org.topbraid</groupId>
             <artifactId>shacl</artifactId>
-            <version>1.4.4</version>
+            <version>1.5.0</version>
             <exclusions>
                 <exclusion>
                     <artifactId>jena-arq</artifactId>
@@ -88,7 +102,7 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
-            <version>5.4.1</version>
+            <version>5.5.1</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-codec</artifactId>
@@ -99,7 +113,7 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>5.4.1</version>
+            <version>5.5.1</version>
             <exclusions>
                 <exclusion>
                     <groupId>jakarta.activation</groupId>

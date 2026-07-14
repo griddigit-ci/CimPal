@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.core.utils;
 
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.TypeMapper;
+import org.apache.jena.sys.JenaSystem;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,11 +24,13 @@ public final class CompleteDatatypeMapLoader {
             if (in == null) {
                 throw new IOException("Datatype map resource not found: " + resourcePath);
             }
+            JenaSystem.init();
 
             Properties props = new Properties();
             props.load(in);
 
             Map<String, RDFDatatype> out = new HashMap<>();
+            TypeMapper.reset();
             TypeMapper tm = TypeMapper.getInstance();
 
             for (String key : props.stringPropertyNames()) {
@@ -46,6 +49,7 @@ public final class CompleteDatatypeMapLoader {
 
             return out;
         }
+
     }
 
     private static String extractDatatypeUri(String raw) {
