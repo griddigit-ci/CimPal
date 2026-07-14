@@ -12,3 +12,4 @@ target/
 *.iws
 out/
 /CimPal-Main/dependency-reduced-pom.xml
+/CimPal-CLI/dependency-reduced-pom.xml
