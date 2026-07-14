@@ -31,6 +31,7 @@
         <module>CimPal-Core</module>
         <module>CimPal-Main</module>
         <module>CimPal-CustomWriter</module>
+        <module>CimPal-CLI</module>
     </modules>
 
     <build>
