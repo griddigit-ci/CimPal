@@ -1,7 +1,7 @@
 package eu.griddigit.CimPal.generators;
 
 import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.riot.Lang;
 
 import java.io.*;
 import java.util.*;
@@ -42,6 +42,11 @@ public class ManifestService {
                 File parent = dir.getParentFile();
                 outputPath = new File(parent, "manifest.ttl").getAbsolutePath();
             }
+            // default accessUrl: the --dir path itself, so accessURL reflects the full
+            // folder structure (e.g. "Instance/Belgovia/Grid/cimxml") instead of just "cimxml"
+            if (accessUrl == null) {
+                accessUrl = opts.get("dir").replace("\\", "/");
+            }
         } else if (opts.containsKey("files")) {
             String[] parts = opts.get("files").split(",");
             for (String p : parts) {
@@ -74,18 +79,14 @@ public class ManifestService {
             System.exit(4);
         }
 
-        // Read models
-        Map<String, Model> models = new HashMap<>();
-        for (File f : sourceFiles) {
-            try (InputStream in = new FileInputStream(f)) {
-                Model m = ModelFactory.createDefaultModel();
-                // let Jena detect RDF format; RDF/XML is common for CIM
-                m.read(in, null);
-                models.put(f.getName(), m);
-                System.out.println("Loaded model: " + f.getAbsolutePath());
-            } catch (Exception e) {
-                System.err.println("Failed to read file " + f.getAbsolutePath() + ": " + e.getMessage());
-            }
+        // Read models - same loader the GUI uses, so relative URIs (rdf:about="#_uuid", standard in CIM/CGMES) resolve correctly
+        Map<String, Model> models;
+        try {
+            models = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoadPerFiles(sourceFiles, "", Lang.RDFXML);
+            models.keySet().forEach(name -> System.out.println("Loaded model: " + name));
+        } catch (Exception e) {
+            System.err.println("Failed to read model files: " + e.getMessage());
+            models = Map.of();
         }
 
         if (models.isEmpty()) {

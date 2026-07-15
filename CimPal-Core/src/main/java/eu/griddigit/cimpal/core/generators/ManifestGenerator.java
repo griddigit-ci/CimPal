@@ -188,7 +188,7 @@ public class ManifestGenerator {
 
             Resource accessUrlRes = coalesceResource(
                     values(sourceModel, distributionFromDataset(sourceModel, datasetHeader), DCAT_ACCESS_URL),
-                    i == 0 ? compactAccessUrlValues(accessUrl, sourceFile) : List.of(),
+                    compactAccessUrlValues(accessUrl, sourceFile),
                     compactAccessUrlValues(null, sourceFile),
                     List.of(DEFAULT_ACCESS_URL)
             );
@@ -591,6 +591,11 @@ public class ManifestGenerator {
                     fileName = p.getFileName() != null ? p.getFileName().toString() : null;
                     Path parent = p.getParent();
                     parentFolder = (parent != null && parent.getFileName() != null) ? parent.getFileName().toString() : null;
+                } else if (uri.getScheme() == null) {
+                    // Plain relative path supplied by the caller (e.g. a repo-relative model
+                    // folder such as "Instance/Belgovia/Grid/cimxml"): use it verbatim as the
+                    // folder prefix instead of collapsing to a single directory name.
+                    parentFolder = raw;
                 }
             } catch (Exception ignored) {
                 // Fall back to selected file info.
@@ -599,8 +604,10 @@ public class ManifestGenerator {
 
         if ((fileName == null || fileName.isBlank()) && sourceFile != null) {
             fileName = sourceFile.getName();
-            File parent = sourceFile.getParentFile();
-            parentFolder = parent != null ? parent.getName() : null;
+            if (parentFolder == null || parentFolder.isBlank()) {
+                File parent = sourceFile.getParentFile();
+                parentFolder = parent != null ? parent.getName() : null;
+            }
         }
 
         if (fileName == null || fileName.isBlank()) {
