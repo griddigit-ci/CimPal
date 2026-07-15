@@ -32,7 +32,7 @@ public class ManifestService {
             }
             File[] matches = dir.listFiles((d, name) -> {
                 String l = name.toLowerCase();
-                return l.endsWith(".xml") || l.endsWith(".rdf") || l.endsWith(".ttl") || l.endsWith(".rdfxml");
+                return l.endsWith(".xml") || l.endsWith(".rdf") || l.endsWith(".ttl");
             });
             if (matches != null) {
                 sourceFiles.addAll(Arrays.asList(matches));
