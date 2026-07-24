@@ -1,0 +1,70 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT  
+  (?this AS ?TopologicalNode)
+  (?sumP AS ?Sum_of_P)
+  (?sumQ AS ?Sum_of_Q)
+  (COALESCE(?missingTerminalCount, 0) AS ?Terminals_without_SvPowerFlow)
+  (COALESCE(?missingTerminalDetails, "") AS ?Missing_terminal_equipment_types)
+WHERE {
+  {
+    SELECT  
+      ?this
+      (SUM(?pDouble) AS ?sumP)
+      (SUM(?qDouble) AS ?sumQ)
+    WHERE {
+      ?this rdf:type cim:TopologicalNode .
+
+      ?t cim:Terminal.TopologicalNode ?this .
+      ?svpf cim:SvPowerFlow.Terminal ?t ;
+            cim:SvPowerFlow.p ?p ;
+            cim:SvPowerFlow.q ?q .
+
+      BIND(xsd:double(STR(?p)) AS ?pDouble)
+      BIND(xsd:double(STR(?q)) AS ?qDouble)
+
+      FILTER NOT EXISTS {
+        ?t cim:Terminal.ConductingEquipment ?ce .
+        { ?ce rdf:type cim:Switch } UNION { ?ce rdf:type cim:Breaker }
+        ?ce cim:Switch.retained false .
+      }
+
+      FILTER NOT EXISTS {
+        ?svi cim:SvInjection.TopologicalNode ?this .
+      }
+    }
+    GROUP BY ?this
+    HAVING (
+      ABS(SUM(?pDouble)) > 0.1 || ABS(SUM(?qDouble)) > 0.1
+    )
+  }
+
+  OPTIONAL {
+    SELECT
+      ?this
+      (COUNT(DISTINCT ?missingTerminal) AS ?missingTerminalCount)
+	  (GROUP_CONCAT(
+	  	DISTINCT CONCAT(
+	  	REPLACE(STR(?missingTerminal), "http://iec.ch/TC57/2013/CIM-schema-cim16#", "cim:"),
+	  	" -> ",
+	  	REPLACE(STR(?ceType), "http://iec.ch/TC57/2013/CIM-schema-cim16#", "cim:")
+	  	);
+	  	separator=" | "
+	  ) AS ?missingTerminalDetails)
+    WHERE {
+      ?missingTerminal cim:Terminal.TopologicalNode ?this .
+
+      FILTER NOT EXISTS {
+        ?svpf2 cim:SvPowerFlow.Terminal ?missingTerminal .
+      }
+
+      OPTIONAL {
+        ?missingTerminal cim:Terminal.ConductingEquipment ?missingCE .
+        ?missingCE rdf:type ?ceType .
+      }
+    }
+    GROUP BY ?this
+  }
+}

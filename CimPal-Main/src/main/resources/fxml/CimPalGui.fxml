@@ -61,6 +61,7 @@
                   <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
                   <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
                   <Tab fx:id="tabValidationByMapping" text="Validation by Mapping"/>
+                  <Tab fx:id="tabIdMapping" text="ID Mapping / Model Matching"/>
                </TabPane>
             </HBox>
          </AnchorPane>

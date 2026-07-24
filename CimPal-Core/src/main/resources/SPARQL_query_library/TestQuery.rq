@@ -1,0 +1,8 @@
+SELECT 
+  (?s AS ?Subject)
+  (?p AS ?Predicate)
+  (?o AS ?Value)
+WHERE {
+  ?s ?p ?o .
+}
+LIMIT 100

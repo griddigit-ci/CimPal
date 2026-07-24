@@ -1,0 +1,249 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT
+  (?terminal AS ?Terminal_ID)
+  (?terminalName AS ?Terminal_Name)
+
+  (?element AS ?Element_ID)
+  (?elementName AS ?Element_Name)
+
+  (?container AS ?Container_ID)
+  (?containerName AS ?Container_Name)
+  (?containerClass AS ?Container_Type)
+
+  (?resolvedRegionName AS ?GeographicalRegion_Name)
+
+  (?cn AS ?Terminal_Connected_To_Node_ID)
+  (?cnName AS ?Terminal_Connected_To_Node_Name)
+  (?nominalVoltage AS ?Connected_node_voltage)
+
+  (?connectedTerminalList AS ?List_of_connected_terminals_to_the_Node_ID)
+  (?connectedElementList AS ?List_of_connected_elements_to_the_Node_ID)
+
+WHERE {
+  #################################################################
+  # Terminal and associated conducting equipment
+  #################################################################
+
+  ?terminal cim:Terminal.ConductingEquipment ?element .
+
+  OPTIONAL {
+    ?terminal cim:IdentifiedObject.name ?terminalName .
+  }
+
+  OPTIONAL {
+    ?element cim:IdentifiedObject.name ?elementName .
+  }
+
+  #################################################################
+  # Equipment container
+  #################################################################
+
+  OPTIONAL {
+    ?element cim:Equipment.EquipmentContainer ?container .
+
+    OPTIONAL {
+      ?container cim:IdentifiedObject.name ?containerName .
+    }
+
+    OPTIONAL {
+      {
+        SELECT
+          ?container
+          (SAMPLE(?containerClassValue) AS ?containerClass)
+        WHERE {
+          ?container rdf:type ?containerType .
+
+          FILTER(
+            STRSTARTS(
+              STR(?containerType),
+              STR(cim:)
+            )
+          )
+
+          BIND(
+            REPLACE(
+              STR(?containerType),
+              "^.*[#/]",
+              ""
+            )
+            AS ?containerClassValue
+          )
+        }
+        GROUP BY ?container
+      }
+    }
+  }
+
+  #################################################################
+  # Geographical region through a substation
+  #
+  # Supported paths:
+  #   Equipment -> Substation
+  #   Equipment -> VoltageLevel -> Substation
+  #   Equipment -> Bay -> VoltageLevel -> Substation
+  #################################################################
+
+  OPTIONAL {
+    {
+      ?container rdf:type cim:Substation .
+      BIND(?container AS ?substation)
+    }
+    UNION
+    {
+      ?container cim:VoltageLevel.Substation ?substation .
+    }
+    UNION
+    {
+      ?container
+        cim:Bay.VoltageLevel/
+        cim:VoltageLevel.Substation
+        ?substation .
+    }
+
+    ?substation
+      cim:Substation.Region/
+      cim:SubGeographicalRegion.Region
+      ?substationGeographicalRegion .
+
+    OPTIONAL {
+      ?substationGeographicalRegion
+        cim:IdentifiedObject.name
+        ?substationRegionName .
+    }
+  }
+
+  #################################################################
+  # Geographical region for equipment contained in a Line
+  #################################################################
+
+  OPTIONAL {
+    ?container rdf:type cim:Line ;
+               cim:Line.Region/
+               cim:SubGeographicalRegion.Region
+               ?lineGeographicalRegion .
+
+    OPTIONAL {
+      ?lineGeographicalRegion
+        cim:IdentifiedObject.name
+        ?lineRegionName .
+    }
+  }
+
+  BIND(
+    COALESCE(
+      ?substationRegionName,
+      ?lineRegionName
+    )
+    AS ?resolvedRegionName
+  )
+
+  #################################################################
+  # ConnectivityNode associated with the terminal
+  #################################################################
+
+  OPTIONAL {
+    ?terminal cim:Terminal.ConnectivityNode ?cn .
+
+    OPTIONAL {
+      ?cn cim:IdentifiedObject.name ?cnName .
+    }
+
+    ################################################################
+    # Voltage of the ConnectivityNode
+    #
+    # Supported structures:
+    #   ConnectivityNode -> VoltageLevel -> BaseVoltage
+    #   ConnectivityNode -> Bay -> VoltageLevel -> BaseVoltage
+    ################################################################
+
+    OPTIONAL {
+      {
+        ?cn
+          cim:ConnectivityNode.ConnectivityNodeContainer
+          ?nodeVoltageLevel .
+
+        ?nodeVoltageLevel rdf:type cim:VoltageLevel .
+      }
+      UNION
+      {
+        ?cn
+          cim:ConnectivityNode.ConnectivityNodeContainer
+          ?nodeBay .
+
+        ?nodeBay cim:Bay.VoltageLevel ?nodeVoltageLevel .
+      }
+
+      ?nodeVoltageLevel
+        cim:VoltageLevel.BaseVoltage
+        ?nodeBaseVoltage .
+
+      ?nodeBaseVoltage
+        cim:BaseVoltage.nominalVoltage
+        ?nominalVoltage .
+    }
+  }
+
+  #################################################################
+  # List of terminals connected to the same ConnectivityNode
+  #################################################################
+
+  OPTIONAL {
+    {
+      SELECT
+        ?cn
+        (
+          GROUP_CONCAT(
+            DISTINCT REPLACE(
+              STR(?connectedTerminal),
+              "http://iec.ch/TC57/2013/CIM-schema-cim16#",
+              "cim:"
+            );
+            separator=" | "
+          )
+          AS ?connectedTerminalList
+        )
+      WHERE {
+        ?connectedTerminal
+          cim:Terminal.ConnectivityNode
+          ?cn .
+      }
+      GROUP BY ?cn
+    }
+  }
+
+  #################################################################
+  # List of conducting equipment connected to the same node
+  #################################################################
+
+  OPTIONAL {
+    {
+      SELECT
+        ?cn
+        (
+          GROUP_CONCAT(
+            DISTINCT REPLACE(
+              STR(?connectedElement),
+              "http://iec.ch/TC57/2013/CIM-schema-cim16#",
+              "cim:"
+            );
+            separator=" | "
+          )
+          AS ?connectedElementList
+        )
+      WHERE {
+        ?connectedTerminal
+          cim:Terminal.ConnectivityNode ?cn ;
+          cim:Terminal.ConductingEquipment ?connectedElement .
+      }
+      GROUP BY ?cn
+    }
+  }
+}
+ORDER BY
+  ?Container_Type
+  ?Container_Name
+  ?Element_Name
+  ?Element_ID
+  ?Terminal_ID

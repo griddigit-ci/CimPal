@@ -1,0 +1,41 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT
+  ?TerminalId
+  ?TerminalName
+  ?EquipmentId
+  ?EquipmentName
+  ?EquipmentClass
+  ?RegionName
+WHERE {
+  ?Terminal cim:Terminal.ConductingEquipment ?Equipment .
+
+  FILTER NOT EXISTS {
+    ?Terminal cim:ACDCTerminal.connected ?connected .
+  }
+
+  BIND(REPLACE(STR(?Terminal), "^.*[#/]", "") AS ?terminalUriId)
+  BIND(REPLACE(STR(?Equipment), "^.*[#/]", "") AS ?equipmentUriId)
+
+  OPTIONAL { ?Terminal cim:IdentifiedObject.mRID ?terminalMRID . }
+  OPTIONAL { ?Terminal cim:IdentifiedObject.name ?terminalName . }
+
+  OPTIONAL { ?Equipment cim:IdentifiedObject.mRID ?equipmentMRID . }
+  OPTIONAL { ?Equipment cim:IdentifiedObject.name ?equipmentName . }
+    OPTIONAL { ?Equipment (cim:Equipment.EquipmentContainer/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name)|(cim:Equipment.EquipmentContainer/cim:VoltageLevel.Substation/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name)|(cim:Equipment.EquipmentContainer/cim:Bay.VoltageLevel/cim:VoltageLevel.Substation/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name)|(cim:Equipment.EquipmentContainer/cim:Line.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name)|(cim:Equipment.EquipmentContainer/cim:DCConverterUnit.Substation/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name) ?regionName . }
+
+  OPTIONAL {
+    ?Equipment rdf:type ?equipmentClassIri .
+    FILTER(STRSTARTS(STR(?equipmentClassIri), STR(cim:)))
+    BIND(REPLACE(STR(?equipmentClassIri), "^.*[#/]", "") AS ?EquipmentClass)
+  }
+
+  BIND(COALESCE(STR(?terminalMRID), ?terminalUriId) AS ?TerminalId)
+  BIND(COALESCE(STR(?terminalName), "") AS ?TerminalName)
+
+  BIND(COALESCE(STR(?equipmentMRID), ?equipmentUriId) AS ?EquipmentId)
+  BIND(COALESCE(STR(?equipmentName), "") AS ?EquipmentName)
+    BIND(COALESCE(STR(?regionName), "") AS ?RegionName)
+}
+ORDER BY ?EquipmentClass ?EquipmentName ?TerminalId

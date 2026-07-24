@@ -1,0 +1,23 @@
+# Map08_Injections - generators, loads, shunts, SVCs and equivalent injections.
+# Matched (Phase 3) by class + voltage level + ratings + name. ratedS/ratedU
+# apply to rotating machines; nomU to shunt compensators.
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?inj ?injType ?injName ?ratedS ?ratedU ?nomU ?container ?substation ?nomV
+WHERE {
+  ?inj a ?injType .
+  VALUES ?injType {
+    cim:SynchronousMachine cim:AsynchronousMachine
+    cim:EnergyConsumer cim:ConformLoad cim:NonConformLoad
+    cim:EnergySource cim:LinearShuntCompensator cim:NonlinearShuntCompensator
+    cim:StaticVarCompensator cim:EquivalentInjection cim:ExternalNetworkInjection
+  }
+  OPTIONAL { ?inj cim:IdentifiedObject.name ?injName }
+  OPTIONAL { ?inj cim:RotatingMachine.ratedS ?ratedS }
+  OPTIONAL { ?inj cim:RotatingMachine.ratedU ?ratedU }
+  OPTIONAL { ?inj cim:ShuntCompensator.nomU ?nomU }
+  OPTIONAL { ?inj cim:Equipment.EquipmentContainer ?container .
+             OPTIONAL { ?container cim:VoltageLevel.Substation ?substation }
+             OPTIONAL { ?container cim:VoltageLevel.BaseVoltage ?bv .
+                        ?bv cim:BaseVoltage.nominalVoltage ?nomV } }
+}

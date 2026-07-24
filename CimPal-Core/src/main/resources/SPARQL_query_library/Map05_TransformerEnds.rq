@@ -1,0 +1,19 @@
+# Map05_TransformerEnds - one row per PowerTransformerEnd.
+# Winding count per transformer distinguishes 2-winding vs 3-winding units;
+# the multiset of ratedU per transformer is the self-loop label used in the
+# substation signature (Phase 2) and to match transformers (Phase 3).
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?trafo ?trafoName ?end ?endNum ?ratedU ?ratedS ?terminal ?substation ?nomV
+WHERE {
+  ?end a cim:PowerTransformerEnd ;
+       cim:PowerTransformerEnd.PowerTransformer ?trafo ;
+       cim:TransformerEnd.Terminal ?terminal .
+  OPTIONAL { ?end cim:TransformerEnd.endNumber ?endNum }
+  OPTIONAL { ?end cim:PowerTransformerEnd.ratedU ?ratedU }
+  OPTIONAL { ?end cim:PowerTransformerEnd.ratedS ?ratedS }
+  OPTIONAL { ?end cim:TransformerEnd.BaseVoltage ?bv .
+             ?bv cim:BaseVoltage.nominalVoltage ?nomV }
+  OPTIONAL { ?trafo cim:IdentifiedObject.name ?trafoName }
+  OPTIONAL { ?trafo cim:Equipment.EquipmentContainer ?substation }
+}

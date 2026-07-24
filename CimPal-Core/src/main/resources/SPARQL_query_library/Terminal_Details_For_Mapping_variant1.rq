@@ -1,0 +1,198 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT
+  (?terminal AS ?Terminal_ID)
+  (SAMPLE(?terminalName) AS ?Terminal_Name)
+
+  (SAMPLE(?element) AS ?Element_ID)
+  (SAMPLE(?elementName) AS ?Element_Name)
+
+  (SAMPLE(?container) AS ?Container_ID)
+  (SAMPLE(?containerName) AS ?Container_Name)
+  (SAMPLE(?containerClass) AS ?Container_Type)
+
+  (SAMPLE(?resolvedRegionName) AS ?GeographicalRegion_Name)
+
+  (SAMPLE(?cn) AS ?Terminal_Connected_To_Node_ID)
+  (SAMPLE(?cnName) AS ?Terminal_Connected_To_Node_Name)
+  (SAMPLE(?nominalVoltage) AS ?Connected_node_voltage)
+
+  (
+    GROUP_CONCAT(
+      DISTINCT REPLACE(
+        STR(?connectedTerminal),
+        "http://iec.ch/TC57/2013/CIM-schema-cim16#",
+        "cim:"
+      );
+      separator=" | "
+    )
+    AS ?List_of_connected_terminals_to_the_Node_ID
+  )
+
+  (
+    GROUP_CONCAT(
+      DISTINCT REPLACE(
+        STR(?connectedElement),
+        "http://iec.ch/TC57/2013/CIM-schema-cim16#",
+        "cim:"
+      );
+      separator=" | "
+    )
+    AS ?List_of_connected_elements_to_the_Node_ID
+  )
+
+WHERE {
+  #################################################################
+  # One initial row per Terminal
+  #################################################################
+
+  ?terminal cim:Terminal.ConductingEquipment ?element .
+
+  OPTIONAL {
+    ?terminal cim:IdentifiedObject.name ?terminalName .
+  }
+
+  OPTIONAL {
+    ?element cim:IdentifiedObject.name ?elementName .
+  }
+
+  #################################################################
+  # Equipment container
+  #################################################################
+
+  OPTIONAL {
+    ?element cim:Equipment.EquipmentContainer ?container .
+
+    OPTIONAL {
+      ?container cim:IdentifiedObject.name ?containerName .
+    }
+
+    OPTIONAL {
+      ?container rdf:type ?containerType .
+
+      FILTER(
+        STRSTARTS(
+          STR(?containerType),
+          "http://iec.ch/TC57/2013/CIM-schema-cim16#"
+        )
+      )
+
+      BIND(
+        REPLACE(
+          STR(?containerType),
+          "^.*[#/]",
+          ""
+        )
+        AS ?containerClass
+      )
+    }
+  }
+
+  #################################################################
+  # Region through Substation
+  #################################################################
+
+  OPTIONAL {
+    {
+      ?container rdf:type cim:Substation .
+      BIND(?container AS ?substation)
+    }
+    UNION
+    {
+      ?container cim:VoltageLevel.Substation ?substation .
+    }
+    UNION
+    {
+      ?container
+        cim:Bay.VoltageLevel/
+        cim:VoltageLevel.Substation
+        ?substation .
+    }
+
+    ?substation
+      cim:Substation.Region/
+      cim:SubGeographicalRegion.Region
+      ?substationGeoRegion .
+
+    OPTIONAL {
+      ?substationGeoRegion
+        cim:IdentifiedObject.name
+        ?substationRegionName .
+    }
+  }
+
+  #################################################################
+  # Region through Line
+  #################################################################
+
+  OPTIONAL {
+    ?container rdf:type cim:Line ;
+               cim:Line.Region/
+               cim:SubGeographicalRegion.Region
+               ?lineGeoRegion .
+
+    OPTIONAL {
+      ?lineGeoRegion
+        cim:IdentifiedObject.name
+        ?lineRegionName .
+    }
+  }
+
+  BIND(
+    COALESCE(
+      ?substationRegionName,
+      ?lineRegionName
+    )
+    AS ?resolvedRegionName
+  )
+
+  #################################################################
+  # ConnectivityNode and voltage
+  #################################################################
+
+  OPTIONAL {
+    ?terminal cim:Terminal.ConnectivityNode ?cn .
+
+    OPTIONAL {
+      ?cn cim:IdentifiedObject.name ?cnName .
+    }
+
+    OPTIONAL {
+      ?cn cim:ConnectivityNode.ConnectivityNodeContainer ?nodeContainer .
+
+      {
+        ?nodeContainer rdf:type cim:VoltageLevel ;
+                       cim:VoltageLevel.BaseVoltage ?baseVoltage .
+      }
+      UNION
+      {
+        ?nodeContainer cim:Bay.VoltageLevel ?nodeVoltageLevel .
+
+        ?nodeVoltageLevel
+          cim:VoltageLevel.BaseVoltage
+          ?baseVoltage .
+      }
+
+      ?baseVoltage
+        cim:BaseVoltage.nominalVoltage
+        ?nominalVoltage .
+    }
+
+    ################################################################
+    # All terminals and elements connected to this node
+    ################################################################
+
+    OPTIONAL {
+      ?connectedTerminal
+        cim:Terminal.ConnectivityNode ?cn ;
+        cim:Terminal.ConductingEquipment ?connectedElement .
+    }
+  }
+}
+GROUP BY ?terminal
+ORDER BY
+  ?Container_Type
+  ?Container_Name
+  ?Element_Name
+  ?Terminal_ID

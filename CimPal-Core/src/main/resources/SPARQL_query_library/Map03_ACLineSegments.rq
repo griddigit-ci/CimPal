@@ -1,0 +1,19 @@
+# Map03_ACLineSegments - segment electrical parameters and Line container.
+# r/x/bch/length are summed per logical line during Phase 1 collapsing.
+# nomV comes from ConductingEquipment.BaseVoltage (resolved via boundary set).
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?acls ?name ?r ?x ?bch ?gch ?length ?nomV ?lineContainer ?lineName
+WHERE {
+  ?acls a cim:ACLineSegment .
+  OPTIONAL { ?acls cim:IdentifiedObject.name ?name }
+  OPTIONAL { ?acls cim:ACLineSegment.r ?r }
+  OPTIONAL { ?acls cim:ACLineSegment.x ?x }
+  OPTIONAL { ?acls cim:ACLineSegment.bch ?bch }
+  OPTIONAL { ?acls cim:ACLineSegment.gch ?gch }
+  OPTIONAL { ?acls cim:Conductor.length ?length }
+  OPTIONAL { ?acls cim:ConductingEquipment.BaseVoltage ?bv .
+             ?bv cim:BaseVoltage.nominalVoltage ?nomV }
+  OPTIONAL { ?acls cim:Equipment.EquipmentContainer ?lineContainer .
+             OPTIONAL { ?lineContainer cim:IdentifiedObject.name ?lineName } }
+}

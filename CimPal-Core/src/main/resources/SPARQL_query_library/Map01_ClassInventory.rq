@@ -1,0 +1,11 @@
+# Map01_ClassInventory - reconnaissance: count of instances per rdf:type.
+# Used by the Statistics sheet and Phase 0 sanity checks.
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?class (COUNT(?s) AS ?count)
+WHERE {
+  ?s a ?class .
+}
+GROUP BY ?class
+ORDER BY DESC(?count)

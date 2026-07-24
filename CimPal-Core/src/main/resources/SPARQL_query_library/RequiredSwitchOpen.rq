@@ -1,0 +1,57 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT
+  ?Equipment
+  ?EquipmentName
+  ?EquipmentClass
+  ?RegionName
+  (COUNT(DISTINCT ?Terminal) AS ?TerminalCount)
+  (GROUP_CONCAT(
+      DISTINCT REPLACE(
+        STR(?Terminal),
+        "http://iec.ch/TC57/2013/CIM-schema-cim16#",
+        "cim:"
+      );
+      separator=" | "
+   ) AS ?Terminals)
+WHERE {
+  VALUES ?targetClass {
+    cim:Switch
+    cim:Disconnector
+    cim:Breaker
+  }
+
+  ?Equipment rdf:type ?targetClass .
+
+  FILTER NOT EXISTS {
+    ?Equipment cim:Switch.open ?v .
+  }
+
+  OPTIONAL {
+    ?Terminal cim:Terminal.ConductingEquipment ?Equipment .
+  }
+
+  OPTIONAL { ?Equipment cim:IdentifiedObject.name ?equipmentName . }
+
+  BIND(REPLACE(STR(?targetClass), "^.*[#/]", "") AS ?EquipmentClass)
+
+  OPTIONAL {
+    ?Equipment (
+      cim:Equipment.EquipmentContainer/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name |
+      cim:Equipment.EquipmentContainer/cim:VoltageLevel.Substation/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name |
+      cim:Equipment.EquipmentContainer/cim:Bay.VoltageLevel/cim:VoltageLevel.Substation/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name |
+      cim:Equipment.EquipmentContainer/cim:Line.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name |
+      cim:Equipment.EquipmentContainer/cim:DCConverterUnit.Substation/cim:Substation.Region/cim:SubGeographicalRegion.Region/cim:IdentifiedObject.name
+    ) ?regionName .
+  }
+
+  BIND(COALESCE(STR(?equipmentName), "") AS ?EquipmentName)
+  BIND(COALESCE(STR(?regionName), "") AS ?RegionName)
+}
+GROUP BY
+  ?Equipment
+  ?EquipmentName
+  ?EquipmentClass
+  ?RegionName
+ORDER BY ?EquipmentClass ?EquipmentName

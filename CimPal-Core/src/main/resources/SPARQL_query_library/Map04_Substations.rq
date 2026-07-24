@@ -1,0 +1,17 @@
+# Map04_Substations - substations with region and their voltage levels.
+# One row per (substation, voltageLevel); a substation with N VLs yields N rows.
+# Duplicate nominal voltages across VLs of one substation flag the ambiguity
+# case described in the design (section 2).
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?substation ?substationName ?region ?regionName ?vl ?vlName ?nomV
+WHERE {
+  ?substation a cim:Substation .
+  OPTIONAL { ?substation cim:IdentifiedObject.name ?substationName }
+  OPTIONAL { ?substation cim:Substation.Region ?region .
+             OPTIONAL { ?region cim:IdentifiedObject.name ?regionName } }
+  OPTIONAL { ?vl cim:VoltageLevel.Substation ?substation .
+             OPTIONAL { ?vl cim:IdentifiedObject.name ?vlName }
+             OPTIONAL { ?vl cim:VoltageLevel.BaseVoltage ?bv .
+                        ?bv cim:BaseVoltage.nominalVoltage ?nomV } }
+}

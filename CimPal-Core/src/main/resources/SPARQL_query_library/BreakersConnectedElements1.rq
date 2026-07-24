@@ -1,0 +1,109 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT
+  ?Breaker_ID
+  ?Breaker_Name
+  ?Breaker_Terminal
+
+  ?Substation_ID
+  ?Substation_Name
+  #?GeographicalRegion_ID
+  ?GeographicalRegion_Name
+
+  ?Next_ConductingEquipment_ID
+  ?Next_ConductingEquipment_Name
+  ?Next_ConductingEquipment_Type
+  #?Next_ConductingEquipment_TerminalCount
+WHERE {
+  {
+    SELECT DISTINCT
+      (?breaker AS ?Breaker_ID)
+      (?breakerName AS ?Breaker_Name)
+      (?brTerminal AS ?Breaker_Terminal)
+
+      (?substation AS ?Substation_ID)
+      (?substationName AS ?Substation_Name)
+      (?geoRegion AS ?GeographicalRegion_ID)
+      (?geoRegionName AS ?GeographicalRegion_Name)
+
+      (?candidateEq AS ?Next_ConductingEquipment_ID)
+      (?candidateName AS ?Next_ConductingEquipment_Name)
+      (?candidateClass AS ?Next_ConductingEquipment_Type)
+      (?terminalCount AS ?Next_ConductingEquipment_TerminalCount)
+      ?isSwitchingDevice
+    WHERE {
+      ?breaker a cim:Breaker .
+      OPTIONAL { ?breaker cim:IdentifiedObject.name ?breakerName . }
+
+      OPTIONAL {
+        ?breaker (
+          cim:Equipment.EquipmentContainer/cim:VoltageLevel.Substation |
+          cim:Equipment.EquipmentContainer/cim:Bay.VoltageLevel/cim:VoltageLevel.Substation
+        ) ?substation .
+
+        OPTIONAL { ?substation cim:IdentifiedObject.name ?substationName . }
+
+        OPTIONAL {
+          ?substation cim:Substation.Region ?subGeoRegion .
+          ?subGeoRegion cim:SubGeographicalRegion.Region ?geoRegion .
+          OPTIONAL { ?geoRegion cim:IdentifiedObject.name ?geoRegionName . }
+        }
+      }
+
+      ?brTerminal cim:Terminal.ConductingEquipment ?breaker ;
+                  cim:Terminal.ConnectivityNode ?cn0 .
+
+      ?passTerminalA cim:Terminal.ConnectivityNode ?cn0 ;
+                     cim:Terminal.ConductingEquipment ?passEq .
+
+      FILTER(?passEq != ?breaker)
+
+      FILTER(
+        EXISTS { ?passEq a cim:Breaker } ||
+        EXISTS { ?passEq a cim:Disconnector }
+      )
+
+      ?passTerminalB cim:Terminal.ConductingEquipment ?passEq ;
+                     cim:Terminal.ConnectivityNode ?cn1 .
+
+      FILTER(?passTerminalB != ?passTerminalA)
+
+      ?candidateTerminal cim:Terminal.ConnectivityNode ?cn1 ;
+                         cim:Terminal.ConductingEquipment ?candidateEq .
+
+      FILTER(?candidateEq != ?passEq)
+      FILTER(?candidateEq != ?breaker)
+
+      OPTIONAL { ?candidateEq cim:IdentifiedObject.name ?candidateName . }
+
+      OPTIONAL {
+        ?candidateEq a ?candidateType .
+        FILTER(STRSTARTS(STR(?candidateType), STR(cim:)))
+        BIND(REPLACE(STR(?candidateType), "^.*[#/]", "") AS ?candidateClass)
+      }
+
+      {
+        SELECT ?candidateEq (COUNT(DISTINCT ?t) AS ?terminalCount)
+        WHERE {
+          ?t cim:Terminal.ConductingEquipment ?candidateEq .
+        }
+        GROUP BY ?candidateEq
+      }
+
+      BIND(
+        EXISTS { ?candidateEq a cim:Breaker } ||
+        EXISTS { ?candidateEq a cim:Disconnector }
+        AS ?isSwitchingDevice
+      )
+    }
+  }
+
+  FILTER(?isSwitchingDevice = false)
+  FILTER(?Next_ConductingEquipment_TerminalCount >= 2)
+}
+ORDER BY
+  ?GeographicalRegion_Name
+  ?Substation_Name
+  ?Breaker_Name
+  ?Next_ConductingEquipment_Type

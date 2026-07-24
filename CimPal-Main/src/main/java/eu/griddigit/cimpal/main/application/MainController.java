@@ -146,6 +146,9 @@ public class MainController implements Initializable {
     @FXML
     private Tab tabValidationByMapping;
 
+    @FXML
+    private Tab tabIdMapping;
+
     public static File rdfModel1;
     public static File rdfModel2;
     public static List<File> IDModel1;
@@ -369,6 +372,13 @@ public class MainController implements Initializable {
         }
 
         initializeValidationByMappingTab();
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/IdMappingTab.fxml"));
+            tabIdMapping.setContent(loader.load());
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("ID Mapping tab error", "The ID Mapping / Model Matching tab could not be loaded.", e);
+        }
 
     }
 

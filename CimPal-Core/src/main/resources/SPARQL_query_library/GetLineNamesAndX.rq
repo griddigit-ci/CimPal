@@ -1,0 +1,12 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT 
+  (?s AS ?Subject)
+  (?x AS ?cim_ACLineSegment_x)
+  (?name AS ?cim_IdentifiedObject_name)
+WHERE {
+  ?s rdf:type cim:ACLineSegment .
+  OPTIONAL { ?s cim:ACLineSegment.x ?x . }
+  OPTIONAL { ?s cim:IdentifiedObject.name ?name . }
+}

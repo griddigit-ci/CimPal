@@ -1,0 +1,33 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT  
+  (?this AS ?TopologicalNode)
+  (SUM(?pDouble) AS ?Sum_of_P)
+  (SUM(?qDouble) AS ?Sum_of_Q)
+WHERE {
+  ?this rdf:type cim:TopologicalNode .
+
+  ?t cim:Terminal.TopologicalNode ?this .
+  ?svpf cim:SvPowerFlow.Terminal ?t ;
+        cim:SvPowerFlow.p ?p ;
+        cim:SvPowerFlow.q ?q .
+
+  BIND(xsd:double(STR(?p)) AS ?pDouble)
+  BIND(xsd:double(STR(?q)) AS ?qDouble)
+
+  FILTER NOT EXISTS {
+    ?t cim:Terminal.ConductingEquipment ?ce .
+    { ?ce rdf:type cim:Switch } UNION { ?ce rdf:type cim:Breaker }
+    ?ce cim:Switch.retained false .
+  }
+
+  FILTER NOT EXISTS {
+    ?svi cim:SvInjection.TopologicalNode ?this .
+  }
+}
+GROUP BY ?this
+HAVING (
+  ABS(SUM(?pDouble)) > 0.1 || ABS(SUM(?qDouble)) > 0.1
+)

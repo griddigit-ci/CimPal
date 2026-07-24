@@ -1,0 +1,22 @@
+# Map06_Switches - switching devices with concrete class and container.
+# In EQ there is no open/closed state (that lives in SSH), so the bay-graph
+# reduction (Phase 3) treats every switch as a connector regardless of
+# normalOpen. Terminal-to-CN adjacency for switches comes from Map02.
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?switch ?switchType ?switchName ?normalOpen ?container ?containerType ?substation
+WHERE {
+  ?switch a ?switchType .
+  VALUES ?switchType {
+    cim:Switch cim:Breaker cim:Disconnector cim:LoadBreakSwitch
+    cim:GroundDisconnector cim:Fuse cim:Jumper cim:ProtectedSwitch
+    cim:Sectionaliser cim:DisconnectingCircuitBreaker
+  }
+  OPTIONAL { ?switch cim:IdentifiedObject.name ?switchName }
+  OPTIONAL { ?switch cim:Switch.normalOpen ?normalOpen }
+  OPTIONAL { ?switch cim:Equipment.EquipmentContainer ?container .
+             ?container a ?containerType .
+             OPTIONAL { ?container cim:VoltageLevel.Substation ?substation }
+             OPTIONAL { ?container cim:Bay.VoltageLevel ?vl .
+                        ?vl cim:VoltageLevel.Substation ?substation } }
+}

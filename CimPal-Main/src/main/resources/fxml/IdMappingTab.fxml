@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<AnchorPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.IdMappingController"
+            prefHeight="400.0" prefWidth="1000.0">
+    <HBox AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+        <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+            <padding>
+                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+            </padding>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="PF EQ files (EirGrid + SONI):" wrapText="true"/>
+                <TextField fx:id="tfPfFiles" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowsePf" text="Browse"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="IGMS EQ file(s):" wrapText="true"/>
+                <TextField fx:id="tfIgmsFiles" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseIgms" text="Browse"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="Boundary set (optional):" wrapText="true"/>
+                <TextField fx:id="tfBoundaryFiles" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseBoundary" text="Browse"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="Query folder (optional):" wrapText="true"/>
+                <TextField fx:id="tfQueryFolder" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseQueryFolder" text="Browse"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="Config JSON (optional):" wrapText="true"/>
+                <TextField fx:id="tfConfigFile" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseConfig" text="Browse"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="New_2nd_name source:" wrapText="true"/>
+                <ChoiceBox fx:id="cbSecondName" minWidth="200.0"/>
+                <Label text="(ignored when a config JSON is provided)" wrapText="true"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="Output workbook (.xlsx):" wrapText="true"/>
+                <TextField fx:id="tfOutputFile" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseOutput" text="Browse"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="Progress:" wrapText="true"/>
+                <ProgressBar fx:id="pbIdMapping" prefWidth="300.0" progress="0.0"/>
+                <Label fx:id="lblStatus" text="Idle." wrapText="true"/>
+            </HBox>
+
+            <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+                <VBox.margin>
+                    <Insets bottom="5.0" right="5.0"/>
+                </VBox.margin>
+                <Button fx:id="btnRunIdMapping" minWidth="80.0" mnemonicParsing="false" onAction="#actionRun" text="Run mapping"/>
+                <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionReset" text="Reset"/>
+            </HBox>
+        </VBox>
+    </HBox>
+</AnchorPane>

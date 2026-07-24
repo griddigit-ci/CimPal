@@ -1,0 +1,28 @@
+# Map02_TerminalDetails - the workhorse adjacency table.
+# One row per Terminal: the conducting equipment it belongs to, the
+# ConnectivityNode it attaches to, and the resolved container/substation.
+# Everything container-related is OPTIONAL because containment can be absent.
+# The in-memory graph is built from (eq, cn) pairs: CN = node, eq = edge.
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?terminal ?seq ?eq ?eqType ?eqName ?cn ?cnName
+       ?container ?containerType ?substation ?substationName ?nomV
+WHERE {
+  ?terminal a cim:Terminal ;
+            cim:Terminal.ConductingEquipment ?eq ;
+            cim:Terminal.ConnectivityNode ?cn .
+  OPTIONAL { ?terminal cim:ACDCTerminal.sequenceNumber ?seq }
+  ?eq a ?eqType .
+  OPTIONAL { ?eq cim:IdentifiedObject.name ?eqName }
+  OPTIONAL { ?cn cim:IdentifiedObject.name ?cnName }
+  OPTIONAL {
+    ?cn cim:ConnectivityNode.ConnectivityNodeContainer ?container .
+    ?container a ?containerType .
+    OPTIONAL { ?container cim:VoltageLevel.Substation ?substation }
+    OPTIONAL { ?container cim:Bay.VoltageLevel ?vl .
+               ?vl  cim:VoltageLevel.Substation ?substation }
+    OPTIONAL { ?container cim:VoltageLevel.BaseVoltage ?bv .
+               ?bv  cim:BaseVoltage.nominalVoltage ?nomV }
+    OPTIONAL { ?substation cim:IdentifiedObject.name ?substationName }
+  }
+}

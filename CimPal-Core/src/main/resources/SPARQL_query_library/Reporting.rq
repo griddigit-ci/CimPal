@@ -1,0 +1,63 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT
+  (?eq AS ?Equipment_ID)
+  (?eqName AS ?Equipment_Name)
+  (?eqClass AS ?Equipment_Type)
+
+  (?terminal AS ?Terminal_ID)
+  (?terminalName AS ?Terminal_Name)
+  (?seq AS ?Terminal_Sequence)
+
+  (?cn AS ?ConnectivityNode_ID)
+  (?cnName AS ?ConnectivityNode_Name)
+
+  (?nodeSubstation AS ?Node_Substation_ID)
+  (?nodeSubstationName AS ?Node_Substation_Name)
+
+  (?geoRegion AS ?Node_GeographicalRegion_ID)
+  (?geoRegionName AS ?Node_GeographicalRegion_Name)
+
+WHERE {
+  ?terminal cim:Terminal.ConductingEquipment ?eq .
+
+  OPTIONAL { ?eq cim:IdentifiedObject.name ?eqName . }
+
+  OPTIONAL {
+    ?eq rdf:type ?eqType .
+    FILTER(STRSTARTS(STR(?eqType), STR(cim:)))
+    BIND(REPLACE(STR(?eqType), "^.*[#/]", "") AS ?eqClass)
+  }
+
+  OPTIONAL { ?terminal cim:IdentifiedObject.name ?terminalName . }
+  OPTIONAL { ?terminal cim:ACDCTerminal.sequenceNumber ?seq . }
+
+  OPTIONAL {
+    ?terminal cim:Terminal.ConnectivityNode ?cn .
+    OPTIONAL { ?cn cim:IdentifiedObject.name ?cnName . }
+
+    OPTIONAL {
+      ?cn (
+        (cim:ConnectivityNode.ConnectivityNodeContainer/cim:VoltageLevel.Substation) |
+        (cim:ConnectivityNode.ConnectivityNodeContainer/cim:Bay.VoltageLevel/cim:VoltageLevel.Substation) |
+        cim:ConnectivityNode.ConnectivityNodeContainer
+      ) ?nodeSubstation .
+
+      ?nodeSubstation rdf:type cim:Substation .
+
+      OPTIONAL { ?nodeSubstation cim:IdentifiedObject.name ?nodeSubstationName . }
+
+      OPTIONAL {
+        ?nodeSubstation cim:Substation.Region ?subGeoRegion .
+        ?subGeoRegion cim:SubGeographicalRegion.Region ?geoRegion .
+        OPTIONAL { ?geoRegion cim:IdentifiedObject.name ?geoRegionName . }
+      }
+    }
+  }
+}
+ORDER BY
+  ?Equipment_Type
+  ?Equipment_Name
+  ?Equipment_ID
+  ?Terminal_Sequence

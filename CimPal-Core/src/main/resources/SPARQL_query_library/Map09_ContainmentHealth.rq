@@ -1,0 +1,19 @@
+# Map09_ContainmentHealth - drives the missing-container statistics (Phase 0).
+# One row per ConnectivityNode with the container/substation it resolves to
+# (or null when containment is broken). The share of CNs with a null
+# ?substation is the containment-completeness metric; if it is badly broken in
+# one model the substation graph (Phase 2) degrades and tolerances must widen.
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?cn ?cnName ?container ?containerType ?substation
+WHERE {
+  ?cn a cim:ConnectivityNode .
+  OPTIONAL { ?cn cim:IdentifiedObject.name ?cnName }
+  OPTIONAL {
+    ?cn cim:ConnectivityNode.ConnectivityNodeContainer ?container .
+    ?container a ?containerType .
+    OPTIONAL { ?container cim:VoltageLevel.Substation ?substation }
+    OPTIONAL { ?container cim:Bay.VoltageLevel ?vl .
+               ?vl cim:VoltageLevel.Substation ?substation }
+  }
+}

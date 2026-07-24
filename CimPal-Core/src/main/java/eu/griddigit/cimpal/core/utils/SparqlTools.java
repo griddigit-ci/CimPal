@@ -308,4 +308,51 @@ public class SparqlTools {
             }
         }
     }
+
+    /**
+     * Public accessor for the node-to-string conversion used by the streaming
+     * API and by callers that consume {@link ResultSet}s directly.
+     */
+    public static String nodeToString(RDFNode node, Model model) {
+        return nodeToExcelValue(node, model);
+    }
+
+    /** Callback for {@link #executeSelectStreaming}: invoked once per solution. */
+    @FunctionalInterface
+    public interface RowHandler {
+        void row(java.util.function.Function<String, String> valueByVar);
+    }
+
+    /**
+     * Runs a SELECT and streams solutions to the handler one at a time, without
+     * materialising the whole result set in memory. Essential for large models:
+     * the caller can fold each row straight into a compact typed record and let
+     * the solution be garbage-collected immediately.
+     *
+     * @param sparqlQuery SELECT query text
+     * @param model       model to query (must not be null)
+     * @param handler     receives, per row, a var-name -&gt; string-value function
+     */
+    public static void executeSelectStreaming(String sparqlQuery, Model model, RowHandler handler) {
+        if (model == null) {
+            throw new IllegalArgumentException("Model cannot be null");
+        }
+        if (sparqlQuery == null || sparqlQuery.isBlank()) {
+            throw new IllegalArgumentException("SPARQL query cannot be empty");
+        }
+        Query query = QueryFactory.create(sparqlQuery);
+        if (!query.isSelectType()) {
+            throw new IllegalArgumentException("Only SELECT SPARQL queries are supported.");
+        }
+        try (QueryExecution queryExecution = QueryExecutionFactory.create(query, model)) {
+            ResultSet resultSet = queryExecution.execSelect();
+            while (resultSet.hasNext()) {
+                QuerySolution solution = resultSet.nextSolution();
+                handler.row(varName -> {
+                    RDFNode node = solution.get(varName);
+                    return node == null ? "" : nodeToExcelValue(node, model);
+                });
+            }
+        }
+    }
 }

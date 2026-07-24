@@ -159,6 +159,7 @@
                                 <requiresJdk>false</requiresJdk>
                                 <requires64Bit>false</requires64Bit>
                                 <minVersion>25</minVersion>
+                                <maxHeapPercent>75</maxHeapPercent>
                             </jre>
                             <versionInfo>
                                 <fileVersion>${cimpal.version}</fileVersion>

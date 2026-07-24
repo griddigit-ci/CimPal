@@ -1,0 +1,154 @@
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT
+    (?breaker AS ?Breaker)
+    (?breakerName AS ?BreakerName)
+    (?substation AS ?Substation)
+    (?substationName AS ?SubstationName)
+
+    (?brTerminal AS ?BreakerTerminal)
+    (?side AS ?BreakerSide)
+
+    (?nextEq AS ?NextEquipment)
+    (?nextEqName AS ?NextEquipmentName)
+    (?nextEqClass AS ?NextEquipmentType)
+    (?nextEqTerminalCount AS ?NextEquipmentTerminalCount)
+
+WHERE {
+
+    ?breaker rdf:type cim:Breaker .
+
+    OPTIONAL {
+        ?breaker cim:IdentifiedObject.name ?breakerName .
+    }
+
+    OPTIONAL {
+        ?breaker
+            (cim:Equipment.EquipmentContainer/cim:VoltageLevel.Substation |
+             cim:Equipment.EquipmentContainer/cim:Bay.VoltageLevel/cim:VoltageLevel.Substation)
+            ?substation .
+
+        OPTIONAL {
+            ?substation cim:IdentifiedObject.name ?substationName .
+        }
+    }
+
+    ?brTerminal
+        cim:Terminal.ConductingEquipment ?breaker ;
+        cim:Terminal.ConnectivityNode ?cn0 ;
+        cim:ACDCTerminal.sequenceNumber ?side .
+
+    {
+        ###########################################################
+        # Direct neighbour
+        ###########################################################
+
+        ?nextTerminal
+            cim:Terminal.ConnectivityNode ?cn0 ;
+            cim:Terminal.ConductingEquipment ?nextEq .
+
+    }
+    UNION
+    {
+        ###########################################################
+        # One disconnector
+        ###########################################################
+
+        ?d1t1
+            cim:Terminal.ConnectivityNode ?cn0 ;
+            cim:Terminal.ConductingEquipment ?d1 .
+
+        ?d1 rdf:type cim:Disconnector .
+
+        ?d1t2
+            cim:Terminal.ConductingEquipment ?d1 ;
+            cim:Terminal.ConnectivityNode ?cn1 .
+
+        FILTER(?d1t2 != ?d1t1)
+
+        ?nextTerminal
+            cim:Terminal.ConnectivityNode ?cn1 ;
+            cim:Terminal.ConductingEquipment ?nextEq .
+
+    }
+    UNION
+    {
+        ###########################################################
+        # Two disconnectors
+        ###########################################################
+
+        ?d1t1
+            cim:Terminal.ConnectivityNode ?cn0 ;
+            cim:Terminal.ConductingEquipment ?d1 .
+
+        ?d1 rdf:type cim:Disconnector .
+
+        ?d1t2
+            cim:Terminal.ConductingEquipment ?d1 ;
+            cim:Terminal.ConnectivityNode ?cn1 .
+
+        FILTER(?d1t2 != ?d1t1)
+
+        ?d2t1
+            cim:Terminal.ConnectivityNode ?cn1 ;
+            cim:Terminal.ConductingEquipment ?d2 .
+
+        ?d2 rdf:type cim:Disconnector .
+
+        FILTER(?d2 != ?d1)
+
+        ?d2t2
+            cim:Terminal.ConductingEquipment ?d2 ;
+            cim:Terminal.ConnectivityNode ?cn2 .
+
+        FILTER(?d2t2 != ?d2t1)
+
+        ?nextTerminal
+            cim:Terminal.ConnectivityNode ?cn2 ;
+            cim:Terminal.ConductingEquipment ?nextEq .
+
+    }
+
+    FILTER(?nextEq != ?breaker)
+
+    FILTER NOT EXISTS {
+        ?nextEq rdf:type cim:Disconnector .
+    }
+
+    OPTIONAL {
+        ?nextEq cim:IdentifiedObject.name ?nextEqName .
+    }
+
+    OPTIONAL {
+        ?nextEq rdf:type ?nextEqType .
+
+        FILTER(STRSTARTS(STR(?nextEqType), STR(cim:)))
+
+        BIND(
+            REPLACE(
+                STR(?nextEqType),
+                "^.*[#/]",
+                ""
+            )
+            AS ?nextEqClass
+        )
+    }
+
+    {
+        SELECT
+            ?nextEq
+            (COUNT(DISTINCT ?t) AS ?nextEqTerminalCount)
+        WHERE {
+            ?t cim:Terminal.ConductingEquipment ?nextEq .
+        }
+        GROUP BY ?nextEq
+    }
+
+    FILTER(?nextEqTerminalCount >= 2)
+
+}
+ORDER BY
+    ?substationName
+    ?breakerName
+    ?side

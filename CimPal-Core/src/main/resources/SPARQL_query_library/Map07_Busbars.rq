@@ -1,0 +1,14 @@
+# Map07_Busbars - BusbarSection per voltage level / substation.
+# Busbars are matched (Phase 3) by which set of already-matched bays connect
+# to them; adjacency comes from Map02.
+PREFIX cim: <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+
+SELECT ?busbar ?busbarName ?container ?substation ?nomV
+WHERE {
+  ?busbar a cim:BusbarSection .
+  OPTIONAL { ?busbar cim:IdentifiedObject.name ?busbarName }
+  OPTIONAL { ?busbar cim:Equipment.EquipmentContainer ?container .
+             OPTIONAL { ?container cim:VoltageLevel.Substation ?substation }
+             OPTIONAL { ?container cim:VoltageLevel.BaseVoltage ?bv .
+                        ?bv cim:BaseVoltage.nominalVoltage ?nomV } }
+}
