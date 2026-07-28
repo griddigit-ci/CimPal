@@ -6,6 +6,7 @@ package eu.griddigit.cimpal.core.matching.report;
 
 import eu.griddigit.cimpal.core.matching.model.MatchingReport;
 import eu.griddigit.cimpal.core.matching.model.MatchingReport.MatchedEntry;
+import eu.griddigit.cimpal.core.matching.model.MatchingReport.StatEntry;
 import eu.griddigit.cimpal.core.matching.model.MatchingReport.UnmatchedEntry;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -30,6 +31,7 @@ public final class MatchingExcelWriter {
 
     private static final String[] MATCHED_HEADER = {"PF_ID", "Element_type", "New_ID", "New_2nd_name"};
     private static final String[] UNMATCHED_HEADER = {"ID", "Element_type", "Name", "Side", "Reason"};
+    private static final String[] STATISTICS_HEADER = {"Metric", "Value"};
 
     private MatchingExcelWriter() {
     }
@@ -60,6 +62,15 @@ public final class MatchingExcelWriter {
                 row.createCell(4).setCellValue(safe(e.reason()));
             }
             autosize(unmatched, UNMATCHED_HEADER.length);
+
+            Sheet stats = newSheet(wb, "Statistics", header, STATISTICS_HEADER);
+            r = 1;
+            for (StatEntry e : report.statistics()) {
+                Row row = stats.createRow(r++);
+                row.createCell(0).setCellValue(safe(e.metric()));
+                row.createCell(1).setCellValue(safe(e.value()));
+            }
+            autosize(stats, STATISTICS_HEADER.length);
 
             Path parent = output.toAbsolutePath().getParent();
             if (parent != null) Files.createDirectories(parent);

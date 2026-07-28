@@ -39,8 +39,13 @@ public final class MatchingReport {
     ) {
     }
 
+    /** One diagnostic metric on the optional Statistics sheet. */
+    public record StatEntry(String metric, String value) {
+    }
+
     private final List<MatchedEntry> matched = new ArrayList<>();
     private final List<UnmatchedEntry> unmatched = new ArrayList<>();
+    private final List<StatEntry> statistics = new ArrayList<>();
 
     public List<MatchedEntry> matched() {
         return matched;
@@ -48,5 +53,13 @@ public final class MatchingReport {
 
     public List<UnmatchedEntry> unmatched() {
         return unmatched;
+    }
+
+    public List<StatEntry> statistics() {
+        return statistics;
+    }
+
+    public void addStat(String metric, String value) {
+        statistics.add(new StatEntry(metric, value));
     }
 }

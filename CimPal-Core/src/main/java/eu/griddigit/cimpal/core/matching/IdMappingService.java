@@ -86,7 +86,7 @@ public final class IdMappingService {
                 pfTables, pfLines, igmsTables, igmsLines, result);
 
         progress(listener, 0.90, "Writing workbook...");
-        MatchingReport report = ReportAssembler.assemble(result, topo);
+        MatchingReport report = ReportAssembler.assemble(result, topo, pfTables, igmsTables, pfLines, igmsLines);
         eu.griddigit.cimpal.core.matching.report.MatchingExcelWriter.write(report, output);
 
         progress(listener, 1.0, "Done.");

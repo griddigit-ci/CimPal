@@ -6,6 +6,8 @@ package eu.griddigit.cimpal.core.matching.query;
 
 import eu.griddigit.cimpal.core.utils.SparqlTools;
 import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ResourceFactory;
+import org.apache.jena.vocabulary.RDF;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,7 +15,11 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Loads named SPARQL queries from the query library and runs them against a
@@ -32,6 +38,11 @@ public final class QueryRunner {
     private static final String EXTENSION = ".rq";
     /** The cim namespace the bundled queries are written against (CGMES 2.4.15 / cim16). */
     private static final String TEMPLATE_CIM_NS = "http://iec.ch/TC57/2013/CIM-schema-cim16#";
+    /** Known CIM schema namespaces across CGMES versions (used to detect the dialect(s) in a model). */
+    private static final List<String> KNOWN_CIM_NS = List.of(
+            "http://iec.ch/TC57/2013/CIM-schema-cim16#",   // CGMES 2.4.15
+            "http://iec.ch/TC57/CIM100#",                  // CGMES 3.0 (early)
+            "https://cim.ucaiug.io/ns#");                  // CGMES 3.0 (ucaiug canonical)
 
     // Canonical query names (base names, no extension).
     public static final String MAP01_CLASS_INVENTORY = "Map01_ClassInventory";
@@ -91,26 +102,53 @@ public final class QueryRunner {
      * Buffers the whole result set; for large models prefer {@link #runStreaming}.
      */
     public SparqlTools.QueryResults run(String queryName, Model model) {
-        String queryText = resolveNamespace(loadQueryText(queryName), model);
+        String template = loadQueryText(queryName);
+        List<String> columns = new ArrayList<>();
+        List<java.util.Map<String, String>> rows = new ArrayList<>();
         try {
-            return SparqlTools.executeSparqlQuery(queryText, model);
+            for (String ns : activeCimNamespaces(model)) {
+                SparqlTools.QueryResults r = SparqlTools.executeSparqlQuery(withNamespace(template, ns), model);
+                if (columns.isEmpty()) columns.addAll(r.columns);
+                rows.addAll(r.rows);
+            }
         } catch (Exception e) {
             throw new IllegalStateException("Query '" + queryName + "' failed: " + e.getMessage(), e);
         }
+        return new SparqlTools.QueryResults(columns, rows);
     }
 
     /**
-     * Makes the bundled cim16 queries dialect-agnostic: if the model declares a
-     * different {@code cim} namespace (e.g. CGMES 3.0 / CIM100), rewrite the
-     * template namespace to the model's. The core class/property local names are
-     * shared across CGMES 2.4.15 and 3.0, so only the namespace differs.
+     * Rewrite the template cim namespace to a concrete one. The core
+     * class/property local names are shared across CGMES 2.4.15 and 3.0, so only
+     * the namespace differs between dialects.
      */
-    private static String resolveNamespace(String queryText, Model model) {
-        String ns = model.getNsPrefixURI("cim");
-        if (ns != null && !ns.equals(TEMPLATE_CIM_NS)) {
-            return queryText.replace(TEMPLATE_CIM_NS, ns);
+    private static String withNamespace(String queryText, String ns) {
+        return ns.equals(TEMPLATE_CIM_NS) ? queryText : queryText.replace(TEMPLATE_CIM_NS, ns);
+    }
+
+    /**
+     * The cim schema namespaces actually used by the model. A union of CGMES
+     * files can mix dialects (e.g. EQ in CIM100 and boundary in the ucaiug
+     * namespace), and the combined model keeps only one {@code cim} prefix, so we
+     * probe each known/declared namespace for a typed Terminal and query every
+     * one that is present. Returns the template namespace if none is detected.
+     */
+    private static List<String> activeCimNamespaces(Model model) {
+        Set<String> candidates = new LinkedHashSet<>(KNOWN_CIM_NS);
+        model.getNsPrefixMap().forEach((prefix, uri) -> {
+            String p = prefix.toLowerCase(Locale.ROOT);
+            String u = uri.toLowerCase(Locale.ROOT);
+            if (p.startsWith("cim") || u.contains("cim-schema") || u.contains("/cim100") || u.contains("cim.ucaiug")) {
+                candidates.add(uri);
+            }
+        });
+        List<String> active = new ArrayList<>();
+        for (String ns : candidates) {
+            if (model.contains(null, RDF.type, ResourceFactory.createResource(ns + "Terminal"))) {
+                active.add(ns);
+            }
         }
-        return queryText;
+        return active.isEmpty() ? List.of(TEMPLATE_CIM_NS) : active;
     }
 
     /**
@@ -118,9 +156,11 @@ public final class QueryRunner {
      * materializing the full result set. Preferred for large instance models.
      */
     public void runStreaming(String queryName, Model model, SparqlTools.RowHandler handler) {
-        String queryText = resolveNamespace(loadQueryText(queryName), model);
+        String template = loadQueryText(queryName);
         try {
-            SparqlTools.executeSelectStreaming(queryText, model, handler);
+            for (String ns : activeCimNamespaces(model)) {
+                SparqlTools.executeSelectStreaming(withNamespace(template, ns), model, handler);
+            }
         } catch (RuntimeException e) {
             throw new IllegalStateException("Query '" + queryName + "' failed: " + e.getMessage(), e);
         }
