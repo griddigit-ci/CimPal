@@ -5,10 +5,17 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.core.kgcl.KgclChange;
+import eu.griddigit.cimpal.core.kgcl.KgclCnlWriter;
+import eu.griddigit.cimpal.core.kgcl.KgclConverter;
+import eu.griddigit.cimpal.core.kgcl.KgclRdfWriter;
+import eu.griddigit.cimpal.core.models.KgclOptions;
 import eu.griddigit.cimpal.core.models.RDFCompareResult;
+import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.RDFcomparisonResultModel;
 import eu.griddigit.cimpal.main.gui.TextAreaEditTableCell;
 import eu.griddigit.cimpal.core.models.RDFCompareResultEntry;
+import eu.griddigit.cimpal.main.util.ModelFactory;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -18,16 +25,23 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.ResourceBundle;
+import java.util.prefs.Preferences;
 
 import static eu.griddigit.cimpal.main.gui.ExcelExportTableView.export;
 
 public class rdfDiffResultController implements Initializable {
     public Button btnCancel;
     public Button btnExportResult;
+    public Button btnExportKgcl;
     @FXML
     private TableView tableViewResults;
     @FXML
@@ -106,6 +120,61 @@ public class rdfDiffResultController implements Initializable {
         export(tableViewResults,"RDFS comparison results","RDFScomparisonResult","Save RDFS comparison result", compareFiles);
         //RDFDataMgr.write(System.out, AddShapesController.reportResource.getModel(), RDFFormat.TURTLE);
 
+    }
+
+    @FXML
+    private void actionBtnExportKgcl(ActionEvent actionEvent) throws IOException {
+        if (rdfCompareResult == null || rdfCompareResult.getEntries().isEmpty()) {
+            return;
+        }
+
+        // Let the user pick the serialization; Model A is treated as the "before" state (A -> B).
+        Map<String, KgclOptions.OutputFormat> formatChoices = new LinkedHashMap<>();
+        formatChoices.put("KGCL (CNL text)", KgclOptions.OutputFormat.CNL);
+        formatChoices.put("KGCL RDF (Turtle)", KgclOptions.OutputFormat.TURTLE);
+        formatChoices.put("KGCL RDF (RDF/XML)", KgclOptions.OutputFormat.RDFXML);
+
+        ChoiceDialog<String> dialog = new ChoiceDialog<>("KGCL (CNL text)", formatChoices.keySet());
+        dialog.setTitle("Export KGCL");
+        dialog.setHeaderText("Export the comparison as a KGCL changeset (Model A → Model B).");
+        dialog.setContentText("Format:");
+        Optional<String> choice = dialog.showAndWait();
+        if (choice.isEmpty()) {
+            return;
+        }
+        KgclOptions.OutputFormat format = formatChoices.get(choice.get());
+
+        KgclOptions options = KgclOptions.builder()
+                .outputFormat(format)
+                .direction(KgclOptions.Direction.A_TO_B)
+                .build();
+        List<KgclChange> changes = new KgclConverter().convert(rdfCompareResult, options);
+
+        String extension = switch (format) {
+            case CNL -> "*.kgcl";
+            case TURTLE -> "*.ttl";
+            case RDFXML -> "*.rdf";
+        };
+        String initialFileName = "RDFScomparisonResult" + extension.substring(1);
+        File saveFile = ModelFactory.fileSaveCustom("KGCL files", List.of(extension),
+                "Save KGCL comparison result", initialFileName);
+        if (saveFile == null) {
+            return;
+        }
+
+        try (FileOutputStream outputStream = new FileOutputStream(saveFile)) {
+            if (format == KgclOptions.OutputFormat.CNL) {
+                new KgclCnlWriter().write(outputStream, changes);
+            } else {
+                new KgclRdfWriter().write(outputStream, changes, format);
+            }
+        }
+
+        if (MainController.prefs != null) {
+            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+        } else {
+            Preferences.userNodeForPackage(rdfDiffResultController.class).put("LastWorkingFolder", saveFile.getParent());
+        }
     }
 
     @FXML

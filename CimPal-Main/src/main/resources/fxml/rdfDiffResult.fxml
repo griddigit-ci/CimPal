@@ -61,6 +61,7 @@
    <ButtonBar>
       <buttons>
          <Button fx:id="btnExportResult" mnemonicParsing="false" onAction="#actionBtnExportResult" text="Export result" />
+         <Button fx:id="btnExportKgcl" mnemonicParsing="false" onAction="#actionBtnExportKgcl" text="Export KGCL" />
          <Button fx:id="btnCancel" cancelButton="true" mnemonicParsing="false" onAction="#actionBtnCancel" text="Cancel" />
       </buttons>
       <VBox.margin>

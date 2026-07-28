@@ -1,7 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers;
 
-import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofile;
-import eu.griddigit.cimpal.core.comparators.ComparisonIRDFSprofileCIMTool;
+import eu.griddigit.cimpal.core.comparators.ComparisonRDFSprofile;
+import eu.griddigit.cimpal.core.comparators.ComparisonRDFSprofileCIMTool;
 import eu.griddigit.cimpal.core.comparators.ComparisonSHACLshapes;
 import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
 import eu.griddigit.cimpal.core.models.RDFCompareResult;
@@ -267,10 +267,10 @@ public class RDFComparisonController implements Initializable {
         IRDFComparator rdfComparator;
         switch (fcbRDFSformat.getSelectionModel().getSelectedItem()) {
             case "RDFS (augmented) by CimSyntaxGen":
-                rdfComparator = new ComparisonIRDFSprofile();
+                rdfComparator = new ComparisonRDFSprofile();
                 break;
             case "RDFS (augmented) by CimSyntaxGen with CIMTool":
-                rdfComparator = new ComparisonIRDFSprofileCIMTool();
+                rdfComparator = new ComparisonRDFSprofileCIMTool();
                 break;
             case "Universal method inlc. SHACL Shapes":
                 rdfComparator = new ComparisonSHACLshapes();
