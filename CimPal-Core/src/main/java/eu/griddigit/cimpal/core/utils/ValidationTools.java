@@ -496,8 +496,14 @@ public class ValidationTools {
                     dbgRow(r.rowIdx, "START writer.appendError dataset=" + r.datasetName);
                     long appendStart = System.currentTimeMillis();
 
-                    writer.appendError(sheet, r.datasetName, r.xmlFiles, r.constraintFile, r.error);
-
+                    writer.appendError(
+                            sheet,
+                            r.datasetName,
+                            r.xmlFiles,
+                            r.missingXmlFiles,
+                            r.constraintFile,
+                            r.error
+                    );
                     dbgRow(r.rowIdx, "DONE writer.appendError dataset=" + r.datasetName,
                             appendStart);
 
@@ -530,8 +536,15 @@ public class ValidationTools {
 
                     writer.appendValidation(sheet, r.datasetName, r.xmlFiles, r.constraintFile, resultsToWrite, r.conforms);
 */
-                    writer.appendValidation(sheet, r.datasetName, r.xmlFiles, r.constraintFile, r.results, r.conforms);
-
+                    writer.appendValidation(
+                            sheet,
+                            r.datasetName,
+                            r.xmlFiles,
+                            r.missingXmlFiles,
+                            r.constraintFile,
+                            r.results,
+                            r.conforms
+                    );
                     dbgRow(r.rowIdx, "DONE writer.appendValidation dataset=" + r.datasetName,
                             appendStart);
                 }
@@ -577,14 +590,16 @@ public class ValidationTools {
         final List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results;
         final boolean conforms;
         final Exception error;
+        final String missingXmlFiles;
 
         ValidationTaskResult(int rowIdx,
                              ValidationExcelWriter.CaseFolder caseFolder,
                              String datasetName,
                              String ttlName,
                              String xmlFiles,
+                             String missingXmlFiles,
                              String constraintFile,
-                             List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results,
+                             List<SHACLValidationResult> results,
                              boolean conforms,
                              Exception error) {
             this.rowIdx = rowIdx;
@@ -592,6 +607,7 @@ public class ValidationTools {
             this.datasetName = datasetName;
             this.ttlName = ttlName;
             this.xmlFiles = xmlFiles;
+            this.missingXmlFiles = missingXmlFiles;
             this.constraintFile = constraintFile;
             this.results = results;
             this.conforms = conforms;
@@ -613,6 +629,7 @@ public class ValidationTools {
         ValidationExcelWriter.CaseFolder caseFolder = categorizeForReport(row);
 
         String xmlFilesText = row.xmlInputsRaw;
+        String missingXmlFilesText = "";
         String constraintFileText = trimReportPath(ttlName, CONSTRAINT_REPORT_PREFIX);
         String datasetName = "UNKNOWN";
 
@@ -624,17 +641,40 @@ public class ValidationTools {
             dbgRow(rowIdx, "START resolveFilesForRow");
             long resolveStart = System.currentTimeMillis();
 
-            LinkedHashSet<Path> xmlFiles = resolveFilesForRow(row, modelsBaseDir);
+            ResolvedXmlFiles resolvedXmlFiles =
+                    resolveFilesForRow(row, modelsBaseDir);
 
-            dbgRow(rowIdx, "DONE resolveFilesForRow xmlFiles=" + xmlFiles.size(), resolveStart);
+            LinkedHashSet<Path> xmlFiles = resolvedXmlFiles.existingFiles;
+            missingXmlFilesText = resolvedXmlFiles.missingInputsText();
+
+            dbgRow(rowIdx,
+                    "DONE resolveFilesForRow xmlFiles=" + xmlFiles.size()
+                            + " missingInputs=" + resolvedXmlFiles.missingInputs.size(),
+                    resolveStart);
 
             datasetName = makeDatasetName(xmlFiles);
             xmlFilesText = formatPaths(xmlFiles);
 
+            if (!resolvedXmlFiles.missingInputs.isEmpty()) {
+                dbgRow(rowIdx,
+                        "WARN missing XML inputs, validation continues: "
+                                + missingXmlFilesText);
+            }
+
             if (xmlFiles.isEmpty()) {
                 dbgRow(rowIdx, "ERROR no XML matched mapping tokens");
-                return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, null, false,
-                        new IOException("No XML matched mapping tokens"));
+                return new ValidationTaskResult(
+                        rowIdx,
+                        caseFolder,
+                        datasetName,
+                        ttlName,
+                        xmlFilesText,
+                        missingXmlFilesText,
+                        constraintFileText,
+                        null,
+                        false,
+                        new IOException("No XML matched mapping tokens")
+                );
             }
 
             dbgRow(rowIdx, "START resolveTtlPath ttlName=" + ttlName);
@@ -644,7 +684,7 @@ public class ValidationTools {
 
             if (!Files.exists(ttlPath)) {
                 dbgRow(rowIdx, "ERROR TTL not found: " + ttlPath);
-                return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, null, false,
+                return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, missingXmlFilesText, constraintFileText, null, false,
                         new FileNotFoundException("TTL not found: " + ttlPath));
             }
 
@@ -708,21 +748,50 @@ public class ValidationTools {
                             + " resultCount=" + (results == null ? "null" : results.size()),
                     rowStart);
 
-            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, results, report.conforms(), null);
-
+            return new ValidationTaskResult(
+                    rowIdx,
+                    caseFolder,
+                    datasetName,
+                    ttlName,
+                    xmlFilesText,
+                    missingXmlFilesText,
+                    constraintFileText,
+                    results,
+                    report.conforms(),
+                    null
+            );
         } catch (Exception ex) {
             dbgRow(rowIdx, "ERROR row dataset=" + datasetName, rowStart);
             ex.printStackTrace();
 
-            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText, constraintFileText, null, false, ex);
+            return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText,missingXmlFilesText, constraintFileText, null, false, ex);
         }
     }
 
     // ---------------- mapping row -> file list ----------------
 
-    private static LinkedHashSet<Path> resolveFilesForRow(MappingRow row, Path modelsBaseDir) throws IOException {
+    private static class ResolvedXmlFiles {
+        final LinkedHashSet<Path> existingFiles;
+        final List<String> missingInputs;
+
+        ResolvedXmlFiles(LinkedHashSet<Path> existingFiles,
+                         List<String> missingInputs) {
+            this.existingFiles = existingFiles;
+            this.missingInputs = missingInputs;
+        }
+
+        String missingInputsText() {
+            return String.join("; ", missingInputs);
+        }
+    }
+
+    private static ResolvedXmlFiles resolveFilesForRow(MappingRow row,
+                                                       Path modelsBaseDir) throws IOException {
+
         List<String> tokens = parseXmlInputs(row.xmlInputsRaw);
-        LinkedHashSet<Path> files = new LinkedHashSet<>();
+
+        LinkedHashSet<Path> existingFiles = new LinkedHashSet<>();
+        List<String> missingInputs = new ArrayList<>();
 
         dbg("resolveFilesForRow tokens=" + tokens.size()
                 + " raw=" + shortValue(row.xmlInputsRaw, 300));
@@ -733,12 +802,20 @@ public class ValidationTools {
             long start = System.currentTimeMillis();
             List<Path> expanded = expandToken(modelsBaseDir, token);
 
-            dbg("DONE expandToken token=" + token + " matches=" + expanded.size(), start);
+            dbg("DONE expandToken token=" + token
+                    + " matches=" + expanded.size(), start);
 
-            files.addAll(expanded);
+            if (expanded.isEmpty()) {
+                missingInputs.add(token);
+
+                dbg("MISSING XML input token=" + token
+                        + " resolvedAgainst=" + modelsBaseDir.toAbsolutePath());
+            } else {
+                existingFiles.addAll(expanded);
+            }
         }
 
-        return files;
+        return new ResolvedXmlFiles(existingFiles, missingInputs);
     }
 
 
@@ -963,7 +1040,10 @@ public class ValidationTools {
 
             dbgRow(rowIdx, "START zip row");
 
-            LinkedHashSet<Path> xmlFiles = resolveFilesForRow(row, modelsBaseDir);
+            ResolvedXmlFiles resolvedXmlFiles =
+                    resolveFilesForRow(row, modelsBaseDir);
+
+            LinkedHashSet<Path> xmlFiles = resolvedXmlFiles.existingFiles;
             if (xmlFiles.isEmpty()) {
                 dbgRow(rowIdx, "SKIP zip row because no xml files matched");
                 continue;
@@ -3295,6 +3375,7 @@ public class ValidationTools {
                         "TIMEOUT_TIMESTAMP_ROW",
                         "UNKNOWN_TTL",
                         "UNKNOWN_XML",
+                        "",
                         "UNKNOWN_CONSTRAINT",
                         null,
                         false,
@@ -3309,6 +3390,7 @@ public class ValidationTools {
                         "EXECUTION_ERROR_TIMESTAMP_ROW",
                         "UNKNOWN_TTL",
                         "UNKNOWN_XML",
+                        "",
                         "UNKNOWN_CONSTRAINT",
                         null,
                         false,
@@ -3368,6 +3450,7 @@ public class ValidationTools {
                         row.datasetName,
                         row.ttlName,
                         row.xmlFilesText,
+                        "",
                         row.constraintFileText,
                         null,
                         false,
@@ -3384,6 +3467,7 @@ public class ValidationTools {
                         row.datasetName,
                         row.ttlName,
                         row.xmlFilesText,
+                        "",
                         row.constraintFileText,
                         null,
                         false,
@@ -3419,6 +3503,7 @@ public class ValidationTools {
                     row.datasetName,
                     row.ttlName,
                     row.xmlFilesText,
+                    "",
                     row.constraintFileText,
                     results,
                     report.conforms(),
@@ -3439,6 +3524,7 @@ public class ValidationTools {
                     row.datasetName,
                     row.ttlName,
                     row.xmlFilesText,
+                    "",
                     row.constraintFileText,
                     null,
                     false,

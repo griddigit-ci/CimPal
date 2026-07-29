@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xssf.usermodel.XSSFChart;
@@ -76,8 +78,16 @@ public class ValidationExcelWriter implements Closeable {
     };
 
     private static final String[] STATISTICS_HEADER = new String[]{
-            "Dataset", "XML files", "Constraint file",
-            "All", "Warnings", "Infos", "Violations", "Conforms", "Validation error"
+            "Dataset",
+            "XML files",
+            "Constraint file",
+            "All",
+            "Warnings",
+            "Infos",
+            "Violations",
+            "Conforms",
+            "Validation error",
+            "Missing XML files"
     };
 
     // One row per unique constraint over the whole report.
@@ -165,6 +175,7 @@ public class ValidationExcelWriter implements Closeable {
     public void appendValidation(CaseFolder cf,
                                  String datasetName,
                                  String xmlFiles,
+                                 String missingXmlFiles,
                                  String constraintFile,
                                  List<SHACLValidationResult> results,
                                  boolean conforms) {
@@ -176,8 +187,16 @@ public class ValidationExcelWriter implements Closeable {
         if (reportDataset.isBlank()) {
             reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
         }
-        writeStatisticsRow(cf, reportDataset, reportXmlFiles, reportConstraintFile, results, conforms, null);
-
+        writeStatisticsRow(
+                cf,
+                reportDataset,
+                reportXmlFiles,
+                reportConstraintFile,
+                results,
+                conforms,
+                null,
+                missingXmlFiles
+        );
         if (results == null || results.isEmpty()) {
             return;
         }
@@ -196,7 +215,7 @@ public class ValidationExcelWriter implements Closeable {
             dr.createCell(5).setCellValue(safe(res.getValue()));
             dr.createCell(6).setCellValue(safe(res.getSourceShape()));
             dr.createCell(7).setCellValue(safe(res.getConstraintComponent()));
-            dr.createCell(8).setCellValue(safe(res.getMessage()));
+            dr.createCell(8).setCellValue(cleanValidationMessage(res.getMessage()));
             dr.createCell(9).setCellValue(safe(res.getSeverity()));
             dr.createCell(10).setCellValue(safe(res.getDescription()));
             dr.createCell(11).setCellValue(safe(res.getOrder()));
@@ -204,7 +223,26 @@ public class ValidationExcelWriter implements Closeable {
             dr.createCell(13).setCellValue(safe(res.getGroup()));
         }
 
-        nextValidationResultsRow = r;    }
+        nextValidationResultsRow = r;
+    }
+
+    public void appendValidation(CaseFolder cf,
+                                 String datasetName,
+                                 String xmlFiles,
+                                 String constraintFile,
+                                 List<SHACLValidationResult> results,
+                                 boolean conforms) {
+
+        appendValidation(
+                cf,
+                datasetName,
+                xmlFiles,
+                "",
+                constraintFile,
+                results,
+                conforms
+        );
+    }
 
     private static String toReportDataset(String xmlFiles, String constraintFile) {
         String constraint = safe(constraintFile);
@@ -290,6 +328,7 @@ public class ValidationExcelWriter implements Closeable {
     public void appendError(CaseFolder cf,
                             String datasetName,
                             String xmlFiles,
+                            String missingXmlFiles,
                             String constraintFile,
                             Exception error) {
 
@@ -300,7 +339,32 @@ public class ValidationExcelWriter implements Closeable {
         if (reportDataset.isBlank()) {
             reportDataset = toReportDataset(reportXmlFiles, reportConstraintFile);
         }
-        writeStatisticsRow(cf, reportDataset, reportXmlFiles, reportConstraintFile, null, false, safeThrowable(error));
+        writeStatisticsRow(
+                cf,
+                reportDataset,
+                reportXmlFiles,
+                reportConstraintFile,
+                null,
+                false,
+                safeThrowable(error),
+                missingXmlFiles
+        );
+    }
+
+    public void appendError(CaseFolder cf,
+                            String datasetName,
+                            String xmlFiles,
+                            String constraintFile,
+                            Exception error) {
+
+        appendError(
+                cf,
+                datasetName,
+                xmlFiles,
+                "",
+                constraintFile,
+                error
+        );
     }
 
     /** Backward-compatible entry point. Prefer appendError(cf, datasetName, xmlFiles, constraintFile, error). */
@@ -314,7 +378,8 @@ public class ValidationExcelWriter implements Closeable {
                                     String reportConstraintFile,
                                     List<SHACLValidationResult> results,
                                     boolean conforms,
-                                    String validationError) {
+                                    String validationError,
+                                    String missingXmlFiles) {
         int vio = 0, warn = 0, info = 0;
 
         if (results != null) {
@@ -338,6 +403,7 @@ public class ValidationExcelWriter implements Closeable {
         row.createCell(6).setCellValue(vio);
         row.createCell(7).setCellValue(conforms && validationError == null);
         row.createCell(8).setCellValue(safe(validationError));
+        row.createCell(9).setCellValue(formatMissingXmlFiles(missingXmlFiles));
     }
 
     private void addConstraintStatistic(String dataset,
@@ -353,7 +419,7 @@ public class ValidationExcelWriter implements Closeable {
                 safe(res.getPath()),
                 safe(res.getSourceShape()),
                 safe(res.getConstraintComponent()),
-                safe(res.getMessage()),
+                cleanValidationMessage(res.getMessage()),
                 safe(res.getSeverity()),
                 safe(res.getDescription()),
                 safe(res.getOrder()),
@@ -470,6 +536,72 @@ public class ValidationExcelWriter implements Closeable {
         }
     }
 
+    private static String cleanValidationMessage(String message) {
+        String text = safe(message);
+
+        if (text.isBlank()) {
+            return "";
+        }
+
+        Pattern classUriPattern = Pattern.compile(
+                "The class\\s+<([^>]+)>\\s+appears\\s+(\\d+)\\s+times?\\s+in the data graph\\.",
+                Pattern.CASE_INSENSITIVE
+        );
+
+        Matcher matcher = classUriPattern.matcher(text);
+        StringBuffer result = new StringBuffer();
+
+        while (matcher.find()) {
+            String uri = matcher.group(1);
+            String countText = matcher.group(2);
+
+            String className = localNameFromUri(uri);
+
+            long count;
+            try {
+                count = Long.parseLong(countText);
+            } catch (NumberFormatException ex) {
+                count = 0;
+            }
+
+            String occurrenceWord = count == 1 ? "time" : "times";
+
+            String replacement = "The class "
+                    + className
+                    + " appears "
+                    + countText
+                    + " "
+                    + occurrenceWord
+                    + " in the data graph.";
+
+            matcher.appendReplacement(
+                    result,
+                    Matcher.quoteReplacement(replacement)
+            );
+        }
+
+        matcher.appendTail(result);
+        return result.toString();
+    }
+
+    private static String localNameFromUri(String uri) {
+        String value = safe(uri).trim();
+
+        if (value.isEmpty()) {
+            return "";
+        }
+
+        int hash = value.lastIndexOf('#');
+        int slash = value.lastIndexOf('/');
+        int separator = Math.max(hash, slash);
+
+        if (separator >= 0 && separator + 1 < value.length()) {
+            return value.substring(separator + 1);
+        }
+
+        return value;
+    }
+
     private static String safe(String s) {
         if (s == null) return "";
         if ("None".equalsIgnoreCase(s)) return "";
@@ -501,6 +633,21 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         return out.length() == 0 ? fileNameOnly(s) : out.toString();
+    }
+
+    private static String formatMissingXmlFiles(String value) {
+        String s = safe(value).trim();
+
+        if (s.isEmpty()) {
+            return "";
+        }
+
+        return Arrays.stream(s.split(";"))
+                .map(String::trim)
+                .filter(part -> !part.isEmpty())
+                .collect(java.util.stream.Collectors.joining(
+                        System.lineSeparator()
+                ));
     }
 
     private static String fileNameOnly(String value) {
@@ -653,7 +800,7 @@ public class ValidationExcelWriter implements Closeable {
                     reportConstraintFile,
                     safe(res.getSourceShape()),
                     safe(res.getConstraintComponent()),
-                    safe(res.getMessage()),
+                    cleanValidationMessage(res.getMessage()),
                     safe(res.getSeverity())
             );
 
