@@ -19,6 +19,17 @@ public final class Names {
     private Names() {
     }
 
+    /**
+     * Normalised name key for equality matching: lower-cased, every run of
+     * non-alphanumeric characters collapsed to a single space, trimmed. Digits
+     * are kept (they can distinguish stations). Returns null for blank input.
+     */
+    public static String nameKey(String name) {
+        if (name == null) return null;
+        String k = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
+        return k.isEmpty() ? null : k;
+    }
+
     /** Local name of a class/resource string like "cim:ACLineSegment" or a full IRI. */
     public static String localName(String s) {
         if (s == null) return null;

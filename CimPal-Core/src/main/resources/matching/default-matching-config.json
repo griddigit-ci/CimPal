@@ -1,10 +1,10 @@
 {
   "_comment": "Sample ID Mapping / Model Matching config. Every key is optional; omitted keys fall back to built-in defaults. Tolerances are fractional (0.20 = 20%) and compared against summed logical-line values; voltageTolerance is in kV. Copy, edit, and point the ID Mapping tab at this file.",
 
-  "rTolerance": 0.20,
-  "xTolerance": 0.20,
-  "lengthTolerance": 0.20,
-  "bchTolerance": 0.30,
+  "rTolerance": 10.20,
+  "xTolerance": 10.20,
+  "lengthTolerance": 10.20,
+  "bchTolerance": 10.30,
   "voltageTolerance": 1.0,
 
   "secondNameSource": "name",

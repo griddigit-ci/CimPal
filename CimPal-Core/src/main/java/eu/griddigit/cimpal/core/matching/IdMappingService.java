@@ -4,8 +4,10 @@
  */
 package eu.griddigit.cimpal.core.matching;
 
+import eu.griddigit.cimpal.core.matching.engine.AliasDictionary;
 import eu.griddigit.cimpal.core.matching.engine.LogicalLineBuilder;
 import eu.griddigit.cimpal.core.matching.engine.ReportAssembler;
+import eu.griddigit.cimpal.core.matching.engine.SimpleIdMatcher;
 import eu.griddigit.cimpal.core.matching.engine.SubstationLineMatcher;
 import eu.griddigit.cimpal.core.matching.engine.TopologyMatcher;
 import eu.griddigit.cimpal.core.matching.model.*;
@@ -45,48 +47,58 @@ public final class IdMappingService {
     }
 
     /**
-     * Runs a full matching and writes the workbook.
+     * Runs a full matching and writes the workbook. IGMG is the source of ids.
      *
-     * @param pfFiles       PF-side EQ files (EirGrid + SONI), unioned
-     * @param igmsFiles     IGMS-side EQ file(s)
-     * @param boundaryFiles optional boundary set(s), loaded read-only into both
-     *                      sides so BaseVoltage and boundary CNs resolve
-     * @param output        target .xlsx path
-     * @param listener      progress callback (may be null)
+     * @param igmgFiles     the IGMG model file(s) - the source of the canonical mRIDs
+     * @param otherFiles    the SONI + EirGrid EQ files, unioned - mapped against IGMG
+     * @param boundaryFiles  optional boundary / common-data set(s), loaded read-only into
+     *                       both sides so BaseVoltage and boundary CNs resolve
+     * @param dictionaryFile optional substation code&lt;-&gt;name dictionary CSV (may be null)
+     * @param output         target .xlsx path
+     * @param listener       progress callback (may be null)
      */
-    public RunSummary run(List<File> pfFiles, List<File> igmsFiles, List<File> boundaryFiles,
-                          Path output, ProgressListener listener) throws Exception {
+    public RunSummary run(List<File> igmgFiles, List<File> otherFiles, List<File> boundaryFiles,
+                          File dictionaryFile, Path output, ProgressListener listener) throws Exception {
         String xmlBase = MatchingConfigPresets.DEFAULT_XML_BASE;
         QueryRunner runner = new QueryRunner(config.getQueryFolder());
 
         // Load, extract and free one side at a time so only one full Jena model
         // is resident at a time and query results are never fully buffered.
-        progress(listener, 0.05, "Loading PF model (union of EQ + boundary)...");
-        Model pfModel = ModelFactory.loadCombinedModelForSparql(union(pfFiles, boundaryFiles), xmlBase);
-        progress(listener, 0.15, "Extracting PF tables via SPARQL (streaming)...");
-        ModelTables pfTables = ModelTablesLoader.load(Side.PF, "PF", runner, pfModel);
-        pfModel = null; // release the model before loading the next side
+        progress(listener, 0.05, "Loading IGMG (source) model...");
+        Model sourceModel = ModelFactory.loadCombinedModelForSparql(union(igmgFiles, boundaryFiles), xmlBase);
+        progress(listener, 0.15, "Extracting IGMG tables via SPARQL (streaming)...");
+        ModelTables sourceTables = ModelTablesLoader.load(Side.SOURCE, "IGMG", runner, sourceModel);
+        sourceModel = null; // release the model before loading the next side
 
-        progress(listener, 0.35, "Loading IGMS model...");
-        Model igmsModel = ModelFactory.loadCombinedModelForSparql(union(igmsFiles, boundaryFiles), xmlBase);
-        progress(listener, 0.45, "Extracting IGMS tables via SPARQL (streaming)...");
-        ModelTables igmsTables = ModelTablesLoader.load(Side.IGMS, "IGMS", runner, igmsModel);
-        igmsModel = null;
+        progress(listener, 0.35, "Loading SONI+EirGrid model (union)...");
+        Model matchedModel = ModelFactory.loadCombinedModelForSparql(union(otherFiles, boundaryFiles), xmlBase);
+        progress(listener, 0.45, "Extracting SONI+EirGrid tables via SPARQL (streaming)...");
+        ModelTables matchedTables = ModelTablesLoader.load(Side.MATCHED, "PF", runner, matchedModel);
+        matchedModel = null;
 
-        progress(listener, 0.60, "Building logical lines (collapsing series chains)...");
-        List<LogicalLine> pfLines = LogicalLineBuilder.build(pfTables);
-        List<LogicalLine> igmsLines = LogicalLineBuilder.build(igmsTables);
+        progress(listener, 0.55, "Same-id + same-type matches...");
+        SimpleIdMatcher.Result simple = SimpleIdMatcher.match(sourceTables, matchedTables);
 
-        progress(listener, 0.72, "Matching substations and lines...");
+        AliasDictionary dict = dictionaryFile == null
+                ? AliasDictionary.empty()
+                : AliasDictionary.fromCsv(dictionaryFile.toPath());
+
+        progress(listener, 0.62, "Building logical lines (collapsing series chains)...");
+        List<LogicalLine> sourceLines = LogicalLineBuilder.build(sourceTables);
+        List<LogicalLine> matchedLines = LogicalLineBuilder.build(matchedTables);
+
+        progress(listener, 0.72, "Matching substations and lines"
+                + (dict.isEmpty() ? "..." : " (using alias dictionary, " + dict.size() + " aliases)..."));
         SubstationLineMatcher.Result result = SubstationLineMatcher.match(
-                pfTables, pfLines, igmsTables, igmsLines, config);
+                sourceTables, sourceLines, matchedTables, matchedLines, config, simple.substationSeeds(), dict);
 
         progress(listener, 0.82, "Matching equipment within substations (topology)...");
         TopologyMatcher.Result topo = TopologyMatcher.match(
-                pfTables, pfLines, igmsTables, igmsLines, result);
+                sourceTables, sourceLines, matchedTables, matchedLines, result);
 
         progress(listener, 0.90, "Writing workbook...");
-        MatchingReport report = ReportAssembler.assemble(result, topo, pfTables, igmsTables, pfLines, igmsLines);
+        MatchingReport report = ReportAssembler.assemble(simple, result, topo,
+                sourceTables, matchedTables, sourceLines, matchedLines);
         eu.griddigit.cimpal.core.matching.report.MatchingExcelWriter.write(report, output);
 
         progress(listener, 1.0, "Done.");

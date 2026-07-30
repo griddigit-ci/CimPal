@@ -6,11 +6,16 @@ package eu.griddigit.cimpal.core.matching.model;
 
 /**
  * Which of the two models a table or element belongs to.
- * PF is the PowerFactory-exported side (union of the EirGrid and SONI EQ files);
- * IGMS is the reference side. The mapping direction is PF -&gt; IGMS
- * (PF_ID is the key, the matched IGMS mRID is New_ID).
+ * <ul>
+ *   <li>{@code SOURCE} - the first model, the source of the canonical mRIDs
+ *       (for EirGrid this is the merged IGMG model). Its ids are the reference,
+ *       reported in the Source_ID column.</li>
+ *   <li>{@code MATCHED} - the model(s) mapped against the source (for EirGrid the
+ *       union of the SONI and EirGrid EQ files). Its ids are reported in the
+ *       Matched_ID column.</li>
+ * </ul>
  */
 public enum Side {
-    PF,
-    IGMS
+    SOURCE,
+    MATCHED
 }

@@ -29,9 +29,12 @@ import java.util.List;
  */
 public final class MatchingExcelWriter {
 
-    private static final String[] MATCHED_HEADER = {"PF_ID", "Element_type", "New_ID", "New_2nd_name"};
+    private static final String[] MATCHED_HEADER = {"Source_ID(IGMG)", "Element_type", "Matched_ID", "Matched_name", "Note"};
     private static final String[] UNMATCHED_HEADER = {"ID", "Element_type", "Name", "Side", "Reason"};
     private static final String[] STATISTICS_HEADER = {"Metric", "Value"};
+    private static final String[] SUBDIAG_HEADER = {
+            "Source_ID(IGMG)", "Source_name", "Connections", "Connections_by_voltage", "Transformers",
+            "Status", "Match_method", "Matched_ID", "Matched_name", "Matched_connections", "Candidates"};
 
     private MatchingExcelWriter() {
     }
@@ -44,10 +47,11 @@ public final class MatchingExcelWriter {
             int r = 1;
             for (MatchedEntry e : report.matched()) {
                 Row row = matched.createRow(r++);
-                row.createCell(0).setCellValue(safe(e.pfId()));
+                row.createCell(0).setCellValue(safe(e.sourceId()));
                 row.createCell(1).setCellValue(safe(e.elementType()));
-                row.createCell(2).setCellValue(safe(e.newId()));
-                row.createCell(3).setCellValue(safe(e.newSecondName()));
+                row.createCell(2).setCellValue(safe(e.matchedId()));
+                row.createCell(3).setCellValue(safe(e.matchedName()));
+                row.createCell(4).setCellValue(safe(e.note()));
             }
             autosize(matched, MATCHED_HEADER.length);
 
@@ -71,6 +75,24 @@ public final class MatchingExcelWriter {
                 row.createCell(1).setCellValue(safe(e.value()));
             }
             autosize(stats, STATISTICS_HEADER.length);
+
+            Sheet diag = newSheet(wb, "Substation_diagnostics", header, SUBDIAG_HEADER);
+            r = 1;
+            for (MatchingReport.SubDiagRow d : report.substationDiagnostics()) {
+                Row row = diag.createRow(r++);
+                row.createCell(0).setCellValue(safe(d.sourceId()));
+                row.createCell(1).setCellValue(safe(d.sourceName()));
+                row.createCell(2).setCellValue(d.connections());
+                row.createCell(3).setCellValue(safe(d.connectionsByVoltage()));
+                row.createCell(4).setCellValue(safe(d.transformers()));
+                row.createCell(5).setCellValue(safe(d.status()));
+                row.createCell(6).setCellValue(safe(d.method()));
+                row.createCell(7).setCellValue(safe(d.matchedId()));
+                row.createCell(8).setCellValue(safe(d.matchedName()));
+                row.createCell(9).setCellValue(safe(d.matchedConnections()));
+                row.createCell(10).setCellValue(d.candidateCount());
+            }
+            autosize(diag, SUBDIAG_HEADER.length);
 
             Path parent = output.toAbsolutePath().getParent();
             if (parent != null) Files.createDirectories(parent);

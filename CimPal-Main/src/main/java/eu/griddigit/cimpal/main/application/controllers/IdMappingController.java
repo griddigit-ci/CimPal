@@ -32,6 +32,7 @@ public class IdMappingController {
     @FXML private TextField tfPfFiles;
     @FXML private TextField tfIgmsFiles;
     @FXML private TextField tfBoundaryFiles;
+    @FXML private TextField tfDictFile;
     @FXML private TextField tfQueryFolder;
     @FXML private TextField tfConfigFile;
     @FXML private TextField tfOutputFile;
@@ -43,6 +44,7 @@ public class IdMappingController {
     private final List<File> pfFiles = new ArrayList<>();
     private final List<File> igmsFiles = new ArrayList<>();
     private final List<File> boundaryFiles = new ArrayList<>();
+    private File dictionaryFile;
     private File queryFolder;
     private File configFile;
     private File outputFile;
@@ -59,8 +61,9 @@ public class IdMappingController {
 
     @FXML
     private void actionBrowsePf() {
-        List<File> sel = ModelFactory.fileChooserCustom(false, "PF EQ files (EirGrid + SONI)",
-                List.of("*.xml", "*.zip", "*.rdf"), "Select PF EQ files");
+        // First input = IGMG (the source of the canonical IDs).
+        List<File> sel = ModelFactory.fileChooserCustom(false, "IGMG model (source of IDs)",
+                List.of("*.xml", "*.zip", "*.rdf"), "Select IGMG EQ file(s)");
         if (sel == null || sel.isEmpty()) return;
         pfFiles.clear();
         pfFiles.addAll(sel);
@@ -69,8 +72,9 @@ public class IdMappingController {
 
     @FXML
     private void actionBrowseIgms() {
-        List<File> sel = ModelFactory.fileChooserCustom(false, "IGMS EQ file(s)",
-                List.of("*.xml", "*.zip", "*.rdf"), "Select IGMS EQ file(s)");
+        // Second input = the SONI + EirGrid EQ files, mapped against IGMG.
+        List<File> sel = ModelFactory.fileChooserCustom(false, "SONI + EirGrid EQ files",
+                List.of("*.xml", "*.zip", "*.rdf"), "Select SONI + EirGrid EQ files");
         if (sel == null || sel.isEmpty()) return;
         igmsFiles.clear();
         igmsFiles.addAll(sel);
@@ -85,6 +89,15 @@ public class IdMappingController {
         boundaryFiles.clear();
         boundaryFiles.addAll(sel);
         tfBoundaryFiles.setText(joinPaths(boundaryFiles));
+    }
+
+    @FXML
+    private void actionBrowseDict() {
+        List<File> sel = ModelFactory.fileChooserCustom(true, "Substation dictionary (optional)",
+                List.of("*.csv", "*.txt"), "Select substation code<->name dictionary CSV");
+        if (sel == null || sel.isEmpty() || sel.get(0) == null) return;
+        dictionaryFile = sel.get(0);
+        tfDictFile.setText(dictionaryFile.getAbsolutePath());
     }
 
     @FXML
@@ -118,12 +131,14 @@ public class IdMappingController {
         pfFiles.clear();
         igmsFiles.clear();
         boundaryFiles.clear();
+        dictionaryFile = null;
         queryFolder = null;
         configFile = null;
         outputFile = null;
         tfPfFiles.clear();
         tfIgmsFiles.clear();
         tfBoundaryFiles.clear();
+        tfDictFile.clear();
         tfQueryFolder.clear();
         tfConfigFile.clear();
         tfOutputFile.clear();
@@ -141,9 +156,10 @@ public class IdMappingController {
         btnRunIdMapping.setDisable(true);
         pbIdMapping.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
-        final List<File> pf = new ArrayList<>(pfFiles);
-        final List<File> igms = new ArrayList<>(igmsFiles);
+        final List<File> igmg = new ArrayList<>(pfFiles);   // first input = IGMG (source)
+        final List<File> other = new ArrayList<>(igmsFiles); // second input = SONI + EirGrid
         final List<File> boundary = new ArrayList<>(boundaryFiles);
+        final File dict = dictionaryFile;
         final File config = configFile;
         final File query = queryFolder;
         final String secondName = cbSecondName.getValue();
@@ -162,8 +178,8 @@ public class IdMappingController {
                 }
 
                 IdMappingService service = new IdMappingService(cfg);
-                IdMappingService.RunSummary summary = service.run(pf, igms,
-                        boundary.isEmpty() ? null : boundary, output,
+                IdMappingService.RunSummary summary = service.run(igmg, other,
+                        boundary.isEmpty() ? null : boundary, dict, output,
                         (fraction, message) -> Platform.runLater(() -> {
                             pbIdMapping.setProgress(fraction);
                             setStatus(message);
@@ -193,11 +209,11 @@ public class IdMappingController {
 
     private boolean validateInputs() {
         if (pfFiles.isEmpty()) {
-            showWarning("Missing PF files", "Select at least one PF EQ file.");
+            showWarning("Missing IGMG model", "Select the IGMG model file (the source of IDs).");
             return false;
         }
         if (igmsFiles.isEmpty()) {
-            showWarning("Missing IGMS files", "Select at least one IGMS EQ file.");
+            showWarning("Missing SONI+EirGrid files", "Select at least one SONI/EirGrid EQ file.");
             return false;
         }
         if (outputFile == null) {

@@ -129,6 +129,24 @@ public final class LogicalLineBuilder {
             if (sub != null) distinctSubs.add(sub);
         }
 
+        // ACLineSegment.BaseVoltage is usually absent; fall back to the nominal
+        // voltage seen at the line's connectivity nodes (their VoltageLevel).
+        if (nomV == null) {
+            for (String cn : endpointCnList) {
+                Double v = idx.cnNominalVoltage(cn);
+                if (v != null) { nomV = v; break; }
+            }
+        }
+        if (nomV == null) {
+            for (String m : members) {
+                for (String cn : idx.cnsOf(m)) {
+                    Double v = idx.cnNominalVoltage(cn);
+                    if (v != null) { nomV = v; break; }
+                }
+                if (nomV != null) break;
+            }
+        }
+
         if (endpointCnList.isEmpty()) {
             notes.add("no resolvable endpoints (isolated)");
         } else if (endpointCnList.size() == 1) {

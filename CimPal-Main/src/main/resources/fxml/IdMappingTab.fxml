@@ -18,13 +18,13 @@
             </padding>
 
             <HBox spacing="10.0">
-                <Label minWidth="150.0" text="PF EQ files (EirGrid + SONI):" wrapText="true"/>
+                <Label minWidth="150.0" text="IGMG model (source of IDs):" wrapText="true"/>
                 <TextField fx:id="tfPfFiles" editable="false" HBox.hgrow="ALWAYS"/>
                 <Button mnemonicParsing="false" onAction="#actionBrowsePf" text="Browse"/>
             </HBox>
 
             <HBox spacing="10.0">
-                <Label minWidth="150.0" text="IGMS EQ file(s):" wrapText="true"/>
+                <Label minWidth="150.0" text="SONI + EirGrid EQ files:" wrapText="true"/>
                 <TextField fx:id="tfIgmsFiles" editable="false" HBox.hgrow="ALWAYS"/>
                 <Button mnemonicParsing="false" onAction="#actionBrowseIgms" text="Browse"/>
             </HBox>
@@ -33,6 +33,12 @@
                 <Label minWidth="150.0" text="Boundary set (optional):" wrapText="true"/>
                 <TextField fx:id="tfBoundaryFiles" editable="false" HBox.hgrow="ALWAYS"/>
                 <Button mnemonicParsing="false" onAction="#actionBrowseBoundary" text="Browse"/>
+            </HBox>
+
+            <HBox spacing="10.0">
+                <Label minWidth="150.0" text="Substation dictionary CSV (optional):" wrapText="true"/>
+                <TextField fx:id="tfDictFile" editable="false" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionBrowseDict" text="Browse"/>
             </HBox>
 
             <HBox spacing="10.0">
