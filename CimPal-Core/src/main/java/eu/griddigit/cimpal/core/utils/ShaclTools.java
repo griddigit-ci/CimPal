@@ -39,7 +39,13 @@ public class ShaclTools {
             String severity = compact(getResourceValue(result.getPropertyResourceValue(SH.resultSeverity)), prefixModel);
 
             String message = getAllLiteralValues(result, SH.resultMessage);
-            String value = compact(getStatementValue(result.getProperty(SH.value)), prefixModel);
+
+            // sh:value must keep its lexical form untouched when it is a literal. Running compact()
+            // over a literal truncated anything that looked like a URI to its last path segment, which
+            // made a string literal indistinguishable from an actual URI reference in the report.
+            RDFNode valueNode = getStatementObject(result.getProperty(SH.value));
+            String value = renderValueNode(valueNode, prefixModel);
+            String valueKind = describeNodeKind(valueNode, prefixModel);
 
             // resultPath is typically a resource (property URI)
             RDFNode resultPathNode = getStatementObject(result.getProperty(SH.resultPath));
@@ -85,18 +91,64 @@ public class ShaclTools {
             }
 
             resultsList.add(new SHACLValidationResult(
-                    sourceShape, focusNode, severity, message, value, path,
+                    sourceShape, focusNode, severity, message, value, valueKind, path,
                     constraintComponent, details,
                     description, order, name, group
             ));
         }
 
-        return resultsList;
+        // Drop exact duplicates. Jena evaluates a sh:sparql constraint declared on a property shape
+        // once per value node, so an aggregate query (COUNT/SUM over the whole graph) produces one
+        // identical result per value node. Those rows carry no extra information but inflated both
+        // the raw sheet and every count derived from this list.
+        return new ArrayList<>(new LinkedHashSet<>(resultsList));
+    }
+
+    /** Renders sh:value: literals keep their lexical form, resources get prefix-compacted. */
+    private static String renderValueNode(RDFNode node, Model prefixModel) {
+        if (node == null) return "";
+        if (node.isLiteral()) return node.asLiteral().getLexicalForm();
+        if (node.isResource()) return compact(getResourceValue(node.asResource()), prefixModel);
+        return node.toString();
+    }
+
+    /** Describes the node kind of sh:value so URI references and string literals stay distinguishable. */
+    private static String describeNodeKind(RDFNode node, Model prefixModel) {
+        if (node == null) return "";
+
+        if (node.isLiteral()) {
+            Literal lit = node.asLiteral();
+
+            String lang = lit.getLanguage();
+            if (lang != null && !lang.isEmpty()) {
+                return "Literal@" + lang;
+            }
+
+            String dt = lit.getDatatypeURI();
+            if (dt == null || dt.isBlank()) {
+                return "Literal";
+            }
+
+            // Always spell out the xsd: prefix, even when the shapes model does not declare it,
+            // so "Literal^^xsd:string" never degrades into a bare "Literal^^string".
+            if (dt.startsWith(XSD_NS)) {
+                return "Literal^^xsd:" + dt.substring(XSD_NS.length());
+            }
+
+            return "Literal^^" + compact(dt, prefixModel);
+        }
+
+        if (node.isAnon()) return "BlankNode";
+        if (node.isURIResource()) return "IRI";
+
+        return "";
     }
 
     // ---------------- helpers ----------------
 
     private static final String SH_NS = "http://www.w3.org/ns/shacl#";
+
+    private static final String XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 
     private static final Property SH_INVERSE_PATH =
             ResourceFactory.createProperty(SH_NS + "inversePath");

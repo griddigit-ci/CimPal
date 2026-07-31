@@ -221,6 +221,37 @@
                        HBox.hgrow="ALWAYS"/>
         </HBox>
 
+        <HBox spacing="10.0" alignment="CENTER_LEFT">
+            <HBox minWidth="170.0" spacing="5.0" alignment="CENTER_LEFT">
+                <Label text="Previous comparison CSV:" wrapText="true"/>
+                <Label fx:id="helpPreviousComparisonCsv"
+                       text="?"
+                       style="-fx-background-color: #e0e0e0;
+                              -fx-background-radius: 20;
+                              -fx-border-color: #808080;
+                              -fx-border-radius: 20;
+                              -fx-text-fill: #333333;
+                              -fx-font-weight: bold;
+                              -fx-alignment: center;
+                              -fx-min-width: 18px;
+                              -fx-min-height: 18px;
+                              -fx-pref-width: 18px;
+                              -fx-pref-height: 18px;
+                              -fx-cursor: hand;"/>
+            </HBox>
+
+            <TextField fx:id="tfPreviousComparisonCsv"
+                       editable="false"
+                       promptText="Optional - previous run totals (region,dataset,total). Timestamped workflow only."
+                       HBox.hgrow="ALWAYS"/>
+
+            <Button fx:id="btnBrowsePreviousComparisonCsv"
+                    minWidth="80.0"
+                    mnemonicParsing="false"
+                    onAction="#actionBrowsePreviousComparisonCsv"
+                    text="Browse"/>
+        </HBox>
+
         <Region VBox.vgrow="ALWAYS"/>
 
         <ProgressBar fx:id="pbValidationByMapping" prefWidth="Infinity" progress="0.0"/>

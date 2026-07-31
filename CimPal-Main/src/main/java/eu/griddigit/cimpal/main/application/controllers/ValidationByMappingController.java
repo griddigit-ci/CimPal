@@ -37,6 +37,14 @@ public class ValidationByMappingController {
     @FXML
     private TextField tfXmlBaseUri;
 
+    // Previous-run comparison CSV (header: region,dataset,total).
+    // Only used by the timestamped workflow; disabled otherwise.
+    @FXML
+    private TextField tfPreviousComparisonCsv;
+
+    @FXML
+    private Button btnBrowsePreviousComparisonCsv;
+
     @FXML
     private ProgressBar pbValidationByMapping;
 
@@ -64,10 +72,14 @@ public class ValidationByMappingController {
     @FXML
     private Label helpXmlBaseUri;
 
+    @FXML
+    private Label helpPreviousComparisonCsv;
+
     private File mappingCsvFile;
     private File modelsInputFolder;
     private File constraintsRootFolder;
     private File outputFolder;
+    private File previousComparisonCsvFile;
 
     @FXML
     private void initialize() {
@@ -87,7 +99,22 @@ public class ValidationByMappingController {
 
         pbValidationByMapping.setProgress(0);
 
+        // Enable the previous-run CSV field only for the timestamped workflow.
+        cbValidationWorkflow.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldVal, newVal) -> updatePreviousComparisonEnabled());
+        updatePreviousComparisonEnabled();
+
         initializeHelpTooltips();
+    }
+
+    private void updatePreviousComparisonEnabled() {
+        boolean timestamped = isTimestampedWorkflow();
+        if (tfPreviousComparisonCsv != null) {
+            tfPreviousComparisonCsv.setDisable(!timestamped);
+        }
+        if (btnBrowsePreviousComparisonCsv != null) {
+            btnBrowsePreviousComparisonCsv.setDisable(!timestamped);
+        }
     }
 
     private void initializeHelpTooltips() {
@@ -132,6 +159,15 @@ public class ValidationByMappingController {
                 helpXmlBaseUri,
                 "Base URI used when loading RDF/XML files.\n\n" +
                         "The default value is normally correct for CIM100 based profiles."
+        );
+
+        installHelpTooltip(
+                helpPreviousComparisonCsv,
+                "Optional CSV holding the previous run's totals, used to build the comparison workbook.\n\n" +
+                        "Only available for the timestamped workflow.\n\n" +
+                        "Expected header: region,dataset,total  (total = warnings + infos + violations).\n\n" +
+                        "This is the same shape the comparison workbook emits, so each run's output can feed the next.\n\n" +
+                        "If left empty, the comparison is produced with an empty \"previous\" column."
         );
     }
 
@@ -225,21 +261,57 @@ public class ValidationByMappingController {
     }
 
     @FXML
+    private void actionBrowsePreviousComparisonCsv() {
+        List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                true,
+                "Previous comparison CSV",
+                List.of("*.csv"),
+                "Previous comparison CSV"
+        );
+
+        if (selected == null || selected.isEmpty() || selected.get(0) == null) {
+            return;
+        }
+
+        File selectedFile = selected.get(0);
+
+        if (!selectedFile.getName().toLowerCase().endsWith(".csv")) {
+            showWarning(
+                    "Invalid comparison file",
+                    "Please select a CSV file (header: region,dataset,total)."
+            );
+            return;
+        }
+
+        previousComparisonCsvFile = selectedFile;
+        if (tfPreviousComparisonCsv != null) {
+            tfPreviousComparisonCsv.setText(previousComparisonCsvFile.getAbsolutePath());
+        }
+    }
+
+    @FXML
     private void actionResetValidationByMapping() {
         mappingCsvFile = null;
         modelsInputFolder = null;
         constraintsRootFolder = null;
         outputFolder = null;
+        previousComparisonCsvFile = null;
 
         tfMappingCsvFile.clear();
         tfModelsInputFolder.clear();
         tfConstraintsRootFolder.clear();
         tfOutputFolder.clear();
 
+        if (tfPreviousComparisonCsv != null) {
+            tfPreviousComparisonCsv.clear();
+        }
+
         cbValidationWorkflow.getSelectionModel().select("Validate by mapping file");
         cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.4");
 
         tfXmlBaseUri.setText("http://iec.ch/TC57/CIM100");
+
+        updatePreviousComparisonEnabled();
 
         pbValidationByMapping.setProgress(0);
     }
@@ -259,6 +331,9 @@ public class ValidationByMappingController {
                 : tfXmlBaseUri.getText().trim();
 
         int threadCount = getThreadCount(runTimestampedWorkflow);
+
+        // Only meaningful for the timestamped workflow; null when none selected.
+        Path previousComparisonCsv = runTimestampedWorkflow ? getPreviousComparisonCsvPath() : null;
 
         btnRunValidationByMapping.setDisable(true);
         pbValidationByMapping.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -281,7 +356,8 @@ public class ValidationByMappingController {
                             selectedOutputFolder.toPath(),
                             threadCount,
                             dataTypeMap,
-                            xmlBase
+                            xmlBase,
+                            previousComparisonCsv
                     );
 
                     System.out.println("Created report count: " + reports.size());
@@ -394,6 +470,20 @@ public class ValidationByMappingController {
             case "CGMES 3.0 / NC 2.4" -> "/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties";
             default -> throw new IllegalStateException("Unknown datatype map: " + selected);
         };
+    }
+
+    /** Previous-run comparison CSV path, or null if none selected. */
+    private Path getPreviousComparisonCsvPath() {
+        if (previousComparisonCsvFile != null) {
+            return previousComparisonCsvFile.toPath();
+        }
+        if (tfPreviousComparisonCsv != null) {
+            String text = tfPreviousComparisonCsv.getText();
+            if (text != null && !text.isBlank()) {
+                return new File(text.trim()).toPath();
+            }
+        }
+        return null;
     }
 
     private int getThreadCount(boolean timestampedWorkflow) {

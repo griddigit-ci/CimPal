@@ -56,6 +56,10 @@ public class ValidationTools {
 
     private static final boolean WRITE_SUMMARY_CHECKPOINT_EACH_TIMESTAMP = false;
 
+    // Month label like "July 2026" for chart titles / comparison labels, derived from md:FullModel.
+    private static final DateTimeFormatter ANALYSIS_MONTH_YEAR =
+            DateTimeFormatter.ofPattern("LLLL yyyy", Locale.ENGLISH);
+
     private ValidationTools() { }
 
     public static class MappingRow {
@@ -80,6 +84,10 @@ public class ValidationTools {
      *  - create one XLSX per timestamp and one aggregated XLSX per TSO
      *
      * This does not replace validateByMapping(...). It is a separate trigger point.
+     *
+     * The analysis name (used in chart titles and as the comparison "current" label) is derived
+     * mid-process from md:FullModel (scenarioTime / startDate) per timestamp group; it is not a
+     * parameter.
      */
     public static List<Path> validateByTimestampedMapping(Path mappingCsvPath,
                                                           Path inputPath,
@@ -87,7 +95,9 @@ public class ValidationTools {
                                                           Path outputBaseDir,
                                                           int threadCount,
                                                           Map<String, RDFDatatype> dataTypeMap,
-                                                          String xmlBase) throws IOException {
+                                                          String xmlBase,
+                                                          Path previousComparisonCsv)    // NEW  nullable
+            throws IOException {
 
         long allStart = System.currentTimeMillis();
 
@@ -125,8 +135,9 @@ public class ValidationTools {
 
         consoleInput("input groups=" + inputGroups.size());
 
-        try (ValidationExcelWriter allCountriesSummaryWriter = ValidationExcelWriter.createTimestampedSummaryWriter()) {
-
+        try (ValidationExcelWriter allCountriesSummaryWriter = ValidationExcelWriter.createTimestampedSummaryWriter();
+             ValidationExcelWriter.ComparisonExcelWriter comparisonWriter =
+                     new ValidationExcelWriter.ComparisonExcelWriter(previousComparisonCsv, "Previous", "Current")) {
             for (InputGroup inputGroup : inputGroups) {
                 long inputGroupStart = System.currentTimeMillis();
 
@@ -216,22 +227,25 @@ public class ValidationTools {
                                     + inputGroup.name + " " + timestampGroup.timestamp);
                         }
 
+                        // NEW: analysis name derived from md:FullModel (scenarioTime / startDate)
+                        String monthLabel = deriveMonthLabel(timestampGroup, resolvedRows);
+                        String analysisName = monthLabel + " Analysis";
+                        comparisonWriter.setCurrentLabel(monthLabel);
+
                         Path timestampReport;
 
                         try (ValidationExcelWriter timestampWriter = new ValidationExcelWriter()) {
+                            timestampWriter.setReportContext(analysisName, inputGroup.name, timestampGroup.timestamp); // NEW
                             appendTaskResultsToWriter(timestampWriter, results);
 
                             timestampReport = saveTimestampReport(
-                                    timestampWriter,
-                                    groupOutputDir,
-                                    inputGroup.name,
-                                    timestampGroup.timestamp
-                            );
-
+                                    timestampWriter, groupOutputDir, inputGroup.name, timestampGroup.timestamp);
                             createdReports.add(timestampReport);
-
                             consoleReport("Timestamp report created: " + timestampReport.toAbsolutePath());
                         }
+
+                        // NEW: feed the comparison workbook (per dataset totals for this timestamp)
+                        feedComparison(comparisonWriter, inputGroup.name, timestampGroup.timestamp, results);
 
                         appendTimestampSummary(
                                 summaryWriter,
@@ -287,9 +301,13 @@ public class ValidationTools {
 
             Path allCountriesSummaryReport = allCountriesSummaryWriter.saveTo(outputBaseDir);
             createdReports.add(allCountriesSummaryReport);
-
             consoleReport("All-countries timestamped summary report created: "
                     + allCountriesSummaryReport.toAbsolutePath());
+
+            // NEW: comparison workbook (region sheets + delta charts)
+            Path comparisonReport = comparisonWriter.saveTo(outputBaseDir);
+            createdReports.add(comparisonReport);
+            consoleReport("Comparison report created: " + comparisonReport.toAbsolutePath());
         }
 
         dbg("DONE validateByTimestampedMapping", allStart);
@@ -297,6 +315,55 @@ public class ValidationTools {
 
         return createdReports;
     }
+
+    // NEW: analysis month helpers -------------------------------------------------
+
+    /**
+     * Returns a month label like "July 2026", derived from md:FullModel.
+     * The timestamp group's time is itself taken from the FullModel header (scenarioTime /
+     * startDate) during discovery, so it is used first; if for some reason it is blank or
+     * unparseable, a FullModel header is read directly from a resolved input file.
+     */
+    private static String deriveMonthLabel(TimestampGroup timestampGroup,
+                                           List<ResolvedMappingRow> resolvedRows) {
+        String label = monthYearFromInstant(timestampGroup == null ? "" : timestampGroup.timestamp);
+        if (label != null) {
+            return label;
+        }
+
+        if (resolvedRows != null) {
+            for (ResolvedMappingRow row : resolvedRows) {
+                if (row == null || row.xmlFiles == null) {
+                    continue;
+                }
+                for (Path xml : row.xmlFiles) {
+                    // readTimestampFromXmlHeader prefers scenarioTime, then startDate, never endDate.
+                    String fromHeader = monthYearFromInstant(readTimestampFromXmlHeader(xml));
+                    if (fromHeader != null) {
+                        return fromHeader;
+                    }
+                }
+            }
+        }
+
+        return LocalDate.now().format(ANALYSIS_MONTH_YEAR);
+    }
+
+    private static String monthYearFromInstant(String instant) {
+        String s = safe(instant).trim();
+        if (s.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(s)
+                    .atZone(ZoneOffset.UTC)
+                    .toLocalDate()
+                    .format(ANALYSIS_MONTH_YEAR);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     /**
      * Validate directly from the mapping (no zips required):
      *  - resolve XML file(s) from xml_inputs (supports wildcards in filename)
@@ -497,13 +564,8 @@ public class ValidationTools {
                     long appendStart = System.currentTimeMillis();
 
                     writer.appendError(
-                            sheet,
-                            r.datasetName,
-                            r.xmlFiles,
-                            r.missingXmlFiles,
-                            r.constraintFile,
-                            r.error
-                    );
+                            sheet, r.datasetName, r.xmlFiles, r.missingXmlFiles, r.constraintFile,
+                            r.error, r.displayName);
                     dbgRow(r.rowIdx, "DONE writer.appendError dataset=" + r.datasetName,
                             appendStart);
 
@@ -537,14 +599,8 @@ public class ValidationTools {
                     writer.appendValidation(sheet, r.datasetName, r.xmlFiles, r.constraintFile, resultsToWrite, r.conforms);
 */
                     writer.appendValidation(
-                            sheet,
-                            r.datasetName,
-                            r.xmlFiles,
-                            r.missingXmlFiles,
-                            r.constraintFile,
-                            r.results,
-                            r.conforms
-                    );
+                            sheet, r.datasetName, r.xmlFiles, r.missingXmlFiles, r.constraintFile,
+                            r.results, r.conforms, r.displayName);
                     dbgRow(r.rowIdx, "DONE writer.appendValidation dataset=" + r.datasetName,
                             appendStart);
                 }
@@ -591,6 +647,13 @@ public class ValidationTools {
         final boolean conforms;
         final Exception error;
         final String missingXmlFiles;
+
+        String displayName = "";   // mapping column C, used for chart x-axis
+
+        ValidationTaskResult withDisplayName(String dn) {
+            this.displayName = (dn == null) ? "" : dn;
+            return this;
+        }
 
         ValidationTaskResult(int rowIdx,
                              ValidationExcelWriter.CaseFolder caseFolder,
@@ -749,17 +812,10 @@ public class ValidationTools {
                     rowStart);
 
             return new ValidationTaskResult(
-                    rowIdx,
-                    caseFolder,
-                    datasetName,
-                    ttlName,
-                    xmlFilesText,
-                    missingXmlFilesText,
-                    constraintFileText,
-                    results,
-                    report.conforms(),
-                    null
-            );
+                    rowIdx, caseFolder, datasetName, ttlName,
+                    xmlFilesText, missingXmlFilesText, constraintFileText,
+                    results, report.conforms(), null
+            ).withDisplayName(row.notes);
         } catch (Exception ex) {
             dbgRow(rowIdx, "ERROR row dataset=" + datasetName, rowStart);
             ex.printStackTrace();
@@ -3498,17 +3554,10 @@ public class ValidationTools {
                     rowStart);
 
             return new ValidationTaskResult(
-                    row.rowIdx,
-                    row.caseFolder,
-                    row.datasetName,
-                    row.ttlName,
-                    row.xmlFilesText,
-                    "",
-                    row.constraintFileText,
-                    results,
-                    report.conforms(),
-                    null
-            );
+                    row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
+                    row.xmlFilesText, "", row.constraintFileText,
+                    results, report.conforms(), null
+            ).withDisplayName(row.sourceRow.notes);
 
         } catch (Exception ex) {
             dbgRow(row.rowIdx, "ERROR timestamped resolved row"
@@ -3538,21 +3587,12 @@ public class ValidationTools {
         for (ValidationTaskResult r : taskResults) {
             if (r.error != null) {
                 writer.appendError(
-                        r.caseFolder,
-                        r.datasetName,
-                        r.xmlFiles,
-                        r.constraintFile,
-                        r.error
-                );
+                        r.caseFolder, r.datasetName, r.xmlFiles, "", r.constraintFile,
+                        r.error, r.displayName);
             } else {
                 writer.appendValidation(
-                        r.caseFolder,
-                        r.datasetName,
-                        r.xmlFiles,
-                        r.constraintFile,
-                        r.results,
-                        r.conforms
-                );
+                        r.caseFolder, r.datasetName, r.xmlFiles, "", r.constraintFile,
+                        r.results, r.conforms, r.displayName);
             }
         }
     }
@@ -3829,5 +3869,28 @@ public class ValidationTools {
         }
 
         return false;
+    }
+
+    private static void feedComparison(ValidationExcelWriter.ComparisonExcelWriter comparisonWriter,
+                                       String region,
+                                       String timestamp,
+                                       List<ValidationTaskResult> results) {
+        if (comparisonWriter == null || results == null) {
+            return;
+        }
+        for (ValidationTaskResult r : results) {
+            if (r.error != null || r.results == null) {
+                continue;
+            }
+            int w = 0, i = 0, v = 0;
+            for (SHACLValidationResult res : r.results) {
+                String sev = safe(res.getSeverity()).toLowerCase(Locale.ROOT);
+                if (sev.contains("violation")) v++;
+                else if (sev.contains("warning")) w++;
+                else i++;
+            }
+            String label = safe(r.displayName).isBlank() ? r.datasetName : r.displayName;
+            comparisonWriter.addTimestampDataset(region, timestamp, label, w, i, v);
+        }
     }
 }
