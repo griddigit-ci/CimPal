@@ -310,6 +310,8 @@ public class ValidationTools {
             consoleReport("Comparison report created: " + comparisonReport.toAbsolutePath());
         }
 
+        deleteDirectoryRecursively(outputBaseDir.resolve("_unzipped"));
+
         dbg("DONE validateByTimestampedMapping", allStart);
         printMemory("end validateByTimestampedMapping");
 
@@ -3869,6 +3871,16 @@ public class ValidationTools {
         }
 
         return false;
+    }
+
+    private static void deleteDirectoryRecursively(Path dir) {
+        if (!Files.exists(dir)) return;
+        try (java.util.stream.Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder())
+                    .forEach(p -> { try { Files.delete(p); } catch (IOException ignore) {} });
+        } catch (IOException ex) {
+            logWarn("Could not delete temporary directory: " + dir + " error=" + ex.getMessage());
+        }
     }
 
     private static void feedComparison(ValidationExcelWriter.ComparisonExcelWriter comparisonWriter,

@@ -999,7 +999,15 @@ public class ValidationExcelWriter implements Closeable {
 
             String rawDataset = getString(statsRow, STAT_COL_DATASET);
             String chartName = getString(statsRow, STAT_COL_CHART_NAME);
-            String label = chartName.isBlank() ? rawDataset : chartName;
+            String label;
+            if (!chartName.isBlank()) {
+                label = chartName;
+            } else {
+                int lastSep = rawDataset.lastIndexOf("__");
+                label = (lastSep >= 0 && lastSep + 2 < rawDataset.length())
+                        ? rawDataset.substring(lastSep + 2)
+                        : rawDataset;
+            }
 
             if (label.isBlank()) {
                 continue;
@@ -1043,16 +1051,16 @@ public class ValidationExcelWriter implements Closeable {
 
         if (outRowA > 1) {
             createStackedBarChart(xs, prefix + " - Total Number of Hits",
-                    0, 1, outRowA - 1, false, 10, 1, 28, 22);
+                    0, 1, outRowA - 1, false, 10, 1, 28, 29);
             createStackedBarChart(xs, prefix + " - Total Distributed Number of Hits",
-                    0, 1, outRowA - 1, true, 10, 24, 28, 45);
+                    0, 1, outRowA - 1, true, 10, 31, 28, 59);
         }
 
         if (outRowB > 1) {
             createStackedBarChart(xs, prefix + " - Total Number of Hits (all datasets)",
-                    5, 1, outRowB - 1, false, 10, 47, 28, 68);
+                    5, 1, outRowB - 1, false, 10, 61, 28, 89);
             createStackedBarChart(xs, prefix + " - Total Distributed Number of Hits (all datasets)",
-                    5, 1, outRowB - 1, true, 10, 70, 28, 91);
+                    5, 1, outRowB - 1, true, 10, 91, 28, 119);
         }
     }
 
