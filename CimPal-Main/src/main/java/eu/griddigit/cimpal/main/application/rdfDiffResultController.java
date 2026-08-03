@@ -15,6 +15,7 @@ import eu.griddigit.cimpal.core.kgcl.KgclRdfWriter;
 import eu.griddigit.cimpal.core.models.KgclOptions;
 import eu.griddigit.cimpal.core.models.RDFCompareResult;
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.ExcelExportTableView;
 import eu.griddigit.cimpal.main.gui.RDFcomparisonResultModel;
 import eu.griddigit.cimpal.main.gui.TextAreaEditTableCell;
 import eu.griddigit.cimpal.main.util.ModelFactory;
@@ -45,6 +46,7 @@ public class rdfDiffResultController implements Initializable {
     public Button btnExportResult;
     public Button btnExportCsv;
     public Button btnExportKgcl;
+    public Button btnExportAll;
     @FXML
     private TableView tableViewResults;
     @FXML
@@ -208,6 +210,51 @@ public class rdfDiffResultController implements Initializable {
         } else {
             Preferences.userNodeForPackage(rdfDiffResultController.class).put("LastWorkingFolder", saveFile.getParent());
         }
+    }
+
+    @FXML
+    private void actionBtnExportAll(ActionEvent actionEvent) throws IOException {
+        if (rdfCompareResult == null || rdfCompareResult.getEntries().isEmpty()) {
+            return;
+        }
+
+        File folder = ModelFactory.folderChooserCustom("Select folder to export all comparison results");
+        if (folder == null) {
+            return;
+        }
+
+        String base = "RDFScomparisonResult";
+
+        // Excel (with the Operation column) and the patch-oriented CSV
+        ExcelExportTableView.exportToFile(tableViewResults, "RDFS comparison results", compareFiles,
+                new File(folder, base + ".xlsx"));
+        List<ComparisonOperationRow> operationRows = ComparisonOperationsFactory.fromResult(rdfCompareResult);
+        try (FileOutputStream out = new FileOutputStream(new File(folder, base + ".csv"))) {
+            new ComparisonCsvWriter().write(out, operationRows);
+        }
+
+        // KGCL changeset in all three serializations (Model A -> Model B)
+        List<KgclChange> changes = new KgclConverter().convert(rdfCompareResult,
+                KgclOptions.builder()
+                        .outputFormat(KgclOptions.OutputFormat.CNL)
+                        .direction(KgclOptions.Direction.A_TO_B)
+                        .build());
+        try (FileOutputStream out = new FileOutputStream(new File(folder, base + ".kgcl"))) {
+            new KgclCnlWriter().write(out, changes);
+        }
+        try (FileOutputStream out = new FileOutputStream(new File(folder, base + ".ttl"))) {
+            new KgclRdfWriter().write(out, changes, KgclOptions.OutputFormat.TURTLE);
+        }
+        try (FileOutputStream out = new FileOutputStream(new File(folder, base + ".rdf"))) {
+            new KgclRdfWriter().write(out, changes, KgclOptions.OutputFormat.RDFXML);
+        }
+
+        Alert info = new Alert(Alert.AlertType.INFORMATION);
+        info.setTitle("Export all");
+        info.setHeaderText("All comparison results exported");
+        info.setContentText("Written to:\n" + folder.getAbsolutePath() + "\n\n"
+                + base + ".xlsx\n" + base + ".csv\n" + base + ".kgcl\n" + base + ".ttl\n" + base + ".rdf");
+        info.showAndWait();
     }
 
     @FXML

@@ -35,6 +35,23 @@ import java.util.prefs.Preferences;
 public class ExcelExportTableView {
 
     public static void export(TableView<RDFcomparisonResultModel> tableView, String sheetname, String initialFileName, String title, List<String> compareFiles) throws IOException {
+        // Save to file
+        File saveFile = ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"), title, initialFileName);
+        if (saveFile != null) {
+            exportToFile(tableView, sheetname, compareFiles, saveFile);
+            if (MainController.prefs != null) {
+                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            } else {
+                Preferences.userNodeForPackage(ExcelExportTableView.class).put("LastWorkingFolder", saveFile.getParent());
+            }
+        }
+    }
+
+    /**
+     * Writes the comparison table to a specific .xlsx file without prompting for a location. Used by
+     * the "Export all" action, which writes every export format into a single chosen folder.
+     */
+    public static void exportToFile(TableView<RDFcomparisonResultModel> tableView, String sheetname, List<String> compareFiles, File targetFile) throws IOException {
         try (SXSSFWorkbook workbook = new SXSSFWorkbook()) {
             workbook.setCompressTempFiles(true);
 
@@ -84,17 +101,8 @@ public class ExcelExportTableView {
             String filterRange = "A1:" + getColumnName(tableView.getColumns().size() - 1) + (items.size() + 1);
             sheet.setAutoFilter(CellRangeAddress.valueOf(filterRange));
 
-            // Save to file
-            File saveFile = ModelFactory.fileSaveCustom("Excel files", List.of("*.xlsx"), title, initialFileName);
-            if (saveFile != null) {
-                try (FileOutputStream outputStream = new FileOutputStream(saveFile)) {
-                    workbook.write(outputStream);
-                }
-                if (MainController.prefs != null) {
-                    MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
-                } else {
-                    Preferences.userNodeForPackage(ExcelExportTableView.class).put("LastWorkingFolder", saveFile.getParent());
-                }
+            try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
+                workbook.write(outputStream);
             }
         }
     }
