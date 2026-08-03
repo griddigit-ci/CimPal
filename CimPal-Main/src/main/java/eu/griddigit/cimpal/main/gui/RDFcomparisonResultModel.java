@@ -13,14 +13,16 @@ public class RDFcomparisonResultModel {
     private final SimpleStringProperty property;
     private final SimpleStringProperty valueModelA;
     private final SimpleStringProperty valueModelB;
+    private final SimpleStringProperty operation;
 
 
-    public RDFcomparisonResultModel(String iitem, String irdfType, String iproperty, String ivalueModelA, String ivalueModelB) {
+    public RDFcomparisonResultModel(String iitem, String irdfType, String iproperty, String ivalueModelA, String ivalueModelB, String ioperation) {
         this.item = new SimpleStringProperty(iitem);
         this.rdfType = new SimpleStringProperty(irdfType);
         this.property = new SimpleStringProperty(iproperty);
         this.valueModelA = new SimpleStringProperty(ivalueModelA);
         this.valueModelB = new SimpleStringProperty(ivalueModelB);
+        this.operation = new SimpleStringProperty(ioperation);
     }
 
     public String getItem() {
@@ -56,5 +58,12 @@ public class RDFcomparisonResultModel {
     }
     public void setValueModelB(String ivalueModelB) {
         valueModelB.set(ivalueModelB);
+    }
+
+    public String getOperation() {
+        return operation.get();
+    }
+    public void setOperation(String ioperation) {
+        operation.set(ioperation);
     }
 }

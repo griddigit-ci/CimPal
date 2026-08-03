@@ -5,6 +5,9 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.core.diffexport.ComparisonCsvWriter;
+import eu.griddigit.cimpal.core.diffexport.ComparisonOperationRow;
+import eu.griddigit.cimpal.core.diffexport.ComparisonOperationsFactory;
 import eu.griddigit.cimpal.core.kgcl.KgclChange;
 import eu.griddigit.cimpal.core.kgcl.KgclCnlWriter;
 import eu.griddigit.cimpal.core.kgcl.KgclConverter;
@@ -14,7 +17,6 @@ import eu.griddigit.cimpal.core.models.RDFCompareResult;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.RDFcomparisonResultModel;
 import eu.griddigit.cimpal.main.gui.TextAreaEditTableCell;
-import eu.griddigit.cimpal.core.models.RDFCompareResultEntry;
 import eu.griddigit.cimpal.main.util.ModelFactory;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -41,6 +43,7 @@ import static eu.griddigit.cimpal.main.gui.ExcelExportTableView.export;
 public class rdfDiffResultController implements Initializable {
     public Button btnCancel;
     public Button btnExportResult;
+    public Button btnExportCsv;
     public Button btnExportKgcl;
     @FXML
     private TableView tableViewResults;
@@ -54,6 +57,8 @@ public class rdfDiffResultController implements Initializable {
     private TableColumn cValueModelA;
     @FXML
     private TableColumn cValueModelB;
+    @FXML
+    private TableColumn cOperation;
     @FXML
     private Label labelModelA;
     @FXML
@@ -85,6 +90,8 @@ public class rdfDiffResultController implements Initializable {
         cValueModelA.setCellFactory(cellFactory);
         cValueModelB.setCellValueFactory( new PropertyValueFactory<RDFcomparisonResultModel, String>( "valueModelB" ) );
         cValueModelB.setCellFactory(cellFactory);
+        cOperation.setCellValueFactory( new PropertyValueFactory<RDFcomparisonResultModel, String>( "operation" ) );
+        cOperation.setCellFactory(cellFactory);
     }
 
     /**
@@ -95,14 +102,14 @@ public class rdfDiffResultController implements Initializable {
         this.rdfCompareResult = result;
         this.compareFiles = files;
 
-        // populate table now that we have data
+        // populate table now that we have data - classify each difference as an operation
+        // (add/remove/update) with Model A as the older/base version; the empty side is blanked
         ObservableList<RDFcomparisonResultModel> tableResultsData= tableViewResults.getItems();
 
         if (rdfCompareResult != null) {
-            List<RDFCompareResultEntry> rdfCompareResultEntries = rdfCompareResult.getEntries();
-            for (RDFCompareResultEntry resultEntry : rdfCompareResultEntries) {
-                tableResultsData.add(new RDFcomparisonResultModel(resultEntry.getItem(), resultEntry.getRdfType(), resultEntry.getProperty(),
-                        resultEntry.getValueModelA(), resultEntry.getValueModelB()));
+            for (ComparisonOperationRow row : ComparisonOperationsFactory.fromResult(rdfCompareResult)) {
+                tableResultsData.add(new RDFcomparisonResultModel(row.getItem(), row.getRdfType(), row.getProperty(),
+                        row.getValueA(), row.getValueB(), row.getOperation().label()));
             }
         }
 
@@ -120,6 +127,32 @@ public class rdfDiffResultController implements Initializable {
         export(tableViewResults,"RDFS comparison results","RDFScomparisonResult","Save RDFS comparison result", compareFiles);
         //RDFDataMgr.write(System.out, AddShapesController.reportResource.getModel(), RDFFormat.TURTLE);
 
+    }
+
+    @FXML
+    private void actionBtnExportCsv(ActionEvent actionEvent) throws IOException {
+        if (rdfCompareResult == null || rdfCompareResult.getEntries().isEmpty()) {
+            return;
+        }
+
+        // patch-oriented CSV: one row per operation, a changed value becomes add(new)+remove(old)
+        List<ComparisonOperationRow> rows = ComparisonOperationsFactory.fromResult(rdfCompareResult);
+
+        File saveFile = ModelFactory.fileSaveCustom("CSV files", List.of("*.csv"),
+                "Save RDFS comparison result (CSV)", "RDFScomparisonResult.csv");
+        if (saveFile == null) {
+            return;
+        }
+
+        try (FileOutputStream outputStream = new FileOutputStream(saveFile)) {
+            new ComparisonCsvWriter().write(outputStream, rows);
+        }
+
+        if (MainController.prefs != null) {
+            MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+        } else {
+            Preferences.userNodeForPackage(rdfDiffResultController.class).put("LastWorkingFolder", saveFile.getParent());
+        }
     }
 
     @FXML
