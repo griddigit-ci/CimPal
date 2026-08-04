@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <jdk.version>25</jdk.version>
-        <cimpal.version>2026.08.04.1</cimpal.version> <!-- Always sync with version tag -->
+        <cimpal.version>2026.08.04.2</cimpal.version> <!-- Always sync with version tag -->
         <!-- Windows RC FILEVERSION: remove leading zeros to avoid octal interpretation by windres -->
         <windows.version>${cimpal.version}</windows.version>
         <log4j.version>2.26.0</log4j.version>
@@ -17,7 +17,7 @@
 
     <groupId>eu.griddigit.CimPal</groupId>
     <artifactId>CimPal</artifactId>
-    <version>2026.08.04.1</version>
+    <version>2026.08.04.2</version>
     <packaging>pom</packaging>
     <name>CimPal</name>
     <organization>
