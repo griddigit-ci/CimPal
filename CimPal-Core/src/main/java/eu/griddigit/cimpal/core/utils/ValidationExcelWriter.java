@@ -999,15 +999,7 @@ public class ValidationExcelWriter implements Closeable {
 
             String rawDataset = getString(statsRow, STAT_COL_DATASET);
             String chartName = getString(statsRow, STAT_COL_CHART_NAME);
-            String label;
-            if (!chartName.isBlank()) {
-                label = chartName;
-            } else {
-                int lastSep = rawDataset.lastIndexOf("__");
-                label = (lastSep >= 0 && lastSep + 2 < rawDataset.length())
-                        ? rawDataset.substring(lastSep + 2)
-                        : rawDataset;
-            }
+            String label = chartName.isBlank() ? rawDataset : chartName;
 
             if (label.isBlank()) {
                 continue;

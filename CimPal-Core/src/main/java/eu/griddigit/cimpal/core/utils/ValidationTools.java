@@ -2488,21 +2488,17 @@ public class ValidationTools {
                                                      Collection<Path> xmlFiles) {
         LinkedHashSet<String> profiles = detectProfilesFromMappingInput(xmlInputsRaw);
 
-        String profilePart;
-
         if (profiles.isEmpty()) {
-            profilePart = xmlFiles == null || xmlFiles.isEmpty()
+            return xmlFiles == null || xmlFiles.isEmpty()
                     ? "UNKNOWN_PROFILES"
                     : xmlFiles.stream()
                     .filter(Objects::nonNull)
                     .map(p -> p.getFileName() == null ? "" : p.getFileName().toString())
                     .filter(s -> !s.isBlank())
                     .collect(Collectors.joining(" + "));
-        } else {
-            profilePart = String.join(" + ", profiles);
         }
 
-        return safe(tso) + "__" + safe(timestamp) + "__" + profilePart;
+        return String.join(" + ", profiles);
     }
 
     private static boolean containsWildcardProfileToken(String value, String profile) {
