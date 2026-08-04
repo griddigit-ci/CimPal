@@ -161,12 +161,12 @@
                                 <minVersion>25</minVersion>
                             </jre>
                             <versionInfo>
-                                <fileVersion>${cimpal.version}</fileVersion>
-                                <txtFileVersion>${cimpal.version}</txtFileVersion>
+                                <fileVersion>${windows.version}</fileVersion>
+                                <txtFileVersion>${windows.version}</txtFileVersion>
                                 <fileDescription>CimPal GUI</fileDescription>
                                 <copyright>gridDigIt</copyright>
-                                <productVersion>${cimpal.version}</productVersion>
-                                <txtProductVersion>${cimpal.version}</txtProductVersion>
+                                <productVersion>${windows.version}</productVersion>
+                                <txtProductVersion>${windows.version}</txtProductVersion>
                                 <productName>CimPal</productName>
                                 <companyName>gridDigIt</companyName>
                                 <internalName>CimPal</internalName>

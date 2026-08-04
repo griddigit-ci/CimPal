@@ -6,6 +6,8 @@
     <properties>
         <jdk.version>25</jdk.version>
         <cimpal.version>2026.08.04.1</cimpal.version> <!-- Always sync with version tag -->
+        <!-- Windows RC FILEVERSION: remove leading zeros to avoid octal interpretation by windres -->
+        <windows.version>${cimpal.version}</windows.version>
         <log4j.version>2.26.0</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jena.version>6.1.0</jena.version>
