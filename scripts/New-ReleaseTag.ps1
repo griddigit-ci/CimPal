@@ -39,8 +39,9 @@ if ($rootContent -notmatch '<cimpal\.version>([^<]+)</cimpal\.version>') {
 }
 $oldVersion = $Matches[1]
 
-$datePrefix = Get-Date -Format "yyyy.MM.dd"
-$existing = git tag -l "$datePrefix.*"
+$datePrefix = Get-Date -Format "yyyy.M.d"
+$legacyDatePrefix = Get-Date -Format "yyyy.MM.dd"
+$existing = @(git tag -l "$datePrefix.*" "$legacyDatePrefix.*")
 $nextN = 1
 if ($existing) {
     $numbers = $existing | ForEach-Object { [int]$_.Split('.')[-1] }
@@ -48,13 +49,8 @@ if ($existing) {
 }
 $newVersion = "$datePrefix.$nextN"
 
-# Generate Windows-compatible version without leading zeros for RC FILEVERSION
-# Convert "2026.08.04.1" → "2026.8.4.1" to avoid octal interpretation in windres
-$windowsVersion = $newVersion -replace '\.0(\d)', '.$1'
-
 Write-Host "Current version: $oldVersion"
 Write-Host "New version:     $newVersion"
-Write-Host "Windows version: $windowsVersion"
 
 if ($DryRun) {
     Write-Host "Dry run - no files changed, nothing committed, nothing tagged/pushed."

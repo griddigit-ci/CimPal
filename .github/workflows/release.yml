@@ -22,17 +22,8 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Compute Windows-compatible version
-        id: version
-        run: |
-          $version = "${{ github.ref_name }}"
-          $windowsVersion = $version -replace '\.0(\d)', '.$1'
-          Write-Output "windows=$windowsVersion" >> $env:GITHUB_OUTPUT
-          Write-Host "Release version: $version"
-          Write-Host "Windows version: $windowsVersion"
-
       - name: Build all modules
-        run: mvn -B package -Dwindows.version=${{ steps.version.outputs.windows }}
+        run: mvn -B package
 
       - name: Create release
         env:
