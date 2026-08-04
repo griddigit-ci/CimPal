@@ -6,7 +6,7 @@
     <parent>
         <groupId>eu.griddigit.CimPal</groupId>
         <artifactId>CimPal</artifactId>
-        <version>2026.08.04.2</version>
+        <version>2026.8.4.3</version>
     </parent>
 
     <artifactId>CimPal-CLI</artifactId>
