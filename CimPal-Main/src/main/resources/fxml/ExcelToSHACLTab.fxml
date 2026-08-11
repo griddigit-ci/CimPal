@@ -14,6 +14,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="RDF file:" wrapText="true" />
+            <Label fx:id="helpRdfFile" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
             <TextField fx:id="fPathRdffileForExcel" editable="false" HBox.hgrow="ALWAYS" />
             <Button mnemonicParsing="false" onAction="#actionBrowseRDFfileForExcel" text="Browse" />
         </HBox>
@@ -22,6 +23,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="RDFS format:" wrapText="true" />
+            <Label fx:id="helpRdfsFormat" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
             <ChoiceBox fx:id="fcbRDFSformatForExcel" minWidth="400.0" />
         </HBox>
         <HBox spacing="10.0">
@@ -29,6 +31,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="Input - Excel file:" wrapText="true" />
+            <Label fx:id="helpExcelFile" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
             <TextField fx:id="fPathXLSfileForShape" editable="false" HBox.hgrow="ALWAYS" />
             <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShape" text="Browse" />
         </HBox>
@@ -37,6 +40,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="Base URI - Shape graph:" wrapText="true" />
+            <Label fx:id="helpBaseUri" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
             <TextField fx:id="fbaseURIShapeExcel" HBox.hgrow="ALWAYS" />
         </HBox>
         <HBox spacing="10.0">
@@ -50,6 +54,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="Prefix:" wrapText="true" />
+            <Label fx:id="helpPrefixNs" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
             <TextField fx:id="fPrefixExcelShape" prefWidth="70.0" />
             <Label minWidth="90.0" text="Namespace:" wrapText="true" />
             <TextField fx:id="fNSexcelShape" HBox.hgrow="ALWAYS" />
@@ -66,6 +71,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="Changes Excel:" wrapText="true" />
+            <Label fx:id="helpChangesExcel" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
             <TextField fx:id="fPathXLSChangesExcelToTtl" editable="false" HBox.hgrow="ALWAYS" />
             <Button mnemonicParsing="false" onAction="#actionBrowseXlsChangesExcelToTtl" text="Browse" />
         </HBox>
@@ -75,6 +81,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="Target TTL:" wrapText="true" />
+            <Label fx:id="helpTargetTtl" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
             <TextField fx:id="fPathTTLChangesExcelToTtl" editable="false" HBox.hgrow="ALWAYS" />
             <Button mnemonicParsing="false" onAction="#actionBrowseTtlChangesExcelToTtl" text="Browse" />
         </HBox>

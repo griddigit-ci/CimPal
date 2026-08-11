@@ -93,6 +93,37 @@ public class RDFStoSHACLController implements Initializable {
     private Button btnConstructShacl;
     @FXML
     private Button btnApply;
+    @FXML
+    private Button btnResetRDFStoSHACL;
+
+    @FXML
+    private Label helpDatatypeMap;
+    @FXML
+    private Label helpProfileVersion;
+    @FXML
+    private Label helpShapesNamespace;
+    @FXML
+    private Label helpShapesBaseUri;
+    @FXML
+    private Label helpOwlImports;
+    @FXML
+    private Label helpRdfsFormat;
+    @FXML
+    private Label helpAbstractGroup;
+    @FXML
+    private Label helpShInGroup;
+    @FXML
+    private Label helpDescrGroup;
+    @FXML
+    private Label helpBaseProfilesGroup;
+    @FXML
+    private Label helpConstraintsGroup;
+    @FXML
+    private Label helpCountNsGroup;
+    @FXML
+    private Label helpUriNcGroup;
+    @FXML
+    private Label helpValidateGroup;
 
     private static Preferences prefs;
     private ArrayList<String> packages;
@@ -149,6 +180,70 @@ public class RDFStoSHACLController implements Initializable {
         fPrefixSHACLCommon.setText("cc");
         fURISHACLcommon.setText("https://common-constraints.eu/");
 
+        initializeHelpTooltips();
+    }
+
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpDatatypeMap,
+                "During the conversion process a datatype mapping can be generated.\n\n" +
+                "• No map; No save: Skip datatype map generation entirely\n" +
+                "• All profiles in one map: Generates a single map file covering all loaded profiles\n" +
+                "• Per profile: Prompts for a save location after each profile's shapes are created\n\n" +
+                "The datatype map can later be used to validate instance data against Shape graphs.");
+        GUIhelper.installHelpTooltip(helpProfileVersion,
+                "The CGMES/CIM version of the loaded RDFS profiles.\n\n" +
+                "This selection affects how namespaces, datatypes and profile relationships are resolved during SHACL generation. " +
+                "Choose the version that matches the standard the profiles were created for.");
+        GUIhelper.installHelpTooltip(helpShapesNamespace,
+                "The namespace prefix and URI for the generated SHACL shapes graph.\n\n" +
+                "• Apply default namespace: Uses the namespace from Preferences\n" +
+                "• Prefix: Short alias used in Turtle output (e.g. 'cim-sh')\n" +
+                "• URI: Full namespace URI the prefix expands to");
+        GUIhelper.installHelpTooltip(helpShapesBaseUri,
+                "The base URI (IRI) of the generated SHACL shapes graph.\n\n" +
+                "• Apply default base URI: Uses the base URI from Preferences\n" +
+                "• Otherwise: Enter the graph IRI directly in the text field");
+        GUIhelper.installHelpTooltip(helpOwlImports,
+                "Comma-separated list of URIs to include as owl:imports in the generated shapes graph header.\n\n" +
+                "Use this to declare that the shapes graph imports one or more other ontologies or shape libraries.");
+        GUIhelper.installHelpTooltip(helpRdfsFormat,
+                "The syntax format/version of the loaded RDFS profiles.\n\n" +
+                "• RDFS (augmented, v2020): Current CimSyntaxGen augmented format\n" +
+                "• RDFS (augmented, v2019): Older CimSyntaxGen format\n" +
+                "• Merged OWL CIMTool: Not yet supported");
+        GUIhelper.installHelpTooltip(helpAbstractGroup,
+                "Shape generation scope options:\n\n" +
+                "• Generate shapes for local properties only: Does NOT trace inheritance — generates property shapes only for properties directly defined on each class, not inherited ones\n" +
+                "• Export inheritance tree: Adds the class hierarchy structure to the SHACL output");
+        GUIhelper.installHelpTooltip(helpShInGroup,
+                "Association value type constraint strategy:\n\n" +
+                "• Use sh:in: When an association allows multiple value types, generates sh:in with a list of all allowed classes\n" +
+                "• Use sh:class when single: If only one value type is allowed, uses the simpler sh:class instead of sh:in");
+        GUIhelper.installHelpTooltip(helpDescrGroup,
+                "When checked, omits the IdentifiedObject.mRID property constraint for classes with the CIM 'Description' stereotype.\n\n" +
+                "These classes are not individually identifiable, so an mRID constraint is not applicable.");
+        GUIhelper.installHelpTooltip(helpBaseProfilesGroup,
+                "Cross-profile value type resolution:\n\n" +
+                "• Consider related profiles: When an association's target class is defined in another loaded profile, uses that profile's shapes for the value type constraint\n" +
+                "• Ignore namespace if class not found: Falls back to matching by class local name only when the full namespace URI match fails in the related profile");
+        GUIhelper.installHelpTooltip(helpConstraintsGroup,
+                "Additional constraint types:\n\n" +
+                "• Create inverse multiplicity constraints: Generates sh:minCount/sh:maxCount for the inverse end of bidirectional associations\n" +
+                "• Create additional property constraints: Generates closed-world constraints that flag any properties on an instance that are not defined in the profile");
+        GUIhelper.installHelpTooltip(helpCountNsGroup,
+                "Counting and namespace options:\n\n" +
+                "• Create sh:Info count constraints: Generates informational shapes that report the count of instances of each class — useful for statistics\n" +
+                "• Namespace type: How the shared common namespace is applied to count shapes\n" +
+                "  - Profile namespace: Uses the profile's own namespace\n" +
+                "  - Custom namespace: Uses the prefix and URI specified in the fields to the right");
+        GUIhelper.installHelpTooltip(helpUriNcGroup,
+                "Special datatype and reference options:\n\n" +
+                "• Treat URI datatype as rdf:resource: Maps properties typed as 'URI' to rdf:resource references rather than xsd:anyURI typed literals\n" +
+                "• Skip nc:PropertyReference checks: Suppresses value type constraints for associations whose target is nc:PropertyReference");
+        GUIhelper.installHelpTooltip(helpValidateGroup,
+                "Output validation and splitting:\n\n" +
+                "• Validate generated SHACL shapes: Runs SHACL-on-SHACL validation on the output to verify the shapes are themselves conformant\n" +
+                "• Generate separate datatypes shapes: Creates an additional output file containing only the datatype validation shapes, separate from the structural shapes");
     }
 
     public void setMainController(MainController mainController) {
@@ -196,6 +291,76 @@ public class RDFStoSHACLController implements Initializable {
             fPrefixCreateCompleteSMTab.setDisable(false);
             fURICreateCompleteSMTab.setDisable(false);
         }
+    }
+
+    @FXML
+    private void actionBtnResetRDFStoSHACL() {
+        treeViewProfileConstraints.setRoot(null);
+        treeViewProfileConstraints.setDisable(true);
+        RDFSmodelsNames = null;
+        RDFSmodels = null;
+        selectedFile = null;
+
+        fselectDatatypeMapDefineConstraints.getSelectionModel().selectFirst();
+        fselectDatatypeMapDefineConstraints.setDisable(true);
+        cbProfilesVersionCreateCompleteSMTab.getSelectionModel().clearSelection();
+        cbProfilesVersionCreateCompleteSMTab.setDisable(true);
+
+        cbApplyDefNsDesignTab.setSelected(false);
+        cbApplyDefNsDesignTab.setDisable(true);
+        fPrefixCreateCompleteSMTab.clear();
+        fPrefixCreateCompleteSMTab.setDisable(false);
+        fURICreateCompleteSMTab.clear();
+        fURICreateCompleteSMTab.setDisable(false);
+
+        cbApplyDefBaseURIDesignTab.setSelected(false);
+        cbApplyDefBaseURIDesignTab.setDisable(true);
+        fshapesBaseURICreateCompleteSMTab.clear();
+        fshapesBaseURICreateCompleteSMTab.setDisable(false);
+
+        fowlImportsCreateCompleteSMTab.clear();
+        fcbRDFSformatShapes.getSelectionModel().selectFirst();
+
+        cbRDFSSHACLabstract.setSelected(false);
+        cbRDFSSHACLabstract.setDisable(true);
+        cbRDFSSHACLinheritTree.setSelected(false);
+        cbRDFSSHACLinheritTree.setDisable(true);
+        cbRDFSSHACLoption1.setSelected(true);
+        cbRDFSSHACLoption1.setDisable(true);
+        cbRDFSSHACLoptionTypeWithOne.setSelected(true);
+        cbRDFSSHACLoptionTypeWithOne.setDisable(true);
+        cbRDFSSHACLoptionDescr.setSelected(true);
+        cbRDFSSHACLoptionDescr.setDisable(true);
+        cbRDFSSHACLoptionBaseprofiles.setSelected(true);
+        cbRDFSSHACLoptionBaseprofiles.setDisable(true);
+        cbRDFSSHACLoptionBaseprofilesIgnoreNS.setSelected(false);
+        cbRDFSSHACLoptionBaseprofilesIgnoreNS.setDisable(true);
+        cbRDFSSHACLoptionBaseprofiles2nd.setSelected(false);
+        cbRDFSSHACLoptionBaseprofiles2nd.setDisable(true);
+        cbRDFSSHACLoptionBaseprofiles3rd.setSelected(false);
+        cbRDFSSHACLoptionBaseprofiles3rd.setDisable(true);
+        cbRDFSSHACLoptionInverse.setSelected(true);
+        cbRDFSSHACLoptionInverse.setDisable(true);
+        cbRDFSSHACLoptionProperty.setSelected(true);
+        cbRDFSSHACLoptionProperty.setDisable(true);
+        cbRDFSSHACLoptionCount.setSelected(true);
+        cbRDFSSHACLoptionCount.setDisable(true);
+        cbRDFSSHACLuri.setSelected(true);
+        cbRDFSSHACLuri.setDisable(true);
+        cbRDFSSHACLncProp.setSelected(true);
+        cbRDFSSHACLncProp.setDisable(true);
+        cbRDFSSHACLvalidate.setSelected(true);
+        cbRDFSSHACLvalidate.setDisable(true);
+        cbRDFSSHACLdatatypesplit.setSelected(false);
+        cbRDFSSHACLdatatypesplit.setDisable(true);
+
+        shaclNSCommonType.getSelectionModel().selectLast();
+        shaclNSCommonType.setDisable(true);
+        fPrefixSHACLCommon.setText("cc");
+        fURISHACLcommon.setText("https://common-constraints.eu/");
+
+        btnConstructShacl.setDisable(true);
+        btnApply.setDisable(true);
     }
 
     @FXML

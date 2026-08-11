@@ -31,7 +31,7 @@
                             <Font size="14.0"/>
                         </font>
                     </Label>
-
+                    <Label fx:id="helpUseMethod" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
                     <ChoiceBox fx:id="fcbGenMethodOptions" minWidth="400.0"/>
                 </HBox>
             </HBox>
@@ -59,7 +59,10 @@
                                     <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
                                 </padding>
 
-                                <Label text="Loaded RDFS files"/>
+                                <HBox alignment="CENTER_LEFT" spacing="5.0">
+                                    <Label text="Loaded RDFS files"/>
+                                    <Label fx:id="helpLoadRdfs" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                                </HBox>
 
                                 <ListView fx:id="ls_geni_rdfs"
                                           VBox.vgrow="ALWAYS"/>
@@ -76,7 +79,10 @@
                                     <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
                                 </padding>
 
-                                <Label text="Loaded Instance files"/>
+                                <HBox alignment="CENTER_LEFT" spacing="5.0">
+                                    <Label text="Loaded Instance files"/>
+                                    <Label fx:id="helpLoadInstances" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                                </HBox>
 
                                 <ListView fx:id="ls_geni_instances"
                                           VBox.vgrow="ALWAYS"/>
@@ -98,6 +104,7 @@
                                           mnemonicParsing="false"
                                           nodeOrientation="RIGHT_TO_LEFT"
                                           text="Hide empty sheets"/>
+                                <Label fx:id="helpHideEmptySheets" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
 
                                 <Label fx:id="label_geninfo"
                                        alignment="CENTER_RIGHT"
@@ -143,6 +150,7 @@
                                 </VBox.margin>
 
                                 <Label text="XLS template:" wrapText="true"/>
+                                <Label fx:id="helpXlsTemplate" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
 
                                 <TextField fx:id="fsXlsTemplatePath"
                                            editable="false"
@@ -162,6 +170,7 @@
                                        prefHeight="17.0"
                                        prefWidth="89.0"
                                        text="Sorting options:"/>
+                                <Label fx:id="helpSortingOptions" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
 
                                 <CheckBox fx:id="fcbSortRDFGen"
                                           minWidth="150.0"
@@ -189,12 +198,14 @@
                                           mnemonicParsing="false"
                                           selected="true"
                                           text="Strip declaration of unused prefixes"/>
+                                <Label fx:id="helpStripPrefixes" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
 
                                 <CheckBox fx:id="fcbExportExtensionsGen"
                                           minWidth="150.0"
                                           mnemonicParsing="false"
                                           selected="true"
                                           text="Export extensions (identified extensions in the template)"/>
+                                <Label fx:id="helpExportExtensions" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
                             </HBox>
 
                             <HBox alignment="CENTER_RIGHT" spacing="10.0">

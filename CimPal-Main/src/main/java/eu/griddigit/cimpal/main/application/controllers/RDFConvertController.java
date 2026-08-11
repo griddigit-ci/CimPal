@@ -3,6 +3,7 @@ package eu.griddigit.cimpal.main.application.controllers;
 import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -82,9 +83,28 @@ public class RDFConvertController implements Initializable {
     private CheckBox fcbRDFconvertFixPackage;
     @FXML
     private Button fbtnRunRDFConvert;
+    @FXML
+    private Label helpSource;
+    @FXML
+    private Label helpOperationsOptions;
+    @FXML
+    private Label helpMainRdf;
+    @FXML
+    private Label helpDeviationRdf;
+    @FXML
+    private Label helpExtendedRdf;
+    @FXML
+    private Label helpSourceType;
+    @FXML
+    private Label helpTargetFormat;
+    @FXML
+    private Label helpXmlBase;
+    @FXML
+    private Label helpSortingOptions;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        initializeHelpTooltips();
         mainRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
         deviationRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
         extRdfBox.disableProperty().bind(fcbRDFconvertModelUnionDetailed.selectedProperty().not());
@@ -134,6 +154,18 @@ public class RDFConvertController implements Initializable {
 
         rdfConvertModelUnionDetailedFiles = new LinkedList<>();
         rdfConvertFileList = new LinkedList<>();
+    }
+
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpSource, "Input RDF file or folder containing RDF files to convert. Multiple files in a folder are processed together.");
+        GUIhelper.installHelpTooltip(helpOperationsOptions, "Processing operations to apply to the source:\n\n• Union model: Merges all input files into a single model\n• Union model detailed: Union with provenance info\n• Fix RDFS Package Assignment: Corrects package assignments in RDFS files\n• Process only inheritance: Limits processing to class hierarchy properties\n• Generate inheritance list: Outputs the inheritance tree as Turtle\n• Inherited members - concrete only: Limits inheritance list to non-abstract classes\n• Add OWL: Adds OWL ontology declarations to output");
+        GUIhelper.installHelpTooltip(helpMainRdf, "Primary RDF file for operations that require a reference model (e.g. deviation comparison).");
+        GUIhelper.installHelpTooltip(helpDeviationRdf, "Secondary RDF file representing deviations or differences from the main model.");
+        GUIhelper.installHelpTooltip(helpExtendedRdf, "Additional RDF file with extension data to include in processing.");
+        GUIhelper.installHelpTooltip(helpSourceType, "Check if the source follows CGMES/IEC 61970-552 instance data serialisation rules. This affects how the parser interprets the RDF structure.");
+        GUIhelper.installHelpTooltip(helpTargetFormat, "The output serialisation format (e.g. RDF/XML, Turtle, N-Triples). Some output options (XML declaration, tab size, etc.) are only available for certain formats.");
+        GUIhelper.installHelpTooltip(helpXmlBase, "The XML base URI embedded in the serialised output. Relative URIs in the output will be resolved against this base. Used when writing RDF/XML.");
+        GUIhelper.installHelpTooltip(helpSortingOptions, "Controls how output triples/subjects are ordered in the serialised file. Sorting alphabetically produces deterministic, diff-friendly output.");
     }
 
     public void setMainController(MainController mainController) {

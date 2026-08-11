@@ -19,6 +19,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -52,9 +53,20 @@ public class RDFComparisonController implements Initializable {
     private TextField fPrefixRDFCompare;
     @FXML
     public Button btnResetRDFComp;
+    @FXML
+    private Label helpRdfFileA;
+    @FXML
+    private Label helpRdfFileB;
+    @FXML
+    private Label helpScopeFormat;
+    @FXML
+    private Label helpSameCimNS;
+    @FXML
+    private Label helpProfileNS;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        initializeHelpTooltips();
         fcbRDFSformat.getItems().addAll(
                 "RDFS (augmented) by CimSyntaxGen",
                 "RDFS (augmented) by CimSyntaxGen with CIMTool",
@@ -311,5 +323,18 @@ public class RDFComparisonController implements Initializable {
             setProgressBar(1);
             alert.showAndWait();
         }
+    }
+
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpRdfFileA,
+                "First RDF model file to compare. Supports RDF/XML (.xml, .rdf), Turtle (.ttl), or ZIP archives containing model files.");
+        GUIhelper.installHelpTooltip(helpRdfFileB,
+                "Second RDF model file to compare against Model A.");
+        GUIhelper.installHelpTooltip(helpScopeFormat,
+                "The version/format of the RDFS profile that describes the models being compared.\n\nChoose the profile version that matches your input files.");
+        GUIhelper.installHelpTooltip(helpSameCimNS,
+                "When checked, treats both models as using the same CIM base namespace even if their actual namespace URIs differ slightly (e.g. different version suffixes).");
+        GUIhelper.installHelpTooltip(helpProfileNS,
+                "When checked, ignores differences in the profile/ontology namespace URI and normalises comparisons using the specified prefix.");
     }
 }

@@ -9,6 +9,7 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TreeView;
@@ -37,10 +38,22 @@ public class SHACLTesterController implements Initializable {
     private TreeView<String> treeViewShaclFiles;
     @FXML
     private CheckBox cbExportReports;
+    @FXML
+    private Label helpShaclFiles;
+    @FXML
+    private Label helpModelsFolder;
+    @FXML
+    private Label helpExportReports;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        initializeHelpTooltips();
+    }
 
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpShaclFiles, "SHACL constraint files (.ttl) used to validate the test models. Multiple files can be selected and combined.");
+        GUIhelper.installHelpTooltip(helpModelsFolder, "Root folder containing CGMES instance data models to validate (XML or ZIP files). All models found recursively will be tested against the SHACL files.");
+        GUIhelper.installHelpTooltip(helpExportReports, "When checked, saves a SHACL validation report file alongside each tested model in the models folder.");
     }
 
     public void setMainController(MainController mainController) {

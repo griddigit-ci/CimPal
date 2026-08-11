@@ -2,11 +2,13 @@ package eu.griddigit.cimpal.main.application.controllers;
 
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.core.ShaclTools;
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.util.ExcelTools;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 
 import java.io.File;
@@ -36,10 +38,19 @@ public class SHACLOrganizerController implements Initializable {
     private TextField fPathShaclFilesToOrganize;
     @FXML
     private TextField fPathXLSfileForShacl;
+    @FXML
+    private Label helpShaclFiles;
+    @FXML
+    private Label helpExcelTemplate;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        initializeHelpTooltips();
+    }
 
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpShaclFiles, "Input SHACL shape files (.ttl) to be organised and documented using the Excel template.");
+        GUIhelper.installHelpTooltip(helpExcelTemplate, "Excel template (.xlsx) that defines the structure and documentation format for organising the SHACL shapes. Produced by the SHACL tester or manually created.");
     }
 
     public void setMainController(MainController mainController) {

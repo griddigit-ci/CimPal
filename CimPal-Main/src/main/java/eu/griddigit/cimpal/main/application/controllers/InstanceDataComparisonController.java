@@ -76,10 +76,27 @@ public class InstanceDataComparisonController implements Initializable {
     private Button btnRunIDcompare;
     @FXML
     private Button btnResetIDComp;
+    @FXML
+    private Label helpFileA;
+    @FXML
+    private Label helpFileB;
+    @FXML
+    private Label helpProfileVersion;
+    @FXML
+    private Label helpBaseNs;
+    @FXML
+    private Label helpDatatypeMap;
+    @FXML
+    private Label helpIgnoreNonPersistent;
+    @FXML
+    private Label helpSvOptions;
+    @FXML
+    private Label helpOutputOptions;
 
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        initializeHelpTooltips();
         fcbIDformat.getItems().addAll(
                 "IEC 61970-600-1&2 (CGMES 3.0.0)",
                 "IEC 61970-45x (CIM17)",
@@ -100,6 +117,17 @@ public class InstanceDataComparisonController implements Initializable {
 
         //Adding action to the choice box
         fcbIDmap.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBIDmap());
+    }
+
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpFileA, "First CGMES instance data file to compare. Accepts XML profile files or ZIP archives containing multiple profile XMLs.");
+        GUIhelper.installHelpTooltip(helpFileB, "Second CGMES instance data file to compare against File A.");
+        GUIhelper.installHelpTooltip(helpProfileVersion, "CGMES version of the instance data. Determines which CIM namespaces are expected in the files.");
+        GUIhelper.installHelpTooltip(helpBaseNs, "The base XML namespace for the instance data. Automatically detected when files are loaded.");
+        GUIhelper.installHelpTooltip(helpDatatypeMap, "Datatype mapping used to validate property values during comparison. Select a built-in map or browse for a custom one.");
+        GUIhelper.installHelpTooltip(helpIgnoreNonPersistent, "Exclude non-persistent classes from the comparison:\n\n• TP: Topology profile classes (busbar sections, etc.)\n• SV: State Variables classes (voltages, flows, etc.)\n• DL: Diagram Layout classes");
+        GUIhelper.installHelpTooltip(helpSvOptions, "Options for State Variables comparison:\n\n• Compare only SV profile: Restricts comparison to State Variables profile data only\n• Rely on ConnectivityNodes: Uses ConnectivityNodes (rather than Terminals) for topology matching\n• Compare only count: Counts instances per class instead of full comparison");
+        GUIhelper.installHelpTooltip(helpOutputOptions, "Output content options:\n\n• Solution overview: Summary statistics across all profiles\n• Show details: Per-object differences in the result\n• Compare Diff: Show only differences (not matching objects)\n• Compare single files: Compare individual profile files rather than the assembled model");
     }
 
     public void setMainController(MainController mainController) {

@@ -50,9 +50,24 @@ public class ExcelToSHACLController implements Initializable {
     private Button btnRunExcelShape;
     @FXML
     private Button btnResetExcelShape;
+    @FXML
+    private Label helpRdfFile;
+    @FXML
+    private Label helpRdfsFormat;
+    @FXML
+    private Label helpExcelFile;
+    @FXML
+    private Label helpBaseUri;
+    @FXML
+    private Label helpPrefixNs;
+    @FXML
+    private Label helpChangesExcel;
+    @FXML
+    private Label helpTargetTtl;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        initializeHelpTooltips();
         fcbRDFSformatForExcel.getItems().addAll(
                 "RDFS (augmented) by CimSyntaxGen"
 
@@ -301,6 +316,23 @@ public class ExcelToSHACLController implements Initializable {
         fNSexcelShape.clear();
         resetProgressBar();
 
+    }
+
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpRdfFile,
+                "The RDFS ontology file (.xml, .rdf) containing CIM class and property definitions. Used as the base for generating SHACL shapes from the Excel constraints.");
+        GUIhelper.installHelpTooltip(helpRdfsFormat,
+                "The format/version of the RDFS profile (e.g. augmented CimSyntaxGen format).");
+        GUIhelper.installHelpTooltip(helpExcelFile,
+                "Excel file (.xls/.xlsx) containing SHACL constraint definitions. Each row defines a constraint derived from the RDFS model.");
+        GUIhelper.installHelpTooltip(helpBaseUri,
+                "The base URI (IRI) for the generated SHACL shapes graph. This URI is used as the graph name in the output.");
+        GUIhelper.installHelpTooltip(helpPrefixNs,
+                "The namespace prefix and URI for the generated shapes graph. The prefix is a short alias used in the Turtle output (e.g. \"sh\"), and the URI is the full namespace it expands to.");
+        GUIhelper.installHelpTooltip(helpChangesExcel,
+                "Excel file (.xls/.xlsx) containing constraint modifications to apply to an existing SHACL Turtle file. Each row specifies a change.");
+        GUIhelper.installHelpTooltip(helpTargetTtl,
+                "The existing SHACL Turtle (.ttl) file to which the changes from the Changes Excel will be applied.");
     }
 
 }
