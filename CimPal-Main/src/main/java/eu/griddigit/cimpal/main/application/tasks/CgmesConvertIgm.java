@@ -73,7 +73,8 @@ public class CgmesConvertIgm implements ITask {
                 inputFiles,
                 keepExtensions,
                 convertOnlyEq,
-                alignRegulatingControlTargets
+                alignRegulatingControlTargets,
+                wizardContext.getOutputDirectory()
         );
 
         this.status = "Conversion finished";

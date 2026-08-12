@@ -19,6 +19,7 @@ public class CgmesConvertBoundaryController {
     @FXML private CheckBox cbConvertToV3;
     @FXML private CheckBox cbSplitBoundaryRef;
     @FXML private CheckBox cbSplitPerTsoBorder;
+    @FXML private CheckBox cbKeepExtensions;
     @FXML private CheckBox saveResult;
 
     private CgmesConvertBoundary task;
@@ -34,12 +35,14 @@ public class CgmesConvertBoundaryController {
         cbConvertToV3.setSelected(task.isConvertToV3());
         cbSplitBoundaryRef.setSelected(task.isSplitBoundaryAndReference());
         cbSplitPerTsoBorder.setSelected(task.isSplitPerTsoBorder());
+        cbKeepExtensions.setSelected(task.isKeepExtensions());
         saveResult.setSelected(task.getSaveResult());
 
         // update task when user changes UI
         cbConvertToV3.selectedProperty().addListener((obs, o, n) -> task.setConvertToV3(n));
         cbSplitBoundaryRef.selectedProperty().addListener((obs, o, n) -> task.setSplitBoundaryAndReference(n));
         cbSplitPerTsoBorder.selectedProperty().addListener((obs, o, n) -> task.setSplitPerTsoBorder(n));
+        cbKeepExtensions.selectedProperty().addListener((obs, o, n) -> task.setKeepExtensions(n));
         saveResult.selectedProperty().addListener((obs, o, n) -> task.setSaveResult(n));
     }
 

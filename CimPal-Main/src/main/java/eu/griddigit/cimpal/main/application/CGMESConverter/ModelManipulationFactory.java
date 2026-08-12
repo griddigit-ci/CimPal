@@ -6,14 +6,8 @@
 
 package eu.griddigit.cimpal.main.application.CGMESConverter;
 
-import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.writer.formats.*;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.FileChooser;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
@@ -72,7 +66,7 @@ public class ModelManipulationFactory {
     }
 
     //Convert CGMES v2.4 to CGMES v3.0
-    public static void ConvertCGMESv2v3(List<Path> inputFiles, boolean keepExtensions, boolean eqOnly, boolean fixRegCont) throws IOException {
+    public static void ConvertCGMESv2v3(List<Path> inputFiles, boolean keepExtensions, boolean eqOnly, boolean fixRegCont, File outputDirectory) throws IOException {
 
 
         //Map<String, Map> loadDataMap= new HashMap<>();
@@ -104,12 +98,12 @@ public class ModelManipulationFactory {
         saveProperties.put("xmlBase", xmlBase);
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         //saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-        saveProperties.put("useFileDialog", false);
-        saveProperties.put("fileFolder", "C:");
+        saveProperties.put("useAboutRules", true);
+        saveProperties.put("useEnumRules", true);
+        saveProperties.put("useFileDialog", true);
+        saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "true");
         saveProperties.put("showXmlBaseDeclaration", "false");
 
         saveProperties.put("putHeaderOnTop", true);
@@ -118,13 +112,7 @@ public class ModelManipulationFactory {
         saveProperties.put("fileExtension", "*.xml");
         saveProperties.put("fileDialogTitle", "Save RDF XML for");
         saveProperties.put("sortRDF", "true");
-        saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-        //RDFFormat rdfFormat=RDFFormat.RDFXML;
-        //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
-        //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
-
+        saveProperties.put("sortRDFprefix", "false");
 
         //TODO to be improved what file names should be assigned. Now it takes the same names
         nameMap = new HashMap<>();
@@ -1131,17 +1119,11 @@ public class ModelManipulationFactory {
     }
 
     //Split boundary per TSO border
-    public static void SplitBoundaryPerBorder() throws IOException {
+    public static void SplitBoundaryPerBorder(List<Path> boundaryFiles, File outputDirectory) throws IOException {
 
-
-        Map<String, Map> loadDataMap = new HashMap<>();
         String xmlBase = "http://iec.ch/TC57/CIM100";
-        //String xmlBase = "";
-
-        //set properties for the export
 
         Map<String, Object> saveProperties = new HashMap<>();
-
         saveProperties.put("filename", "test");
         saveProperties.put("showXmlDeclaration", "true");
         saveProperties.put("showDoctypeDeclaration", "false");
@@ -1150,76 +1132,32 @@ public class ModelManipulationFactory {
         saveProperties.put("showXmlEncoding", "true");
         saveProperties.put("xmlBase", xmlBase);
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-        //saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-        saveProperties.put("useFileDialog", false);
-        saveProperties.put("fileFolder", "C:");
+        saveProperties.put("useAboutRules", true);
+        saveProperties.put("useEnumRules", true);
+        saveProperties.put("useFileDialog", true);
+        saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "true");
         saveProperties.put("showXmlBaseDeclaration", "false");
-
         saveProperties.put("putHeaderOnTop", true);
         saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
         saveProperties.put("extensionName", "RDF XML");
         saveProperties.put("fileExtension", "*.xml");
         saveProperties.put("fileDialogTitle", "Save RDF XML for");
         saveProperties.put("sortRDF", "true");
-        saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-        //RDFFormat rdfFormat=RDFFormat.RDFXML;
-        //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
-        //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
+        saveProperties.put("sortRDFprefix", "false");
 
+        nameMap = new HashMap<>();
+        List<File> baseInstanceModelFiles = boundaryFiles.stream().map(Path::toFile).toList();
+        Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(baseInstanceModelFiles, xmlBase, null);
 
-        Map<String, ArrayList<Object>> profileDataMap = new HashMap<>();
-        Map<String, Model> profileDataMapAsModel = new HashMap<>();
-
-        // load all profile models
-        Map<String, Model> profileModelMap = null;
-
-
-        loadDataMap.put("profileDataMap", profileDataMap);
-        loadDataMap.put("profileDataMapAsModel", profileDataMapAsModel);
-        loadDataMap.put("profileModelMap", profileModelMap);
-
-        // load base instance models
-        FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Boundary equipment", "*.xml"));
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
-        File file;
-
-        try {
-            file = filechooser.showOpenDialog(null);
-        } catch (Exception k) {
-            filechooser.setInitialDirectory(new File("C:\\\\"));
-            file = filechooser.showOpenDialog(null);
-        }
-        List<File> baseInstanceModelFiles = new LinkedList<>();
-        if (file != null) {// the file is selected
-
-            baseInstanceModelFiles.add(file);
-
-            Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(baseInstanceModelFiles, xmlBase, null);
-            loadDataMap.put("baseInstanceModelMap", baseInstanceModelMap);
-
-        }
-        Map<String, Model> instanceModelMap = loadDataMap.get("baseInstanceModelMap");
-        Model instanceModelBD = null;
-        //Model instanceModelBD = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-        for (Map.Entry<String, Model> entry : instanceModelMap.entrySet()) {
-            if (!entry.getKey().equals("unionModel") && !entry.getKey().equals("modelUnionWithoutHeader")) {
-                if (entry.getKey().equals("EQBD")) {
-                    instanceModelBD = entry.getValue();
-                }
-            }
-
+        Model instanceModelBD = baseInstanceModelMap.get("EQBD");
+        if (instanceModelBD == null) {
+            throw new IOException("No boundary dataset (EQBD) file found among the selected files.");
         }
 
         Map<String, Model> newBDModelMap = new HashMap<>();
 
-        assert instanceModelBD != null;
         for (ResIterator i = instanceModelBD.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/CIM100-European#BoundaryPoint")); i.hasNext(); ) {
             Resource resItem = i.next();
             String fromTSOname = instanceModelBD.getRequiredProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/CIM100-European#BoundaryPoint.fromEndNameTso")).getObject().toString();
@@ -1261,17 +1199,11 @@ public class ModelManipulationFactory {
     }
 
     //Split Boundary and Reference data (CGMES v3.0)
-    public static void SplitBoundaryAndRefData() throws IOException {
+    public static void SplitBoundaryAndRefData(List<Path> boundaryFiles, File outputDirectory, boolean keepExtensions) throws IOException {
 
-
-        Map<String, Map> loadDataMap = new HashMap<>();
         String xmlBase = "http://iec.ch/TC57/CIM100";
-        //String xmlBase = "";
-
-        //set properties for the export
 
         Map<String, Object> saveProperties = new HashMap<>();
-
         saveProperties.put("filename", "test");
         saveProperties.put("showXmlDeclaration", "true");
         saveProperties.put("showDoctypeDeclaration", "false");
@@ -1280,71 +1212,28 @@ public class ModelManipulationFactory {
         saveProperties.put("showXmlEncoding", "true");
         saveProperties.put("xmlBase", xmlBase);
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-        //saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-        saveProperties.put("useFileDialog", false);
-        saveProperties.put("fileFolder", "C:");
+        saveProperties.put("useAboutRules", true);
+        saveProperties.put("useEnumRules", true);
+        saveProperties.put("useFileDialog", true);
+        saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "true");
         saveProperties.put("showXmlBaseDeclaration", "false");
-
         saveProperties.put("putHeaderOnTop", true);
         saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
         saveProperties.put("extensionName", "RDF XML");
         saveProperties.put("fileExtension", "*.xml");
         saveProperties.put("fileDialogTitle", "Save RDF XML for");
         saveProperties.put("sortRDF", "true");
-        saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-        //RDFFormat rdfFormat=RDFFormat.RDFXML;
-        //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
-        //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
+        saveProperties.put("sortRDFprefix", "false");
 
+        nameMap = new HashMap<>();
+        List<File> baseInstanceModelFiles = boundaryFiles.stream().map(Path::toFile).toList();
+        Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(baseInstanceModelFiles, xmlBase, null);
 
-        Map<String, ArrayList<Object>> profileDataMap = new HashMap<>();
-        Map<String, Model> profileDataMapAsModel = new HashMap<>();
-
-        // load all profile models
-        Map<String, Model> profileModelMap = null;
-
-
-        loadDataMap.put("profileDataMap", profileDataMap);
-        loadDataMap.put("profileDataMapAsModel", profileDataMapAsModel);
-        loadDataMap.put("profileModelMap", profileModelMap);
-
-        // load base instance models
-        FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Boundary equipment", "*.xml"));
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
-        File file;
-
-        try {
-            file = filechooser.showOpenDialog(null);
-        } catch (Exception k) {
-            filechooser.setInitialDirectory(new File("C:\\\\"));
-            file = filechooser.showOpenDialog(null);
-        }
-        List<File> baseInstanceModelFiles = new LinkedList<>();
-        if (file != null) {// the file is selected
-
-            baseInstanceModelFiles.add(file);
-
-            Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(baseInstanceModelFiles, xmlBase, null);
-            loadDataMap.put("baseInstanceModelMap", baseInstanceModelMap);
-
-        }
-        Map<String, Model> instanceModelMap = loadDataMap.get("baseInstanceModelMap");
-        Model instanceModelBD = null;
-        //Model instanceModelBD = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-        for (Map.Entry<String, Model> entry : instanceModelMap.entrySet()) {
-            if (!entry.getKey().equals("unionModel") && !entry.getKey().equals("modelUnionWithoutHeader")) {
-                if (entry.getKey().equals("EQBD")) {
-                    instanceModelBD = entry.getValue();
-                }
-            }
-
+        Model instanceModelBD = baseInstanceModelMap.get("EQBD");
+        if (instanceModelBD == null) {
+            throw new IOException("No boundary dataset (EQBD) file found among the selected files.");
         }
 
         List<String> keepInBD = new LinkedList<>();
@@ -1360,47 +1249,27 @@ public class ModelManipulationFactory {
 
         Map<String, Model> newBDModelMap = new HashMap<>();
 
-        //create the new model for BP
         Model newBoderModel = ModelFactory.createDefaultModel();
         newBoderModel.setNsPrefix("cim", "http://iec.ch/TC57/CIM100#");
         newBoderModel.setNsPrefix("eu", "http://iec.ch/TC57/CIM100-European#");
         newBoderModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
         newBoderModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 
-        //create the new model for ref data
         Model newRefModel = ModelFactory.createDefaultModel();
         newRefModel.setNsPrefix("cim", "http://iec.ch/TC57/CIM100#");
         newRefModel.setNsPrefix("eu", "http://iec.ch/TC57/CIM100-European#");
         newRefModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
         newRefModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 
-        assert instanceModelBD != null;
         Map<String, String> oldPrefix = instanceModelBD.getNsPrefixMap();
-        int keepExtensions = 1; // keep extensions
-        if (oldPrefix.containsKey("cgmbp")) {
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setContentText("The Boundary Set includes non CIM (cgmbp) extensions. Do you want to keep them in the split Boundary Set?");
-            alert.setHeaderText(null);
-            alert.setTitle("Question - cgmbp extensions are present");
-            ButtonType btnYes = new ButtonType("Yes");
-            ButtonType btnNo = new ButtonType("No", ButtonBar.ButtonData.CANCEL_CLOSE);
-            alert.getButtonTypes().setAll(btnYes, btnNo);
-            Optional<ButtonType> result = alert.showAndWait();
-
-            if (result.get() == btnNo) {
-                keepExtensions = 0;
-            } else {
-                if (oldPrefix.containsKey("cgmbp")) {
-                    newBoderModel.setNsPrefix("cgmbp", "http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
-                    newRefModel.setNsPrefix("cgmbp", "http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
-                }
-            }
+        if (keepExtensions && oldPrefix.containsKey("cgmbp")) {
+            newBoderModel.setNsPrefix("cgmbp", "http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
+            newRefModel.setNsPrefix("cgmbp", "http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
         }
-
 
         for (StmtIterator i = instanceModelBD.listStatements(null, RDF.type, (RDFNode) null); i.hasNext(); ) {
             Statement stmt = i.next();
-            if (keepExtensions == 1) {
+            if (keepExtensions) {
                 if (keepInBD.contains(stmt.getObject().asResource().getLocalName())) {
                     for (StmtIterator k = instanceModelBD.listStatements(stmt.getSubject(), null, (RDFNode) null); k.hasNext(); ) {
                         Statement stmtKeep = k.next();
@@ -1439,26 +1308,18 @@ public class ModelManipulationFactory {
             }
         }
 
-
         newBDModelMap.put("BoundaryData.xml", newBoderModel);
         newBDModelMap.put("ReferenceData.xml", newRefModel);
-        //save the borders
         saveInstanceModelData(newBDModelMap, saveProperties, "CGMESv3.0");
 
     }
 
     // Convert CGMES v2.4 Boundary Set to CGMES v3.0
-    public static void ConvertBoundarySetCGMESv2v3() throws IOException {
+    public static void ConvertBoundarySetCGMESv2v3(List<Path> boundaryFiles, File outputDirectory, boolean keepExtensions) throws IOException {
 
-
-        Map<String, Map> loadDataMap = new HashMap<>();
         String xmlBase = "http://iec.ch/TC57/CIM100";
-        //String xmlBase = "";
-
-        //set properties for the export
 
         Map<String, Object> saveProperties = new HashMap<>();
-
         saveProperties.put("filename", "test");
         saveProperties.put("showXmlDeclaration", "true");
         saveProperties.put("showDoctypeDeclaration", "false");
@@ -1467,108 +1328,41 @@ public class ModelManipulationFactory {
         saveProperties.put("showXmlEncoding", "true");
         saveProperties.put("xmlBase", xmlBase);
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-        //saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-        saveProperties.put("useFileDialog", false);
-        saveProperties.put("fileFolder", "C:");
+        saveProperties.put("useAboutRules", true);
+        saveProperties.put("useEnumRules", true);
+        saveProperties.put("useFileDialog", true);
+        saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
+        saveProperties.put("instanceData", "true");
         saveProperties.put("showXmlBaseDeclaration", "false");
-
         saveProperties.put("putHeaderOnTop", true);
         saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
         saveProperties.put("extensionName", "RDF XML");
         saveProperties.put("fileExtension", "*.xml");
         saveProperties.put("fileDialogTitle", "Save RDF XML for");
         saveProperties.put("sortRDF", "true");
-        saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-        //RDFFormat rdfFormat=RDFFormat.RDFXML;
-        //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
-        //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-        //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
+        saveProperties.put("sortRDFprefix", "false");
 
+        nameMap = new HashMap<>();
+        List<File> baseInstanceModelFiles = boundaryFiles.stream().map(Path::toFile).toList();
+        Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(baseInstanceModelFiles, xmlBase, null);
 
-        Map<String, ArrayList<Object>> profileDataMap = new HashMap<>();
-        Map<String, Model> profileDataMapAsModel = new HashMap<>();
-        //Map<String,Model> conversionInstruction=new HashMap<>();
-
-        // load all profile models
-        Map<String, Model> profileModelMap = null;
-
-
-        loadDataMap.put("profileDataMap", profileDataMap);
-        loadDataMap.put("profileDataMapAsModel", profileDataMapAsModel);
-        loadDataMap.put("profileModelMap", profileModelMap);
-        loadDataMap.put("conversionInstruction", profileModelMap);
-
-
-        //xmlBase = "http://iec.ch/TC57/2013/CIM-schema-cim16";
-        // load base instance models
-        FileChooser filechooser = new FileChooser();
-        filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Boundary equipment", "*.xml"));
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
-        File file;
-
-        try {
-            file = filechooser.showOpenDialog(null);
-        } catch (Exception k) {
-            filechooser.setInitialDirectory(new File("C:\\\\"));
-            file = filechooser.showOpenDialog(null);
-        }
-        List<File> baseInstanceModelFiles = new LinkedList<>();
-        if (file != null) {// the file is selected
-
-            baseInstanceModelFiles.add(file);
-
-            Map<String, Model> baseInstanceModelMap = InstanceDataFactory.modelLoad(baseInstanceModelFiles, xmlBase, null);
-            loadDataMap.put("baseInstanceModelMap", baseInstanceModelMap);
-
-        }
-        Map<String, Model> instanceModelMap = loadDataMap.get("baseInstanceModelMap");
-        Model instanceModelBD = null;
-        //Model instanceModelBD = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-        for (Map.Entry<String, Model> entry : instanceModelMap.entrySet()) {
-            if (!entry.getKey().equals("unionModel") && !entry.getKey().equals("modelUnionWithoutHeader")) {
-                if (entry.getKey().equals("EQBD")) {
-                    instanceModelBD = entry.getValue();
-                }
-            }
-
+        Model instanceModelBD = baseInstanceModelMap.get("EQBD");
+        if (instanceModelBD == null) {
+            throw new IOException("No boundary dataset (EQBD) file found among the selected files.");
         }
 
         Map<String, Model> newBDModelMap = new HashMap<>();
 
-        //create the new model
         Model newBoderModel = ModelFactory.createDefaultModel();
         newBoderModel.setNsPrefix("cim", "http://iec.ch/TC57/CIM100#");
         newBoderModel.setNsPrefix("eu", "http://iec.ch/TC57/CIM100-European#");
         newBoderModel.setNsPrefix("md", "http://iec.ch/TC57/61970-552/ModelDescription/1#");
         newBoderModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 
-        //check for extensions
-
-        assert instanceModelBD != null;
         Map<String, String> oldPrefix = instanceModelBD.getNsPrefixMap();
-        int keepExtensions = 1; // keep extensions
-        if (oldPrefix.containsKey("cgmbp")) {
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setContentText("The Boundary Set includes non CIM (cgmbp) extensions. Do you want to keep them in the converted Boundary Set?");
-            alert.setHeaderText(null);
-            alert.setTitle("Question - cgmbp extensions are present");
-            ButtonType btnYes = new ButtonType("Yes");
-            ButtonType btnNo = new ButtonType("No", ButtonBar.ButtonData.CANCEL_CLOSE);
-            alert.getButtonTypes().setAll(btnYes, btnNo);
-            Optional<ButtonType> result = alert.showAndWait();
-
-            if (result.get() == btnNo) {
-                keepExtensions = 0;
-            } else {
-                if (oldPrefix.containsKey("cgmbp")) {
-                    newBoderModel.setNsPrefix("cgmbp", "http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
-                }
-            }
+        if (keepExtensions && oldPrefix.containsKey("cgmbp")) {
+            newBoderModel.setNsPrefix("cgmbp", "http://entsoe.eu/CIM/Extensions/CGM-BP/2020#");
         }
 
         //conversion process
@@ -1737,7 +1531,7 @@ public class ModelManipulationFactory {
         //filter extensions
         List<Statement> StmtDeleteList = new LinkedList<>();
         int deleteClass;
-        if (keepExtensions == 0) {
+        if (!keepExtensions) {
             for (StmtIterator i = newBoderModel.listStatements(null, RDF.type, (RDFNode) null); i.hasNext(); ) { // loop on all classes
                 Statement stmt = i.next();
                 deleteClass = 0;
@@ -1938,23 +1732,6 @@ public class ModelManipulationFactory {
     //Save data
     public static void saveInstanceModelData(Map<String, Model> instanceDataModelMap, Map<String, Object> saveProperties, String cgmesVersion) throws IOException {
 
-        boolean useFileDialog = (boolean) saveProperties.get("useFileDialog");
-        if (!useFileDialog) {
-            DirectoryChooser folderchooser = new DirectoryChooser();
-            folderchooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
-            File file;
-
-            try {
-                file = folderchooser.showDialog(null);
-            } catch (Exception k) {
-                folderchooser.setInitialDirectory(new File("C:\\\\"));
-                file = folderchooser.showDialog(null);
-            }
-            saveProperties.replace("fileFolder", file);
-        }
-
-//        HashMap<String, Set<Resource>> rdfAboutMap = LoadRDFAbout("CGMESv2.4");
-//        HashMap<String, Set<Resource>> rdfEnumMap = LoadRDFEnum("CGMESv2.4");
 
         for (Map.Entry<String, Model> entry : instanceDataModelMap.entrySet()) {
 
@@ -2020,14 +1797,10 @@ public class ModelManipulationFactory {
                 saveProperties.put("rdfEnumList", rdfEnumList);
             }
 
-            if (SelectedTask.class.getName() == "CGMES 2.4 → 3.0: Convert Boundary dataset") {
-                saveProperties.replace("filename", entry.getKey());
+            if (nameMap != null && nameMap.containsKey(entry.getKey())) {
+                saveProperties.replace("filename", nameMap.get(entry.getKey()));
             } else {
-                if (nameMap.size() != 0) {
-                    saveProperties.replace("filename", nameMap.get(entry.getKey()));
-                } else {
-                    saveProperties.replace("filename", entry.getKey());
-                }
+                saveProperties.replace("filename", entry.getKey());
             }
 
 
@@ -2063,31 +1836,8 @@ public class ModelManipulationFactory {
             TP = new File(jarDir + "/RDFSCGMESv2.4/TopologyProfileRDFSAugmented-v2_4_15-4Sep2020.rdf");
 
             if (!EQ.exists() && !FH.exists() && !EQBD.exists() && !TPBD.exists() && !SSH.exists() && !SV.exists() && !TP.exists()) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setContentText("RFS folder does not exist. Please select the folder with Select or cancel conversion.");
-                alert.setHeaderText(null);
-                alert.setTitle("Warning - RDFS folder does not exist");
-                ButtonType btnYes = new ButtonType("Select RDFS folder");
-                ButtonType btnNo = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-                alert.getButtonTypes().setAll(btnYes, btnNo);
-                Optional<ButtonType> result = alert.showAndWait();
-                if (result.get() == btnNo) {
-                    return modelFiles;
-                } else if (result.get() == btnYes) {
-                    DirectoryChooser directoryChooser = new DirectoryChooser();
-                    directoryChooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder", "")));
-                    File folder = directoryChooser.showDialog(null);
-                    String rdfsdir = folder.getAbsolutePath();
-                    EQ = new File(rdfsdir + "/EquipmentProfileCoreOperationShortCircuitRDFSAugmented-v2_4_15-4Sep2020.rdf");
-                    FH = new File(rdfsdir + "/FileHeader.rdf");
-                    EQBD = new File(rdfsdir + "/EquipmentBoundaryProfileRDFSAugmented-v2_4_15-4Sep2020.rdf");
-                    TPBD = new File(rdfsdir + "/TopologyBoundaryProfileRDFSAugmented-v2_4_15-4Sep2020.rdf");
-                    SSH = new File(rdfsdir + "/SteadyStateHypothesisProfileRDFSAugmented-v2_4_15-4Sep2020.rdf");
-                    SV = new File(rdfsdir + "/StateVariableProfileRDFSAugmented-v2_4_15-4Sep2020.rdf");
-                    TP = new File(rdfsdir + "/TopologyProfileRDFSAugmented-v2_4_15-4Sep2020.rdf");
-                }
+                throw new URISyntaxException(jarDir + "/RDFSCGMESv2.4/", "RDFS v2.4 profiles not found at expected path");
             }
-
 
             modelFiles.add(EQ);
             modelFiles.add(FH);
@@ -2396,8 +2146,8 @@ public class ModelManipulationFactory {
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         saveProperties.put("useAboutRules", true);
         saveProperties.put("useEnumRules", true);
-        saveProperties.put("useFileDialog", false);
-        saveProperties.put("fileFolder", "C:");
+        saveProperties.put("useFileDialog", true);
+        saveProperties.put("fileFolder", wizardContext.getOutputDirectory());
         saveProperties.put("dozip", false);
         saveProperties.put("instanceData", "true");
         saveProperties.put("showXmlBaseDeclaration", "false");

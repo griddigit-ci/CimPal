@@ -3,17 +3,17 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="200.0" prefWidth="1200.0"
+<AnchorPane prefHeight="230.0" prefWidth="1200.0"
             xmlns="http://javafx.com/javafx/25"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CgmesConvertBoundaryController">
 
     <TitledPane animated="false" collapsible="false"
                 layoutX="11.0" layoutY="8.0"
-                prefHeight="180.0" prefWidth="1180.0"
+                prefHeight="210.0" prefWidth="1180.0"
                 text="CGMES 2.4 → 3.0: Convert Boundary dataset">
 
-        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="160.0" prefWidth="1180.0">
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="190.0" prefWidth="1180.0">
 
             <Label layoutX="29.0" layoutY="18.0" text="Boundary dataset folder:"/>
             <TextField fx:id="tfBoundaryFolder" editable="false" layoutX="180.0" layoutY="12.0" prefHeight="26.0" prefWidth="587.0"/>
@@ -28,6 +28,9 @@
 
             <CheckBox fx:id="cbSplitPerTsoBorder" layoutX="180.0" layoutY="118.0" mnemonicParsing="false"
                       text="Split Boundary part per TSO border (CGMES v3.0)"/>
+
+            <CheckBox fx:id="cbKeepExtensions" layoutX="180.0" layoutY="148.0" mnemonicParsing="false"
+                      selected="true" text="Keep non-CIM (cgmbp) extensions"/>
 
             <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="18.0" mnemonicParsing="false"
                       selected="true" text="Save Result to Working Dir"/>

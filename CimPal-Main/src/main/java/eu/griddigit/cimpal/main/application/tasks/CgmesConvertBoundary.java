@@ -4,9 +4,11 @@ import eu.griddigit.cimpal.main.application.CGMESConverter.ModelManipulationFact
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 public class CgmesConvertBoundary implements ITask {
 
@@ -30,6 +32,7 @@ public class CgmesConvertBoundary implements ITask {
     private boolean convertToV3 = true;
     private boolean splitBoundaryAndReference = false;
     private boolean splitPerTsoBorder = false;
+    private boolean keepExtensions = true;
 
 
     @Override
@@ -74,6 +77,14 @@ public class CgmesConvertBoundary implements ITask {
         this.splitPerTsoBorder = splitPerTsoBorder;
     }
 
+    public boolean isKeepExtensions() {
+        return keepExtensions;
+    }
+
+    public void setKeepExtensions(boolean keepExtensions) {
+        this.keepExtensions = keepExtensions;
+    }
+
     @Override
     public boolean getSaveResult() {
         return saveResult;
@@ -109,10 +120,43 @@ public class CgmesConvertBoundary implements ITask {
 
     @Override
     public void execute(SelectedTask parent) throws IOException {
+        String validationError = validateInputs();
+        if (validationError != null) {
+            throw new IllegalStateException(validationError);
+        }
+
         WizardContext wizardContext = WizardContext.getInstance();
-        taskUpdater.updateState(parent,"Loading Base Data", "1%", wizardContext);
+        taskUpdater.updateState(parent, "Loading boundary data", "1%", wizardContext);
 
-        ModelManipulationFactory.ConvertBoundarySetCGMESv2v3();
+        List<Path> boundaryFiles;
+        try (var stream = Files.list(boundaryDatasetFolder)) {
+            boundaryFiles = stream
+                    .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".xml"))
+                    .sorted()
+                    .toList();
+        }
 
-        System.out.print("Conversion finished.\n");    }
+        if (boundaryFiles.isEmpty()) {
+            throw new IllegalStateException("No XML files found in folder: " + boundaryDatasetFolder);
+        }
+
+        File outputDirectory = wizardContext.getOutputDirectory();
+
+        if (convertToV3) {
+            taskUpdater.updateState(parent, "Converting boundary to CGMESv3.0", "20%", wizardContext);
+            ModelManipulationFactory.ConvertBoundarySetCGMESv2v3(boundaryFiles, outputDirectory, keepExtensions);
+        }
+        if (splitBoundaryAndReference) {
+            taskUpdater.updateState(parent, "Splitting boundary and reference data", "60%", wizardContext);
+            ModelManipulationFactory.SplitBoundaryAndRefData(boundaryFiles, outputDirectory, keepExtensions);
+        }
+        if (splitPerTsoBorder) {
+            taskUpdater.updateState(parent, "Splitting boundary per TSO border", "80%", wizardContext);
+            ModelManipulationFactory.SplitBoundaryPerBorder(boundaryFiles, outputDirectory);
+        }
+
+        this.status = "Conversion finished";
+        this.info = "100%";
+        taskUpdater.updateState(parent, this.status, this.info, wizardContext);
+    }
 }
