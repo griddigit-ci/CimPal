@@ -19,4 +19,5 @@ module CimPal.Core {
     requires org.apache.poi.ooxml;
     requires java.prefs;
     requires java.xml;
+    requires java.net.http;
 }

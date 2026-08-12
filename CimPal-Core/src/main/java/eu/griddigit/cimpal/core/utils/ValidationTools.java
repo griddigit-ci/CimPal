@@ -34,6 +34,16 @@ import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 
+import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.security.MessageDigest;
+import java.time.Duration;
+import java.util.HexFormat;
+
 public class ValidationTools {
 
 
@@ -45,6 +55,11 @@ public class ValidationTools {
     );
 
     private static final Object DEBUG_LOCK = new Object();
+
+    private static final RemoteFetchConfig REMOTE_FETCH_CONFIG = RemoteFetchConfig.defaults();
+    static final Map<String, Model> REMOTE_IMPORTS_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Object> REMOTE_URL_LOCKS = new ConcurrentHashMap<>();
+
     private static final String XML_REPORT_PREFIX =
             "C:\\GitHub\\relicapgrid\\Instance\\";
 
@@ -128,7 +143,7 @@ public class ValidationTools {
         consoleInput("mapping rows=" + mappingRows.size());
         consoleInput("threads=" + threads);
 
-        Map<Path, Model> shapesCache = new ConcurrentHashMap<>();
+        Map<String, Model> shapesCache = new ConcurrentHashMap<>();
         List<Path> createdReports = new ArrayList<>();
 
         List<InputGroup> inputGroups = prepareTimestampedInputGroups(inputPath, outputBaseDir);
@@ -416,7 +431,7 @@ public class ValidationTools {
         System.out.println("[INFO] dataTypeMap size=" + (dataTypeMap == null ? "null" : dataTypeMap.size()));
         System.out.println("[INFO] xmlBase=" + xmlBase);
 
-        Map<Path, Model> shapesCache = new ConcurrentHashMap<>();
+        Map<String, Model> shapesCache = new ConcurrentHashMap<>();
 
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         List<Callable<ValidationTaskResult>> tasks = new ArrayList<>();
@@ -684,7 +699,7 @@ public class ValidationTools {
                                                        MappingRow row,
                                                        Path modelsBaseDir,
                                                        Path constraintsRoot,
-                                                       Map<Path, Model> shapesCache,
+                                                       Map<String, Model> shapesCache,
                                                        Map<String, RDFDatatype> dataTypeMap,
                                                        String xmlBase) {
 
@@ -753,19 +768,38 @@ public class ValidationTools {
                         new FileNotFoundException("TTL not found: " + ttlPath));
             }
 
-            dbgRow(rowIdx, "START loadShapesWithLocalImports ttlPath=" + ttlPath.toAbsolutePath());
+            dbgRow(rowIdx, "START loadShapesWithImports ttlPath=" + ttlPath.toAbsolutePath());
             long shapesStart = System.currentTimeMillis();
 
-            Model shapesModel = loadShapesWithLocalImports(ttlPath, constraintsRoot, shapesCache);
+            LoadShapesResult shapesResult = loadShapesWithImports(
+                    new LocalShapeSource(ttlPath), constraintsRoot, shapesCache);
+            Model shapesModel = shapesResult.model();
 
-            dbgRow(rowIdx, "DONE loadShapesWithLocalImports shapesTriples=" + shapesModel.size(),
+            dbgRow(rowIdx, "DONE loadShapesWithImports shapesTriples=" + shapesModel.size(),
                     shapesStart);
 
-            if (shapesModel.size() < 200) {
-                System.err.println("[WARN][row " + rowIdx + "] Shapes model seems too small ("
-                        + shapesModel.size()
-                        + " triples). Imports may not be loaded for: "
-                        + ttlPath);
+            Resource shNodeShape = ResourceFactory.createResource("http://www.w3.org/ns/shacl#NodeShape");
+            Resource shPropertyShape = ResourceFactory.createResource("http://www.w3.org/ns/shacl#PropertyShape");
+            long shapeCount = shapesModel.listSubjectsWithProperty(RDF.type, shNodeShape).toList().size()
+                    + shapesModel.listSubjectsWithProperty(RDF.type, shPropertyShape).toList().size();
+
+            if (shapeCount == 0) {
+                String warnMsg = "[WARN][row " + rowIdx + "] Shapes model contains 0 sh:NodeShape/sh:PropertyShape"
+                        + " after loading " + shapesResult.loadedFiles() + " file(s) with "
+                        + shapesModel.size() + " triples."
+                        + " The shapes file may be empty or contain only owl:imports declarations."
+                        + " file=" + ttlPath;
+                System.err.println(warnMsg);
+                dbgRow(rowIdx, warnMsg);
+            }
+
+            if (shapesResult.unresolvableImports() > 0) {
+                String warnMsg = "[WARN][row " + rowIdx + "] "
+                        + shapesResult.unresolvableImports()
+                        + " owl:imports declaration(s) could not be resolved to any local or remote file."
+                        + " Some shapes may be missing. file=" + ttlPath;
+                System.err.println(warnMsg);
+                dbgRow(rowIdx, warnMsg);
             }
 
             logShapeStats(rowIdx, shapesModel);
@@ -1491,58 +1525,73 @@ public class ValidationTools {
                 .trim();
     }
 
-    private static Model loadShapesWithLocalImports(Path ttlPath, Path constraintsRoot, Map<Path, Model> cache) throws IOException {
-        Path key = ttlPath.toAbsolutePath().normalize();
+    static LoadShapesResult loadShapesWithImports(ShapeSource root,
+                                                  Path constraintsRoot,
+                                                  Map<String, Model> cache) throws IOException {
+        String rootKey = root.key();
 
-        Model cached = cache.get(key);
+        Model cached = cache.get(rootKey);
         if (cached != null) {
-            dbg("SHAPES cache hit key=" + key + " triples=" + cached.size());
-            return cached;
+            dbg("SHAPES cache hit key=" + rootKey + " triples=" + cached.size());
+            return new LoadShapesResult(cached, 0, 0, 0);
         }
 
-        dbg("SHAPES cache miss key=" + key);
+        dbg("SHAPES cache miss key=" + rootKey);
 
         Model shapes = ModelFactory.createDefaultModel();
-        Set<Path> visited = new HashSet<>();
-        Deque<Path> stack = new ArrayDeque<>();
-        stack.push(key);
+        Set<String> visited = new HashSet<>();
+        Deque<ShapeSource> stack = new ArrayDeque<>();
+        stack.push(root);
 
         int loadedFiles = 0;
+        int localCount = 0;
+        int remoteCount = 0;
+        int remoteCacheHits = 0;
+        long totalFetchedMs = 0;
+        int totalImportsFound = 0;
+        int unresolvableImports = 0;
 
         while (!stack.isEmpty()) {
-            Path p = stack.pop().toAbsolutePath().normalize();
+            ShapeSource src = stack.pop();
+            String key = src.key();
 
-            if (!visited.add(p)) {
-                dbg("SHAPES skip already visited: " + p);
+            if (!visited.add(key)) {
+                dbg("SHAPES skip already visited: " + key);
                 continue;
             }
 
-            if (!Files.exists(p)) {
-                throw new FileNotFoundException("Imported TTL not found: " + p);
-            }
-
             loadedFiles++;
+            boolean isRemote = src instanceof RemoteShapeSource;
+            if (isRemote) remoteCount++;
+            else localCount++;
 
-            dbg("SHAPES START read ttl index=" + loadedFiles + " path=" + p);
+            dbg("SHAPES START read index=" + loadedFiles
+                    + " type=" + (isRemote ? "remote" : "local")
+                    + " src=" + src.displayName());
             long readStart = System.currentTimeMillis();
 
-            Model tmp = ModelFactory.createDefaultModel();
-            RDFDataMgr.read(tmp, p.toUri().toString());
+            Model tmp;
+            if (isRemote) {
+                boolean inRunCacheHit = REMOTE_IMPORTS_CACHE.containsKey(key);
+                long fetchStart = System.currentTimeMillis();
+                tmp = loadRemoteCached(key);
+                if (inRunCacheHit) {
+                    remoteCacheHits++;
+                } else {
+                    totalFetchedMs += System.currentTimeMillis() - fetchStart;
+                }
+            } else {
+                tmp = readLocalShapeSource((LocalShapeSource) src);
+            }
 
-            dbg("SHAPES DONE read ttl index=" + loadedFiles
+            dbg("SHAPES DONE read index=" + loadedFiles
                     + " tmpTriples=" + tmp.size()
-                    + " path=" + p.getFileName(), readStart);
-
-            long addStart = System.currentTimeMillis();
+                    + " src=" + src.displayName(), readStart);
 
             shapes.add(tmp);
 
-            dbg("SHAPES DONE add ttl index=" + loadedFiles
-                    + " totalShapesTriples=" + shapes.size()
-                    + " path=" + p.getFileName(), addStart);
-
             StmtIterator it = tmp.listStatements(null, OWL.imports, (RDFNode) null);
-            int imports = 0;
+            int importsInFile = 0;
 
             while (it.hasNext()) {
                 Statement st = it.nextStatement();
@@ -1551,58 +1600,109 @@ public class ValidationTools {
                 if (!obj.isURIResource()) continue;
 
                 String uri = obj.asResource().getURI();
-                imports++;
+                importsInFile++;
+                totalImportsFound++;
 
-                Path importedPath = resolveImportToLocalPath(uri, p, constraintsRoot);
+                ShapeSource resolved = resolveImport(uri, src, constraintsRoot);
 
-                if (importedPath != null) {
-                    dbg("SHAPES import local uri=" + uri
-                            + " resolved=" + importedPath.toAbsolutePath());
-                    stack.push(importedPath);
+                if (resolved != null) {
+                    dbg("SHAPES import uri=" + uri
+                            + " resolved=" + resolved.key()
+                            + " from=" + src.displayName());
+                    stack.push(resolved);
                 } else {
-                    System.out.println("[DBG] Skipping non-local import: " + uri);
+                    // Intentional: urn: prefixes and HTTP/HTTPS namespace URIs that have no
+                    // recognised RDF file extension (vocabulary declarations, not downloadable files).
+                    boolean isHttpOrHttps = uri.startsWith("http://") || uri.startsWith("https://");
+                    boolean intentionalSkip = uri.startsWith("urn:")
+                            || (isHttpOrHttps && detectLang(uri) == null);
+                    if (intentionalSkip) {
+                        dbg("SHAPES skipping import uri=" + uri
+                                + " (urn: or namespace URI without RDF extension)"
+                                + " from=" + src.displayName());
+                    } else {
+                        unresolvableImports++;
+                        dbg("SHAPES unresolvable import uri=" + uri
+                                + " could not be resolved to any local or remote file"
+                                + " from=" + src.displayName());
+                    }
                 }
             }
 
-            dbg("SHAPES imports found=" + imports + " ttl=" + p.getFileName());
+            dbg("SHAPES imports found=" + importsInFile + " src=" + src.displayName());
         }
 
-        cache.put(key, shapes);
+        cache.put(rootKey, shapes);
 
-        dbg("SHAPES DONE load with imports loadedFiles=" + loadedFiles
+        dbg("SHAPES DONE load with imports"
+                + " loadedFiles=" + loadedFiles
+                + " (local=" + localCount + " remote=" + remoteCount + ")"
                 + " totalTriples=" + shapes.size()
-                + " key=" + key);
+                + " fetchedMs=" + totalFetchedMs
+                + " cacheHits=" + remoteCacheHits
+                + " key=" + rootKey);
 
-        return shapes;
+        return new LoadShapesResult(shapes, totalImportsFound, loadedFiles, unresolvableImports);
     }
 
-    private static Path resolveImportToLocalPath(String importUri, Path currentTtl, Path constraintsRoot) {
+    static ShapeSource resolveImport(String importUri, ShapeSource current, Path constraintsRoot) {
         String u = importUri == null ? "" : importUri.trim();
+        if (u.isEmpty()) return null;
+        if (u.startsWith("urn:")) return null;
 
-        if (u.startsWith("http://") || u.startsWith("https://") || u.startsWith("urn:")) {
-            return null;
-        }
-
-        try {
-            if (u.startsWith("file:")) {
-                Path p = Paths.get(java.net.URI.create(u));
-                dbg("resolveImportToLocalPath fileUri=" + importUri + " resolved=" + p);
-                return p;
+        if (u.startsWith("http://") || u.startsWith("https://")) {
+            // Only fetch URLs that look like actual RDF files (have a recognised extension).
+            // Namespace URIs such as http://www.w3.org/ns/shacl# carry no file extension
+            // and are vocabulary declarations, not downloadable shape files.  Trying to
+            // fetch them breaks existing configurations and hammers third-party servers.
+            if (detectLang(u) == null) {
+                dbg("resolveImport skipping non-file remote URI (no RDF extension): " + importUri);
+                return null;
             }
-        } catch (Exception ex) {
-            dbg("resolveImportToLocalPath invalid fileUri=" + importUri + " error=" + ex.getMessage());
+            try {
+                return new RemoteShapeSource(new URI(u));
+            } catch (URISyntaxException e) {
+                dbg("resolveImport invalid remote URI=" + importUri + " error=" + e.getMessage());
+                return null;
+            }
         }
 
-        Path currentDir = currentTtl.getParent();
+        if (u.startsWith("file:")) {
+            try {
+                Path p = Paths.get(URI.create(u));
+                dbg("resolveImport fileUri=" + importUri + " resolved=" + p);
+                return new LocalShapeSource(p);
+            } catch (Exception ex) {
+                dbg("resolveImport invalid fileUri=" + importUri + " error=" + ex.getMessage());
+                return null;
+            }
+        }
+
+        // Relative reference: if current is remote, resolve against its URI
+        if (current instanceof RemoteShapeSource rss) {
+            try {
+                URI resolved = rss.uri().resolve(u);
+                dbg("resolveImport relative-from-remote uri=" + u + " resolved=" + resolved);
+                return new RemoteShapeSource(resolved);
+            } catch (Exception e) {
+                dbg("resolveImport relative-from-remote failed uri=" + u + " error=" + e.getMessage());
+            }
+        }
+
+        Path currentDir = current instanceof LocalShapeSource lss
+                ? lss.path().toAbsolutePath().normalize().getParent()
+                : constraintsRoot;
 
         Path candidate1 = currentDir.resolve(u).normalize();
         if (Files.exists(candidate1)) {
-            return candidate1;
+            dbg("resolveImport candidate1=" + candidate1);
+            return new LocalShapeSource(candidate1);
         }
 
         Path candidate2 = constraintsRoot.resolve(u).normalize();
         if (Files.exists(candidate2)) {
-            return candidate2;
+            dbg("resolveImport candidate2=" + candidate2);
+            return new LocalShapeSource(candidate2);
         }
 
         String fileName = u;
@@ -1610,7 +1710,227 @@ public class ValidationTools {
         if (slash >= 0) fileName = fileName.substring(slash + 1);
 
         Path candidate3 = constraintsRoot.resolve(fileName).normalize();
-        return Files.exists(candidate3) ? candidate3 : null;
+        if (Files.exists(candidate3)) {
+            dbg("resolveImport candidate3=" + candidate3);
+            return new LocalShapeSource(candidate3);
+        }
+
+        dbg("resolveImport could not resolve uri=" + importUri + " from=" + current.displayName());
+        return null;
+    }
+
+    private static Model readLocalShapeSource(LocalShapeSource src) throws IOException {
+        Path p = src.path().toAbsolutePath().normalize();
+        if (!Files.exists(p)) {
+            throw new FileNotFoundException("Imported TTL not found: " + p);
+        }
+        Model m = ModelFactory.createDefaultModel();
+        RDFDataMgr.read(m, p.toUri().toString());
+        return m;
+    }
+
+    private static Model loadRemoteCached(String url) throws IOException {
+        Model existing = REMOTE_IMPORTS_CACHE.get(url);
+        if (existing != null) {
+            return ModelFactory.createDefaultModel().add(existing);
+        }
+        Object lock = REMOTE_URL_LOCKS.computeIfAbsent(url, k -> new Object());
+        synchronized (lock) {
+            Model existing2 = REMOTE_IMPORTS_CACHE.get(url);
+            if (existing2 != null) {
+                return ModelFactory.createDefaultModel().add(existing2);
+            }
+            dbg("SHAPES remote fetch start url=" + url);
+            long fetchStart = System.currentTimeMillis();
+            Model fetched = fetchRemoteModel(url);
+            dbg("SHAPES remote fetch done url=" + url
+                    + " triples=" + fetched.size(), fetchStart);
+            REMOTE_IMPORTS_CACHE.put(url, fetched);
+            return ModelFactory.createDefaultModel().add(fetched);
+        }
+    }
+
+    private static Model fetchRemoteModel(String url) throws IOException {
+        if (!REMOTE_FETCH_CONFIG.enabled()) {
+            throw new IOException("Remote imports are disabled by configuration: " + url);
+        }
+        if (REMOTE_FETCH_CONFIG.offline()) {
+            return loadFromDiskCacheOrFail(url);
+        }
+
+        String hash = sha256Hex(url);
+        Path cacheDir = REMOTE_FETCH_CONFIG.diskCacheDir();
+        Path cachedFile = cacheDir.resolve(hash + ".ttl");
+        Path metaFile = cacheDir.resolve(hash + ".meta");
+
+        String etag = null;
+        String lastModified = null;
+        if (Files.exists(cachedFile) && Files.exists(metaFile)) {
+            Properties meta = new Properties();
+            try (InputStream in = Files.newInputStream(metaFile)) {
+                meta.load(in);
+            } catch (IOException ignore) {
+                // corrupt meta — fetch fresh
+            }
+            etag = meta.getProperty("etag");
+            lastModified = meta.getProperty("last-modified");
+        }
+
+        IOException lastEx = null;
+        for (int attempt = 0; attempt <= REMOTE_FETCH_CONFIG.retries(); attempt++) {
+            if (attempt > 0) {
+                try {
+                    Thread.sleep(500L * (1L << (attempt - 1)));
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting to retry: " + url, ie);
+                }
+            }
+            try {
+                return fetchHttpWithDiskCache(url, etag, lastModified, cachedFile, metaFile);
+            } catch (IOException e) {
+                String msg = e.getMessage();
+                if (msg != null && msg.startsWith("HTTP 404")) throw e;
+                lastEx = e;
+                dbg("SHAPES remote fetch attempt=" + attempt + " failed url=" + url
+                        + " error=" + e.getMessage());
+            }
+        }
+        throw lastEx != null ? lastEx
+                : new IOException("Failed to fetch remote import: " + url);
+    }
+
+    private static Model fetchHttpWithDiskCache(String url,
+                                                String conditionalEtag,
+                                                String conditionalLastMod,
+                                                Path cachedFile,
+                                                Path metaFile) throws IOException {
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.connectTimeoutMs()))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.readTimeoutMs()));
+
+        if (conditionalEtag != null) {
+            reqBuilder.header("If-None-Match", conditionalEtag);
+        } else if (conditionalLastMod != null) {
+            reqBuilder.header("If-Modified-Since", conditionalLastMod);
+        }
+
+        HttpResponse<byte[]> response;
+        try {
+            response = client.send(reqBuilder.GET().build(),
+                    HttpResponse.BodyHandlers.ofByteArray());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("HTTP request interrupted for: " + url, e);
+        }
+
+        int status = response.statusCode();
+        dbg("SHAPES remote HTTP status=" + status + " url=" + url
+                + " bytes=" + (response.body() != null ? response.body().length : 0));
+
+        if (status == 304 && Files.exists(cachedFile)) {
+            dbg("SHAPES remote 304 Not Modified, using disk cache url=" + url);
+            return parseTtlBytes(Files.readAllBytes(cachedFile), url);
+        }
+
+        if (status == 404) {
+            throw new IOException("HTTP 404 Not Found: " + url);
+        }
+        if (status < 200 || status >= 300) {
+            throw new IOException("HTTP " + status + " fetching: " + url);
+        }
+
+        byte[] body = response.body();
+        String newEtag = response.headers().firstValue("ETag").orElse(null);
+        String newLastMod = response.headers().firstValue("Last-Modified").orElse(null);
+
+        Model m = parseTtlBytes(body, url);
+
+        try {
+            Path dir = cachedFile.getParent();
+            if (dir != null) Files.createDirectories(dir);
+            Path tmpFile = dir.resolve(cachedFile.getFileName() + ".tmp");
+            Files.write(tmpFile, body);
+            Files.move(tmpFile, cachedFile, StandardCopyOption.REPLACE_EXISTING);
+
+            if (newEtag != null || newLastMod != null) {
+                Properties meta = new Properties();
+                if (newEtag != null) meta.setProperty("etag", newEtag);
+                if (newLastMod != null) meta.setProperty("last-modified", newLastMod);
+                try (var out = Files.newOutputStream(metaFile)) {
+                    meta.store(out, null);
+                }
+            }
+        } catch (IOException cacheEx) {
+            dbg("SHAPES remote disk cache write failed url=" + url
+                    + " error=" + cacheEx.getMessage());
+        }
+
+        return m;
+    }
+
+    private static Model loadFromDiskCacheOrFail(String url) throws IOException {
+        String hash = sha256Hex(url);
+        Path cachedFile = REMOTE_FETCH_CONFIG.diskCacheDir().resolve(hash + ".ttl");
+        if (!Files.exists(cachedFile)) {
+            throw new IOException("Offline mode: URL not in disk cache: " + url);
+        }
+        dbg("SHAPES offline disk cache hit url=" + url);
+        return parseTtlBytes(Files.readAllBytes(cachedFile), url);
+    }
+
+    private static Model parseTtlBytes(byte[] bytes, String baseUrl) throws IOException {
+        bytes = fixDoubleAngleBracket(bytes);
+        Lang lang = detectLang(baseUrl);
+        Model m = ModelFactory.createDefaultModel();
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes)) {
+            if (lang != null) {
+                RDFParser.source(bais).lang(lang).base(baseUrl).parse(m);
+            } else {
+                RDFParser.source(bais).base(baseUrl).parse(m);
+            }
+        } catch (Exception e) {
+            throw new IOException("Failed to parse RDF from " + baseUrl + ": " + e.getMessage(), e);
+        }
+        return m;
+    }
+
+    private static byte[] fixDoubleAngleBracket(byte[] bytes) {
+        // Some NCP 2.5 SHACL files contain a typo in SPARQL IN() lists:
+        //   IN (<<https://...>  instead of  IN (<https://...>
+        // "<<https://" and "<<http://" are never valid in any RDF or SPARQL syntax
+        // (old RDF-star uses "<< <iri>" with a space; new syntax uses "<<("),
+        // so this replacement is safe and unambiguous.
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String f = s.replace("<<https://", "<https://").replace("<<http://", "<http://");
+        return f.length() == s.length() && f.equals(s) ? bytes : f.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static Lang detectLang(String url) {
+        String lower = url.toLowerCase(Locale.ROOT);
+        int q = lower.indexOf('?');
+        String path = q >= 0 ? lower.substring(0, q) : lower;
+        if (path.endsWith(".ttl")) return Lang.TURTLE;
+        if (path.endsWith(".rdf") || path.endsWith(".owl")) return Lang.RDFXML;
+        if (path.endsWith(".nt")) return Lang.NTRIPLES;
+        if (path.endsWith(".jsonld")) return Lang.JSONLD;
+        if (path.endsWith(".n3")) return Lang.N3;
+        return null;
+    }
+
+    private static String sha256Hex(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     // ---------------- debug helpers ----------------
@@ -3371,7 +3691,7 @@ public class ValidationTools {
 
     private static List<ValidationTaskResult> executeResolvedRows(List<ResolvedMappingRow> resolvedRows,
                                                                   Path constraintsRoot,
-                                                                  Map<Path, Model> shapesCache,
+                                                                  Map<String, Model> shapesCache,
                                                                   Map<Path, Model> staticXmlModelCache,
                                                                   Map<Path, Model> timestampXmlModelCache,
                                                                   int threads,
@@ -3482,7 +3802,7 @@ public class ValidationTools {
 
     private static ValidationTaskResult validateOneResolvedRow(ResolvedMappingRow row,
                                                                Path constraintsRoot,
-                                                               Map<Path, Model> shapesCache,
+                                                               Map<String, Model> shapesCache,
                                                                Map<Path, Model> staticXmlModelCache,
                                                                Map<Path, Model> timestampXmlModelCache,
                                                                Map<String, RDFDatatype> dataTypeMap,
@@ -3529,7 +3849,9 @@ public class ValidationTools {
                 );
             }
 
-            Model shapesModel = loadShapesWithLocalImports(ttlPath, constraintsRoot, shapesCache);
+            LoadShapesResult shapesResult = loadShapesWithImports(
+                    new LocalShapeSource(ttlPath), constraintsRoot, shapesCache);
+            Model shapesModel = shapesResult.model();
 
             Model dataModel = loadRdfXmlFromFilesWithCache(
                     row.xmlFiles,
@@ -3901,4 +4223,69 @@ public class ValidationTools {
             comparisonWriter.addTimestampDataset(region, timestamp, label, w, i, v);
         }
     }
+
+    // ---- ShapeSource: abstraction over local path or remote URL ----
+
+    sealed interface ShapeSource permits LocalShapeSource, RemoteShapeSource {
+        String key();
+        String displayName();
+    }
+
+    record LocalShapeSource(Path path) implements ShapeSource {
+        @Override
+        public String key() {
+            return path.toAbsolutePath().normalize().toString();
+        }
+
+        @Override
+        public String displayName() {
+            return path.getFileName().toString();
+        }
+    }
+
+    record RemoteShapeSource(URI uri) implements ShapeSource {
+        @Override
+        public String key() {
+            try {
+                return new URI(
+                        uri.getScheme().toLowerCase(Locale.ROOT),
+                        uri.getUserInfo(),
+                        uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : null,
+                        uri.getPort(),
+                        uri.getPath(),
+                        uri.getQuery(),
+                        uri.getFragment()
+                ).toString();
+            } catch (URISyntaxException e) {
+                return uri.toString();
+            }
+        }
+
+        @Override
+        public String displayName() {
+            String p = uri.getPath();
+            int i = p.lastIndexOf('/');
+            return (i >= 0 && i < p.length() - 1) ? p.substring(i + 1) : p;
+        }
+    }
+
+    record RemoteFetchConfig(
+            boolean enabled,
+            int connectTimeoutMs,
+            int readTimeoutMs,
+            int maxRedirects,
+            int retries,
+            boolean offline,
+            Path diskCacheDir
+    ) {
+        static RemoteFetchConfig defaults() {
+            String localAppData = System.getenv("LOCALAPPDATA");
+            Path cacheDir = localAppData != null
+                    ? Paths.get(localAppData, "CimPal", "shapes-cache")
+                    : Paths.get(System.getProperty("user.home"), ".cimpal", "shapes-cache");
+            return new RemoteFetchConfig(true, 10_000, 30_000, 5, 2, false, cacheDir);
+        }
+    }
+
+    record LoadShapesResult(Model model, int importsFound, int loadedFiles, int unresolvableImports) {}
 }
