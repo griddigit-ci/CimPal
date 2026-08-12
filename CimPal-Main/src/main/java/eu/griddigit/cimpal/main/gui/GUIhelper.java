@@ -14,6 +14,7 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
+import javafx.util.Duration;
 import javafx.util.Pair;
 import org.apache.jena.rdf.model.Model;
 
@@ -28,6 +29,33 @@ import static eu.griddigit.cimpal.main.application.MainController.foutputWindowV
 public class GUIhelper implements IOutputHandler {
 
     private static final String GENERIC_ERROR_MESSAGE = "An unexpected error occurred. You can review and copy the technical details for support.";
+
+    public static final String HELP_ICON_STYLE =
+            "-fx-background-color: #e0e0e0;" +
+            "-fx-background-radius: 20;" +
+            "-fx-border-color: #808080;" +
+            "-fx-border-radius: 20;" +
+            "-fx-text-fill: #333333;" +
+            "-fx-font-weight: bold;" +
+            "-fx-alignment: center;" +
+            "-fx-min-width: 18px;" +
+            "-fx-min-height: 18px;" +
+            "-fx-pref-width: 18px;" +
+            "-fx-pref-height: 18px;" +
+            "-fx-cursor: hand;";
+
+    public static void installHelpTooltip(Label helpIcon, String text) {
+        if (helpIcon == null) {
+            return;
+        }
+        Tooltip tooltip = new Tooltip(text);
+        tooltip.setWrapText(true);
+        tooltip.setMaxWidth(450);
+        tooltip.setShowDelay(Duration.millis(300));
+        tooltip.setHideDelay(Duration.millis(200));
+        tooltip.setShowDuration(Duration.INDEFINITE);
+        Tooltip.install(helpIcon, tooltip);
+    }
 
     public static Alert expandableAlert(String title, String header, String contextText, String labelText, String detailsText) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);

@@ -7,7 +7,7 @@
 package eu.griddigit.cimpal.main.core;
 
 import eu.griddigit.cimpal.main.application.MainController;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import eu.griddigit.cimpal.main.model.RDFAttributeData;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.datatypes.xsd.impl.RDFLangString;

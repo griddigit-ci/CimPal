@@ -151,9 +151,9 @@
    <HBox>
       <ButtonBar prefHeight="40.0" HBox.hgrow="ALWAYS">
          <buttons>
-            <Button fx:id="btnOK" mnemonicParsing="false" onAction="#actionBtnOK" text="OK"/>
+            <Button mnemonicParsing="false" onAction="#actionBtnOK" text="OK"/>
             <Button mnemonicParsing="false" onAction="#actionBtnDefault" text="Default"/>
-            <Button fx:id="btnCancel" cancelButton="true" mnemonicParsing="false" onAction="#actionBtnCancel"
+            <Button cancelButton="true" mnemonicParsing="false" onAction="#actionBtnCancel"
                     text="Cancel"/>
          </buttons>
          <HBox.margin>

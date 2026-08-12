@@ -28,7 +28,7 @@ public class ExcelTools {
 
             // Create header row
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"Focus Node", "SourceShape", "Severity", "Message", "Value", "Path"};
+            String[] headers = {"Focus Node", "SourceShape", "Severity", "Message", "Value", "Value kind", "Path"};
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
@@ -44,7 +44,8 @@ public class ExcelTools {
                 row.createCell(2).setCellValue(result.getSeverity());
                 row.createCell(3).setCellValue(result.getMessage());
                 row.createCell(4).setCellValue(result.getValue());
-                row.createCell(5).setCellValue(result.getPath());
+                row.createCell(5).setCellValue(result.getValueKind());
+                row.createCell(6).setCellValue(result.getPath());
             }
 
             // Auto-size columns

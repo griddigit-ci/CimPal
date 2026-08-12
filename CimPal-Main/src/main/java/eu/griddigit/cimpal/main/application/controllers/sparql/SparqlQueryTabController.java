@@ -10,7 +10,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.stage.FileChooser;
@@ -27,6 +26,7 @@ import java.util.List;
 import java.util.ResourceBundle;
 
 public class SparqlQueryTabController implements Initializable {
+    private MainController mainController;
 
     private static final String DEFAULT_XML_BASE = "http://iec.ch/TC57/2013/CIM-schema-cim16";
 
@@ -42,14 +42,41 @@ public class SparqlQueryTabController implements Initializable {
     @FXML
     private Label lblModelFiles;
 
+    @FXML
+    private Label helpSelectModels;
+    @FXML
+    private Label helpSparqlQuery;
+
     private final List<File> selectedModelFiles = new ArrayList<>();
     private File currentQueryFile;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        initializeHelpTooltips();
         setStatus("Ready to edit or import a SPARQL SELECT query.");
         setCurrentQueryFile(null);
         updateModelFilesLabel();
+    }
+
+    private void initializeHelpTooltips() {
+        GUIhelper.installHelpTooltip(helpSelectModels, "Select one or more RDF/XML files or ZIP archives containing CGMES model data to query. The files are loaded as a combined RDF dataset.");
+        GUIhelper.installHelpTooltip(helpSparqlQuery, "Write a SPARQL SELECT query to execute against the loaded model files.\n\nUse Load query to import an existing .sparql or .rq file, or type/edit the query directly in the text area below.");
+    }
+
+    public void setMainController(MainController mainController) {
+        this.mainController = mainController;
+    }
+
+    private void setProgressBar(double progress) {
+        if (mainController != null) {
+            mainController.setProgressBarValue(progress);
+        }
+    }
+
+    private void resetProgressBar() {
+        if (mainController != null) {
+            mainController.resetProgressBar();
+        }
     }
 
     @FXML
@@ -224,7 +251,7 @@ public class SparqlQueryTabController implements Initializable {
 
     private void showResultsWindow(SparqlTools.QueryResults results) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/sparqlResultsWindow.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SparqlResultsWindow.fxml"));
             Parent root = loader.load();
 
             SparqlResultsWindowController controller = loader.getController();

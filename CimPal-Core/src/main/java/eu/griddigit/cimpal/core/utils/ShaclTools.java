@@ -12,6 +12,8 @@ import java.util.*;
 
 public class ShaclTools {
 
+
+
     /**
      * Extract results and enrich with fields coming from the source shape.
      *
@@ -37,11 +39,24 @@ public class ShaclTools {
             String severity = compact(getResourceValue(result.getPropertyResourceValue(SH.resultSeverity)), prefixModel);
 
             String message = getAllLiteralValues(result, SH.resultMessage);
-            String value = compact(getStatementValue(result.getProperty(SH.value)), prefixModel);
+
+            // sh:value must keep its lexical form untouched when it is a literal. Running compact()
+            // over a literal truncated anything that looked like a URI to its last path segment, which
+            // made a string literal indistinguishable from an actual URI reference in the report.
+            RDFNode valueNode = getStatementObject(result.getProperty(SH.value));
+            String value = renderValueNode(valueNode, prefixModel);
+            String valueKind = describeNodeKind(valueNode, prefixModel);
 
             // resultPath is typically a resource (property URI)
-            String path = compact(getResourceValue(result.getPropertyResourceValue(SH.resultPath)), prefixModel);
+            RDFNode resultPathNode = getStatementObject(result.getProperty(SH.resultPath));
 
+            String path = renderResultPath(
+                    resultPathNode,
+                    sourceShapeRes,
+                    shapesModel,
+                    reportModel,
+                    prefixModel
+            );
             String constraintComponent = compact(getResourceValue(result.getPropertyResourceValue(SH.sourceConstraintComponent)), prefixModel);
 
             // details can be multiple result resources
@@ -55,13 +70,11 @@ public class ShaclTools {
 
             if (sourceShapeRes != null && shapesModel != null) {
                 // important: read from shapes model to ensure we see all shape metadata/prefixes
-                Resource shape = shapesModel.getResource(sourceShapeRes.isAnon()
-                        ? sourceShapeRes.getId().toString()
-                        : sourceShapeRes.getURI());
+                Resource shape = findEquivalentResourceInModel(shapesModel, sourceShapeRes);
 
-                // If the exact resource instance isn't found like above (blank nodes / different model identity),
-                // fall back to using the result's sourceShapeRes directly:
-                if (shape == null) shape = sourceShapeRes;
+                if (shape == null) {
+                    shape = sourceShapeRes;
+                }
 
                 description = getAllLiteralValues(shape, SH.description);
                 order = getStatementValue(shape.getProperty(SH.order));
@@ -78,16 +91,213 @@ public class ShaclTools {
             }
 
             resultsList.add(new SHACLValidationResult(
-                    sourceShape, focusNode, severity, message, value, path,
+                    sourceShape, focusNode, severity, message, value, valueKind, path,
                     constraintComponent, details,
                     description, order, name, group
             ));
         }
 
-        return resultsList;
+        // Drop exact duplicates. Jena evaluates a sh:sparql constraint declared on a property shape
+        // once per value node, so an aggregate query (COUNT/SUM over the whole graph) produces one
+        // identical result per value node. Those rows carry no extra information but inflated both
+        // the raw sheet and every count derived from this list.
+        return new ArrayList<>(new LinkedHashSet<>(resultsList));
+    }
+
+    /** Renders sh:value: literals keep their lexical form, resources get prefix-compacted. */
+    private static String renderValueNode(RDFNode node, Model prefixModel) {
+        if (node == null) return "";
+        if (node.isLiteral()) return node.asLiteral().getLexicalForm();
+        if (node.isResource()) return compact(getResourceValue(node.asResource()), prefixModel);
+        return node.toString();
+    }
+
+    /** Describes the node kind of sh:value so URI references and string literals stay distinguishable. */
+    private static String describeNodeKind(RDFNode node, Model prefixModel) {
+        if (node == null) return "";
+
+        if (node.isLiteral()) {
+            Literal lit = node.asLiteral();
+
+            String lang = lit.getLanguage();
+            if (lang != null && !lang.isEmpty()) {
+                return "Literal@" + lang;
+            }
+
+            String dt = lit.getDatatypeURI();
+            if (dt == null || dt.isBlank()) {
+                return "Literal";
+            }
+
+            // Always spell out the xsd: prefix, even when the shapes model does not declare it,
+            // so "Literal^^xsd:string" never degrades into a bare "Literal^^string".
+            if (dt.startsWith(XSD_NS)) {
+                return "Literal^^xsd:" + dt.substring(XSD_NS.length());
+            }
+
+            return "Literal^^" + compact(dt, prefixModel);
+        }
+
+        if (node.isAnon()) return "BlankNode";
+        if (node.isURIResource()) return "IRI";
+
+        return "";
     }
 
     // ---------------- helpers ----------------
+
+    private static final String SH_NS = "http://www.w3.org/ns/shacl#";
+
+    private static final String XSD_NS = "http://www.w3.org/2001/XMLSchema#";
+
+    private static final Property SH_INVERSE_PATH =
+            ResourceFactory.createProperty(SH_NS + "inversePath");
+
+    private static final Property SH_ZERO_OR_MORE_PATH =
+            ResourceFactory.createProperty(SH_NS + "zeroOrMorePath");
+
+    private static final Property SH_ONE_OR_MORE_PATH =
+            ResourceFactory.createProperty(SH_NS + "oneOrMorePath");
+
+    private static final Property SH_ZERO_OR_ONE_PATH =
+            ResourceFactory.createProperty(SH_NS + "zeroOrOnePath");
+
+    private static String renderShaclPath(Model shapesModel, RDFNode pathNode) {
+        return renderShaclPath(shapesModel, pathNode, new HashSet<>(), shapesModel);
+    }
+
+    private static String renderShaclPath(Model shapesModel,
+                                          RDFNode pathNode,
+                                          Set<Resource> visited,
+                                          Model prefixModel) {
+        if (pathNode == null) {
+            return "";
+        }
+
+        if (pathNode.isLiteral()) {
+            return pathNode.asLiteral().getLexicalForm();
+        }
+
+        if (!pathNode.isResource()) {
+            return pathNode.toString();
+        }
+
+        Resource r = pathNode.asResource();
+
+        if (!visited.add(r)) {
+            return shortResourceName(r, prefixModel);
+        }
+
+        Statement inverse = shapesModel == null ? null : shapesModel.getProperty(r, SH_INVERSE_PATH);
+        if (inverse != null) {
+            return "[ sh:inversePath " + renderShaclPath(shapesModel, inverse.getObject(), visited, prefixModel) + " ]";
+        }
+
+        Statement zeroOrMore = shapesModel == null ? null : shapesModel.getProperty(r, SH_ZERO_OR_MORE_PATH);
+        if (zeroOrMore != null) {
+            return "[ sh:zeroOrMorePath " + renderShaclPath(shapesModel, zeroOrMore.getObject(), visited, prefixModel) + " ]";
+        }
+
+        Statement oneOrMore = shapesModel == null ? null : shapesModel.getProperty(r, SH_ONE_OR_MORE_PATH);
+        if (oneOrMore != null) {
+            return "[ sh:oneOrMorePath " + renderShaclPath(shapesModel, oneOrMore.getObject(), visited, prefixModel) + " ]";
+        }
+
+        Statement zeroOrOne = shapesModel == null ? null : shapesModel.getProperty(r, SH_ZERO_OR_ONE_PATH);
+        if (zeroOrOne != null) {
+            return "[ sh:zeroOrOnePath " + renderShaclPath(shapesModel, zeroOrOne.getObject(), visited, prefixModel) + " ]";
+        }
+
+        return shortResourceName(r, prefixModel);
+    }
+
+    private static String shortResourceName(Resource r, Model prefixModel) {
+        if (r == null) {
+            return "";
+        }
+
+        if (r.isAnon()) {
+            return r.toString();
+        }
+
+        String uri = r.getURI();
+
+        if (uri == null || uri.isBlank()) {
+            return r.toString();
+        }
+
+        if (prefixModel != null) {
+            String qname = prefixModel.qnameFor(uri);
+            if (qname != null && !qname.isBlank()) {
+                return qname;
+            }
+        }
+
+        String ns = r.getNameSpace();
+        String local = r.getLocalName();
+
+        if (ns != null && local != null) {
+            if (ns.toLowerCase(Locale.ROOT).contains("cim")) {
+                return "cim:" + local;
+            }
+
+            if (ns.toLowerCase(Locale.ROOT).contains("shacl")) {
+                return "sh:" + local;
+            }
+        }
+
+        int hash = uri.lastIndexOf('#');
+        int slash = uri.lastIndexOf('/');
+        int idx = Math.max(hash, slash);
+
+        return idx >= 0 && idx + 1 < uri.length()
+                ? uri.substring(idx + 1)
+                : uri;
+    }
+
+    private static String resolvePathFromSourceShape(Model shapesModel,
+                                                     Resource sourceShapeRes,
+                                                     Model prefixModel) {
+        if (shapesModel == null || sourceShapeRes == null) {
+            return "";
+        }
+
+        Property shPath = ResourceFactory.createProperty(SH_NS + "path");
+
+        Resource sourceInShapesModel = findEquivalentResourceInModel(shapesModel, sourceShapeRes);
+
+        Statement st = null;
+
+        if (sourceInShapesModel != null) {
+            st = shapesModel.getProperty(sourceInShapesModel, shPath);
+        }
+
+        if (st == null) {
+            st = shapesModel.getProperty(sourceShapeRes, shPath);
+        }
+
+        if (st == null) {
+            return "";
+        }
+
+        return renderShaclPath(shapesModel, st.getObject(), new HashSet<>(), prefixModel);
+    }
+
+    private static Resource findEquivalentResourceInModel(Model model, Resource resource) {
+        if (model == null || resource == null) {
+            return null;
+        }
+
+        if (resource.isURIResource()) {
+            return model.getResource(resource.getURI());
+        }
+
+        if (resource.isAnon()) {
+            return model.createResource(resource.getId());
+        }
+
+        return resource;
+    }
 
     private static String getResourceValue(Resource resource) {
         if (resource == null) return "";
@@ -220,5 +430,82 @@ public class ShaclTools {
         //up to here this defines e.g. sh:targetClass cim:GeographicalRegion ;
 
         return shapeModel;
+    }
+
+    private static String renderResultPath(RDFNode resultPathNode,
+                                           Resource sourceShapeRes,
+                                           Model shapesModel,
+                                           Model reportModel,
+                                           Model prefixModel) {
+        String path = "";
+
+        if (resultPathNode != null) {
+            path = renderShaclPathSafe(shapesModel, resultPathNode, prefixModel);
+
+            if (isGeneratedOrUnreadablePath(path)) {
+                path = renderShaclPathSafe(reportModel, resultPathNode, prefixModel);
+            }
+        }
+
+        if (isGeneratedOrUnreadablePath(path) || path.isBlank()) {
+            String fallback = resolvePathFromSourceShape(shapesModel, sourceShapeRes, prefixModel);
+
+            if (!fallback.isBlank()) {
+                path = fallback;
+            }
+        }
+
+        if (path.isBlank() && resultPathNode != null) {
+            path = compact(getNodeValue(resultPathNode), prefixModel);
+        }
+
+        return path;
+    }
+
+    private static String renderShaclPathSafe(Model model, RDFNode pathNode, Model prefixModel) {
+        if (pathNode == null) {
+            return "";
+        }
+
+        if (model == null) {
+            return compact(getNodeValue(pathNode), prefixModel);
+        }
+
+        try {
+            return renderShaclPath(model, pathNode, new HashSet<>(), prefixModel);
+        } catch (Exception ex) {
+            return compact(getNodeValue(pathNode), prefixModel);
+        }
+    }
+
+    private static boolean isGeneratedOrUnreadablePath(String path) {
+        String s = path == null ? "" : path.trim().toLowerCase(Locale.ROOT);
+
+        return s.isBlank()
+                || s.startsWith("urn:uuid:")
+                || s.contains("urn:x-arq:")
+                || s.contains("genid")
+                || s.startsWith("_:")
+                || s.matches("^[a-f0-9\\-]{20,}$");
+    }
+
+    private static RDFNode getStatementObject(Statement statement) {
+        return statement == null ? null : statement.getObject();
+    }
+
+    private static String getNodeValue(RDFNode node) {
+        if (node == null) {
+            return "";
+        }
+
+        if (node.isLiteral()) {
+            return node.asLiteral().getLexicalForm();
+        }
+
+        if (node.isResource()) {
+            return getResourceValue(node.asResource());
+        }
+
+        return node.toString();
     }
 }

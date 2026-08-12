@@ -3,6 +3,7 @@
  * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
  * @author Chavdar Ivanov
  */
+
 package eu.griddigit.cimpal.core.comparators;
 
 import eu.griddigit.cimpal.core.interfaces.IRDFComparator;
@@ -14,30 +15,30 @@ import org.apache.jena.vocabulary.RDFS;
 
 import java.util.*;
 
-public class ComparisonIRDFSprofile implements IRDFComparator {
+public class ComparisonRDFSprofileCIMTool implements IRDFComparator {
 
     public RDFCompareResult compare(Model modelA, Model modelB){
-        RDFCompareResult compareResults = new RDFCompareResult();
+        RDFCompareResult compareResult = new RDFCompareResult();
         //first run - this compared model A with model B. Identified common parts and reports differences. New
         //classes in Model A that are not in Model B are reported
-        compareResults = compareModels(compareResults, modelA, modelB, 0);
+        compareResult = compareModels(compareResult, modelA, modelB, 0);
         //second run - reverse run. Model B is compared to Model A. Only if there are new parts (classes, attributes, associations) in Model B that are not in Model A
         //are reported
-        compareResults = compareModels(compareResults, modelB, modelA, 1);
+        compareResult = compareModels(compareResult, modelB, modelA, 1);
 
-        return compareResults;
+        return compareResult;
 
     }
 
 
     //compares two models (RDFS)
-    private static RDFCompareResult compareModels(RDFCompareResult compareResults, Model modelA, Model modelB, int reverse){
+    private static RDFCompareResult compareModels(RDFCompareResult compareResult, Model modelA, Model modelB, int reverse){
         //iterate on the items found in the rdf file
         String cimNSmodelA=modelA.getNsPrefixURI("cim");
         for (ResIterator i = modelA.listSubjects(); i.hasNext(); ) {
             Resource resItem = i.next();
 
-            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of the rdf:type
+            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
             String rdfType;
             if (rdfTypeInit.length == 1) {
                 rdfType = rdfTypeInit[0];
@@ -46,25 +47,25 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
             }
 
             if (rdfType.equals("ClassCategory")) { // if it is a package
-                compareResults = comparePackage(compareResults, modelB, rdfType, resItem, cimNSmodelA, reverse);
+                compareResult= comparePackage(compareResult, modelB, rdfType, resItem, cimNSmodelA, reverse);
 
             } else if (rdfType.equals("Class")) { // if it is a class
-                compareResults = compareClass(compareResults, modelA, modelB, rdfType, resItem, cimNSmodelA, reverse);
+                compareResult= compareClass(compareResult, modelA, modelB, rdfType, resItem, cimNSmodelA, reverse);
             }
         }
-        return compareResults;
+        return compareResult;
     }
 
     //checks if a subject of a given type is in another model
     private static Map<String,String> contains(Model model, String rdftype, Resource value, String cimNSmodelValue){
-        Map<String,String> result = new HashMap<>();
+        Map<String,String> resultMap = new HashMap<>();
 
         String cimNSmodel=model.getNsPrefixURI("cim");
         //iterate on the items found in the rdf file
         for (ResIterator i = model.listSubjects(); i.hasNext(); ) {
             Resource resItem = i.next();
 
-            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of the rdf:type
+            String[] rdfTypeInit = resItem.getRequiredProperty(RDF.type).getObject().toString().split("#", 2); // the second part of the resource of of the rdf:type
             String rdfType;
             if (rdfTypeInit.length == 1) {
                 rdfType = rdfTypeInit[0];
@@ -79,40 +80,40 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
                 //if resItemNS==cimNSmodel and valueNS==cimNSmodelValue => all is ok ignore
                 if (!resItemNS.equals(cimNSmodel) && valueNS.equals(cimNSmodelValue)) {
                     //if resItemNS!=cimNSmodel and valueNS==cimNSmodelValue => report the change
-                    result.putIfAbsent("namespace",resItemNS);
+                    resultMap.putIfAbsent("namespace",resItemNS);
                 }else if (resItemNS.equals(cimNSmodel) && !valueNS.equals(cimNSmodelValue)) {
                     //if resItemNS==cimNSmodel and valueNS!=cimNSmodelValue => report the change
-                    result.putIfAbsent("namespace",resItemNS);
+                    resultMap.putIfAbsent("namespace",resItemNS);
                 }else if (!resItemNS.equals(cimNSmodel) && !resItemNS.equals(valueNS)) {
                     //if resItemNS!=cimNSmodel and valueNS!=cimNSmodelValue and resItemNS!=valueNS => report the change
-                    result.putIfAbsent("namespace",resItemNS);
+                    resultMap.putIfAbsent("namespace",resItemNS);
                 }
 
                 if (rdfType.equals(rdftype)) {
                     if (rdfType.equals("ClassCategory")) {
-                        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString();
-                        result.putIfAbsent("label",rdfsLabel);
+                        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().asLiteral().getString();
+                        resultMap.putIfAbsent("label",rdfsLabel);
                         if (resItem.hasProperty(RDFS.comment)) {
                             String rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
-                            result.putIfAbsent("comment", rdfsComment);
+                            resultMap.putIfAbsent("comment", rdfsComment);
                         }else{
-                            result.putIfAbsent("comment", "-");// added 30 Oct 2020
+                            resultMap.putIfAbsent("comment", "-");// added 30 Oct 2020
                         }
 
                     }else if (rdfType.equals("Class")){
-                        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString();
-                        result.putIfAbsent("label",rdfsLabel);
+                        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().asLiteral().getString();
+                        resultMap.putIfAbsent("label",rdfsLabel);
                         if (resItem.hasProperty(RDFS.comment)) {
                             String rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
-                            result.putIfAbsent("comment", rdfsComment);
+                            resultMap.putIfAbsent("comment", rdfsComment);
                         }else{
-                            result.putIfAbsent("comment", "-");// added 30 Oct 2020
+                            resultMap.putIfAbsent("comment", "-");// added 30 Oct 2020
                         }
                         if (resItem.hasProperty(RDFS.subClassOf)) {
                             String subClassOf = resItem.getRequiredProperty(RDFS.subClassOf).getObject().toString().split("#", 2)[1];
-                            result.putIfAbsent("subClassOf", subClassOf);
+                            resultMap.putIfAbsent("subClassOf", subClassOf);
                         }else{
-                            result.putIfAbsent("subClassOf", "-"); //added 30 Oct 2020
+                            resultMap.putIfAbsent("subClassOf", "-"); //added 30 Oct 2020
                         }
                         List<String> ClassStereotypes = new LinkedList<>();
                         String enumeration = "false";
@@ -120,37 +121,37 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
                         for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
                             RDFNode resItemNode = j.next();
                             if (resItemNode.isResource()){
-                                if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#enumeration")) {
+                                if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#enumeration") || resItemNode.toString().equals("http://langdale.com.au/2005/UML#enumeration")) {
                                     enumeration = "true";
-                                }else if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#concrete")) {
+                                }else if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#concrete") || resItemNode.toString().equals("http://langdale.com.au/2005/UML#concrete")) {
                                     concreteClass="true";
                                 }
                             }else if (resItemNode.isLiteral()){
                                 ClassStereotypes.add(resItemNode.toString());
                             }
                         }
-                        result.putIfAbsent("enumeration",enumeration);
-                        result.putIfAbsent("concrete",concreteClass);
+                        resultMap.putIfAbsent("enumeration",enumeration);
+                        resultMap.putIfAbsent("concrete",concreteClass);
                         Collections.sort(ClassStereotypes);
                         String stereotypes = String.join(",", ClassStereotypes);
-                        result.putIfAbsent("stereotype",stereotypes);
+                        resultMap.putIfAbsent("stereotype",stereotypes);
                         String ClassBelongsToCategory = "";
                         for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "belongsToCategory")); j.hasNext(); ) {
                             RDFNode resItemNode = j.next();
                             ClassBelongsToCategory = resItemNode.toString().split("#Package_", 2)[1];
                         }
-                        result.putIfAbsent("belongsToCategory",ClassBelongsToCategory);
+                        resultMap.putIfAbsent("belongsToCategory",ClassBelongsToCategory);
 
                     }
                 }
             }
         }
-        return result;
+        return resultMap;
     }
 
     //checks if a property of a given type is in another model
     private static Map<String,String> containsProperty(Model model, String attribute, Resource value, String cimNSmodelValue){
-        Map<String,String> result = new HashMap<>();
+        Map<String,String> resultMap = new HashMap<>();
 
 
         String cimNSmodel=model.getNsPrefixURI("cim");
@@ -165,75 +166,81 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
                 //if resItemNS==cimNSmodel and valueNS==cimNSmodelValue => all is ok ignore
                 if (!resItemNS.equals(cimNSmodel) && valueNS.equals(cimNSmodelValue)) {
                     //if resItemNS!=cimNSmodel and valueNS==cimNSmodelValue => report the change
-                    result.putIfAbsent("namespace",resItemNS);
+                    resultMap.putIfAbsent("namespace",resItemNS);
                 }else if (resItemNS.equals(cimNSmodel) && !valueNS.equals(cimNSmodelValue)) {
                     //if resItemNS==cimNSmodel and valueNS!=cimNSmodelValue => report the change
-                    result.putIfAbsent("namespace",resItemNS);
+                    resultMap.putIfAbsent("namespace",resItemNS);
                 }else if (!resItemNS.equals(cimNSmodel) && !resItemNS.equals(valueNS)) {
                     //if resItemNS!=cimNSmodel and valueNS!=cimNSmodelValue and resItemNS!=valueNS => report the change
-                    result.putIfAbsent("namespace",resItemNS);
+                    resultMap.putIfAbsent("namespace",resItemNS);
                 }
 
-                String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString();
-                result.putIfAbsent("label", rdfsLabel);
+                String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().asLiteral().getString();
+                resultMap.putIfAbsent("label", rdfsLabel);
                 if (resItem.hasProperty(RDFS.comment)) {
                     String rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
-                    result.putIfAbsent("comment", rdfsComment);
+                    resultMap.putIfAbsent("comment", rdfsComment);
                 }else{
-                    result.putIfAbsent("comment", "-"); //added 30 Oct 2020
+                    resultMap.putIfAbsent("comment", "-"); //added 30 Oct 2020
                 }
                 String rdfsDomain = resItem.getRequiredProperty(RDFS.domain).getObject().toString().split("#", 2)[1];
-                result.putIfAbsent("domain", rdfsDomain);
+                resultMap.putIfAbsent("domain", rdfsDomain);
                 List<String> AttrAssocStereotypes = new LinkedList<>();
                 for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
                     RDFNode resItemNode = j.next();
                     if (resItemNode.isLiteral()) {
                         AttrAssocStereotypes.add(resItemNode.toString());
                     }else{ //added 21 June 2021
-                        AttrAssocStereotypes.add(resItemNode.asResource().getLocalName());
+                        if (resItemNode.asResource().getLocalName().equals("byreference")) {
+                            AttrAssocStereotypes.add(resItemNode.asResource().getLocalName());
+                        }
                     }
                 }
                 Collections.sort(AttrAssocStereotypes);
                 String stereotypes = String.join(",", AttrAssocStereotypes);
-                result.putIfAbsent("stereotype", stereotypes);
+                resultMap.putIfAbsent("stereotype", stereotypes);
                 for (NodeIterator j = model.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "multiplicity")); j.hasNext(); ) {
                     RDFNode resItemNode = j.next();
-                    result.putIfAbsent("multiplicity", resItemNode.toString().split("#M:", 2)[1]);
+                    resultMap.putIfAbsent("multiplicity", resItemNode.toString().split("#M:", 2)[1]);
                 }
 
                 if (resItem.hasProperty(RDFS.range)) {// range is used if the type of the attribute is enumeration
                     String rdfsRange = resItem.getRequiredProperty(RDFS.range).getObject().toString().split("#", 2)[1];
-                    result.putIfAbsent("range", rdfsRange);
+                    resultMap.putIfAbsent("range", rdfsRange);
                 }
 
                 if (attribute.equals("true")) {// it is an attribute
                     if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType"))){
                         //the datatype is used for primitive, datatype and compound
                         String dataType = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "dataType")).getObject().toString().split("#", 2)[1];
-                        result.putIfAbsent("dataType", dataType);
+                        resultMap.putIfAbsent("dataType", dataType);
                     }
                     if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed"))){
                         String isFixed = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "isFixed")).getObject().toString();
-                        result.putIfAbsent("isFixed", isFixed);
+                        resultMap.putIfAbsent("isFixed", isFixed);
                     }
 
                 }else { //it is an association
                     if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName"))){
                         String inverseRoleName = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName")).getObject().toString().split("#", 2)[1];
-                        result.putIfAbsent("inverseRoleName", inverseRoleName);
+                        resultMap.putIfAbsent("inverseRoleName", inverseRoleName);
                     }
                     if (resItem.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))){
                         String AssociationUsed = resItem.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed")).getObject().toString();
-                        result.putIfAbsent("AssociationUsed", AssociationUsed);
+                        resultMap.putIfAbsent("AssociationUsed", AssociationUsed);
                     }else{
-                        result.putIfAbsent("AssociationUsed", "-"); //added 21 Jun 2021
+                        if (AttrAssocStereotypes.contains("byreference")) {
+                            resultMap.putIfAbsent("AssociationUsed", "Yes"); //added 21 Jun 2021
+                        }else{
+                            resultMap.putIfAbsent("AssociationUsed", "No"); //added 24 Jun 2021
+                        }
                     }
                 }
             }
         }
-        return result;
+        return resultMap;
     }
-    //adds a line to the compareResults
+    //adds a line to the compareResult
     private static RDFCompareResult addResult(RDFCompareResult compareResult, String item, String property, String valueModelA, String valueModelB) {
         //item; property; value in model A; value in model B
         compareResult.addEntry(new RDFCompareResultEntry(item, property, valueModelA, valueModelB));
@@ -243,7 +250,7 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
     //compare Package
     private static RDFCompareResult comparePackage(RDFCompareResult compareResult, Model modelB, String rdfType, Resource resItem, String cimNSmodelA, int reverse){
         Map<String,String> resultMap = contains(modelB, rdfType, resItem,cimNSmodelA);
-        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString();
+        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().asLiteral().getString();
         String rdfsComment="";
         if (resItem.hasProperty(RDFS.comment)) {
             rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
@@ -280,8 +287,8 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
 
     //compare Class
     private static RDFCompareResult compareClass(RDFCompareResult compareResult, Model modelA, Model modelB, String rdfType, Resource resItem, String cimNSmodelA, int reverse){
-        Map<String, String> resultMap = contains(modelB, rdfType, resItem,cimNSmodelA);
-        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().toString();
+        Map<String,String> resultMap = contains(modelB, rdfType, resItem,cimNSmodelA);
+        String rdfsLabel = resItem.getRequiredProperty(RDFS.label).getObject().asLiteral().getString();
         String rdfsComment="";
         if (resItem.hasProperty(RDFS.comment)) {
             rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
@@ -296,9 +303,9 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
         for (NodeIterator j = modelA.listObjectsOfProperty(resItem, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
             RDFNode resItemNode = j.next();
             if (resItemNode.isResource()){
-                if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#enumeration")) {
+                if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#enumeration") || resItemNode.toString().equals("http://langdale.com.au/2005/UML#enumeration")) {
                     enumeration = "true";
-                }else if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#concrete")) {
+                }else if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#concrete") || resItemNode.toString().equals("http://langdale.com.au/2005/UML#concrete")) {
                     concreteClass="true";
                 }
             }else if (resItemNode.isLiteral()){
@@ -388,15 +395,19 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
             for (NodeIterator j = modelA.listObjectsOfProperty(resItemAttr, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype")); j.hasNext(); ) {
                 RDFNode resItemNode = j.next();
                 if (resItemNode.isResource()){
-                    if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#attribute")) {
+                    if (resItemNode.toString().equals("http://iec.ch/TC57/NonStandard/UML#attribute") || resItemNode.toString().equals("http://langdale.com.au/2005/UML#attribute")) {
                         attribute = "true";
+                    }
+                    if (resItemNode.asResource().getLocalName().equals("byreference")) {
+                        AttrAssocStereotypes.add(resItemNode.asResource().getLocalName());
                     }
                 }else if (resItemNode.isLiteral()){
                     AttrAssocStereotypes.add(resItemNode.toString());
                 }
+
             }
 
-            String rdfsLabel = resItemAttr.getRequiredProperty(RDFS.label).getObject().toString();
+            String rdfsLabel = resItemAttr.getRequiredProperty(RDFS.label).getObject().asLiteral().getString();
             String rdfsComment="";
             if (resItemAttr.hasProperty(RDFS.comment)) {
                 rdfsComment = resItemAttr.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];
@@ -428,10 +439,17 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
                 inverseRoleName = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "inverseRoleName")).getObject().asResource().getLocalName();
             }
             //special for association
-            String AssociationUsed="";
+            String AssociationUsed;
             if (resItemAttr.hasProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed"))) {
                 AssociationUsed = resItemAttr.getRequiredProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "AssociationUsed")).getObject().toString();
+            }else {
+                if (AttrAssocStereotypes.contains("byreference")) {
+                    AssociationUsed = "Yes"; //added 21 Jun 2021
+                } else {
+                    AssociationUsed = "No"; //added 21 Jun 2021
+                }
             }
+
 
 
             Map<String,String> resultMap = new HashMap<>();
@@ -526,7 +544,7 @@ public class ComparisonIRDFSprofile implements IRDFComparator {
                     if (resItemAttr.hasProperty(RDFS.range)) {
                         compareResult = addResult(compareResult, resItemAttr.getLocalName(), "rdfs:range", "-", rdfsRange);
                     }
-                    if (!stereotypes.isEmpty()) {
+                    if (!stereotypes.equals("")) {
                         compareResult = addResult(compareResult, resItemAttr.getLocalName(), "cims:stereotype", "-", stereotypes);
                     }
                     if (attribute.equals("true")) { //it is an attribute

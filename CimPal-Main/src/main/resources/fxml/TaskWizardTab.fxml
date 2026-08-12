@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.TaskWizardController"
+            prefHeight="180.0" prefWidth="200.0">
+    <AnchorPane maxHeight="-Infinity" prefHeight="595.0">
+        <VBox maxHeight="201.0">
+            <BorderPane fx:id="wizardBorderPane" maxHeight="210.0">
+                <top>
+                    <HBox BorderPane.alignment="CENTER">
+                        <Button fx:id="wizardTaskSelectionButton" defaultButton="true"
+                                mnemonicParsing="false" text="Task Selection"/>
+                        <Button fx:id="wizardTaskInputButton" disable="true" mnemonicParsing="false"
+                                text="Task Input"/>
+                        <Button fx:id="wizardTaskStatusButton" disable="true" mnemonicParsing="false"
+                                text="Task Execution Status"/>
+                    </HBox>
+                </top>
+                <center>
+                    <fx:include fx:id="wizardPane" source="wizardPages/taskSelection.fxml"/>
+                </center>
+                <bottom>
+                    <VBox spacing="10">
+                        <HBox/>
+                        <HBox prefHeight="0.0" prefWidth="1264.0" spacing="10">
+                            <Label/>
+                            <Button mnemonicParsing="false" onAction="#backWizardPane" text="Back"/>
+                            <Button fx:id="forwardWizardButton" mnemonicParsing="false"
+                                    onAction="#forwardWizardPane" text="Next"/>
+                        </HBox>
+                    </VBox>
+                </bottom>
+            </BorderPane>
+        </VBox>
+    </AnchorPane>
+</AnchorPane>

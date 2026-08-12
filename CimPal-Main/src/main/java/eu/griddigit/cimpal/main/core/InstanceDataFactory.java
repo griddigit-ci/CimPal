@@ -157,7 +157,7 @@ public class InstanceDataFactory {
         //register custom format
         CustomRDFFormat.RegisterCustomFormatWriters();
 
-        String filename=saveProperties.get("filename").toString().toUpperCase();
+        String filename=saveProperties.get("filename").toString();
         filename=filename.replace(".XML", ".xml"); //TODO make this more intelligent and bring it to GUI
         String showXmlDeclaration=saveProperties.get("showXmlDeclaration").toString();
         String showDoctypeDeclaration=saveProperties.get("showDoctypeDeclaration").toString();

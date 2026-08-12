@@ -82,7 +82,7 @@ public class DataTypeStreamRDF implements StreamRDF {
                     datatype
             );
 
-            Node objectNode = NodeFactory.createLiteral(
+            Node objectNode = NodeFactory.createLiteralDT(
                     typedLiteral.getLexicalForm(),
                     typedLiteral.getDatatype()
             );
@@ -126,6 +126,11 @@ public class DataTypeStreamRDF implements StreamRDF {
 
     public void prefix(String prefix, String iri) {
         this.prefixMapping.put(prefix, iri);
+    }
+
+    @Override
+    public void version(String version) {
+        
     }
 
     public void finish() {
