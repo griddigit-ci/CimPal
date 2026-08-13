@@ -2235,34 +2235,25 @@ public class SHACLFromRDF {
         switch (checkType) {
             case "cardinality":
                 String cardinality = propertyNodeFeatures.get(5).toString();
-                if (cardinality.length() == 1) {
+                //the multiplicity in the RDFS is normally given as x..y, but it can also be given as a single value,
+                //e.g. M:1 or M:2, which means that exactly that number of occurrences is expected
+                int boundsSeparator = cardinality.indexOf("..");
+                if (boundsSeparator < 0) {
+                    lowerBound = parseCardinalityBound(cardinality, 0);
+                    upperBound = parseCardinalityBound(cardinality, 999);
+                } else {
+                    lowerBound = parseCardinalityBound(cardinality.substring(0, boundsSeparator), 0);
+                    upperBound = parseCardinalityBound(cardinality.substring(boundsSeparator + 2), 999);
+                }
+
+                if (lowerBound == 1 && upperBound == 1) {
                     //need to have sh:minCount 1 ; and sh:maxCount 1 ;
                     multiplicity = "required";
-                    lowerBound = 1;
-                    upperBound = 1;
                     shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
 
-                } else if (cardinality.length() == 4) {
+                } else {
                     multiplicity = "seeBounds";
-                    lowerBound = 0;
-                    upperBound = 0;
-
-                    if (Character.isDigit(cardinality.charAt(0))) {
-                        lowerBound = Character.getNumericValue(cardinality.charAt(0));
-                        //propertyNodeFeatures.set(1,"Cardinality violation. Lower bound shall be "+lowerBound);
-                    }
-                    if (Character.isDigit(cardinality.charAt(3))) {
-                        upperBound = Character.getNumericValue(cardinality.charAt(3));
-                        //propertyNodeFeatures.set(1,"Cardinality violation. Upper bound shall be "+upperBound);
-                    } else {
-                        upperBound = 999; // means that no upper bound is defined when we have upper bound "to many"
-                    }
-             /*   if (lowerBound!=1 && upperBound!=1) {//is they are the same 1..1 "Missing required association" is used
-                    propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
-                }else if (lowerBound!=1 && upperBound!=1) {
-                }else if (lowerBound!=1 && upperBound!=1) {
-                }*/
-                    if (lowerBound != 0 && upperBound != 999) { // covers 1..1 x..y excludes 0..n
+                    if (lowerBound != 0 && upperBound != 999) { // covers x..y excludes 0..n
                         if (lowerBound != 1 && upperBound != 1) {//is they are the same 1..1 "Missing required association" is used
                             propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
                         }
@@ -2274,7 +2265,7 @@ public class SHACLFromRDF {
                         propertyNodeFeatures.set(1, "Cardinality violation. Lower bound shall be " + lowerBound);
                         shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
                     }
-
+                    //0..n does not constrain the cardinality, no property shape is needed for it
                 }
                 break;
             case "datatype":
@@ -2831,6 +2822,16 @@ public class SHACLFromRDF {
         }
 
         return shapeModel;
+    }
+
+    //parses one bound of the multiplicity. The given default is used when the bound is not a number, which is the case
+    //for the upper bound "to many", e.g. the n in 1..n
+    private int parseCardinalityBound(String bound, int defaultBound) {
+        try {
+            return Integer.parseInt(bound.trim());
+        } catch (NumberFormatException e) {
+            return defaultBound;
+        }
     }
 
     private Model addPropertyNodeCardinality(Model shapeModel, Resource nodeShapeResource, ArrayList<Object> propertyNodeFeatures, String nsURIprofile, String localName, String propertyFullURI, String multiplicity, Integer lowerBound, Integer upperBound) {
