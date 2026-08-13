@@ -5,6 +5,7 @@ import eu.griddigit.cimpal.core.models.RDFtoSHACLOptions;
 import eu.griddigit.cimpal.core.models.RdfsModelDefinition;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.application.PreferencesController;
+import eu.griddigit.cimpal.main.core.ShaclTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -15,6 +16,7 @@ import javafx.scene.input.MouseEvent;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 
@@ -656,6 +658,18 @@ public class RDFStoSHACLController implements Initializable {
             rdftoSHACL.convert();
             if (cbRDFSSHACLvalidate.isSelected()) {
                 rdftoSHACL.validateShapeModels();
+                List<ValidationReport> validationReports = rdftoSHACL.getValidationReports();
+                for (int r = 0; r < validationReports.size(); r++) {
+                    ValidationReport report = validationReports.get(r);
+                    String profileName = r < RDFSmodelsNames.size() ? RDFSmodelsNames.get(r).getModelName() : String.valueOf(r);
+                    if (report.conforms()) {
+                        System.out.printf("Generated SHACL shapes: %s conform to SHACL-SHACL validation.\n", profileName);
+                    } else {
+                        System.out.printf("Validation failed. Generated SHACL shapes: %s does not conform to the SHACL-SHACL shapes.\n", profileName);
+                        System.out.println("Validation problems:");
+                        ShaclTools.printSHACLreport(report);
+                    }
+                }
             }
 
             // save the generated shapes
