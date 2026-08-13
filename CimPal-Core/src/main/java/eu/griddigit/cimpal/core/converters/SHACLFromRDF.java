@@ -2392,6 +2392,8 @@ public class SHACLFromRDF {
                             o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("LangString")) {
                             o10 = shapeModel.createResource(RDFLangString.rdfLangString.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Language")) {
+                            o10 = shapeModel.createResource(RDFLangString.rdfLangString.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("Version")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("UUID")) {
