@@ -363,10 +363,12 @@ public class SHACLFromRDF {
             if (options.getShaclOutputFormat().equals(RDFtoSHACLOptions.SerializationFormat.RDFXML)) {
                 ext = ".rdf";
             }
-            for (Model shapeModel : shapeModels) {
-                Path savePath = outputDir.resolve(options.getRdfsModelDefinitions().get(shapeModels.indexOf(shapeModel)).getModelName() + ext);
-                try (OutputStream outputStream = new FileOutputStream(savePath.toFile(), true)) {
-                    saveShapeModel(outputStream, shapeModel, options.getRdfsModelDefinitions().get(shapeModels.indexOf(shapeModel)).getBaseUri());
+            for (int s = 0; s < shapeModels.size(); s++) {
+                RdfsModelDefinition modelDefinition = options.getRdfsModelDefinitions().get(s);
+                Path savePath = outputDir.resolve(modelDefinition.getModelName() + ext);
+                //the file is overwritten, in append mode the serialisation of a previous run is kept in the file
+                try (OutputStream outputStream = new FileOutputStream(savePath.toFile())) {
+                    saveShapeModel(outputStream, shapeModels.get(s), modelDefinition.getBaseUri());
                 }
             }
         } else {
@@ -380,10 +382,12 @@ public class SHACLFromRDF {
             if (options.getShaclOutputFormat().equals(RDFtoSHACLOptions.SerializationFormat.RDFXML)) {
                 ext = ".rdf";
             }
-            for (Model shapeModelDT : shapeModelDTs) {
-                Path savePath = outputDir.resolve("datatype-" + options.getRdfsModelDefinitions().get(shapeModelDTs.indexOf(shapeModelDT)).getModelName() + ext);
-                try (OutputStream outputStream = new FileOutputStream(savePath.toFile(), true)) {
-                    saveShapeModel(outputStream, shapeModelDT, options.getRdfsModelDefinitions().get(shapeModelDTs.indexOf(shapeModelDT)).getBaseUri());
+            for (int s = 0; s < shapeModelDTs.size(); s++) {
+                RdfsModelDefinition modelDefinition = options.getRdfsModelDefinitions().get(s);
+                Path savePath = outputDir.resolve("datatype-" + modelDefinition.getModelName() + ext);
+                //the file is overwritten, in append mode the serialisation of a previous run is kept in the file
+                try (OutputStream outputStream = new FileOutputStream(savePath.toFile())) {
+                    saveShapeModel(outputStream, shapeModelDTs.get(s), modelDefinition.getBaseUri());
                 }
             }
         } else {
@@ -393,10 +397,11 @@ public class SHACLFromRDF {
 
     public void saveInheritanceModel(Path outputDir) throws IOException {
         if (!inheritanceModels.isEmpty()) {
-            for (Model inheritanceModel : inheritanceModels) {
-                Path savePath = outputDir.resolve("inheritance-" + options.getRdfsModelDefinitions().get(inheritanceModels.indexOf(inheritanceModel)).getModelName() + ".ttl");
-                try (OutputStream outputStream = new FileOutputStream(savePath.toFile(), true)) {
-                    saveShapeModel(outputStream, inheritanceModel, "");
+            for (int s = 0; s < inheritanceModels.size(); s++) {
+                Path savePath = outputDir.resolve("inheritance-" + options.getRdfsModelDefinitions().get(s).getModelName() + ".ttl");
+                //the file is overwritten, in append mode the serialisation of a previous run is kept in the file
+                try (OutputStream outputStream = new FileOutputStream(savePath.toFile())) {
+                    saveShapeModel(outputStream, inheritanceModels.get(s), "");
                 }
             }
         } else {
