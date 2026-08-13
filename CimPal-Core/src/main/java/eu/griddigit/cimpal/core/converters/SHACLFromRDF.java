@@ -1880,7 +1880,7 @@ public class SHACLFromRDF {
             } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#publisher")) || stmt.getPredicate().equals(DCTerms.publisher)) {
                 shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.publisher, stmt.getObject()));
             } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#identifier")) || stmt.getPredicate().equals(DCTerms.identifier)) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.identifier, ResourceFactory.createPlainLiteral("urn:uuid" + UUID.randomUUID())));
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.identifier, ResourceFactory.createPlainLiteral(UUID.randomUUID().toString())));
             }
         }
         shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.issued, ResourceFactory.createTypedLiteral(String.valueOf(LocalDateTime.now()), XSDDatatype.XSDdateTime)));
