@@ -613,8 +613,11 @@ public class RDFStoSHACLController implements Initializable {
             RDFtoSHACLOptions.RdfsFormatShapes rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.RDFS_AUGMENTED_2020;
             if (rdfFormatcbInput.equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
                 rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.RDFS_AUGMENTED_2019;
-            } else if (rdfFormatcbInput.equals("CIMTool-merged-owl")) {
-                rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.CIMTOOL_MERGED_OWL;
+            } else if (rdfFormatcbInput.equals("Merged OWL CIMTool (NOT READY)")) {
+                //the conversion from merged OWL is not implemented, without this the selection was silently
+                //falling back to the v2020 augmented RDFS conversion
+                showFormatNotSupportedAlert();
+                return;
             }
 
             setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -658,18 +661,9 @@ public class RDFStoSHACLController implements Initializable {
             rdftoSHACL.convert();
             if (cbRDFSSHACLvalidate.isSelected()) {
                 rdftoSHACL.validateShapeModels();
-                List<ValidationReport> validationReports = rdftoSHACL.getValidationReports();
-                for (int r = 0; r < validationReports.size(); r++) {
-                    ValidationReport report = validationReports.get(r);
-                    String profileName = r < RDFSmodelsNames.size() ? RDFSmodelsNames.get(r).getModelName() : String.valueOf(r);
-                    if (report.conforms()) {
-                        System.out.printf("Generated SHACL shapes: %s conform to SHACL-SHACL validation.\n", profileName);
-                    } else {
-                        System.out.printf("Validation failed. Generated SHACL shapes: %s does not conform to the SHACL-SHACL shapes.\n", profileName);
-                        System.out.println("Validation problems:");
-                        ShaclTools.printSHACLreport(report);
-                    }
-                }
+                printSHACLSHACLreports(rdftoSHACL.getValidationReports(), "");
+                //the datatype constraints are in a separate shapes model when the option to split datatypes is selected
+                printSHACLSHACLreports(rdftoSHACL.getValidationReportsDT(), "datatype-");
             }
 
             // save the generated shapes
@@ -703,6 +697,30 @@ public class RDFStoSHACLController implements Initializable {
             alert.setHeaderText(null);
             alert.setTitle("Error - no profile selected");
             alert.showAndWait();
+        }
+    }
+
+    private void showFormatNotSupportedAlert() {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setContentText("Generation of SHACL shapes from merged OWL exported by CIMTool is not implemented. Please select one of the augmented RDFS formats.");
+        alert.setHeaderText(null);
+        alert.setTitle("Error - RDFS format not supported");
+        alert.showAndWait();
+    }
+
+    //prints the outcome of the SHACL-SHACL validation of the generated shapes. The reports are in the same order as
+    //the profiles, the prefix is used to name the shapes file the report belongs to
+    private void printSHACLSHACLreports(List<ValidationReport> validationReports, String namePrefix) {
+        for (int r = 0; r < validationReports.size(); r++) {
+            ValidationReport report = validationReports.get(r);
+            String shapesName = namePrefix + (r < RDFSmodelsNames.size() ? RDFSmodelsNames.get(r).getModelName() : String.valueOf(r));
+            if (report.conforms()) {
+                System.out.printf("Generated SHACL shapes: %s conform to SHACL-SHACL validation.\n", shapesName);
+            } else {
+                System.out.printf("Validation failed. Generated SHACL shapes: %s do not conform to the SHACL-SHACL shapes.\n", shapesName);
+                System.out.println("Validation problems:");
+                ShaclTools.printSHACLreport(report);
+            }
         }
     }
 
@@ -1392,9 +1410,9 @@ public class RDFStoSHACLController implements Initializable {
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2020";
             file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "");
-        } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool")) {
-            rdfFormatInput = "CIMTool-merged-owl";
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Merged OWL CIMTool files", List.of("*.owl"), "");
+        } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool (NOT READY)")) {
+            showFormatNotSupportedAlert();
+            return;
         }
         this.selectedFile = file;
 

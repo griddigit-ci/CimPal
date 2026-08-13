@@ -31,6 +31,7 @@ public class SHACLFromRDF {
     private List<Model> shapeModelDTs;
     private List<Model> inheritanceModels;
     private List<ValidationReport> validationReports;
+    private List<ValidationReport> validationReportsDT;
     private List<Statement> rdfsHeaderStatements;
     private Map<String, Map<String, RDFDatatype>> dataTypeMapFromShapesPerProfile;
 
@@ -40,6 +41,7 @@ public class SHACLFromRDF {
         shapeModelDTs = new ArrayList<>();
         inheritanceModels = new ArrayList<>();
         validationReports = new ArrayList<>();
+        validationReportsDT = new ArrayList<>();
         dataTypeMapFromShapesPerProfile = new HashMap<>();
     }
 
@@ -61,6 +63,10 @@ public class SHACLFromRDF {
 
     public List<ValidationReport> getValidationReports() {
         return validationReports;
+    }
+
+    public List<ValidationReport> getValidationReportsDT() {
+        return validationReportsDT;
     }
 
     public List<Statement> getRdfsHeaderStatements() {
@@ -143,7 +149,10 @@ public class SHACLFromRDF {
 
             switch (rdfCase) {
 
-                case "RDFS2020" -> {
+                //the v2019 and the v2020 augmented RDFS share the same cims: body, the v2020 only adds the
+                //owl:Ontology header. Both the header extraction and the addSHACLheader below are guarded by the
+                //presence of that header, so the same conversion serves both formats.
+                case "RDFS2020", "RDFS2019" -> {
 
                     //Extract RDFS header information
                     if (model.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()) {
@@ -279,8 +288,15 @@ public class SHACLFromRDF {
                             }
                         }
 
+                        //the statements collected above can point to nested blank node structures, e.g. an rdf list for
+                        //a sequence path of a compound attribute, for sh:in or for sh:ignoredProperties. These have to
+                        //be copied as well, otherwise the datatype shapes model is not a valid shapes graph.
                         shapeModelDT.add(datatypeStatementsNS);
+                        shapeModelDT.add(collectBlankNodeStatements(shapeModel, datatypeStatementsNS));
                         shapeModelDT.add(datatypeStatements);
+                        shapeModelDT.add(collectBlankNodeStatements(shapeModel, datatypeStatements));
+                        //only the statements of the datatype shapes themselves are removed, the nested blank nodes are
+                        //left in place because they can be shared with the shapes that stay in this model
                         shapeModel.remove(datatypeStatements);
 
 
@@ -326,6 +342,8 @@ public class SHACLFromRDF {
 
                 }
 
+                default -> throw new UnsupportedOperationException("Generation of SHACL shapes from " + options.getRdfsFormatShapes()
+                        + " is not implemented. Please select one of the augmented RDFS formats.");
             }
             m = m + 1;
         }
@@ -408,6 +426,39 @@ public class SHACLFromRDF {
             ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModel.getGraph());
             validationReports.add(report);
         }
+        //when the option to split datatypes is selected the datatype constraints are moved out of the shape model
+        //into a separate shape model, so they are validated separately, otherwise they are not validated at all
+        for (Model shapeModelDT : shapeModelDTs) {
+            ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModelDT.getGraph());
+            validationReportsDT.add(report);
+        }
+    }
+
+    //collects the statements of the blank nodes that are used as object in the given statements. Nested blank nodes are
+    //followed as well, so that a complete rdf list, e.g. the members of a sequence path, is collected.
+    private List<Statement> collectBlankNodeStatements(Model shapeModel, List<Statement> statements) {
+        List<Statement> blankNodeStatements = new LinkedList<>();
+        List<Resource> blankNodesToVisit = new LinkedList<>();
+        for (Statement statement : statements) {
+            if (statement.getObject().isAnon()) {
+                blankNodesToVisit.add(statement.getObject().asResource());
+            }
+        }
+        List<Resource> visitedBlankNodes = new LinkedList<>();
+        while (!blankNodesToVisit.isEmpty()) {
+            Resource blankNode = blankNodesToVisit.removeFirst();
+            if (visitedBlankNodes.contains(blankNode)) {
+                continue;
+            }
+            visitedBlankNodes.add(blankNode);
+            for (Statement statement : shapeModel.listStatements(blankNode, null, (RDFNode) null).toList()) {
+                blankNodeStatements.add(statement);
+                if (statement.getObject().isAnon()) {
+                    blankNodesToVisit.add(statement.getObject().asResource());
+                }
+            }
+        }
+        return blankNodeStatements;
     }
 
     private void saveShapeModel(OutputStream outputStream, Model shapeModel, String baseURI) {
