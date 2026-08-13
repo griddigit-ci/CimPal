@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.core.converters;
 
 import eu.griddigit.cimpal.core.models.RDFtoSHACLOptions;
 import eu.griddigit.cimpal.core.models.RdfsModelDefinition;
+import eu.griddigit.cimpal.core.utils.MultiplicityTools;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.datatypes.xsd.impl.RDFLangString;
@@ -2235,16 +2236,9 @@ public class SHACLFromRDF {
         switch (checkType) {
             case "cardinality":
                 String cardinality = propertyNodeFeatures.get(5).toString();
-                //the multiplicity in the RDFS is normally given as x..y, but it can also be given as a single value,
-                //e.g. M:1 or M:2, which means that exactly that number of occurrences is expected
-                int boundsSeparator = cardinality.indexOf("..");
-                if (boundsSeparator < 0) {
-                    lowerBound = parseCardinalityBound(cardinality, 0);
-                    upperBound = parseCardinalityBound(cardinality, 999);
-                } else {
-                    lowerBound = parseCardinalityBound(cardinality.substring(0, boundsSeparator), 0);
-                    upperBound = parseCardinalityBound(cardinality.substring(boundsSeparator + 2), 999);
-                }
+                MultiplicityTools.Bounds bounds = MultiplicityTools.parse(cardinality);
+                lowerBound = bounds.lowerBound;
+                upperBound = bounds.upperBound;
 
                 if (lowerBound == 1 && upperBound == 1) {
                     //need to have sh:minCount 1 ; and sh:maxCount 1 ;
@@ -2253,15 +2247,15 @@ public class SHACLFromRDF {
 
                 } else {
                     multiplicity = "seeBounds";
-                    if (lowerBound != 0 && upperBound != 999) { // covers x..y excludes 0..n
+                    if (lowerBound != 0 && upperBound != MultiplicityTools.UNBOUNDED) { // covers x..y excludes 0..n
                         if (lowerBound != 1 && upperBound != 1) {//is they are the same 1..1 "Missing required association" is used
                             propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
                         }
                         shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                    } else if (lowerBound == 0 && upperBound != 999) {//need to cover 0..x
+                    } else if (lowerBound == 0 && upperBound != MultiplicityTools.UNBOUNDED) {//need to cover 0..x
                         propertyNodeFeatures.set(1, "Cardinality violation. Upper bound shall be " + upperBound);
                         shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                    } else if (lowerBound != 0 && upperBound == 999) {//need to cover x..n
+                    } else if (lowerBound != 0 && upperBound == MultiplicityTools.UNBOUNDED) {//need to cover x..n
                         propertyNodeFeatures.set(1, "Cardinality violation. Lower bound shall be " + lowerBound);
                         shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
                     }
@@ -2824,16 +2818,6 @@ public class SHACLFromRDF {
         return shapeModel;
     }
 
-    //parses one bound of the multiplicity. The given default is used when the bound is not a number, which is the case
-    //for the upper bound "to many", e.g. the n in 1..n
-    private int parseCardinalityBound(String bound, int defaultBound) {
-        try {
-            return Integer.parseInt(bound.trim());
-        } catch (NumberFormatException e) {
-            return defaultBound;
-        }
-    }
-
     private Model addPropertyNodeCardinality(Model shapeModel, Resource nodeShapeResource, ArrayList<Object> propertyNodeFeatures, String nsURIprofile, String localName, String propertyFullURI, String multiplicity, Integer lowerBound, Integer upperBound) {
         /*
          * propertyNodeFeatures structure
@@ -2901,12 +2885,14 @@ public class SHACLFromRDF {
                 RDFNode o4 = shapeModel.createTypedLiteral(1, "http://www.w3.org/2001/XMLSchema#integer");
                 r.addProperty(SH.maxCount, o4);
             } else if (multiplicity.equals("seeBounds")) {
-                if (lowerBound < 999 && lowerBound != 0) {
+                if (lowerBound < MultiplicityTools.UNBOUNDED && lowerBound != 0) {
                     //Property p3 = shapeModel.createProperty(shaclURI, "minCount");
                     RDFNode o3 = shapeModel.createTypedLiteral(lowerBound, "http://www.w3.org/2001/XMLSchema#integer");
                     r.addProperty(SH.minCount, o3);
                 }
-                if (upperBound < 999 && upperBound != 0) {
+                //an upper bound of 0, i.e. the multiplicity 0..0, means that the property is not allowed, so
+                //sh:maxCount 0 has to be added as well
+                if (upperBound < MultiplicityTools.UNBOUNDED) {
                     //Property p4 = shapeModel.createProperty(shaclURI, "maxCount");
                     RDFNode o4 = shapeModel.createTypedLiteral(upperBound, "http://www.w3.org/2001/XMLSchema#integer");
                     r.addProperty(SH.maxCount, o4);
