@@ -25,6 +25,7 @@ import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
 import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
+import eu.griddigit.cimpal.core.utils.MultiplicityTools;
 import eu.griddigit.cimpal.main.util.PropertyHolder;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -2397,46 +2398,30 @@ public class ShaclTools {
         switch (checkType) {
             case "cardinality":
                 String cardinality = propertyNodeFeatures.get(5).toString();
-                if (cardinality.length() == 1) {
+                MultiplicityTools.Bounds bounds = MultiplicityTools.parse(cardinality);
+                lowerBound = bounds.lowerBound;
+                upperBound = bounds.upperBound;
+
+                if (lowerBound == 1 && upperBound == 1) {
                     //need to have sh:minCount 1 ; and sh:maxCount 1 ;
                     multiplicity = "required";
-                    lowerBound = 1;
-                    upperBound = 1;
                     shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
 
-                } else if (cardinality.length() == 4) {
+                } else {
                     multiplicity = "seeBounds";
-                    lowerBound = 0;
-                    upperBound = 0;
-
-                    if (Character.isDigit(cardinality.charAt(0))) {
-                        lowerBound = Character.getNumericValue(cardinality.charAt(0));
-                        //propertyNodeFeatures.set(1,"Cardinality violation. Lower bound shall be "+lowerBound);
-                    }
-                    if (Character.isDigit(cardinality.charAt(3))) {
-                        upperBound = Character.getNumericValue(cardinality.charAt(3));
-                        //propertyNodeFeatures.set(1,"Cardinality violation. Upper bound shall be "+upperBound);
-                    } else {
-                        upperBound = 999; // means that no upper bound is defined when we have upper bound "to many"
-                    }
-             /*   if (lowerBound!=1 && upperBound!=1) {//is they are the same 1..1 "Missing required association" is used
-                    propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
-                }else if (lowerBound!=1 && upperBound!=1) {
-                }else if (lowerBound!=1 && upperBound!=1) {
-                }*/
-                    if (lowerBound != 0 && upperBound != 999) { // covers 1..1 x..y excludes 0..n
+                    if (lowerBound != 0 && upperBound != MultiplicityTools.UNBOUNDED) { // covers x..y excludes 0..n
                         if (lowerBound != 1 && upperBound != 1) {//is they are the same 1..1 "Missing required association" is used
                             propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
                         }
                         shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                    } else if (lowerBound == 0 && upperBound != 999) {//need to cover 0..x
+                    } else if (lowerBound == 0 && upperBound != MultiplicityTools.UNBOUNDED) {//need to cover 0..x
                         propertyNodeFeatures.set(1, "Cardinality violation. Upper bound shall be " + upperBound);
                         shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                    } else if (lowerBound != 0 && upperBound == 999) {//need to cover x..n
+                    } else if (lowerBound != 0 && upperBound == MultiplicityTools.UNBOUNDED) {//need to cover x..n
                         propertyNodeFeatures.set(1, "Cardinality violation. Lower bound shall be " + lowerBound);
                         shapeModel = ShaclTools.addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
                     }
-
+                    //0..n does not constrain the cardinality, no property shape is needed for it
                 }
                 break;
             case "datatype":
@@ -3060,12 +3045,14 @@ public class ShaclTools {
                 RDFNode o4 = shapeModel.createTypedLiteral(1, "http://www.w3.org/2001/XMLSchema#integer");
                 r.addProperty(SH.maxCount, o4);
             } else if (multiplicity.equals("seeBounds")) {
-                if (lowerBound < 999 && lowerBound != 0) {
+                if (lowerBound < MultiplicityTools.UNBOUNDED && lowerBound != 0) {
                     //Property p3 = shapeModel.createProperty(shaclURI, "minCount");
                     RDFNode o3 = shapeModel.createTypedLiteral(lowerBound, "http://www.w3.org/2001/XMLSchema#integer");
                     r.addProperty(SH.minCount, o3);
                 }
-                if (upperBound < 999 && upperBound != 0) {
+                //an upper bound of 0, i.e. the multiplicity 0..0, means that the property is not allowed, so
+                //sh:maxCount 0 has to be added as well
+                if (upperBound < MultiplicityTools.UNBOUNDED) {
                     //Property p4 = shapeModel.createProperty(shaclURI, "maxCount");
                     RDFNode o4 = shapeModel.createTypedLiteral(upperBound, "http://www.w3.org/2001/XMLSchema#integer");
                     r.addProperty(SH.maxCount, o4);

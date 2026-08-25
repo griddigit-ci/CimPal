@@ -1,5 +1,6 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
+import eu.griddigit.cimpal.core.utils.MultiplicityTools;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -1680,43 +1681,12 @@ public class DataGeneratorFactory {
         Map<String,Integer> cardinalityMap = new HashMap<>();
 
 
-        String multiplicity ="";
-        int lowerBoundRDF = 0;
-        int upperBoundRDF =0;
         int lowerBound = 0;
         int upperBound =0;
 
-        if (cardinality.length() == 1) {
-            //need to have sh:minCount 1 ; and sh:maxCount 1 ;
-            multiplicity = "required";
-            lowerBoundRDF = 1;
-            upperBoundRDF = 1;
-
-
-        } else if (cardinality.length() == 4) {
-            multiplicity = "seeBounds";
-
-            if (Character.isDigit(cardinality.charAt(0))) {
-                lowerBoundRDF = Character.getNumericValue(cardinality.charAt(0));
-            }
-            if (Character.isDigit(cardinality.charAt(3))) {
-                upperBoundRDF = Character.getNumericValue(cardinality.charAt(3));
-
-            } else {
-                upperBoundRDF = 999; // means that no upper bound is defined when we have upper bound "to many"
-            }
-
-              /*  if (lowerBound != 0 && upperBound != 999) { // covers 1..1 x..y excludes 0..n
-                    if (lowerBound != 1 && upperBound != 1) {//is they are the same 1..1 "Missing required association" is used
-                    }
-
-                } else if (lowerBound == 0 && upperBound != 999) {//need to cover 0..x
-
-                } else if (lowerBound != 0 && upperBound == 999) {//need to cover x..n
-
-                }*/
-
-        }
+        MultiplicityTools.Bounds boundsRDF = MultiplicityTools.parse(cardinality);
+        int lowerBoundRDF = boundsRDF.lowerBound;
+        int upperBoundRDF = boundsRDF.upperBound;
 
         if (shaclContraintResult!=null ) {
             int lowerBoundShacl = 0;

@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.core.converters;
 
 import eu.griddigit.cimpal.core.models.RDFtoSHACLOptions;
 import eu.griddigit.cimpal.core.models.RdfsModelDefinition;
+import eu.griddigit.cimpal.core.utils.MultiplicityTools;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.datatypes.xsd.impl.RDFLangString;
@@ -31,6 +32,7 @@ public class SHACLFromRDF {
     private List<Model> shapeModelDTs;
     private List<Model> inheritanceModels;
     private List<ValidationReport> validationReports;
+    private List<ValidationReport> validationReportsDT;
     private List<Statement> rdfsHeaderStatements;
     private Map<String, Map<String, RDFDatatype>> dataTypeMapFromShapesPerProfile;
 
@@ -40,6 +42,7 @@ public class SHACLFromRDF {
         shapeModelDTs = new ArrayList<>();
         inheritanceModels = new ArrayList<>();
         validationReports = new ArrayList<>();
+        validationReportsDT = new ArrayList<>();
         dataTypeMapFromShapesPerProfile = new HashMap<>();
     }
 
@@ -61,6 +64,10 @@ public class SHACLFromRDF {
 
     public List<ValidationReport> getValidationReports() {
         return validationReports;
+    }
+
+    public List<ValidationReport> getValidationReportsDT() {
+        return validationReportsDT;
     }
 
     public List<Statement> getRdfsHeaderStatements() {
@@ -143,7 +150,10 @@ public class SHACLFromRDF {
 
             switch (rdfCase) {
 
-                case "RDFS2020" -> {
+                //the v2019 and the v2020 augmented RDFS share the same cims: body, the v2020 only adds the
+                //owl:Ontology header. Both the header extraction and the addSHACLheader below are guarded by the
+                //presence of that header, so the same conversion serves both formats.
+                case "RDFS2020", "RDFS2019" -> {
 
                     //Extract RDFS header information
                     if (model.listSubjectsWithProperty(RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")).hasNext()) {
@@ -279,8 +289,15 @@ public class SHACLFromRDF {
                             }
                         }
 
+                        //the statements collected above can point to nested blank node structures, e.g. an rdf list for
+                        //a sequence path of a compound attribute, for sh:in or for sh:ignoredProperties. These have to
+                        //be copied as well, otherwise the datatype shapes model is not a valid shapes graph.
                         shapeModelDT.add(datatypeStatementsNS);
+                        shapeModelDT.add(collectBlankNodeStatements(shapeModel, datatypeStatementsNS));
                         shapeModelDT.add(datatypeStatements);
+                        shapeModelDT.add(collectBlankNodeStatements(shapeModel, datatypeStatements));
+                        //only the statements of the datatype shapes themselves are removed, the nested blank nodes are
+                        //left in place because they can be shared with the shapes that stay in this model
                         shapeModel.remove(datatypeStatements);
 
 
@@ -326,6 +343,8 @@ public class SHACLFromRDF {
 
                 }
 
+                default -> throw new UnsupportedOperationException("Generation of SHACL shapes from " + options.getRdfsFormatShapes()
+                        + " is not implemented. Please select one of the augmented RDFS formats.");
             }
             m = m + 1;
         }
@@ -345,10 +364,12 @@ public class SHACLFromRDF {
             if (options.getShaclOutputFormat().equals(RDFtoSHACLOptions.SerializationFormat.RDFXML)) {
                 ext = ".rdf";
             }
-            for (Model shapeModel : shapeModels) {
-                Path savePath = outputDir.resolve(options.getRdfsModelDefinitions().get(shapeModels.indexOf(shapeModel)).getModelName() + ext);
-                try (OutputStream outputStream = new FileOutputStream(savePath.toFile(), true)) {
-                    saveShapeModel(outputStream, shapeModel, options.getRdfsModelDefinitions().get(shapeModels.indexOf(shapeModel)).getBaseUri());
+            for (int s = 0; s < shapeModels.size(); s++) {
+                RdfsModelDefinition modelDefinition = options.getRdfsModelDefinitions().get(s);
+                Path savePath = outputDir.resolve(modelDefinition.getModelName() + ext);
+                //the file is overwritten, in append mode the serialisation of a previous run is kept in the file
+                try (OutputStream outputStream = new FileOutputStream(savePath.toFile())) {
+                    saveShapeModel(outputStream, shapeModels.get(s), modelDefinition.getBaseUri());
                 }
             }
         } else {
@@ -362,10 +383,12 @@ public class SHACLFromRDF {
             if (options.getShaclOutputFormat().equals(RDFtoSHACLOptions.SerializationFormat.RDFXML)) {
                 ext = ".rdf";
             }
-            for (Model shapeModelDT : shapeModelDTs) {
-                Path savePath = outputDir.resolve("datatype-" + options.getRdfsModelDefinitions().get(shapeModelDTs.indexOf(shapeModelDT)).getModelName() + ext);
-                try (OutputStream outputStream = new FileOutputStream(savePath.toFile(), true)) {
-                    saveShapeModel(outputStream, shapeModelDT, options.getRdfsModelDefinitions().get(shapeModelDTs.indexOf(shapeModelDT)).getBaseUri());
+            for (int s = 0; s < shapeModelDTs.size(); s++) {
+                RdfsModelDefinition modelDefinition = options.getRdfsModelDefinitions().get(s);
+                Path savePath = outputDir.resolve("datatype-" + modelDefinition.getModelName() + ext);
+                //the file is overwritten, in append mode the serialisation of a previous run is kept in the file
+                try (OutputStream outputStream = new FileOutputStream(savePath.toFile())) {
+                    saveShapeModel(outputStream, shapeModelDTs.get(s), modelDefinition.getBaseUri());
                 }
             }
         } else {
@@ -375,10 +398,11 @@ public class SHACLFromRDF {
 
     public void saveInheritanceModel(Path outputDir) throws IOException {
         if (!inheritanceModels.isEmpty()) {
-            for (Model inheritanceModel : inheritanceModels) {
-                Path savePath = outputDir.resolve("inheritance-" + options.getRdfsModelDefinitions().get(inheritanceModels.indexOf(inheritanceModel)).getModelName() + ".ttl");
-                try (OutputStream outputStream = new FileOutputStream(savePath.toFile(), true)) {
-                    saveShapeModel(outputStream, inheritanceModel, "");
+            for (int s = 0; s < inheritanceModels.size(); s++) {
+                Path savePath = outputDir.resolve("inheritance-" + options.getRdfsModelDefinitions().get(s).getModelName() + ".ttl");
+                //the file is overwritten, in append mode the serialisation of a previous run is kept in the file
+                try (OutputStream outputStream = new FileOutputStream(savePath.toFile())) {
+                    saveShapeModel(outputStream, inheritanceModels.get(s), "");
                 }
             }
         } else {
@@ -408,6 +432,39 @@ public class SHACLFromRDF {
             ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModel.getGraph());
             validationReports.add(report);
         }
+        //when the option to split datatypes is selected the datatype constraints are moved out of the shape model
+        //into a separate shape model, so they are validated separately, otherwise they are not validated at all
+        for (Model shapeModelDT : shapeModelDTs) {
+            ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModelDT.getGraph());
+            validationReportsDT.add(report);
+        }
+    }
+
+    //collects the statements of the blank nodes that are used as object in the given statements. Nested blank nodes are
+    //followed as well, so that a complete rdf list, e.g. the members of a sequence path, is collected.
+    private List<Statement> collectBlankNodeStatements(Model shapeModel, List<Statement> statements) {
+        List<Statement> blankNodeStatements = new LinkedList<>();
+        List<Resource> blankNodesToVisit = new LinkedList<>();
+        for (Statement statement : statements) {
+            if (statement.getObject().isAnon()) {
+                blankNodesToVisit.add(statement.getObject().asResource());
+            }
+        }
+        List<Resource> visitedBlankNodes = new LinkedList<>();
+        while (!blankNodesToVisit.isEmpty()) {
+            Resource blankNode = blankNodesToVisit.removeFirst();
+            if (visitedBlankNodes.contains(blankNode)) {
+                continue;
+            }
+            visitedBlankNodes.add(blankNode);
+            for (Statement statement : shapeModel.listStatements(blankNode, null, (RDFNode) null).toList()) {
+                blankNodeStatements.add(statement);
+                if (statement.getObject().isAnon()) {
+                    blankNodesToVisit.add(statement.getObject().asResource());
+                }
+            }
+        }
+        return blankNodeStatements;
     }
 
     private void saveShapeModel(OutputStream outputStream, Model shapeModel, String baseURI) {
@@ -1856,7 +1913,7 @@ public class SHACLFromRDF {
             } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#publisher")) || stmt.getPredicate().equals(DCTerms.publisher)) {
                 shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.publisher, stmt.getObject()));
             } else if (stmt.getPredicate().equals(ResourceFactory.createProperty("http://purl.org/dc/terms/#identifier")) || stmt.getPredicate().equals(DCTerms.identifier)) {
-                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.identifier, ResourceFactory.createPlainLiteral("urn:uuid" + UUID.randomUUID())));
+                shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.identifier, ResourceFactory.createPlainLiteral(UUID.randomUUID().toString())));
             }
         }
         shapeModel.add(ResourceFactory.createStatement(shaclHeaderRes, DCTerms.issued, ResourceFactory.createTypedLiteral(String.valueOf(LocalDateTime.now()), XSDDatatype.XSDdateTime)));
@@ -2206,46 +2263,30 @@ public class SHACLFromRDF {
         switch (checkType) {
             case "cardinality":
                 String cardinality = propertyNodeFeatures.get(5).toString();
-                if (cardinality.length() == 1) {
+                MultiplicityTools.Bounds bounds = MultiplicityTools.parse(cardinality);
+                lowerBound = bounds.lowerBound;
+                upperBound = bounds.upperBound;
+
+                if (lowerBound == 1 && upperBound == 1) {
                     //need to have sh:minCount 1 ; and sh:maxCount 1 ;
                     multiplicity = "required";
-                    lowerBound = 1;
-                    upperBound = 1;
                     shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
 
-                } else if (cardinality.length() == 4) {
+                } else {
                     multiplicity = "seeBounds";
-                    lowerBound = 0;
-                    upperBound = 0;
-
-                    if (Character.isDigit(cardinality.charAt(0))) {
-                        lowerBound = Character.getNumericValue(cardinality.charAt(0));
-                        //propertyNodeFeatures.set(1,"Cardinality violation. Lower bound shall be "+lowerBound);
-                    }
-                    if (Character.isDigit(cardinality.charAt(3))) {
-                        upperBound = Character.getNumericValue(cardinality.charAt(3));
-                        //propertyNodeFeatures.set(1,"Cardinality violation. Upper bound shall be "+upperBound);
-                    } else {
-                        upperBound = 999; // means that no upper bound is defined when we have upper bound "to many"
-                    }
-             /*   if (lowerBound!=1 && upperBound!=1) {//is they are the same 1..1 "Missing required association" is used
-                    propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
-                }else if (lowerBound!=1 && upperBound!=1) {
-                }else if (lowerBound!=1 && upperBound!=1) {
-                }*/
-                    if (lowerBound != 0 && upperBound != 999) { // covers 1..1 x..y excludes 0..n
+                    if (lowerBound != 0 && upperBound != MultiplicityTools.UNBOUNDED) { // covers x..y excludes 0..n
                         if (lowerBound != 1 && upperBound != 1) {//is they are the same 1..1 "Missing required association" is used
                             propertyNodeFeatures.set(1, "Cardinality violation. Cardinality shall be " + cardinality);
                         }
                         shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                    } else if (lowerBound == 0 && upperBound != 999) {//need to cover 0..x
+                    } else if (lowerBound == 0 && upperBound != MultiplicityTools.UNBOUNDED) {//need to cover 0..x
                         propertyNodeFeatures.set(1, "Cardinality violation. Upper bound shall be " + upperBound);
                         shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
-                    } else if (lowerBound != 0 && upperBound == 999) {//need to cover x..n
+                    } else if (lowerBound != 0 && upperBound == MultiplicityTools.UNBOUNDED) {//need to cover x..n
                         propertyNodeFeatures.set(1, "Cardinality violation. Lower bound shall be " + lowerBound);
                         shapeModel = addPropertyNodeCardinality(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localName, propertyFullURI, multiplicity, lowerBound, upperBound);
                     }
-
+                    //0..n does not constrain the cardinality, no property shape is needed for it
                 }
                 break;
             case "datatype":
@@ -2418,6 +2459,8 @@ public class SHACLFromRDF {
                         } else if (propertyNodeFeatures.get(6).toString().equals("URL")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDanyURI.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("LangString")) {
+                            o10 = shapeModel.createResource(RDFLangString.rdfLangString.getURI());
+                        } else if (propertyNodeFeatures.get(6).toString().equals("Language")) {
                             o10 = shapeModel.createResource(RDFLangString.rdfLangString.getURI());
                         } else if (propertyNodeFeatures.get(6).toString().equals("Version")) {
                             o10 = shapeModel.createResource(XSDDatatype.XSDstring.getURI());
@@ -2869,12 +2912,14 @@ public class SHACLFromRDF {
                 RDFNode o4 = shapeModel.createTypedLiteral(1, "http://www.w3.org/2001/XMLSchema#integer");
                 r.addProperty(SH.maxCount, o4);
             } else if (multiplicity.equals("seeBounds")) {
-                if (lowerBound < 999 && lowerBound != 0) {
+                if (lowerBound < MultiplicityTools.UNBOUNDED && lowerBound != 0) {
                     //Property p3 = shapeModel.createProperty(shaclURI, "minCount");
                     RDFNode o3 = shapeModel.createTypedLiteral(lowerBound, "http://www.w3.org/2001/XMLSchema#integer");
                     r.addProperty(SH.minCount, o3);
                 }
-                if (upperBound < 999 && upperBound != 0) {
+                //an upper bound of 0, i.e. the multiplicity 0..0, means that the property is not allowed, so
+                //sh:maxCount 0 has to be added as well
+                if (upperBound < MultiplicityTools.UNBOUNDED) {
                     //Property p4 = shapeModel.createProperty(shaclURI, "maxCount");
                     RDFNode o4 = shapeModel.createTypedLiteral(upperBound, "http://www.w3.org/2001/XMLSchema#integer");
                     r.addProperty(SH.maxCount, o4);
