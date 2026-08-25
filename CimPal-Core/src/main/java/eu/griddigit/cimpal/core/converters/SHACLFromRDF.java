@@ -837,11 +837,20 @@ public class SHACLFromRDF {
                             //RDFNode o = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
                             Resource nodeShapeResourceClassProp = shapeModel.getResource(nsURIprofile + resItem.getLocalName() + "-AllowedProperties");
 
+                            Set<String> addedPropPaths = new HashSet<>();
+                            for (Statement s : shapeModel.listStatements(nodeShapeResourceClassProp, SH.property, (RDFNode) null).toList()) {
+                                Resource bn = s.getObject().asResource();
+                                StmtIterator pit = shapeModel.listStatements(bn, path, (RDFNode) null);
+                                if (pit.hasNext()) addedPropPaths.add(pit.next().getObject().toString());
+                            }
                             for (Statement stmtP : localInheritPropertiesNoInverse) {
-                                Resource resbn = ResourceFactory.createResource();
-                                Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
-                                nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
-                                shapeModel.add(stmtbnP);
+                                String propURI = stmtP.getSubject().getURI();
+                                if (addedPropPaths.add(propURI)) {
+                                    Resource resbn = ResourceFactory.createResource();
+                                    Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(propURI));
+                                    nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
+                                    shapeModel.add(stmtbnP);
+                                }
                             }
 
 
@@ -1163,11 +1172,20 @@ public class SHACLFromRDF {
                                 //RDFNode o = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
                                 Resource nodeShapeResourceClassProp = shapeModel.getResource(nsURIprofile + resItem.getLocalName() + "-AllowedProperties");
 
+                                Set<String> addedPropPaths = new HashSet<>();
+                                for (Statement s : shapeModel.listStatements(nodeShapeResourceClassProp, SH.property, (RDFNode) null).toList()) {
+                                    Resource bn = s.getObject().asResource();
+                                    StmtIterator pit = shapeModel.listStatements(bn, path, (RDFNode) null);
+                                    if (pit.hasNext()) addedPropPaths.add(pit.next().getObject().toString());
+                                }
                                 for (Statement stmtP : localInheritPropertiesNoInverse) {
-                                    Resource resbn = ResourceFactory.createResource();
-                                    Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
-                                    nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
-                                    shapeModel.add(stmtbnP);
+                                    String propURI = stmtP.getSubject().getURI();
+                                    if (addedPropPaths.add(propURI)) {
+                                        Resource resbn = ResourceFactory.createResource();
+                                        Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(propURI));
+                                        nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
+                                        shapeModel.add(stmtbnP);
+                                    }
                                 }
 
 
@@ -1483,11 +1501,20 @@ public class SHACLFromRDF {
                                         //RDFNode o = shapeModel.createResource(nsURIprofile + "AllowedClasses-property");
                                         Resource nodeShapeResourceClassProp = shapeModel.getResource(nsURIprofile + resBaseItem.getLocalName() + "-AllowedProperties");
 
-                                        for (Statement stmtP : localInheritProperties) {
-                                            Resource resbn = ResourceFactory.createResource();
-                                            Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(stmtP.getSubject().getURI()));
-                                            nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
-                                            shapeModel.add(stmtbnP);
+                                        Set<String> addedPropPaths = new HashSet<>();
+                                        for (Statement s : shapeModel.listStatements(nodeShapeResourceClassProp, SH.property, (RDFNode) null).toList()) {
+                                            Resource bn = s.getObject().asResource();
+                                            StmtIterator pit = shapeModel.listStatements(bn, path, (RDFNode) null);
+                                            if (pit.hasNext()) addedPropPaths.add(pit.next().getObject().toString());
+                                        }
+                                        for (Statement stmtP : localInheritPropertiesNoInverse) {
+                                            String propURI = stmtP.getSubject().getURI();
+                                            if (addedPropPaths.add(propURI)) {
+                                                Resource resbn = ResourceFactory.createResource();
+                                                Statement stmtbnP = ResourceFactory.createStatement(resbn, path, ResourceFactory.createProperty(propURI));
+                                                nodeShapeResourceClassProp.addProperty(SH.property, asProperty(resbn));
+                                                shapeModel.add(stmtbnP);
+                                            }
                                         }
 
 
