@@ -1501,6 +1501,13 @@ public class SHACLFromRDF {
 //                            }
                             // get concrete classes from base profile
                             LinkedList<Resource> concreteClassesBase = getConcreteSubclassesFromBase(resItem, baseTier1Map, baseTier2Map, baseTier3Map);
+                            // In Simple mode (no separate base profiles) baseTier1Map holds the profile model
+                            // itself, but getConcreteSubclassesFromBase is gated on isBaseprofilesshaclglag()
+                            // so it returns empty. Fall back to the abstract class itself as the shape target:
+                            // sh:targetClass on an abstract class covers all its concrete instances in SHACL.
+                            if (concreteClassesBase.isEmpty() && !options.isBaseprofilesshaclglag()) {
+                                concreteClassesBase.add(resItem);
+                            }
                             for (Resource resBaseItem : concreteClassesBase) {
 
                                 //add the NodeShape
