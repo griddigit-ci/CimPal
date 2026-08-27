@@ -90,10 +90,11 @@ public class ValidationByMappingController {
         cbValidationWorkflow.getSelectionModel().select("Validate by mapping file");
 
         cbDatatypeMap.getItems().setAll(
+                "CGMES 3.0 / NC 2.5",
                 "CGMES 3.0 / NC 2.4",
                 "CGMES 2.4 / NC 2.2"
         );
-        cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.4");
+        cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.5");
 
         tfXmlBaseUri.setText("http://iec.ch/TC57/CIM100");
 
@@ -151,6 +152,7 @@ public class ValidationByMappingController {
         installHelpTooltip(
                 helpDatatypeMap,
                 "Select the CGMES and NC version combination used to load the datatype mapping for validation.\n\n" +
+                        "CGMES 3.0 / NC 2.5 uses the CIM17 / CGMES 3 / NC 2.5 datatype map.\n\n" +
                         "CGMES 3.0 / NC 2.4 uses the CIM17 / CGMES 3 / NC 2.4 datatype map.\n\n" +
                         "CGMES 2.4 / NC 2.2 uses the CIM16 / CGMES 2.4 / NC 2.2 datatype map."
         );
@@ -307,7 +309,7 @@ public class ValidationByMappingController {
         }
 
         cbValidationWorkflow.getSelectionModel().select("Validate by mapping file");
-        cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.4");
+        cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.5");
 
         tfXmlBaseUri.setText("http://iec.ch/TC57/CIM100");
 
@@ -349,7 +351,8 @@ public class ValidationByMappingController {
                         CompleteDatatypeMapLoader.loadFromResource(datatypeMapResource);
 
                 if (runTimestampedWorkflow) {
-                    List<Path> reports = ValidationTools.validateByTimestampedMapping(
+                    ValidationTools.ValidationTimestampedRunSummary tsResult =
+                            ValidationTools.validateByTimestampedMapping(
                             selectedMappingFile.toPath(),
                             selectedModelsInputFolder.toPath(),
                             selectedConstraintsRootFolder.toPath(),
@@ -359,6 +362,7 @@ public class ValidationByMappingController {
                             xmlBase,
                             previousComparisonCsv
                     );
+                    List<Path> reports = tsResult.reports();
 
                     System.out.println("Created report count: " + reports.size());
                     for (Path report : reports) {
@@ -366,7 +370,7 @@ public class ValidationByMappingController {
                     }
 
                 } else {
-                    Path report = ValidationTools.validateByMapping(
+                    ValidationTools.ValidationRunSummary result = ValidationTools.validateByMapping(
                             selectedMappingFile.toPath(),
                             selectedModelsInputFolder.toPath(),
                             selectedConstraintsRootFolder.toPath(),
@@ -375,6 +379,7 @@ public class ValidationByMappingController {
                             dataTypeMap,
                             xmlBase
                     );
+                    Path report = result.reportPath();
 
                     System.out.println("Report saved to: " + report);
 
@@ -468,6 +473,7 @@ public class ValidationByMappingController {
         return switch (selected) {
             case "CGMES 2.4 / NC 2.2" -> "/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties";
             case "CGMES 3.0 / NC 2.4" -> "/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties";
+            case "CGMES 3.0 / NC 2.5" -> "/CompleteDatatypeMap_CIM17_CGMES3_NC25.properties";
             default -> throw new IllegalStateException("Unknown datatype map: " + selected);
         };
     }

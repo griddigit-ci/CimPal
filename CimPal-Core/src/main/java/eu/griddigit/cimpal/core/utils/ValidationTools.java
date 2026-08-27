@@ -60,6 +60,10 @@ public class ValidationTools {
     static final Map<String, Model> REMOTE_IMPORTS_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Object> REMOTE_URL_LOCKS = new ConcurrentHashMap<>();
 
+    // Cache for XML files downloaded from remote URLs (GitHub / HTTP)
+    private static final Path REMOTE_XML_CACHE_DIR = initRemoteXmlCacheDir();
+    private static final Map<String, Path> REMOTE_XML_FILE_CACHE = new ConcurrentHashMap<>();
+
     private static final String XML_REPORT_PREFIX =
             "C:\\GitHub\\relicapgrid\\Instance\\";
 
@@ -104,7 +108,7 @@ public class ValidationTools {
      * mid-process from md:FullModel (scenarioTime / startDate) per timestamp group; it is not a
      * parameter.
      */
-    public static List<Path> validateByTimestampedMapping(Path mappingCsvPath,
+    public static ValidationTimestampedRunSummary validateByTimestampedMapping(Path mappingCsvPath,
                                                           Path inputPath,
                                                           Path constraintsRoot,
                                                           Path outputBaseDir,
@@ -145,6 +149,9 @@ public class ValidationTools {
 
         Map<String, Model> shapesCache = new ConcurrentHashMap<>();
         List<Path> createdReports = new ArrayList<>();
+        int totalConforming = 0;
+        int totalViolations = 0;
+        int totalErrors    = 0;
 
         List<InputGroup> inputGroups = prepareTimestampedInputGroups(inputPath, outputBaseDir);
 
@@ -242,6 +249,12 @@ public class ValidationTools {
                                     + inputGroup.name + " " + timestampGroup.timestamp);
                         }
 
+                        for (ValidationTaskResult r : results) {
+                            if (r.error != null) totalErrors++;
+                            else if (r.conforms)  totalConforming++;
+                            else                  totalViolations++;
+                        }
+
                         // NEW: analysis name derived from md:FullModel (scenarioTime / startDate)
                         String monthLabel = deriveMonthLabel(timestampGroup, resolvedRows);
                         String analysisName = monthLabel + " Analysis";
@@ -330,7 +343,7 @@ public class ValidationTools {
         dbg("DONE validateByTimestampedMapping", allStart);
         printMemory("end validateByTimestampedMapping");
 
-        return createdReports;
+        return new ValidationTimestampedRunSummary(createdReports, totalConforming, totalViolations, totalErrors);
     }
 
     // NEW: analysis month helpers -------------------------------------------------
@@ -389,7 +402,7 @@ public class ValidationTools {
      *  - validate data model vs shapes model
      *  - write one Excel report: one sheet per CaseFolder
      */
-    public static Path validateByMapping(Path mappingCsvPath,
+    public static ValidationRunSummary validateByMapping(Path mappingCsvPath,
                                          Path modelsBaseDir,
                                          Path constraintsRoot,
                                          Path outputBaseDir,
@@ -648,7 +661,7 @@ public class ValidationTools {
         dbg("DONE validateByMapping", allStart);
         printMemory("end validateByMapping");
 
-        return reportPath;
+        return new ValidationRunSummary(reportPath, ok, fail, err);
     }
 
     // ---------------- core validation per row ----------------
@@ -889,19 +902,27 @@ public class ValidationTools {
                 + " raw=" + shortValue(row.xmlInputsRaw, 300));
 
         for (String token : tokens) {
-            dbg("START expandToken token=" + token);
-
             long start = System.currentTimeMillis();
-            List<Path> expanded = expandToken(modelsBaseDir, token);
+            List<Path> expanded;
 
-            dbg("DONE expandToken token=" + token
-                    + " matches=" + expanded.size(), start);
+            if (isUrlToken(token)) {
+                dbg("START expandUrlToken token=" + token);
+                expanded = expandUrlToken(token);
+                dbg("DONE expandUrlToken token=" + token
+                        + " matches=" + expanded.size(), start);
+            } else {
+                dbg("START expandToken token=" + token);
+                expanded = expandToken(modelsBaseDir, token);
+                dbg("DONE expandToken token=" + token
+                        + " matches=" + expanded.size(), start);
+            }
 
             if (expanded.isEmpty()) {
                 missingInputs.add(token);
 
                 dbg("MISSING XML input token=" + token
-                        + " resolvedAgainst=" + modelsBaseDir.toAbsolutePath());
+                        + (isUrlToken(token) ? " (URL, could not download)"
+                                             : " resolvedAgainst=" + modelsBaseDir.toAbsolutePath()));
             } else {
                 existingFiles.addAll(expanded);
             }
@@ -1525,6 +1546,310 @@ public class ValidationTools {
                 .trim();
     }
 
+    // ---------------- remote XML download (GitHub / HTTP) ----------------
+
+    private static Path initRemoteXmlCacheDir() {
+        Path dir = Paths.get(System.getProperty("java.io.tmpdir"), "cimpal_remote_xml_cache");
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            System.err.println("[WARN] Could not create remote XML cache dir: " + dir + " \u2013 " + e.getMessage());
+        }
+        return dir;
+    }
+
+    private static boolean isUrlToken(String token) {
+        return token.startsWith("https://") || token.startsWith("http://");
+    }
+
+    /**
+     * Converts GitHub UI URLs to raw content URLs so the file content is directly downloadable.
+     *   https://github.com/owner/repo/blob/branch/path \u2192 https://raw.githubusercontent.com/owner/repo/branch/path
+     *   https://github.com/owner/repo/raw/branch/path  \u2192 https://raw.githubusercontent.com/owner/repo/branch/path
+     * Other URLs are returned unchanged.
+     */
+    private static String toRawUrl(String url) {
+        if (url.startsWith("https://github.com/") || url.startsWith("http://github.com/")) {
+            int hostEnd = url.indexOf('/', url.indexOf("//") + 2);
+            String rest = url.substring(hostEnd + 1); // owner/repo/TYPE/branch/path
+            String[] segs = rest.split("/", 4);        // [owner, repo, type, tail]
+            if (segs.length == 4 && (segs[2].equals("blob") || segs[2].equals("raw"))) {
+                return "https://raw.githubusercontent.com/" + segs[0] + "/" + segs[1] + "/" + segs[3];
+            }
+        }
+        return url;
+    }
+
+    /**
+     * Expands a URL token (possibly containing a glob in the last segment) to a list of local Paths.
+     *   No glob: downloads the single file to the local cache.
+     *   Glob:    uses the GitHub Contents API to list the directory, filters by glob pattern,
+     *            then downloads each matching file.
+     */
+    private static List<Path> expandUrlToken(String token) throws IOException {
+        String norm = cleanToken(token).replace("\\", "/");
+        boolean hasGlob = norm.contains("*") || norm.contains("?") || norm.contains("[");
+
+        if (!hasGlob) {
+            if (!norm.toLowerCase(Locale.ROOT).endsWith(".xml")) {
+                dbg("expandUrlToken skip non-xml url=" + norm);
+                return List.of();
+            }
+            try {
+                Path p = downloadXmlToCache(norm);
+                dbg("expandUrlToken downloaded url=" + norm + " local=" + p);
+                return List.of(p);
+            } catch (IOException e) {
+                dbg("expandUrlToken download failed url=" + norm + " error=" + e.getMessage());
+                return List.of();
+            }
+        }
+
+        // Glob: directory URL is everything before the last '/'
+        int lastSlash = norm.lastIndexOf('/');
+        String dirUrl  = norm.substring(0, lastSlash);
+        String pattern = norm.substring(lastSlash + 1);
+
+        String apiUrl = buildGitHubContentsApiUrl(dirUrl);
+        if (apiUrl == null) {
+            dbg("expandUrlToken cannot map dirUrl to GitHub Contents API: " + dirUrl);
+            return List.of();
+        }
+
+        dbg("expandUrlToken glob pattern=" + pattern + " apiUrl=" + apiUrl);
+
+        List<GitHubApiEntry> entries;
+        try {
+            entries = fetchGitHubDirectoryContents(apiUrl);
+        } catch (IOException e) {
+            dbg("expandUrlToken GitHub API fetch failed apiUrl=" + apiUrl + " error=" + e.getMessage());
+            return List.of();
+        }
+
+        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+
+        List<Path> matches = new ArrayList<>();
+        for (GitHubApiEntry entry : entries) {
+            if (entry.downloadUrl() == null || entry.downloadUrl().isBlank()) continue;
+            if (!entry.name().toLowerCase(Locale.ROOT).endsWith(".xml")) continue;
+            if (!matcher.matches(Paths.get(entry.name()))) continue;
+            try {
+                matches.add(downloadXmlToCache(entry.downloadUrl()));
+                dbg("expandUrlToken glob match name=" + entry.name());
+            } catch (IOException e) {
+                dbg("expandUrlToken glob download failed name=" + entry.name() + " error=" + e.getMessage());
+            }
+        }
+
+        matches.sort(Comparator.comparing(p -> p.getFileName().toString()));
+        dbg("expandUrlToken glob matches=" + matches.size() + " token=" + token);
+        return matches;
+    }
+
+    /**
+     * Downloads an XML file from {@code url} to the local cache directory and returns its Path.
+     * Files are cached by URL hash; subsequent calls for the same URL return immediately.
+     */
+    private static Path downloadXmlToCache(String url) throws IOException {
+        Path existing = REMOTE_XML_FILE_CACHE.get(url);
+        if (existing != null) {
+            dbg("downloadXmlToCache memory-hit url=" + url);
+            return existing;
+        }
+
+        String rawUrl = toRawUrl(url);
+        String hash = sha256Hex(rawUrl);
+        String fileName = rawUrl.substring(rawUrl.lastIndexOf('/') + 1);
+        int q = fileName.indexOf('?');
+        if (q >= 0) fileName = fileName.substring(0, q);
+        fileName = fileName.toLowerCase(Locale.ROOT).endsWith(".xml")
+                ? hash + "_" + fileName
+                : hash + ".xml";
+
+        Path target = REMOTE_XML_CACHE_DIR.resolve(fileName);
+
+        if (!Files.exists(target)) {
+            dbg("downloadXmlToCache fetch rawUrl=" + rawUrl);
+            byte[] bytes = fetchHttpBytes(rawUrl);
+            Path tmp = REMOTE_XML_CACHE_DIR.resolve(fileName + ".tmp");
+            Files.createDirectories(REMOTE_XML_CACHE_DIR);
+            Files.write(tmp, bytes);
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            dbg("downloadXmlToCache saved bytes=" + bytes.length + " local=" + target);
+        } else {
+            dbg("downloadXmlToCache disk-hit rawUrl=" + rawUrl + " local=" + target);
+        }
+
+        REMOTE_XML_FILE_CACHE.put(url, target);
+        return target;
+    }
+
+    private static byte[] fetchHttpBytes(String url) throws IOException {
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.connectTimeoutMs()))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+
+        HttpRequest.Builder req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.readTimeoutMs()));
+
+        addGitHubAuthHeader(req, url);
+
+        HttpResponse<byte[]> response;
+        try {
+            response = client.send(req.GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("HTTP request interrupted: " + url, e);
+        }
+
+        int status = response.statusCode();
+        if (status == 404) throw new IOException("HTTP 404 Not Found: " + url);
+        if (status < 200 || status >= 300) throw new IOException("HTTP " + status + ": " + url);
+        return response.body();
+    }
+
+    /**
+     * Converts a GitHub directory URL to the GitHub Contents API URL.
+     *   https://github.com/owner/repo/tree/branch/path \u2192 https://api.github.com/repos/owner/repo/contents/path?ref=branch
+     *   https://raw.githubusercontent.com/owner/repo/branch/path \u2192 same
+     */
+    private static String buildGitHubContentsApiUrl(String dirUrl) {
+        if (dirUrl.startsWith("https://github.com/") || dirUrl.startsWith("http://github.com/")) {
+            int hostEnd = dirUrl.indexOf('/', dirUrl.indexOf("//") + 2);
+            String rest = dirUrl.substring(hostEnd + 1); // owner/repo/tree/branch/path
+            String[] segs = rest.split("/", 4);           // [owner, repo, type, tail]
+            if (segs.length < 4) return null;
+            String owner = segs[0], repo = segs[1], tail = segs[3]; // tail = branch/path
+            int slash = tail.indexOf('/');
+            if (slash < 0) return null;
+            String branch = tail.substring(0, slash);
+            String path   = tail.substring(slash + 1);
+            return "https://api.github.com/repos/" + owner + "/" + repo + "/contents/" + path + "?ref=" + branch;
+        }
+
+        if (dirUrl.startsWith("https://raw.githubusercontent.com/") || dirUrl.startsWith("http://raw.githubusercontent.com/")) {
+            // raw.githubusercontent.com/owner/repo/branch/path
+            String noScheme = dirUrl.substring(dirUrl.indexOf("//") + 2);
+            String[] segs = noScheme.split("/", 5); // [host, owner, repo, branch, path]
+            if (segs.length < 5) return null;
+            String owner = segs[1], repo = segs[2], branch = segs[3], path = segs[4];
+            return "https://api.github.com/repos/" + owner + "/" + repo + "/contents/" + path + "?ref=" + branch;
+        }
+
+        return null;
+    }
+
+    private static List<GitHubApiEntry> fetchGitHubDirectoryContents(String apiUrl) throws IOException {
+        dbg("fetchGitHubDirectoryContents url=" + apiUrl);
+
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.connectTimeoutMs()))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+
+        HttpRequest.Builder req = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl))
+                .timeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.readTimeoutMs()))
+                .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", "2022-11-28");
+
+        addGitHubAuthHeader(req, apiUrl);
+
+        HttpResponse<String> response;
+        try {
+            response = client.send(req.GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("HTTP request interrupted: " + apiUrl, e);
+        }
+
+        int status = response.statusCode();
+        if (status == 404) throw new IOException("HTTP 404 Not Found: " + apiUrl);
+        if (status < 200 || status >= 300) throw new IOException("HTTP " + status + ": " + apiUrl);
+
+        return parseGitHubContentsJson(response.body());
+    }
+
+    private static void addGitHubAuthHeader(HttpRequest.Builder req, String url) {
+        String token = System.getenv("GITHUB_TOKEN");
+        if (token != null && !token.isBlank()
+                && (url.contains("github.com") || url.contains("githubusercontent.com"))) {
+            req.header("Authorization", "Bearer " + token);
+        }
+    }
+
+    private record GitHubApiEntry(String name, String downloadUrl) {}
+
+    /**
+     * Minimal JSON parser for the GitHub Contents API array response.
+     * Extracts "name", "type", and "download_url" from each object in the array.
+     * No external dependencies \u2014 uses only basic string operations.
+     */
+    private static List<GitHubApiEntry> parseGitHubContentsJson(String json) {
+        List<GitHubApiEntry> entries = new ArrayList<>();
+        for (String obj : splitJsonTopLevelObjects(json)) {
+            String name = extractJsonString(obj, "name");
+            String type = extractJsonString(obj, "type");
+            String dlUrl = extractJsonString(obj, "download_url");
+            if (name != null && "file".equals(type)) {
+                entries.add(new GitHubApiEntry(name, dlUrl));
+            }
+        }
+        return entries;
+    }
+
+    /** Splits a JSON array string into its top-level object substrings. */
+    private static List<String> splitJsonTopLevelObjects(String json) {
+        List<String> objects = new ArrayList<>();
+        int depth = 0;
+        int start = -1;
+        boolean inStr = false;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (inStr) {
+                if (c == '\\') i++;           // skip escaped character
+                else if (c == '"') inStr = false;
+            } else {
+                switch (c) {
+                    case '"' -> inStr = true;
+                    case '{' -> { if (depth++ == 0) start = i; }
+                    case '}' -> { if (--depth == 0 && start >= 0) { objects.add(json.substring(start, i + 1)); start = -1; } }
+                    default -> { /* ignore */ }
+                }
+            }
+        }
+        return objects;
+    }
+
+    /** Extracts the string value for {@code key} from a single JSON object string. */
+    private static String extractJsonString(String obj, String key) {
+        String search = "\"" + key + "\"";
+        int ki = obj.indexOf(search);
+        if (ki < 0) return null;
+
+        int ci = obj.indexOf(':', ki + search.length());
+        if (ci < 0) return null;
+
+        int vi = ci + 1;
+        while (vi < obj.length() && Character.isWhitespace(obj.charAt(vi))) vi++;
+        if (vi >= obj.length() || obj.startsWith("null", vi)) return null;
+        if (obj.charAt(vi) != '"') return null;
+
+        StringBuilder sb = new StringBuilder();
+        int i = vi + 1;
+        while (i < obj.length()) {
+            char c = obj.charAt(i);
+            if (c == '"') break;
+            if (c == '\\') { i++; if (i < obj.length()) sb.append(obj.charAt(i)); }
+            else sb.append(c);
+            i++;
+        }
+        return sb.toString();
+    }
+
     static LoadShapesResult loadShapesWithImports(ShapeSource root,
                                                   Path constraintsRoot,
                                                   Map<String, Model> cache) throws IOException {
@@ -1589,6 +1914,7 @@ public class ValidationTools {
                     + " src=" + src.displayName(), readStart);
 
             shapes.add(tmp);
+            shapes.setNsPrefixes(tmp.getNsPrefixMap());
 
             StmtIterator it = tmp.listStatements(null, OWL.imports, (RDFNode) null);
             int importsInFile = 0;
@@ -1732,13 +2058,13 @@ public class ValidationTools {
     private static Model loadRemoteCached(String url) throws IOException {
         Model existing = REMOTE_IMPORTS_CACHE.get(url);
         if (existing != null) {
-            return ModelFactory.createDefaultModel().add(existing);
+            return copyWithPrefixes(existing);
         }
         Object lock = REMOTE_URL_LOCKS.computeIfAbsent(url, k -> new Object());
         synchronized (lock) {
             Model existing2 = REMOTE_IMPORTS_CACHE.get(url);
             if (existing2 != null) {
-                return ModelFactory.createDefaultModel().add(existing2);
+                return copyWithPrefixes(existing2);
             }
             dbg("SHAPES remote fetch start url=" + url);
             long fetchStart = System.currentTimeMillis();
@@ -1746,8 +2072,12 @@ public class ValidationTools {
             dbg("SHAPES remote fetch done url=" + url
                     + " triples=" + fetched.size(), fetchStart);
             REMOTE_IMPORTS_CACHE.put(url, fetched);
-            return ModelFactory.createDefaultModel().add(fetched);
+            return copyWithPrefixes(fetched);
         }
+    }
+
+    private static Model copyWithPrefixes(Model src) {
+        return ModelFactory.createDefaultModel().add(src).setNsPrefixes(src.getNsPrefixMap());
     }
 
     private static Model fetchRemoteModel(String url) throws IOException {
@@ -1886,6 +2216,7 @@ public class ValidationTools {
 
     private static Model parseTtlBytes(byte[] bytes, String baseUrl) throws IOException {
         bytes = fixDoubleAngleBracket(bytes);
+        bytes = injectSparqlPrefixes(bytes);
         Lang lang = detectLang(baseUrl);
         Model m = ModelFactory.createDefaultModel();
         try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes)) {
@@ -1909,6 +2240,44 @@ public class ValidationTools {
         String s = new String(bytes, StandardCharsets.UTF_8);
         String f = s.replace("<<https://", "<https://").replace("<<http://", "<http://");
         return f.length() == s.length() && f.equals(s) ? bytes : f.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Jena SHACL does not reliably resolve prefixes in sh:select/sh:ask SPARQL queries from
+     * sh:PrefixDeclaration resources in the shapes graph when models are merged across imports.
+     * This fix collects the Turtle/SPARQL PREFIX declarations at the top of the file and injects
+     * them verbatim at the start of every sh:select and sh:ask triple-quoted string, ensuring
+     * the SPARQL parser always has the full prefix context for each query.
+     */
+    private static byte[] injectSparqlPrefixes(byte[] bytes) {
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String[] lines = s.split("\n", -1);
+
+        // Collect PREFIX declarations: both SPARQL-style (PREFIX foo: <...>) and
+        // Turtle-style (@prefix foo: <...> .) — converting the latter to SPARQL form.
+        StringBuilder prefixBlock = new StringBuilder();
+        for (String line : lines) {
+            String t = line.trim();
+            if (t.startsWith("PREFIX ") || t.startsWith("prefix ")) {
+                prefixBlock.append(t).append("\n");
+            } else if (t.startsWith("@prefix ") || t.startsWith("@PREFIX ")) {
+                String sparql = t
+                    .replaceFirst("(?i)^@prefix\\s+", "PREFIX ")
+                    .replaceFirst("\\s*\\.$", "");
+                prefixBlock.append(sparql).append("\n");
+            }
+        }
+        if (prefixBlock.length() == 0) return bytes;
+
+        String injection = "\n" + prefixBlock;
+        String trigger1 = "sh:select \"\"\"";
+        String trigger2 = "sh:ask \"\"\"";
+        boolean changed = s.contains(trigger1) || s.contains(trigger2);
+        if (!changed) return bytes;
+
+        String fixed = s.replace(trigger1, trigger1 + injection)
+                        .replace(trigger2, trigger2 + injection);
+        return fixed.getBytes(StandardCharsets.UTF_8);
     }
 
     private static Lang detectLang(String url) {
@@ -4288,4 +4657,14 @@ public class ValidationTools {
     }
 
     record LoadShapesResult(Model model, int importsFound, int loadedFiles, int unresolvableImports) {}
+
+    public record ValidationRunSummary(Path reportPath, int conforming, int violations, int errors) {
+        public boolean hasViolations() { return violations > 0 || errors > 0; }
+        public int totalRows() { return conforming + violations + errors; }
+    }
+
+    public record ValidationTimestampedRunSummary(List<Path> reports, int conforming, int violations, int errors) {
+        public boolean hasViolations() { return violations > 0 || errors > 0; }
+        public int totalRows() { return conforming + violations + errors; }
+    }
 }
