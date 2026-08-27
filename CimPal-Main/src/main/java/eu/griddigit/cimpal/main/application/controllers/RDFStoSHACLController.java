@@ -574,6 +574,7 @@ public class RDFStoSHACLController implements Initializable {
                 }
             } else {
                 rdfsToShaclGuiMapBool.put("shaclflagCount", false);
+                rdfsToShaclGuiMapBool.put("shaclflagCountDefaultURI", true);
             }
 
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
