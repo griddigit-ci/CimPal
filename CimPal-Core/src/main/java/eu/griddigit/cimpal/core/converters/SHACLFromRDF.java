@@ -1571,7 +1571,7 @@ public class SHACLFromRDF {
                                             StmtIterator pit = shapeModel.listStatements(bn, path, (RDFNode) null);
                                             if (pit.hasNext()) addedPropPaths.add(pit.next().getObject().toString());
                                         }
-                                        for (Statement stmtP : localInheritPropertiesNoInverse) {
+                                        for (Statement stmtP : localInheritProperties) {
                                             String propURI = stmtP.getSubject().getURI();
                                             if (addedPropPaths.add(propURI)) {
                                                 Resource resbn = ResourceFactory.createResource();
