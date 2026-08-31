@@ -6,7 +6,7 @@
     <parent>
         <groupId>eu.griddigit.CimPal</groupId>
         <artifactId>CimPal</artifactId>
-        <version>2026.8.31.1</version>
+        <version>2026.8.31.2</version>
     </parent>
 
     <artifactId>CimPal-Main</artifactId>
@@ -159,6 +159,9 @@
                                 <requiresJdk>false</requiresJdk>
                                 <requires64Bit>false</requires64Bit>
                                 <minVersion>25</minVersion>
+                                <opts>
+                                    <opt>-Dprism.order=sw</opt>
+                                </opts>
                             </jre>
                             <versionInfo>
                                 <fileVersion>${cimpal.version}</fileVersion>
