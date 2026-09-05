@@ -1,0 +1,75 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: Dracula
+ * The canonical Dracula palette - #282a36 background, #f8f8f2 foreground, purple and
+ * pink accents. Accent tones are darkened from the reference palette so white text on
+ * a selection bar still clears WCAG AA.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #282a36;
+    -fx-background:                   #21222c;
+    -fx-control-inner-background:     #2f3140;
+    -fx-control-inner-background-alt: #282a36;
+    -fx-accent:                       #5b3a9e;
+    -fx-focus-color:                  #bd93f9;
+    -fx-faint-focus-color:            #bd93f922;
+    -fx-selection-bar:                #5b3a9e;
+    -fx-selection-bar-non-focused:    #3b3d4d;
+    -fx-default-button:               #44475a;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #f8f8f2;
+    -fx-dark-text-color:              #21222c;
+    -fx-text-base-color:              #f8f8f2;
+    -fx-text-background-color:        #f8f8f2;
+    -fx-text-inner-color:             #f8f8f2;
+    -fx-mid-text-color:               #a9adc1;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #f8f8f2;
+    -cimpal-text-muted:      #a9adc1;
+    -cimpal-text-disabled:   #9096ad;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #282a36;
+    -cimpal-surface-2:       #383a4a;
+    -cimpal-border:          #565872;
+    -cimpal-badge-bg:        #383a4a;
+    -cimpal-badge-border:    #bd93f9;
+    -cimpal-badge-text:      #ff79c6;
+    -cimpal-warning:         #ff6e6e;
+}
+
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover {
+    -fx-background-color: -fx-focus-color, -cimpal-surface-2;
+}
+
+.titled-pane > .title > .text {
+    -fx-fill: -cimpal-badge-text;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-border-color: transparent transparent -fx-focus-color transparent;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-text-fill: -fx-focus-color;
+}
+
+.titled-pane > .title,
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 4 4 0 0;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: #50fa7b;
+}

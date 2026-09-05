@@ -15,7 +15,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="SHACL files:" wrapText="true" />
-            <Label fx:id="helpShaclFiles" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpShaclFiles" text="?" styleClass="help-badge"/>
             <TextField fx:id="fPathShaclFilesToOrganize" editable="false" HBox.hgrow="ALWAYS" />
             <Button mnemonicParsing="false" onAction="#actionBrowseShaclFilesToOrganize" text="Browse" />
         </HBox>
@@ -24,7 +24,7 @@
                 <Insets left="5.0" right="5.0" top="5.0" />
             </padding>
             <Label minWidth="90.0" text="Excel template file:" wrapText="true" />
-            <Label fx:id="helpExcelTemplate" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpExcelTemplate" text="?" styleClass="help-badge"/>
             <TextField fx:id="fPathXLSfileForShacl" editable="false" HBox.hgrow="ALWAYS" />
             <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShacl" text="Browse" />
         </HBox>

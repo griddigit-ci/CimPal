@@ -35,7 +35,7 @@
 
                     <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="0">
                         <Label text="RDF file A (Model A):" wrapText="true"/>
-                        <Label fx:id="helpRdfFileA" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpRdfFileA" text="?" styleClass="help-badge"/>
                     </HBox>
                     <TextField fx:id="fPathRdffile1"
                                editable="false"
@@ -51,7 +51,7 @@
 
                     <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="0">
                         <Label text="RDF file B (Model B):" wrapText="true"/>
-                        <Label fx:id="helpRdfFileB" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpRdfFileB" text="?" styleClass="help-badge"/>
                     </HBox>
                     <TextField fx:id="fPathRdffile2"
                                editable="false"
@@ -67,7 +67,7 @@
 
                     <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0">
                         <Label text="RDF scope and format:" wrapText="true"/>
-                        <Label fx:id="helpScopeFormat" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpScopeFormat" text="?" styleClass="help-badge"/>
                     </HBox>
                     <HBox spacing="10.0"
                           GridPane.rowIndex="2"
@@ -81,7 +81,7 @@
                                   mnemonicParsing="false"
                                   text="Assume same CIM namespace"
                                   wrapText="true" />
-                        <Label fx:id="helpSameCimNS" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpSameCimNS" text="?" styleClass="help-badge"/>
                     </HBox>
                 </GridPane>
 
@@ -90,7 +90,7 @@
                               mnemonicParsing="false"
                               text="Assume same Profile/Ontology namespace for prefix:"
                               wrapText="true" />
-                    <Label fx:id="helpProfileNS" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                    <Label fx:id="helpProfileNS" text="?" styleClass="help-badge"/>
                     <TextField fx:id="fPrefixRDFCompare"
                                HBox.hgrow="ALWAYS" />
                 </HBox>

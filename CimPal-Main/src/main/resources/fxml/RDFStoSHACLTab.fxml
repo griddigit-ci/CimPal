@@ -9,6 +9,7 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.control.TreeView?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
@@ -54,7 +55,7 @@
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
                 <Label minWidth="140.0" text="Save datatypes map:" wrapText="true" />
-                <Label fx:id="helpDatatypeMap" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpDatatypeMap" text="?" styleClass="help-badge"/>
                 <ChoiceBox fx:id="fselectDatatypeMapDefineConstraints" disable="true" minWidth="250.0" HBox.hgrow="ALWAYS">
                     <tooltip>
                         <Tooltip text="During the conversion process a datatype mapping can be generated. Please select one of the three options. This datatype mapping can be used in the process to validate instance data using Shape graph." wrapText="true">
@@ -70,7 +71,7 @@
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
                 <Label minWidth="140.0" text="Profile(s) version:" wrapText="true" />
-                <Label fx:id="helpProfileVersion" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpProfileVersion" text="?" styleClass="help-badge"/>
                 <ChoiceBox fx:id="cbProfilesVersionCreateCompleteSMTab" disable="true" minWidth="250.0" HBox.hgrow="ALWAYS">
                     <tooltip>
                         <Tooltip text="This is the profile version of the RDFS profile(s) that were imported." wrapText="true">
@@ -86,7 +87,7 @@
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
                 <Label minWidth="140.0" text="Shapes namespace:" />
-                <Label fx:id="helpShapesNamespace" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpShapesNamespace" text="?" styleClass="help-badge"/>
                 <VBox spacing="10.0" HBox.hgrow="ALWAYS">
                     <CheckBox fx:id="cbApplyDefNsDesignTab" disable="true" mnemonicParsing="false" onAction="#cbApplyDefNamespace" prefWidth="250.0" text="Apply default namespace" />
                     <HBox>
@@ -106,7 +107,7 @@
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
                 <Label minWidth="140.0" text="Shapes base URI:" />
-                <Label fx:id="helpShapesBaseUri" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpShapesBaseUri" text="?" styleClass="help-badge"/>
                 <VBox spacing="10.0" HBox.hgrow="ALWAYS">
                     <CheckBox fx:id="cbApplyDefBaseURIDesignTab" disable="true" mnemonicParsing="false" onAction="#cbApplyDefBaseURI" prefWidth="250.0" text="Apply default base URI" />
                     <TextField fx:id="fshapesBaseURICreateCompleteSMTab" />
@@ -117,7 +118,7 @@
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
                 <Label minWidth="140.0" text="Shapes owl:imports URIs:" />
-                <Label fx:id="helpOwlImports" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpOwlImports" text="?" styleClass="help-badge"/>
                 <TextField fx:id="fowlImportsCreateCompleteSMTab" HBox.hgrow="ALWAYS" />
             </HBox>
             <HBox spacing="10.0">
@@ -125,41 +126,43 @@
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
                 <Label minWidth="140.0" text="RDFS format:" wrapText="true" />
-                <Label fx:id="helpRdfsFormat" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpRdfsFormat" text="?" styleClass="help-badge"/>
                 <ChoiceBox fx:id="fcbRDFSformatShapes" minWidth="400.0" />
             </HBox>
-            <HBox spacing="10.0">
+            <!-- The option rows below are FlowPanes so their long labels reflow onto extra
+                 lines instead of overflowing the tab on a narrower window. -->
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpAbstractGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpAbstractGroup" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="cbRDFSSHACLabstract" disable="true" mnemonicParsing="false" text="Generate shapes for local properties of concrete and abstract classes, i.e. do not trace inferitance when generating" />
                 <CheckBox fx:id="cbRDFSSHACLinheritTree" disable="true" mnemonicParsing="false" text="Export inheritance tree" />
-            </HBox>
-            <HBox spacing="10.0">
+            </FlowPane>
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpShInGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpShInGroup" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="cbRDFSSHACLoption1" disable="true" mnemonicParsing="false" selected="true" text="Use sh:in for association value type constraint instead of sh:class and sh:or" />
                 <CheckBox fx:id="cbRDFSSHACLoptionTypeWithOne" disable="true" mnemonicParsing="false" selected="true" text="Use sh:class for association value type constraint instead of sh:in in case value type is one class only" />
-            </HBox>
-            <HBox spacing="10.0">
+            </FlowPane>
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpDescrGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpDescrGroup" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="cbRDFSSHACLoptionDescr" disable="true" mnemonicParsing="false" selected="true" text="Exclude IdentifiedObject.mRID for classes stereotypes with Description" />
-            </HBox>
-            <HBox spacing="10.0">
+            </FlowPane>
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpBaseProfilesGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpBaseProfilesGroup" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles" disable="true" mnemonicParsing="false" selected="true" text="Consider related profiles for cross profile value type shapes" />
                 <CheckBox fx:id="cbRDFSSHACLoptionBaseprofilesIgnoreNS" disable="true" mnemonicParsing="false" text="Ignore namespace if class not found in base profile (i.e. search by class name only)" />
-            </HBox>
-            <HBox spacing="10.0">
+            </FlowPane>
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
@@ -168,25 +171,32 @@
                 </VBox.margin>
                 <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles2nd" disable="true" mnemonicParsing="false" text="Consider 2nd set of related profiles for cross profile value type shapes" />
                 <CheckBox fx:id="cbRDFSSHACLoptionBaseprofiles3rd" disable="true" mnemonicParsing="false" text="Consider 3rd set of related profiles for cross profile value type shapes">
-                    <HBox.margin>
+                    <FlowPane.margin>
                         <Insets left="20.0" />
-                    </HBox.margin>
+                    </FlowPane.margin>
                 </CheckBox>
-            </HBox>
-            <HBox spacing="10.0">
+            </FlowPane>
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpConstraintsGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpConstraintsGroup" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="cbRDFSSHACLoptionInverse" disable="true" mnemonicParsing="false" selected="true" text="Create contstraints for checking multiplicity of inverse association's end" />
                 <CheckBox fx:id="cbRDFSSHACLoptionProperty" disable="true" mnemonicParsing="false" selected="true" text="Create constraints for checking presence of additional properties (i.e. properties not defined in the profile)" />
-            </HBox>
+            </FlowPane>
+            <FlowPane hgap="10.0" vgap="6.0">
+                <padding>
+                    <Insets left="5.0" right="5.0" top="5.0" />
+                </padding>
+                <Label fx:id="helpCountNsGroup" text="?" styleClass="help-badge"/>
+                <CheckBox fx:id="cbRDFSSHACLoptionCount" disable="true" mnemonicParsing="false" selected="true" text="Create sh:Info constraints to count number of classes" />
+            </FlowPane>
+            <!-- Namespace controls kept on their own HBox row so fURISHACLcommon can still
+                 stretch with hgrow; folding them into the row above made the tab 1412px wide. -->
             <HBox spacing="10.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpCountNsGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
-                <CheckBox fx:id="cbRDFSSHACLoptionCount" disable="true" mnemonicParsing="false" selected="true" text="Create sh:Info constraints to count number of classes" />
                 <Label minWidth="-Infinity" text="Namespace type:" />
                 <ChoiceBox fx:id="shaclNSCommonType" disable="true" minWidth="250.0">
                     <tooltip>
@@ -202,22 +212,22 @@
                 <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
                 <TextField fx:id="fURISHACLcommon" HBox.hgrow="ALWAYS" />
             </HBox>
-            <HBox spacing="10.0">
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpUriNcGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpUriNcGroup" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="cbRDFSSHACLuri" disable="true" mnemonicParsing="false" selected="true" text="Treat URI datatype as rdf:resource" />
                 <CheckBox fx:id="cbRDFSSHACLncProp" disable="true" mnemonicParsing="false" selected="true" text="Skip value type checks for associations to nc:PropertyReference" />
-            </HBox>
-            <HBox spacing="10.0">
+            </FlowPane>
+            <FlowPane hgap="10.0" vgap="6.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
                 </padding>
-                <Label fx:id="helpValidateGroup" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpValidateGroup" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="cbRDFSSHACLvalidate" disable="true" mnemonicParsing="false" selected="true" text="Validate generated SHACL shapes" />
                 <CheckBox fx:id="cbRDFSSHACLdatatypesplit" disable="true" mnemonicParsing="false" text="Generate separate SHACL shapes for datatypes validation" />
-            </HBox>
+            </FlowPane>
         </VBox>
     </HBox>
   </ScrollPane>

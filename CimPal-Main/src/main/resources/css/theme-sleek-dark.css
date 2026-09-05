@@ -1,0 +1,57 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: Sleek Dark Mode
+ * Neutral dark greys with a muted blue accent.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #2b2b2b;
+    -fx-background:                   #1e1e1e;
+    -fx-control-inner-background:     #313335;
+    -fx-control-inner-background-alt: #2b2d2f;
+    -fx-accent:                       #2f6ba3;
+    -fx-focus-color:                  #6aa9e0;
+    -fx-faint-focus-color:            #6aa9e022;
+    -fx-selection-bar:                #2f6ba3;
+    -fx-selection-bar-non-focused:    #3a3d3f;
+    -fx-default-button:               #35536f;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #e6e6e6;
+    -fx-dark-text-color:              #1a1a1a;
+    -fx-text-base-color:              #e6e6e6;
+    -fx-text-background-color:        #e6e6e6;
+    -fx-text-inner-color:             #e6e6e6;
+    -fx-mid-text-color:               #b0b0b0;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #e6e6e6;
+    -cimpal-text-muted:      #b0b0b0;
+    -cimpal-text-disabled:   #9a9a9a;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #2b2b2b;
+    -cimpal-surface-2:       #3a3d3f;
+    -cimpal-border:          #5a5e60;
+    -cimpal-badge-bg:        #3c3f41;
+    -cimpal-badge-border:    #6aa9e0;
+    -cimpal-badge-text:      #e6e6e6;
+    -cimpal-warning:         #ff8a8a;
+}
+
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 3;
+}
+
+.menu-bar {
+    -fx-border-color: transparent transparent -cimpal-border transparent;
+}
+
+.titled-pane > .title,
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 3 3 0 0;
+}

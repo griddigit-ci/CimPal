@@ -1,0 +1,67 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: Solarized Dark
+ * Solarized base03/base02 surfaces with the cyan/blue accents. Canonical Solarized body
+ * text (base0 #839496) is only ~3:1 on base03, so the foreground is lifted to base1/base2
+ * to clear WCAG AA. The hues stay Solarized; the lightness does not.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #073642;   /* base02 */
+    -fx-background:                   #002b36;   /* base03 */
+    -fx-control-inner-background:     #093f4c;
+    -fx-control-inner-background-alt: #073642;
+    -fx-accent:                       #1c6070;
+    -fx-focus-color:                  #2aa198;   /* cyan */
+    -fx-faint-focus-color:            #2aa19822;
+    -fx-selection-bar:                #1c6070;
+    -fx-selection-bar-non-focused:    #0d4653;
+    -fx-default-button:               #1c6070;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #eee8d5;
+    -fx-dark-text-color:              #002b36;
+    -fx-text-base-color:              #eee8d5;   /* base2 */
+    -fx-text-background-color:        #eee8d5;
+    -fx-text-inner-color:             #eee8d5;
+    -fx-mid-text-color:               #b7b8a8;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #eee8d5;
+    -cimpal-text-muted:      #b7b8a8;
+    -cimpal-text-disabled:   #9aa39d;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #073642;
+    -cimpal-surface-2:       #0d4653;
+    -cimpal-border:          #2c6a78;
+    -cimpal-badge-bg:        #073642;
+    -cimpal-badge-border:    #2aa198;
+    -cimpal-badge-text:      #6fd4cc;
+    -cimpal-warning:         #f08a84;
+}
+
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 3;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover {
+    -fx-background-color: -fx-focus-color, -cimpal-surface-2;
+}
+
+.titled-pane > .title,
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 3 3 0 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-text-fill: -cimpal-badge-text;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: -fx-focus-color;
+}

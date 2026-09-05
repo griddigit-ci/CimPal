@@ -36,18 +36,7 @@
                 <Label text="Validation workflow:" wrapText="true"/>
                 <Label fx:id="helpValidationWorkflow"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <ChoiceBox fx:id="cbValidationWorkflow" minWidth="350.0" HBox.hgrow="ALWAYS"/>
@@ -58,18 +47,7 @@
                 <Label text="Mapping CSV file:" wrapText="true"/>
                 <Label fx:id="helpMappingCsvFile"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <TextField fx:id="tfMappingCsvFile"
@@ -88,18 +66,7 @@
                 <Label text="Models / input root folder:" wrapText="true"/>
                 <Label fx:id="helpModelsInputFolder"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <TextField fx:id="tfModelsInputFolder"
@@ -118,18 +85,7 @@
                 <Label text="Constraints root folder:" wrapText="true"/>
                 <Label fx:id="helpConstraintsRootFolder"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <TextField fx:id="tfConstraintsRootFolder"
@@ -148,18 +104,7 @@
                 <Label text="Output folder:" wrapText="true"/>
                 <Label fx:id="helpOutputFolder"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <TextField fx:id="tfOutputFolder"
@@ -178,18 +123,7 @@
                 <Label text="Datatype map:" wrapText="true"/>
                 <Label fx:id="helpDatatypeMap"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <ChoiceBox fx:id="cbDatatypeMap" minWidth="350.0" HBox.hgrow="ALWAYS"/>
@@ -200,18 +134,7 @@
                 <Label text="XML base URI:" wrapText="true"/>
                 <Label fx:id="helpXmlBaseUri"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <TextField fx:id="tfXmlBaseUri"
@@ -224,18 +147,7 @@
                 <Label text="Previous comparison CSV:" wrapText="true"/>
                 <Label fx:id="helpPreviousComparisonCsv"
                        text="?"
-                       style="-fx-background-color: #e0e0e0;
-                              -fx-background-radius: 20;
-                              -fx-border-color: #808080;
-                              -fx-border-radius: 20;
-                              -fx-text-fill: #333333;
-                              -fx-font-weight: bold;
-                              -fx-alignment: center;
-                              -fx-min-width: 18px;
-                              -fx-min-height: 18px;
-                              -fx-pref-width: 18px;
-                              -fx-pref-height: 18px;
-                              -fx-cursor: hand;"/>
+                       styleClass="help-badge"/>
             </HBox>
 
             <TextField fx:id="tfPreviousComparisonCsv"
@@ -252,7 +164,9 @@
 
         <Region VBox.vgrow="ALWAYS"/>
 
-        <ProgressBar fx:id="pbValidationByMapping" prefWidth="Infinity" progress="0.0"/>
+        <!-- maxWidth, not prefWidth: prefWidth="Infinity" made the whole tab report an
+             infinite preferred width. maxWidth is what makes it stretch to the container. -->
+        <ProgressBar fx:id="pbValidationByMapping" maxWidth="Infinity" progress="0.0"/>
 
         <HBox alignment="BOTTOM_RIGHT" spacing="10.0" VBox.vgrow="NEVER">
             <Button minWidth="90.0"

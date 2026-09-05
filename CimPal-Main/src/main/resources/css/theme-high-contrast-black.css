@@ -1,0 +1,94 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: High Contrast Black (accessibility)
+ * Pure black surfaces, pure white text, yellow focus. Every text token clears WCAG AAA
+ * (7:1) rather than merely AA, and borders are 2px so control boundaries stay visible
+ * for low-vision users.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #000000;
+    -fx-background:                   #000000;
+    -fx-control-inner-background:     #000000;
+    -fx-control-inner-background-alt: #0d0d0d;
+    -fx-accent:                       #0050a0;
+    -fx-focus-color:                  #ffff00;
+    -fx-faint-focus-color:            #ffff0033;
+    -fx-selection-bar:                #0050a0;
+    -fx-selection-bar-non-focused:    #303030;
+    -fx-default-button:               #0050a0;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #ffffff;
+    -fx-dark-text-color:              #000000;
+    -fx-text-base-color:              #ffffff;
+    -fx-text-background-color:        #ffffff;
+    -fx-text-inner-color:             #ffffff;
+    -fx-mid-text-color:               #e0e0e0;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #ffffff;
+    -cimpal-text-muted:      #e0e0e0;
+    -cimpal-text-disabled:   #c0c0c0;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #000000;
+    -cimpal-surface-2:       #1a1a1a;
+    -cimpal-border:          #ffffff;
+    -cimpal-badge-bg:        #000000;
+    -cimpal-badge-border:    #ffff00;
+    -cimpal-badge-text:      #ffff00;
+    -cimpal-warning:         #ff8080;
+}
+
+/* --- 2px borders everywhere so control boundaries are unmistakable --- */
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button,
+.text-field, .text-area {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 0;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover {
+    -fx-background-color: -fx-focus-color, -fx-base;
+    -fx-text-fill: -fx-focus-color;
+}
+
+.button:focused, .toggle-button:focused, .check-box:focused, .radio-button:focused,
+.text-field:focused, .text-area:focused, .choice-box:focused, .combo-box-base:focused,
+.tree-view:focused, .list-view:focused, .table-view:focused {
+    -fx-border-color: -fx-focus-color;
+    -fx-border-width: 2;
+}
+
+.menu-bar,
+.titled-pane > .title,
+.table-view .column-header-background,
+.tree-table-view .column-header-background {
+    -fx-border-color: -cimpal-border;
+    -fx-border-width: 0 0 2 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-border-color: transparent transparent -fx-focus-color transparent;
+    -fx-border-width: 0 0 3 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-text-fill: -fx-focus-color;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-padding: 0 2 0 2;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-radius: 0;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: -fx-focus-color;
+    -fx-background-radius: 0;
+}

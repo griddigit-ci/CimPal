@@ -10,10 +10,12 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ButtonBar?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
@@ -141,8 +143,29 @@
                   <Region VBox.vgrow="ALWAYS"/>
                </VBox>
          </Tab>
-         <Tab disable="true" text="Application">
-            <AnchorPane minHeight="0.0" minWidth="0.0"/>
+         <Tab text="Application">
+            <VBox minHeight="0.0" minWidth="0.0" spacing="10.0">
+               <padding>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+               </padding>
+               <TitledPane animated="false" collapsible="false" maxWidth="1.7976931348623157E308"
+                           minHeight="0.0" text="Themes" VBox.vgrow="ALWAYS">
+                  <VBox minHeight="0.0" spacing="8.0">
+                     <padding>
+                        <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+                     </padding>
+                     <Label text="Applied immediately as a preview. Press OK to keep it, Cancel to revert."
+                            wrapText="true"/>
+                     <fx:define>
+                        <ToggleGroup fx:id="themeToggleGroup"/>
+                     </fx:define>
+                     <!-- Populated from ThemeManager.Theme.values() by PreferencesController. -->
+                     <ScrollPane fitToWidth="true" minHeight="0.0" VBox.vgrow="ALWAYS">
+                        <VBox fx:id="themeRadioContainer" minHeight="0.0" spacing="4.0"/>
+                     </ScrollPane>
+                  </VBox>
+               </TitledPane>
+            </VBox>
          </Tab>
       </TabPane>
    </HBox>

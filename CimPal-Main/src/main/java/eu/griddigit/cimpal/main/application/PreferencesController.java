@@ -5,10 +5,17 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.main.gui.ThemeManager;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.geometry.Insets;
+import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Toggle;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.apache.commons.io.FileUtils;
 
@@ -35,6 +42,16 @@ public class PreferencesController implements Initializable {
     @FXML
     private TextField furiOther;
 
+    @FXML
+    private ToggleGroup themeToggleGroup;
+    @FXML
+    private VBox themeRadioContainer;
+
+    /** The theme that was active when the dialog opened, restored if the user cancels. */
+    private ThemeManager.Theme themeOnOpen;
+    /** Suppresses the toggle listener while the radio buttons are set programmatically. */
+    private boolean syncingThemeSelection;
+
     public static Stage guiPrefStage;
 
 
@@ -44,11 +61,18 @@ public class PreferencesController implements Initializable {
     }
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        buildThemeRadios();
+
+        themeOnOpen = ThemeManager.get().getCurrent();
+
+        themeToggleGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (syncingThemeSelection || newToggle == null) {
+                return;
+            }
+            ThemeManager.get().apply((ThemeManager.Theme) newToggle.getUserData());
+        });
+
         prefToGui();
-
-
-
-
     }
 
     @FXML
@@ -65,6 +89,9 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("prefixOther", fprefixOther.getText());
         MainController.prefs.put("uriOther", furiOther.getText());
 
+        //keep the theme that is currently previewed
+        ThemeManager.get().save();
+
         //close the eu.griddigit.cimpal.gui
         guiPrefStage.close();
     }
@@ -72,6 +99,8 @@ public class PreferencesController implements Initializable {
     @FXML
     //action button Cancel
     private void actionBtnCancel(ActionEvent actionEvent) {
+        //undo the live theme preview
+        ThemeManager.get().apply(themeOnOpen);
         guiPrefStage.close();
     }
 
@@ -101,12 +130,21 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("prefixOther", "");
         MainController.prefs.put("uriOther", "");
         MainController.prefs.put("LastWorkingFolder", String.valueOf(FileUtils.getUserDirectory())); // it was "C:" before but this was causing issue for MAC
+        MainController.prefs.put(ThemeManager.PREF_KEY, ThemeManager.Theme.DEFAULT.id());
 
     }
 
 
     //set the preferences to the GUI
     private void prefToGui(){
+
+        //the Default button rewrites the stored theme, so re-read and apply it
+        ThemeManager.Theme storedTheme = ThemeManager.Theme.fromId(
+                MainController.prefs.get(ThemeManager.PREF_KEY, ThemeManager.get().getCurrent().id()));
+        if (storedTheme != ThemeManager.get().getCurrent()) {
+            ThemeManager.get().apply(storedTheme);
+        }
+        selectThemeRadio(storedTheme);
 
         fCIMnamespace.setText(MainController.prefs.get("CIMnamespace",""));
         fcimsnamespace.setText(MainController.prefs.get("cimsNamespace",""));
@@ -118,5 +156,41 @@ public class PreferencesController implements Initializable {
         furiEU.setText(MainController.prefs.get("uriEU",""));
         fprefixOther.setText(MainController.prefs.get("prefixOther",""));
         furiOther.setText(MainController.prefs.get("uriOther",""));
+    }
+
+    //build one radio button per ThemeManager.Theme, grouped under its group() heading
+    private void buildThemeRadios() {
+        themeRadioContainer.getChildren().clear();
+        String currentGroup = null;
+        for (ThemeManager.Theme theme : ThemeManager.Theme.values()) {
+            if (!theme.group().equals(currentGroup)) {
+                currentGroup = theme.group();
+                Label heading = new Label(currentGroup);
+                heading.setStyle("-fx-font-weight: bold;");
+                VBox.setMargin(heading, new Insets(currentGroup.equals(
+                        ThemeManager.Theme.values()[0].group()) ? 0 : 10, 0, 2, 0));
+                themeRadioContainer.getChildren().add(heading);
+            }
+            RadioButton radio = new RadioButton(theme.displayName());
+            radio.setUserData(theme);
+            radio.setToggleGroup(themeToggleGroup);
+            VBox.setMargin(radio, new Insets(0, 0, 0, 12));
+            themeRadioContainer.getChildren().add(radio);
+        }
+    }
+
+    //tick the radio button for the given theme without re-triggering the preview listener
+    private void selectThemeRadio(ThemeManager.Theme theme) {
+        syncingThemeSelection = true;
+        try {
+            for (Toggle toggle : themeToggleGroup.getToggles()) {
+                if (toggle.getUserData() == theme) {
+                    themeToggleGroup.selectToggle(toggle);
+                    return;
+                }
+            }
+        } finally {
+            syncingThemeSelection = false;
+        }
     }
 }

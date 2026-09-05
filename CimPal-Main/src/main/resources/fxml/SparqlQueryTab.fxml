@@ -22,13 +22,13 @@
          </padding>
          <HBox spacing="8.0">
             <Button mnemonicParsing="false" onAction="#actionSelectModelFiles" text="Select model files..."/>
-            <Label fx:id="helpSelectModels" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpSelectModels" text="?" styleClass="help-badge"/>
             <Button mnemonicParsing="false" onAction="#actionLoadQuery" text="Load query..."/>
             <Button mnemonicParsing="false" onAction="#actionSaveQuery" text="Save query..."/>
             <Button mnemonicParsing="false" onAction="#actionSaveAsQuery" text="Save as..."/>
             <Button mnemonicParsing="false" onAction="#actionClearQuery" text="Clear"/>
             <Button defaultButton="true" mnemonicParsing="false" onAction="#actionRunQuery" text="Run query"/>
-            <Label fx:id="helpSparqlQuery" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpSparqlQuery" text="?" styleClass="help-badge"/>
          </HBox>
          <HBox spacing="8.0">
             <Label text="Model files:"/>

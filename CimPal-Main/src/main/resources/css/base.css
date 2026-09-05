@@ -1,0 +1,303 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * base.css - structure and control rules shared by every theme. Always applied
+ * underneath the active theme-*.css.
+ *
+ * Contains NO colour literals. Every colour is a looked-up variable that the active
+ * theme defines in its .root block:
+ *
+ *   -cimpal-text            primary body text        (>= 4.5:1 on every surface)
+ *   -cimpal-text-muted      secondary + prompt text  (>= 3:1)
+ *   -cimpal-text-disabled   disabled controls        (>= 3:1)
+ *   -cimpal-text-on-accent  text on accent/selection backgrounds
+ *   -cimpal-surface         menu bar, tab + column headers, titled-pane titles
+ *   -cimpal-surface-2       raised/alternate surface, disabled input background
+ *   -cimpal-border          hairlines, dividers, scrollbar thumbs
+ *   -cimpal-badge-bg/-border/-text   the round "?" help badge
+ *   -cimpal-warning         inline warning text
+ *
+ * The point of pinning these explicitly is that Modena otherwise derives text colour
+ * with ladder()/derive() off -fx-base, which guesses wrong wherever a theme restyles a
+ * control's background, and dims disabled controls with -fx-opacity, which is what makes
+ * grey text unreadable on dark backgrounds.
+ */
+
+/* ===================== text colour ===================== */
+
+.label,
+.check-box,
+.radio-button,
+.toggle-button,
+.button,
+.menu-button,
+.choice-box,
+.combo-box-base,
+.tab-label,
+.text-field,
+.text-area,
+.list-cell,
+.tree-cell,
+.table-cell,
+.menu-item .label,
+.titled-pane {
+    -fx-text-fill: -cimpal-text;
+}
+
+/* TitledPane titles and CheckBox/RadioButton glyph labels render as Text nodes. */
+.titled-pane > .title > .text,
+.check-box > .text,
+.radio-button > .text {
+    -fx-fill: -cimpal-text;
+}
+
+/* Spots Modena hardcodes to a fixed grey. */
+.table-view .placeholder .label,
+.tree-table-view .placeholder .label,
+.list-view .placeholder .label {
+    -fx-text-fill: -cimpal-text-muted;
+}
+
+/* The invisible-prompt fix: Modena uses derive(-fx-control-inner-background, -30%),
+   which on a dark theme is darker than the field the prompt sits in. */
+.text-input {
+    -fx-prompt-text-fill: -cimpal-text-muted;
+}
+
+/* Selected rows must not end up dark-on-dark. */
+.list-cell:filled:selected,
+.tree-cell:filled:selected,
+.table-row-cell:filled:selected,
+.table-row-cell:filled:selected .table-cell,
+.list-cell:filled:selected .label,
+.tree-cell:filled:selected .label {
+    -fx-text-fill: -cimpal-text-on-accent;
+}
+
+/* ===================== disabled state ===================== */
+/*
+ * Modena dims disabled controls with -fx-opacity: 0.4. Compositing light text at 40%
+ * over a dark background lands around 2.2:1 contrast - unreadable. Dim with colour
+ * instead, so disabled still reads as disabled but stays legible.
+ */
+
+.button:disabled,
+.toggle-button:disabled,
+.check-box:disabled,
+.radio-button:disabled,
+.choice-box:disabled,
+.combo-box-base:disabled,
+.menu-button:disabled,
+.label:disabled,
+.hyperlink:disabled,
+.text-input:disabled,
+.text-field:disabled,
+.text-area:disabled,
+.tree-view:disabled,
+.list-view:disabled,
+.table-view:disabled,
+.tree-table-view:disabled,
+.titled-pane:disabled,
+.tab:disabled,
+.slider:disabled,
+.progress-bar:disabled,
+.scroll-pane:disabled {
+    -fx-opacity: 1.0;
+}
+
+.button:disabled,
+.toggle-button:disabled,
+.check-box:disabled,
+.radio-button:disabled,
+.choice-box:disabled,
+.combo-box-base:disabled,
+.menu-button:disabled,
+.label:disabled,
+.hyperlink:disabled,
+.tab:disabled .tab-label {
+    -fx-text-fill: -cimpal-text-disabled;
+}
+
+.check-box:disabled > .text,
+.radio-button:disabled > .text,
+.titled-pane:disabled > .title > .text {
+    -fx-fill: -cimpal-text-disabled;
+}
+
+/* Disabled inputs recess instead of fading out. */
+.text-input:disabled,
+.text-field:disabled,
+.text-area:disabled {
+    -fx-text-fill: -cimpal-text-disabled;
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.text-area:disabled .content {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.choice-box:disabled,
+.combo-box-base:disabled,
+.button:disabled,
+.toggle-button:disabled,
+.menu-button:disabled {
+    -fx-background-color: -cimpal-border, -cimpal-surface-2;
+}
+
+.tree-view:disabled,
+.list-view:disabled,
+.table-view:disabled,
+.tree-table-view:disabled {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.check-box:disabled > .box,
+.radio-button:disabled > .radio {
+    -fx-background-color: -cimpal-border, -cimpal-surface-2;
+}
+
+/* ===================== containers ===================== */
+/*
+ * Every tab is wrapped in a ScrollPane. Modena paints the viewport with a light
+ * background, which would leave a pale rectangle behind themed content.
+ */
+
+.scroll-pane,
+.scroll-pane > .viewport,
+.split-pane,
+.tab-pane > .tab-content-area {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane > .corner {
+    -fx-background-color: -cimpal-surface;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-background-color: -cimpal-border;
+    -fx-padding: 0 1 0 1;
+}
+
+.separator .line {
+    -fx-border-color: -cimpal-border;
+}
+
+/* ===================== surfaces ===================== */
+
+.menu-bar {
+    -fx-background-color: -cimpal-surface;
+}
+
+.titled-pane > .title {
+    -fx-background-color: -cimpal-surface;
+    -fx-border-color: -cimpal-border;
+}
+
+.titled-pane > .content {
+    -fx-background-color: -fx-background;
+    -fx-border-color: -cimpal-border;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: -cimpal-surface;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: transparent transparent -fx-accent transparent;
+    -fx-border-width: 0 0 2 0;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: -cimpal-surface;
+}
+
+.table-view .column-header-background,
+.tree-table-view .column-header-background {
+    -fx-background-color: -cimpal-surface;
+}
+
+.table-view .column-header,
+.tree-table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent -cimpal-border transparent transparent;
+}
+
+.table-view .column-header .label,
+.tree-table-view .column-header .label {
+    -fx-text-fill: -cimpal-text;
+}
+
+.text-area,
+.text-area .content {
+    -fx-background-color: -fx-control-inner-background;
+}
+
+.context-menu,
+.combo-box-popup > .list-view {
+    -fx-background-color: -cimpal-surface;
+    -fx-border-color: -cimpal-border;
+}
+
+/* ===================== scrollbars ===================== */
+
+.scroll-bar {
+    -fx-background-color: -cimpal-surface;
+}
+
+.scroll-bar > .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-color: -cimpal-border;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar > .thumb:hover {
+    -fx-background-color: -fx-accent;
+}
+
+.scroll-bar > .increment-button,
+.scroll-bar > .decrement-button {
+    -fx-background-color: transparent;
+}
+
+/* ===================== progress ===================== */
+
+.progress-bar > .bar {
+    -fx-background-color: -fx-accent;
+}
+
+.progress-bar > .track {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+/* ===================== CimPal widgets ===================== */
+
+/* The round "?" help badge used next to most input rows. */
+.help-badge {
+    -fx-background-color: -cimpal-badge-bg;
+    -fx-background-radius: 20;
+    -fx-border-color: -cimpal-badge-border;
+    -fx-border-radius: 20;
+    -fx-text-fill: -cimpal-badge-text;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-min-width: 18px;
+    -fx-min-height: 18px;
+    -fx-pref-width: 18px;
+    -fx-pref-height: 18px;
+    -fx-cursor: hand;
+}
+
+.help-badge:hover {
+    -fx-background-color: -cimpal-badge-border;
+    -fx-text-fill: -cimpal-text-on-accent;
+}
+
+/* Inline hints that must read as a warning regardless of theme. */
+.warning-text {
+    -fx-text-fill: -cimpal-warning;
+}

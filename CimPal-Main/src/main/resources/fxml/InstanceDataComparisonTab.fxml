@@ -18,7 +18,7 @@
                 <Insets left="5.0" right="5.0" top="5.0"/>
             </padding>
             <Label minWidth="140.0" text="File A (Model A):" wrapText="true"/>
-            <Label fx:id="helpFileA" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpFileA" text="?" styleClass="help-badge"/>
             <TextField fx:id="fPathIDfile1" editable="false" HBox.hgrow="ALWAYS"/>
             <Button mnemonicParsing="false" onAction="#actionBrowseIDfile1" text="Browse"/>
         </HBox>
@@ -27,7 +27,7 @@
                 <Insets left="5.0" right="5.0" top="5.0"/>
             </padding>
             <Label minWidth="140.0" text="File B (Model B):" wrapText="true"/>
-            <Label fx:id="helpFileB" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpFileB" text="?" styleClass="help-badge"/>
             <TextField fx:id="fPathIDfile2" editable="false" HBox.hgrow="ALWAYS"/>
             <Button mnemonicParsing="false" onAction="#actionBrowseIDfile2" text="Browse"/>
         </HBox>
@@ -36,10 +36,10 @@
                 <Insets left="5.0" right="5.0" top="5.0"/>
             </padding>
             <Label minWidth="140.0" text="Profile(s) version:" wrapText="true"/>
-            <Label fx:id="helpProfileVersion" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpProfileVersion" text="?" styleClass="help-badge"/>
             <ChoiceBox fx:id="fcbIDformat" minWidth="400.0"/>
             <Label minWidth="140.0" text="Base namespace:" wrapText="true"/>
-            <Label fx:id="helpBaseNs" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpBaseNs" text="?" styleClass="help-badge"/>
             <TextField fx:id="fPathIDmapXmlBase" editable="false" HBox.hgrow="ALWAYS"/>
         </HBox>
         <HBox spacing="10.0">
@@ -47,7 +47,7 @@
                 <Insets left="5.0" right="5.0" top="5.0"/>
             </padding>
             <Label minWidth="140.0" text="Datatypes Map:" wrapText="true"/>
-            <Label fx:id="helpDatatypeMap" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+            <Label fx:id="helpDatatypeMap" text="?" styleClass="help-badge"/>
             <ChoiceBox fx:id="fcbIDmap" minWidth="300.0"/>
             <TextField fx:id="fPathIDmap" editable="false" HBox.hgrow="ALWAYS"/>
             <Button fx:id="fBTbrowseIDmap" disable="true" mnemonicParsing="false" onAction="#actionBrowseIDmap"
@@ -61,7 +61,7 @@
                 <padding>
                     <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
                 </padding>
-                <Label fx:id="helpIgnoreNonPersistent" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpIgnoreNonPersistent" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="fcbIDcompIgnoreTP" mnemonicParsing="false"
                           text="Ignore Topology non-persistent classes"/>
                 <CheckBox fx:id="fcbIDcompIgnoreSV" mnemonicParsing="false"
@@ -76,7 +76,7 @@
                 <HBox.margin>
                     <Insets left="50.0"/>
                 </HBox.margin>
-                <Label fx:id="helpSvOptions" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpSvOptions" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="fcbIDcompSVonly" mnemonicParsing="false"
                           text="Compare only solution (State Variables) profile "/>
                 <CheckBox fx:id="fcbIDcompSVonlyCN" mnemonicParsing="false" text="Rely on ConnectivityNode-s">
@@ -91,7 +91,7 @@
                 <padding>
                     <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
                 </padding>
-                <Label fx:id="helpOutputOptions" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                <Label fx:id="helpOutputOptions" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="fcbIDcompSolutionOverview" mnemonicParsing="false" text="Create solution overview "/>
                 <CheckBox fx:id="fcbIDcompShowDetails" mnemonicParsing="false" text="Show details"/>
                 <CheckBox fx:id="fcbIDcompDiff" mnemonicParsing="false" text="Compare Diff"/>

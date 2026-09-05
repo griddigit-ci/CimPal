@@ -1,0 +1,71 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: Nordic Light
+ * Nord "Snow Storm" surfaces with "Frost" accents - soft and cool-toned. Body text is
+ * Nord "Polar Night" darkened enough to clear WCAG AA on every surface.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #eceff4;
+    -fx-background:                   #e5e9f0;
+    -fx-control-inner-background:     #fbfcfe;
+    -fx-control-inner-background-alt: #eceff4;
+    -fx-accent:                       #4c6f9c;
+    -fx-focus-color:                  #5e81ac;
+    -fx-faint-focus-color:            #5e81ac22;
+    -fx-selection-bar:                #4c6f9c;
+    -fx-selection-bar-non-focused:    #d8dee9;
+    -fx-default-button:               #d8dee9;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #ffffff;
+    -fx-dark-text-color:              #2e3440;
+    -fx-text-base-color:              #2e3440;
+    -fx-text-background-color:        #2e3440;
+    -fx-text-inner-color:             #2e3440;
+    -fx-mid-text-color:               #4c566a;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #2e3440;
+    -cimpal-text-muted:      #4c566a;
+    -cimpal-text-disabled:   #5b6478;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #d8dee9;
+    -cimpal-surface-2:       #cfd6e3;
+    -cimpal-border:          #aeb8c8;
+    -cimpal-badge-bg:        #d8dee9;
+    -cimpal-badge-border:    #5e81ac;
+    -cimpal-badge-text:      #2e3440;
+    -cimpal-warning:         #9d2933;
+}
+
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover {
+    -fx-background-color: -fx-focus-color, derive(-fx-base, -3%);
+}
+
+.menu-bar {
+    -fx-border-color: transparent transparent -cimpal-border transparent;
+}
+
+.titled-pane > .title,
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 4 4 0 0;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-radius: 6;
+}
+
+.progress-bar > .bar,
+.progress-bar > .track {
+    -fx-background-radius: 4;
+}
