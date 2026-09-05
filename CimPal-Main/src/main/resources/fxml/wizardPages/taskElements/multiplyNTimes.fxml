@@ -1,16 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="83.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.MultiplyNTimesController">
-    <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="66.0" prefWidth="1180.0"
-                text="Multiply Base Model N Times">
-        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="47.0" prefWidth="714.0">
-            <Label layoutX="29.0" layoutY="12.0" text="Multiply N times:"/>
-            <TextField fx:id="timesToMultiply" layoutX="682.0" layoutY="8.0" prefHeight="26.0" prefWidth="271.0"/>
-            <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="12.0" mnemonicParsing="false" selected="true"
-                      text="Save Result to Working Dir"/>
-        </AnchorPane>
-    </TitledPane>
-</AnchorPane>
+<TitledPane animated="false" collapsible="false" maxWidth="1.7976931348623157E308" text="Multiply Base Model N Times"
+            xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.MultiplyNTimesController">
+    <GridPane hgap="10.0" vgap="10.0">
+        <columnConstraints>
+            <ColumnConstraints hgrow="NEVER" minWidth="220.0"/>
+            <ColumnConstraints hgrow="ALWAYS" minWidth="200.0"/>
+            <ColumnConstraints hgrow="NEVER" minWidth="180.0"/>
+        </columnConstraints>
+        <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+        </padding>
+
+        <Label text="Multiply N times:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+        <TextField fx:id="timesToMultiply" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+        <CheckBox fx:id="saveResult" mnemonicParsing="false" selected="true"
+                  text="Save Result to Working Dir" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+    </GridPane>
+</TitledPane>

@@ -5,21 +5,21 @@
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFComparisonController"
-            prefHeight="400.0" prefWidth="600.0">
+<?import javafx.scene.control.ScrollPane?>
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFComparisonController"
+      minHeight="0.0" minWidth="0.0">
+  <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
     <VBox spacing="12.0"
-          AnchorPane.topAnchor="0.0"
-          AnchorPane.rightAnchor="0.0"
-          AnchorPane.bottomAnchor="0.0"
-          AnchorPane.leftAnchor="0.0"
+          minHeight="0.0"
+          minWidth="0.0"
           style="-fx-padding: 10;">
         <GridPane hgap="10.0" vgap="10.0">
                     <columnConstraints>
@@ -95,7 +95,9 @@
                                HBox.hgrow="ALWAYS" />
                 </HBox>
 
-                <HBox spacing="10.0" alignment="CENTER_RIGHT">
+                <Region VBox.vgrow="ALWAYS" />
+
+                <HBox spacing="10.0" alignment="CENTER_RIGHT" VBox.vgrow="NEVER">
                     <Button fx:id="btnResetRDFComp"
                             mnemonicParsing="false"
                             onAction="#actionBtnResetRDFComp"
@@ -109,4 +111,5 @@
                             minWidth="90.0" />
                 </HBox>
     </VBox>
-</AnchorPane>
+  </ScrollPane>
+</VBox>

@@ -4,11 +4,12 @@
 <?import javafx.scene.layout.*?>
 
 <?import javafx.geometry.Insets?>
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="eu.griddigit.cimpal.main.application.controllers.ExcelToSHACLController"
-            prefHeight="180.0" prefWidth="200.0">
-    <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="eu.griddigit.cimpal.main.application.controllers.ExcelToSHACLController"
+      minHeight="0.0" minWidth="0.0">
+  <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
+    <VBox minHeight="0.0" minWidth="0.0" spacing="10.0">
         <HBox spacing="10.0">
             <padding>
                 <Insets left="5.0" right="5.0" top="5.0" />
@@ -93,12 +94,14 @@
             <Button fx:id="btnRunExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelToTtl" text="Run" />
             <Button fx:id="btnResetExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetExcelToTtl" text="Reset" />
         </HBox>
-        <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+        <Region VBox.vgrow="ALWAYS" />
+        <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="NEVER">
             <VBox.margin>
                 <Insets bottom="5.0" right="5.0" />
             </VBox.margin>
-            <Button fx:id="btnRunExcelShape" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelShape" text="Run" HBox.hgrow="ALWAYS" />
+            <Button fx:id="btnRunExcelShape" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelShape" text="Run" />
             <Button fx:id="btnResetExcelShape" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetExcelShape" text="Reset" />
         </HBox>
     </VBox>
-</AnchorPane>
+  </ScrollPane>
+</VBox>

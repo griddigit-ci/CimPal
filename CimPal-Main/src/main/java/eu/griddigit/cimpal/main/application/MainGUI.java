@@ -42,6 +42,8 @@ public class MainGUI extends Application {
 
             // Show the scene containing the root layout.
             primaryStage.setScene(mainApp);
+            primaryStage.setMinWidth(900);
+            primaryStage.setMinHeight(600);
             primaryStage.setMaximized(false);
 
             /*// Get current screen of the stage

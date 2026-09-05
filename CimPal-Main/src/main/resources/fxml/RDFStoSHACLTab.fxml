@@ -5,22 +5,23 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.control.TreeView?>
-<?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="600.0" prefWidth="1278.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFStoSHACLController">
-    <HBox prefHeight="543.0" prefWidth="1278.0" AnchorPane.bottomAnchor="-3.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-        <VBox minWidth="255.0" spacing="5.0">
+<VBox minHeight="0.0" minWidth="0.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFStoSHACLController">
+  <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
+    <HBox minHeight="0.0" minWidth="0.0">
+        <VBox minWidth="255.0" prefWidth="280.0" spacing="5.0">
             <HBox.margin>
                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
             </HBox.margin>
             <Label prefWidth="120.0" text="Profiles:" />
-            <TreeView fx:id="treeViewProfileConstraints" disable="true" minHeight="70.0" onMouseClicked="#actionTreeProfileConstraintsTab" prefHeight="500.0" prefWidth="250.0" VBox.vgrow="ALWAYS">
+            <TreeView fx:id="treeViewProfileConstraints" disable="true" minHeight="70.0" onMouseClicked="#actionTreeProfileConstraintsTab" VBox.vgrow="ALWAYS">
                 <tooltip>
                     <Tooltip contentDisplay="BOTTOM" graphicTextGap="5.0" text="The list of imported RDFS profiles." wrapText="true">
                         <font>
@@ -29,7 +30,7 @@
                     </Tooltip>
                 </tooltip>
             </TreeView>
-            <HBox alignment="BOTTOM_LEFT" maxHeight="26.0" nodeOrientation="RIGHT_TO_LEFT" spacing="5.0" VBox.vgrow="ALWAYS">
+            <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="5.0" VBox.vgrow="NEVER">
                 <VBox.margin>
                     <Insets bottom="5.0" right="5.0" />
                 </VBox.margin>
@@ -47,7 +48,7 @@
                 </Button>
             </HBox>
         </VBox>
-        <VBox prefHeight="513.0" prefWidth="1018.0" spacing="10.0" HBox.hgrow="ALWAYS">
+        <VBox minWidth="0.0" spacing="10.0" HBox.hgrow="ALWAYS">
             <HBox spacing="10.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
@@ -108,7 +109,7 @@
                 <Label fx:id="helpShapesBaseUri" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
                 <VBox spacing="10.0" HBox.hgrow="ALWAYS">
                     <CheckBox fx:id="cbApplyDefBaseURIDesignTab" disable="true" mnemonicParsing="false" onAction="#cbApplyDefBaseURI" prefWidth="250.0" text="Apply default base URI" />
-                    <TextField fx:id="fshapesBaseURICreateCompleteSMTab" VBox.vgrow="ALWAYS" />
+                    <TextField fx:id="fshapesBaseURICreateCompleteSMTab" />
                 </VBox>
             </HBox>
             <HBox spacing="10.0">
@@ -199,7 +200,7 @@
                 <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="Prefix:" />
                 <TextField fx:id="fPrefixSHACLCommon" maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="100.0" />
                 <Label maxHeight="-Infinity" maxWidth="-Infinity" prefWidth="50.0" text="URI:" />
-                <TextField fx:id="fURISHACLcommon" />
+                <TextField fx:id="fURISHACLcommon" HBox.hgrow="ALWAYS" />
             </HBox>
             <HBox spacing="10.0">
                 <padding>
@@ -219,4 +220,5 @@
             </HBox>
         </VBox>
     </HBox>
-</AnchorPane>
+  </ScrollPane>
+</VBox>

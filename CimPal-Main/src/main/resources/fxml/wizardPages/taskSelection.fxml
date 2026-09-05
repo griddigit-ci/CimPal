@@ -10,86 +10,100 @@
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.control.cell.PropertyValueFactory?>
-<?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
 
 
-<BorderPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.TaskSelectionController">
+<BorderPane minHeight="0.0" minWidth="0.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.TaskSelectionController">
    <top>
-       <TitledPane animated="false" collapsible="false" text="RDFS" BorderPane.alignment="CENTER">
-           <AnchorPane>
-               <Label layoutX="27.0" layoutY="14.0" text="Select RDFS Profile Version:" />
-               <ChoiceBox fx:id="fcbProfileVersionIDG" layoutX="199.0" layoutY="10.0" prefHeight="26.0" prefWidth="322.0" />
-               <Label layoutX="28.0" layoutY="56.0" text="Base Namespace: " />
-               <TextArea fx:id="rdfsProfileBaseNamespaceTextField" disable="true" layoutX="199.0" layoutY="44.0" prefHeight="18.0" prefWidth="322.0" wrapText="true" />
-               <Label layoutX="838.0" layoutY="56.0" text="RDFS Format:" />
-               <ChoiceBox fx:id="rdfsFormatsDropdown" disable="true" layoutX="931.0" layoutY="52.0" prefWidth="150.0" />
-               <Button fx:id="rdfsProfileBrowseButton" disable="true" layoutX="835.0" layoutY="10.0" mnemonicParsing="false" onAction="#actionBrowseProfileIDG" prefHeight="26.0" prefWidth="247.0" text="Browse" />
-               <TextArea fx:id="fieldTextProfileIDG" editable="false" layoutX="582.0" layoutY="9.0" prefHeight="71.0" prefWidth="239.0" wrapText="true" HBox.hgrow="ALWAYS" />
-           </AnchorPane>
-         <padding>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-         </padding>
-       </TitledPane>
+      <VBox spacing="10.0" BorderPane.alignment="CENTER">
+         <TitledPane animated="false" collapsible="false" text="RDFS">
+            <GridPane hgap="10.0" vgap="10.0">
+               <columnConstraints>
+                  <ColumnConstraints hgrow="NEVER" minWidth="170.0"/>
+                  <ColumnConstraints hgrow="ALWAYS" minWidth="200.0"/>
+                  <ColumnConstraints hgrow="ALWAYS" minWidth="200.0"/>
+                  <ColumnConstraints hgrow="NEVER" minWidth="90.0"/>
+                  <ColumnConstraints hgrow="NEVER" minWidth="150.0"/>
+               </columnConstraints>
+               <rowConstraints>
+                  <RowConstraints vgrow="NEVER"/>
+                  <RowConstraints vgrow="NEVER"/>
+               </rowConstraints>
+               <padding>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+               </padding>
+
+               <Label text="Select RDFS Profile Version:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+               <ChoiceBox fx:id="fcbProfileVersionIDG" maxWidth="1.7976931348623157E308"
+                          GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+               <TextArea fx:id="fieldTextProfileIDG" editable="false" prefHeight="71.0" wrapText="true"
+                         GridPane.columnIndex="2" GridPane.rowIndex="0" GridPane.rowSpan="2"/>
+               <Button fx:id="rdfsProfileBrowseButton" disable="true" maxWidth="1.7976931348623157E308"
+                       mnemonicParsing="false" onAction="#actionBrowseProfileIDG" text="Browse"
+                       GridPane.columnIndex="4" GridPane.rowIndex="0"/>
+
+               <Label text="Base Namespace: " GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+               <TextArea fx:id="rdfsProfileBaseNamespaceTextField" disable="true" prefHeight="30.0" wrapText="true"
+                         GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+               <Label text="RDFS Format:" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
+               <ChoiceBox fx:id="rdfsFormatsDropdown" disable="true" maxWidth="1.7976931348623157E308"
+                          GridPane.columnIndex="4" GridPane.rowIndex="1"/>
+            </GridPane>
+         </TitledPane>
+
+         <TitledPane animated="false" collapsible="false" text="Instance Model">
+            <HBox alignment="CENTER_LEFT" spacing="10.0">
+               <padding>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+               </padding>
+               <Label minWidth="140.0" text="Base Instance Model:"/>
+               <TextArea fx:id="baseInstanceModelFilesPaths" editable="false" prefHeight="60.0" wrapText="true"
+                         HBox.hgrow="ALWAYS"/>
+               <Button mnemonicParsing="false" onAction="#browseBaseInstance" text="Browse"/>
+            </HBox>
+         </TitledPane>
+      </VBox>
    </top>
    <center>
-       <TitledPane animated="false" collapsible="false" prefHeight="50.0" text="Instance Model"
-                   BorderPane.alignment="CENTER">
-           <padding>
-               <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-           </padding>
-           <HBox alignment="CENTER_LEFT" spacing="10.0">
-               <padding>
-                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-               </padding>
-               <Label text="Base Instance Model:"/>
-               <TextArea fx:id="baseInstanceModelFilesPaths" editable="false" wrapText="true" HBox.hgrow="ALWAYS"/>
-               <Button mnemonicParsing="false" onAction="#browseBaseInstance" text="Browse"/>
-           </HBox>
-       </TitledPane>
+      <HBox minHeight="0.0" minWidth="0.0" spacing="10.0" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+         </padding>
+         <VBox minHeight="0.0" minWidth="0.0" HBox.hgrow="ALWAYS">
+            <Label text="Selected tasks:"/>
+            <TableView fx:id="tableForSelectedTasks" editable="true" minHeight="120.0" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn minWidth="50.0" prefWidth="-1.0" style="-fx-alignment: CENTER;" text="Order">
+                     <cellValueFactory>
+                        <PropertyValueFactory property="order"/>
+                     </cellValueFactory>
+                  </TableColumn>
+                  <TableColumn minWidth="300.0" prefWidth="-1.0" text="Task">
+                     <cellValueFactory>
+                        <PropertyValueFactory property="name"/>
+                     </cellValueFactory>
+                  </TableColumn>
+                  <TableColumn fx:id="removeColumn" minWidth="100.0" prefWidth="-1.0"
+                               style="-fx-alignment: CENTER; -fx-underline: true;" text="Action">
+                     <cellValueFactory>
+                        <PropertyValueFactory property="action"/>
+                     </cellValueFactory>
+                  </TableColumn>
+               </columns>
+            </TableView>
+         </VBox>
+         <VBox minHeight="0.0" minWidth="0.0" nodeOrientation="LEFT_TO_RIGHT" HBox.hgrow="ALWAYS">
+            <Label text="Select tasks in order of execution:"/>
+            <ListView fx:id="tasksForSelection" minHeight="120.0" VBox.vgrow="ALWAYS"/>
+         </VBox>
+      </HBox>
    </center>
-   <bottom>
-       <HBox alignment="BASELINE_CENTER" prefHeight="250.0" BorderPane.alignment="CENTER">
-           <padding>
-               <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-           </padding>
-           <VBox HBox.hgrow="ALWAYS">
-               <padding>
-                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-               </padding>
-               <TableView fx:id="tableForSelectedTasks" editable="true">
-                   <columns>
-                       <TableColumn minWidth="50.0" prefWidth="-1.0" style="-fx-alignment: CENTER;" text="Order">
-                           <cellValueFactory>
-                               <PropertyValueFactory property="order"/>
-                           </cellValueFactory>
-                       </TableColumn>
-                       <TableColumn minWidth="300.0" prefWidth="-1.0" text="Task">
-                           <cellValueFactory>
-                               <PropertyValueFactory property="name"/>
-                           </cellValueFactory>
-                       </TableColumn>
-                       <TableColumn fx:id="removeColumn" minWidth="100.0" prefWidth="-1.0"
-                                    style="-fx-alignment: CENTER; -fx-underline: true;" text="Action">
-                           <cellValueFactory>
-                               <PropertyValueFactory property="action"/>
-                           </cellValueFactory>
-                       </TableColumn>
-                   </columns>
-               </TableView>
-           </VBox>
-           <VBox nodeOrientation="LEFT_TO_RIGHT" HBox.hgrow="ALWAYS">
-               <padding>
-                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-               </padding>
-               <Label text="Select tasks in order of execution:"/>
-               <ListView fx:id="tasksForSelection"/>
-           </VBox>
-       </HBox>
-   </bottom>
    <padding>
-      <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+      <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
    </padding>
 </BorderPane>

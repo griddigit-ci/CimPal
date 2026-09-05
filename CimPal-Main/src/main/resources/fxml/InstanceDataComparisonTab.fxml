@@ -7,12 +7,12 @@
 <?import javafx.scene.layout.*?>
 
 <?import javafx.geometry.Insets?>
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="eu.griddigit.cimpal.main.application.controllers.InstanceDataComparisonController"
-            prefHeight="180.0" prefWidth="200.0">
-    <VBox prefHeight="431.0" prefWidth="1278.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
-          AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="eu.griddigit.cimpal.main.application.controllers.InstanceDataComparisonController"
+      minHeight="0.0" minWidth="0.0">
+  <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
+    <VBox minHeight="0.0" minWidth="0.0" spacing="10.0">
         <HBox spacing="10.0">
             <padding>
                 <Insets left="5.0" right="5.0" top="5.0"/>
@@ -98,14 +98,16 @@
                 <CheckBox fx:id="fcbIDcompPerFileAndAll" mnemonicParsing="false" text="Compare single files"/>
             </VBox>
         </HBox>
-        <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+        <Region VBox.vgrow="ALWAYS"/>
+        <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="NEVER">
             <VBox.margin>
                 <Insets bottom="5.0" right="5.0"/>
             </VBox.margin>
             <Button fx:id="btnRunIDcompare" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunIDcompare"
-                    text="Run" HBox.hgrow="ALWAYS"/>
+                    text="Run"/>
             <Button fx:id="btnResetIDComp" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetIDComp"
                     text="Reset"/>
         </HBox>
     </VBox>
-</AnchorPane>
+  </ScrollPane>
+</VBox>

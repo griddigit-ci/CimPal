@@ -10,8 +10,8 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.MainController">
-   <MenuBar prefHeight="13.0" prefWidth="1280.0" VBox.vgrow="NEVER">
+<VBox minHeight="600.0" minWidth="900.0" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.MainController">
+   <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <SeparatorMenuItem mnemonicParsing="false" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuPreferences" text="Preferences…" />
@@ -45,87 +45,68 @@
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />
       </Menu>
    </MenuBar>
-   <AnchorPane minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
-      <SplitPane fx:id="mainSplitPane" dividerPositions="0.8146067415730337" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="579.0" prefWidth="1278.0">
-            <HBox alignment="TOP_RIGHT" layoutX="106.0" layoutY="108.0" prefHeight="569.0" prefWidth="1278.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-               <TabPane fx:id="tabPaneConstraintsDetails" prefHeight="595.0" prefWidth="1278.0" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
-                  <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
-                  <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
-                  <Tab fx:id="tabExcelToSHACL" text="Excel to SHACL"/>
-                  <Tab fx:id="tabRDFConvert" text="RDF Convert"/>
-                  <Tab fx:id="tabInstanceDataComparison" text="Instance Data Comparison"/>
-                  <Tab fx:id="tabSHACLOrganizer" text="SHACL Organizer"/>
-                  <Tab fx:id="tabSHACLTester" text="SHACL tester"/>
-                  <Tab fx:id="tabGenerateInstanceData" text="Generate Instance data"/>
-                  <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
-                  <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
-                  <Tab fx:id="tabValidationByMapping" text="Validation by Mapping"/>
+   <SplitPane fx:id="mainSplitPane" dividerPositions="0.8146067415730337" minHeight="0.0" minWidth="0.0" orientation="VERTICAL" VBox.vgrow="ALWAYS">
+      <TabPane fx:id="tabPaneConstraintsDetails" minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
+         <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
+         <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
+         <Tab fx:id="tabExcelToSHACL" text="Excel to SHACL"/>
+         <Tab fx:id="tabRDFConvert" text="RDF Convert"/>
+         <Tab fx:id="tabInstanceDataComparison" text="Instance Data Comparison"/>
+         <Tab fx:id="tabSHACLOrganizer" text="SHACL Organizer"/>
+         <Tab fx:id="tabSHACLTester" text="SHACL tester"/>
+         <Tab fx:id="tabGenerateInstanceData" text="Generate Instance data"/>
+         <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
+         <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
+         <Tab fx:id="tabValidationByMapping" text="Validation by Mapping"/>
+      </TabPane>
+      <TitledPane fx:id="outputSourceContainer" animated="false" minHeight="0.0" minWidth="0.0" text="Output &amp; Source Code">
+         <BorderPane minHeight="0.0" minWidth="0.0">
+            <left>
+               <VBox alignment="TOP_CENTER" spacing="10.0">
+                  <padding>
+                     <Insets bottom="3.0" left="3.0" right="3.0" top="3.0"/>
+                  </padding>
+                  <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBtnClear"
+                          text="Clear" wrapText="true"/>
+                  <ToggleButton fx:id="btnShowSourceCodeDefineTab" maxWidth="1.7976931348623157E308"
+                                mnemonicParsing="false" onAction="#actionBtnShowSourceCodeShacl" text="Show"
+                                wrapText="true">
+                     <tooltip>
+                        <Tooltip text="Show or hide the source code of the constraints."/>
+                     </tooltip>
+                  </ToggleButton>
+               </VBox>
+            </left>
+            <center>
+               <TabPane fx:id="tabPaneDown" minHeight="0.0" minWidth="0.0" side="BOTTOM"
+                        tabClosingPolicy="UNAVAILABLE" BorderPane.alignment="CENTER">
+                  <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
+                     <TextArea fx:id="foutputWindow" minHeight="0.0" minWidth="0.0" wrapText="true"/>
+                  </Tab>
+                  <Tab fx:id="tabConstraintsSourceCode" closable="false"
+                       onSelectionChanged="#actionTabConstraintsSourceCode" text="Source code">
+                     <TextArea fx:id="fsourceDefineTab" editable="false" minHeight="0.0" minWidth="0.0" wrapText="true"/>
+                  </Tab>
                </TabPane>
-            </HBox>
-         </AnchorPane>
-         <TitledPane fx:id="outputSourceContainer" animated="false" text="Output &amp; Source Code">
-            <BorderPane minHeight="0.0" minWidth="0.0">
-               <left>
-                  <VBox alignment="TOP_CENTER" spacing="10.0">
-                     <padding>
-                        <Insets bottom="3.0" left="3.0" right="3.0" top="3.0"/>
-                     </padding>
-                     <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBtnClear"
-                             text="Clear" wrapText="true"/>
-                     <ToggleButton fx:id="btnShowSourceCodeDefineTab" maxWidth="1.7976931348623157E308"
-                                   mnemonicParsing="false" onAction="#actionBtnShowSourceCodeShacl" text="Show"
-                                   wrapText="true">
-                        <tooltip>
-                           <Tooltip text="Show or hide the source code of the constraints."/>
-                        </tooltip>
-                     </ToggleButton>
-                  </VBox>
-               </left>
-               <center>
-                  <TabPane fx:id="tabPaneDown" minHeight="0.0" minWidth="0.0" side="BOTTOM"
-                           tabClosingPolicy="UNAVAILABLE" BorderPane.alignment="CENTER">
-                     <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                           <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true"
-                                       AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
-                                       AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                              <TextArea fx:id="foutputWindow" wrapText="true"/>
-                           </ScrollPane>
-                        </AnchorPane>
-                     </Tab>
-                     <Tab fx:id="tabConstraintsSourceCode" closable="false"
-                          onSelectionChanged="#actionTabConstraintsSourceCode" text="Source code">
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                           <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true"
-                                       AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
-                                       AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                              <TextArea fx:id="fsourceDefineTab" editable="false" wrapText="true"/>
-                           </ScrollPane>
-                        </AnchorPane>
-                     </Tab>
-                  </TabPane>
-               </center>
-            </BorderPane>
-         </TitledPane>
-      </SplitPane>
-   </AnchorPane>
-   <HBox id="HBox" alignment="CENTER_LEFT" prefHeight="20.0" prefWidth="1280.0" spacing="5.0" VBox.vgrow="NEVER">
+            </center>
+         </BorderPane>
+      </TitledPane>
+   </SplitPane>
+   <HBox id="HBox" alignment="CENTER_LEFT" spacing="5.0" VBox.vgrow="NEVER">
       <padding>
          <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
       </padding>
-      <Label maxHeight="1.7976931348623157E308" text="Status:" HBox.hgrow="ALWAYS">
+      <Label maxHeight="1.7976931348623157E308" text="Status:" HBox.hgrow="NEVER">
          <font>
             <Font size="11.0" fx:id="x3" />
          </font>
       </Label>
-      <Pane HBox.hgrow="ALWAYS">
-         <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0">
-            <padding>
-               <Insets left="10.0" />
-            </padding>
-         </ProgressBar>
-      </Pane>
+      <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0" HBox.hgrow="NEVER">
+         <HBox.margin>
+            <Insets left="10.0" />
+         </HBox.margin>
+      </ProgressBar>
+      <Region HBox.hgrow="ALWAYS" />
       <Label font="$x3" text="Version: 2026.9.05.1" HBox.hgrow="NEVER" />
    </HBox>
 </VBox>

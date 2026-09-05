@@ -1,35 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
+<?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="133.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.MultiplyIGMFromConfigFileController">
-    <TitledPane animated="false" collapsible="false" layoutX="11.0" layoutY="8.0" prefHeight="115.0" prefWidth="1180.0"
-                text="Multiply IGM from Config File">
-        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="73.0" prefWidth="714.0">
-            <Label layoutX="29.0" layoutY="12.0" text="IGM multiply config file:"/>
-            <Button layoutX="417.0" layoutY="7.0" mnemonicParsing="false" onAction="#actionBrowseMultiplyIGMFiles"
-                    prefHeight="26.0" prefWidth="100.0" text="Browse"/>
-            <TextField fx:id="eqbdId" layoutX="642.0" layoutY="7.0" prefHeight="26.0" prefWidth="222.0"/>
-            <TextField fx:id="tpbdId" layoutX="642.0" layoutY="50.0" prefHeight="26.0" prefWidth="220.0"/>
+<TitledPane animated="false" collapsible="false" maxWidth="1.7976931348623157E308" text="Multiply IGM from Config File"
+            xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.MultiplyIGMFromConfigFileController">
+    <GridPane hgap="10.0" vgap="10.0">
+        <columnConstraints>
+            <ColumnConstraints hgrow="NEVER" minWidth="200.0"/>
+            <ColumnConstraints hgrow="ALWAYS" minWidth="200.0"/>
+            <ColumnConstraints hgrow="NEVER" minWidth="152.0"/>
+            <ColumnConstraints hgrow="NEVER" minWidth="180.0"/>
+        </columnConstraints>
+        <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+        </padding>
 
-            <TextArea fx:id="loadedXMLFile" disable="true" editable="false" layoutX="172.0" layoutY="7.0"
-                      prefHeight="69.0" prefWidth="222.0" HBox.hgrow="ALWAYS" wrapText="true">
-                <font>
-                    <Font name="Consolas" size="12.0"/>
-                </font>
-            </TextArea>
-            <CheckBox fx:id="persistentEQ" layoutX="417.0" layoutY="55.0" mnemonicParsing="false" prefHeight="18.0"
-                      prefWidth="100.0" text="Persistent EQ"/>
-            <Label layoutX="586.0" layoutY="12.0" text="EQBD ID:"/>
-            <Button layoutX="877.0" layoutY="7.0" mnemonicParsing="false" onAction="#browsEQBDFile"
-                    prefHeight="26.0" prefWidth="94.0" text="Browse"/>
-            <Label layoutX="587.0" layoutY="55.0" text="TPBD ID:"/>
-            <Button layoutX="877.0" layoutY="52.0" mnemonicParsing="false" onAction="#browsTPBDFile"
-                    prefHeight="26.0" prefWidth="94.0" text="Browse"/>
-            <CheckBox fx:id="saveResult" layoutX="989.0" layoutY="12.0" mnemonicParsing="false" selected="true"
-                      text="Save Result to Working Dir"/>
-        </AnchorPane>
-    </TitledPane>
-</AnchorPane>
+        <Label text="IGM multiply config file:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+        <TextArea fx:id="loadedXMLFile" disable="true" editable="false" maxWidth="1.7976931348623157E308"
+                  prefHeight="69.0" wrapText="true"
+                  GridPane.columnIndex="1" GridPane.rowIndex="0" GridPane.rowSpan="2">
+            <font>
+                <Font name="Consolas" size="12.0"/>
+            </font>
+        </TextArea>
+        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBrowseMultiplyIGMFiles" text="Browse"
+                GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+        <CheckBox fx:id="saveResult" mnemonicParsing="false" selected="true"
+                  text="Save Result to Working Dir" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+        <CheckBox fx:id="persistentEQ" mnemonicParsing="false" text="Persistent EQ"
+                  GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+        <Label text="EQBD ID:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+        <TextField fx:id="eqbdId" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#browsEQBDFile" text="Browse"
+                GridPane.columnIndex="2" GridPane.rowIndex="2"/>
+        <Label text="TPBD ID:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+        <TextField fx:id="tpbdId" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#browsTPBDFile" text="Browse"
+                GridPane.columnIndex="2" GridPane.rowIndex="3"/>
+    </GridPane>
+</TitledPane>

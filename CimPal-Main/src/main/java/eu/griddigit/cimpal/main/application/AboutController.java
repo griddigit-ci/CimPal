@@ -11,7 +11,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.awt.*;
@@ -28,7 +28,7 @@ public class AboutController implements Initializable {
     @FXML
     private ImageView fImage;
     @FXML
-    private AnchorPane faPane;
+    private VBox faPane;
     @FXML
     private Hyperlink fsupportemail;
     @FXML
@@ -50,8 +50,7 @@ public class AboutController implements Initializable {
 //Creating a hyper link
         Hyperlink link = new Hyperlink();
 
-        link.setLayoutX(fImage.getLayoutX());
-        link.setLayoutY(fImage.getLayoutY());
+        // setGraphic re-parents fImage out of faPane, so the link takes its place at the top.
         link.setGraphic(fImage);
         link.setOnAction(ev -> {
                     try {
@@ -61,7 +60,7 @@ public class AboutController implements Initializable {
                     }
         });
 
-        faPane.getChildren().add(link);
+        faPane.getChildren().add(0, link);
         fsupportemail.setOnAction(ev -> {
             try {
                 Desktop.getDesktop().browse(new URL("mailto:cimpal@griddigit.eu").toURI());

@@ -14,7 +14,6 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
-import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 
 import java.io.File;
@@ -39,9 +38,6 @@ public class TaskSelectionController implements Initializable, IController {
 
     @FXML
     public TextArea fieldTextProfileIDG;
-
-    @FXML
-    private AnchorPane taskSelectionAnchorPane;
 
     @FXML
     private ListView<String> tasksForSelection;

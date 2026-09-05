@@ -10,7 +10,6 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.TextArea;
-import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 
@@ -21,8 +20,6 @@ import java.util.ResourceBundle;
 public class TaskInputController  implements Initializable, IController {
 
     public Button buttonSelectWorkingDirectory;
-    @FXML
-    private AnchorPane taskInputAnchorPane;
 
     @FXML
     private VBox vBoxForTaskInputs;

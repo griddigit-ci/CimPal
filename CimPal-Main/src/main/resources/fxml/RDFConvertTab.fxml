@@ -7,12 +7,13 @@
 <?import javafx.scene.layout.*?>
 
 <?import javafx.geometry.Insets?>
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFConvertController"
-            prefHeight="180.0" prefWidth="200.0">
-    <HBox prefHeight="400.0" prefWidth="958.4" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-        <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFConvertController"
+      minHeight="0.0" minWidth="0.0">
+  <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
+    <HBox minHeight="0.0" minWidth="0.0">
+        <VBox minWidth="0.0" spacing="10.0" HBox.hgrow="ALWAYS">
             <HBox spacing="10.0">
                 <padding>
                     <Insets left="5.0" right="5.0" top="5.0" />
@@ -127,13 +128,15 @@
                 <ChoiceBox fx:id="fcbRDFsortOptions" disable="true" prefWidth="200.0" />
                 <CheckBox fx:id="fcbStripPrefixes" disable="true" minWidth="150.0" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
             </HBox>
-            <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="ALWAYS">
+            <Region VBox.vgrow="ALWAYS" />
+            <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="NEVER">
                 <VBox.margin>
                     <Insets bottom="5.0" right="5.0" />
                 </VBox.margin>
-                <Button fx:id="fbtnRunRDFConvert" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunRDFConvert" text="Convert" HBox.hgrow="ALWAYS" />
+                <Button fx:id="fbtnRunRDFConvert" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunRDFConvert" text="Convert" />
                 <Button minWidth="60.0" mnemonicParsing="false" onAction="#actionBrtResetRDFConvert" text="Reset" />
             </HBox>
         </VBox>
     </HBox>
-</AnchorPane>
+  </ScrollPane>
+</VBox>

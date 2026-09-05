@@ -44,7 +44,7 @@
    <center>
       <TextArea fx:id="txtSparqlQuery" promptText="Write a SPARQL SELECT query here, or load one and edit it."
                 BorderPane.alignment="CENTER"
-                prefHeight="500.0" prefWidth="1000.0">
+                minHeight="0.0" minWidth="0.0">
          <BorderPane.margin>
             <Insets bottom="8.0" left="8.0" right="8.0"/>
          </BorderPane.margin>
