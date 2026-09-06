@@ -4,6 +4,7 @@ import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -154,6 +155,17 @@ public class RDFConvertController implements Initializable {
 
         rdfConvertModelUnionDetailedFiles = new LinkedList<>();
         rdfConvertFileList = new LinkedList<>();
+
+        //restore the paths this tab was last used with. The source field also shows a joined
+        //list when "Union model" is on; PathMemory only stores text that is an existing path,
+        //so that case simply leaves the field empty.
+        PathMemory.bind(fsourcePathTextField, "tab.rdfConvert.source", file -> rdfConvertFile = file);
+        PathMemory.bind(fMainRdfPathTextField, "tab.rdfConvert.mainRdf",
+                file -> rdfConvertModelUnionDetailedFiles.add(file));
+        PathMemory.bind(fDeviationRdfPathTextField, "tab.rdfConvert.deviationRdf",
+                file -> rdfConvertModelUnionDetailedFiles.add(file));
+        PathMemory.bind(fExtendedRdfPathTextField, "tab.rdfConvert.extendedRdf",
+                file -> rdfConvertModelUnionDetailedFiles.add(file));
     }
 
     private void initializeHelpTooltips() {
@@ -192,7 +204,7 @@ public class RDFConvertController implements Initializable {
         List<File> file;
         List<File> fileL;
         if (fcbRDFconvertModelUnion.isSelected()) {
-            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.sourceUnion");
 
             if (!fileL.isEmpty()) {// the file is selected
                 fsourcePathTextField.setText(fileL.toString());
@@ -201,7 +213,7 @@ public class RDFConvertController implements Initializable {
                 fsourcePathTextField.clear();
             }
         } else {
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.source");
 
             if (!file.isEmpty()) {// the file is selected
                 //MainController.prefs.put("LastWorkingFolder", file.getParent());
@@ -215,7 +227,7 @@ public class RDFConvertController implements Initializable {
 
     @FXML
     private void actionBrowseMainRDF() {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Main RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Main RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.mainRdf");
 
         if (file.getFirst() != null) {// the file is selected
             fMainRdfPathTextField.setText(file.getFirst().toString());
@@ -227,7 +239,7 @@ public class RDFConvertController implements Initializable {
 
     @FXML
     private void actionBrowseDeviationRDF() {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Deviation RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Deviation RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.deviationRdf");
 
         if (file.getFirst() != null) {// the file is selected
             fDeviationRdfPathTextField.setText(file.getFirst().toString());
@@ -239,7 +251,7 @@ public class RDFConvertController implements Initializable {
 
     @FXML
     private void actionBrowseExtendedRDF() {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Extended RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Extended RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.extendedRdf");
 
         if (file.getFirst() != null) {// the file is selected
             fExtendedRdfPathTextField.setText(file.getFirst().toString());

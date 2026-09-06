@@ -4,6 +4,7 @@ import eu.griddigit.cimpal.core.shacl_tools.ShaclFromXls;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.core.ShaclTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.util.ExcelTools;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -73,6 +74,17 @@ public class ExcelToSHACLController implements Initializable {
 
         );
         fcbRDFSformatForExcel.getSelectionModel().selectFirst();
+
+        //restore the paths this tab was last used with; the consumers repeat what the
+        //Browse handlers do besides filling the field
+        PathMemory.bind(fPathRdffileForExcel, "tab.excelToShacl.rdfsFile",
+                file -> MainController.rdfModelExcelShacl = file);
+        PathMemory.bind(fPathXLSfileForShape, "tab.excelToShacl.excelFile",
+                file -> MainController.xlsFileExcelShacl = file);
+        PathMemory.bind(fPathXLSChangesExcelToTtl, "tab.excelToShacl.changesExcel",
+                file -> MainController.XlsChangesExcelToTtl = file);
+        PathMemory.bind(fPathTTLChangesExcelToTtl, "tab.excelToShacl.targetTtl",
+                file -> MainController.TtlChangesExcelToTtl = file);
     }
 
     public void setMainController(MainController mainController) {
@@ -96,7 +108,7 @@ public class ExcelToSHACLController implements Initializable {
     private void actionBrowseRDFfileForExcel() {
         resetProgressBar();
         //select file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf"), "", "tab.excelToShacl.rdfsFile");
         if (!file.isEmpty()) {// the file is selected
             fPathRdffileForExcel.setText(file.getFirst().toString());
             MainController.rdfModelExcelShacl = file.getFirst();
@@ -111,7 +123,7 @@ public class ExcelToSHACLController implements Initializable {
     private void actionBrowseExcelfileForShape() {
         resetProgressBar();
         //select file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "", "tab.excelToShacl.excelFile");
 
         if (!file.isEmpty()) {// the file is selected
             fPathXLSfileForShape.setText(file.getFirst().toString());
@@ -127,7 +139,7 @@ public class ExcelToSHACLController implements Initializable {
     private void actionBrowseXlsChangesExcelToTtl() {
         resetProgressBar();
         //select file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel files", List.of("*.xlsx"), "", "tab.excelToShacl.changesExcel");
 
         if (!file.isEmpty()) {// the file is selected
             fPathXLSChangesExcelToTtl.setText(file.getFirst().toString());
@@ -143,7 +155,7 @@ public class ExcelToSHACLController implements Initializable {
     private void actionBrowseTtlChangesExcelToTtl() {
         resetProgressBar();
         //select file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "TTL files", List.of("*.ttl"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "TTL files", List.of("*.ttl"), "", "tab.excelToShacl.targetTtl");
         if (file.getFirst() != null) {// the file is selected
             fPathTTLChangesExcelToTtl.setText(file.getFirst().toString());
             MainController.TtlChangesExcelToTtl = file.getFirst();
@@ -215,7 +227,9 @@ public class ExcelToSHACLController implements Initializable {
             // 4) Save-as
             FileChooser fc = new FileChooser();
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Turtle (*.ttl)", "*.ttl"));
+            PathMemory.prepare(fc, "dialog.excelToShacl.saveTtl");
             File out = fc.showSaveDialog(btnRunExcelToTtl.getScene().getWindow());
+            PathMemory.remember("dialog.excelToShacl.saveTtl", out);
             if (out != null) {
                 String saveBaseURI = null; // keep as given
 

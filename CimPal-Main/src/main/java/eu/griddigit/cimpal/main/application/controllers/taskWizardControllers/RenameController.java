@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.tasks.Rename;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -35,7 +36,7 @@ public class RenameController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Input data XLS", "*.xlsx"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.rename.configXls");
         File file = filechooser.showOpenDialog(null);
 
         if (file != null ) {// the file is selected
@@ -45,6 +46,7 @@ public class RenameController implements Initializable {
             Rename task = (Rename) wizardContext.getSelectedTasks().stream().filter(x -> x.getTask().getClass() == Rename.class).findFirst().get().getTask();
             task.setIRenameConfigXmlFilePath(file.toString());
             wizardContext.setLastOpenedDir(file.getParentFile());
+            PathMemory.remember("dialog.wizard.rename.configXls", file.getParentFile());
         }
 
         else {

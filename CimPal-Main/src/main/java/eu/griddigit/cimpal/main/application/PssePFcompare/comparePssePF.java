@@ -8,6 +8,7 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import eu.griddigit.cimpal.main.util.ExcelTools;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -36,11 +37,12 @@ public class comparePssePF {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for nodes PSS/E", "*.xlsx"));
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser, "dialog.psse.nodesPsse");
         File file = filechooser.showOpenDialog(null);
 
         if (file!=null) {// the file is selected
             MainController.prefs.put("LastWorkingFolder", file.getParent());
+            PathMemory.remember("dialog.psse.nodesPsse", file);
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file.toString(),0);
 
@@ -62,13 +64,14 @@ public class comparePssePF {
         //select file
         FileChooser filechooser1 = new FileChooser();
         filechooser1.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for nodes PowerFactory", "*.xlsx"));
-        filechooser1.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser1, "dialog.psse.nodesPf");
         File file1 = filechooser1.showOpenDialog(null);
 
         int countPF=0;
         int count1=0;
         if (file1!=null) {// the file is selected
             MainController.prefs.put("LastWorkingFolder", file1.getParent());
+            PathMemory.remember("dialog.psse.nodesPf", file1);
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file1.toString(),0);
 
@@ -138,11 +141,12 @@ public class comparePssePF {
         //select file
         FileChooser filechooser2 = new FileChooser();
         filechooser2.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for lines PSS/E", "*.xlsx"));
-        filechooser2.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser2, "dialog.psse.linesPsse");
         File file2 = filechooser2.showOpenDialog(null);
 
         if (file2!=null) {// the file is selected
             MainController.prefs.put("LastWorkingFolder", file2.getParent());
+            PathMemory.remember("dialog.psse.linesPsse", file2);
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file2.toString(),0);
 
@@ -203,12 +207,13 @@ public class comparePssePF {
         //select file
         FileChooser filechooser3 = new FileChooser();
         filechooser3.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for lines PowerFactory", "*.xlsx"));
-        filechooser3.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser3, "dialog.psse.linesPf");
         File file3 = filechooser3.showOpenDialog(null);
 
         int countPFline=0;
         if (file3!=null) {// the file is selected
             MainController.prefs.put("LastWorkingFolder", file3.getParent());
+            PathMemory.remember("dialog.psse.linesPf", file3);
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file3.toString(),0);
 
@@ -362,11 +367,12 @@ public class comparePssePF {
         //select file
         FileChooser filechooser4 = new FileChooser();
         filechooser4.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for trafo PSS/E", "*.xlsx"));
-        filechooser4.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser4, "dialog.psse.trafoPsse");
         File file4 = filechooser4.showOpenDialog(null);
 
         if (file4!=null) {// the file is selected
             MainController.prefs.put("LastWorkingFolder", file4.getParent());
+            PathMemory.remember("dialog.psse.trafoPsse", file4);
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file4.toString(),0);
 
@@ -427,12 +433,13 @@ public class comparePssePF {
         //select file
         FileChooser filechooser5 = new FileChooser();
         filechooser5.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select files for trafo PowerFactory", "*.xlsx"));
-        filechooser5.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser5, "dialog.psse.trafoPf");
         File file5 = filechooser5.showOpenDialog(null);
 
         int countPFtrafo=0;
         if (file5!=null) {// the file is selected
             MainController.prefs.put("LastWorkingFolder", file5.getParent());
+            PathMemory.remember("dialog.psse.trafoPf", file5);
 
             ArrayList<Object> inputXLSdata = ExcelTools.importXLSX(file5.toString(),0);
 
@@ -618,11 +625,12 @@ public class comparePssePF {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Result files", "*.xlsx"));
         filechooser.setInitialFileName(initialFileName);
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser, "dialog.psse.resultExport");
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
             MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            PathMemory.remember("dialog.psse.resultExport", saveFile);
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);
@@ -723,11 +731,12 @@ public class comparePssePF {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Result files", "*.xlsx"));
         filechooser.setInitialFileName(initialFileName);
-        filechooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser, "dialog.psse.resultExport");
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
             MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            PathMemory.remember("dialog.psse.resultExport", saveFile);
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);

@@ -3,105 +3,120 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<?import javafx.geometry.Insets?>
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="eu.griddigit.cimpal.main.application.controllers.ExcelToSHACLController"
       minHeight="0.0" minWidth="0.0">
   <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
-    <VBox minHeight="0.0" minWidth="0.0" spacing="10.0">
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="RDF file:" wrapText="true" />
-            <Label fx:id="helpRdfFile" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPathRdffileForExcel" editable="false" HBox.hgrow="ALWAYS" />
-            <Button mnemonicParsing="false" onAction="#actionBrowseRDFfileForExcel" text="Browse" />
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="RDFS format:" wrapText="true" />
-            <Label fx:id="helpRdfsFormat" text="?" styleClass="help-badge"/>
-            <ChoiceBox fx:id="fcbRDFSformatForExcel" minWidth="400.0" />
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="Input - Excel file:" wrapText="true" />
-            <Label fx:id="helpExcelFile" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPathXLSfileForShape" editable="false" HBox.hgrow="ALWAYS" />
-            <Button mnemonicParsing="false" onAction="#actionBrowseExcelfileForShape" text="Browse" />
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="Base URI - Shape graph:" wrapText="true" />
-            <Label fx:id="helpBaseUri" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fbaseURIShapeExcel" HBox.hgrow="ALWAYS" />
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="Namespace information for the resulted Shape graph:" wrapText="true" />
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="Prefix:" wrapText="true" />
-            <Label fx:id="helpPrefixNs" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPrefixExcelShape" prefWidth="70.0" />
-            <Label minWidth="90.0" text="Namespace:" wrapText="true" />
-            <TextField fx:id="fNSexcelShape" HBox.hgrow="ALWAYS" />
-        </HBox>
-        <!-- New: Excel→TTL change inputs -->
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="40.0" />
-            </padding>
-            <Label minWidth="90.0" text="Modify Constraints from xls file" wrapText="true" />
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="Changes Excel:" wrapText="true" />
-            <Label fx:id="helpChangesExcel" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPathXLSChangesExcelToTtl" editable="false" HBox.hgrow="ALWAYS" />
-            <Button mnemonicParsing="false" onAction="#actionBrowseXlsChangesExcelToTtl" text="Browse" />
-        </HBox>
+    <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" styleClass="tab-root">
 
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0" />
-            </padding>
-            <Label minWidth="90.0" text="Target TTL:" wrapText="true" />
-            <Label fx:id="helpTargetTtl" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPathTTLChangesExcelToTtl" editable="false" HBox.hgrow="ALWAYS" />
-            <Button mnemonicParsing="false" onAction="#actionBrowseTtlChangesExcelToTtl" text="Browse" />
-        </HBox>
-        <!-- New: Left-side Run/Reset for Excel→TTL -->
-        <HBox alignment="BOTTOM_LEFT" spacing="10.0" VBox.vgrow="NEVER">
-            <VBox.margin>
-                <Insets bottom="5.0" left="5.0" />
-            </VBox.margin>
-            <Button fx:id="btnRunExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelToTtl" text="Run" />
-            <Button fx:id="btnResetExcelToTtl" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetExcelToTtl" text="Reset" />
-        </HBox>
+        <!--
+          This tab runs two independent jobs. They used to be one flat column of rows whose two
+          Run/Reset pairs sat at opposite ends of the tab, so neither pair read as belonging to
+          anything. Each job is now its own section with its own action bar directly beneath it.
+        -->
+        <VBox spacing="8.0">
+            <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+                <columnConstraints>
+                    <!-- 0: labels. Fixed so every field in the tab starts on the same x. -->
+                    <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0" />
+                    <!-- 1: the field. The only column that absorbs slack. minWidth 0 lets the tab shrink. -->
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="0.0" />
+                    <!-- 2: Browse. Fixed so it never inflates into a banner. -->
+                    <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0" />
+                </columnConstraints>
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                    <Label text="RDF file:" wrapText="true" />
+                    <Label fx:id="helpRdfFile" text="?" styleClass="help-badge"/>
+                </HBox>
+                <TextField fx:id="fPathRdffileForExcel" editable="false" maxWidth="1.7976931348623157E308"
+                           GridPane.rowIndex="0" GridPane.columnIndex="1" />
+                <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseRDFfileForExcel" text="Browse"
+                        GridPane.rowIndex="0" GridPane.columnIndex="2" />
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                    <Label text="RDFS format:" wrapText="true" />
+                    <Label fx:id="helpRdfsFormat" text="?" styleClass="help-badge"/>
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                    <ChoiceBox fx:id="fcbRDFSformatForExcel" prefWidth="400.0" />
+                    <!-- A ChoiceBox has a natural width; the spacer absorbs the slack instead. -->
+                    <Region HBox.hgrow="ALWAYS" />
+                </HBox>
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
+                    <Label text="Input - Excel file:" wrapText="true" />
+                    <Label fx:id="helpExcelFile" text="?" styleClass="help-badge"/>
+                </HBox>
+                <TextField fx:id="fPathXLSfileForShape" editable="false" maxWidth="1.7976931348623157E308"
+                           GridPane.rowIndex="2" GridPane.columnIndex="1" />
+                <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseExcelfileForShape" text="Browse"
+                        GridPane.rowIndex="2" GridPane.columnIndex="2" />
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="3" GridPane.columnIndex="0">
+                    <Label text="Base URI - Shape graph:" wrapText="true" />
+                    <Label fx:id="helpBaseUri" text="?" styleClass="help-badge"/>
+                </HBox>
+                <TextField fx:id="fbaseURIShapeExcel" maxWidth="1.7976931348623157E308"
+                           GridPane.rowIndex="3" GridPane.columnIndex="1" GridPane.columnSpan="2" />
+
+                <Label text="Namespace information for the resulted Shape graph:" wrapText="true" styleClass="section-title"
+                       GridPane.rowIndex="4" GridPane.columnIndex="0" GridPane.columnSpan="3" />
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="5" GridPane.columnIndex="0">
+                    <Label text="Prefix:" wrapText="true" />
+                    <Label fx:id="helpPrefixNs" text="?" styleClass="help-badge"/>
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="5" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                    <TextField fx:id="fPrefixExcelShape" prefWidth="70.0" />
+                    <Label text="Namespace:" wrapText="true" />
+                    <TextField fx:id="fNSexcelShape" HBox.hgrow="ALWAYS" />
+                </HBox>
+            </GridPane>
+
+            <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+                <Button fx:id="btnResetExcelShape" minWidth="95.0" mnemonicParsing="false" onAction="#actionBtnResetExcelShape" text="Reset" />
+                <Button fx:id="btnRunExcelShape" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false" onAction="#actionBtnRunExcelShape" text="Run" />
+            </HBox>
+        </VBox>
+
+        <VBox spacing="8.0" styleClass="section-box">
+            <Label text="Modify Constraints from xls file" wrapText="true" styleClass="section-title" />
+
+            <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+                <columnConstraints>
+                    <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0" />
+                    <ColumnConstraints hgrow="ALWAYS" minWidth="0.0" />
+                    <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0" />
+                </columnConstraints>
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                    <Label text="Changes Excel:" wrapText="true" />
+                    <Label fx:id="helpChangesExcel" text="?" styleClass="help-badge"/>
+                </HBox>
+                <TextField fx:id="fPathXLSChangesExcelToTtl" editable="false" maxWidth="1.7976931348623157E308"
+                           GridPane.rowIndex="0" GridPane.columnIndex="1" />
+                <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseXlsChangesExcelToTtl" text="Browse"
+                        GridPane.rowIndex="0" GridPane.columnIndex="2" />
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                    <Label text="Target TTL:" wrapText="true" />
+                    <Label fx:id="helpTargetTtl" text="?" styleClass="help-badge"/>
+                </HBox>
+                <TextField fx:id="fPathTTLChangesExcelToTtl" editable="false" maxWidth="1.7976931348623157E308"
+                           GridPane.rowIndex="1" GridPane.columnIndex="1" />
+                <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseTtlChangesExcelToTtl" text="Browse"
+                        GridPane.rowIndex="1" GridPane.columnIndex="2" />
+            </GridPane>
+
+            <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+                <Button fx:id="btnResetExcelToTtl" minWidth="95.0" mnemonicParsing="false" onAction="#actionBtnResetExcelToTtl" text="Reset" />
+                <Button fx:id="btnRunExcelToTtl" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false" onAction="#actionBtnRunExcelToTtl" text="Run" />
+            </HBox>
+        </VBox>
+
         <Region VBox.vgrow="ALWAYS" />
-        <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="NEVER">
-            <VBox.margin>
-                <Insets bottom="5.0" right="5.0" />
-            </VBox.margin>
-            <Button fx:id="btnRunExcelShape" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunExcelShape" text="Run" />
-            <Button fx:id="btnResetExcelShape" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetExcelShape" text="Reset" />
-        </HBox>
     </VBox>
   </ScrollPane>
 </VBox>

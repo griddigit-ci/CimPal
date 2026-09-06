@@ -6,6 +6,7 @@
 
 package eu.griddigit.cimpal.main.core;
 
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.stage.FileChooser;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.*;
@@ -1078,8 +1079,11 @@ public class ExportSHACLInformation {
         fileChooser.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("CSV files (*.csv)", "*.csv")
         );
+        PathMemory.prepare(fileChooser, "dialog.shaclEaImportCsv");
 
-        return fileChooser.showSaveDialog(null);
+        File chosen = fileChooser.showSaveDialog(null);
+        PathMemory.remember("dialog.shaclEaImportCsv", chosen);
+        return chosen;
     }
 
     // Build a wide predicate table for given subjects; `sh:name` goes first if present.

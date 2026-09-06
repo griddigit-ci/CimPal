@@ -3,6 +3,7 @@ package eu.griddigit.cimpal.main.application.controllers.sparql;
 import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.util.ModelFactory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -85,7 +86,8 @@ public class SparqlQueryTabController implements Initializable {
                 false,
                 "Instance files",
                 List.of("*.xml", "*.zip"),
-                "Select RDF/XML or ZIP model files"
+                "Select RDF/XML or ZIP model files",
+                "dialog.sparqlModelFiles"
         );
 
         if (modelFiles == null || modelFiles.isEmpty()) {
@@ -109,10 +111,13 @@ public class SparqlQueryTabController implements Initializable {
                 new FileChooser.ExtensionFilter("All files", "*.*")
         );
 
+        PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
+
         File queryFile = chooser.showOpenDialog(txtSparqlQuery.getScene().getWindow());
         if (queryFile == null) {
             return;
         }
+        PathMemory.remember("dialog.sparqlQueryFile", queryFile);
 
         try {
             String queryText = Files.readString(queryFile.toPath(), StandardCharsets.UTF_8);
@@ -140,10 +145,12 @@ public class SparqlQueryTabController implements Initializable {
                         new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql"),
                         new FileChooser.ExtensionFilter("All files", "*.*")
                 );
+                PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
                 targetFile = chooser.showSaveDialog(txtSparqlQuery.getScene().getWindow());
                 if (targetFile == null) {
                     return;
                 }
+                PathMemory.remember("dialog.sparqlQueryFile", targetFile);
             }
 
             String queryText = txtSparqlQuery.getText();
@@ -178,10 +185,12 @@ public class SparqlQueryTabController implements Initializable {
                     new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql"),
                     new FileChooser.ExtensionFilter("All files", "*.*")
             );
+            PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
             File targetFile = chooser.showSaveDialog(txtSparqlQuery.getScene().getWindow());
             if (targetFile == null) {
                 return;
             }
+            PathMemory.remember("dialog.sparqlQueryFile", targetFile);
 
             String queryText = txtSparqlQuery.getText();
             if (queryText == null || queryText.isBlank()) {

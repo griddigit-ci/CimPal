@@ -1,5 +1,6 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 import eu.griddigit.cimpal.main.application.tasks.DeleteRequiredProperties;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;
@@ -34,7 +35,7 @@ public class DeleteRequiredPropertiesController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL constraints", "*.rdf", "*.ttl", "*.xml"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.deleteRequiredProps.shaclFiles");
 
         List<File> selectedFilesPaths = null;
         selectedFilesPaths = filechooser.showOpenMultipleDialog(null);
@@ -46,6 +47,7 @@ public class DeleteRequiredPropertiesController implements Initializable {
                 DeleteRequiredProperties task = (DeleteRequiredProperties) wizardContext.getSelectedTasks().stream().filter(x -> x.getTask().getClass() == DeleteRequiredProperties.class).findFirst().get().getTask();
                 task.setShaclFilesPath(selectedFilesPaths.stream().map(x -> x.getPath()).toArray(String[]::new));
                 wizardContext.setLastOpenedDir(selectedFilesPaths.get(0).getParentFile());
+                PathMemory.remember("dialog.wizard.deleteRequiredProps.shaclFiles", selectedFilesPaths.get(0).getParentFile());
         }
         else{
             loadedShaclFiles.clear();

@@ -5,11 +5,14 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.gui.ThemeManager;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
@@ -41,6 +44,9 @@ public class PreferencesController implements Initializable {
     private TextField furiEU;
     @FXML
     private TextField furiOther;
+
+    @FXML
+    private Label lblRememberedLocations;
 
     @FXML
     private ToggleGroup themeToggleGroup;
@@ -105,6 +111,27 @@ public class PreferencesController implements Initializable {
     }
 
     @FXML
+    //action button Clear remembered locations
+    private void actionClearRememberedLocations(ActionEvent actionEvent) {
+        int count = PathMemory.count();
+        if (count == 0) {
+            showRememberedLocationCount();
+            return;
+        }
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Clear remembered locations");
+        confirm.setHeaderText("Forget " + count + " remembered location" + (count == 1 ? "" : "s") + "?");
+        confirm.setContentText("Fields will start empty and dialogs will open in your home folder "
+                + "until you pick a location again. Nothing on disk is changed.");
+        confirm.showAndWait()
+                .filter(button -> button == ButtonType.OK)
+                .ifPresent(button -> {
+                    PathMemory.clearAll();
+                    showRememberedLocationCount();
+                });
+    }
+
+    @FXML
     //action button Default
     private void actionBtnDefault(ActionEvent actionEvent) {
         prefDefault();
@@ -129,6 +156,9 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("uriEU", "http://iec.ch/TC57/CIM100-European#");
         MainController.prefs.put("prefixOther", "");
         MainController.prefs.put("uriOther", "");
+        //the remembered per-field and per-dialog locations are part of the stored state,
+        //so resetting to defaults forgets them too
+        PathMemory.clearAll();
         MainController.prefs.put("LastWorkingFolder", String.valueOf(FileUtils.getUserDirectory())); // it was "C:" before but this was causing issue for MAC
         MainController.prefs.put(ThemeManager.PREF_KEY, ThemeManager.Theme.DEFAULT.id());
 
@@ -156,6 +186,16 @@ public class PreferencesController implements Initializable {
         furiEU.setText(MainController.prefs.get("uriEU",""));
         fprefixOther.setText(MainController.prefs.get("prefixOther",""));
         furiOther.setText(MainController.prefs.get("uriOther",""));
+
+        showRememberedLocationCount();
+    }
+
+    //report how many locations are currently remembered
+    private void showRememberedLocationCount() {
+        int count = PathMemory.count();
+        lblRememberedLocations.setText(count == 0
+                ? "Nothing remembered yet."
+                : count + (count == 1 ? " location" : " locations") + " remembered.");
     }
 
     //build one radio button per ThemeManager.Theme, grouped under its group() heading

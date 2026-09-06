@@ -2,7 +2,6 @@
 
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.text.Font?>
 
 <VBox xmlns="http://javafx.com/javafx"
@@ -13,223 +12,182 @@
 
   <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
 
-    <HBox minHeight="0.0" minWidth="0.0">
+    <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" styleClass="tab-root">
 
-        <VBox minWidth="0.0" spacing="10.0" HBox.hgrow="ALWAYS">
+        <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+            <columnConstraints>
+                <!-- 0: labels. Fixed so every field in the tab starts on the same x. -->
+                <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0"/>
+                <!-- 1: the field. The only column that absorbs slack. minWidth 0 lets the tab shrink. -->
+                <ColumnConstraints hgrow="ALWAYS" minWidth="0.0"/>
+                <!-- 2: Browse. Fixed so it never inflates into a banner. -->
+                <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0"/>
+            </columnConstraints>
 
-            <HBox alignment="CENTER_LEFT" spacing="10.0">
-                <padding>
-                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                </padding>
-
-                <HBox alignment="CENTER_LEFT" spacing="10.0">
-                    <Label text="Use method:" wrapText="true">
-                        <font>
-                            <Font size="14.0"/>
-                        </font>
-                    </Label>
-                    <Label fx:id="helpUseMethod" text="?" styleClass="help-badge"/>
-                    <ChoiceBox fx:id="fcbGenMethodOptions" minWidth="400.0"/>
-                </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                <Label text="Use method:" wrapText="true">
+                    <font>
+                        <Font size="14.0"/>
+                    </font>
+                </Label>
+                <Label fx:id="helpUseMethod" text="?" styleClass="help-badge"/>
             </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0"
+                  GridPane.rowIndex="0" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <!-- prefWidth, not minWidth: minWidth="400" made the whole tab unable to shrink below it. -->
+                <ChoiceBox fx:id="fcbGenMethodOptions" prefWidth="400.0"/>
+                <Region HBox.hgrow="ALWAYS"/>
+            </HBox>
+        </GridPane>
 
-            <!-- Replaced Accordion with VBox so both TitledPanes can stay open -->
-            <VBox spacing="10.0" VBox.vgrow="ALWAYS">
+        <!-- Replaced Accordion with VBox so both TitledPanes can stay open -->
+        <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" VBox.vgrow="ALWAYS">
 
-                <TitledPane expanded="true"
-                            collapsible="true"
-                            minHeight="0.0"
-                            text="Create xlsx template from RDFS or dataset serialised in CIMXML"
-                            VBox.vgrow="ALWAYS">
+            <TitledPane expanded="true"
+                        collapsible="true"
+                        minHeight="0.0"
+                        text="Create xlsx template from RDFS or dataset serialised in CIMXML"
+                        VBox.vgrow="ALWAYS">
 
-                        <HBox minHeight="0.0"
-                              minWidth="0.0"
-                              spacing="10.0">
+                <HBox minHeight="0.0" minWidth="0.0" spacing="16.0">
 
-                            <VBox alignment="CENTER"
-                                  spacing="10.0"
-                                  HBox.hgrow="ALWAYS">
-                                <padding>
-                                    <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-                                </padding>
-
-                                <HBox alignment="CENTER_LEFT" spacing="5.0">
-                                    <Label text="Loaded RDFS files"/>
-                                    <Label fx:id="helpLoadRdfs" text="?" styleClass="help-badge"/>
-                                </HBox>
-
-                                <ListView fx:id="ls_geni_rdfs"
-                                          VBox.vgrow="ALWAYS"/>
-
-                                <Button mnemonicParsing="false"
-                                        onAction="#actionLoadRDFSGen"
-                                        text="Load RDFS"/>
-                            </VBox>
-
-                            <VBox alignment="CENTER"
-                                  spacing="10.0"
-                                  HBox.hgrow="ALWAYS">
-                                <padding>
-                                    <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-                                </padding>
-
-                                <HBox alignment="CENTER_LEFT" spacing="5.0">
-                                    <Label text="Loaded Instance files"/>
-                                    <Label fx:id="helpLoadInstances" text="?" styleClass="help-badge"/>
-                                </HBox>
-
-                                <ListView fx:id="ls_geni_instances"
-                                          VBox.vgrow="ALWAYS"/>
-
-                                <Button mnemonicParsing="false"
-                                        onAction="#actionLoadInstanceDataGen"
-                                        text="Load Instance data"/>
-                            </VBox>
-
-                            <VBox alignment="BOTTOM_RIGHT"
-                                  spacing="10.0"
-                                  HBox.hgrow="ALWAYS">
-                                <padding>
-                                    <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-                                </padding>
-
-                                <CheckBox fx:id="hideEmptySheets"
-                                          disable="true"
-                                          mnemonicParsing="false"
-                                          nodeOrientation="RIGHT_TO_LEFT"
-                                          text="Hide empty sheets"/>
-                                <Label fx:id="helpHideEmptySheets" text="?" styleClass="help-badge"/>
-
-                                <Label fx:id="label_geninfo"
-                                       alignment="CENTER_RIGHT"
-                                       maxWidth="290.0"
-                                       nodeOrientation="LEFT_TO_RIGHT"
-                                       styleClass="warning-text"
-                                       text="Load RDFS and/or Instance data to generate template."
-                                       wrapText="true"/>
-
-                                <Button alignment="BOTTOM_RIGHT"
-                                        mnemonicParsing="false"
-                                        onAction="#actionCreateXlsTemplate"
-                                        text="Generate template"/>
-                            </VBox>
+                    <VBox minWidth="0.0" spacing="8.0" HBox.hgrow="ALWAYS">
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <Label text="Loaded RDFS files"/>
+                            <Label fx:id="helpLoadRdfs" text="?" styleClass="help-badge"/>
                         </HBox>
-                </TitledPane>
+                        <ListView fx:id="ls_geni_rdfs" minHeight="100.0" minWidth="0.0"
+                                  maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS"/>
+                        <HBox alignment="CENTER_RIGHT" spacing="8.0">
+                            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionLoadRDFSGen"
+                                    text="Load RDFS"/>
+                        </HBox>
+                    </VBox>
 
-                <TitledPane expanded="true"
-                            collapsible="true"
-                            text="Create CIMXML dataset based on xlsx template">
+                    <VBox minWidth="0.0" spacing="8.0" HBox.hgrow="ALWAYS">
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <Label text="Loaded Instance files"/>
+                            <Label fx:id="helpLoadInstances" text="?" styleClass="help-badge"/>
+                        </HBox>
+                        <ListView fx:id="ls_geni_instances" minHeight="100.0" minWidth="0.0"
+                                  maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS"/>
+                        <HBox alignment="CENTER_RIGHT" spacing="8.0">
+                            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionLoadInstanceDataGen"
+                                    text="Load Instance data"/>
+                        </HBox>
+                    </VBox>
 
-                        <VBox minHeight="0.0"
-                              minWidth="0.0"
-                              spacing="5.0">
+                    <VBox minWidth="0.0" spacing="8.0" HBox.hgrow="ALWAYS">
+                        <!--
+                          The checkbox used to carry nodeOrientation="RIGHT_TO_LEFT" to pull itself to the
+                          right edge, which also put its tick box after its text; label_geninfo then carried
+                          LEFT_TO_RIGHT to undo the reading order. Both are gone.
+                        -->
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <CheckBox fx:id="hideEmptySheets"
+                                      disable="true"
+                                      mnemonicParsing="false"
+                                      text="Hide empty sheets"/>
+                            <Label fx:id="helpHideEmptySheets" text="?" styleClass="help-badge"/>
+                        </HBox>
 
-                            <HBox spacing="10.0">
-                                <padding>
-                                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                                </padding>
+                        <Label fx:id="label_geninfo"
+                               maxWidth="1.7976931348623157E308"
+                               styleClass="warning-text"
+                               text="Load RDFS and/or Instance data to generate template."
+                               wrapText="true"/>
 
-                                <VBox.margin>
-                                    <Insets top="10.0"/>
-                                </VBox.margin>
+                        <Region VBox.vgrow="ALWAYS"/>
 
-                                <Label text="XLS template:" wrapText="true"/>
-                                <Label fx:id="helpXlsTemplate" text="?" styleClass="help-badge"/>
+                        <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar">
+                            <Button minWidth="110.0"
+                                    styleClass="primary-action"
+                                    mnemonicParsing="false"
+                                    onAction="#actionCreateXlsTemplate"
+                                    text="Generate template"/>
+                        </HBox>
+                    </VBox>
+                </HBox>
+            </TitledPane>
 
-                                <TextField fx:id="fsXlsTemplatePath"
-                                           editable="false"
-                                           HBox.hgrow="ALWAYS"/>
+            <TitledPane expanded="true"
+                        collapsible="true"
+                        text="Create CIMXML dataset based on xlsx template">
 
-                                <Button mnemonicParsing="false"
-                                        onAction="#actionBrowseXlsTemplate"
-                                        text="Browse"/>
-                            </HBox>
+                <VBox minHeight="0.0" minWidth="0.0" spacing="16.0">
 
-                            <HBox spacing="10.0">
-                                <padding>
-                                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                                </padding>
+                    <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+                        <columnConstraints>
+                            <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0"/>
+                            <ColumnConstraints hgrow="ALWAYS" minWidth="0.0"/>
+                            <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0"/>
+                        </columnConstraints>
 
-                                <Label minWidth="50.0"
-                                       prefHeight="17.0"
-                                       prefWidth="89.0"
-                                       text="Sorting options:"/>
-                                <Label fx:id="helpSortingOptions" text="?" styleClass="help-badge"/>
+                        <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                            <Label text="XLS template:" wrapText="true"/>
+                            <Label fx:id="helpXlsTemplate" text="?" styleClass="help-badge"/>
+                        </HBox>
+                        <TextField fx:id="fsXlsTemplatePath" editable="false" maxWidth="1.7976931348623157E308"
+                                   GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                        <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseXlsTemplate"
+                                text="Browse" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
 
-                                <CheckBox fx:id="fcbSortRDFGen"
-                                          minWidth="150.0"
-                                          mnemonicParsing="false"
-                                          selected="true"
-                                          text="Sort alphabetically">
-                                    <HBox.margin>
-                                        <Insets left="10.0"/>
-                                    </HBox.margin>
-                                </CheckBox>
-
+                        <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                            <Label text="Sorting options:"/>
+                            <Label fx:id="helpSortingOptions" text="?" styleClass="help-badge"/>
+                        </HBox>
+                        <!-- FlowPane so the options reflow instead of overflowing the tab. -->
+                        <FlowPane hgap="16.0" vgap="8.0" styleClass="option-flow"
+                                  GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                            <CheckBox fx:id="fcbSortRDFGen" mnemonicParsing="false" selected="true"
+                                      text="Sort alphabetically"/>
+                            <HBox alignment="CENTER_LEFT" spacing="8.0">
                                 <Label text="Sorting options:"/>
-
-                                <ChoiceBox fx:id="fcbRDFsortOptionsGen"
-                                           prefWidth="200.0"/>
+                                <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0"/>
                             </HBox>
+                            <CheckBox fx:id="fcbStripPrefixesGen" mnemonicParsing="false" selected="true"
+                                      text="Strip declaration of unused prefixes"/>
+                            <Label fx:id="helpStripPrefixes" text="?" styleClass="help-badge"/>
+                        </FlowPane>
 
-                            <HBox spacing="10.0">
-                                <padding>
-                                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                                </padding>
+                        <FlowPane hgap="16.0" vgap="8.0" styleClass="option-flow"
+                                  GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                            <CheckBox fx:id="fcbExportExtensionsGen" mnemonicParsing="false" selected="true"
+                                      text="Export extensions (identified extensions in the template)"/>
+                            <Label fx:id="helpExportExtensions" text="?" styleClass="help-badge"/>
+                        </FlowPane>
+                    </GridPane>
 
-                                <CheckBox fx:id="fcbStripPrefixesGen"
-                                          minWidth="150.0"
-                                          mnemonicParsing="false"
-                                          selected="true"
-                                          text="Strip declaration of unused prefixes"/>
-                                <Label fx:id="helpStripPrefixes" text="?" styleClass="help-badge"/>
+                    <!--
+                      Always hidden. It lives in its own container rather than as a hidden grid row,
+                      because an unmanaged row still contributes its vgap; an unmanaged container
+                      contributes nothing at all.
+                    -->
+                    <HBox alignment="CENTER_LEFT" spacing="8.0" visible="false" managed="false">
+                        <Label text="Profile version:" wrapText="true"/>
+                        <ChoiceBox fx:id="fcb_giVersion" prefWidth="400.0"/>
+                    </HBox>
 
-                                <CheckBox fx:id="fcbExportExtensionsGen"
-                                          minWidth="150.0"
-                                          mnemonicParsing="false"
-                                          selected="true"
-                                          text="Export extensions (identified extensions in the template)"/>
-                                <Label fx:id="helpExportExtensions" text="?" styleClass="help-badge"/>
-                            </HBox>
-
-                            <HBox alignment="CENTER_RIGHT" spacing="10.0">
-                                <padding>
-                                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                                </padding>
-
-                                <Button minWidth="60.0"
-                                        mnemonicParsing="false"
-                                        onAction="#actionBtnRunGenerateInstance"
-                                        text="Create"/>
-                            </HBox>
-
-                            <HBox spacing="10.0" visible="false" managed="false">
-                                <padding>
-                                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                                </padding>
-
-                                <Label text="Profile version:" wrapText="true"/>
-
-                                <ChoiceBox fx:id="fcb_giVersion" minWidth="400.0"/>
-                            </HBox>
-                        </VBox>
-                </TitledPane>
-            </VBox>
-
-            <!-- Global Reset button for both sections -->
-            <HBox alignment="CENTER_RIGHT" spacing="10.0">
-                <padding>
-                    <Insets bottom="10.0" left="10.0" right="10.0" top="5.0"/>
-                </padding>
-
-                <Button fx:id="btnResetGenerateInstance"
-                        minWidth="80.0"
-                        mnemonicParsing="false"
-                        onAction="#actionBtnResetGenerateInstance"
-                        text="Reset"/>
-            </HBox>
-
+                    <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar">
+                        <Button minWidth="110.0"
+                                styleClass="primary-action"
+                                mnemonicParsing="false"
+                                onAction="#actionBtnRunGenerateInstance"
+                                text="Create"/>
+                    </HBox>
+                </VBox>
+            </TitledPane>
         </VBox>
-    </HBox>
+
+        <!-- Global Reset button for both sections -->
+        <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+            <Button fx:id="btnResetGenerateInstance"
+                    minWidth="95.0"
+                    mnemonicParsing="false"
+                    onAction="#actionBtnResetGenerateInstance"
+                    text="Reset"/>
+        </HBox>
+
+    </VBox>
   </ScrollPane>
 </VBox>

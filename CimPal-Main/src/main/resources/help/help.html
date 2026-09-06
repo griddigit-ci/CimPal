@@ -451,14 +451,15 @@ CIM-based data exchange:</p>
   <li><a href="#tab-rdfs-to-shacl">RDFS to SHACL</a> &mdash; load the profile RDFS files, select the
       profiles in the tree, set the shapes namespace and base URI, press <em>Create</em>, save the
       generated <code>.ttl</code> shapes.</li>
-  <li><a href="#tool-validate-shacl-shapes">Tools &#9656; Validate SHACL shapes</a> &mdash; confirm
+  <li><a href="#tool-validate-shacl-shapes">Tools &#9656; SHACL Constraints &#9656; Validate SHACL
+      shapes</a> &mdash; confirm
       the generated shapes are themselves conformant (or simply leave <em>Validate generated SHACL
       shapes</em> ticked in step 1).</li>
   <li><a href="#tab-shacl-tester">SHACL tester</a> &mdash; run the new shapes over a folder of
       known-good models and check that nothing conformant is rejected.</li>
-  <li><a href="#tool-export-shacl-info">Tools &#9656; Export SHACL constraints information to
-      Excel</a> &mdash; produce the human-readable constraint documentation that accompanies the
-      release.</li>
+  <li><a href="#tool-export-shacl-info">Tools &#9656; SHACL Constraints &#9656; Export SHACL
+      constraints information to Excel</a> &mdash; produce the human-readable constraint
+      documentation that accompanies the release.</li>
 </ol>
 
 <h3>Reviewing what changed between two profile releases</h3>
@@ -728,6 +729,11 @@ modifications and edits an already-published shapes file in place, which is how 
 corrections are made to a released constraint set without regenerating it.</p>
 
 <h4>Inputs</h4>
+
+<p>The two jobs are two separate sections of the tab, each with its own <em>Reset</em> and
+<em>Run</em>; filling in one does not affect the other.</p>
+
+<p><strong>Create shapes from Excel</strong> &mdash; the upper section:</p>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
 <tr><td>RDF file</td><td>file, required</td>
@@ -737,19 +743,25 @@ corrections are made to a released constraint set without regenerating it.</p>
 <tr><td>RDFS format</td><td>choice</td>
     <td>The format/version of the RDFS profile (for example the augmented CimSyntaxGen
         format).</td></tr>
-<tr><td>Excel file</td><td>file, required</td>
+<tr><td>Input - Excel file</td><td>file, required</td>
     <td>Excel file (<code>.xls</code>/<code>.xlsx</code>) containing SHACL constraint definitions.
         Each row defines a constraint derived from the RDFS model.</td></tr>
-<tr><td>Base URI</td><td>text</td>
+<tr><td>Base URI - Shape graph</td><td>text</td>
     <td>The base URI (IRI) for the generated SHACL shapes graph, used as the graph name in the
         output.</td></tr>
-<tr><td>Prefix / namespace</td><td>text</td>
+<tr><td>Prefix / Namespace</td><td>text</td>
     <td>The namespace prefix and URI for the generated shapes graph: the prefix is the short Turtle
         alias, the URI the full namespace it expands to.</td></tr>
-<tr><td>Changes Excel</td><td>file</td>
+</table>
+
+<p><strong>Apply changes to an existing Turtle file</strong> &mdash; the lower section, headed
+<em>Modify Constraints from xls file</em>:</p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Changes Excel</td><td>file, required</td>
     <td>Excel file containing constraint modifications to apply to an existing SHACL Turtle file.
         Each row specifies a change.</td></tr>
-<tr><td>Target ttl</td><td>file</td>
+<tr><td>Target TTL</td><td>file, required</td>
     <td>The existing SHACL Turtle (<code>.ttl</code>) file to which the changes from the Changes
         Excel will be applied.</td></tr>
 </table>
@@ -1175,7 +1187,30 @@ what turns validation from a one-off check into a trend you can watch across rel
 <h2>Tools menu</h2>
 
 <p>Single-purpose batch operations. Each one prompts for its inputs with a file or folder chooser,
-does its work, and reports to the Output window. They are listed here in menu order.</p>
+does its work, and reports to the Output window.</p>
+
+<p>The menu is grouped into five submenus by the kind of artefact each tool works on, so a tool can
+be found by asking &ldquo;what am I holding?&rdquo; rather than by scanning one long list:</p>
+
+<ul>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;RDFS Profiles</strong> &mdash; Export RDFS descriptions;
+      Export RDF tripples to xls; Generate information from RDFS &mdash; needed for serialisation;
+      Generate properties info from RDFS (xls, ttl, json); Create datatypes map.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;SHACL Constraints</strong> &mdash; Export SHACL constraints
+      information to Excel; Export All SHACL constraints information to Excel; Validate SHACL
+      shapes; Restore ttl from constraint csv.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;Reference Data</strong> &mdash; Convert Reference Data;
+      Convert Reference data to Common data.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;Instance Data &amp; Models</strong> &mdash; Model
+      transformation; Populate missing attributes; Generate Manifest; PSSE-PowerFactory
+      compare.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;Quality Reports</strong> &mdash; Generate QAR based on xls;
+      Create xlsx template from QAR; QoCDC 3.2.1 xml to Excel.</li>
+</ul>
+
+<p>Two entries stay at the top level of the menu, below the submenus, because they are not batch
+tools at all: <em>Validate by mapping file</em> and <em>Run SPARQL Query</em> only bring their tab
+to the front. The cards below are in menu order, submenu by submenu.</p>
 
 <details class="fn" id="tool-export-rdfs-descriptions">
 <summary><span class="kind">Tool</span> Export RDFS descriptions</summary>
@@ -1646,8 +1681,8 @@ practical way to bring a corpus of already-published models up to a new requirem
 related</strong> tab defines the namespaces of the standard CimPal is working against &mdash; get
 these right once and every generated artefact carries consistent, correct namespace declarations;
 get them wrong and the output is subtly invalid in a way that is tedious to trace. The
-<strong>Application</strong> tab controls appearance. Settings are stored per user and persist
-between sessions.</p>
+<strong>Application</strong> tab controls appearance and the folders CimPal reopens in. Settings
+are stored per user and persist between sessions.</p>
 
 <h4>Inputs</h4>
 <table class="io">
@@ -1666,6 +1701,11 @@ between sessions.</p>
     <td>Prefix and URI of the European extension namespace.</td></tr>
 <tr><td>Other prefix / URI</td><td>CIM related</td>
     <td>Prefix and URI of a further custom extension namespace.</td></tr>
+<tr><td>Clear remembered locations</td><td>Application &#9656; Remembered locations</td>
+    <td>Forgets every remembered field value and dialog folder, after asking for confirmation. The
+        label above the button reports how many are currently remembered. Nothing on disk is
+        touched: path fields simply start empty again and dialogs open in your home folder until
+        you pick a location.</td></tr>
 <tr><td>Theme</td><td>Application &#9656; Themes</td>
     <td>One of ten themes, grouped light, dark and accessibility: Minimalist White, Nordic Light,
         Solarized Light, Sepia (Warm Paper), Sleek Dark Mode, Material Dark, Dracula, Solarized
@@ -1678,10 +1718,22 @@ between sessions.</p>
   <li><strong>OK</strong> &mdash; saves the values and closes the dialog. They persist for this
       user between sessions and are picked up as the defaults by the tabs that offer <em>Apply
       default namespace</em> and <em>Apply default base URI</em>.</li>
-  <li><strong>Default</strong> &mdash; restores the shipped default values.</li>
+  <li><strong>Default</strong> &mdash; restores the shipped default values, and forgets the
+      remembered locations as well.</li>
   <li><strong>Cancel</strong> &mdash; discards the changes, including reverting a previewed
       theme.</li>
 </ul>
+
+<div class="note" style="margin-top:16px">
+  <strong>Remembered locations</strong> &mdash; CimPal remembers each path field and each file or
+  folder dialog separately, so a field comes back filled in the next time you start the application
+  and every dialog opens where that same dialog was last used. A field's <em>Reset</em> button also
+  forgets its remembered path. If a remembered folder has since been deleted, the dialog opens in
+  the nearest folder that still exists instead of reporting an error, and a field whose file no
+  longer exists simply starts empty. A few fields show a list of several selected files rather than
+  one path; those cannot be restored into the field, but their dialogs still remember their
+  folder.
+</div>
 
 <div class="note" style="margin-top:16px">
   <strong>Note</strong> &mdash; a theme change applies to windows that are open at the time and to
@@ -1690,7 +1742,7 @@ between sessions.</p>
 </div>
 
 <p class="src">Source: <code>MainController.actionMenuPreferences()</code>,
-<code>PreferencesController</code>, <code>ThemeManager</code></p>
+<code>PreferencesController</code>, <code>ThemeManager</code>, <code>PathMemory</code></p>
 </div>
 </details>
 

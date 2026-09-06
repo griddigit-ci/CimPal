@@ -9,6 +9,7 @@ package eu.griddigit.cimpal.main.util;
 
 import eu.griddigit.cimpal.core.utils.DataTypeStreamRDF;
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.scene.control.Alert;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -174,13 +175,23 @@ public class ModelFactory {
 
     //File(s) selection Filechooser
     public static List<File> fileChooserCustom(Boolean typeSingleFile, String titleExtensionFilter, List<String> extExtensionFilter, String title) {
+        return fileChooserCustom(typeSingleFile, titleExtensionFilter, extExtensionFilter, title, null);
+    }
+
+    /**
+     * As {@link #fileChooserCustom(Boolean, String, List, String)}, but remembering the chosen
+     * location under {@code memoryKey} so this particular dialog reopens where it was last used.
+     */
+    public static List<File> fileChooserCustom(Boolean typeSingleFile, String titleExtensionFilter, List<String> extExtensionFilter, String title, String memoryKey) {
 
         List<File> fileL = new LinkedList<>();
         File file = null;
 
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(titleExtensionFilter, extExtensionFilter));
-        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder", "")));
+        // PathMemory only sets a directory once it has verified one exists, so the chooser is never
+        // handed a dead path.
+        PathMemory.prepare(filechooser, memoryKey);
         filechooser.setTitle(title);
 
         try {
@@ -191,10 +202,10 @@ public class ModelFactory {
             }
         } catch (Exception e) {
             if (typeSingleFile) {
-                filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+                filechooser.setInitialDirectory(FileUtils.getUserDirectory());
                 file = filechooser.showOpenDialog(null);
             } else {
-                filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+                filechooser.setInitialDirectory(FileUtils.getUserDirectory());
                 fileL = filechooser.showOpenMultipleDialog(null);
             }
         }
@@ -202,11 +213,13 @@ public class ModelFactory {
         if (typeSingleFile) {
             if (file != null) {// the file is selected
                 prefs.put("LastWorkingFolder", file.getParent());
+                PathMemory.remember(memoryKey, file);
                 fileL.add(file);
             }
         } else {
             if (fileL != null) {// the file is selected
                 prefs.put("LastWorkingFolder", fileL.getFirst().getParent());
+                PathMemory.remember(memoryKey, fileL.getFirst());
             }
         }
         return fileL;
@@ -214,43 +227,22 @@ public class ModelFactory {
 
     //Folder selection
     public static File folderChooserCustom() {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        File selectedDirectory = null;
-
-        // Validate the stored last working folder
-        File initialDirectory = new File(prefs.get("LastWorkingFolder", ""));
-        if (!initialDirectory.exists() || !initialDirectory.isDirectory()) {
-            initialDirectory = FileUtils.getUserDirectory(); // Default to user's home directory
-        }
-
-        directoryChooser.setInitialDirectory(initialDirectory);
-        directoryChooser.setTitle("Select Output Folder");
-
-        try {
-            selectedDirectory = directoryChooser.showDialog(null);
-        } catch (Exception e) {
-            directoryChooser.setInitialDirectory(FileUtils.getUserDirectory());
-            selectedDirectory = directoryChooser.showDialog(null);
-        }
-
-        if (selectedDirectory != null) {
-            prefs.put("LastWorkingFolder", selectedDirectory.getAbsolutePath());
-        }
-
-        return selectedDirectory;
+        return folderChooserCustom("Select Output Folder", null);
     }
 
     public static File folderChooserCustom(String title) {
+        return folderChooserCustom(title, null);
+    }
+
+    /**
+     * As {@link #folderChooserCustom(String)}, but remembering the chosen folder under
+     * {@code memoryKey} so this particular dialog reopens where it was last used.
+     */
+    public static File folderChooserCustom(String title, String memoryKey) {
         DirectoryChooser directoryChooser = new DirectoryChooser();
-        File selectedDirectory = null;
+        File selectedDirectory;
 
-        // Validate the stored last working folder
-        File initialDirectory = new File(prefs.get("LastWorkingFolder", ""));
-        if (!initialDirectory.exists() || !initialDirectory.isDirectory()) {
-            initialDirectory = FileUtils.getUserDirectory(); // Default to user's home directory
-        }
-
-        directoryChooser.setInitialDirectory(initialDirectory);
+        PathMemory.prepare(directoryChooser, memoryKey);
         directoryChooser.setTitle(title);
 
         try {
@@ -262,6 +254,7 @@ public class ModelFactory {
 
         if (selectedDirectory != null) {
             prefs.put("LastWorkingFolder", selectedDirectory.getAbsolutePath());
+            PathMemory.remember(memoryKey, selectedDirectory);
         }
 
         return selectedDirectory;
@@ -269,20 +262,33 @@ public class ModelFactory {
 
     //File(s) selection Filechooser
     public static File fileSaveCustom(String titleExtensionFilter, List<String> extExtensionFilter, String Dialogtitle, String filename) {
+        return fileSaveCustom(titleExtensionFilter, extExtensionFilter, Dialogtitle, filename, null);
+    }
+
+    /**
+     * As {@link #fileSaveCustom(String, List, String, String)}, but remembering the chosen location
+     * under {@code memoryKey} so this particular save dialog reopens where it was last used.
+     */
+    public static File fileSaveCustom(String titleExtensionFilter, List<String> extExtensionFilter, String Dialogtitle, String filename, String memoryKey) {
 
         File file = null;
 
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter(titleExtensionFilter, extExtensionFilter));
-        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder", "")));
+        PathMemory.prepare(filechooser, memoryKey);
         filechooser.setTitle(Dialogtitle);
         filechooser.setInitialFileName(filename);
 
         try {
             file = filechooser.showSaveDialog(null);
         } catch (Exception e) {
-            filechooser.setInitialDirectory(new File(String.valueOf(FileUtils.getUserDirectory())));
+            filechooser.setInitialDirectory(FileUtils.getUserDirectory());
             file = filechooser.showSaveDialog(null);
+        }
+
+        if (file != null && file.getParent() != null) {
+            prefs.put("LastWorkingFolder", file.getParent());
+            PathMemory.remember(memoryKey, file);
         }
 
         return file;

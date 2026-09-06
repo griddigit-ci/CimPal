@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.tasks.MultiplyIGMFromConfigXLS;
 import eu.griddigit.cimpal.main.application.datagenerator.InstanceDataFactory;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -75,7 +76,7 @@ public class MultiplyIGMFromConfigFileController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Input data XLS", "*.xlsx"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.multiplyIgmConfigXls");
         File file = filechooser.showOpenDialog(null);
 
         if (file != null ) {// the file is selected
@@ -83,6 +84,7 @@ public class MultiplyIGMFromConfigFileController implements Initializable {
             MultiplyIGMFromConfigXLS task = (MultiplyIGMFromConfigXLS) wizardContext.getSelectedTasks().stream().filter(x -> x.getTask().getClass() == MultiplyIGMFromConfigXLS.class).findFirst().get().getTask();
             task.setMultiplyXMLFile(file.toString());
             wizardContext.setLastOpenedDir(file.getParentFile());
+            PathMemory.remember("dialog.wizard.multiplyIgmConfigXls", file.getParentFile());
             //MainController.inputXLSCGM = file;
         }
 
@@ -95,7 +97,7 @@ public class MultiplyIGMFromConfigFileController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("EQBD File", "*.zip"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.eqbdFile");
         eqbdFile = filechooser.showOpenDialog(null);
         //load and get Id
 
@@ -111,6 +113,7 @@ public class MultiplyIGMFromConfigFileController implements Initializable {
             eqbdId.setDisable(true);
             eqbdId.setEditable(false);
             wizardContext.setLastOpenedDir(eqbdFile.getParentFile());
+            PathMemory.remember("dialog.wizard.eqbdFile", eqbdFile.getParentFile());
         }
         else {
             eqbdId.clear();
@@ -123,7 +126,7 @@ public class MultiplyIGMFromConfigFileController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("TPBD File", "*.zip"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.tpbdFile");
         tpbdFile = filechooser.showOpenDialog(null);
         //load and get Id
         InputStream inputStream = InstanceDataFactory.unzip(tpbdFile);
@@ -138,6 +141,7 @@ public class MultiplyIGMFromConfigFileController implements Initializable {
             tpbdId.setDisable(true);
             tpbdId.setEditable(false);
             wizardContext.setLastOpenedDir(tpbdFile.getParentFile());
+            PathMemory.remember("dialog.wizard.tpbdFile", tpbdFile.getParentFile());
         }
         else {
             tpbdId.clear();

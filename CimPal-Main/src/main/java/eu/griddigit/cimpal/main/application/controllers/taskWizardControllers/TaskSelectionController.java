@@ -5,6 +5,7 @@ import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -160,7 +161,7 @@ public class TaskSelectionController implements Initializable, IController {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select Base Instance Model Files", "*.zip", "*.xml", "*.ttl"));
-        filechooser.setInitialDirectory(new File(context.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.baseInstanceModels");
 
         selectedBaseInstanceModelFilePaths = filechooser.showOpenMultipleDialog(null);
 
@@ -173,6 +174,7 @@ public class TaskSelectionController implements Initializable, IController {
             }
             context.getDataGeneratorModel().setBaseInstanceModelPath(filePaths);
             context.setLastOpenedDir(selectedBaseInstanceModelFilePaths.getFirst().getParentFile());
+            PathMemory.remember("dialog.wizard.baseInstanceModels", selectedBaseInstanceModelFilePaths.getFirst().getParentFile());
         } else {
             baseInstanceModelFilesPaths.clear();
         }
@@ -184,7 +186,7 @@ public class TaskSelectionController implements Initializable, IController {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF profile file", "*.rdf", "*.ttl"));
-        filechooser.setInitialDirectory(new File(context.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.profileRdfs");
         selectedProfileIDG = filechooser.showOpenMultipleDialog(null);
 
         if (selectedProfileIDG != null) {// the file is selected
@@ -195,6 +197,7 @@ public class TaskSelectionController implements Initializable, IController {
             }
             context.getDataGeneratorModel().getRdfsProfileVersion().setPathToRDFSFiles(filePaths);
             context.setLastOpenedDir(selectedProfileIDG.getFirst().getParentFile());
+            PathMemory.remember("dialog.wizard.profileRdfs", selectedProfileIDG.getFirst().getParentFile());
         } else {
             fieldTextProfileIDG.clear();
         }

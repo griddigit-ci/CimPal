@@ -600,13 +600,13 @@ public class RDFStoSHACLController implements Initializable {
             List<File> baseModelFiles3 = null;
 
             if (cbRDFSSHACLoptionBaseprofiles.isSelected()) {
-                baseModelFiles1 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 1st Base profiles");
+                baseModelFiles1 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 1st Base profiles", "dialog.rdfsToShacl.baseProfiles1");
             }
             if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) {
-                baseModelFiles2 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd Base profiles");
+                baseModelFiles2 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd Base profiles", "dialog.rdfsToShacl.baseProfiles2");
             }
             if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) {
-                baseModelFiles3 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd Base profiles");
+                baseModelFiles3 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd Base profiles", "dialog.rdfsToShacl.baseProfiles3");
             }
 
 
@@ -668,7 +668,7 @@ public class RDFStoSHACLController implements Initializable {
             }
 
             // save the generated shapes
-            Path outputFolderPath = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select output folder").toPath();
+            Path outputFolderPath = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select output folder", "dialog.rdfsToShacl.outputFolder").toPath();
             rdftoSHACL.saveShapeModel(outputFolderPath);
 
             // save datatype map if requested
@@ -1407,10 +1407,10 @@ public class RDFStoSHACLController implements Initializable {
         List<File> file = null;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2019";
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "", "tab.rdfsToShacl.rdfsProfiles");
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2020";
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "", "tab.rdfsToShacl.rdfsProfiles");
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool (NOT READY)")) {
             showFormatNotSupportedAlert();
             return;

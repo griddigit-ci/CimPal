@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.services.TaskInputElementsFactory;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -57,16 +58,18 @@ public class TaskInputController  implements Initializable, IController {
     public void selectWorkingDirectory(ActionEvent actionEvent) {
         DirectoryChooser folderchooser = new DirectoryChooser();
         folderchooser.setTitle("Select working directory");
-        folderchooser.setInitialDirectory(new File(context.getLastOpenedDir().toString()));
+        PathMemory.prepare(folderchooser, "dialog.wizard.workingDirectory");
         File selectFolder = folderchooser.showDialog(null);
+        PathMemory.remember("dialog.wizard.workingDirectory", selectFolder);
         context.setWorkingDirectory(selectFolder);
     }
 
     public void selectOutputDirectory(ActionEvent actionEvent) {
         DirectoryChooser folderchooser = new DirectoryChooser();
         folderchooser.setTitle("Select output directory");
-        folderchooser.setInitialDirectory(new File(context.getLastOpenedDir().toString()));
+        PathMemory.prepare(folderchooser, "dialog.wizard.outputDirectory");
         File selectFolder = folderchooser.showDialog(null);
+        PathMemory.remember("dialog.wizard.outputDirectory", selectFolder);
         context.setOutputDirectory(selectFolder);
     }
 

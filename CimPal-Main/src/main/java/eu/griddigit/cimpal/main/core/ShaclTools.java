@@ -27,6 +27,7 @@ import org.topbraid.shacl.vocabulary.DASH;
 import org.topbraid.shacl.vocabulary.SH;
 import eu.griddigit.cimpal.core.utils.MultiplicityTools;
 import eu.griddigit.cimpal.main.util.PropertyHolder;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.scene.control.Alert;
@@ -3315,7 +3316,9 @@ public class ShaclTools {
         }else { // this is where the user only selects the folder and the files are saved there
             DirectoryChooser directoryChooser = new DirectoryChooser();
             directoryChooser.setTitle(title);
+            PathMemory.prepare(directoryChooser, "dialog.shaclSavePerFileFolder");
             selectedDirectory = directoryChooser.showDialog(null);
+            PathMemory.remember("dialog.shaclSavePerFileFolder", selectedDirectory);
 
 
             for (int mod = 0; mod < shapeModels.size(); mod++){
@@ -5454,14 +5457,22 @@ public class ShaclTools {
         fileChooser.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("CSV files (*.csv)", "*.csv")
         );
+        PathMemory.prepare(fileChooser, "dialog.constraintCsvFiles");
 
-        return fileChooser.showOpenMultipleDialog(null);
+        List<File> chosen = fileChooser.showOpenMultipleDialog(null);
+        if (chosen != null && !chosen.isEmpty()) {
+            PathMemory.remember("dialog.constraintCsvFiles", chosen.getFirst());
+        }
+        return chosen;
     }
 
     private static File chooseTtlOutputFolder() {
         DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select output folder for restored TTL files");
-        return directoryChooser.showDialog(null);
+        PathMemory.prepare(directoryChooser, "dialog.restoredTtlOutputFolder");
+        File chosen = directoryChooser.showDialog(null);
+        PathMemory.remember("dialog.restoredTtlOutputFolder", chosen);
+        return chosen;
     }
 
     public static RestoreResult restoreTtlFromSingleCsv(File csvFile, File outputFolder) throws IOException {

@@ -14,33 +14,46 @@
 <VBox minHeight="0.0" minWidth="0.0" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.MainController">
    <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
-         <SeparatorMenuItem mnemonicParsing="false" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuPreferences" text="Preferences…" />
          <SeparatorMenuItem mnemonicParsing="false" />
          <MenuItem mnemonicParsing="false" onAction="#menuQuit" text="Quit" />
       </Menu>
       <Menu mnemonicParsing="false" text="Tools">
-         <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportDescriptionMenu" text="Export RDFS descriptions" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuExportSHACLInfo" text="Export SHACL constraints information to Excel" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuExportAllSHACLInfo" text="Export All SHACL constraints information to Excel" />
-         <MenuItem mnemonicParsing="false" onAction="#actionGenInfoFromRDFS" text="Generate information from RDFS - needed for serialisation" />
-         <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
-         <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
-         <MenuItem mnemonicParsing="false" onAction="#actionCreateQARTemplate" text="Create xlsx template from QAR" />
-         <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
-         <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
-         <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text=" Model transformation" />
+         <Menu mnemonicParsing="false" text="RDFS Profiles">
+            <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportDescriptionMenu" text="Export RDFS descriptions" />
+            <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
+            <SeparatorMenuItem mnemonicParsing="false" />
+            <MenuItem mnemonicParsing="false" onAction="#actionGenInfoFromRDFS" text="Generate information from RDFS - needed for serialisation" />
+            <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="SHACL Constraints">
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuExportSHACLInfo" text="Export SHACL constraints information to Excel" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuExportAllSHACLInfo" text="Export All SHACL constraints information to Excel" />
+            <SeparatorMenuItem mnemonicParsing="false" />
+            <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
+            <MenuItem mnemonicParsing="false" onAction="#actionRestoreTtlFromConstraintCsv" text="Restore ttl from constraint csv" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="Reference Data">
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="Instance Data &amp; Models">
+            <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text="Model transformation" />
+            <MenuItem mnemonicParsing="false" onAction="#actionPopulateMissingAttributes" text="Populate missing attributes" />
+            <MenuItem mnemonicParsing="false" onAction="#actionGenerateManifest" text="Generate Manifest" />
+            <SeparatorMenuItem mnemonicParsing="false" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuPSSEPF" text="PSSE-PowerFactory compare" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="Quality Reports">
+            <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
+            <MenuItem mnemonicParsing="false" onAction="#actionCreateQARTemplate" text="Create xlsx template from QAR" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
+         </Menu>
+         <SeparatorMenuItem mnemonicParsing="false" />
+         <!-- Not tools: these two only switch to a tab, so they stay reachable at the top level. -->
          <MenuItem mnemonicParsing="false" onAction="#actionValidateByMapping" text="Validate by mapping file" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuPSSEPF" text="PSSE-PowerFactory compare" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
-         <MenuItem mnemonicParsing="false" onAction="#actionGenerateManifest" text="Generate Manifest" />
          <MenuItem mnemonicParsing="false" onAction="#actionRunSPARQLQuery" text="Run SPARQL Query" />
-         <MenuItem mnemonicParsing="false" onAction="#actionRestoreTtlFromConstraintCsv" text="Restore ttl from constraint csv" />
-         <MenuItem mnemonicParsing="false" onAction="#actionPopulateMissingAttributes" text="Populate missing attributes" />
-
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuHelpContents" text="Help Contents">
@@ -69,14 +82,15 @@
       <TitledPane fx:id="outputSourceContainer" animated="false" minHeight="0.0" minWidth="0.0" text="Output &amp; Source Code">
          <BorderPane minHeight="0.0" minWidth="0.0">
             <left>
-               <VBox alignment="TOP_CENTER" spacing="10.0">
+               <VBox alignment="TOP_CENTER" spacing="8.0">
                   <padding>
-                     <Insets bottom="3.0" left="3.0" right="3.0" top="3.0"/>
+                     <Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/>
                   </padding>
-                  <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBtnClear"
-                          text="Clear" wrapText="true"/>
+                  <Button maxWidth="1.7976931348623157E308" minWidth="80.0" mnemonicParsing="false"
+                          onAction="#actionBtnClear" text="Clear" wrapText="true"/>
                   <ToggleButton fx:id="btnShowSourceCodeDefineTab" maxWidth="1.7976931348623157E308"
-                                mnemonicParsing="false" onAction="#actionBtnShowSourceCodeShacl" text="Show"
+                                minWidth="80.0" mnemonicParsing="false"
+                                onAction="#actionBtnShowSourceCodeShacl" text="Show"
                                 wrapText="true">
                      <tooltip>
                         <Tooltip text="Show or hide the source code of the constraints."/>
@@ -99,20 +113,16 @@
          </BorderPane>
       </TitledPane>
    </SplitPane>
-   <HBox id="HBox" alignment="CENTER_LEFT" spacing="5.0" VBox.vgrow="NEVER">
+   <HBox id="HBox" alignment="CENTER_LEFT" spacing="8.0" VBox.vgrow="NEVER">
       <padding>
-         <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
+         <Insets bottom="8.0" left="8.0" right="8.0" top="8.0" />
       </padding>
       <Label maxHeight="1.7976931348623157E308" text="Status:" HBox.hgrow="NEVER">
          <font>
             <Font size="11.0" fx:id="x3" />
          </font>
       </Label>
-      <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0" HBox.hgrow="NEVER">
-         <HBox.margin>
-            <Insets left="10.0" />
-         </HBox.margin>
-      </ProgressBar>
+      <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0" HBox.hgrow="NEVER" />
       <Region HBox.hgrow="ALWAYS" />
       <Label font="$x3" text="Version: 2026.9.05.1" HBox.hgrow="NEVER" />
    </HBox>

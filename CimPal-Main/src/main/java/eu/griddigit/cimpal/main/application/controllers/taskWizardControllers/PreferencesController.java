@@ -6,6 +6,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -136,14 +137,18 @@ public class PreferencesController implements Initializable {
     public void selectDefWorkingDir(ActionEvent actionEvent) {
         DirectoryChooser folderChooser = new DirectoryChooser();
         folderChooser.setTitle("Select working directory");
+        PathMemory.prepare(folderChooser, "dialog.wizard.defaultWorkingDir");
         File selectFolder = folderChooser.showDialog(null);
+        PathMemory.remember("dialog.wizard.defaultWorkingDir", selectFolder);
         CimPalWizardController.prefs.put("DefWorkingDir" , selectFolder.getAbsolutePath());
         textWorkingDir.setText(CimPalWizardController.prefs.get("DefWorkingDir",""));
     }
     public void selectDefOutputDir(ActionEvent actionEvent) {
         DirectoryChooser folderChooser = new DirectoryChooser();
         folderChooser.setTitle("Select output directory");
+        PathMemory.prepare(folderChooser, "dialog.wizard.defaultOutputDir");
         File selectFolder = folderChooser.showDialog(null);
+        PathMemory.remember("dialog.wizard.defaultOutputDir", selectFolder);
         CimPalWizardController.prefs.put("DefOutputDir" , selectFolder.getAbsolutePath());
         textOutputDir.setText(CimPalWizardController.prefs.get("DefOutputDir",""));
     }

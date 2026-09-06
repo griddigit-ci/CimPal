@@ -301,3 +301,48 @@
 .warning-text {
     -fx-text-fill: -cimpal-warning;
 }
+
+/* ===================== layout scaffolding ===================== */
+
+/*
+ * Structure-only classes shared by every tab, so the 8/16 px grid is declared
+ * once here instead of as per-node Insets in eleven FXML files. Colour-free
+ * except for the .action-bar rule, which uses the theme's own -cimpal-border
+ * and therefore needs no per-theme override.
+ */
+
+.tab-root {
+    -fx-padding: 16;
+}
+
+.form-grid {
+    -fx-hgap: 8;
+    -fx-vgap: 8;
+}
+
+.section-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 1.05em;
+}
+
+.section-box {
+    -fx-spacing: 8;
+    -fx-padding: 12 0 0 0;
+}
+
+/* The top border replaces the Separator nodes the tabs used to draw by hand:
+   one theme-aware rule, no layout node, nothing to mis-size. */
+.action-bar {
+    -fx-padding: 16 0 0 0;
+    -fx-border-color: -cimpal-border transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.primary-action {
+    -fx-font-weight: bold;
+}
+
+.option-flow {
+    -fx-hgap: 16;
+    -fx-vgap: 8;
+}

@@ -14,6 +14,7 @@ import org.apache.jena.vocabulary.RDF;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import eu.griddigit.cimpal.main.util.ExcelTools;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -201,9 +202,10 @@ public class GenerateInstanceDataModel implements ITask {
             //select output folder
             saveProperties.replace("useFileDialog",false);
             DirectoryChooser folderchooser = new DirectoryChooser();
-            folderchooser.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
+            PathMemory.prepare(folderchooser, "dialog.generateInstanceDataOutputFolder");
             folderchooser.setTitle("Select output folder");
             File selectFolder = folderchooser.showDialog(null);
+            PathMemory.remember("dialog.generateInstanceDataOutputFolder", selectFolder);
             saveProperties.replace("fileFolder",selectFolder.getPath());
             saveProperties.put("dozip", true);
 

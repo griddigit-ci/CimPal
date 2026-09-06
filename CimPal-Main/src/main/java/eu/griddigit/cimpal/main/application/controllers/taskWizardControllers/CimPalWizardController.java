@@ -9,6 +9,7 @@ import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.AboutController;
 import eu.griddigit.cimpal.main.application.services.TaskExecutionService;
 import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -122,11 +123,12 @@ public class CimPalWizardController implements Initializable {
     private void actionMenuQoCDCxls() throws FileNotFoundException {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select QoCDC xml", "*.xml"));
-        filechooser.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser, "dialog.qocdcXml");
         File file = filechooser.showOpenDialog(null);
 
         if (file!=null) {// the file is selected
             CimPalWizardController.prefs.put("LastWorkingFolder", file.getParent());
+            PathMemory.remember("dialog.qocdcXml", file);
 
             Model model = ModelFactory.createDefaultModel();
             InputStream inputStream = new FileInputStream(file.toString());

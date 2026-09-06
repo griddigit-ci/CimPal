@@ -1,6 +1,7 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.stage.FileChooser;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -81,11 +82,12 @@ public class ExportFactory {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("QoCDC321", "*.xlsx"));
         filechooser.setInitialFileName(initialFileName);
-        filechooser.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser, "dialog.qocdcXlsxExport");
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
             CimPalWizardController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            PathMemory.remember("dialog.qocdcXlsxExport", saveFile);
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);

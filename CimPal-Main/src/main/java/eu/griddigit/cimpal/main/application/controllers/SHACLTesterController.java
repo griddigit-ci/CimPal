@@ -4,6 +4,7 @@ import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -48,6 +49,13 @@ public class SHACLTesterController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
+
+        //the SHACL files field holds a comma-joined list of several files, so it is not
+        //restored; its chooser still reopens in the folder it was last used in
+        PathMemory.bind(fPathModelsForShaclValidator, "tab.shaclTester.modelsFolder", folder -> {
+            selectedFolder = folder;
+            GUIhelper.buildFileTree(folder, treeViewShaclFiles);
+        });
     }
 
     private void initializeHelpTooltips() {
@@ -74,7 +82,7 @@ public class SHACLTesterController implements Initializable {
 
     @FXML
     private void actionBrowseShaclFilesTester(ActionEvent actionEvent) {
-        selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "", "tab.shaclTester.shaclFiles");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
             for (File file : selectedFile) {
@@ -86,7 +94,8 @@ public class SHACLTesterController implements Initializable {
 
     @FXML
     private void actionBrowseFolderPathForShaclTester(ActionEvent actionEvent) {
-        selectedFolder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom();
+        selectedFolder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
+                "Select Output Folder", "tab.shaclTester.modelsFolder");
         if (selectedFolder != null) {
             fPathModelsForShaclValidator.setText(selectedFolder.toString());
 

@@ -117,6 +117,10 @@ public class InstanceDataComparisonController implements Initializable {
 
         //Adding action to the choice box
         fcbIDmap.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBIDmap());
+
+        //All three fields on this tab show List<File>.toString(), i.e. "[a.xml, b.zip]",
+        //which is not a path and cannot be restored into the field. The four dialogs behind
+        //them still remember their own folder, so each reopens where it was last used.
     }
 
     private void initializeHelpTooltips() {
@@ -189,7 +193,7 @@ public class InstanceDataComparisonController implements Initializable {
         resetProgressBar();
 
         //select file 1
-        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "", "tab.instanceDataComparison.file1");
 
         if (fileL != null) {// the file is selected
 
@@ -206,7 +210,7 @@ public class InstanceDataComparisonController implements Initializable {
     private void actionBrowseIDfile2() {
         resetProgressBar();
         //select file 1
-        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
+        List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "", "tab.instanceDataComparison.file2");
 
         if (fileL != null) {// the file is selected
 
@@ -229,11 +233,11 @@ public class InstanceDataComparisonController implements Initializable {
         if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Generate from RDFS")) {
             MainController.IDmapSelect = 1;
             //select file
-            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
+            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "", "tab.instanceDataComparison.mapRdfs");
         } else if (fcbIDmap.getSelectionModel().getSelectedItem().equals("Use saved map")) {
             MainController.IDmapSelect = 2;
             //select file
-            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Map file", List.of("*.properties"), "");
+            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Map file", List.of("*.properties"), "", "tab.instanceDataComparison.mapSaved");
         }
 
         if (fileL != null) {// the file is selected

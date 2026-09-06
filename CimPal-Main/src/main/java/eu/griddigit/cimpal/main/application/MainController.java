@@ -451,11 +451,12 @@ public class MainController implements Initializable {
     private void actionMenuQoCDCxls() throws FileNotFoundException {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select QoCDC xml", "*.xml"));
-        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder", "")));
+        PathMemory.prepare(filechooser, "dialog.qocdcXml");
         File file = filechooser.showOpenDialog(null);
 
         if (file != null) {// the file is selected
             prefs.put("LastWorkingFolder", file.getParent());
+            PathMemory.remember("dialog.qocdcXml", file);
 
             Model model = ModelFactory.createDefaultModel();
             InputStream inputStream = new FileInputStream(file.toString());

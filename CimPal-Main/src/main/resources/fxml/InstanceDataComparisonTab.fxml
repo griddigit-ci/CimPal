@@ -1,66 +1,86 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.*?>
-<?import java.util.*?>
-<?import javafx.scene.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<?import javafx.geometry.Insets?>
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="eu.griddigit.cimpal.main.application.controllers.InstanceDataComparisonController"
       minHeight="0.0" minWidth="0.0">
   <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
-    <VBox minHeight="0.0" minWidth="0.0" spacing="10.0">
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0"/>
-            </padding>
-            <Label minWidth="140.0" text="File A (Model A):" wrapText="true"/>
-            <Label fx:id="helpFileA" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPathIDfile1" editable="false" HBox.hgrow="ALWAYS"/>
-            <Button mnemonicParsing="false" onAction="#actionBrowseIDfile1" text="Browse"/>
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0"/>
-            </padding>
-            <Label minWidth="140.0" text="File B (Model B):" wrapText="true"/>
-            <Label fx:id="helpFileB" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPathIDfile2" editable="false" HBox.hgrow="ALWAYS"/>
-            <Button mnemonicParsing="false" onAction="#actionBrowseIDfile2" text="Browse"/>
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0"/>
-            </padding>
-            <Label minWidth="140.0" text="Profile(s) version:" wrapText="true"/>
-            <Label fx:id="helpProfileVersion" text="?" styleClass="help-badge"/>
-            <ChoiceBox fx:id="fcbIDformat" minWidth="400.0"/>
-            <Label minWidth="140.0" text="Base namespace:" wrapText="true"/>
-            <Label fx:id="helpBaseNs" text="?" styleClass="help-badge"/>
-            <TextField fx:id="fPathIDmapXmlBase" editable="false" HBox.hgrow="ALWAYS"/>
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0"/>
-            </padding>
-            <Label minWidth="140.0" text="Datatypes Map:" wrapText="true"/>
-            <Label fx:id="helpDatatypeMap" text="?" styleClass="help-badge"/>
-            <ChoiceBox fx:id="fcbIDmap" minWidth="300.0"/>
-            <TextField fx:id="fPathIDmap" editable="false" HBox.hgrow="ALWAYS"/>
-            <Button fx:id="fBTbrowseIDmap" disable="true" mnemonicParsing="false" onAction="#actionBrowseIDmap"
-                    text="Browse"/>
-        </HBox>
-        <HBox spacing="10.0">
-            <padding>
-                <Insets left="5.0" right="5.0" top="5.0"/>
-            </padding>
-            <VBox spacing="10.0">
-                <padding>
-                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                </padding>
+    <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" styleClass="tab-root">
+
+        <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+            <columnConstraints>
+                <!-- 0: labels. Fixed so every row's field starts on the same x. -->
+                <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0"/>
+                <!-- 1: the field. The only column that absorbs slack. minWidth 0 lets the tab shrink. -->
+                <ColumnConstraints hgrow="ALWAYS" minWidth="0.0"/>
+                <!-- 2: Browse. Fixed so it never inflates into a banner. -->
+                <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0"/>
+            </columnConstraints>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                <Label text="File A (Model A):" wrapText="true"/>
+                <Label fx:id="helpFileA" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="fPathIDfile1" editable="false" maxWidth="1.7976931348623157E308"
+                       GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseIDfile1" text="Browse"
+                    GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                <Label text="File B (Model B):" wrapText="true"/>
+                <Label fx:id="helpFileB" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="fPathIDfile2" editable="false" maxWidth="1.7976931348623157E308"
+                       GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseIDfile2" text="Browse"
+                    GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+
+            <!-- Profile version and base namespace used to share one row; they are unrelated inputs. -->
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
+                <Label text="Profile(s) version:" wrapText="true"/>
+                <Label fx:id="helpProfileVersion" text="?" styleClass="help-badge"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <ChoiceBox fx:id="fcbIDformat" prefWidth="400.0"/>
+                <!-- A ChoiceBox has a natural width; the spacer absorbs the slack instead. -->
+                <Region HBox.hgrow="ALWAYS"/>
+            </HBox>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="3" GridPane.columnIndex="0">
+                <Label text="Base namespace:" wrapText="true"/>
+                <Label fx:id="helpBaseNs" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="fPathIDmapXmlBase" editable="false" maxWidth="1.7976931348623157E308"
+                       GridPane.rowIndex="3" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="4" GridPane.columnIndex="0">
+                <Label text="Datatypes Map:" wrapText="true"/>
+                <Label fx:id="helpDatatypeMap" text="?" styleClass="help-badge"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="4" GridPane.columnIndex="1">
+                <ChoiceBox fx:id="fcbIDmap" prefWidth="300.0"/>
+                <TextField fx:id="fPathIDmap" editable="false" HBox.hgrow="ALWAYS"/>
+            </HBox>
+            <Button fx:id="fBTbrowseIDmap" disable="true" minWidth="95.0" mnemonicParsing="false"
+                    onAction="#actionBrowseIDmap" text="Browse"
+                    GridPane.rowIndex="4" GridPane.columnIndex="2"/>
+        </GridPane>
+
+        <!--
+          The three option groups as one 3-column grid: the columns line up on the same gap as the
+          form above, replacing the hand-placed Insets left="50" that used to fake the middle gutter.
+        -->
+        <GridPane hgap="16.0" vgap="8.0">
+            <columnConstraints>
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="0.0"/>
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="0.0"/>
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="0.0"/>
+            </columnConstraints>
+
+            <VBox spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
                 <Label fx:id="helpIgnoreNonPersistent" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="fcbIDcompIgnoreTP" mnemonicParsing="false"
                           text="Ignore Topology non-persistent classes"/>
@@ -69,44 +89,32 @@
                 <CheckBox fx:id="fcbIDcompIgnoreDL" mnemonicParsing="false"
                           text="Ignore Diagram layout non-persistent classes"/>
             </VBox>
-            <VBox spacing="10.0">
-                <padding>
-                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                </padding>
-                <HBox.margin>
-                    <Insets left="50.0"/>
-                </HBox.margin>
+
+            <VBox spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="1">
                 <Label fx:id="helpSvOptions" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="fcbIDcompSVonly" mnemonicParsing="false"
                           text="Compare only solution (State Variables) profile "/>
-                <CheckBox fx:id="fcbIDcompSVonlyCN" mnemonicParsing="false" text="Rely on ConnectivityNode-s">
-                    <VBox.margin>
-                        <Insets/>
-                    </VBox.margin>
-                </CheckBox>
+                <CheckBox fx:id="fcbIDcompSVonlyCN" mnemonicParsing="false" text="Rely on ConnectivityNode-s"/>
                 <Separator/>
                 <CheckBox fx:id="fcbIDcompCount" mnemonicParsing="false" text="Compare only count or classes"/>
             </VBox>
-            <VBox spacing="10.0">
-                <padding>
-                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                </padding>
+
+            <VBox spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="2">
                 <Label fx:id="helpOutputOptions" text="?" styleClass="help-badge"/>
                 <CheckBox fx:id="fcbIDcompSolutionOverview" mnemonicParsing="false" text="Create solution overview "/>
                 <CheckBox fx:id="fcbIDcompShowDetails" mnemonicParsing="false" text="Show details"/>
                 <CheckBox fx:id="fcbIDcompDiff" mnemonicParsing="false" text="Compare Diff"/>
                 <CheckBox fx:id="fcbIDcompPerFileAndAll" mnemonicParsing="false" text="Compare single files"/>
             </VBox>
-        </HBox>
+        </GridPane>
+
         <Region VBox.vgrow="ALWAYS"/>
-        <HBox alignment="BOTTOM_LEFT" nodeOrientation="RIGHT_TO_LEFT" spacing="10.0" VBox.vgrow="NEVER">
-            <VBox.margin>
-                <Insets bottom="5.0" right="5.0"/>
-            </VBox.margin>
-            <Button fx:id="btnRunIDcompare" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnRunIDcompare"
-                    text="Run"/>
-            <Button fx:id="btnResetIDComp" minWidth="60.0" mnemonicParsing="false" onAction="#actionBtnResetIDComp"
+
+        <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+            <Button fx:id="btnResetIDComp" minWidth="95.0" mnemonicParsing="false" onAction="#actionBtnResetIDComp"
                     text="Reset"/>
+            <Button fx:id="btnRunIDcompare" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false"
+                    onAction="#actionBtnRunIDcompare" text="Run"/>
         </HBox>
     </VBox>
   </ScrollPane>

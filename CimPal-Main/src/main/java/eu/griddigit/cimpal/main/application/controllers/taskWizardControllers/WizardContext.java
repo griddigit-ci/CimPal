@@ -1,6 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.application.tasks.*;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
@@ -204,12 +205,17 @@ public class WizardContext {
         this.outputDirectory = outputDirectory;
     }
 
+    //the wizard shares one remembered folder with the rest of the application. The field
+    //is still kept in step so nothing that reads it directly changes behaviour, but the
+    //value handed out is validated: if the folder has been deleted, the nearest existing
+    //parent is returned instead of a path that would make the dialog throw.
     public File getLastOpenedDir() {
-        return lastOpenedDir;
+        return PathMemory.resolveDirectory("wizard.lastDir");
     }
 
     public void setLastOpenedDir(File lastOpenedDir) {
         this.lastOpenedDir = lastOpenedDir;
+        PathMemory.remember("wizard.lastDir", lastOpenedDir);
     }
 
     // Save instance model based

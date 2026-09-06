@@ -10,26 +10,33 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/24.0.1" xmlns:fx="http://javafx.com/fxml/1"
+            styleClass="tab-root"
             fx:controller="eu.griddigit.cimpal.main.application.controllers.sparql.SparqlQueryTabController">
    <top>
       <VBox spacing="8.0" BorderPane.alignment="CENTER_LEFT">
-         <padding>
-            <Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/>
-         </padding>
-         <HBox spacing="8.0">
+         <BorderPane.margin>
+            <Insets bottom="8.0"/>
+         </BorderPane.margin>
+         <!--
+           A FlowPane rather than an HBox: seven buttons plus two badges overflow a narrow window,
+           and an HBox would clip the rightmost of them - including Run query.
+         -->
+         <FlowPane hgap="8.0" vgap="8.0">
             <Button mnemonicParsing="false" onAction="#actionSelectModelFiles" text="Select model files..."/>
             <Label fx:id="helpSelectModels" text="?" styleClass="help-badge"/>
             <Button mnemonicParsing="false" onAction="#actionLoadQuery" text="Load query..."/>
             <Button mnemonicParsing="false" onAction="#actionSaveQuery" text="Save query..."/>
             <Button mnemonicParsing="false" onAction="#actionSaveAsQuery" text="Save as..."/>
             <Button mnemonicParsing="false" onAction="#actionClearQuery" text="Clear"/>
-            <Button defaultButton="true" mnemonicParsing="false" onAction="#actionRunQuery" text="Run query"/>
+            <Button defaultButton="true" mnemonicParsing="false" onAction="#actionRunQuery" styleClass="primary-action"
+                    text="Run query"/>
             <Label fx:id="helpSparqlQuery" text="?" styleClass="help-badge"/>
-         </HBox>
+         </FlowPane>
          <HBox spacing="8.0">
             <Label text="Model files:"/>
             <Label fx:id="lblModelFiles" maxWidth="1.7976931348623157E308" text="No model files selected"
@@ -46,20 +53,15 @@
                 BorderPane.alignment="CENTER"
                 minHeight="0.0" minWidth="0.0">
          <BorderPane.margin>
-            <Insets bottom="8.0" left="8.0" right="8.0"/>
+            <Insets bottom="8.0"/>
          </BorderPane.margin>
       </TextArea>
    </center>
    <bottom>
-      <VBox spacing="4.0" BorderPane.alignment="CENTER_LEFT">
-         <padding>
-            <Insets bottom="8.0" left="8.0" right="8.0"/>
-         </padding>
+      <VBox spacing="8.0" BorderPane.alignment="CENTER_LEFT">
          <Label text="Tip: load a query, edit it in the text area, then run it against selected RDF/XML or ZIP files."
                 wrapText="true"/>
          <Label fx:id="lblStatus" text="Ready." wrapText="true"/>
       </VBox>
    </bottom>
 </BorderPane>
-
-

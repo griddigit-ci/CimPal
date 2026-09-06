@@ -3,6 +3,7 @@ package eu.griddigit.cimpal.main.application.controllers;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.core.ShaclTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.util.ExcelTools;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -46,6 +47,11 @@ public class SHACLOrganizerController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
+
+        //the SHACL files field holds a comma-joined list of several files, so it is not
+        //restored; its chooser still reopens in the folder it was last used in
+        PathMemory.bind(fPathXLSfileForShacl, "tab.shaclOrganizer.excelTemplate",
+                file -> inputXLS = List.of(file));
     }
 
     private void initializeHelpTooltips() {
@@ -70,7 +76,7 @@ public class SHACLOrganizerController implements Initializable {
     }
 
     public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
-        selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
+        selectedFile = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "", "tab.shaclOrganizer.shaclFiles");
         if (selectedFile != null) {
             StringBuilder paths = new StringBuilder();
             for (int m = 0; m < selectedFile.size(); m++) {
@@ -81,7 +87,7 @@ public class SHACLOrganizerController implements Initializable {
     }
 
     public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Input template instance data XLS", List.of("*.xlsx"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Input template instance data XLS", List.of("*.xlsx"), "", "tab.shaclOrganizer.excelTemplate");
 
         if (!file.isEmpty()) {
             inputXLS = file;

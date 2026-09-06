@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.main.application.controllers;
 
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -187,6 +188,19 @@ public class ValidationByMappingController {
         tooltip.setShowDuration(Duration.INDEFINITE);
 
         Tooltip.install(helpIcon, tooltip);
+
+        //restore the paths this tab was last used with; the consumers repeat what the
+        //Browse handlers do besides filling the field
+        PathMemory.bind(tfMappingCsvFile, "tab.validationByMapping.mappingCsv",
+                file -> mappingCsvFile = file);
+        PathMemory.bind(tfModelsInputFolder, "tab.validationByMapping.modelsInput",
+                folder -> modelsInputFolder = folder);
+        PathMemory.bind(tfConstraintsRootFolder, "tab.validationByMapping.constraintsRoot",
+                folder -> constraintsRootFolder = folder);
+        PathMemory.bind(tfOutputFolder, "tab.validationByMapping.outputFolder",
+                folder -> outputFolder = folder);
+        PathMemory.bind(tfPreviousComparisonCsv, "tab.validationByMapping.previousComparisonCsv",
+                file -> previousComparisonCsvFile = file);
     }
 
     @FXML
@@ -195,7 +209,8 @@ public class ValidationByMappingController {
                 true,
                 "Validation mapping file",
                 List.of("*.csv"),
-                "Mapping file"
+                "Mapping file",
+                "tab.validationByMapping.mappingCsv"
         );
 
         if (selected == null || selected.isEmpty() || selected.get(0) == null) {
@@ -223,7 +238,8 @@ public class ValidationByMappingController {
         File selected = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
                 timestamped
                         ? "Select the timestamped input root folder"
-                        : "Select the models root folder"
+                        : "Select the models root folder",
+                "tab.validationByMapping.modelsInput"
         );
 
         if (selected == null) {
@@ -237,7 +253,8 @@ public class ValidationByMappingController {
     @FXML
     private void actionBrowseConstraintsRootFolder() {
         File selected = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
-                "Select constraint's root folder"
+                "Select constraint's root folder",
+                "tab.validationByMapping.constraintsRoot"
         );
 
         if (selected == null) {
@@ -251,7 +268,8 @@ public class ValidationByMappingController {
     @FXML
     private void actionBrowseOutputFolder() {
         File selected = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom(
-                "Select the output folder of reports and zips"
+                "Select the output folder of reports and zips",
+                "tab.validationByMapping.outputFolder"
         );
 
         if (selected == null) {
@@ -268,7 +286,8 @@ public class ValidationByMappingController {
                 true,
                 "Previous comparison CSV",
                 List.of("*.csv"),
-                "Previous comparison CSV"
+                "Previous comparison CSV",
+                "tab.validationByMapping.previousComparisonCsv"
         );
 
         if (selected == null || selected.isEmpty() || selected.get(0) == null) {

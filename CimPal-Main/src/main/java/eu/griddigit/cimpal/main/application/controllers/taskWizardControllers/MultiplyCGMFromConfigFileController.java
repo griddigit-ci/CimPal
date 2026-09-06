@@ -3,6 +3,7 @@ package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 import eu.griddigit.cimpal.main.application.tasks.MultiplyCGMFromConfigXLS;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.main.application.datagenerator.InstanceDataFactory;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -92,7 +93,7 @@ public class MultiplyCGMFromConfigFileController  implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Input MAS data XLS", "*.xlsx"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.masFile");
         File file = filechooser.showOpenDialog(null);
 
 
@@ -101,6 +102,7 @@ public class MultiplyCGMFromConfigFileController  implements Initializable {
             MultiplyCGMFromConfigXLS task = (MultiplyCGMFromConfigXLS) wizardContext.getSelectedTasks().stream().filter(x -> x.getTask().getClass() == MultiplyCGMFromConfigXLS.class).findFirst().get().getTask();
             task.setInputMASCGMFilePath(file.toString());
             wizardContext.setLastOpenedDir(file.getParentFile());
+            PathMemory.remember("dialog.wizard.masFile", file.getParentFile());
         }
 
         else{
@@ -115,7 +117,7 @@ public class MultiplyCGMFromConfigFileController  implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Input data XLS", "*.xlsx"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.multiplyCgmConfigXls");
         File file = filechooser.showOpenDialog(null);
 
 
@@ -124,6 +126,7 @@ public class MultiplyCGMFromConfigFileController  implements Initializable {
             MultiplyCGMFromConfigXLS task = (MultiplyCGMFromConfigXLS) wizardContext.getSelectedTasks().stream().filter(x -> x.getTask().getClass() == MultiplyCGMFromConfigXLS.class).findFirst().get().getTask();
             task.setInputCGMConfigXmlFilePath(file.toString());
             wizardContext.setLastOpenedDir(file.getParentFile());
+            PathMemory.remember("dialog.wizard.multiplyCgmConfigXls", file.getParentFile());
         }
 
         else{
@@ -134,7 +137,7 @@ public class MultiplyCGMFromConfigFileController  implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("TPBD File", "*.zip"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.tpbdFile");
         tpbdFile = filechooser.showOpenDialog(null);
         //load and get Id
         InputStream inputStream = InstanceDataFactory.unzip(tpbdFile);
@@ -149,6 +152,7 @@ public class MultiplyCGMFromConfigFileController  implements Initializable {
             tpbdId.setDisable(true);
             tpbdId.setEditable(false);
             wizardContext.setLastOpenedDir(tpbdFile.getParentFile());
+            PathMemory.remember("dialog.wizard.tpbdFile", tpbdFile.getParentFile());
         }
         else {
             tpbdId.clear();
