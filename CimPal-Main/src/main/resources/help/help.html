@@ -1072,6 +1072,62 @@ model stand out. Clicking a node reports its full URI on the status line. Node l
 while there are 120 nodes or fewer and predicate labels while there are 120 relationships or
 fewer; past that they would overlap into noise, and hovering a node shows its name instead.</p>
 
+<h4>Navigating references</h4>
+
+<p>An object row whose value is another resource &mdash; <code>Terminal.ConductingEquipment
+&rarr; loc:_abc</code> &mdash; can be followed when the tree also describes that resource. The
+disclosure arrow says which is which: an arrow means the reference leads somewhere, no arrow means
+it leads nowhere the tree can show, so you know before you click. Following works across graphs,
+which is what a CGMES dataset needs &mdash; a Terminal declared in the EQ file is referenced from
+the SSH file constantly.</p>
+
+<table class="io">
+<tr><th>Gesture</th><th>On</th><th>Effect</th></tr>
+<tr><td>Click</td><td>a reference row with an arrow</td>
+    <td>Opens the target&rsquo;s properties underneath the row, where it stands. Those properties
+        have followable references of their own, so a chain can be traced as many levels deep as
+        there are clicks without losing the row you started from. A reference leading back to where
+        you began simply opens again one level down: nothing loops, because a row builds its
+        children only when it is opened.</td></tr>
+<tr><td>Double-click</td><td>a reference row with an arrow</td>
+    <td>Jumps to the resource&rsquo;s <em>own</em> row, wherever the current <em>Group by</em> put
+        it &mdash; ancestors opened, the row selected and scrolled into view. There is no
+        disambiguation delay, so a double click also delivers a single click first and the row you
+        left is opened in passing; both steps are on the trail, so right-clicking retraces
+        them.</td></tr>
+<tr><td>Double-click</td><td>a reference row with no arrow</td>
+    <td>Reports why the resource cannot be found. A single click stays silent, so selecting such a
+        row merely to scope the diagram never nags.</td></tr>
+<tr><td>Click</td><td>the disclosure arrow itself</td>
+    <td>Expands or collapses, and nothing more. The arrow is how a followed row is closed again.</td></tr>
+<tr><td>Right-click</td><td>anywhere in the tree</td>
+    <td>Steps back one hop, closing what that hop opened and restoring what was highlighted before
+        it.</td></tr>
+<tr><td>Double right-click</td><td>anywhere in the tree</td>
+    <td>Unwinds the whole trace and returns to where it started.</td></tr>
+</table>
+
+<p>A reference that cannot be followed gets one of three messages, because the remedy differs in
+each case:</p>
+
+<table class="io">
+<tr><th>Message</th><th>What it means</th></tr>
+<tr><td>&hellip; is described in <em>graph</em> but is not in the tree</td>
+    <td>That graph is ticked, but the filters exclude the resource or it fell past the subject cap.
+        Clear the filters, or show more subjects.</td></tr>
+<tr><td>&hellip; is described in <em>graph</em>, which is not ticked</td>
+    <td>The resource is loaded, but the graph describing it is left out of the tree. Tick it in
+        <em>Named graphs</em>.</td></tr>
+<tr><td>&hellip; is referenced but nothing loaded describes it</td>
+    <td>A genuinely dangling reference &mdash; or, more often, the profile file that describes the
+        resource has simply not been loaded.</td></tr>
+</table>
+
+<p>In the two nested groupings a resource&rsquo;s own row can sit deep inside a structure that has
+to be built a level at a time, so the search for it is bounded. Where the bound is reached the
+message says the resource is in the data but could not be located in this grouping;
+<em>Subject (flat)</em> always finds it.</p>
+
 <h4>Outputs</h4>
 <ul>
   <li>The graph tree. Subjects sort alphabetically by their displayed form and expand to their
@@ -1099,10 +1155,16 @@ fewer; past that they would overlap into noise, and hovering a node shows its na
 <ul>
   <li><em>Expand selected</em> opens every highlighted branch and everything below it, stopping
       after 1000 nodes across all of them so that a large subtree cannot lock up the view; expand
-      the remaining branches individually. <em>Collapse all</em> closes everything.</li>
-  <li>Very large graphs are truncated at 5000 subjects each, and the status line says so when it
-      happens. The filters are the intended way to reach the rest &mdash; a tree of tens of
-      thousands of rows is not browsable in any case.</li>
+      the remaining branches individually. <em>Collapse all</em> closes everything. It deliberately
+      stops at reference rows: opening one loads the target&rsquo;s properties, whose own references
+      would be opened in turn, and a single press would chase them across the whole graph until the
+      budget ran out. Following a reference stays a deliberate click.</li>
+  <li>Each graph is truncated at 5000 subjects, and the last row of a truncated graph says so:
+      clicking that row raises the cap by another 5000 and rescans, exactly as <em>Apply</em> does,
+      so the tree collapses and reopens with more in it. The raised cap holds until <em>Reset</em>.
+      Narrowing the filters remains the quicker route when the resource can be named in one &mdash;
+      a tree of tens of thousands of rows is not browsable in any case &mdash; but the row is there
+      for the resource that cannot be.</li>
   <li>Relative URIs are resolved against the document's own declared base where it has one, and
       otherwise against the location the file was read from.</li>
   <li>A file that cannot be parsed does not abort the load: the remaining files are loaded, and the

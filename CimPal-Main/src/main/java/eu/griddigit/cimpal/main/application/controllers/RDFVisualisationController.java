@@ -27,10 +27,13 @@ import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.Literal;
@@ -90,6 +93,13 @@ public class RDFVisualisationController implements Initializable {
 
     /** Bound on the nodes one "Expand selected" press may open, so a big subtree cannot freeze the view. */
     private static final int MAX_EXPANDED_NODES = 1_000;
+
+    /**
+     * Bound on the tree nodes one jump-to-reference search may visit. The nesting modes have to
+     * materialise a level before they can look inside it, so the search gets a budget rather than
+     * licence to walk an arbitrarily deep structure; exhausting it is reported rather than hidden.
+     */
+    private static final int MAX_NAVIGATION_VISITS = 50_000;
 
     /** Entry-count bound for a single archive - archives arrive from third parties. */
     private static final int MAX_ZIP_ENTRIES = 10_000;
@@ -216,6 +226,23 @@ public class RDFVisualisationController implements Initializable {
      */
     private final Map<String, Hierarchy> hierarchies = new HashMap<>();
 
+    /**
+     * Every shown subject by its full URI, across <em>all</em> shown graphs, so a reference row can
+     * be resolved to the rows that describe it. Cross-graph deliberately: in a CGMES dataset a
+     * Terminal declared in the EQ file is referenced from the SSH file constantly. Rebuilt with the
+     * tree, first graph winning a collision.
+     */
+    private final Map<String, SubjectRows> subjectIndex = new HashMap<>();
+
+    /** The steps a right-click retraces, most recent first. Cleared whenever the tree is reshaped. */
+    private final Deque<NavStep> navigation = new ArrayDeque<>();
+
+    /**
+     * Subjects the scan materialises per graph. Starts at {@value #MAX_SUBJECTS_PER_GRAPH} and is
+     * raised by that much again each time the show-more row is clicked; <em>Reset</em> puts it back.
+     */
+    private int subjectLimit = MAX_SUBJECTS_PER_GRAPH;
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
@@ -225,6 +252,12 @@ public class RDFVisualisationController implements Initializable {
 
         tvGraph.setRoot(new TreeItem<>(NodeValue.info("")));
         tvGraph.setShowRoot(false);
+        // A cell of our own, so a row can say what it is: the show-more row is drawn as an action
+        // rather than as data, and the cell knows exactly which row a click landed on.
+        tvGraph.setCellFactory(view -> new GraphTreeCell());
+        // The secondary button is handled on the view rather than on the cell, so a right-click
+        // anywhere in the pane retraces - there is no need to find the row you came from.
+        tvGraph.setOnMouseClicked(this::handleTreeSecondaryClick);
 
         // Both lists are multi-selection: the diagram is drawn for the union of what is
         // highlighted, so several graphs or several resources can be compared at once.
@@ -317,6 +350,14 @@ public class RDFVisualisationController implements Initializable {
                         + "namespace is mostly folder path - it is stood in for by loc:, so a row reads "
                         + "loc:_1234-5678. A second such namespace in the same graph becomes loc2:, a third "
                         + "loc3:. A short namespace, urn:uuid: for instance, is left as written.\n\n"
+                        + "An object row that points at a resource the tree also describes carries a "
+                        + "disclosure arrow: click it to open that resource's properties in place, and again "
+                        + "on the rows below to trace a chain without losing your place. Double-click instead "
+                        + "to jump to the resource's own row. No arrow means the reference leads nowhere "
+                        + "the tree can show, and a double click then says why. One right-click steps back, a "
+                        + "double right-click returns to where the trace started.\n\n"
+                        + "Where a graph holds more subjects than the tree shows, its last row says so and "
+                        + "clicking that row rescans for 5000 more.\n\n"
                         + "Copy value puts the full URI or literal of every highlighted row on the clipboard, "
                         + "one per line, and the filters match the full URI too.\n\n"
                         + "Highlighting rows also narrows the graph view to them.");
@@ -771,6 +812,7 @@ public class RDFVisualisationController implements Initializable {
     private void actionClearAll(ActionEvent event) {
         graphEntries.clear();
         clearFilterFields();
+        subjectLimit = MAX_SUBJECTS_PER_GRAPH;
         lastRows = List.of();
         buildTreeItems();
         graphView.clear();
@@ -828,10 +870,12 @@ public class RDFVisualisationController implements Initializable {
         setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
         btnApplyFilters.setDisable(true);
 
+        // Captured before the scan starts, so a show-more click during one cannot change it midway.
+        int limit = subjectLimit;
         Thread scanner = new Thread(() -> {
             List<GraphRows> rows = new ArrayList<>(selected.size());
             for (GraphEntry entry : selected) {
-                rows.add(scan(entry, filter));
+                rows.add(scan(entry, filter, limit));
             }
 
             Platform.runLater(() -> {
@@ -845,7 +889,7 @@ public class RDFVisualisationController implements Initializable {
     }
 
     /** One pass over a graph, grouping the matching triples by subject in subject-label order. */
-    private static GraphRows scan(GraphEntry entry, Filter filter) {
+    private static GraphRows scan(GraphEntry entry, Filter filter, int subjectLimit) {
         Model model = entry.model();
         // Per graph, so a namespace it had to invent a prefix for keeps that prefix for the
         // whole scan and two rows of the same graph never disagree about what loc: means.
@@ -872,7 +916,7 @@ public class RDFVisualisationController implements Initializable {
 
                 SubjectRows rowsForSubject = bySubject.get(subject.raw());
                 if (rowsForSubject == null) {
-                    if (bySubject.size() >= MAX_SUBJECTS_PER_GRAPH) {
+                    if (bySubject.size() >= subjectLimit) {
                         truncated = true;
                         continue;
                     }
@@ -908,6 +952,17 @@ public class RDFVisualisationController implements Initializable {
      */
     private void buildTreeItems() {
         hierarchies.clear();
+        // The steps hold TreeItems of the shape being replaced, so after a reshape they lead
+        // nowhere: a Group by change or an Apply mid-trace starts the trace afresh.
+        navigation.clear();
+        // First graph wins a collision: one resource described in two profile files is still one
+        // resource, and the earlier graph is the one loaded first.
+        subjectIndex.clear();
+        for (GraphRows graph : lastRows) {
+            for (SubjectRows subject : graph.subjects()) {
+                subjectIndex.putIfAbsent(subject.subject().raw(), subject);
+            }
+        }
         // Cleared explicitly: the highlight cannot survive a reshape, and clearing it is what
         // widens the graph view's scope again.
         tvGraph.getSelectionModel().clearSelection();
@@ -948,11 +1003,11 @@ public class RDFVisualisationController implements Initializable {
         return selected == null ? Grouping.FLAT : selected;
     }
 
-    private static List<TreeItem<NodeValue>> subjectItems(GraphRows graph) {
+    private List<TreeItem<NodeValue>> subjectItems(GraphRows graph) {
         return subjectItems(graph.subjects(), graph.truncated());
     }
 
-    private static List<TreeItem<NodeValue>> subjectItems(List<SubjectRows> subjects, boolean truncated) {
+    private List<TreeItem<NodeValue>> subjectItems(List<SubjectRows> subjects, boolean truncated) {
         List<TreeItem<NodeValue>> items = new ArrayList<>(subjects.size() + 1);
         for (SubjectRows subject : subjects) {
             String label = subject.subject().label() + "  (" + subject.triples().size() + ")";
@@ -966,7 +1021,7 @@ public class RDFVisualisationController implements Initializable {
     }
 
     /** A folder per {@code rdf:type}, holding its instances. A subject with two types is in both. */
-    private static List<TreeItem<NodeValue>> classItems(GraphRows graph) {
+    private List<TreeItem<NodeValue>> classItems(GraphRows graph) {
         List<ClassGroup> groups = classGroups(graph.subjects());
         List<TreeItem<NodeValue>> items = new ArrayList<>(groups.size() + 1);
         for (ClassGroup group : groups) {
@@ -981,7 +1036,7 @@ public class RDFVisualisationController implements Initializable {
 
     private List<TreeItem<NodeValue>> hierarchyItems(GraphRows graph) {
         Hierarchy hierarchy = hierarchies.computeIfAbsent(graph.name(),
-                key -> Hierarchy.of(graph, grouping() == Grouping.CONTAINMENT));
+                key -> new Hierarchy(graph, grouping() == Grouping.CONTAINMENT));
         List<TreeItem<NodeValue>> items = hierarchy.rootItems();
         if (graph.truncated()) {
             items.add(truncationItem());
@@ -1033,12 +1088,17 @@ public class RDFVisualisationController implements Initializable {
                 group.members().stream().map(member -> member.subject().raw()).toList());
     }
 
-    private static TreeItem<NodeValue> truncationItem() {
-        return new TreeItem<>(NodeValue.info(
-                "... further subjects not shown - narrow the filters to reach them"));
+    /**
+     * The last row of a truncated graph. Clicking it raises the cap and rescans, because the
+     * subjects past the cap were never built - there is nothing sitting here to reveal.
+     */
+    private TreeItem<NodeValue> truncationItem() {
+        return new TreeItem<>(NodeValue.more(String.format(
+                "... showing the first %,d subjects - click to show %,d more",
+                subjectLimit, MAX_SUBJECTS_PER_GRAPH)));
     }
 
-    private static List<TreeItem<NodeValue>> predicateItems(SubjectRows subject) {
+    private List<TreeItem<NodeValue>> predicateItems(SubjectRows subject) {
         // Group by predicate, preserving the sorted order established in scan().
         Map<String, List<TripleRow>> byPredicate = new LinkedHashMap<>();
         for (TripleRow triple : subject.triples()) {
@@ -1051,19 +1111,40 @@ public class RDFVisualisationController implements Initializable {
             if (group.size() == 1) {
                 // Single-valued: one line rather than a node the user must open to see one child.
                 Term object = group.getFirst().object();
-                items.add(new TreeItem<>(NodeValue.value(
-                        predicate.label() + "  →  " + object.label(), object.raw())));
+                items.add(objectItem(predicate.label() + "  →  " + object.label(), object));
             } else {
                 TreeItem<NodeValue> predicateItem = new TreeItem<>(NodeValue.value(
                         predicate.label() + "  (" + group.size() + ")", predicate.raw()));
                 for (TripleRow triple : group) {
-                    predicateItem.getChildren().add(new TreeItem<>(
-                            NodeValue.value(triple.object().label(), triple.object().raw())));
+                    predicateItem.getChildren().add(
+                            objectItem(triple.object().label(), triple.object()));
                 }
                 items.add(predicateItem);
             }
         }
         return items;
+    }
+
+    /**
+     * A row for one object, followable when it points at a resource the tree also describes.
+     * <p>
+     * A resolvable reference is a {@link LazyItem}, which is what makes following work in both
+     * directions at once: the disclosure arrow itself says the row leads somewhere, expanding it
+     * loads the target's own predicate rows, and those rows' references are branches in turn - so
+     * a chain can be traced as many levels as there are clicks. Recursion is safe because a
+     * LazyItem builds nothing until it is opened, so a cycle costs one click per hop rather than
+     * looping. An unresolvable reference stays a leaf, so the missing arrow says so before the
+     * click.
+     */
+    private TreeItem<NodeValue> objectItem(String label, Term object) {
+        if (!object.resource()) {
+            return new TreeItem<>(NodeValue.value(label, object.raw()));
+        }
+        SubjectRows target = subjectIndex.get(object.raw());
+        NodeValue value = NodeValue.reference(label, object.raw());
+        return target == null
+                ? new TreeItem<>(value)
+                : new LazyItem(value, () -> predicateItems(target));
     }
 
     // ==================== tree controls ====================
@@ -1096,6 +1177,12 @@ public class RDFVisualisationController implements Initializable {
 
     private static int expandRecursively(TreeItem<NodeValue> item, int alreadyExpanded) {
         if (alreadyExpanded >= MAX_EXPANDED_NODES) {
+            return alreadyExpanded;
+        }
+        // Not through a reference: opening one loads the target's rows, whose own references
+        // would be opened in turn, and "Expand selected" would chase them across the whole graph
+        // until the budget ran out. Following a reference stays a deliberate click.
+        if (item.getValue() != null && item.getValue().kind() == NodeKind.REFERENCE) {
             return alreadyExpanded;
         }
         int count = alreadyExpanded;
@@ -1140,6 +1227,234 @@ public class RDFVisualisationController implements Initializable {
         setStatus(values.size() == 1
                 ? "Copied to clipboard: " + values.getFirst()
                 : "Copied " + values.size() + " values to the clipboard, one per line.");
+    }
+
+    // ==================== following references ====================
+
+    /**
+     * Raises the subject cap and rescans. The subjects past the cap were never materialised, so
+     * there is nothing here to reveal in place: this is an <em>Apply</em> with a higher limit, and
+     * it collapses the tree exactly as <em>Apply</em> does. The raised cap holds until <em>Reset</em>.
+     */
+    private void showMoreSubjects() {
+        subjectLimit += MAX_SUBJECTS_PER_GRAPH;
+        setStatus(String.format("Rescanning with up to %,d subjects per graph...", subjectLimit));
+        rebuildTree();
+    }
+
+    /**
+     * Opens a reference row where it stands, so the target's properties appear beneath it and the
+     * next reference down can be followed without leaving the row the trace started from.
+     */
+    private void followReference(TreeItem<NodeValue> item) {
+        if (!(item instanceof LazyItem) || item.isExpanded()) {
+            return;
+        }
+        navigation.push(new NavStep(
+                new ArrayList<>(tvGraph.getSelectionModel().getSelectedItems()), item));
+        item.setExpanded(true);
+        tvGraph.scrollTo(tvGraph.getRow(item));
+        setStatus("Opened " + item.getValue().raw() + " here. Right-click to step back, "
+                + "double right-click to return to the start of the trace.");
+    }
+
+    /**
+     * Moves to the target's own node in the tree, wherever the current grouping put it, rather
+     * than showing a copy of it under the row that referenced it.
+     */
+    private void jumpToReference(TreeItem<NodeValue> item) {
+        String uri = item.getValue().raw();
+        if (!subjectIndex.containsKey(uri)) {
+            reportUnresolved(uri);
+            return;
+        }
+        List<TreeItem<NodeValue>> from =
+                new ArrayList<>(tvGraph.getSelectionModel().getSelectedItems());
+        TreeItem<NodeValue> target = locateSubject(uri);
+        if (target == null) {
+            setStatus("\"" + uri + "\" is in the data, but its own row could not be located in this "
+                    + "grouping. Set Group by to Subject (flat), which always finds it.");
+            return;
+        }
+        // Nothing to collapse on the way back: the jump opened the target's ancestors, and folding
+        // them again would close parts of the tree the user may have opened themselves.
+        navigation.push(new NavStep(from, null));
+        revealAndSelect(target);
+        setStatus("Jumped to " + uri + ". Right-click to step back, double right-click to return "
+                + "to the start of the trace.");
+    }
+
+    /**
+     * The tree node that is this resource's own row, found by walking the real items rather than
+     * by computing a path per grouping mode - there are four of them, and a class folder can sit
+     * at an intermediate level of the nesting modes. Two rules keep the walk cheap and honest:
+     * only the kinds that can <em>contain</em> a subject row are descended into, and a reference
+     * row never is.
+     * <p>
+     * Cost follows the mode. {@code FLAT} matches at the first level with nothing loaded;
+     * {@code CLASS} loads one level of folders; the nesting modes load level by level, bounded by
+     * {@value #MAX_NAVIGATION_VISITS} visits.
+     *
+     * @return the row, or {@code null} when the budget ran out before it was found
+     */
+    private TreeItem<NodeValue> locateSubject(String uri) {
+        boolean nesting = grouping() == Grouping.CONTAINMENT || grouping() == Grouping.REFERENCES;
+        Deque<TreeItem<NodeValue>> queue = new ArrayDeque<>();
+        queue.addLast(tvGraph.getRoot());
+        int visits = 0;
+
+        while (!queue.isEmpty() && visits++ < MAX_NAVIGATION_VISITS) {
+            TreeItem<NodeValue> item = queue.removeFirst();
+            NodeValue value = item.getValue();
+            if (value == null) {
+                continue;
+            }
+            if (value.kind() == NodeKind.SUBJECT && uri.equals(value.raw())) {
+                return item;
+            }
+            boolean descend = switch (value.kind()) {
+                case INFO, GRAPH, CLASS -> true;
+                // Only in the nesting modes does a subject hold other subjects. In FLAT and CLASS
+                // it holds predicate rows alone, and descending would mean loading five thousand
+                // subjects' properties to find a row that was in the root's children all along.
+                case SUBJECT -> nesting;
+                // Never a reference: those are traces, not canonical locations. Following them
+                // would let the search wander the whole graph, and it could "find" the target
+                // inside somebody else's inline trace instead of at its own node.
+                default -> false;
+            };
+            if (!descend) {
+                continue;
+            }
+            if (item instanceof LazyItem lazy) {
+                lazy.ensureLoaded();
+            }
+            queue.addAll(item.getChildren());
+        }
+        return null;
+    }
+
+    /** Opens every ancestor and the row itself, then selects it once the rows have been laid out. */
+    private void revealAndSelect(TreeItem<NodeValue> target) {
+        for (TreeItem<NodeValue> parent = target.getParent(); parent != null;
+                parent = parent.getParent()) {
+            parent.setExpanded(true);
+        }
+        target.setExpanded(true);
+        // Deferred: a row index is only meaningful once the expansions above have taken effect.
+        Platform.runLater(() -> {
+            tvGraph.getSelectionModel().clearSelection();
+            tvGraph.getSelectionModel().select(target);
+            tvGraph.scrollTo(tvGraph.getRow(target));
+        });
+    }
+
+    /**
+     * Says why a reference could not be followed, which is three different situations and three
+     * different remedies: the resource is described by a ticked graph but the filters excluded it
+     * or it fell past the subject cap; it is described by a graph that is not ticked; or nothing
+     * loaded describes it at all, and the reference is genuinely dangling.
+     */
+    private void reportUnresolved(String uri) {
+        String inTicked = null;
+        String inUnticked = null;
+
+        // A blank-node id is not a URI and cannot be looked up in a model; the rows are the only
+        // place it could have been resolved, and those have already been checked.
+        if (!uri.startsWith("_:")) {
+            for (GraphEntry entry : graphEntries) {
+                Model model = entry.model();
+                if (!model.contains(model.getResource(uri), null, (RDFNode) null)) {
+                    continue;
+                }
+                if (entry.isSelected()) {
+                    inTicked = entry.name();
+                    break;
+                }
+                if (inUnticked == null) {
+                    inUnticked = entry.name();
+                }
+            }
+        }
+
+        if (inTicked != null) {
+            setStatus("\"" + uri + "\" is described in " + inTicked + " but is not in the tree: "
+                    + "the filters exclude it, or it fell past the subject cap. Clear the filters, "
+                    + "or click the row at the end of the graph to show more subjects.");
+        } else if (inUnticked != null) {
+            setStatus("\"" + uri + "\" is described in \"" + inUnticked + "\", which is not ticked. "
+                    + "Tick it in Named graphs to bring it into the tree.");
+        } else {
+            setStatus("\"" + uri + "\" is referenced but nothing loaded describes it - a dangling "
+                    + "reference, or the file that describes it has not been loaded.");
+        }
+    }
+
+    /**
+     * Retracing, on the secondary button. Both counts fire on a double click - 1, then 2 - which is
+     * exactly what is wanted here: the first pops one step and the second unwinds whatever is left,
+     * so the two gestures compose without a disambiguation delay.
+     */
+    private void handleTreeSecondaryClick(MouseEvent event) {
+        if (event.getButton() != MouseButton.SECONDARY) {
+            return;
+        }
+        if (event.getClickCount() == 1) {
+            navigateBack();
+        } else if (event.getClickCount() == 2) {
+            navigateToStart();
+        }
+    }
+
+    private void navigateBack() {
+        NavStep step = navigation.poll();
+        if (step == null) {
+            setStatus("Nothing to go back to.");
+            return;
+        }
+        undo(step);
+        setStatus(navigation.isEmpty()
+                ? "Back at the start of the trace."
+                : "Stepped back; " + navigation.size()
+                        + (navigation.size() == 1 ? " step left." : " steps left."));
+    }
+
+    private void navigateToStart() {
+        if (navigation.isEmpty()) {
+            setStatus("Nothing to go back to.");
+            return;
+        }
+        // The last one popped is the earliest, so its selection is the one that ends up restored.
+        while (!navigation.isEmpty()) {
+            undo(navigation.poll());
+        }
+        setStatus("Back at the start of the trace.");
+    }
+
+    /** Closes what the step opened, then puts the highlight back where it was. */
+    private void undo(NavStep step) {
+        if (step.collapseOnBack() != null) {
+            step.collapseOnBack().setExpanded(false);
+        }
+        restoreSelection(step.selection());
+    }
+
+    /** Reselects the rows that are still in the tree; ones it has since dropped are skipped. */
+    private void restoreSelection(List<TreeItem<NodeValue>> selection) {
+        tvGraph.getSelectionModel().clearSelection();
+        TreeItem<NodeValue> first = null;
+        for (TreeItem<NodeValue> item : selection) {
+            if (item == null || tvGraph.getRow(item) < 0) {
+                continue;
+            }
+            tvGraph.getSelectionModel().select(item);
+            if (first == null) {
+                first = item;
+            }
+        }
+        if (first != null) {
+            tvGraph.scrollTo(tvGraph.getRow(first));
+        }
     }
 
     // ==================== term rendering ====================
@@ -1270,8 +1585,8 @@ public class RDFVisualisationController implements Initializable {
                 .append(matched).append(" of ").append(total).append(" triples shown across ")
                 .append(subjects).append(subjects == 1 ? " subject." : " subjects.");
         if (truncated) {
-            text.append(" Truncated at ").append(MAX_SUBJECTS_PER_GRAPH)
-                    .append(" subjects per graph - narrow the filters to see the rest.");
+            text.append(String.format(" Truncated at %,d subjects per graph - click the row at the "
+                    + "end of a truncated graph to show more, or narrow the filters.", subjectLimit));
         }
         text.append(lastLoadNote);
         return text.toString();
@@ -1358,12 +1673,16 @@ public class RDFVisualisationController implements Initializable {
     private record ClassGroup(Term type, List<SubjectRows> members) {
     }
 
+    /** One reversible navigation step: what was selected, and what to re-collapse on the way back. */
+    private record NavStep(List<TreeItem<NodeValue>> selection, TreeItem<NodeValue> collapseOnBack) {
+    }
+
     /**
      * What a tree row stands for. The graph view reads this to tell a named-graph row from a
      * resource row, which it used to guess by asking whether the row's value was also a graph
      * name.
      */
-    private enum NodeKind { GRAPH, CLASS, SUBJECT, VALUE, INFO }
+    private enum NodeKind { GRAPH, CLASS, SUBJECT, VALUE, REFERENCE, MORE, INFO }
 
     /**
      * Value of one tree row: {@code label} is rendered, {@code raw} is what Copy value yields,
@@ -1388,6 +1707,19 @@ public class RDFVisualisationController implements Initializable {
             return new NodeValue(label, raw, NodeKind.VALUE, List.of());
         }
 
+        /**
+         * An object row whose object is a resource. Carries the target URI as its raw value, so
+         * the graph view still treats it as a focus resource and Copy value still yields the URI.
+         */
+        static NodeValue reference(String label, String raw) {
+            return new NodeValue(label, raw, NodeKind.REFERENCE, List.of());
+        }
+
+        /** The row that raises the subject cap. No value, so it draws and copies nothing. */
+        static NodeValue more(String label) {
+            return new NodeValue(label, "", NodeKind.MORE, List.of());
+        }
+
         /** A structural or explanatory row: nothing to copy, nothing to draw. */
         static NodeValue info(String label) {
             return new NodeValue(label, "", NodeKind.INFO, List.of());
@@ -1405,26 +1737,22 @@ public class RDFVisualisationController implements Initializable {
      * Built from rows that are already filtered, and cached per graph, so reshaping the tree
      * never goes back to the model.
      */
-    private static final class Hierarchy {
+    private final class Hierarchy {
         private final Map<String, SubjectRows> index;
         private final Map<String, Set<String>> children;
         private final List<String> roots;
 
-        private Hierarchy(Map<String, SubjectRows> index, Map<String, Set<String>> children,
-                          List<String> roots) {
-            this.index = index;
-            this.children = children;
-            this.roots = roots;
-        }
-
         /**
          * Builds the parent/child edges from the resource-valued triples of the given rows.
+         * <p>
+         * The index stays per graph: nesting should not cross graph boundaries, only
+         * <em>following</em> a reference should, which is what {@link #subjectIndex} is for.
          *
          * @param containment nest by who points <em>at</em> a resource, which is what makes a
          *                    CGMES dataset read Region &#9656; Substation &#9656; VoltageLevel;
          *                    otherwise nest by what a resource points to
          */
-        static Hierarchy of(GraphRows graph, boolean containment) {
+        Hierarchy(GraphRows graph, boolean containment) {
             Map<String, SubjectRows> index = new LinkedHashMap<>();
             for (SubjectRows subject : graph.subjects()) {
                 index.putIfAbsent(subject.subject().raw(), subject);
@@ -1468,7 +1796,9 @@ public class RDFVisualisationController implements Initializable {
                     reach(raw, children, reached);
                 }
             }
-            return new Hierarchy(index, children, roots);
+            this.index = index;
+            this.children = children;
+            this.roots = roots;
         }
 
         /** Breadth-first walk from one root, marking everything below it as reached. */
@@ -1594,6 +1924,14 @@ public class RDFVisualisationController implements Initializable {
         }
 
         /**
+         * Materialises the children without expanding, so a search can look inside a node the
+         * user has not opened - which is how a jump finds a row in a collapsed branch.
+         */
+        void ensureLoaded() {
+            load();
+        }
+
+        /**
          * Always a branch: LazyItem is only created for nodes known to have children, and the
          * disclosure arrow has to be drawn before those children exist.
          */
@@ -1640,6 +1978,93 @@ public class RDFVisualisationController implements Initializable {
 
         boolean isSelected() {
             return selected.get();
+        }
+    }
+
+    /**
+     * Tree row rendering, and the primary-button gestures.
+     * <p>
+     * The primary button is handled in the cell rather than on the view because the cell knows
+     * exactly which row was hit. Only the two action kinds are intercepted: every other row keeps
+     * plain selection, which is what scopes the diagram.
+     * <p>
+     * JavaFX delivers count 1 and then count 2 on a double click, and no disambiguation delay is
+     * imposed, so following is instant. A double click on a reference therefore opens the row in
+     * place before it jumps - and the toolkit's own double-click branch toggle, which runs on the
+     * second release, closes it again on the way past. Either way the extra step is on the
+     * navigation stack, so a right-click undoes it.
+     */
+    private final class GraphTreeCell extends TreeCell<NodeValue> {
+
+        private GraphTreeCell() {
+            addEventFilter(MouseEvent.MOUSE_CLICKED, this::handleClick);
+        }
+
+        @Override
+        protected void updateItem(NodeValue value, boolean empty) {
+            super.updateItem(value, empty);
+            // Cells are recycled, so the action styling has to come off a row that is no longer one.
+            getStyleClass().remove("tree-action-row");
+            if (empty || value == null) {
+                setText(null);
+                return;
+            }
+            setText(value.label());
+            if (value.kind() == NodeKind.MORE) {
+                getStyleClass().add("tree-action-row");
+            }
+        }
+
+        private void handleClick(MouseEvent event) {
+            if (event.getButton() != MouseButton.PRIMARY || isEmpty() || getItem() == null) {
+                return;
+            }
+            NodeValue value = getItem();
+            if (value.kind() == NodeKind.MORE) {
+                if (event.getClickCount() == 1) {
+                    event.consume();
+                    showMoreSubjects();
+                }
+                return;
+            }
+            if (value.kind() != NodeKind.REFERENCE) {
+                return;
+            }
+
+            // A click on the arrow has already expanded or collapsed the row, and following it
+            // as well would reopen a row the user has just closed. The arrow is expand/collapse
+            // alone; the rest of the row is the gesture.
+            if (onDisclosureNode(event)) {
+                return;
+            }
+
+            TreeItem<NodeValue> item = getTreeItem();
+            // Only a resolvable reference was built as a LazyItem, which is the same thing the
+            // disclosure arrow tells the user.
+            boolean resolvable = item instanceof LazyItem;
+            if (event.getClickCount() == 1) {
+                // Silent when it cannot be followed: a row selected only to scope the diagram
+                // should not nag about a reference nobody asked to follow.
+                if (resolvable) {
+                    followReference(item);
+                }
+            } else if (event.getClickCount() == 2) {
+                // Consumed: the gesture is handled here, and nothing above the cell should act on
+                // it as well.
+                event.consume();
+                if (resolvable) {
+                    jumpToReference(item);
+                } else {
+                    reportUnresolved(value.raw());
+                }
+            }
+        }
+
+        /** The same bounds test the toolkit uses to decide that a click was on the arrow. */
+        private boolean onDisclosureNode(MouseEvent event) {
+            javafx.scene.Node disclosure = getDisclosureNode();
+            return disclosure != null
+                    && disclosure.getBoundsInParent().contains(event.getX(), event.getY());
         }
     }
 
