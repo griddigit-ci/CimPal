@@ -111,6 +111,22 @@ public class RDFVisualisationController implements Initializable {
     /** Folder collecting the subjects that declare no {@code rdf:type}. Sorted last. */
     private static final String NO_TYPE_LABEL = "(no rdf:type)";
 
+    /**
+     * Prefix stood in for a namespace the source document declares no prefix for. A file-based
+     * namespace is nearly all folder path - {@code file:///C:/Users/.../MicroGrid_EQ.xml#_1234} -
+     * which pushes the part that identifies the resource off the end of the row; {@code loc:_1234}
+     * says the same thing in a width that fits. A graph with a second such namespace gets
+     * {@code loc2:}, a third {@code loc3:}, so two resources never share a label.
+     */
+    private static final String LOCAL_PREFIX = "loc";
+
+    /**
+     * Namespace length above which an invented prefix is worth it. The substitution exists to buy
+     * width, so a namespace that already reads at a glance - {@code urn:uuid:} is nine characters,
+     * and {@code loc:} would only make it anonymous - is left exactly as the document wrote it.
+     */
+    private static final int MIN_SHORTENED_NAMESPACE = 24;
+
     /** Name of the graph produced by Merge. Merging again replaces it. */
     private static final String MERGED_GRAPH_NAME = "Merged Graph";
 
@@ -296,9 +312,13 @@ public class RDFVisualisationController implements Initializable {
                         + "  References (outgoing) - nested the other way, by what a resource points to.\n\n"
                         + "In the two nesting modes a node shows its nested resources first and its own "
                         + "properties after; past eight nested children they are grouped into class folders.\n\n"
-                        + "URIs are shortened using the namespace prefixes declared in the source file, or written "
-                        + "relative to the document base where no prefix applies. Copy value puts the full URI or "
-                        + "literal of every highlighted row on the clipboard, one per line.\n\n"
+                        + "URIs are shortened using the namespace prefixes declared in the source file. Where no "
+                        + "prefix applies and the namespace is long enough to crowd out the name - a file:/// "
+                        + "namespace is mostly folder path - it is stood in for by loc:, so a row reads "
+                        + "loc:_1234-5678. A second such namespace in the same graph becomes loc2:, a third "
+                        + "loc3:. A short namespace, urn:uuid: for instance, is left as written.\n\n"
+                        + "Copy value puts the full URI or literal of every highlighted row on the clipboard, "
+                        + "one per line, and the filters match the full URI too.\n\n"
                         + "Highlighting rows also narrows the graph view to them.");
     }
 
@@ -827,6 +847,9 @@ public class RDFVisualisationController implements Initializable {
     /** One pass over a graph, grouping the matching triples by subject in subject-label order. */
     private static GraphRows scan(GraphEntry entry, Filter filter) {
         Model model = entry.model();
+        // Per graph, so a namespace it had to invent a prefix for keeps that prefix for the
+        // whole scan and two rows of the same graph never disagree about what loc: means.
+        Labels labels = new Labels(model, entry.base());
         Map<String, SubjectRows> bySubject = new LinkedHashMap<>();
         int total = 0;
         int matched = 0;
@@ -838,9 +861,9 @@ public class RDFVisualisationController implements Initializable {
                 Statement statement = it.nextStatement();
                 total++;
 
-                Term subject = term(statement.getSubject(), model, entry.base());
-                Term predicate = term(statement.getPredicate(), model, entry.base());
-                Term object = term(statement.getObject(), model, entry.base());
+                Term subject = term(statement.getSubject(), labels);
+                Term predicate = term(statement.getPredicate(), labels);
+                Term object = term(statement.getObject(), labels);
 
                 if (!filter.accepts(subject, predicate, object)) {
                     continue;
@@ -1126,13 +1149,13 @@ public class RDFVisualisationController implements Initializable {
      * in the tree, {@code raw} the full URI or literal value - filters test both, so a search
      * works whether the user types a prefixed name or a full URI.
      */
-    private static Term term(RDFNode node, Model model, String base) {
+    private static Term term(RDFNode node, Labels labels) {
         if (node == null) {
             return new Term("", "", false);
         }
         if (node.isURIResource()) {
             String uri = node.asResource().getURI();
-            return new Term(shorten(uri, model, base), uri, true);
+            return new Term(labels.shorten(uri), uri, true);
         }
         if (node.isAnon()) {
             Resource resource = node.asResource();
@@ -1149,26 +1172,76 @@ public class RDFVisualisationController implements Initializable {
         if (language != null && !language.isEmpty()) {
             label = '"' + lexical + "\"@" + language;
         } else if (datatype != null && !datatype.equals(XSDDatatype.XSDstring.getURI())) {
-            label = '"' + lexical + "\"^^" + shorten(datatype, model, base);
+            label = '"' + lexical + "\"^^" + labels.shorten(datatype);
         } else {
             label = '"' + lexical + '"';
         }
         return new Term(label, lexical, false);
     }
 
-    private static String shorten(String uri, Model model, String base) {
-        String prefixed = model.shortForm(uri);
-        if (!prefixed.equals(uri)) {
-            return prefixed;
+    /**
+     * Where a URI's namespace ends, split the way RDF splits it: after the last {@code #},
+     * otherwise after the last {@code /}, otherwise after the last {@code :}.
+     *
+     * @return the index the local name starts at, or -1 when the URI has no local name to show
+     */
+    private static int localNameStart(String uri) {
+        int start = Math.max(uri.lastIndexOf('#'),
+                Math.max(uri.lastIndexOf('/'), uri.lastIndexOf(':'))) + 1;
+        return start > 0 && start < uri.length() ? start : -1;
+    }
+
+    /**
+     * Shortens URIs for display, inventing a prefix for any namespace the source document
+     * declares none for. One instance per graph scan, because the invented prefixes are only
+     * meaningful within the graph that produced them.
+     */
+    private static final class Labels {
+        private final Model model;
+        private final String base;
+        /** Namespace to invented prefix, in order of first appearance. */
+        private final Map<String, String> invented = new LinkedHashMap<>();
+
+        Labels(Model model, String base) {
+            this.model = model;
+            this.base = base;
         }
-        // No prefix covers it: show it the way the source document does, relative to its base.
-        if (base != null && !base.isEmpty() && uri.startsWith(base)) {
-            String relative = uri.substring(base.length());
-            if (!relative.isEmpty()) {
-                return relative;
+
+        String shorten(String uri) {
+            String prefixed = model.shortForm(uri);
+            if (!prefixed.equals(uri)) {
+                return prefixed;
             }
+
+            // No declared prefix covers it. When the namespace is long enough to crowd the local
+            // name off the row it gets a prefix of its own; a short one is left alone. Only the
+            // label changes: Term.raw stays the full URI, so the filters, Copy value and the
+            // graph view's node identity are untouched.
+            int start = localNameStart(uri);
+            if (start >= MIN_SHORTENED_NAMESPACE) {
+                return prefixFor(uri.substring(0, start)) + ':' + uri.substring(start);
+            }
+
+            // A bare namespace, with no local name to hang a prefix on: show it the way the
+            // source document does, relative to its base.
+            if (base != null && !base.isEmpty() && uri.startsWith(base)) {
+                String relative = uri.substring(base.length());
+                if (!relative.isEmpty()) {
+                    return relative;
+                }
+            }
+            return '<' + uri + '>';
         }
-        return '<' + uri + '>';
+
+        /** loc for the first namespace of a graph, then loc2, loc3 - so labels stay distinct. */
+        private String prefixFor(String namespace) {
+            String prefix = invented.get(namespace);
+            if (prefix == null) {
+                prefix = invented.isEmpty() ? LOCAL_PREFIX : LOCAL_PREFIX + (invented.size() + 1);
+                invented.put(namespace, prefix);
+            }
+            return prefix;
+        }
     }
 
     // ==================== status and enablement ====================

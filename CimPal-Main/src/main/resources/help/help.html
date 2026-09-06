@@ -1078,9 +1078,16 @@ fewer; past that they would overlap into noise, and hovering a node shows its na
       predicates; a predicate with a single value is shown on one line, a repeated predicate
       becomes a node with one child per value.</li>
   <li>URIs are shortened using the namespace prefixes declared in the source file. Where no prefix
-      applies they are written relative to the document base &mdash; which is how the source file
-      itself expresses them &mdash; and otherwise in full, in angle brackets. Literals are shown
-      quoted, with their language tag or datatype where they have one.</li>
+      applies and the namespace is long enough to crowd the name off the row &mdash; a
+      <code>file:///C:/&hellip;</code> namespace is mostly folder path &mdash; it is stood in for
+      by <code>loc:</code>, so the row reads <code>loc:_1234-5678</code> instead of the whole
+      path. A graph with a second such namespace gets <code>loc2:</code>, a third
+      <code>loc3:</code>, so two resources never end up sharing a label; the prefixes are assigned
+      per graph, in order of first appearance. A short namespace with no prefix &mdash;
+      <code>urn:uuid:</code>, for instance &mdash; is left as the document wrote it, because
+      hiding nine characters behind <code>loc:</code> would only make it anonymous. Only the
+      displayed form changes: <em>Copy value</em> yields the full URI, and the filters match it.
+      Literals are shown quoted, with their language tag or datatype where they have one.</li>
   <li><em>Copy value</em> puts the full URI or literal of every highlighted row on the clipboard,
       one per line, ready to paste into a SPARQL query or into a filter field.</li>
   <li>The status line reports how many of the loaded triples the filters admitted, across how many
