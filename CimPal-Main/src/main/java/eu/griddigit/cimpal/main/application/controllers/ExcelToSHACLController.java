@@ -24,8 +24,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
 
+/**
+ * Controller for the <em>SHACL Constraints Operations</em> tab.
+ * <p>
+ * The tab hosts three independent routines as accordion sections: generating constraints
+ * from an Excel template, modifying an existing constraints {@code .ttl} from Excel input,
+ * and splitting a constraints {@code .ttl} per an Excel template. The third was previously
+ * the separate <em>SHACL Organizer</em> tab; an FXML file has a single controller, so its
+ * members were folded in here when the tabs were merged. Each routine's state is kept
+ * distinct - nothing is shared between the three sections.
+ */
 public class ExcelToSHACLController implements Initializable {
     private MainController mainController;
+
+    // ---- section 3 (split constraints) state, formerly SHACLOrganizerController ----
+    private List<File> shaclFilesToSplit;
+    private List<File> splitTemplateXls;
 
     @FXML
     private TextField fPathRdffileForExcel;
@@ -66,6 +80,26 @@ public class ExcelToSHACLController implements Initializable {
     @FXML
     private Label helpTargetTtl;
 
+    // ---- section 3 (split constraints) controls ----
+    @FXML
+    private TextField fPathShaclFilesToOrganize;
+    @FXML
+    private TextField fPathXLSfileForShacl;
+    @FXML
+    private TextField fbaseURIShacl;
+    @FXML
+    private TextField fPrefixShaclOrganizer;
+    @FXML
+    private TextField fNSShaclOrganizer;
+    @FXML
+    private Button btnRunShaclOrganizer;
+    @FXML
+    private Button btnResetShaclOrganizer;
+    @FXML
+    private Label helpShaclFilesToSplit;
+    @FXML
+    private Label helpExcelTemplate;
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
@@ -74,6 +108,9 @@ public class ExcelToSHACLController implements Initializable {
 
         );
         fcbRDFSformatForExcel.getSelectionModel().selectFirst();
+
+        //The first routine opens by default; that is declared on the TitledPane in the FXML,
+        //because an Accordion discards an expandedPane set from initialize().
 
         //restore the paths this tab was last used with; the consumers repeat what the
         //Browse handlers do besides filling the field
@@ -85,6 +122,11 @@ public class ExcelToSHACLController implements Initializable {
                 file -> MainController.XlsChangesExcelToTtl = file);
         PathMemory.bind(fPathTTLChangesExcelToTtl, "tab.excelToShacl.targetTtl",
                 file -> MainController.TtlChangesExcelToTtl = file);
+
+        //the SHACL files field holds a comma-joined list of several files, so it is not
+        //restored; its chooser still reopens in the folder it was last used in
+        PathMemory.bind(fPathXLSfileForShacl, "tab.shaclOrganizer.excelTemplate",
+                file -> splitTemplateXls = List.of(file));
     }
 
     public void setMainController(MainController mainController) {
@@ -332,6 +374,72 @@ public class ExcelToSHACLController implements Initializable {
 
     }
 
+    // ================= section 3: split constraints per Excel template =================
+    // Formerly the SHACL Organizer tab. Behaviour is unchanged; only the field labels and
+    // the enclosing container differ.
+
+    @FXML
+    public void actionBrowseShaclFilesToOrganize(ActionEvent actionEvent) {
+        shaclFilesToSplit = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                false, "SHACL Constraints file", List.of("*.rdf", "*.ttl"), "",
+                "tab.shaclOrganizer.shaclFiles");
+        if (shaclFilesToSplit != null) {
+            StringBuilder paths = new StringBuilder();
+            for (File file : shaclFilesToSplit) {
+                paths.append(", ").append(file.toString());
+            }
+            fPathShaclFilesToOrganize.setText(paths.toString());
+        }
+    }
+
+    @FXML
+    public void actionBrowseExcelfileForShacl(ActionEvent actionEvent) {
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                true, "Input template instance data XLS", List.of("*.xlsx"), "",
+                "tab.shaclOrganizer.excelTemplate");
+
+        if (!file.isEmpty()) {
+            splitTemplateXls = file;
+            fPathXLSfileForShacl.setText(file.getFirst().toString());
+        }
+    }
+
+    @FXML
+    public void actionBtnRunShaclOrganizer(ActionEvent actionEvent) throws IOException {
+        resetProgressBar();
+
+        if (splitTemplateXls == null || splitTemplateXls.isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setContentText("Please select the Excel template file.");
+            alert.setHeaderText(null);
+            alert.setTitle("Error - not all fields are filled in");
+            alert.showAndWait();
+            return;
+        }
+
+        if (shaclFilesToSplit != null) {
+            for (int m = 0; m < shaclFilesToSplit.size(); m++) {
+                eu.griddigit.cimpal.main.util.ModelFactory.shapeModelLoad(m, shaclFilesToSplit);
+            }
+        }
+
+        ArrayList<Object> inputXLSdata =
+                ExcelTools.importXLSX(splitTemplateXls.getFirst().toString(), 0);
+
+        ShaclTools.splitShaclPerXlsInput(inputXLSdata);
+
+        setProgressBar(1);
+    }
+
+    @FXML
+    public void actionBtnResetShaclOrganizer(ActionEvent actionEvent) {
+        fPathShaclFilesToOrganize.clear();
+        fPathXLSfileForShacl.clear();
+        splitTemplateXls = null;
+        shaclFilesToSplit = null;
+        resetProgressBar();
+    }
+
     private void initializeHelpTooltips() {
         GUIhelper.installHelpTooltip(helpRdfFile,
                 "The RDFS ontology file (.xml, .rdf) containing CIM class and property definitions. Used as the base for generating SHACL shapes from the Excel constraints.");
@@ -344,9 +452,13 @@ public class ExcelToSHACLController implements Initializable {
         GUIhelper.installHelpTooltip(helpPrefixNs,
                 "The namespace prefix and URI for the generated shapes graph. The prefix is a short alias used in the Turtle output (e.g. \"sh\"), and the URI is the full namespace it expands to.");
         GUIhelper.installHelpTooltip(helpChangesExcel,
-                "Excel file (.xls/.xlsx) containing constraint modifications to apply to an existing SHACL Turtle file. Each row specifies a change.");
+                "Excel file (.xlsx) containing the constraint modifications to apply. Each row specifies one change to the constraints file selected below.");
         GUIhelper.installHelpTooltip(helpTargetTtl,
-                "The existing SHACL Turtle (.ttl) file to which the changes from the Changes Excel will be applied.");
+                "The existing SHACL constraints file (.ttl) that the changes from the Excel input above will be applied to. The result is written to a new file you choose when the routine finishes; this file is not overwritten in place.");
+        GUIhelper.installHelpTooltip(helpShaclFilesToSplit,
+                "SHACL constraints files (.ttl) to be split into separate files according to the Excel template. Multiple files can be selected and are combined before splitting.");
+        GUIhelper.installHelpTooltip(helpExcelTemplate,
+                "Excel template (.xlsx) that defines how the constraints are grouped into the resulting files. Produced by the SHACL constraints information export, or created manually.");
     }
 
 }

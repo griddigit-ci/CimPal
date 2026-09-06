@@ -10,6 +10,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 <VBox minHeight="0.0" minWidth="0.0" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.MainController">
    <MenuBar VBox.vgrow="NEVER">
@@ -69,48 +70,44 @@
       <TabPane fx:id="tabPaneConstraintsDetails" minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
          <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
          <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
-         <Tab fx:id="tabExcelToSHACL" text="Excel to SHACL"/>
+         <Tab fx:id="tabExcelToSHACL" text="SHACL Constraints Operations"/>
          <Tab fx:id="tabRDFConvert" text="RDF Convert"/>
          <Tab fx:id="tabInstanceDataComparison" text="Instance Data Comparison"/>
-         <Tab fx:id="tabSHACLOrganizer" text="SHACL Organizer"/>
-         <Tab fx:id="tabSHACLTester" text="SHACL tester"/>
          <Tab fx:id="tabGenerateInstanceData" text="Generate Instance data"/>
          <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
          <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
-         <Tab fx:id="tabValidationByMapping" text="Validation by Mapping"/>
+         <Tab fx:id="tabValidationByMapping" text="Dataset SHACL Validation"/>
       </TabPane>
-      <TitledPane fx:id="outputSourceContainer" animated="false" minHeight="0.0" minWidth="0.0" text="Output &amp; Source Code">
-         <BorderPane minHeight="0.0" minWidth="0.0">
-            <left>
-               <VBox alignment="TOP_CENTER" spacing="8.0">
-                  <padding>
-                     <Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/>
-                  </padding>
-                  <Button maxWidth="1.7976931348623157E308" minWidth="80.0" mnemonicParsing="false"
-                          onAction="#actionBtnClear" text="Clear" wrapText="true"/>
-                  <ToggleButton fx:id="btnShowSourceCodeDefineTab" maxWidth="1.7976931348623157E308"
-                                minWidth="80.0" mnemonicParsing="false"
-                                onAction="#actionBtnShowSourceCodeShacl" text="Show"
-                                wrapText="true">
-                     <tooltip>
-                        <Tooltip text="Show or hide the source code of the constraints."/>
-                     </tooltip>
-                  </ToggleButton>
-               </VBox>
-            </left>
-            <center>
-               <TabPane fx:id="tabPaneDown" minHeight="0.0" minWidth="0.0" side="BOTTOM"
-                        tabClosingPolicy="UNAVAILABLE" BorderPane.alignment="CENTER">
-                  <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
-                     <TextArea fx:id="foutputWindow" minHeight="0.0" minWidth="0.0" wrapText="true"/>
-                  </Tab>
-                  <Tab fx:id="tabConstraintsSourceCode" closable="false"
-                       onSelectionChanged="#actionTabConstraintsSourceCode" text="Source code">
-                     <TextArea fx:id="fsourceDefineTab" editable="false" minHeight="0.0" minWidth="0.0" wrapText="true"/>
-                  </Tab>
-               </TabPane>
-            </center>
-         </BorderPane>
+      <TitledPane fx:id="outputSourceContainer" animated="false" minHeight="0.0" minWidth="0.0" text="Output">
+         <!--
+           The Clear button sits in a strip above the text area rather than in a left-hand
+           column, so the output area spans the full width of the pane. The pane held a
+           second "Source code" tab and a Show/Hide toggle for it; nothing ever wrote to
+           that text area, so both were removed rather than left as dead controls.
+         -->
+         <VBox minHeight="0.0" minWidth="0.0" spacing="6.0">
+            <padding>
+               <Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/>
+            </padding>
+            <HBox alignment="CENTER_LEFT" spacing="8.0" VBox.vgrow="NEVER">
+               <Button fx:id="btnClearOutput" mnemonicParsing="false" onAction="#actionBtnClear"
+                       styleClass="icon-button">
+                  <graphic>
+                     <!-- Trash-can silhouette: lid handle, lid, body. Drawn rather than
+                          loaded from a font or image so it inherits the theme's text
+                          colour and renders identically on every platform. -->
+                     <SVGPath styleClass="icon-glyph"
+                              content="M6 1.5 H10 V3.5 H6 Z M2 4 H14 V6 H2 Z M3.6 6.8 H12.4 L11.7 15.2 H4.3 Z"/>
+                  </graphic>
+                  <tooltip>
+                     <Tooltip text="Clear Output Window"/>
+                  </tooltip>
+               </Button>
+               <Region HBox.hgrow="ALWAYS"/>
+            </HBox>
+            <TextArea fx:id="foutputWindow" minHeight="0.0" minWidth="0.0" wrapText="true"
+                      VBox.vgrow="ALWAYS"/>
+         </VBox>
       </TitledPane>
    </SplitPane>
    <HBox id="HBox" alignment="CENTER_LEFT" spacing="8.0" VBox.vgrow="NEVER">

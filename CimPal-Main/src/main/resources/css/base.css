@@ -342,6 +342,30 @@
     -fx-font-weight: bold;
 }
 
+/*
+ * Icon-only button (the Clear control above the output area). Sized to the glyph
+ * rather than to a text label, so it reads as a toolbar affordance; the glyph is an
+ * SVGPath and takes its colour from the theme's own text and warning variables,
+ * needing no per-theme override.
+ */
+.icon-button {
+    -fx-padding: 4 7 4 7;
+    -fx-min-width: 30px;
+    -fx-min-height: 28px;
+}
+
+.icon-button .icon-glyph {
+    -fx-fill: -cimpal-text-muted;
+}
+
+.icon-button:hover .icon-glyph {
+    -fx-fill: -cimpal-warning;
+}
+
+.icon-button:disabled .icon-glyph {
+    -fx-fill: -cimpal-text-disabled;
+}
+
 .option-flow {
     -fx-hgap: 16;
     -fx-vgap: 8;

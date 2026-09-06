@@ -374,15 +374,13 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <div class="group">Main GUI tabs</div>
   <a href="#tab-rdfs-to-shacl">RDFS to SHACL</a>
   <a href="#tab-rdf-comparison">RDF Comparison</a>
-  <a href="#tab-excel-to-shacl">Excel to SHACL</a>
+  <a href="#tab-excel-to-shacl">SHACL Constraints Operations</a>
   <a href="#tab-rdf-convert">RDF Convert</a>
   <a href="#tab-instance-data-comparison">Instance Data Comparison</a>
-  <a href="#tab-shacl-organizer">SHACL Organizer</a>
-  <a href="#tab-shacl-tester">SHACL tester</a>
   <a href="#tab-generate-instance-data">Generate Instance data</a>
   <a href="#tab-task-wizard">Task Wizard</a>
   <a href="#tab-sparql-query">SPARQL Query</a>
-  <a href="#tab-validation-by-mapping">Validation by Mapping</a>
+  <a href="#tab-validation-by-mapping">Dataset SHACL Validation</a>
 
   <div class="group">Tools menu</div>
   <div class="subgroup">RDFS Profiles</div>
@@ -473,7 +471,8 @@ CIM-based data exchange:</p>
       shapes</a> &mdash; confirm
       the generated shapes are themselves conformant (or simply leave <em>Validate generated SHACL
       shapes</em> ticked in step 1).</li>
-  <li><a href="#tab-shacl-tester">SHACL tester</a> &mdash; run the new shapes over a folder of
+  <li><a href="#tab-validation-by-mapping">Dataset SHACL Validation</a> &mdash; with the
+      <em>Validate by manual selection</em> workflow, run the new shapes over a folder of
       known-good models and check that nothing conformant is rejected.</li>
   <li><a href="#tool-export-shacl-info">Tools &#9656; SHACL Constraints &#9656; Export SHACL
       constraints information to Excel</a> &mdash; produce the human-readable constraint
@@ -490,10 +489,10 @@ CIM-based data exchange:</p>
 
 <h3>Checking a received dataset</h3>
 <ol>
-  <li><a href="#tab-shacl-tester">SHACL tester</a> or
-      <a href="#tab-validation-by-mapping">Validation by Mapping</a> &mdash; validate the model
-      against the applicable constraint set; use Validation by Mapping when a CSV drives which
-      constraints apply to which input.</li>
+  <li><a href="#tab-validation-by-mapping">Dataset SHACL Validation</a> &mdash; validate the
+      model against the applicable constraint set. Use <em>Validate by manual selection</em> when
+      you pick the constraint files yourself, or one of the mapping workflows when a CSV drives
+      which constraints apply to which input.</li>
   <li><a href="#tab-instance-data-comparison">Instance Data Comparison</a> &mdash; compare the
       dataset against the reference or previous version.</li>
   <li><a href="#tab-sparql-query">SPARQL Query</a> &mdash; answer any ad-hoc question the reports
@@ -512,10 +511,9 @@ CIM-based data exchange:</p>
 <h2 id="using">Using the window</h2>
 
 <ul>
-  <li><strong>Output &amp; Source Code panel</strong> &mdash; the collapsible panel at the bottom.
-      The <em>Output window</em> tab receives all progress and result messages; <em>Clear</em>
-      empties it. The <em>Source code</em> tab shows the generated constraint source when
-      <em>Show</em> is toggled on. Drag the divider to resize.</li>
+  <li><strong>Output panel</strong> &mdash; the collapsible panel at the bottom. It receives all
+      progress and result messages. The bin icon above it empties the panel; hover it for the
+      <em>Clear Output Window</em> tooltip. Drag the divider to resize.</li>
   <li><strong>Status bar</strong> &mdash; the progress bar at the very bottom shows the progress of
       the running operation. An indeterminate bar means the operation cannot report a percentage.</li>
   <li><strong>Help badges</strong> &mdash; the small <code>?</code> markers next to fields in the
@@ -678,8 +676,6 @@ instance-data validation, a separate datatypes-only shapes file, and the class i
       choice.</li>
   <li>SHACL-on-SHACL validation reports printed to the Output window when validation is
       enabled.</li>
-  <li>The generated constraint source is viewable in the <em>Source code</em> tab of the bottom
-      panel.</li>
 </ul>
 
 <p class="src">Source: <code>RDFStoSHACLController.actionOpenRDFS()</code>,
@@ -734,24 +730,30 @@ change so that a version bump does not appear as a wholesale rewrite.</p>
 </details>
 
 <details class="fn" id="tab-excel-to-shacl">
-<summary><span class="kind">Tab</span> Excel to SHACL</summary>
+<summary><span class="kind">Tab</span> SHACL Constraints Operations</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
-<p>The spreadsheet route into a constraint set, for the cases the automatic RDFS&nbsp;&rarr;&nbsp;SHACL
-derivation cannot cover. It does two related jobs. <strong>Create shapes from Excel</strong> takes an
-RDFS ontology plus a spreadsheet in which each row defines one constraint, and builds the
-corresponding SHACL shapes graph &mdash; letting domain experts author constraints in a familiar
-tool. <strong>Apply changes to an existing Turtle file</strong> takes a spreadsheet of
-modifications and edits an already-published shapes file in place, which is how targeted
-corrections are made to a released constraint set without regenerating it.</p>
+<p>The spreadsheet-driven operations on a constraint set, for the cases the automatic
+RDFS&nbsp;&rarr;&nbsp;SHACL derivation cannot cover. Three related routines share the tab, each in
+its own collapsible section with its own <em>Reset</em> and <em>Run</em>; filling in one does not
+affect the others, and only one section is open at a time.</p>
+<ol>
+  <li><strong>Generate SHACL constraints based on Excel template</strong> takes an RDFS ontology
+      plus a spreadsheet in which each row defines one constraint, and builds the corresponding
+      SHACL shapes graph &mdash; letting domain experts author constraints in a familiar tool.</li>
+  <li><strong>Modify SHACL .ttl based on Excel input</strong> takes a spreadsheet of modifications
+      and applies them to an already-published shapes file, which is how targeted corrections are
+      made to a released constraint set without regenerating it.</li>
+  <li><strong>Split SHACL Constraints .ttl based on Excel template</strong> restructures a
+      constraint set into separate deliverable files according to a spreadsheet plan.</li>
+</ol>
+
+<p class="note">The third routine was previously a separate <em>SHACL Organizer</em> tab.</p>
 
 <h4>Inputs</h4>
 
-<p>The two jobs are two separate sections of the tab, each with its own <em>Reset</em> and
-<em>Run</em>; filling in one does not affect the other.</p>
-
-<p><strong>Create shapes from Excel</strong> &mdash; the upper section:</p>
+<p><strong>1. Generate SHACL constraints based on Excel template</strong>:</p>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
 <tr><td>RDF file</td><td>file, required</td>
@@ -772,28 +774,41 @@ corrections are made to a released constraint set without regenerating it.</p>
         alias, the URI the full namespace it expands to.</td></tr>
 </table>
 
-<p><strong>Apply changes to an existing Turtle file</strong> &mdash; the lower section, headed
-<em>Modify Constraints from xls file</em>:</p>
+<p><strong>2. Modify SHACL .ttl based on Excel input</strong>:</p>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Changes Excel</td><td>file, required</td>
-    <td>Excel file containing constraint modifications to apply to an existing SHACL Turtle file.
-        Each row specifies a change.</td></tr>
-<tr><td>Target TTL</td><td>file, required</td>
-    <td>The existing SHACL Turtle (<code>.ttl</code>) file to which the changes from the Changes
-        Excel will be applied.</td></tr>
+<tr><td>Input from Excel .xlsx</td><td>file, required</td>
+    <td>Excel file (<code>.xlsx</code>) containing the constraint modifications to apply. Each row
+        specifies one change to the constraints file selected below.</td></tr>
+<tr><td>Constraints .ttl to modify</td><td>file, required</td>
+    <td>The existing SHACL constraints file (<code>.ttl</code>) that the changes from the Excel
+        input are applied to. The result is written to a new file you choose when the routine
+        finishes; this file is not overwritten in place.</td></tr>
+</table>
+
+<p><strong>3. Split SHACL Constraints .ttl based on Excel template</strong>:</p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>SHACL Constraints files (.ttl)</td><td>files, required</td>
+    <td>Input SHACL constraints files (<code>.ttl</code>) to be split according to the Excel
+        template. Several files can be selected and are combined before splitting.</td></tr>
+<tr><td>Excel template file</td><td>file, required</td>
+    <td>Excel template (<code>.xlsx</code>) defining how the constraints are grouped into the
+        resulting files. Produced by the SHACL constraints information export, or created
+        manually. The first worksheet is read.</td></tr>
 </table>
 
 <h4>Outputs</h4>
 <ul>
-  <li>A SHACL shapes file written to the location chosen in the <em>Save as for shape
+  <li>Routine 1: a SHACL shapes file written to the location chosen in the <em>Save as for shape
       model</em> dialog.</li>
-  <li>For the changes route, an updated Turtle file saved through a standard save dialog.</li>
-  <li>Progress and any problems reported in the Output window.</li>
+  <li>Routine 2: an updated Turtle file saved through a standard save dialog.</li>
+  <li>Routine 3: the reorganised SHACL Turtle files, split as the spreadsheet specifies.</li>
+  <li>Progress in the status bar and any problems reported in the Output window.</li>
 </ul>
 
 <p class="src">Source: <code>ExcelToSHACLController.actionBtnRunExcelShape()</code>,
-<code>actionBtnRunExcelToTtl()</code></p>
+<code>actionBtnRunExcelToTtl()</code>, <code>actionBtnRunShaclOrganizer()</code></p>
 </div>
 </details>
 
@@ -916,79 +931,6 @@ read, it can report instance counts per class instead.</p>
 </ul>
 
 <p class="src">Source: <code>InstanceDataComparisonController.actionBtnRunIDcompare()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tab-shacl-organizer">
-<summary><span class="kind">Tab</span> SHACL Organizer</summary>
-<div class="fn-body">
-
-<h4>Business logic</h4>
-<p>Restructures a set of SHACL constraint files according to a spreadsheet plan. A generated
-constraint set arrives grouped the way the generator produced it, which is rarely the way it should
-be published: constraints need to be split across deliverable files by profile, severity or
-release. This tab reads the intended arrangement from an Excel sheet and splits the input shapes
-accordingly, so the packaging of a constraint release is repeatable rather than a manual editing
-exercise.</p>
-
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>SHACL files</td><td>files, required</td>
-    <td>Input SHACL shape files (<code>.ttl</code>) to be organised and documented using the Excel
-        template.</td></tr>
-<tr><td>Excel template</td><td>file, required</td>
-    <td>Excel template (<code>.xlsx</code>) defining the structure and documentation format for
-        organising the shapes. Produced by the SHACL tester or created manually. The first
-        worksheet is read.</td></tr>
-</table>
-
-<h4>Outputs</h4>
-<ul>
-  <li>The reorganised SHACL Turtle files, split as the spreadsheet specifies.</li>
-  <li>Progress in the status bar and messages in the Output window.</li>
-</ul>
-
-<p class="src">Source: <code>SHACLOrganizerController.actionBtnRunShaclOrganizer()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tab-shacl-tester">
-<summary><span class="kind">Tab</span> SHACL tester</summary>
-<div class="fn-body">
-
-<h4>Business logic</h4>
-<p>Batch validation. Point it at a constraint set and at a folder tree of models, and it validates
-every model it finds against those constraints, reporting conformance for each. This is the
-regression test for a constraint set: run it over a corpus of known-good and known-bad models and
-confirm that the good ones pass and the bad ones fail for the expected reason. It is equally the
-acceptance check for a batch of received datasets.</p>
-
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>SHACL files</td><td>files, required</td>
-    <td>SHACL constraint files (<code>.ttl</code>) used to validate the test models. Several files
-        can be selected and are combined.</td></tr>
-<tr><td>Models folder</td><td>folder, required</td>
-    <td>Root folder containing the CGMES instance data models to validate. Searched recursively
-        (up to three levels) for <code>.zip</code> model archives.</td></tr>
-<tr><td>Export reports</td><td>checkbox</td>
-    <td>When checked, saves a SHACL validation report file alongside each tested model in the
-        models folder.</td></tr>
-</table>
-
-<h4>Outputs</h4>
-<ul>
-  <li>Per-model conformance results and validation messages streamed to the Output window as the
-      run proceeds, with live progress in the status bar.</li>
-  <li>A validation report file next to each tested model when <em>Export reports</em> is
-      ticked.</li>
-  <li>Nothing happens, and the progress bar resets, if no model archives are found in the
-      folder.</li>
-</ul>
-
-<p class="src">Source: <code>SHACLTesterController.actionBtnRunShaclValidator()</code></p>
 </div>
 </details>
 
@@ -1140,45 +1082,76 @@ Queries can be saved and reloaded, so a useful investigation becomes a reusable 
 </details>
 
 <details class="fn" id="tab-validation-by-mapping">
-<summary><span class="kind">Tab</span> Validation by Mapping</summary>
+<summary><span class="kind">Tab</span> Dataset SHACL Validation</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
-<p>Production-scale validation driven by a mapping file. Instead of choosing constraints and models
-by hand, a CSV declares which constraint files apply to which inputs; CimPal then executes the
-whole matrix and produces the reports, summaries and ZIP deliverables in one run. The
-<em>timestamped</em> workflow additionally discovers timestamped input files and organises the
-reports by timestamp, and can compare each run's totals against the previous run's &mdash; which is
-what turns validation from a one-off check into a trend you can watch across releases.</p>
+<p>Validates datasets against a SHACL constraint set. The <em>Validation workflow</em> choice
+selects one of three routes, and the rest of the form enables only the fields that route reads.</p>
+<ul>
+  <li><strong>Validate by mapping file</strong> &mdash; production-scale validation driven by a
+      mapping file. Instead of choosing constraints and models by hand, a CSV declares which
+      constraint files apply to which inputs; CimPal then executes the whole matrix and produces
+      the reports, summaries and ZIP deliverables in one run.</li>
+  <li><strong>Validate by timestamped mapping</strong> &mdash; as above, but additionally discovers
+      timestamped input files and organises the reports by timestamp, and can compare each run's
+      totals against the previous run's &mdash; which is what turns validation from a one-off check
+      into a trend you can watch across releases.</li>
+  <li><strong>Validate by manual selection</strong> &mdash; batch validation without a mapping
+      file. Point it at constraint files you pick yourself and at the models root folder, and it
+      validates every model archive it finds against those constraints, reporting conformance for
+      each. This is the regression test for a constraint set: run it over a corpus of known-good
+      and known-bad models and confirm that the good ones pass and the bad ones fail for the
+      expected reason. It is equally the acceptance check for a batch of received datasets.</li>
+</ul>
+
+<p class="note">The manual workflow was previously a separate <em>SHACL tester</em> tab. Its
+&ldquo;Parent folder for test models&rdquo; field is now the tab's own <em>Models / input root
+folder</em>, shared with the two mapping workflows.</p>
 
 <h4>Inputs</h4>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
 <tr><td>Validation workflow</td><td>choice, required</td>
-    <td><em>Validate by mapping file</em> validates the selected input model structure according to
-        the mapping CSV and creates a validation report and ZIP files. <em>Validate by timestamped
-        mapping</em> discovers timestamped input files and creates timestamp-based validation
-        reports.</td></tr>
-<tr><td>Mapping CSV file</td><td>file, required</td>
+    <td>Which of the three routes above to run. Changing it enables and disables the rest of the
+        form accordingly.</td></tr>
+<tr><td>SHACL Constraint files (.ttl)</td><td>files</td>
+    <td>SHACL constraint files (<code>.ttl</code>) used to validate the models. Several files can
+        be selected and are combined into one shapes graph. <strong>Manual selection only</strong>
+        &mdash; the mapping workflows resolve their constraint files from the mapping CSV, and this
+        field is disabled for them.</td></tr>
+<tr><td>Mapping CSV file</td><td>file</td>
     <td>CSV mapping file containing the XML input definitions and the SHACL constraint files. Only
-        <code>.csv</code> files are accepted.</td></tr>
+        <code>.csv</code> files are accepted. Required for both mapping workflows; disabled for
+        manual selection.</td></tr>
 <tr><td>Models / input root folder</td><td>folder, required</td>
     <td>For normal mapping, the models root folder. For timestamped mapping, the root folder
-        containing timestamped XML or ZIP files.</td></tr>
-<tr><td>Constraints root folder</td><td>folder, required</td>
+        containing timestamped XML or ZIP files. For manual selection, the parent folder that is
+        searched recursively (up to three levels) for <code>.zip</code> model archives.</td></tr>
+<tr><td>Constraints root folder</td><td>folder</td>
     <td>Root folder where the SHACL constraint files live. The constraint paths in the mapping file
-        are resolved relative to this folder.</td></tr>
-<tr><td>Output folder</td><td>folder, required</td>
+        are resolved relative to this folder. Required for both mapping workflows; disabled for
+        manual selection.</td></tr>
+<tr><td>Output folder</td><td>folder</td>
     <td>Folder where validation reports, timestamped summaries and generated ZIP files are
-        written.</td></tr>
+        written. Required for both mapping workflows; disabled for manual selection.</td></tr>
+<tr><td>Export model validation reports</td><td>checkbox</td>
+    <td>When checked, saves a SHACL validation report file alongside each validated model in the
+        models root folder. <strong>Manual selection only</strong> &mdash; hidden for the mapping
+        workflows.</td></tr>
+<tr><td>Discovered models tree</td><td>read-only</td>
+    <td>Lists what was found under the models root folder, so you can see what a manual run will
+        cover before starting it. <strong>Manual selection only</strong> &mdash; hidden for the
+        mapping workflows.</td></tr>
 <tr><td>Datatype map</td><td>choice</td>
-    <td>The CGMES and NC version combination whose datatype map is loaded for validation:
+    <td>Disabled for manual selection. The CGMES and NC version combination whose datatype map is
+        loaded for validation:
         <em>CGMES 3.0 / NC 2.5</em> uses the CIM17 / CGMES 3 / NC 2.5 map, <em>CGMES 3.0 / NC
         2.4</em> the CIM17 / CGMES 3 / NC 2.4 map, <em>CGMES 2.4 / NC 2.2</em> the CIM16 / CGMES 2.4
         / NC 2.2 map.</td></tr>
 <tr><td>XML base URI</td><td>text</td>
     <td>Base URI used when loading RDF/XML files. The default is normally correct for CIM100 based
-        profiles.</td></tr>
+        profiles. Disabled for manual selection.</td></tr>
 <tr><td>Previous comparison CSV</td><td>file, optional</td>
     <td>CSV holding the previous run's totals, used to build the comparison workbook. Timestamped
         workflow only. Expected header <code>region,dataset,total</code> where total = warnings +
@@ -1189,14 +1162,19 @@ what turns validation from a one-off check into a trend you can watch across rel
 
 <h4>Outputs</h4>
 <ul>
-  <li>Validation report files per input, written into the output folder.</li>
-  <li>ZIP deliverables assembled from the reports.</li>
-  <li>For the timestamped workflow, timestamp-based summaries and a comparison workbook against the
-      previous run's totals.</li>
+  <li>Mapping workflows: validation report files per input, written into the output folder, plus
+      ZIP deliverables assembled from the reports.</li>
+  <li>Timestamped workflow: additionally timestamp-based summaries and a comparison workbook
+      against the previous run's totals.</li>
+  <li>Manual selection: per-model conformance results and validation messages streamed to the
+      Output window as the run proceeds, and a validation report file next to each validated model
+      when <em>Export model validation reports</em> is ticked. Nothing happens, and the progress
+      bar resets, if no model archives are found under the models root folder.</li>
   <li>Progress on the tab's own progress bar and messages in the Output window.</li>
 </ul>
 
-<p class="src">Source: <code>ValidationByMappingController.actionRunValidationByMapping()</code></p>
+<p class="src">Source: <code>ValidationByMappingController.actionRunValidationByMapping()</code>,
+<code>runManualValidation()</code></p>
 </div>
 </details>
 
@@ -1673,12 +1651,12 @@ Each rule's name, severity, level, description and message are extracted.</p>
 <div class="fn-body">
 <h4>Business logic</h4>
 <p>A shortcut. This menu item performs no work of its own &mdash; it simply brings the
-<a href="#tab-validation-by-mapping">Validation by Mapping</a> tab to the front, where the whole
+<a href="#tab-validation-by-mapping">Dataset SHACL Validation</a> tab to the front, where the whole
 workflow lives. See that tab for inputs and outputs.</p>
 <h4>Inputs</h4>
 <p>None.</p>
 <h4>Outputs</h4>
-<ul><li>The <em>Validation by Mapping</em> tab is selected in the main window.</li></ul>
+<ul><li>The <em>Dataset SHACL Validation</em> tab is selected in the main window.</li></ul>
 <p class="src">Source: <code>MainController.actionValidateByMapping()</code></p>
 </div>
 </details>

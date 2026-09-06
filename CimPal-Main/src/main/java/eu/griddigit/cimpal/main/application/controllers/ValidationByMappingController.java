@@ -1,26 +1,58 @@
 package eu.griddigit.cimpal.main.application.controllers;
 
+import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
+import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
+import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
 import javafx.util.Duration;
 import org.apache.jena.datatypes.RDFDatatype;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Controller for the <em>Dataset SHACL Validation</em> tab.
+ * <p>
+ * The tab offers three workflows, selected by the {@code Validation workflow} choice box:
+ * two mapping-driven ones that resolve constraint files from a mapping CSV, and
+ * {@code Validate by manual selection}, which validates every model found under the models
+ * root folder against constraint files chosen by hand. The last was previously the separate
+ * <em>SHACL tester</em> tab; it is a third workflow here rather than a tab of its own because
+ * it shares the models root folder with the mapping workflows.
+ */
 public class ValidationByMappingController {
 
     private static final Logger LOG = LoggerFactory.getLogger(ValidationByMappingController.class);
 
+    /** Choice-box label for the manual workflow, formerly the SHACL tester tab. */
+    private static final String WORKFLOW_MAPPING = "Validate by mapping file";
+    private static final String WORKFLOW_TIMESTAMPED = "Validate by timestamped mapping";
+    private static final String WORKFLOW_MANUAL = "Validate by manual selection";
+
+    /** Depth used when discovering model archives under the models root folder. */
+    private static final int MODEL_SCAN_DEPTH = 3;
+
+    private MainController mainController;
 
     @FXML
     private ChoiceBox<String> cbValidationWorkflow;
@@ -52,6 +84,15 @@ public class ValidationByMappingController {
     private Button btnBrowsePreviousComparisonCsv;
 
     @FXML
+    private Button btnBrowseMappingCsv;
+
+    @FXML
+    private Button btnBrowseConstraintsRootFolder;
+
+    @FXML
+    private Button btnBrowseOutputFolder;
+
+    @FXML
     private ProgressBar pbValidationByMapping;
 
     @FXML
@@ -81,19 +122,50 @@ public class ValidationByMappingController {
     @FXML
     private Label helpPreviousComparisonCsv;
 
+    // ---- manual-selection workflow controls, formerly the SHACL tester tab ----
+    @FXML
+    private HBox rowShaclConstraintFilesLabel;
+
+    @FXML
+    private TextField tfShaclConstraintFiles;
+
+    @FXML
+    private Button btnBrowseShaclConstraintFiles;
+
+    @FXML
+    private Label helpShaclConstraintFiles;
+
+    @FXML
+    private HBox rowExportModelReports;
+
+    @FXML
+    private CheckBox cbExportReports;
+
+    @FXML
+    private Label helpExportReports;
+
+    @FXML
+    private TreeView<String> treeViewShaclFiles;
+
     private File mappingCsvFile;
     private File modelsInputFolder;
     private File constraintsRootFolder;
     private File outputFolder;
     private File previousComparisonCsvFile;
+    private List<File> shaclConstraintFiles;
+
+    public void setMainController(MainController mainController) {
+        this.mainController = mainController;
+    }
 
     @FXML
     private void initialize() {
         cbValidationWorkflow.getItems().setAll(
-                "Validate by mapping file",
-                "Validate by timestamped mapping"
+                WORKFLOW_MAPPING,
+                WORKFLOW_TIMESTAMPED,
+                WORKFLOW_MANUAL
         );
-        cbValidationWorkflow.getSelectionModel().select("Validate by mapping file");
+        cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
 
         cbDatatypeMap.getItems().setAll(
                 "CGMES 3.0 / NC 2.5",
@@ -106,21 +178,61 @@ public class ValidationByMappingController {
 
         pbValidationByMapping.setProgress(0);
 
-        // Enable the previous-run CSV field only for the timestamped workflow.
+        // Each workflow uses a different subset of the form; re-evaluate on every change.
         cbValidationWorkflow.getSelectionModel().selectedItemProperty()
-                .addListener((obs, oldVal, newVal) -> updatePreviousComparisonEnabled());
-        updatePreviousComparisonEnabled();
+                .addListener((obs, oldVal, newVal) -> updateWorkflowControls());
+        updateWorkflowControls();
 
         initializeHelpTooltips();
     }
 
-    private void updatePreviousComparisonEnabled() {
+    /**
+     * Enables the fields the selected workflow actually reads, and disables the rest.
+     * <p>
+     * The two mapping workflows resolve their constraint files from the mapping CSV, so the
+     * manual constraint-files row does not apply to them; the manual workflow reads neither
+     * the mapping CSV nor the constraints root, output folder, datatype map or XML base, so
+     * those are disabled in turn. Without this, {@link #validateInputs()} would demand a
+     * mapping CSV for a run that never looks at one.
+     */
+    private void updateWorkflowControls() {
         boolean timestamped = isTimestampedWorkflow();
-        if (tfPreviousComparisonCsv != null) {
-            tfPreviousComparisonCsv.setDisable(!timestamped);
+        boolean manual = isManualWorkflow();
+
+        // Previous-run comparison CSV: timestamped workflow only.
+        setDisabled(!timestamped, tfPreviousComparisonCsv, btnBrowsePreviousComparisonCsv,
+                helpPreviousComparisonCsv);
+
+        // Manual constraint file selection: manual workflow only.
+        setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
+                btnBrowseShaclConstraintFiles);
+
+        // Mapping-driven inputs: not read by the manual workflow.
+        setDisabled(manual, tfMappingCsvFile, btnBrowseMappingCsv,
+                tfConstraintsRootFolder, btnBrowseConstraintsRootFolder,
+                tfOutputFolder, btnBrowseOutputFolder,
+                cbDatatypeMap, tfXmlBaseUri);
+
+        // The export option and the discovered-model tree only mean anything for the manual
+        // workflow, so they are hidden outright rather than shown disabled.
+        setShown(manual, rowExportModelReports, treeViewShaclFiles);
+    }
+
+    private static void setDisabled(boolean disabled, Node... nodes) {
+        for (Node node : nodes) {
+            if (node != null) {
+                node.setDisable(disabled);
+            }
         }
-        if (btnBrowsePreviousComparisonCsv != null) {
-            btnBrowsePreviousComparisonCsv.setDisable(!timestamped);
+    }
+
+    /** Hides and unmanages, so a hidden node gives its space back instead of leaving a gap. */
+    private static void setShown(boolean shown, Node... nodes) {
+        for (Node node : nodes) {
+            if (node != null) {
+                node.setVisible(shown);
+                node.setManaged(shown);
+            }
         }
     }
 
@@ -129,19 +241,34 @@ public class ValidationByMappingController {
                 helpValidationWorkflow,
                 "Select which validation process should be executed.\n\n" +
                         "Validate by mapping file: validates the selected input model structure according to the mapping CSV and creates a validation report and ZIP files.\n\n" +
-                        "Validate by timestamped mapping: discovers timestamped input files and creates timestamp-based validation reports."
+                        "Validate by timestamped mapping: discovers timestamped input files and creates timestamp-based validation reports.\n\n" +
+                        "Validate by manual selection: validates every model archive found under the models root folder against the SHACL constraint files you select by hand, with no mapping file. Results are written to the Output pane."
+        );
+
+        installHelpTooltip(
+                helpShaclConstraintFiles,
+                "SHACL constraint files (.ttl) used to validate the models. Several files can be selected and are combined into one shapes graph.\n\n" +
+                        "Only used by the \"Validate by manual selection\" workflow; the mapping workflows resolve their constraint files from the mapping CSV instead."
         );
 
         installHelpTooltip(
                 helpMappingCsvFile,
                 "CSV mapping file containing the XML input definitions and the SHACL constraint files.\n\n" +
-                        "Only .csv files are accepted."
+                        "Only .csv files are accepted.\n\n" +
+                        "Not used by the \"Validate by manual selection\" workflow."
         );
 
         installHelpTooltip(
                 helpModelsInputFolder,
                 "For normal mapping, select the models root folder.\n\n" +
-                        "For timestamped mapping, select the root folder containing timestamped XML or ZIP files."
+                        "For timestamped mapping, select the root folder containing timestamped XML or ZIP files.\n\n" +
+                        "For manual selection, this is the parent folder that is searched for model archives to validate."
+        );
+
+        installHelpTooltip(
+                helpExportReports,
+                "When checked, saves a SHACL validation report file alongside each validated model in the models root folder.\n\n" +
+                        "Only used by the \"Validate by manual selection\" workflow."
         );
 
         installHelpTooltip(
@@ -199,7 +326,12 @@ public class ValidationByMappingController {
         PathMemory.bind(tfMappingCsvFile, "tab.validationByMapping.mappingCsv",
                 file -> mappingCsvFile = file);
         PathMemory.bind(tfModelsInputFolder, "tab.validationByMapping.modelsInput",
-                folder -> modelsInputFolder = folder);
+                folder -> {
+                    modelsInputFolder = folder;
+                    //the manual workflow shows the discovered models, so rebuild the tree
+                    //whenever the folder is restored, exactly as the Browse handler does
+                    GUIhelper.buildFileTree(folder, treeViewShaclFiles);
+                });
         PathMemory.bind(tfConstraintsRootFolder, "tab.validationByMapping.constraintsRoot",
                 folder -> constraintsRootFolder = folder);
         PathMemory.bind(tfOutputFolder, "tab.validationByMapping.outputFolder",
@@ -253,6 +385,40 @@ public class ValidationByMappingController {
 
         modelsInputFolder = selected;
         tfModelsInputFolder.setText(modelsInputFolder.getAbsolutePath());
+
+        //the manual workflow lists what was found under this folder
+        GUIhelper.buildFileTree(modelsInputFolder, treeViewShaclFiles);
+    }
+
+    /**
+     * Selects the constraint files for the manual workflow. Multi-select: the field shows the
+     * joined list and is not restored on restart, but the chooser reopens where it was last
+     * used. Keeps the SHACL tester's path-memory key so that folder survives the tab merge.
+     */
+    @FXML
+    private void actionBrowseShaclConstraintFiles() {
+        List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                false,
+                "SHACL Constraints file",
+                List.of("*.ttl", "*.rdf"),
+                "",
+                "tab.shaclTester.shaclFiles"
+        );
+
+        if (selected == null || selected.isEmpty()) {
+            return;
+        }
+
+        shaclConstraintFiles = selected;
+
+        StringBuilder paths = new StringBuilder();
+        for (File file : selected) {
+            if (!paths.isEmpty()) {
+                paths.append(", ");
+            }
+            paths.append(file.toString());
+        }
+        tfShaclConstraintFiles.setText(paths.toString());
     }
 
     @FXML
@@ -322,22 +488,35 @@ public class ValidationByMappingController {
         constraintsRootFolder = null;
         outputFolder = null;
         previousComparisonCsvFile = null;
+        shaclConstraintFiles = null;
 
         tfMappingCsvFile.clear();
         tfModelsInputFolder.clear();
         tfConstraintsRootFolder.clear();
         tfOutputFolder.clear();
 
+        if (tfShaclConstraintFiles != null) {
+            tfShaclConstraintFiles.clear();
+        }
+
+        if (treeViewShaclFiles != null) {
+            treeViewShaclFiles.setRoot(null);
+        }
+
+        if (cbExportReports != null) {
+            cbExportReports.setSelected(true);
+        }
+
         if (tfPreviousComparisonCsv != null) {
             tfPreviousComparisonCsv.clear();
         }
 
-        cbValidationWorkflow.getSelectionModel().select("Validate by mapping file");
+        cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
         cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.5");
 
         tfXmlBaseUri.setText("http://iec.ch/TC57/CIM100");
 
-        updatePreviousComparisonEnabled();
+        updateWorkflowControls();
 
         pbValidationByMapping.setProgress(0);
     }
@@ -347,6 +526,11 @@ public class ValidationByMappingController {
         pbValidationByMapping.setProgress(0);
 
         if (!validateInputs()) {
+            return;
+        }
+
+        if (isManualWorkflow()) {
+            runManualValidation();
             return;
         }
 
@@ -446,7 +630,108 @@ public class ValidationByMappingController {
         }, "validation-by-mapping-runner").start();
     }
 
+    /**
+     * Runs the manual workflow: discovers model archives under the models root folder and
+     * validates them against the hand-picked constraint files.
+     * <p>
+     * Carried over from the SHACL tester tab, with the models root folder standing in for
+     * that tab's separate "Parent folder for test models" field. Progress and per-model
+     * output go to the shared progress bar and the Output pane, as they did before.
+     */
+    private void runManualValidation() {
+        File selectedModelsFolder = modelsInputFolder;
+        List<File> selectedConstraintFiles = shaclConstraintFiles;
+        boolean exportReports = cbExportReports != null && cbExportReports.isSelected();
+
+        List<File> archives = new ArrayList<>();
+        try {
+            Files.walkFileTree(selectedModelsFolder.toPath(), EnumSet.noneOf(FileVisitOption.class),
+                    MODEL_SCAN_DEPTH, new SimpleFileVisitor<Path>() {
+                        @Override
+                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                            if (file.toString().endsWith(".zip")) {
+                                archives.add(file.toFile());
+                            }
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("Error while searching for files",
+                    "An error occurred while searching for models in the selected folder.", e);
+            pbValidationByMapping.setProgress(0);
+            return;
+        }
+
+        if (archives.isEmpty()) {
+            showWarning("No models found",
+                    "No model archives (.zip) were found under the selected models root folder.");
+            pbValidationByMapping.setProgress(0);
+            return;
+        }
+
+        btnRunValidationByMapping.setDisable(true);
+        pbValidationByMapping.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        new Thread(() -> {
+            try {
+                ShaclAutoTester tester = new ShaclAutoTester(new ShaclAutoTesterCallback() {
+                    @Override
+                    public void updateProgress(double progress) {
+                        Platform.runLater(() -> pbValidationByMapping.setProgress(progress));
+                    }
+
+                    @Override
+                    public void appendOutput(String message) {
+                        if (mainController != null) {
+                            mainController.appendText(message);
+                        }
+                    }
+                });
+
+                tester.runTests(selectedConstraintFiles, selectedModelsFolder, archives, exportReports);
+
+                Platform.runLater(() -> {
+                    pbValidationByMapping.setProgress(1);
+                    btnRunValidationByMapping.setDisable(false);
+                    showInfo("Validation finished",
+                            "Validated " + archives.size() + " model(s). See the Output pane for details.");
+                });
+
+            } catch (Exception ex) {
+                LOG.error("Manual SHACL validation failed", ex);
+
+                Platform.runLater(() -> {
+                    pbValidationByMapping.setProgress(0);
+                    btnRunValidationByMapping.setDisable(false);
+                    showError("Validation failed", ex.getMessage());
+                });
+            }
+        }, "manual-shacl-validation-runner").start();
+    }
+
     private boolean validateInputs() {
+        if (cbValidationWorkflow.getSelectionModel().getSelectedItem() == null) {
+            showWarning("Missing workflow", "Please select a validation workflow.");
+            return false;
+        }
+
+        // The manual workflow reads only the constraint files and the models root folder.
+        if (isManualWorkflow()) {
+            if (shaclConstraintFiles == null || shaclConstraintFiles.isEmpty()) {
+                showWarning("Missing constraint files",
+                        "Please select one or more SHACL constraint files (.ttl).");
+                return false;
+            }
+
+            if (modelsInputFolder == null) {
+                showWarning("Missing models folder",
+                        "Please select the models root folder holding the models to validate.");
+                return false;
+            }
+
+            return true;
+        }
+
         if (mappingCsvFile == null) {
             showWarning("Missing mapping file", "Please select a CSV mapping file.");
             return false;
@@ -472,11 +757,6 @@ public class ValidationByMappingController {
             return false;
         }
 
-        if (cbValidationWorkflow.getSelectionModel().getSelectedItem() == null) {
-            showWarning("Missing workflow", "Please select a validation workflow.");
-            return false;
-        }
-
         if (cbDatatypeMap.getSelectionModel().getSelectedItem() == null) {
             showWarning("Missing datatype map", "Please select a datatype map.");
             return false;
@@ -486,7 +766,13 @@ public class ValidationByMappingController {
     }
 
     private boolean isTimestampedWorkflow() {
-        return "Validate by timestamped mapping".equals(
+        return WORKFLOW_TIMESTAMPED.equals(
+                cbValidationWorkflow.getSelectionModel().getSelectedItem()
+        );
+    }
+
+    private boolean isManualWorkflow() {
+        return WORKFLOW_MANUAL.equals(
                 cbValidationWorkflow.getSelectionModel().getSelectedItem()
         );
     }

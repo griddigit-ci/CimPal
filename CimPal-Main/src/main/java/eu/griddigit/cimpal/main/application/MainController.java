@@ -100,7 +100,6 @@ public class MainController implements Initializable {
     public Tab tabInstanceDataComparison;
     public Tab tabExcelToSHACL;
     public Tab tabRDFConvert;
-    public Tab tabOutputWindow;
     public Tab tabSPARQLQuery;
     public Font x3;
     @FXML
@@ -114,8 +113,6 @@ public class MainController implements Initializable {
     @FXML
     private ProgressBar progressBar;
 
-    @FXML
-    private TabPane tabPaneDown;
     @FXML
     private SplitPane mainSplitPane;
     @FXML
@@ -131,17 +128,7 @@ public class MainController implements Initializable {
     @FXML
     private Tab tabGenerateInstanceData;
     @FXML
-    private Tab tabSHACLTester;
-    @FXML
-    private Tab tabSHACLOrganizer;
-    @FXML
     private Tab tabRDFStoSHACL;
-    @FXML
-    private Tab tabConstraintsSourceCode;
-    @FXML
-    private ToggleButton btnShowSourceCodeDefineTab;
-    @FXML
-    private TextArea fsourceDefineTab;
 
     @FXML
     private Tab tabValidationByMapping;
@@ -311,7 +298,7 @@ public class MainController implements Initializable {
             ExcelToSHACLController controller = loader.getController();
             controller.setMainController(this);
         } catch (IOException e) {
-            GUIhelper.showUserFriendlyError("Excel to SHACL tab error", "The Excel to SHACL tab could not be loaded.", e);
+            GUIhelper.showUserFriendlyError("SHACL Constraints Operations tab error", "The SHACL Constraints Operations tab could not be loaded.", e);
         }
 
         try {
@@ -321,24 +308,6 @@ public class MainController implements Initializable {
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("RDF Convert tab error", "The RDF Convert tab could not be loaded.", e);
-        }
-
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SHACLOrganizerTab.fxml"));
-            tabSHACLOrganizer.setContent(loader.load());
-            SHACLOrganizerController controller = loader.getController();
-            controller.setMainController(this);
-        } catch (IOException e) {
-            GUIhelper.showUserFriendlyError("SHACL Organizer tab error", "The SHACL Organizer tab could not be loaded.", e);
-        }
-
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SHACLTesterTab.fxml"));
-            tabSHACLTester.setContent(loader.load());
-            SHACLTesterController controller = loader.getController();
-            controller.setMainController(this);
-        } catch (IOException e) {
-            GUIhelper.showUserFriendlyError("SHACL Tester tab error", "The SHACL Tester tab could not be loaded.", e);
         }
 
         try {
@@ -385,10 +354,16 @@ public class MainController implements Initializable {
 
             tabValidationByMapping.setContent(root);
 
+            //the manual-selection workflow streams per-model results to the Output pane
+            ValidationByMappingController controller = loader.getController();
+            if (controller != null) {
+                controller.setMainController(this);
+            }
+
         } catch (Exception e) {
             GUIhelper.showUserFriendlyError(
-                    "Validation by Mapping tab error",
-                    "The Validation by Mapping tab could not be loaded.",
+                    "Dataset SHACL Validation tab error",
+                    "The Dataset SHACL Validation tab could not be loaded.",
                     e
             );
         }
@@ -727,11 +702,9 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    //Action for button "Clear" related to the output window
+    //Action for the Clear icon button above the output window
     private void actionBtnClear() {
-        if (tabPaneDown.getSelectionModel().getSelectedItem().getText().equals("Output window")) { //clears Output window
-            foutputWindow.clear();
-        }
+        foutputWindow.clear();
     }
 
     @FXML
@@ -1660,17 +1633,6 @@ public class MainController implements Initializable {
 //    }
 
 
-    @FXML
-    // action on button "Show/Hide source code" in the SHACL Shapes Browser
-    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
-        if (btnShowSourceCodeDefineTab.isSelected()) {
-            btnShowSourceCodeDefineTab.setText("Hide");
-        } else {
-            btnShowSourceCodeDefineTab.setText("Show");
-            fsourceDefineTab.clear();
-        }
-    }
-
     //set expand in the Instance data tree view
     public static void treeInstanceDataExpand(TaggedTreeItem<String> expandedItem) {
 
@@ -1820,11 +1782,6 @@ public class MainController implements Initializable {
         return currentItem;
     }
 
-    @FXML
-    // //action for tab pane down - the tab pane with the source code
-    private void actionTabConstraintsSourceCode() {
-        btnShowSourceCodeDefineTab.setDisable(!tabConstraintsSourceCode.isSelected());
-    }
 
 
     public static Map getDataTypeMapFromShapes() {

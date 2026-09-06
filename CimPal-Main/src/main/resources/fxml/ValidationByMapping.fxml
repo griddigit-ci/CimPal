@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TreeView?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 
 <VBox minHeight="0.0" minWidth="0.0"
       xmlns="http://javafx.com/javafx/25"
@@ -21,12 +22,6 @@
   <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
 
     <VBox spacing="16.0" minHeight="0.0" minWidth="0.0" styleClass="tab-root">
-
-        <Label text="Validation by Mapping">
-            <font>
-                <Font size="18.0"/>
-            </font>
-        </Label>
 
         <!--
           One grid instead of eight HBox rows, each of which used to carry its own
@@ -55,7 +50,32 @@
                 <Region HBox.hgrow="ALWAYS"/>
             </HBox>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="0">
+            <!--
+              Manual-selection row. Only the "Validate by manual selection" workflow uses
+              explicitly chosen constraint files; the two mapping workflows resolve them from
+              the mapping CSV instead. The row stays in place and is disabled rather than
+              hidden, so the form does not reflow when the workflow changes.
+            -->
+            <HBox fx:id="rowShaclConstraintFilesLabel" spacing="8.0" alignment="CENTER_LEFT"
+                  GridPane.rowIndex="1" GridPane.columnIndex="0">
+                <Label text="SHACL Constraint files (.ttl):" wrapText="true"/>
+                <Label fx:id="helpShaclConstraintFiles"
+                       text="?"
+                       styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfShaclConstraintFiles"
+                       editable="false"
+                       maxWidth="1.7976931348623157E308"
+                       promptText="Select one or more SHACL constraint files (.ttl)"
+                       GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+            <Button fx:id="btnBrowseShaclConstraintFiles"
+                    minWidth="95.0"
+                    mnemonicParsing="false"
+                    onAction="#actionBrowseShaclConstraintFiles"
+                    text="Browse"
+                    GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0">
                 <Label text="Mapping CSV file:" wrapText="true"/>
                 <Label fx:id="helpMappingCsvFile"
                        text="?"
@@ -65,14 +85,15 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select a .csv mapping file"
-                       GridPane.rowIndex="1" GridPane.columnIndex="1"/>
-            <Button minWidth="95.0"
+                       GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+            <Button fx:id="btnBrowseMappingCsv"
+                    minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseMappingCsv"
                     text="Browse"
-                    GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="2" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="0">
                 <Label text="Models / input root folder:" wrapText="true"/>
                 <Label fx:id="helpModelsInputFolder"
                        text="?"
@@ -82,14 +103,14 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select model root folder or timestamped input root folder"
-                       GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                       GridPane.rowIndex="3" GridPane.columnIndex="1"/>
             <Button minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseModelsInputFolder"
                     text="Browse"
-                    GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="3" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="4" GridPane.columnIndex="0">
                 <Label text="Constraints root folder:" wrapText="true"/>
                 <Label fx:id="helpConstraintsRootFolder"
                        text="?"
@@ -99,14 +120,15 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select constraints root folder"
-                       GridPane.rowIndex="3" GridPane.columnIndex="1"/>
-            <Button minWidth="95.0"
+                       GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+            <Button fx:id="btnBrowseConstraintsRootFolder"
+                    minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseConstraintsRootFolder"
                     text="Browse"
-                    GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="4" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="4" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="5" GridPane.columnIndex="0">
                 <Label text="Output folder:" wrapText="true"/>
                 <Label fx:id="helpOutputFolder"
                        text="?"
@@ -116,26 +138,27 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select output folder"
-                       GridPane.rowIndex="4" GridPane.columnIndex="1"/>
-            <Button minWidth="95.0"
+                       GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+            <Button fx:id="btnBrowseOutputFolder"
+                    minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseOutputFolder"
                     text="Browse"
-                    GridPane.rowIndex="4" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="5" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="5" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="0">
                 <Label text="Datatype map:" wrapText="true"/>
                 <Label fx:id="helpDatatypeMap"
                        text="?"
                        styleClass="help-badge"/>
             </HBox>
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="5" GridPane.columnIndex="1"
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="1"
                   GridPane.columnSpan="2">
                 <ChoiceBox fx:id="cbDatatypeMap" prefWidth="350.0"/>
                 <Region HBox.hgrow="ALWAYS"/>
             </HBox>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="0">
                 <Label text="XML base URI:" wrapText="true"/>
                 <Label fx:id="helpXmlBaseUri"
                        text="?"
@@ -144,9 +167,9 @@
             <TextField fx:id="tfXmlBaseUri"
                        maxWidth="1.7976931348623157E308"
                        text="http://iec.ch/TC57/CIM100"
-                       GridPane.rowIndex="6" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
+                       GridPane.rowIndex="7" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="8" GridPane.columnIndex="0">
                 <Label text="Previous comparison CSV:" wrapText="true"/>
                 <Label fx:id="helpPreviousComparisonCsv"
                        text="?"
@@ -156,16 +179,32 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Optional - previous run totals (region,dataset,total). Timestamped workflow only."
-                       GridPane.rowIndex="7" GridPane.columnIndex="1"/>
+                       GridPane.rowIndex="8" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowsePreviousComparisonCsv"
                     minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowsePreviousComparisonCsv"
                     text="Browse"
-                    GridPane.rowIndex="7" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="8" GridPane.columnIndex="2"/>
         </GridPane>
 
-        <Region VBox.vgrow="ALWAYS"/>
+        <!--
+          Manual-selection extras. Unlike the constraint-files row above these are hidden
+          rather than disabled: an empty file tree and an inapplicable export option are
+          noise in the two mapping workflows, and both are unmanaged when hidden so they
+          give their space back to the tab rather than leaving a gap.
+        -->
+        <HBox fx:id="rowExportModelReports" spacing="8.0" alignment="CENTER_LEFT"
+              visible="false" managed="false" VBox.vgrow="NEVER">
+            <CheckBox fx:id="cbExportReports" mnemonicParsing="false" selected="true"
+                      text="Export model validation reports"/>
+            <Label fx:id="helpExportReports" text="?" styleClass="help-badge"/>
+        </HBox>
+
+        <TreeView fx:id="treeViewShaclFiles" maxWidth="1.7976931348623157E308" minHeight="100.0"
+                  showRoot="false" visible="false" managed="false" VBox.vgrow="ALWAYS"/>
+
+        <Region fx:id="spacerBelowForm" VBox.vgrow="ALWAYS"/>
 
         <!-- maxWidth, not prefWidth: prefWidth="Infinity" made the whole tab report an
              infinite preferred width. maxWidth is what makes it stretch to the container. -->
