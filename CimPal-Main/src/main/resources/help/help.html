@@ -157,6 +157,18 @@ nav a.active {
 nav a.hidden { display: none; }
 nav .group.hidden { display: none; }
 
+/* Submenu heading: same voice as .group but quieter, so the sidebar mirrors the
+   two levels of the Tools menu instead of one flat list. */
+nav .subgroup {
+  padding: 11px 18px 3px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+nav .subgroup.hidden { display: none; }
+nav a.sub { padding-left: 30px; }
+
 .nav-empty {
   display: none;
   padding: 10px 18px;
@@ -373,26 +385,32 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <a href="#tab-validation-by-mapping">Validation by Mapping</a>
 
   <div class="group">Tools menu</div>
-  <a href="#tool-export-rdfs-descriptions">Export RDFS descriptions</a>
-  <a href="#tool-datatypes-map">Create datatypes map</a>
-  <a href="#tool-convert-reference-data">Convert Reference Data</a>
-  <a href="#tool-export-shacl-info">Export SHACL constraints information to Excel</a>
-  <a href="#tool-export-all-shacl-info">Export All SHACL constraints information</a>
-  <a href="#tool-gen-info-from-rdfs">Generate information from RDFS</a>
-  <a href="#tool-properties-info-from-rdfs">Generate properties info from RDFS</a>
-  <a href="#tool-ref-to-common-data">Convert Reference data to Common data</a>
-  <a href="#tool-generate-qar">Generate QAR based on xls</a>
-  <a href="#tool-qar-template">Create xlsx template from QAR</a>
-  <a href="#tool-validate-shacl-shapes">Validate SHACL shapes</a>
-  <a href="#tool-export-triples">Export RDF tripples to xls</a>
-  <a href="#tool-model-transformation">Model transformation</a>
-  <a href="#tool-validate-by-mapping">Validate by mapping file</a>
-  <a href="#tool-psse-pf">PSSE-PowerFactory compare</a>
-  <a href="#tool-qocdc">QoCDC 3.2.1 xml to Excel</a>
-  <a href="#tool-generate-manifest">Generate Manifest</a>
-  <a href="#tool-run-sparql">Run SPARQL Query</a>
-  <a href="#tool-restore-ttl">Restore ttl from constraint csv</a>
-  <a href="#tool-populate-attributes">Populate missing attributes</a>
+  <div class="subgroup">RDFS Profiles</div>
+  <a class="sub" href="#tool-export-rdfs-descriptions">Export RDFS descriptions</a>
+  <a class="sub" href="#tool-export-triples">Export RDF tripples to xls</a>
+  <a class="sub" href="#tool-gen-info-from-rdfs">Generate information from RDFS</a>
+  <a class="sub" href="#tool-properties-info-from-rdfs">Generate properties info from RDFS</a>
+  <a class="sub" href="#tool-datatypes-map">Create datatypes map</a>
+  <div class="subgroup">SHACL Constraints</div>
+  <a class="sub" href="#tool-export-shacl-info">Export SHACL constraints information to Excel</a>
+  <a class="sub" href="#tool-export-all-shacl-info">Export All SHACL constraints information</a>
+  <a class="sub" href="#tool-validate-shacl-shapes">Validate SHACL shapes</a>
+  <a class="sub" href="#tool-restore-ttl">Restore ttl from constraint csv</a>
+  <div class="subgroup">Reference Data</div>
+  <a class="sub" href="#tool-convert-reference-data">Convert Reference Data</a>
+  <a class="sub" href="#tool-ref-to-common-data">Convert Reference data to Common data</a>
+  <div class="subgroup">Instance Data &amp; Models</div>
+  <a class="sub" href="#tool-model-transformation">Model transformation</a>
+  <a class="sub" href="#tool-populate-attributes">Populate missing attributes</a>
+  <a class="sub" href="#tool-generate-manifest">Generate Manifest</a>
+  <a class="sub" href="#tool-psse-pf">PSSE-PowerFactory compare</a>
+  <div class="subgroup">Quality Reports</div>
+  <a class="sub" href="#tool-generate-qar">Generate QAR based on xls</a>
+  <a class="sub" href="#tool-qar-template">Create xlsx template from QAR</a>
+  <a class="sub" href="#tool-qocdc">QoCDC 3.2.1 xml to Excel</a>
+  <div class="subgroup">Top level</div>
+  <a class="sub" href="#tool-validate-by-mapping">Validate by mapping file</a>
+  <a class="sub" href="#tool-run-sparql">Run SPARQL Query</a>
 
   <div class="group">Settings</div>
   <a href="#preferences">Preferences</a>
@@ -1212,6 +1230,8 @@ be found by asking &ldquo;what am I holding?&rdquo; rather than by scanning one 
 tools at all: <em>Validate by mapping file</em> and <em>Run SPARQL Query</em> only bring their tab
 to the front. The cards below are in menu order, submenu by submenu.</p>
 
+<h3>Tools &#9656; RDFS Profiles</h3>
+
 <details class="fn" id="tool-export-rdfs-descriptions">
 <summary><span class="kind">Tool</span> Export RDFS descriptions</summary>
 <div class="fn-body">
@@ -1230,6 +1250,68 @@ definition.</p>
 <ul><li>An exported description file at the location you choose, plus progress in the Output
     window.</li></ul>
 <p class="src">Source: <code>MainController.actionRDFSexportDescriptionMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-export-triples">
+<summary><span class="kind">Tool</span> Export RDF tripples to xls</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Flattens an RDF model into a spreadsheet, one row per triple. This is the lowest-level view of a
+model and the pragmatic answer to &ldquo;what is actually in this file?&rdquo; &mdash; useful for
+sorting, filtering and pivoting model content with spreadsheet tools when no more specific export
+fits.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDF file</td><td>single file (<code>*.rdf</code>, <code>*.xml</code>), required</td>
+    <td>The model to flatten.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>An Excel workbook of subject / predicate / object rows at the location you choose.</li></ul>
+<p class="src">Source: <code>MainController.actionRDFSexportTripplesMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-gen-info-from-rdfs">
+<summary><span class="kind">Tool</span> Generate information from RDFS &mdash; needed for serialisation</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Pre-computes the profile knowledge that CimPal's writers need in order to serialise instance data
+correctly: which properties are attributes and which are references, what their order is, which
+namespace each belongs to. Without this derived information a writer cannot produce
+CGMES-conformant CIMXML, so this step is run once per profile release and its output reused.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDFS profile files</td><td>files (<code>*.rdf</code>), required</td>
+    <td>The profiles to derive serialisation information from. Several can be selected and are
+        processed together.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The generated serialisation information files, saved where you choose, plus progress in the
+    Output window.</li></ul>
+<p class="src">Source: <code>MainController.actionGenInfoFromRDFS()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-properties-info-from-rdfs">
+<summary><span class="kind">Tool</span> Generate properties info from RDFS (xls, ttl, json)</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Produces the full inventory of properties defined by a set of profiles, in three formats at
+once, so it can serve three audiences: a spreadsheet for review and mapping work, Turtle for RDF
+tooling, and JSON for scripts and web front-ends. It is the reference list used when building
+instance data templates or mapping a profile onto another data model.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDFS profile files</td><td>files (<code>*.rdf</code>), required</td>
+    <td>The profiles to inventory. Several can be selected.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The properties inventory as Excel, Turtle and JSON at the location you choose.</li></ul>
+<p class="src">Source: <code>MainController.actionRDFSInstanceDataInfoMenu()</code></p>
 </div>
 </details>
 
@@ -1264,27 +1346,7 @@ exists. It is emitted in three shapes at once so it can be consumed by tooling
 </div>
 </details>
 
-<details class="fn" id="tool-convert-reference-data">
-<summary><span class="kind">Tool</span> Convert Reference Data</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>Converts reference data instance files &mdash; the shared codelists and boundary definitions that
-exchanged models point at &mdash; using a datatype map to resolve value types correctly. Reference
-data has a long life and passes through several standard versions, so converting it faithfully,
-with datatypes preserved, is a recurring maintenance job.</p>
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Instance data files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
-    <td>The reference data to convert.</td></tr>
-<tr><td>Datatype map</td><td>file (<code>*.properties</code>), required</td>
-    <td>The map used to resolve property datatypes during conversion.</td></tr>
-</table>
-<h4>Outputs</h4>
-<ul><li>The converted reference data files, plus conversion messages in the Output window.</li></ul>
-<p class="src">Source: <code>MainController.actionMenuConvertRefData()</code></p>
-</div>
-</details>
+<h3>Tools &#9656; SHACL Constraints</h3>
 
 <details class="fn" id="tool-export-shacl-info">
 <summary><span class="kind">Tool</span> Export SHACL constraints information to Excel</summary>
@@ -1335,45 +1397,77 @@ be carried back into the UML modelling environment where the profile originates.
 </div>
 </details>
 
-<details class="fn" id="tool-gen-info-from-rdfs">
-<summary><span class="kind">Tool</span> Generate information from RDFS &mdash; needed for serialisation</summary>
+<details class="fn" id="tool-validate-shacl-shapes">
+<summary><span class="kind">Tool</span> Validate SHACL shapes</summary>
 <div class="fn-body">
 <h4>Business logic</h4>
-<p>Pre-computes the profile knowledge that CimPal's writers need in order to serialise instance data
-correctly: which properties are attributes and which are references, what their order is, which
-namespace each belongs to. Without this derived information a writer cannot produce
-CGMES-conformant CIMXML, so this step is run once per profile release and its output reused.</p>
+<p>Validates a SHACL shapes graph against the SHACL specification's own shapes &mdash;
+&ldquo;SHACL-on-SHACL&rdquo;. A shapes file that is itself malformed will silently fail to catch the
+errors it was written to catch, which is the worst possible failure mode for a constraint set. Run
+this on any hand-edited or newly-generated constraint file before publishing it.</p>
 <h4>Inputs</h4>
 <table class="io">
 <tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>RDFS profile files</td><td>files (<code>*.rdf</code>), required</td>
-    <td>The profiles to derive serialisation information from. Several can be selected and are
-        processed together.</td></tr>
+<tr><td>Shapes files</td><td>files (<code>*.rdf</code>, <code>*.ttl</code>), required</td>
+    <td>The shapes graphs to check. Several can be selected; each is reported
+        separately.</td></tr>
 </table>
 <h4>Outputs</h4>
-<ul><li>The generated serialisation information files, saved where you choose, plus progress in the
-    Output window.</li></ul>
-<p class="src">Source: <code>MainController.actionGenInfoFromRDFS()</code></p>
+<ul>
+  <li>A conformance verdict per file in the Output window, followed by the full SHACL validation
+      report for any file that does not conform.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionSHACLSHACL()</code></p>
 </div>
 </details>
 
-<details class="fn" id="tool-properties-info-from-rdfs">
-<summary><span class="kind">Tool</span> Generate properties info from RDFS (xls, ttl, json)</summary>
+<details class="fn" id="tool-restore-ttl">
+<summary><span class="kind">Tool</span> Restore ttl from constraint csv</summary>
 <div class="fn-body">
 <h4>Business logic</h4>
-<p>Produces the full inventory of properties defined by a set of profiles, in three formats at
-once, so it can serve three audiences: a spreadsheet for review and mapping work, Turtle for RDF
-tooling, and JSON for scripts and web front-ends. It is the reference list used when building
-instance data templates or mapping a profile onto another data model.</p>
+<p>Rebuilds SHACL Turtle constraint files from the CSV form of those constraints. Constraints are
+often reviewed and edited as CSV &mdash; it diffs well and non-RDF users can work with it &mdash; but
+only Turtle is executable. This tool closes that loop, turning the reviewed CSV back into a working
+shapes file, so CSV can be used as the editing format without losing the ability to validate.</p>
 <h4>Inputs</h4>
 <table class="io">
 <tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>RDFS profile files</td><td>files (<code>*.rdf</code>), required</td>
-    <td>The profiles to inventory. Several can be selected.</td></tr>
+<tr><td>Constraint CSV files</td><td>files (<code>*.csv</code>), required</td>
+    <td>The CSV constraint definitions to restore. Several can be selected.</td></tr>
+<tr><td>Output folder</td><td>folder, required</td>
+    <td>Where the restored Turtle files are written.</td></tr>
 </table>
 <h4>Outputs</h4>
-<ul><li>The properties inventory as Excel, Turtle and JSON at the location you choose.</li></ul>
-<p class="src">Source: <code>MainController.actionRDFSInstanceDataInfoMenu()</code></p>
+<ul>
+  <li>One restored <code>.ttl</code> constraint file per input CSV, in the chosen output
+      folder.</li>
+  <li>A progress dialog during the run, and a summary in the Output window.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionRestoreTtlFromConstraintCsv()</code></p>
+</div>
+</details>
+
+<h3>Tools &#9656; Reference Data</h3>
+
+<details class="fn" id="tool-convert-reference-data">
+<summary><span class="kind">Tool</span> Convert Reference Data</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Converts reference data instance files &mdash; the shared codelists and boundary definitions that
+exchanged models point at &mdash; using a datatype map to resolve value types correctly. Reference
+data has a long life and passes through several standard versions, so converting it faithfully,
+with datatypes preserved, is a recurring maintenance job.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Instance data files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The reference data to convert.</td></tr>
+<tr><td>Datatype map</td><td>file (<code>*.properties</code>), required</td>
+    <td>The map used to resolve property datatypes during conversion.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The converted reference data files, plus conversion messages in the Output window.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuConvertRefData()</code></p>
 </div>
 </details>
 
@@ -1396,6 +1490,113 @@ from the same common basis.</p>
 <p class="src">Source: <code>MainController.actionMenuConvertRefToComData()</code></p>
 </div>
 </details>
+
+<h3>Tools &#9656; Instance Data &amp; Models</h3>
+
+<details class="fn" id="tool-model-transformation">
+<summary><span class="kind">Tool</span> Model transformation</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Applies a SPARQL-defined transformation to a set of models. Because the transformation is data
+&mdash; a SPARQL file you supply, not code inside CimPal &mdash; arbitrary migrations can be
+expressed and version-controlled outside the application: moving content between profile versions,
+renaming properties across a corpus, or injecting derived triples. This is the general-purpose
+answer for bulk model change.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Original models</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The models to transform.</td></tr>
+<tr><td>Transformation definition</td><td>file (<code>*.ttl</code>, <code>*.trig</code>), required</td>
+    <td>The SPARQL-based transformation rules to apply.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The transformed models, plus transformation progress and messages in the Output
+    window.</li></ul>
+<p class="src">Source: <code>MainController.actionModelTransformationMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-populate-attributes">
+<summary><span class="kind">Tool</span> Populate missing attributes</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Fills gaps in existing models from a spreadsheet of attribute values. When a profile gains newly
+mandatory attributes, or an export omitted values that downstream consumers require, this injects
+them into the model rather than requiring a fresh export from the source system &mdash; the
+practical way to bring a corpus of already-published models up to a new requirement.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Model files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The models to populate.</td></tr>
+<tr><td>Attributes template</td><td>single file (<code>*.xlsx</code>), required</td>
+    <td>Workbook containing a <code>ClassAttributes</code> worksheet mapping classes to the
+        attribute values to inject.</td></tr>
+<tr><td>Output folder</td><td>folder, required</td>
+    <td>Where the populated models are written.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>The populated models, written as RDF/XML in CimPal's custom plain pretty format into the
+      output folder. The XML base defaults to <code>https://cim.ucaiug.io/ns</code> unless the
+      model declares its own <code>cim</code> prefix, which then takes precedence.</li>
+  <li>Injection counts and any unmatched entries in the Output window.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionPopulateMissingAttributes()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-generate-manifest">
+<summary><span class="kind">Tool</span> Generate Manifest</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Produces a manifest describing a set of model files: what is in the delivery, and where it can be
+retrieved from. A manifest is what allows a consumer to discover and resolve the parts of a
+distributed dataset without being told about each file individually, and it is normally required to
+accompany a published model set.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Model files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The files the manifest should describe. All are loaded to read their headers.</td></tr>
+<tr><td>Access URL</td><td>text</td>
+    <td>The base location from which the described files can be retrieved.</td></tr>
+<tr><td>Output file</td><td>save dialog (<code>manifest.ttl</code>)</td>
+    <td>Where to write the manifest.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>A <code>manifest.ttl</code> file at the chosen location.</li>
+  <li>A confirmation dialog reporting the manifest path and the number of files described.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionGenerateManifest()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-psse-pf">
+<summary><span class="kind">Tool</span> PSSE-PowerFactory compare</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Compares power flow results produced by PSS&reg;E with those produced by PowerFactory. When the
+same CIM model is imported into two different power system analysis tools, the two solutions should
+agree; where they do not, the discrepancy usually points at an ambiguity or defect in the model or
+in one tool's import. This comparison is how such cases are located.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Result files</td><td>files, required</td>
+    <td>The PSS&reg;E and PowerFactory result files to compare, requested by the comparison
+        routine.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The comparison result, reported to the Output window and to the generated result
+    file.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuPSSEPF()</code></p>
+</div>
+</details>
+
+<h3>Tools &#9656; Quality Reports</h3>
 
 <details class="fn" id="tool-generate-qar">
 <summary><span class="kind">Tool</span> Generate QAR based on xls</summary>
@@ -1443,111 +1644,6 @@ analysis.</p>
 </div>
 </details>
 
-<details class="fn" id="tool-validate-shacl-shapes">
-<summary><span class="kind">Tool</span> Validate SHACL shapes</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>Validates a SHACL shapes graph against the SHACL specification's own shapes &mdash;
-&ldquo;SHACL-on-SHACL&rdquo;. A shapes file that is itself malformed will silently fail to catch the
-errors it was written to catch, which is the worst possible failure mode for a constraint set. Run
-this on any hand-edited or newly-generated constraint file before publishing it.</p>
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Shapes files</td><td>files (<code>*.rdf</code>, <code>*.ttl</code>), required</td>
-    <td>The shapes graphs to check. Several can be selected; each is reported
-        separately.</td></tr>
-</table>
-<h4>Outputs</h4>
-<ul>
-  <li>A conformance verdict per file in the Output window, followed by the full SHACL validation
-      report for any file that does not conform.</li>
-</ul>
-<p class="src">Source: <code>MainController.actionSHACLSHACL()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tool-export-triples">
-<summary><span class="kind">Tool</span> Export RDF tripples to xls</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>Flattens an RDF model into a spreadsheet, one row per triple. This is the lowest-level view of a
-model and the pragmatic answer to &ldquo;what is actually in this file?&rdquo; &mdash; useful for
-sorting, filtering and pivoting model content with spreadsheet tools when no more specific export
-fits.</p>
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>RDF file</td><td>single file (<code>*.rdf</code>, <code>*.xml</code>), required</td>
-    <td>The model to flatten.</td></tr>
-</table>
-<h4>Outputs</h4>
-<ul><li>An Excel workbook of subject / predicate / object rows at the location you choose.</li></ul>
-<p class="src">Source: <code>MainController.actionRDFSexportTripplesMenu()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tool-model-transformation">
-<summary><span class="kind">Tool</span> Model transformation</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>Applies a SPARQL-defined transformation to a set of models. Because the transformation is data
-&mdash; a SPARQL file you supply, not code inside CimPal &mdash; arbitrary migrations can be
-expressed and version-controlled outside the application: moving content between profile versions,
-renaming properties across a corpus, or injecting derived triples. This is the general-purpose
-answer for bulk model change.</p>
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Original models</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
-    <td>The models to transform.</td></tr>
-<tr><td>Transformation definition</td><td>file (<code>*.ttl</code>, <code>*.trig</code>), required</td>
-    <td>The SPARQL-based transformation rules to apply.</td></tr>
-</table>
-<h4>Outputs</h4>
-<ul><li>The transformed models, plus transformation progress and messages in the Output
-    window.</li></ul>
-<p class="src">Source: <code>MainController.actionModelTransformationMenu()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tool-validate-by-mapping">
-<summary><span class="kind">Tool</span> Validate by mapping file</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>A shortcut. This menu item performs no work of its own &mdash; it simply brings the
-<a href="#tab-validation-by-mapping">Validation by Mapping</a> tab to the front, where the whole
-workflow lives. See that tab for inputs and outputs.</p>
-<h4>Inputs</h4>
-<p>None.</p>
-<h4>Outputs</h4>
-<ul><li>The <em>Validation by Mapping</em> tab is selected in the main window.</li></ul>
-<p class="src">Source: <code>MainController.actionValidateByMapping()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tool-psse-pf">
-<summary><span class="kind">Tool</span> PSSE-PowerFactory compare</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>Compares power flow results produced by PSS&reg;E with those produced by PowerFactory. When the
-same CIM model is imported into two different power system analysis tools, the two solutions should
-agree; where they do not, the discrepancy usually points at an ambiguity or defect in the model or
-in one tool's import. This comparison is how such cases are located.</p>
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Result files</td><td>files, required</td>
-    <td>The PSS&reg;E and PowerFactory result files to compare, requested by the comparison
-        routine.</td></tr>
-</table>
-<h4>Outputs</h4>
-<ul><li>The comparison result, reported to the Output window and to the generated result
-    file.</li></ul>
-<p class="src">Source: <code>MainController.actionMenuPSSEPF()</code></p>
-</div>
-</details>
-
 <details class="fn" id="tool-qocdc">
 <summary><span class="kind">Tool</span> QoCDC 3.2.1 xml to Excel</summary>
 <div class="fn-body">
@@ -1570,30 +1666,20 @@ Each rule's name, severity, level, description and message are extracted.</p>
 </div>
 </details>
 
-<details class="fn" id="tool-generate-manifest">
-<summary><span class="kind">Tool</span> Generate Manifest</summary>
+<h3>Tools &mdash; top level of the menu</h3>
+
+<details class="fn" id="tool-validate-by-mapping">
+<summary><span class="kind">Tool</span> Validate by mapping file</summary>
 <div class="fn-body">
 <h4>Business logic</h4>
-<p>Produces a manifest describing a set of model files: what is in the delivery, and where it can be
-retrieved from. A manifest is what allows a consumer to discover and resolve the parts of a
-distributed dataset without being told about each file individually, and it is normally required to
-accompany a published model set.</p>
+<p>A shortcut. This menu item performs no work of its own &mdash; it simply brings the
+<a href="#tab-validation-by-mapping">Validation by Mapping</a> tab to the front, where the whole
+workflow lives. See that tab for inputs and outputs.</p>
 <h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Model files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
-    <td>The files the manifest should describe. All are loaded to read their headers.</td></tr>
-<tr><td>Access URL</td><td>text</td>
-    <td>The base location from which the described files can be retrieved.</td></tr>
-<tr><td>Output file</td><td>save dialog (<code>manifest.ttl</code>)</td>
-    <td>Where to write the manifest.</td></tr>
-</table>
+<p>None.</p>
 <h4>Outputs</h4>
-<ul>
-  <li>A <code>manifest.ttl</code> file at the chosen location.</li>
-  <li>A confirmation dialog reporting the manifest path and the number of files described.</li>
-</ul>
-<p class="src">Source: <code>MainController.actionGenerateManifest()</code></p>
+<ul><li>The <em>Validation by Mapping</em> tab is selected in the main window.</li></ul>
+<p class="src">Source: <code>MainController.actionValidateByMapping()</code></p>
 </div>
 </details>
 
@@ -1609,62 +1695,6 @@ are written and run. See that tab for inputs and outputs.</p>
 <h4>Outputs</h4>
 <ul><li>The <em>SPARQL Query</em> tab is selected in the main window.</li></ul>
 <p class="src">Source: <code>MainController.actionRunSPARQLQuery()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tool-restore-ttl">
-<summary><span class="kind">Tool</span> Restore ttl from constraint csv</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>Rebuilds SHACL Turtle constraint files from the CSV form of those constraints. Constraints are
-often reviewed and edited as CSV &mdash; it diffs well and non-RDF users can work with it &mdash; but
-only Turtle is executable. This tool closes that loop, turning the reviewed CSV back into a working
-shapes file, so CSV can be used as the editing format without losing the ability to validate.</p>
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Constraint CSV files</td><td>files (<code>*.csv</code>), required</td>
-    <td>The CSV constraint definitions to restore. Several can be selected.</td></tr>
-<tr><td>Output folder</td><td>folder, required</td>
-    <td>Where the restored Turtle files are written.</td></tr>
-</table>
-<h4>Outputs</h4>
-<ul>
-  <li>One restored <code>.ttl</code> constraint file per input CSV, in the chosen output
-      folder.</li>
-  <li>A progress dialog during the run, and a summary in the Output window.</li>
-</ul>
-<p class="src">Source: <code>MainController.actionRestoreTtlFromConstraintCsv()</code></p>
-</div>
-</details>
-
-<details class="fn" id="tool-populate-attributes">
-<summary><span class="kind">Tool</span> Populate missing attributes</summary>
-<div class="fn-body">
-<h4>Business logic</h4>
-<p>Fills gaps in existing models from a spreadsheet of attribute values. When a profile gains newly
-mandatory attributes, or an export omitted values that downstream consumers require, this injects
-them into the model rather than requiring a fresh export from the source system &mdash; the
-practical way to bring a corpus of already-published models up to a new requirement.</p>
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Model files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
-    <td>The models to populate.</td></tr>
-<tr><td>Attributes template</td><td>single file (<code>*.xlsx</code>), required</td>
-    <td>Workbook containing a <code>ClassAttributes</code> worksheet mapping classes to the
-        attribute values to inject.</td></tr>
-<tr><td>Output folder</td><td>folder, required</td>
-    <td>Where the populated models are written.</td></tr>
-</table>
-<h4>Outputs</h4>
-<ul>
-  <li>The populated models, written as RDF/XML in CimPal's custom plain pretty format into the
-      output folder. The XML base defaults to <code>https://cim.ucaiug.io/ns</code> unless the
-      model declares its own <code>cim</code> prefix, which then takes precedence.</li>
-  <li>Injection counts and any unmatched entries in the Output window.</li>
-</ul>
-<p class="src">Source: <code>MainController.actionPopulateMissingAttributes()</code></p>
 </div>
 </details>
 
@@ -1760,7 +1790,8 @@ can be re-checked against the code.
 
   var cards = Array.prototype.slice.call(document.querySelectorAll("details.fn"));
   var links = Array.prototype.slice.call(document.querySelectorAll("nav a"));
-  var groups = Array.prototype.slice.call(document.querySelectorAll("nav .group"));
+  var groups = Array.prototype.slice.call(
+    document.querySelectorAll("nav .group, nav .subgroup"));
   var empty = document.getElementById("navEmpty");
 
   // ---- Expand all / Collapse all -----------------------------------------
@@ -1800,11 +1831,16 @@ can be re-checked against the code.
       if (hit) { anyVisible = true; }
     });
 
-    // A group heading is only useful while at least one of its links survives.
+    // A heading is only useful while at least one of its links survives. A submenu
+    // heading owns the links up to the next heading of either level; a top-level
+    // group heading owns everything up to the next top-level group, submenus
+    // included, so it stays visible whenever any of its submenus does.
     groups.forEach(function (g) {
+      var isSub = g.classList.contains("subgroup");
       var visible = false;
       var node = g.nextElementSibling;
       while (node && !node.classList.contains("group")) {
+        if (isSub && node.classList.contains("subgroup")) { break; }
         if (node.tagName === "A" && !node.classList.contains("hidden")) { visible = true; }
         node = node.nextElementSibling;
       }
