@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+ Licensed under the EUPL-1.2-or-later.
+ Copyright (c) 2026, gridDigIt Kft. All rights reserved.
+-->
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            styleClass="tab-root"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFVisualisationController">
+   <top>
+      <VBox spacing="8.0" BorderPane.alignment="CENTER_LEFT">
+         <BorderPane.margin>
+            <Insets bottom="8.0"/>
+         </BorderPane.margin>
+
+         <FlowPane hgap="8.0" vgap="8.0">
+            <Button mnemonicParsing="false" onAction="#actionLoadFiles" text="Load RDF files..."/>
+            <Button mnemonicParsing="false" onAction="#actionAddFiles" text="Add files..."/>
+            <Button fx:id="btnRemoveGraph" mnemonicParsing="false" onAction="#actionRemoveSelectedGraph"
+                    text="Remove selected"/>
+            <Button fx:id="btnClearAll" mnemonicParsing="false" onAction="#actionClearAll" text="Reset"/>
+            <Label fx:id="helpLoad" styleClass="help-badge" text="?"/>
+         </FlowPane>
+
+         <!--
+           Filters are applied on Enter or on Apply rather than on every keystroke: a CGMES
+           dataset is hundreds of thousands of triples and re-scanning it per character typed
+           would make the fields unusable.
+         -->
+         <GridPane styleClass="form-grid">
+            <Label text="Subject contains:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+            <TextField fx:id="tfSubjectFilter" onAction="#actionApplyFilters" prefWidth="240.0"
+                       promptText="URI or local name" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+            <Label text="Predicate contains:" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+            <TextField fx:id="tfPredicateFilter" onAction="#actionApplyFilters" prefWidth="240.0"
+                       promptText="URI or local name" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+
+            <Label text="Object contains:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+            <TextField fx:id="tfObjectFilter" onAction="#actionApplyFilters" prefWidth="240.0"
+                       promptText="URI, literal value" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+
+            <Label text="Full text search:" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+            <TextField fx:id="tfFullTextSearch" onAction="#actionApplyFilters" prefWidth="240.0"
+                       promptText="any subject, predicate or object" GridPane.columnIndex="3"
+                       GridPane.rowIndex="1"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.columnIndex="4" GridPane.rowIndex="0"
+                  GridPane.rowSpan="2">
+               <Button fx:id="btnApplyFilters" defaultButton="true" mnemonicParsing="false"
+                       onAction="#actionApplyFilters" styleClass="primary-action" text="Apply"/>
+               <Button mnemonicParsing="false" onAction="#actionClearFilters" text="Clear filters"/>
+               <Label fx:id="helpFilters" styleClass="help-badge" text="?"/>
+            </HBox>
+         </GridPane>
+      </VBox>
+   </top>
+
+   <center>
+      <SplitPane dividerPositions="0.26" minHeight="0.0" minWidth="0.0"
+                 BorderPane.alignment="CENTER">
+         <BorderPane.margin>
+            <Insets bottom="8.0"/>
+         </BorderPane.margin>
+
+         <VBox minHeight="0.0" minWidth="0.0" spacing="8.0">
+            <padding>
+               <Insets right="8.0"/>
+            </padding>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+               <Label styleClass="section-title" text="Named graphs"/>
+               <Label fx:id="helpGraphs" styleClass="help-badge" text="?"/>
+            </HBox>
+            <!--
+              One entry per loaded file (per entry, for ZIP archives), each with a tick box.
+              Unticking a graph removes it from the tree without unloading it, so a subset of a
+              multi-file dataset can be inspected and then the rest brought back instantly.
+            -->
+            <ListView fx:id="lvGraphs" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS"/>
+            <FlowPane hgap="8.0" vgap="8.0">
+               <Button mnemonicParsing="false" onAction="#actionSelectAllGraphs" text="Select all"/>
+               <Button mnemonicParsing="false" onAction="#actionSelectNoGraphs" text="Select none"/>
+            </FlowPane>
+         </VBox>
+
+         <VBox minHeight="0.0" minWidth="0.0" spacing="8.0">
+            <padding>
+               <Insets left="8.0"/>
+            </padding>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+               <Label styleClass="section-title" text="Graph tree"/>
+               <Label fx:id="helpTree" styleClass="help-badge" text="?"/>
+               <Region HBox.hgrow="ALWAYS"/>
+               <Button mnemonicParsing="false" onAction="#actionExpandSelected" text="Expand selected"/>
+               <Button mnemonicParsing="false" onAction="#actionCollapseAll" text="Collapse all"/>
+               <Button mnemonicParsing="false" onAction="#actionCopySelected" text="Copy value"/>
+            </HBox>
+            <TreeView fx:id="tvGraph" minHeight="0.0" minWidth="0.0" showRoot="false" VBox.vgrow="ALWAYS"/>
+         </VBox>
+      </SplitPane>
+   </center>
+
+   <bottom>
+      <VBox spacing="8.0" BorderPane.alignment="CENTER_LEFT">
+         <Label text="Tip: load any RDF syntax Jena supports (.rdf, .xml, .ttl, .nt, .nq, .trig, .jsonld, .rj, .trix) or a ZIP of them. Each file becomes a named graph."
+                wrapText="true"/>
+         <Label fx:id="lblStatus" text="No data loaded." wrapText="true"/>
+      </VBox>
+   </bottom>
+</BorderPane>

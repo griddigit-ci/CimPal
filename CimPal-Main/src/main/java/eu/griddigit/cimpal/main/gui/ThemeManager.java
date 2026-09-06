@@ -51,7 +51,12 @@ public final class ThemeManager {
         HIGH_CONTRAST_BLACK("high-contrast-black", "High Contrast Black", "Accessibility",
                 "/css/theme-high-contrast-black.css");
 
-        public static final Theme DEFAULT = MINIMALIST_WHITE;
+        /**
+         * Applied on a first run and whenever the stored id is missing or unrecognised. An
+         * existing installation keeps whatever the user last chose - the preference is only
+         * defaulted when absent, never overwritten.
+         */
+        public static final Theme DEFAULT = DRACULA;
 
         private final String id;
         private final String displayName;

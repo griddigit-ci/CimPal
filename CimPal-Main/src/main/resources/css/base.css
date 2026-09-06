@@ -213,6 +213,34 @@
     -fx-background-color: -cimpal-surface;
 }
 
+/*
+ * Outer row of the two-level tab structure (the three categories of work). The two header
+ * bands sit directly on top of one another, so the category row is given a heavier, larger
+ * label and a thicker selection underline; without that difference the two rows read as one
+ * block of nine tabs and the grouping is lost. Colour-free - both rows keep the theme's own
+ * surface and accent from the rules above.
+ */
+.category-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-padding: 5 18 5 18;
+}
+
+.category-tabs > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 1.1em;
+}
+
+.category-tabs > .tab-header-area > .headers-region > .tab:selected {
+    -fx-border-width: 0 0 3 0;
+}
+
+/*
+ * Container TitledPane whose whole job is to be collapsible: its content is a TabPane that
+ * should sit flush against the title, with none of Modena's content padding.
+ */
+.pane-flush > .content {
+    -fx-padding: 0;
+}
+
 .table-view .column-header-background,
 .tree-table-view .column-header-background {
     -fx-background-color: -cimpal-surface;

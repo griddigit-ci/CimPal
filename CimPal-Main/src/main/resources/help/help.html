@@ -372,15 +372,19 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <a href="#glossary">Glossary</a>
 
   <div class="group">Main GUI tabs</div>
-  <a href="#tab-rdfs-to-shacl">RDFS to SHACL</a>
-  <a href="#tab-rdf-comparison">RDF Comparison</a>
-  <a href="#tab-excel-to-shacl">SHACL Constraints Operations</a>
-  <a href="#tab-rdf-convert">RDF Convert</a>
-  <a href="#tab-instance-data-comparison">Instance Data Comparison</a>
-  <a href="#tab-generate-instance-data">Generate Instance data</a>
-  <a href="#tab-task-wizard">Task Wizard</a>
-  <a href="#tab-sparql-query">SPARQL Query</a>
-  <a href="#tab-validation-by-mapping">Dataset SHACL Validation</a>
+  <div class="subgroup">SHACL Generation</div>
+  <a class="sub" href="#tab-rdfs-to-shacl">RDFS to SHACL</a>
+  <a class="sub" href="#tab-excel-to-shacl">Constraints Operations</a>
+  <div class="subgroup">RDF Operations</div>
+  <a class="sub" href="#tab-rdf-comparison">Comparison</a>
+  <a class="sub" href="#tab-rdf-convert">Convert</a>
+  <a class="sub" href="#tab-rdf-visualisation">Visualisation</a>
+  <div class="subgroup">Dataset Operations</div>
+  <a class="sub" href="#tab-instance-data-comparison">Comparison</a>
+  <a class="sub" href="#tab-generate-instance-data">Generate</a>
+  <a class="sub" href="#tab-task-wizard">Task Wizard</a>
+  <a class="sub" href="#tab-sparql-query">SPARQL Query</a>
+  <a class="sub" href="#tab-validation-by-mapping">SHACL Validation</a>
 
   <div class="group">Tools menu</div>
   <div class="subgroup">RDFS Profiles</div>
@@ -437,8 +441,10 @@ works on three kinds of artefact and, above all, on the relationships between th
 <p>Everything in the application is reachable from three places: the <strong>tabs</strong> in the
 main window (interactive, multi-step work), the <strong>Tools</strong> menu (single-shot batch
 conversions and exports), and <strong>File&nbsp;&#9656;&nbsp;Preferences</strong> (namespaces and
-appearance). Every operation writes progress and results to the <em>Output&nbsp;&amp;&nbsp;Source
-Code</em> panel at the bottom of the window.</p>
+appearance). The tabs are grouped into three categories &mdash; <em>SHACL Generation</em>,
+<em>RDF Operations</em> and <em>Dataset Operations</em> &mdash; which is also how this page is
+organised. Every operation writes progress and results to the <em>Output</em> panel at the bottom
+of the window.</p>
 
 <h2 id="purpose">Core purpose</h2>
 
@@ -471,7 +477,7 @@ CIM-based data exchange:</p>
       shapes</a> &mdash; confirm
       the generated shapes are themselves conformant (or simply leave <em>Validate generated SHACL
       shapes</em> ticked in step 1).</li>
-  <li><a href="#tab-validation-by-mapping">Dataset SHACL Validation</a> &mdash; with the
+  <li><a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> &mdash; with the
       <em>Validate by manual selection</em> workflow, run the new shapes over a folder of
       known-good models and check that nothing conformant is rejected.</li>
   <li><a href="#tool-export-shacl-info">Tools &#9656; SHACL Constraints &#9656; Export SHACL
@@ -481,29 +487,32 @@ CIM-based data exchange:</p>
 
 <h3>Reviewing what changed between two profile releases</h3>
 <ol>
-  <li><a href="#tab-rdf-comparison">RDF Comparison</a> &mdash; load the two RDFS profile files,
+  <li><a href="#tab-rdf-comparison">RDF Operations &#9656; Comparison</a> &mdash; load the two RDFS profile files,
       choose the matching format, run the comparison and read the difference report.</li>
-  <li><a href="#tab-rdf-convert">RDF Convert</a> &mdash; optionally normalise both files to sorted
+  <li><a href="#tab-rdf-convert">RDF Operations &#9656; Convert</a> &mdash; optionally normalise both files to sorted
       Turtle first, so any remaining textual diff is meaningful.</li>
 </ol>
 
 <h3>Checking a received dataset</h3>
 <ol>
-  <li><a href="#tab-validation-by-mapping">Dataset SHACL Validation</a> &mdash; validate the
+  <li><a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> &mdash; validate the
       model against the applicable constraint set. Use <em>Validate by manual selection</em> when
       you pick the constraint files yourself, or one of the mapping workflows when a CSV drives
       which constraints apply to which input.</li>
-  <li><a href="#tab-instance-data-comparison">Instance Data Comparison</a> &mdash; compare the
+  <li><a href="#tab-instance-data-comparison">Dataset Operations &#9656; Comparison</a> &mdash; compare the
       dataset against the reference or previous version.</li>
-  <li><a href="#tab-sparql-query">SPARQL Query</a> &mdash; answer any ad-hoc question the reports
-      did not cover.</li>
+  <li><a href="#tab-rdf-visualisation">RDF Operations &#9656; Visualisation</a> &mdash; open the
+      objects the validation report or the comparison named, and look at their remaining
+      properties in context.</li>
+  <li><a href="#tab-sparql-query">Dataset Operations &#9656; SPARQL Query</a> &mdash; answer any
+      ad-hoc question the reports did not cover.</li>
 </ol>
 
 <h3>Producing test data for a constraint set</h3>
 <ol>
-  <li><a href="#tab-generate-instance-data">Generate Instance data</a> &mdash; create an Excel
+  <li><a href="#tab-generate-instance-data">Dataset Operations &#9656; Generate</a> &mdash; create an Excel
       template from the profile, fill it in, convert it to CIMXML.</li>
-  <li><a href="#tab-task-wizard">Task Wizard</a> &mdash; multiply the base model, regenerate
+  <li><a href="#tab-task-wizard">Dataset Operations &#9656; Task Wizard</a> &mdash; multiply the base model, regenerate
       identifiers, or deliberately introduce non-conformities to prove that the constraints catch
       them.</li>
 </ol>
@@ -511,9 +520,18 @@ CIM-based data exchange:</p>
 <h2 id="using">Using the window</h2>
 
 <ul>
-  <li><strong>Output panel</strong> &mdash; the collapsible panel at the bottom. It receives all
-      progress and result messages. The bin icon above it empties the panel; hover it for the
-      <em>Clear Output Window</em> tooltip. Drag the divider to resize.</li>
+  <li><strong>Two rows of tabs</strong> &mdash; the upper row selects one of the three categories
+      of work, the lower row the function within it. Switching category does not disturb the other
+      categories: each remembers which of its functions you last had open, and no tab loses its
+      loaded models or field values when you navigate away.</li>
+  <li><strong>Collapsing either half of the window</strong> &mdash; both <em>Operations</em> (the
+      tabs) and <em>Output</em> are collapsible panels. Click the title of either one to fold it
+      away and give the whole height to the other: fold <em>Operations</em> to read a long
+      validation log full-window, then click its title again to return to exactly the split you had
+      before. The divider between them can also be dragged as usual.</li>
+  <li><strong>Output panel</strong> &mdash; the panel at the bottom receives all progress and
+      result messages. The bin icon above it empties the panel; hover it for the <em>Clear Output
+      Window</em> tooltip.</li>
   <li><strong>Status bar</strong> &mdash; the progress bar at the very bottom shows the progress of
       the running operation. An indeterminate bar means the operation cannot report a percentage.</li>
   <li><strong>Help badges</strong> &mdash; the small <code>?</code> markers next to fields in the
@@ -566,10 +584,26 @@ CIM-based data exchange:</p>
 
 <h2>Main GUI tabs</h2>
 
-<p>The eleven tabs of the main window, in the order they appear.</p>
+<p>The main window groups its ten functions into three categories, shown as the upper row of
+tabs; the functions of the selected category are the lower row. The categories reflect what the
+function operates on, not what it produces:</p>
+
+<ul>
+  <li><strong>SHACL Generation</strong> &mdash; deriving and maintaining constraint sets from
+      RDFS profile definitions.</li>
+  <li><strong>RDF Operations</strong> &mdash; syntax-level work that applies to any RDF graph,
+      whether it is a profile definition or a dataset: comparing, converting, browsing.</li>
+  <li><strong>Dataset Operations</strong> &mdash; work specific to instance data: comparing,
+      generating, transforming, querying and validating exchanged models.</li>
+</ul>
+
+<p>The categories are listed below in the order they appear, and the functions within each
+category likewise.</p>
+
+<h3>SHACL Generation</h3>
 
 <details class="fn" id="tab-rdfs-to-shacl">
-<summary><span class="kind">Tab</span> RDFS to SHACL</summary>
+<summary><span class="kind">Tab</span> SHACL Generation &#9656; RDFS to SHACL</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -683,54 +717,8 @@ instance-data validation, a separate datatypes-only shapes file, and the class i
 </div>
 </details>
 
-<details class="fn" id="tab-rdf-comparison">
-<summary><span class="kind">Tab</span> RDF Comparison</summary>
-<div class="fn-body">
-
-<h4>Business logic</h4>
-<p>Compares two RDFS profile definitions &mdash; typically two releases of the same profile &mdash;
-and reports the semantic differences: classes and properties added or removed, changed
-multiplicities, changed datatypes and value types. This answers &ldquo;what actually changed in this
-release?&rdquo; without reading a textual diff of two large RDF files, and works across a namespace
-change so that a version bump does not appear as a wholesale rewrite.</p>
-
-<h4>Inputs</h4>
-<table class="io">
-<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Model A</td><td>file, required</td>
-    <td>First RDF model file to compare. Supports RDF/XML (<code>.xml</code>, <code>.rdf</code>),
-        Turtle (<code>.ttl</code>) or ZIP archives containing model files.</td></tr>
-<tr><td>Model B</td><td>file, required</td>
-    <td>Second RDF model file to compare against Model A.</td></tr>
-<tr><td>Scope / RDFS format</td><td>choice, required</td>
-    <td>The version/format of the RDFS profile describing the models. Choose the one matching your
-        input files: <em>RDFS (augmented) by CimSyntaxGen</em>, <em>RDFS (augmented) by
-        CimSyntaxGen with CIMTool</em>, or <em>Universal method incl. SHACL Shapes</em> &mdash; the
-        last also compares SHACL shape graphs.</td></tr>
-<tr><td>Same CIM namespace</td><td>checkbox</td>
-    <td>Treats both models as using the same CIM base namespace even if their actual namespace URIs
-        differ slightly (for example a different version suffix).</td></tr>
-<tr><td>Profile namespace</td><td>checkbox + prefix</td>
-    <td>Ignores differences in the profile/ontology namespace URI and normalises comparisons using
-        the specified prefix.</td></tr>
-</table>
-
-<h4>Outputs</h4>
-<ul>
-  <li>A modal <em>Comparison RDFS profiles</em> result window listing the differences, with the two
-      compared file names as column headings.</li>
-  <li>If nothing differs beyond the namespace, the information message <em>&ldquo;The two models are
-      identical if the CIM namespace would be the same.&rdquo;</em></li>
-  <li>An error message if a file has no header and its profile namespace prefix is not
-      declared.</li>
-</ul>
-
-<p class="src">Source: <code>RDFComparisonController.actionBtnRunRDFcompare()</code></p>
-</div>
-</details>
-
 <details class="fn" id="tab-excel-to-shacl">
-<summary><span class="kind">Tab</span> SHACL Constraints Operations</summary>
+<summary><span class="kind">Tab</span> SHACL Generation &#9656; Constraints Operations</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -812,8 +800,56 @@ affect the others, and only one section is open at a time.</p>
 </div>
 </details>
 
+<h3>RDF Operations</h3>
+
+<details class="fn" id="tab-rdf-comparison">
+<summary><span class="kind">Tab</span> RDF Operations &#9656; Comparison</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Compares two RDFS profile definitions &mdash; typically two releases of the same profile &mdash;
+and reports the semantic differences: classes and properties added or removed, changed
+multiplicities, changed datatypes and value types. This answers &ldquo;what actually changed in this
+release?&rdquo; without reading a textual diff of two large RDF files, and works across a namespace
+change so that a version bump does not appear as a wholesale rewrite.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Model A</td><td>file, required</td>
+    <td>First RDF model file to compare. Supports RDF/XML (<code>.xml</code>, <code>.rdf</code>),
+        Turtle (<code>.ttl</code>) or ZIP archives containing model files.</td></tr>
+<tr><td>Model B</td><td>file, required</td>
+    <td>Second RDF model file to compare against Model A.</td></tr>
+<tr><td>Scope / RDFS format</td><td>choice, required</td>
+    <td>The version/format of the RDFS profile describing the models. Choose the one matching your
+        input files: <em>RDFS (augmented) by CimSyntaxGen</em>, <em>RDFS (augmented) by
+        CimSyntaxGen with CIMTool</em>, or <em>Universal method incl. SHACL Shapes</em> &mdash; the
+        last also compares SHACL shape graphs.</td></tr>
+<tr><td>Same CIM namespace</td><td>checkbox</td>
+    <td>Treats both models as using the same CIM base namespace even if their actual namespace URIs
+        differ slightly (for example a different version suffix).</td></tr>
+<tr><td>Profile namespace</td><td>checkbox + prefix</td>
+    <td>Ignores differences in the profile/ontology namespace URI and normalises comparisons using
+        the specified prefix.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>A modal <em>Comparison RDFS profiles</em> result window listing the differences, with the two
+      compared file names as column headings.</li>
+  <li>If nothing differs beyond the namespace, the information message <em>&ldquo;The two models are
+      identical if the CIM namespace would be the same.&rdquo;</em></li>
+  <li>An error message if a file has no header and its profile namespace prefix is not
+      declared.</li>
+</ul>
+
+<p class="src">Source: <code>RDFComparisonController.actionBtnRunRDFcompare()</code></p>
+</div>
+</details>
+
 <details class="fn" id="tab-rdf-convert">
-<summary><span class="kind">Tab</span> RDF Convert</summary>
+<summary><span class="kind">Tab</span> RDF Operations &#9656; Convert</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -822,8 +858,15 @@ syntax and writes it out in another, but the reason to use it is usually one of 
 options: merging a set of files into a single union model, correcting RDFS package assignments,
 extracting or listing the class inheritance tree, or adding OWL declarations. Its sorting and
 prefix-stripping options produce deterministic output, which is what makes generated artefacts
-reviewable in a version control diff. When the source is CGMES instance data it applies the
-IEC&nbsp;61970-552 serialisation rules.</p>
+reviewable in a version control diff.</p>
+
+<p><strong>Also the converter for datasets and instance data.</strong> This tab sits under
+<em>RDF Operations</em> because conversion is a syntax-level operation that does not care what the
+graph means, and it is deliberately the only place in the application that converts. It is
+therefore the tab to use for CGMES instance data as well as for profile definitions: tick
+<em>Source type</em> and it applies the CGMES&nbsp;/&nbsp;IEC&nbsp;61970-552 instance data
+serialisation rules on output. There is no separate converter under <em>Dataset
+Operations</em>.</p>
 
 <h4>Inputs</h4>
 <table class="io">
@@ -876,8 +919,104 @@ IEC&nbsp;61970-552 serialisation rules.</p>
 </div>
 </details>
 
+<details class="fn" id="tab-rdf-visualisation">
+<summary><span class="kind">Tab</span> RDF Operations &#9656; Visualisation</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>A read-only browser for RDF, for the moment when a comparison report or a validation message
+names a resource and the next question is simply what that object actually looks like. It loads
+RDF in any syntax Apache Jena can parse and presents it as a
+subject&nbsp;&rarr;&nbsp;predicate&nbsp;&rarr;&nbsp;object tree, with filters on each of the three
+positions and a full text search across all of them. Nothing is written: neither the loaded models
+nor any file on disk is modified.</p>
+<p>Every loaded file becomes its own <strong>named graph</strong> &mdash; and every RDF entry of a
+loaded ZIP archive likewise, so a complete CGMES dataset delivered as one archive arrives as one
+graph per profile file. Each graph carries a tick box, so the tree can show all of them together
+or any subset: the EQ file alone, or EQ and SSH together, without unloading and reloading. With
+more than one graph ticked the tree gains a named-graph level above the subjects; with a single
+graph the subjects are shown directly.</p>
+<p>It answers the questions the other tabs do not. <em>Comparison</em> tells you that a triple
+changed; this shows you the object it belongs to and its remaining properties. <em>SPARQL
+Query</em> answers a question you can already formulate; this is for looking around before you
+can. And because it accepts every Jena syntax, it will open a Turtle constraints file or an
+N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Load RDF files&hellip;</td><td>files, required</td>
+    <td>Replaces whatever is loaded with the chosen files. Accepts every syntax Jena has a parser
+        for &mdash; RDF/XML (<code>.rdf</code>, <code>.xml</code>, <code>.owl</code>), Turtle
+        (<code>.ttl</code>), N-Triples (<code>.nt</code>), N-Quads (<code>.nq</code>), TriG
+        (<code>.trig</code>), JSON-LD (<code>.jsonld</code>), RDF/JSON (<code>.rj</code>), TriX
+        (<code>.trix</code>) &mdash; and <code>.zip</code> archives of them. The syntax is taken
+        from the file extension; non-RDF entries of an archive are skipped.</td></tr>
+<tr><td>Add files&hellip;</td><td>files</td>
+    <td>The same, but keeping what is already loaded. Use it to bring a second dataset alongside
+        the first for side-by-side browsing.</td></tr>
+<tr><td>Remove selected</td><td>action</td>
+    <td>Unloads the graph highlighted in the <em>Named graphs</em> list.</td></tr>
+<tr><td>Reset</td><td>action</td><td>Unloads everything and clears the filters.</td></tr>
+<tr><td>Named graphs</td><td>tick boxes</td>
+    <td>One row per loaded file or archive entry, with its triple count. Unticking a graph leaves
+        it out of the tree without unloading it. <em>Select all</em> and <em>Select none</em> act
+        on every row at once.</td></tr>
+<tr><td>Subject contains, Predicate contains, Object contains</td><td>text</td>
+    <td>Keeps only the triples whose corresponding term contains the text. Matched
+        case-insensitively against both the shortened form shown in the tree and the full URI or
+        literal value, so either a prefixed name (<code>cim:Breaker.normalOpen</code>) or a
+        fragment of the full URI finds the same triples. Non-empty fields combine: all of them
+        must match.</td></tr>
+<tr><td>Full text search</td><td>text</td>
+    <td>Keeps a triple when <em>any one</em> of its subject, predicate or object matches. This is
+        the field to use when you have an mRID or a value and do not know which position it
+        occupies.</td></tr>
+<tr><td>Apply</td><td>action</td>
+    <td>Runs the filters. They are applied on demand rather than as you type, because each run
+        rescans every ticked graph and a CGMES dataset is hundreds of thousands of triples.
+        Pressing <kbd>Enter</kbd> in any filter field does the same.</td></tr>
+<tr><td>Clear filters</td><td>action</td>
+    <td>Empties all four fields and shows everything in the ticked graphs again.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>The graph tree. Subjects sort alphabetically by their displayed form and expand to their
+      predicates; a predicate with a single value is shown on one line, a repeated predicate
+      becomes a node with one child per value.</li>
+  <li>URIs are shortened using the namespace prefixes declared in the source file. Where no prefix
+      applies they are written relative to the document base &mdash; which is how the source file
+      itself expresses them &mdash; and otherwise in full, in angle brackets. Literals are shown
+      quoted, with their language tag or datatype where they have one.</li>
+  <li><em>Copy value</em> puts the full URI or literal of the selected row on the clipboard, ready
+      to paste into a SPARQL query or into a filter field.</li>
+  <li>The status line reports how many of the loaded triples the filters admitted, across how many
+      subjects and graphs.</li>
+</ul>
+
+<h4>Notes</h4>
+<ul>
+  <li><em>Expand selected</em> opens the highlighted branch and everything below it, stopping after
+      1000 nodes so that a large subtree cannot lock up the view; expand the remaining branches
+      individually. <em>Collapse all</em> closes everything.</li>
+  <li>Very large graphs are truncated at 5000 subjects each, and the status line says so when it
+      happens. The filters are the intended way to reach the rest &mdash; a tree of tens of
+      thousands of rows is not browsable in any case.</li>
+  <li>Relative URIs are resolved against the document's own declared base where it has one, and
+      otherwise against the location the file was read from.</li>
+  <li>A file that cannot be parsed does not abort the load: the remaining files are loaded, and the
+      reason for each failure is written to the Output window.</li>
+</ul>
+
+<p class="src">Source: <code>RDFVisualisationController</code></p>
+</div>
+</details>
+
+<h3>Dataset Operations</h3>
+
 <details class="fn" id="tab-instance-data-comparison">
-<summary><span class="kind">Tab</span> Instance Data Comparison</summary>
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; Comparison</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -935,7 +1074,7 @@ read, it can report instance counts per class instead.</p>
 </details>
 
 <details class="fn" id="tab-generate-instance-data">
-<summary><span class="kind">Tab</span> Generate Instance data</summary>
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; Generate</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -989,7 +1128,7 @@ RDF/XML.</p>
 </details>
 
 <details class="fn" id="tab-task-wizard">
-<summary><span class="kind">Tab</span> Task Wizard</summary>
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; Task Wizard</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -1045,7 +1184,7 @@ and an output location. The twelve available tasks are:</p>
 </details>
 
 <details class="fn" id="tab-sparql-query">
-<summary><span class="kind">Tab</span> SPARQL Query</summary>
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; SPARQL Query</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -1082,7 +1221,7 @@ Queries can be saved and reloaded, so a useful investigation becomes a reusable 
 </details>
 
 <details class="fn" id="tab-validation-by-mapping">
-<summary><span class="kind">Tab</span> Dataset SHACL Validation</summary>
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; SHACL Validation</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -1651,7 +1790,7 @@ Each rule's name, severity, level, description and message are extracted.</p>
 <div class="fn-body">
 <h4>Business logic</h4>
 <p>A shortcut. This menu item performs no work of its own &mdash; it simply brings the
-<a href="#tab-validation-by-mapping">Dataset SHACL Validation</a> tab to the front, where the whole
+<a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> tab to the front, where the whole
 workflow lives. See that tab for inputs and outputs.</p>
 <h4>Inputs</h4>
 <p>None.</p>
@@ -1666,7 +1805,7 @@ workflow lives. See that tab for inputs and outputs.</p>
 <div class="fn-body">
 <h4>Business logic</h4>
 <p>A shortcut. This menu item performs no work of its own &mdash; it brings the
-<a href="#tab-sparql-query">SPARQL Query</a> tab to the front, where models are loaded and queries
+<a href="#tab-sparql-query">Dataset Operations &#9656; SPARQL Query</a> tab to the front, where models are loaded and queries
 are written and run. See that tab for inputs and outputs.</p>
 <h4>Inputs</h4>
 <p>None.</p>
@@ -1717,8 +1856,10 @@ are stored per user and persist between sessions.</p>
 <tr><td>Theme</td><td>Application &#9656; Themes</td>
     <td>One of ten themes, grouped light, dark and accessibility: Minimalist White, Nordic Light,
         Solarized Light, Sepia (Warm Paper), Sleek Dark Mode, Material Dark, Dracula, Solarized
-        Dark, High-contrast Cyberpunk, High Contrast Black. The selection is applied immediately as
-        a preview &mdash; press <em>OK</em> to keep it, <em>Cancel</em> to revert.</td></tr>
+        Dark, High-contrast Cyberpunk, High Contrast Black. <strong>Dracula</strong> is the theme a
+        fresh installation starts with; an installation that has already had a theme chosen keeps
+        that choice. The selection is applied immediately as a preview &mdash; press <em>OK</em> to
+        keep it, <em>Cancel</em> to revert.</td></tr>
 </table>
 
 <h4>Outputs</h4>

@@ -95,12 +95,16 @@ public class MainController implements Initializable {
     private final GUIhelper guiHelper;
     private eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController cimPalWizardController;
 
-    public TabPane tabPaneConstraintsDetails;
+    /** Outer row of the two-level tab structure: the three categories of work. */
+    @FXML
+    private TabPane tabPaneMainCategories;
     public Tab tabCreateCompleteSM1;
     public Tab tabInstanceDataComparison;
     public Tab tabExcelToSHACL;
     public Tab tabRDFConvert;
     public Tab tabSPARQLQuery;
+    @FXML
+    private Tab tabRDFVisualisation;
     public Font x3;
     @FXML
     public TreeView treeViewInstanceData;
@@ -117,6 +121,8 @@ public class MainController implements Initializable {
     private SplitPane mainSplitPane;
     @FXML
     private TitledPane outputSourceContainer;
+    @FXML
+    private TitledPane workAreaContainer;
     public static Preferences prefs;
     @FXML
     private CheckBox cbShowUnionModelOnly;
@@ -233,32 +239,7 @@ public class MainController implements Initializable {
 
         cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
 
-        Platform.runLater(() -> {
-            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
-                outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
-                mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, oldValue, newValue) -> {
-                    if (outputSourceContainer == null || outputSourceContainer.isExpanded()) {
-                        outputSourceDividerPosition = newValue.doubleValue();
-                    }
-                });
-            }
-
-            if (outputSourceContainer != null) {
-                outputSourceContainer.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
-                    if (!isExpanded) {
-                        if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
-                            outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
-                        }
-                    } else {
-                        Platform.runLater(() -> {
-                            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
-                                mainSplitPane.setDividerPosition(0, outputSourceDividerPosition);
-                            }
-                        });
-                    }
-                });
-            }
-        });
+        Platform.runLater(this::initializeCollapsiblePanes);
 
 
         //TODO: see how to have this default on the screen
@@ -337,8 +318,109 @@ public class MainController implements Initializable {
             GUIhelper.showUserFriendlyError("SPARQL Query tab error", "The SPARQL Query tab could not be loaded.", e);
         }
 
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFVisualisationTab.fxml"));
+            tabRDFVisualisation.setContent(loader.load());
+            RDFVisualisationController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("RDF Visualisation tab error", "The RDF Visualisation tab could not be loaded.", e);
+        }
+
         initializeValidationByMappingTab();
 
+    }
+
+    /**
+     * Makes both halves of the main SplitPane behave as an accordion: collapsing the
+     * <em>Operations</em> pane hands the whole height to <em>Output</em>, and vice versa.
+     * <p>
+     * The divider has to be driven explicitly, because a SplitPane leaves it where the user last
+     * put it and a collapsed pane would otherwise just leave an empty gap. Both panes carry
+     * {@code minHeight="0"} in the FXML - needed so that either one can be squeezed right down -
+     * which also means the SplitPane is free to squeeze a collapsed pane past its title bar and
+     * leave the user no way to expand it again. So while a pane is collapsed its minimum height is
+     * pinned to that title bar, and released when it expands. The last position while both panes
+     * were open is remembered, so re-expanding restores the layout rather than a default.
+     */
+    private void initializeCollapsiblePanes() {
+        if (mainSplitPane == null || mainSplitPane.getDividers().isEmpty()) {
+            return;
+        }
+
+        outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+        mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, oldValue, newValue) -> {
+            if (bothPanesExpanded()) {
+                outputSourceDividerPosition = newValue.doubleValue();
+            }
+        });
+
+        addCollapseListener(workAreaContainer, 0.0);
+        addCollapseListener(outputSourceContainer, 1.0);
+    }
+
+    /**
+     * @param collapsedDividerPosition the end of the divider's travel that belongs to this pane:
+     *                                 0 for the upper pane, 1 for the lower one.
+     */
+    private void addCollapseListener(TitledPane pane, double collapsedDividerPosition) {
+        if (pane == null) {
+            return;
+        }
+        pane.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
+            if (mainSplitPane == null || mainSplitPane.getDividers().isEmpty()) {
+                return;
+            }
+            if (isExpanded) {
+                pane.setMinHeight(0);
+                // Deferred: the pane's content is still being laid out at this point, so a
+                // position set now would be recomputed and lost.
+                Platform.runLater(() -> {
+                    if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty() && bothPanesExpanded()) {
+                        mainSplitPane.setDividerPosition(0, outputSourceDividerPosition);
+                    }
+                });
+            } else {
+                outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+                Platform.runLater(() -> {
+                    if (mainSplitPane == null || mainSplitPane.getDividers().isEmpty()) {
+                        return;
+                    }
+                    // Collapsed, a TitledPane's preferred height is exactly its title bar.
+                    pane.setMinHeight(pane.prefHeight(pane.getWidth()));
+                    mainSplitPane.setDividerPosition(0, collapsedDividerPosition);
+                });
+            }
+        });
+    }
+
+    private boolean bothPanesExpanded() {
+        return (workAreaContainer == null || workAreaContainer.isExpanded())
+                && (outputSourceContainer == null || outputSourceContainer.isExpanded());
+    }
+
+    /**
+     * Brings a function tab to the front, selecting its category tab first. Used by the
+     * Tools menu items that only navigate; a plain {@code select(tab)} on the inner TabPane
+     * would leave the tab hidden behind another category.
+     */
+    private void selectFunctionTab(Tab functionTab) {
+        if (functionTab == null) {
+            return;
+        }
+        TabPane functionPane = functionTab.getTabPane();
+        if (functionPane == null) {
+            return;
+        }
+        if (tabPaneMainCategories != null) {
+            for (Tab category : tabPaneMainCategories.getTabs()) {
+                if (category.getContent() == functionPane) {
+                    tabPaneMainCategories.getSelectionModel().select(category);
+                    break;
+                }
+            }
+        }
+        functionPane.getSelectionModel().select(functionTab);
     }
 
     private void initializeValidationByMappingTab() {
@@ -731,12 +813,12 @@ public class MainController implements Initializable {
 
     @FXML
     public void actionValidateByMapping() {
-        if (tabPaneConstraintsDetails == null || tabValidationByMapping == null) {
+        if (tabValidationByMapping == null) {
             System.err.println("[ERROR] Validation by Mapping tab is not initialized.");
             return;
         }
 
-        tabPaneConstraintsDetails.getSelectionModel().select(tabValidationByMapping);
+        selectFunctionTab(tabValidationByMapping);
     }
 
     @FXML
@@ -1875,9 +1957,7 @@ public class MainController implements Initializable {
 
     @FXML
     public void actionRunSPARQLQuery(ActionEvent actionEvent) {
-        if (tabPaneConstraintsDetails != null && tabSPARQLQuery != null) {
-            tabPaneConstraintsDetails.getSelectionModel().select(tabSPARQLQuery);
-        }
+        selectFunctionTab(tabSPARQLQuery);
     }
 
     @FXML

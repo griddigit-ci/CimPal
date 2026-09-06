@@ -67,18 +67,49 @@
       </Menu>
    </MenuBar>
    <SplitPane fx:id="mainSplitPane" dividerPositions="0.8146067415730337" minHeight="0.0" minWidth="0.0" orientation="VERTICAL" VBox.vgrow="ALWAYS">
-      <TabPane fx:id="tabPaneConstraintsDetails" minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
-         <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
-         <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
-         <Tab fx:id="tabExcelToSHACL" text="SHACL Constraints Operations"/>
-         <Tab fx:id="tabRDFConvert" text="RDF Convert"/>
-         <Tab fx:id="tabInstanceDataComparison" text="Instance Data Comparison"/>
-         <Tab fx:id="tabGenerateInstanceData" text="Generate Instance data"/>
-         <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
-         <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
-         <Tab fx:id="tabValidationByMapping" text="Dataset SHACL Validation"/>
-      </TabPane>
-      <TitledPane fx:id="outputSourceContainer" animated="false" minHeight="0.0" minWidth="0.0" text="Output">
+      <!--
+        The ten functions are grouped into three categories, so the landing view shows the three
+        areas of work rather than one row of ten equally-weighted tabs. The outer TabPane carries
+        the "category-tabs" class purely so base.css can weight its labels more heavily than the
+        inner row's - two identically styled header bands would read as a single confusing block.
+
+        Both halves of the SplitPane are TitledPanes: collapsing either one gives the whole height
+        to the other, which is what lets the Output pane be read full-window without a resize drag.
+        maxHeight is unbounded on both for that to work - a SplitPane never grows an item past its
+        maximum height, and a TitledPane's default maximum is its content's preferred height, so
+        without this the pane left expanded would keep its old height and leave the freed space
+        blank. See MainController.initializeCollapsiblePanes() for the matching divider handling.
+      -->
+      <TitledPane fx:id="workAreaContainer" animated="false" maxHeight="1.7976931348623157E308"
+                  minHeight="0.0" minWidth="0.0" styleClass="pane-flush" text="Operations">
+         <TabPane fx:id="tabPaneMainCategories" minHeight="0.0" minWidth="0.0"
+                  styleClass="category-tabs" tabClosingPolicy="UNAVAILABLE">
+            <Tab text="SHACL Generation">
+               <TabPane minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
+                  <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
+                  <Tab fx:id="tabExcelToSHACL" text="Constraints Operations"/>
+               </TabPane>
+            </Tab>
+            <Tab text="RDF Operations">
+               <TabPane minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
+                  <Tab fx:id="tabCreateCompleteSM1" text="Comparison"/>
+                  <Tab fx:id="tabRDFConvert" text="Convert"/>
+                  <Tab fx:id="tabRDFVisualisation" text="Visualisation"/>
+               </TabPane>
+            </Tab>
+            <Tab text="Dataset Operations">
+               <TabPane minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
+                  <Tab fx:id="tabInstanceDataComparison" text="Comparison"/>
+                  <Tab fx:id="tabGenerateInstanceData" text="Generate"/>
+                  <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
+                  <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
+                  <Tab fx:id="tabValidationByMapping" text="SHACL Validation"/>
+               </TabPane>
+            </Tab>
+         </TabPane>
+      </TitledPane>
+      <TitledPane fx:id="outputSourceContainer" animated="false" maxHeight="1.7976931348623157E308"
+                  minHeight="0.0" minWidth="0.0" text="Output">
          <!--
            The Clear button sits in a strip above the text area rather than in a left-hand
            column, so the output area spans the full width of the pane. The pane held a
