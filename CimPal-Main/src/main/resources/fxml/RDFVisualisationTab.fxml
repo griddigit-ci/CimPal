@@ -9,15 +9,15 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.control.TreeView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
-<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
@@ -40,49 +40,60 @@
                     text="Remove selected"/>
             <Button fx:id="btnClearAll" mnemonicParsing="false" onAction="#actionClearAll" text="Reset"/>
             <Label fx:id="helpLoad" styleClass="help-badge" text="?"/>
-            <!--
-              The two panes on the left are removed from the SplitPane rather than merely hidden
-              when untoggled: an unmanaged SplitPane item still holds its division, so hiding
-              alone would not give the diagram the freed width.
-            -->
-            <ToggleButton fx:id="tbShowGraphs" mnemonicParsing="false" onAction="#actionTogglePanes"
-                          selected="true" text="Named graphs"/>
-            <ToggleButton fx:id="tbShowTree" mnemonicParsing="false" onAction="#actionTogglePanes"
-                          selected="true" text="Graph tree"/>
-            <Label fx:id="helpPanes" styleClass="help-badge" text="?"/>
          </FlowPane>
 
          <!--
            Filters are applied on Enter or on Apply rather than on every keystroke: a CGMES
            dataset is hundreds of thousands of triples and re-scanning it per character typed
            would make the fields unusable.
+
+           A FlowPane rather than a grid: four short fields fit on one line on a normal window
+           and reflow onto a second line when the window is narrow, instead of clipping.
          -->
-         <GridPane styleClass="form-grid">
-            <Label text="Subject contains:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-            <TextField fx:id="tfSubjectFilter" onAction="#actionApplyFilters" prefWidth="240.0"
-                       promptText="URI or local name" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-
-            <Label text="Predicate contains:" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
-            <TextField fx:id="tfPredicateFilter" onAction="#actionApplyFilters" prefWidth="240.0"
-                       promptText="URI or local name" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
-
-            <Label text="Object contains:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-            <TextField fx:id="tfObjectFilter" onAction="#actionApplyFilters" prefWidth="240.0"
-                       promptText="URI, literal value" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-
-            <Label text="Full text search:" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
-            <TextField fx:id="tfFullTextSearch" onAction="#actionApplyFilters" prefWidth="240.0"
-                       promptText="any subject, predicate or object" GridPane.columnIndex="3"
-                       GridPane.rowIndex="1"/>
-
-            <HBox spacing="8.0" GridPane.columnIndex="4" GridPane.rowIndex="0"
-                  GridPane.rowSpan="2" GridPane.valignment="CENTER">
-               <Button fx:id="btnApplyFilters" defaultButton="true" mnemonicParsing="false"
-                       onAction="#actionApplyFilters" styleClass="primary-action" text="Apply"/>
-               <Button mnemonicParsing="false" onAction="#actionClearFilters" text="Clear filters"/>
-               <Label fx:id="helpFilters" styleClass="help-badge" text="?"/>
+         <FlowPane hgap="12.0" vgap="8.0">
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+               <Label text="Subject contains:"/>
+               <TextField fx:id="tfSubjectFilter" onAction="#actionApplyFilters" prefWidth="170.0"
+                          promptText="URI or local name"/>
             </HBox>
-         </GridPane>
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+               <Label text="Predicate contains:"/>
+               <TextField fx:id="tfPredicateFilter" onAction="#actionApplyFilters" prefWidth="170.0"
+                          promptText="URI or local name"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+               <Label text="Object contains:"/>
+               <TextField fx:id="tfObjectFilter" onAction="#actionApplyFilters" prefWidth="170.0"
+                          promptText="URI, literal value"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+               <Label text="Full text search:"/>
+               <TextField fx:id="tfFullTextSearch" onAction="#actionApplyFilters" prefWidth="170.0"
+                          promptText="any subject, predicate or object"/>
+            </HBox>
+         </FlowPane>
+
+         <!--
+           The two panes on the left are removed from the SplitPane rather than merely hidden
+           when folded away: an unmanaged SplitPane item still holds its division, so hiding
+           alone would not give the diagram the freed width.
+
+           Plain buttons rather than toggles, and always in this fixed spot: the label states
+           what pressing them will do, so restoring a folded-away pane is never a hunt. Each
+           pane header also carries a chevron for collapsing that pane in place.
+         -->
+         <HBox alignment="CENTER_LEFT" spacing="8.0">
+            <Button fx:id="btnApplyFilters" defaultButton="true" mnemonicParsing="false"
+                    onAction="#actionApplyFilters" styleClass="primary-action" text="Apply"/>
+            <Button mnemonicParsing="false" onAction="#actionClearFilters" text="Clear filters"/>
+            <Label fx:id="helpFilters" styleClass="help-badge" text="?"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="btnToggleGraphsPane" mnemonicParsing="false"
+                    onAction="#actionToggleGraphsPane" text="Hide Named graphs"/>
+            <Button fx:id="btnToggleTreePane" mnemonicParsing="false"
+                    onAction="#actionToggleTreePane" text="Hide Graph tree"/>
+            <Label fx:id="helpPanes" styleClass="help-badge" text="?"/>
+         </HBox>
       </VBox>
    </top>
 
@@ -101,10 +112,24 @@
             <padding>
                <Insets right="8.0"/>
             </padding>
-            <HBox spacing="8.0">
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
                <Label styleClass="section-title" text="Named graphs"/>
                <Label fx:id="helpGraphs" styleClass="help-badge" text="?"/>
+               <Region HBox.hgrow="ALWAYS"/>
+               <Button mnemonicParsing="false" onAction="#actionToggleGraphsPane"
+                       styleClass="icon-button" text="&#171;">
+                  <tooltip>
+                     <Tooltip text="Fold this pane away (Show Named graphs brings it back)"/>
+                  </tooltip>
+               </Button>
             </HBox>
+            <!--
+              The tick box and the row highlight are two independent controls, so the caption
+              spells out which does what: "select" reads as highlighting, and the two used to be
+              conflated by ticking a row also highlighting it.
+            -->
+            <Label styleClass="caption-text" wrapText="true"
+                   text="Tick = include in the tree &#183; Highlight (Ctrl/Shift for several) = draw in the Graph view"/>
             <!--
               One entry per loaded file (per entry, for ZIP archives), each with a tick box.
               Unticking a graph removes it from the tree and the diagram without unloading it, so
@@ -112,8 +137,8 @@
             -->
             <ListView fx:id="lvGraphs" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS"/>
             <FlowPane hgap="8.0" vgap="8.0">
-               <Button mnemonicParsing="false" onAction="#actionSelectAllGraphs" text="Select all"/>
-               <Button mnemonicParsing="false" onAction="#actionSelectNoGraphs" text="Select none"/>
+               <Button mnemonicParsing="false" onAction="#actionTickAllGraphs" text="Tick all"/>
+               <Button mnemonicParsing="false" onAction="#actionUntickAllGraphs" text="Untick all"/>
             </FlowPane>
          </VBox>
 
@@ -121,9 +146,19 @@
             <padding>
                <Insets left="8.0" right="8.0"/>
             </padding>
-            <HBox spacing="8.0">
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
                <Label styleClass="section-title" text="Graph tree"/>
                <Label fx:id="helpTree" styleClass="help-badge" text="?"/>
+               <Region HBox.hgrow="ALWAYS"/>
+               <Label text="Group by:"/>
+               <!-- Reshapes the rows already scanned, so changing it never rescans the models. -->
+               <ComboBox fx:id="cbGrouping" prefWidth="200.0"/>
+               <Button mnemonicParsing="false" onAction="#actionToggleTreePane"
+                       styleClass="icon-button" text="&#171;">
+                  <tooltip>
+                     <Tooltip text="Fold this pane away (Show Graph tree brings it back)"/>
+                  </tooltip>
+               </Button>
             </HBox>
             <TreeView fx:id="tvGraph" minHeight="0.0" minWidth="0.0" showRoot="false" VBox.vgrow="ALWAYS"/>
             <FlowPane hgap="8.0" vgap="8.0">
@@ -137,7 +172,7 @@
             <padding>
                <Insets left="8.0"/>
             </padding>
-            <HBox spacing="8.0">
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
                <Label styleClass="section-title" text="Graph view"/>
                <Label fx:id="helpGraphView" styleClass="help-badge" text="?"/>
                <Region HBox.hgrow="ALWAYS"/>

@@ -4,11 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bce3aea1-59af-438f-9d92-c53a79978571" name="Changes" comment="RDF visualisation refinement">
-      <change beforePath="$PROJECT_DIR$/CimPal-Core/src/main/java/eu/griddigit/cimpal/core/utils/ValidationTools.java" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Core/src/main/java/eu/griddigit/cimpal/core/utils/ValidationTools.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CimPal-Main/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/java/eu/griddigit/cimpal/main/application/MainController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/java/eu/griddigit/cimpal/main/application/MainController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/resources/fxml/CimPalGui.fxml" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/resources/fxml/CimPalGui.fxml" afterDir="false" />
+    <list default="true" id="bce3aea1-59af-438f-9d92-c53a79978571" name="Changes" comment="Fix the remote cache issue for validation methods. Fix warnings">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/java/eu/griddigit/cimpal/main/application/controllers/RDFVisualisationController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/java/eu/griddigit/cimpal/main/application/controllers/RDFVisualisationController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/resources/css/base.css" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/resources/css/base.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/resources/fxml/RDFVisualisationTab.fxml" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/resources/fxml/RDFVisualisationTab.fxml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/resources/help/help.html" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/resources/help/help.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -49,23 +49,23 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0037471262945747" />
-      <entry key="MS500" value="1.3465679683595653" />
-      <entry key="S2" value="2.5937355734672414" />
-      <entry key="S5" value="3.976067594852431" />
-      <entry key="S10" value="4.817571108406028" />
-      <entry key="S30" value="5.55947759438646" />
-      <entry key="S60" value="5.773471087046411" />
-      <entry key="M2" value="5.923454952514261" />
-      <entry key="M5" value="6.980772567422129" />
-      <entry key="M10" value="10.080613442269645" />
-      <entry key="M15" value="15.553834894451706" />
-      <entry key="M30" value="39.243960077384244" />
-      <entry key="H1" value="83.23584708295093" />
-      <entry key="H2" value="158.3573176683723" />
-      <entry key="H4" value="298.756109286313" />
-      <entry key="D1" value="966.3288060210723" />
-      <entry key="W1" value="1291.7636107814951" />
+      <entry key="MS100" value="1.117440343656897" />
+      <entry key="MS500" value="1.6579757188128812" />
+      <entry key="S2" value="2.4369700525205085" />
+      <entry key="S5" value="4.042032360912796" />
+      <entry key="S10" value="5.673888323867085" />
+      <entry key="S30" value="7.610359849943524" />
+      <entry key="S60" value="8.261852898679193" />
+      <entry key="M2" value="8.627208606622254" />
+      <entry key="M5" value="9.33811026466135" />
+      <entry key="M10" value="11.601533609179778" />
+      <entry key="M15" value="15.378063630564332" />
+      <entry key="M30" value="34.20674496596835" />
+      <entry key="H1" value="75.73017152861622" />
+      <entry key="H2" value="150.79684608346955" />
+      <entry key="H4" value="291.706637038071" />
+      <entry key="D1" value="966.4778102000043" />
+      <entry key="W1" value="1299.0667100027686" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
@@ -87,23 +87,23 @@
       <entry key="W1" value="0.0" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="0.9830397829983984" />
-      <entry key="MS500" value="1.3399978913635127" />
-      <entry key="S2" value="2.5897642965981733" />
-      <entry key="S5" value="3.973474150500529" />
-      <entry key="S10" value="4.815975340110512" />
-      <entry key="S30" value="5.558858783576227" />
-      <entry key="S60" value="5.773149216446759" />
-      <entry key="M2" value="5.9232889051853" />
-      <entry key="M5" value="6.980686009365633" />
-      <entry key="M10" value="10.080538041673993" />
-      <entry key="M15" value="15.553744941676758" />
-      <entry key="M30" value="39.24382100451264" />
-      <entry key="H1" value="83.23550689282904" />
-      <entry key="H2" value="158.3565087183261" />
-      <entry key="H4" value="298.7550913522755" />
-      <entry key="D1" value="966.3283884804747" />
-      <entry key="W1" value="1291.7635393066191" />
+      <entry key="MS100" value="1.0637433331947286" />
+      <entry key="MS500" value="1.6410869048932897" />
+      <entry key="S2" value="2.4310600463029037" />
+      <entry key="S5" value="4.038351538983895" />
+      <entry key="S10" value="5.671333597363257" />
+      <entry key="S30" value="7.609213653413482" />
+      <entry key="S60" value="8.261229180960738" />
+      <entry key="M2" value="8.626882544936507" />
+      <entry key="M5" value="9.33797027115594" />
+      <entry key="M10" value="11.601446021489878" />
+      <entry key="M15" value="15.377981276679273" />
+      <entry key="M30" value="34.20663289439008" />
+      <entry key="H1" value="75.72988740202688" />
+      <entry key="H2" value="150.7961160215937" />
+      <entry key="H4" value="291.70567093839855" />
+      <entry key="D1" value="966.4773960102945" />
+      <entry key="W1" value="1299.066638554162" />
     </decayedShown>
   </component>
   <component name="ProblemsViewState">
@@ -237,9 +237,9 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Application.FxmlSmokeTest" />
         <item itemvalue="JUnit.ShapeSourceTest" />
         <item itemvalue="JUnit.ComparisonCsvWriterTest" />
-        <item itemvalue="Application.FxmlSmokeTest" />
         <item itemvalue="Application.PathMemoryCheck" />
         <item itemvalue="Application.HelpSmokeTest" />
       </list>
@@ -597,7 +597,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="various fixes" />
     <MESSAGE value="RDFS to SHACL fix with allowed properties" />
     <MESSAGE value="small fix xls to xml" />
     <MESSAGE value="update af QAR generation from xls" />
@@ -622,7 +621,8 @@
     <MESSAGE value="Align GUI on a couple of places and clear warnings" />
     <MESSAGE value="Cleaning warnings and code optimisation" />
     <MESSAGE value="RDF visualisation refinement" />
-    <option name="LAST_COMMIT_MESSAGE" value="RDF visualisation refinement" />
+    <MESSAGE value="Fix the remote cache issue for validation methods. Fix warnings" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix the remote cache issue for validation methods. Fix warnings" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

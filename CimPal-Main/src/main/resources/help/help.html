@@ -937,8 +937,10 @@ Operations</em>.</p>
 names a resource and the next question is simply what that object actually looks like. It loads
 RDF in any syntax Apache Jena can parse and presents it as a
 subject&nbsp;&rarr;&nbsp;predicate&nbsp;&rarr;&nbsp;object tree, with filters on each of the three
-positions and a full text search across all of them. Nothing is written: neither the loaded models
-nor any file on disk is modified.</p>
+positions and a full text search across all of them. That tree can be left flat, grouped by
+<code>rdf:type</code>, or nested by the references between resources, which is what turns a list of
+several thousand subjects into a structure you can walk. Nothing is written: neither the loaded
+models nor any file on disk is modified.</p>
 <p>Every loaded file becomes its own <strong>named graph</strong> &mdash; and every RDF entry of a
 loaded ZIP archive likewise, so a complete CGMES dataset delivered as one archive arrives as one
 graph per profile file. Each graph carries a tick box, so the tree can show all of them together
@@ -979,13 +981,18 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
         count is normally lower than the sum of the parts. Merging again replaces the previous
         <em>Merged Graph</em> rather than nesting one inside another.</td></tr>
 <tr><td>Remove selected</td><td>action</td>
-    <td>Unloads the graph highlighted in the <em>Named graphs</em> list. Click a graph's name to
-        highlight it; ticking or unticking one highlights it too.</td></tr>
+    <td>Unloads every graph highlighted in the <em>Named graphs</em> list. Click a graph's name to
+        highlight it, <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click for several. Ticking a graph
+        does not highlight it, so this never unloads a graph you only meant to hide.</td></tr>
 <tr><td>Reset</td><td>action</td><td>Unloads everything and clears the filters.</td></tr>
-<tr><td>Named graphs</td><td>tick boxes</td>
-    <td>One row per loaded file or archive entry, with its triple count. Unticking a graph leaves
-        it out of the tree without unloading it. <em>Select all</em> and <em>Select none</em> act
-        on every row at once.</td></tr>
+<tr><td>Named graphs</td><td>tick boxes and a multi-select list</td>
+    <td>One row per loaded file or archive entry, with its triple count. The tick box and the row
+        highlight do two different things, which is what the caption above the list states.
+        <strong>Ticking</strong> includes a graph in the tree and the diagram; unticking leaves it
+        out without unloading it, and <em>Tick all</em> and <em>Untick all</em> act on every row at
+        once. <strong>Highlighting</strong> a row &mdash; clicking its name, <kbd>Ctrl</kbd>-click
+        or <kbd>Shift</kbd>-click for several &mdash; narrows the graph view to those graphs and
+        tells <em>Remove selected</em> what to unload. Neither action triggers the other.</td></tr>
 <tr><td>Subject contains, Predicate contains, Object contains</td><td>text</td>
     <td>Keeps only the triples whose corresponding term contains the text. Matched
         case-insensitively against both the shortened form shown in the tree and the full URI or
@@ -1002,10 +1009,32 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
         Pressing <kbd>Enter</kbd> in any filter field does the same.</td></tr>
 <tr><td>Clear filters</td><td>action</td>
     <td>Empties all four fields and shows everything in the ticked graphs again.</td></tr>
-<tr><td>Named graphs, Graph tree</td><td>toggles</td>
-    <td>Fold either panel away to give the graph view the whole width of the tab, and press again
-        to bring it back. The panels are removed from the split rather than merely hidden, so the
-        diagram actually gains the space.</td></tr>
+<tr><td>Group by</td><td>choice</td>
+    <td>How the tree arranges the subjects of each graph. It reshapes rows that have already been
+        scanned, so changing it takes effect at once and never rescans the models &mdash; there is
+        nothing to <em>Apply</em> afterwards, and the status line does not change.
+        <table class="io">
+        <tr><th>Mode</th><th>Arrangement</th></tr>
+        <tr><td>Subject (flat)</td>
+            <td>Every subject at one level, sorted by its displayed form. The default, and the view
+                for finding a particular resource by name.</td></tr>
+        <tr><td>Class (rdf:type)</td>
+            <td>A folder per <code>rdf:type</code> holding the subjects that declare it, with the
+                member count beside the name. A subject with two types appears under both; one with
+                none goes to a <em>(no rdf:type)</em> folder, sorted last.</td></tr>
+        <tr><td>Containment (incoming)</td>
+            <td>Nests each resource under the resources that point <em>at</em> it, which is what
+                makes a CGMES dataset read as Region &#9656; Substation &#9656; VoltageLevel
+                &#9656; Bay. The view for seeing where an object sits in the model.</td></tr>
+        <tr><td>References (outgoing)</td>
+            <td>Nests each resource under what it points <em>to</em>, following the references as
+                written. The view for seeing what an object depends on.</td></tr>
+        </table></td></tr>
+<tr><td>Hide Named graphs, Hide Graph tree</td><td>actions</td>
+    <td>Fold either panel away to give the graph view the whole width of the tab; the label then
+        reads <em>Show</em>, so bringing the panel back is never a hunt. The <code>&#171;</code>
+        chevron in a panel's own header does the same for that panel. The panels are removed from
+        the split rather than merely hidden, so the diagram actually gains the space.</td></tr>
 <tr><td>Include literals</td><td>checkbox</td>
     <td>Adds attribute values to the diagram as their own nodes. Off by default: with literals in,
         even a handful of resources produces a dense fan of value nodes, and the relationships
@@ -1018,16 +1047,24 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
 
 <h4>What the graph view shows</h4>
 
-<p>The diagram follows the filters and the selection, so it always shows the same content the tree
-does. Scope is taken from the narrowest thing selected:</p>
+<p>The diagram follows the filters and the highlight, so it always shows the same content the tree
+does. Scope is taken from the narrowest thing highlighted, and from the union of them when several
+rows are:</p>
 
 <table class="io">
-<tr><th>Selection</th><th>The diagram shows</th></tr>
+<tr><th>Highlighted</th><th>The diagram shows</th></tr>
 <tr><td>A subject in the tree</td>
     <td>That resource and its immediate neighbours - the triples where it is the subject, and the
         triples where it is the object.</td></tr>
+<tr><td>Several subjects (<kbd>Ctrl</kbd>- or <kbd>Shift</kbd>-click)</td>
+    <td>All of them and their immediate neighbours in one diagram, which is how two resources get
+        compared or a connection between them found.</td></tr>
+<tr><td>A class folder, in a class or a nested grouping</td>
+    <td>Every subject in that folder and their immediate neighbours &mdash; the whole
+        <code>Breaker</code> population at once, for instance.</td></tr>
 <tr><td>A named graph, in the tree or in the list</td><td>Only that graph.</td></tr>
-<tr><td>Nothing selected</td><td>Everything the filters admitted, across all ticked graphs.</td></tr>
+<tr><td>Several named graphs</td><td>Those graphs together.</td></tr>
+<tr><td>Nothing highlighted</td><td>Everything the filters admitted, across all ticked graphs.</td></tr>
 </table>
 
 <p>Node size follows the number of relationships a resource takes part in, so the hubs of the
@@ -1044,8 +1081,8 @@ fewer; past that they would overlap into noise, and hovering a node shows its na
       applies they are written relative to the document base &mdash; which is how the source file
       itself expresses them &mdash; and otherwise in full, in angle brackets. Literals are shown
       quoted, with their language tag or datatype where they have one.</li>
-  <li><em>Copy value</em> puts the full URI or literal of the selected row on the clipboard, ready
-      to paste into a SPARQL query or into a filter field.</li>
+  <li><em>Copy value</em> puts the full URI or literal of every highlighted row on the clipboard,
+      one per line, ready to paste into a SPARQL query or into a filter field.</li>
   <li>The status line reports how many of the loaded triples the filters admitted, across how many
       subjects and graphs; the line under the diagram reports how many nodes and relationships it
       drew, and for which scope.</li>
@@ -1053,9 +1090,9 @@ fewer; past that they would overlap into noise, and hovering a node shows its na
 
 <h4>Notes</h4>
 <ul>
-  <li><em>Expand selected</em> opens the highlighted branch and everything below it, stopping after
-      1000 nodes so that a large subtree cannot lock up the view; expand the remaining branches
-      individually. <em>Collapse all</em> closes everything.</li>
+  <li><em>Expand selected</em> opens every highlighted branch and everything below it, stopping
+      after 1000 nodes across all of them so that a large subtree cannot lock up the view; expand
+      the remaining branches individually. <em>Collapse all</em> closes everything.</li>
   <li>Very large graphs are truncated at 5000 subjects each, and the status line says so when it
       happens. The filters are the intended way to reach the rest &mdash; a tree of tens of
       thousands of rows is not browsable in any case.</li>
@@ -1069,6 +1106,20 @@ fewer; past that they would overlap into noise, and hovering a node shows its na
   <li>The layout is deterministic - the same filter and selection always produce the same
       arrangement - and it is computed fresh on each redraw, so a node you dragged returns to its
       computed place the next time the scope changes.</li>
+  <li>The class grouping reads <code>rdf:type</code> from the triples the filters admitted. A
+      predicate filter that excludes <code>rdf:type</code> therefore leaves every subject in the
+      <em>(no rdf:type)</em> folder; narrow a class view with the subject or object filter
+      instead.</li>
+  <li>In the two nested groupings, a resource with more than eight nested children has them
+      grouped into class folders, because forty children in one flat list is not browsable. Fewer
+      than that, or a grouping that would produce a single folder, and the children are listed
+      directly.</li>
+  <li>References form a graph, not a tree. A resource reached from two parents appears under each
+      of them, which is what a reference view should show, and a cycle is broken where it closes,
+      so nothing is ever nested under itself.</li>
+  <li>A resource's own properties are listed directly when it has nothing nested under it, and
+      behind a <em>properties</em> folder when it has, so the structure the grouping exists to show
+      stays legible.</li>
 </ul>
 
 <p class="src">Source: <code>RDFVisualisationController</code></p>

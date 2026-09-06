@@ -11,20 +11,23 @@ import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeItem;
-import javafx.scene.control.ToggleButton;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -40,20 +43,28 @@ import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFLanguages;
+import org.apache.jena.vocabulary.RDF;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -89,6 +100,16 @@ public class RDFVisualisationController implements Initializable {
      * subject in the tree to see a neighbourhood instead.
      */
     private static final int MAX_GRAPH_NODES = 400;
+
+    /**
+     * Nested children above which a hierarchy node groups them into class folders. A substation
+     * with forty children is a wall of rows; the same forty behind five class folders is
+     * browsable, and below the threshold a folder level would only cost a click.
+     */
+    private static final int HIERARCHY_CLASS_GROUP_THRESHOLD = 8;
+
+    /** Folder collecting the subjects that declare no {@code rdf:type}. Sorted last. */
+    private static final String NO_TYPE_LABEL = "(no rdf:type)";
 
     /** Name of the graph produced by Merge. Merging again replaces it. */
     private static final String MERGED_GRAPH_NAME = "Merged Graph";
@@ -130,9 +151,11 @@ public class RDFVisualisationController implements Initializable {
     @FXML
     private Button btnMergeGraphs;
     @FXML
-    private ToggleButton tbShowGraphs;
+    private Button btnToggleGraphsPane;
     @FXML
-    private ToggleButton tbShowTree;
+    private Button btnToggleTreePane;
+    @FXML
+    private ComboBox<Grouping> cbGrouping;
     @FXML
     private SplitPane visualisationSplitPane;
     @FXML
@@ -157,6 +180,10 @@ public class RDFVisualisationController implements Initializable {
      */
     private boolean suppressRebuild;
 
+    /** Whether each of the two left-hand panes is currently part of the split. */
+    private boolean graphsPaneVisible = true;
+    private boolean treePaneVisible = true;
+
     /** Appended to the status line: what the last load could not read. Empty when all was well. */
     private String lastLoadNote = "";
 
@@ -166,6 +193,13 @@ public class RDFVisualisationController implements Initializable {
      */
     private List<GraphRows> lastRows = List.of();
 
+    /**
+     * Parent/child views of {@link #lastRows}, one per graph, for the two nesting grouping modes.
+     * Cleared whenever the tree is rebuilt, so a new filter result or a new grouping mode never
+     * reuses a stale hierarchy.
+     */
+    private final Map<String, Hierarchy> hierarchies = new HashMap<>();
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
@@ -173,25 +207,37 @@ public class RDFVisualisationController implements Initializable {
         lvGraphs.setItems(graphEntries);
         lvGraphs.setCellFactory(view -> new GraphEntryCell());
 
-        tvGraph.setRoot(new TreeItem<>(new NodeValue("", "")));
+        tvGraph.setRoot(new TreeItem<>(NodeValue.info("")));
         tvGraph.setShowRoot(false);
 
-        graphEntries.addListener((javafx.collections.ListChangeListener<GraphEntry>) change ->
+        // Both lists are multi-selection: the diagram is drawn for the union of what is
+        // highlighted, so several graphs or several resources can be compared at once.
+        lvGraphs.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        tvGraph.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+
+        cbGrouping.getItems().setAll(Grouping.values());
+        cbGrouping.setValue(Grouping.FLAT);
+        // Grouping reshapes rows that are already scanned and filtered, so it rebuilds the tree
+        // without touching the models.
+        cbGrouping.valueProperty().addListener((obs, oldValue, newValue) -> buildTreeItems());
+
+        graphEntries.addListener((ListChangeListener<GraphEntry>) change ->
                 updateControlsEnabled());
 
-        // Selecting in either the list or the tree narrows the diagram to that scope.
-        lvGraphs.getSelectionModel().selectedItemProperty()
-                .addListener((obs, oldValue, newValue) -> redrawGraphView());
-        tvGraph.getSelectionModel().selectedItemProperty()
-                .addListener((obs, oldValue, newValue) -> redrawGraphView());
+        // Highlighting in either the list or the tree narrows the diagram to that scope.
+        lvGraphs.getSelectionModel().getSelectedItems()
+                .addListener((ListChangeListener<GraphEntry>) change -> redrawGraphView());
+        tvGraph.getSelectionModel().getSelectedItems()
+                .addListener((ListChangeListener<TreeItem<NodeValue>>) change -> redrawGraphView());
         graphView.setOnNodeClicked(id -> setStatus("Selected in graph view: " + id));
 
         updateControlsEnabled();
         setStatus("No data loaded. Use Load RDF files... to begin.");
 
-        // Deferred: the SplitPane has no width until it is laid out, and a position set before
-        // that is discarded.
-        Platform.runLater(() -> visualisationSplitPane.setDividerPositions(0.22, 0.5));
+        // Also labels the two pane buttons; the divider positions it sets are deferred, because
+        // the SplitPane has no width until it is laid out and a position set before that is
+        // discarded.
+        applyPaneVisibility();
     }
 
     private void initializeHelpTooltips() {
@@ -211,32 +257,49 @@ public class RDFVisualisationController implements Initializable {
                         + "keystroke, because a large dataset has to be rescanned each time.");
         GUIhelper.installHelpTooltip(helpGraphs,
                 "One entry per loaded file, or per entry inside a loaded ZIP archive, with its triple count.\n\n"
-                        + "Untick a graph to leave it out of the tree without unloading it. When more than one "
-                        + "graph is ticked the tree gets a named-graph level above the subjects; with a single "
-                        + "graph the subjects are shown directly.");
+                        + "The tick box and the row highlight do two different things. Ticking includes a graph "
+                        + "in the tree; unticking leaves it out without unloading it. Tick all and Untick all "
+                        + "act on every row. When more than one graph is ticked the tree gets a named-graph "
+                        + "level above the subjects; with a single graph the subjects are shown directly.\n\n"
+                        + "Highlighting a row - clicking its name, with Ctrl or Shift for several - narrows the "
+                        + "graph view to those graphs, and tells Remove selected which graphs to unload. "
+                        + "Ticking a row does not highlight it, and highlighting one does not tick it.");
         GUIhelper.installHelpTooltip(helpPanes,
                 "Named graphs and Graph tree can each be folded away to give the graph view the whole "
-                        + "width. The panes are removed from the split rather than hidden, so the "
-                        + "diagram actually gains the space.");
+                        + "width. The buttons say what pressing them will do and turn into Show Named graphs "
+                        + "and Show Graph tree once the pane is away, so bringing one back is never a hunt; "
+                        + "the chevron in a pane's own header folds that pane in place.\n\n"
+                        + "The panes are removed from the split rather than hidden, so the diagram actually "
+                        + "gains the space.");
         GUIhelper.installHelpTooltip(helpGraphView,
                 "The relationships between the resources currently shown, drawn as a node-link diagram: "
                         + "one node per resource, one arrow per triple whose object is another resource.\n\n"
-                        + "It follows the filters and the selection. Select a subject in the tree to see "
-                        + "just that resource and its immediate neighbours; select a named graph, in either "
-                        + "the list or the tree, to see only that graph; select nothing to see everything the "
-                        + "filters admitted.\n\n"
+                        + "It follows the filters and the highlighted rows. Highlight resources in the tree - "
+                        + "Ctrl or Shift for several - to see just those and their immediate neighbours; "
+                        + "highlight a class folder to see that class's instances; highlight named graphs, in "
+                        + "either the list or the tree, to see only those graphs; highlight nothing to see "
+                        + "everything the filters admitted.\n\n"
                         + "Include literals adds attribute values as extra nodes - useful for a handful of "
                         + "resources, overwhelming for many.\n\n"
                         + "Scroll to zoom, drag the background to pan, drag a node to rearrange it, and use "
                         + "Fit to bring everything back into view.");
         GUIhelper.installHelpTooltip(helpTree,
-                "Subjects of the filtered triples, each expanding to its predicates and objects. A predicate "
+                "The filtered triples, each resource expanding to its predicates and objects. A predicate "
                         + "with one value is shown on a single line; a repeated predicate becomes a node with one "
                         + "child per value.\n\n"
+                        + "Group by reshapes the rows already scanned, so it never rescans the models:\n"
+                        + "  Subject (flat) - every resource in one alphabetical list.\n"
+                        + "  Class (rdf:type) - a folder per class, holding its instances. A resource with two "
+                        + "types appears under both.\n"
+                        + "  Containment (incoming) - nested by what points at a resource, so a CGMES "
+                        + "dataset reads Region, Substation, VoltageLevel, Bay, Equipment, Terminal.\n"
+                        + "  References (outgoing) - nested the other way, by what a resource points to.\n\n"
+                        + "In the two nesting modes a node shows its nested resources first and its own "
+                        + "properties after; past eight nested children they are grouped into class folders.\n\n"
                         + "URIs are shortened using the namespace prefixes declared in the source file, or written "
                         + "relative to the document base where no prefix applies. Copy value puts the full URI or "
-                        + "literal of the selected row on the clipboard.\n\n"
-                        + "Selecting a row also narrows the graph view to it.");
+                        + "literal of every highlighted row on the clipboard, one per line.\n\n"
+                        + "Highlighting rows also narrows the graph view to them.");
     }
 
     public void setMainController(MainController mainController) {
@@ -424,22 +487,22 @@ public class RDFVisualisationController implements Initializable {
         return message == null || message.isBlank() ? t.getClass().getSimpleName() : message;
     }
 
-    // ==================== graph selection ====================
+    // ==================== graph ticking and highlighting ====================
 
     @FXML
-    private void actionSelectAllGraphs(ActionEvent event) {
-        setAllGraphsSelected(true);
+    private void actionTickAllGraphs(ActionEvent event) {
+        setAllGraphsTicked(true);
     }
 
     @FXML
-    private void actionSelectNoGraphs(ActionEvent event) {
-        setAllGraphsSelected(false);
+    private void actionUntickAllGraphs(ActionEvent event) {
+        setAllGraphsTicked(false);
     }
 
-    private void setAllGraphsSelected(boolean selected) {
+    private void setAllGraphsTicked(boolean ticked) {
         suppressRebuild = true;
         try {
-            graphEntries.forEach(entry -> entry.selectedProperty().set(selected));
+            graphEntries.forEach(entry -> entry.selectedProperty().set(ticked));
         } finally {
             suppressRebuild = false;
         }
@@ -448,17 +511,22 @@ public class RDFVisualisationController implements Initializable {
         rebuildTree();
     }
 
+    /** Unloads every highlighted graph. Ticking plays no part: it decides inclusion, not scope. */
     @FXML
     private void actionRemoveSelectedGraph(ActionEvent event) {
-        GraphEntry highlighted = lvGraphs.getSelectionModel().getSelectedItem();
-        if (highlighted == null) {
-            GUIhelper.showWarning("No graph selected",
-                    "Click a graph in the Named graphs list first, then press Remove selected.");
+        // Copied first: the selection list is a live view and shrinks as the entries go.
+        List<GraphEntry> highlighted = new ArrayList<>(lvGraphs.getSelectionModel().getSelectedItems());
+        if (highlighted.isEmpty()) {
+            GUIhelper.showWarning("No graph highlighted",
+                    "Click a graph's name in the Named graphs list first - Ctrl or Shift for several - "
+                            + "then press Remove selected.");
             return;
         }
-        graphEntries.remove(highlighted);
         lvGraphs.getSelectionModel().clearSelection();
-        setStatus("Removed graph: " + highlighted.name());
+        graphEntries.removeAll(highlighted);
+        setStatus(highlighted.size() == 1
+                ? "Removed graph: " + highlighted.getFirst().name()
+                : "Removed " + highlighted.size() + " graphs.");
         rebuildTree();
     }
 
@@ -502,24 +570,40 @@ public class RDFVisualisationController implements Initializable {
         rebuildTree();
     }
 
-    /**
-     * Adds or removes the two left-hand panes. They are taken out of the SplitPane rather than
-     * hidden: an unmanaged SplitPane item keeps its division, so hiding alone would leave the
-     * diagram no wider than before.
-     */
     @FXML
-    private void actionTogglePanes(ActionEvent event) {
+    private void actionToggleGraphsPane(ActionEvent event) {
+        graphsPaneVisible = !graphsPaneVisible;
+        applyPaneVisibility();
+    }
+
+    @FXML
+    private void actionToggleTreePane(ActionEvent event) {
+        treePaneVisible = !treePaneVisible;
+        applyPaneVisibility();
+    }
+
+    /**
+     * Rebuilds the split from the two pane flags and relabels the buttons. The panes are taken
+     * out of the SplitPane rather than hidden: an unmanaged SplitPane item keeps its division, so
+     * hiding alone would leave the diagram no wider than before.
+     */
+    private void applyPaneVisibility() {
         List<javafx.scene.Node> panes = new ArrayList<>(3);
-        if (tbShowGraphs.isSelected()) {
+        if (graphsPaneVisible) {
             panes.add(graphsPane);
         }
-        if (tbShowTree.isSelected()) {
+        if (treePaneVisible) {
             panes.add(treePane);
         }
         panes.add(graphViewPane);
         visualisationSplitPane.getItems().setAll(panes);
 
+        // The label states the action, so it flips once the pane is away.
+        btnToggleGraphsPane.setText(graphsPaneVisible ? "Hide Named graphs" : "Show Named graphs");
+        btnToggleTreePane.setText(treePaneVisible ? "Hide Graph tree" : "Show Graph tree");
+
         // setAll drops the divider positions, so restore a sensible split for the new item count.
+        // Deferred, because a position set before the SplitPane has been laid out is discarded.
         Platform.runLater(() -> {
             if (panes.size() == 3) {
                 visualisationSplitPane.setDividerPositions(0.22, 0.5);
@@ -551,11 +635,12 @@ public class RDFVisualisationController implements Initializable {
     }
 
     /**
-     * Redraws the diagram for the current filter result and selection.
+     * Redraws the diagram for the current filter result and the highlighted rows.
      * <p>
-     * Scope, narrowest first: a subject selected in the tree gives that resource and its
-     * immediate neighbours; a named graph selected in the tree or the list gives that graph;
-     * otherwise everything the filters admitted.
+     * Highlighted graphs - rows of the list, or named-graph rows of the tree - set which graphs
+     * are in scope; with none highlighted every filtered graph is. Any other highlighted tree row
+     * is a focus resource, and the diagram is narrowed to those resources and their immediate
+     * neighbours; a class folder contributes all of its instances.
      */
     private void redrawGraphView() {
         if (lastRows.isEmpty()) {
@@ -564,47 +649,55 @@ public class RDFVisualisationController implements Initializable {
             return;
         }
 
-        String selectedGraph = null;
-        String focusSubject = null;
+        Set<String> selectedGraphs = new LinkedHashSet<>();
+        Set<String> focusNodes = new LinkedHashSet<>();
 
-        GraphEntry listSelection = lvGraphs.getSelectionModel().getSelectedItem();
-        if (listSelection != null) {
-            selectedGraph = listSelection.name();
-        }
-
-        TreeItem<NodeValue> treeSelection = tvGraph.getSelectionModel().getSelectedItem();
-        if (treeSelection != null && treeSelection.getValue() != null) {
-            String raw = treeSelection.getValue().raw();
-            boolean isGraphNode = lastRows.stream().anyMatch(row -> row.name().equals(raw));
-            if (isGraphNode) {
-                selectedGraph = raw;
-            } else if (!raw.isEmpty()) {
-                focusSubject = raw;
+        for (GraphEntry entry : lvGraphs.getSelectionModel().getSelectedItems()) {
+            if (entry != null) {
+                selectedGraphs.add(entry.name());
             }
         }
 
-        final String graphScope = selectedGraph;
-        List<GraphRows> scope = graphScope == null
-                ? lastRows
-                : lastRows.stream().filter(row -> row.name().equals(graphScope)).toList();
+        for (TreeItem<NodeValue> item : tvGraph.getSelectionModel().getSelectedItems()) {
+            // A removed row can still be reported by the selection model for a moment.
+            if (item == null || item.getValue() == null) {
+                continue;
+            }
+            NodeValue value = item.getValue();
+            if (value.kind() == NodeKind.GRAPH) {
+                selectedGraphs.add(value.raw());
+            } else if (value.kind() == NodeKind.CLASS) {
+                focusNodes.addAll(value.members());
+            } else if (!value.raw().isEmpty()) {
+                focusNodes.add(value.raw());
+            }
+        }
 
-        List<RdfGraphView.Edge> edges = buildEdges(scope, focusSubject, cbIncludeLiterals.isSelected());
+        List<GraphRows> scope = selectedGraphs.isEmpty()
+                ? lastRows
+                : lastRows.stream().filter(row -> selectedGraphs.contains(row.name())).toList();
+
+        List<RdfGraphView.Edge> edges = buildEdges(scope, focusNodes, cbIncludeLiterals.isSelected());
         RdfGraphView.Rendered rendered = graphView.show(edges, MAX_GRAPH_NODES);
         Platform.runLater(graphView::fitToView);
 
         StringBuilder info = new StringBuilder();
         if (rendered.nodeCount() == 0) {
-            info.append("Nothing to draw: the selection has no relationships between resources.");
+            info.append("Nothing to draw: the highlighted rows have no relationships between resources.");
             if (!cbIncludeLiterals.isSelected()) {
                 info.append(" Tick Include literals to see attribute values as nodes.");
             }
         } else {
             info.append(rendered.nodeCount()).append(" nodes, ")
                     .append(rendered.edgeCount()).append(" relationships");
-            if (focusSubject != null) {
+            if (focusNodes.size() == 1) {
                 info.append(" around the selected resource");
-            } else if (selectedGraph != null) {
-                info.append(" in ").append(selectedGraph);
+            } else if (!focusNodes.isEmpty()) {
+                info.append(" around ").append(focusNodes.size()).append(" selected resources");
+            } else if (selectedGraphs.size() == 1) {
+                info.append(" in ").append(selectedGraphs.iterator().next());
+            } else if (!selectedGraphs.isEmpty()) {
+                info.append(" in ").append(selectedGraphs.size()).append(" graphs");
             }
             info.append('.');
             if (rendered.truncated()) {
@@ -618,12 +711,12 @@ public class RDFVisualisationController implements Initializable {
     /**
      * Turns filtered rows into diagram edges.
      *
-     * @param focusSubject when set, keep only triples touching that resource, so the diagram
-     *                     shows its immediate neighbourhood rather than the whole graph
+     * @param focusNodes   when non-empty, keep only triples touching one of these resources, so
+     *                     the diagram shows their neighbourhood rather than the whole graph
      * @param withLiterals include literal objects as their own nodes
      */
     private static List<RdfGraphView.Edge> buildEdges(
-            List<GraphRows> scope, String focusSubject, boolean withLiterals) {
+            List<GraphRows> scope, Set<String> focusNodes, boolean withLiterals) {
 
         List<RdfGraphView.Edge> edges = new ArrayList<>();
         for (GraphRows graph : scope) {
@@ -634,9 +727,9 @@ public class RDFVisualisationController implements Initializable {
                     if (!object.resource() && !withLiterals) {
                         continue;
                     }
-                    if (focusSubject != null
-                            && !focusSubject.equals(subjectId)
-                            && !focusSubject.equals(object.raw())) {
+                    if (!focusNodes.isEmpty()
+                            && !focusNodes.contains(subjectId)
+                            && !focusNodes.contains(object.raw())) {
                         continue;
                     }
                     // A literal is not identified by its value, so give each one its own node id;
@@ -658,8 +751,8 @@ public class RDFVisualisationController implements Initializable {
     private void actionClearAll(ActionEvent event) {
         graphEntries.clear();
         clearFilterFields();
-        tvGraph.getRoot().getChildren().clear();
         lastRows = List.of();
+        buildTreeItems();
         graphView.clear();
         lblGraphViewInfo.setText("Load RDF to draw the relationships.");
         lastLoadNote = "";
@@ -698,8 +791,8 @@ public class RDFVisualisationController implements Initializable {
         }
         List<GraphEntry> selected = graphEntries.stream().filter(GraphEntry::isSelected).toList();
         if (selected.isEmpty()) {
-            tvGraph.getRoot().getChildren().clear();
             lastRows = List.of();
+            buildTreeItems();
             graphView.clear();
             lblGraphViewInfo.setText("No graph is ticked.");
             setStatus(graphEntries.isEmpty()
@@ -780,40 +873,146 @@ public class RDFVisualisationController implements Initializable {
 
     private void showRows(List<GraphRows> rows) {
         lastRows = rows;
-        TreeItem<NodeValue> root = tvGraph.getRoot();
-        root.getChildren().clear();
-
-        // The named-graph level only earns its extra click when there is more than one graph.
-        if (rows.size() == 1) {
-            root.getChildren().setAll(subjectItems(rows.getFirst()));
-        } else {
-            List<TreeItem<NodeValue>> graphItems = new ArrayList<>(rows.size());
-            for (GraphRows graph : rows) {
-                String label = graph.name() + "  (" + graph.subjects().size() + " subject"
-                        + (graph.subjects().size() == 1 ? "" : "s") + ", "
-                        + graph.matched() + " of " + graph.total() + " triples)";
-                graphItems.add(new LazyItem(new NodeValue(label, graph.name()),
-                        () -> subjectItems(graph)));
-            }
-            root.getChildren().setAll(graphItems);
-        }
-
+        buildTreeItems();
         setStatus(statusText(rows));
         redrawGraphView();
     }
 
+    /**
+     * Rebuilds the tree from {@link #lastRows} in the current grouping. Grouping is a reshaping
+     * of rows that are already scanned and filtered, so this never touches the models - which is
+     * why switching Group by needs no Apply.
+     */
+    private void buildTreeItems() {
+        hierarchies.clear();
+        // Cleared explicitly: the highlight cannot survive a reshape, and clearing it is what
+        // widens the graph view's scope again.
+        tvGraph.getSelectionModel().clearSelection();
+
+        TreeItem<NodeValue> root = tvGraph.getRoot();
+        root.getChildren().clear();
+        if (lastRows.isEmpty()) {
+            return;
+        }
+
+        // The named-graph level only earns its extra click when there is more than one graph.
+        if (lastRows.size() == 1) {
+            root.getChildren().setAll(groupedItems(lastRows.getFirst()));
+        } else {
+            List<TreeItem<NodeValue>> graphItems = new ArrayList<>(lastRows.size());
+            for (GraphRows graph : lastRows) {
+                String label = graph.name() + "  (" + graph.subjects().size() + " subject"
+                        + (graph.subjects().size() == 1 ? "" : "s") + ", "
+                        + graph.matched() + " of " + graph.total() + " triples)";
+                graphItems.add(new LazyItem(NodeValue.graph(label, graph.name()),
+                        () -> groupedItems(graph)));
+            }
+            root.getChildren().setAll(graphItems);
+        }
+    }
+
+    /** The rows of one graph, shaped by the selected grouping. */
+    private List<TreeItem<NodeValue>> groupedItems(GraphRows graph) {
+        return switch (grouping()) {
+            case FLAT -> subjectItems(graph);
+            case CLASS -> classItems(graph);
+            case CONTAINMENT, REFERENCES -> hierarchyItems(graph);
+        };
+    }
+
+    private Grouping grouping() {
+        Grouping selected = cbGrouping.getValue();
+        return selected == null ? Grouping.FLAT : selected;
+    }
+
     private static List<TreeItem<NodeValue>> subjectItems(GraphRows graph) {
-        List<TreeItem<NodeValue>> items = new ArrayList<>(graph.subjects().size());
-        for (SubjectRows subject : graph.subjects()) {
+        return subjectItems(graph.subjects(), graph.truncated());
+    }
+
+    private static List<TreeItem<NodeValue>> subjectItems(List<SubjectRows> subjects, boolean truncated) {
+        List<TreeItem<NodeValue>> items = new ArrayList<>(subjects.size() + 1);
+        for (SubjectRows subject : subjects) {
             String label = subject.subject().label() + "  (" + subject.triples().size() + ")";
-            items.add(new LazyItem(new NodeValue(label, subject.subject().raw()),
+            items.add(new LazyItem(NodeValue.subject(label, subject.subject().raw()),
                     () -> predicateItems(subject)));
         }
-        if (graph.truncated()) {
-            items.add(new TreeItem<>(new NodeValue(
-                    "... further subjects not shown - narrow the filters to reach them", "")));
+        if (truncated) {
+            items.add(truncationItem());
         }
         return items;
+    }
+
+    /** A folder per {@code rdf:type}, holding its instances. A subject with two types is in both. */
+    private static List<TreeItem<NodeValue>> classItems(GraphRows graph) {
+        List<ClassGroup> groups = classGroups(graph.subjects());
+        List<TreeItem<NodeValue>> items = new ArrayList<>(groups.size() + 1);
+        for (ClassGroup group : groups) {
+            List<SubjectRows> members = group.members();
+            items.add(new LazyItem(classNodeValue(group), () -> subjectItems(members, false)));
+        }
+        if (graph.truncated()) {
+            items.add(truncationItem());
+        }
+        return items;
+    }
+
+    private List<TreeItem<NodeValue>> hierarchyItems(GraphRows graph) {
+        Hierarchy hierarchy = hierarchies.computeIfAbsent(graph.name(),
+                key -> Hierarchy.of(graph, grouping() == Grouping.CONTAINMENT));
+        List<TreeItem<NodeValue>> items = hierarchy.rootItems();
+        if (graph.truncated()) {
+            items.add(truncationItem());
+        }
+        return items;
+    }
+
+    /**
+     * Groups subjects by the classes their own rows declare, folders sorted by name with the
+     * untyped ones last. A subject with two {@code rdf:type} triples is a member of both folders.
+     */
+    private static List<ClassGroup> classGroups(List<SubjectRows> subjects) {
+        Map<String, Term> types = new LinkedHashMap<>();
+        Map<String, List<SubjectRows>> byType = new LinkedHashMap<>();
+        List<SubjectRows> untyped = new ArrayList<>();
+
+        for (SubjectRows subject : subjects) {
+            Set<String> seen = new HashSet<>();
+            for (TripleRow triple : subject.triples()) {
+                if (!RDF.type.getURI().equals(triple.predicate().raw())) {
+                    continue;
+                }
+                Term type = triple.object();
+                if (!seen.add(type.raw())) {
+                    continue; // the same type stated twice is still one folder
+                }
+                types.putIfAbsent(type.raw(), type);
+                byType.computeIfAbsent(type.raw(), key -> new ArrayList<>()).add(subject);
+            }
+            if (seen.isEmpty()) {
+                untyped.add(subject);
+            }
+        }
+
+        List<ClassGroup> groups = new ArrayList<>(byType.size() + 1);
+        byType.forEach((raw, members) -> groups.add(new ClassGroup(types.get(raw), members)));
+        groups.sort(Comparator.comparing(group -> group.type().label(), String.CASE_INSENSITIVE_ORDER));
+        if (!untyped.isEmpty()) {
+            groups.add(new ClassGroup(new Term(NO_TYPE_LABEL, "", false), untyped));
+        }
+        return groups;
+    }
+
+    /** Carries the members, so highlighting a class folder draws that class's instances. */
+    private static NodeValue classNodeValue(ClassGroup group) {
+        return NodeValue.classNode(
+                group.type().label() + "  (" + group.members().size() + ")",
+                group.type().raw(),
+                group.members().stream().map(member -> member.subject().raw()).toList());
+    }
+
+    private static TreeItem<NodeValue> truncationItem() {
+        return new TreeItem<>(NodeValue.info(
+                "... further subjects not shown - narrow the filters to reach them"));
     }
 
     private static List<TreeItem<NodeValue>> predicateItems(SubjectRows subject) {
@@ -829,14 +1028,14 @@ public class RDFVisualisationController implements Initializable {
             if (group.size() == 1) {
                 // Single-valued: one line rather than a node the user must open to see one child.
                 Term object = group.getFirst().object();
-                items.add(new TreeItem<>(new NodeValue(
+                items.add(new TreeItem<>(NodeValue.value(
                         predicate.label() + "  →  " + object.label(), object.raw())));
             } else {
-                TreeItem<NodeValue> predicateItem = new TreeItem<>(new NodeValue(
+                TreeItem<NodeValue> predicateItem = new TreeItem<>(NodeValue.value(
                         predicate.label() + "  (" + group.size() + ")", predicate.raw()));
                 for (TripleRow triple : group) {
                     predicateItem.getChildren().add(new TreeItem<>(
-                            new NodeValue(triple.object().label(), triple.object().raw())));
+                            NodeValue.value(triple.object().label(), triple.object().raw())));
                 }
                 items.add(predicateItem);
             }
@@ -848,9 +1047,24 @@ public class RDFVisualisationController implements Initializable {
 
     @FXML
     private void actionExpandSelected(ActionEvent event) {
-        TreeItem<NodeValue> selected = tvGraph.getSelectionModel().getSelectedItem();
-        TreeItem<NodeValue> start = selected != null ? selected : tvGraph.getRoot();
-        int expanded = expandRecursively(start, 0);
+        // Copied first: expanding a LazyItem replaces children, which the selection model reports.
+        List<TreeItem<NodeValue>> highlighted =
+                new ArrayList<>(tvGraph.getSelectionModel().getSelectedItems());
+        List<TreeItem<NodeValue>> starts = highlighted.isEmpty()
+                ? List.of(tvGraph.getRoot())
+                : highlighted;
+
+        // One budget shared across the highlighted branches, not one per branch.
+        int expanded = 0;
+        for (TreeItem<NodeValue> start : starts) {
+            if (start == null) {
+                continue;
+            }
+            expanded = expandRecursively(start, expanded);
+            if (expanded >= MAX_EXPANDED_NODES) {
+                break;
+            }
+        }
         if (expanded >= MAX_EXPANDED_NODES) {
             setStatus("Expanded the first " + MAX_EXPANDED_NODES
                     + " nodes of the selection; expand the remaining branches individually.");
@@ -885,17 +1099,24 @@ public class RDFVisualisationController implements Initializable {
         item.setExpanded(false);
     }
 
+    /** Copies the full value of every highlighted row, one per line. Structural rows carry none. */
     @FXML
     private void actionCopySelected(ActionEvent event) {
-        TreeItem<NodeValue> selected = tvGraph.getSelectionModel().getSelectedItem();
-        if (selected == null || selected.getValue() == null || selected.getValue().raw().isEmpty()) {
-            setStatus("Select a row in the tree first, then press Copy value.");
+        List<String> values = tvGraph.getSelectionModel().getSelectedItems().stream()
+                .filter(item -> item != null && item.getValue() != null)
+                .map(item -> item.getValue().raw())
+                .filter(raw -> !raw.isEmpty())
+                .toList();
+        if (values.isEmpty()) {
+            setStatus("Highlight a row in the tree first, then press Copy value.");
             return;
         }
         ClipboardContent content = new ClipboardContent();
-        content.putString(selected.getValue().raw());
+        content.putString(String.join(System.lineSeparator(), values));
         Clipboard.getSystemClipboard().setContent(content);
-        setStatus("Copied to clipboard: " + selected.getValue().raw());
+        setStatus(values.size() == 1
+                ? "Copied to clipboard: " + values.getFirst()
+                : "Copied " + values.size() + " values to the clipboard, one per line.");
     }
 
     // ==================== term rendering ====================
@@ -996,6 +1217,33 @@ public class RDFVisualisationController implements Initializable {
 
     // ==================== supporting types ====================
 
+    /**
+     * How the tree arranges the filtered rows. All four are reshapings of the same rows, so
+     * switching between them costs no rescan.
+     */
+    private enum Grouping {
+        /** One alphabetical list of every resource. */
+        FLAT("Subject (flat)"),
+        /** A folder per class, holding its instances. */
+        CLASS("Class (rdf:type)"),
+        /** Nested by what points at a resource: Region, Substation, VoltageLevel, Bay, Equipment. */
+        CONTAINMENT("Containment (incoming)"),
+        /** Nested by what a resource points to: Terminal, Equipment, VoltageLevel, Substation. */
+        REFERENCES("References (outgoing)");
+
+        private final String label;
+
+        Grouping(String label) {
+            this.label = label;
+        }
+
+        /** Rendered by the ComboBox's default cell factory, which calls toString(). */
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
     /** An RDF term as shown ({@code label}) and as matched and copied ({@code raw}). */
     private record Term(String label, String raw, boolean resource) {
         boolean contains(String needle) {
@@ -1033,12 +1281,215 @@ public class RDFVisualisationController implements Initializable {
                              boolean truncated) {
     }
 
-    /** Value of one tree row: {@code label} is rendered, {@code raw} is what Copy value yields. */
-    private record NodeValue(String label, String raw) {
+    /** One class folder: the type it stands for, and the subjects that declare it. */
+    private record ClassGroup(Term type, List<SubjectRows> members) {
+    }
+
+    /**
+     * What a tree row stands for. The graph view reads this to tell a named-graph row from a
+     * resource row, which it used to guess by asking whether the row's value was also a graph
+     * name.
+     */
+    private enum NodeKind { GRAPH, CLASS, SUBJECT, VALUE, INFO }
+
+    /**
+     * Value of one tree row: {@code label} is rendered, {@code raw} is what Copy value yields,
+     * {@code kind} is how the graph view reads the row, and {@code members} carries the subjects
+     * of a class folder so that highlighting the folder draws them.
+     */
+    private record NodeValue(String label, String raw, NodeKind kind, List<String> members) {
+
+        static NodeValue graph(String label, String raw) {
+            return new NodeValue(label, raw, NodeKind.GRAPH, List.of());
+        }
+
+        static NodeValue classNode(String label, String raw, List<String> members) {
+            return new NodeValue(label, raw, NodeKind.CLASS, List.copyOf(members));
+        }
+
+        static NodeValue subject(String label, String raw) {
+            return new NodeValue(label, raw, NodeKind.SUBJECT, List.of());
+        }
+
+        static NodeValue value(String label, String raw) {
+            return new NodeValue(label, raw, NodeKind.VALUE, List.of());
+        }
+
+        /** A structural or explanatory row: nothing to copy, nothing to draw. */
+        static NodeValue info(String label) {
+            return new NodeValue(label, "", NodeKind.INFO, List.of());
+        }
+
         /** Rendered by the TreeView's default cell factory, which calls toString(). */
         @Override
         public String toString() {
             return label == null ? "" : label;
+        }
+    }
+
+    /**
+     * A parent/child view over one graph's subjects, backing the two nesting grouping modes.
+     * Built from rows that are already filtered, and cached per graph, so reshaping the tree
+     * never goes back to the model.
+     */
+    private static final class Hierarchy {
+        private final Map<String, SubjectRows> index;
+        private final Map<String, Set<String>> children;
+        private final List<String> roots;
+
+        private Hierarchy(Map<String, SubjectRows> index, Map<String, Set<String>> children,
+                          List<String> roots) {
+            this.index = index;
+            this.children = children;
+            this.roots = roots;
+        }
+
+        /**
+         * Builds the parent/child edges from the resource-valued triples of the given rows.
+         *
+         * @param containment nest by who points <em>at</em> a resource, which is what makes a
+         *                    CGMES dataset read Region &#9656; Substation &#9656; VoltageLevel;
+         *                    otherwise nest by what a resource points to
+         */
+        static Hierarchy of(GraphRows graph, boolean containment) {
+            Map<String, SubjectRows> index = new LinkedHashMap<>();
+            for (SubjectRows subject : graph.subjects()) {
+                index.putIfAbsent(subject.subject().raw(), subject);
+            }
+
+            Map<String, Set<String>> children = new LinkedHashMap<>();
+            Set<String> hasParent = new HashSet<>();
+            for (SubjectRows subject : graph.subjects()) {
+                String from = subject.subject().raw();
+                for (TripleRow triple : subject.triples()) {
+                    Term object = triple.object();
+                    // Only a reference to another row of this graph can nest: a literal is a
+                    // property, and a URI nothing here describes has no row to nest under.
+                    if (!object.resource()
+                            || object.raw().equals(from)
+                            || !index.containsKey(object.raw())) {
+                        continue;
+                    }
+                    String parent = containment ? object.raw() : from;
+                    String child = containment ? from : object.raw();
+                    // Two predicates can point at the same resource; it is still one child.
+                    children.computeIfAbsent(parent, key -> new LinkedHashSet<>()).add(child);
+                    hasParent.add(child);
+                }
+            }
+
+            List<String> roots = new ArrayList<>();
+            Set<String> reached = new HashSet<>();
+            for (String raw : index.keySet()) {
+                if (!hasParent.contains(raw)) {
+                    roots.add(raw);
+                    reach(raw, children, reached);
+                }
+            }
+            // A mutual-reference pair or a longer cycle has no parentless member, so the walk
+            // above never arrives at it. Each such component gets a root of its own, which is
+            // what guarantees that nothing indexed is unreachable.
+            for (String raw : index.keySet()) {
+                if (!reached.contains(raw)) {
+                    roots.add(raw);
+                    reach(raw, children, reached);
+                }
+            }
+            return new Hierarchy(index, children, roots);
+        }
+
+        /** Breadth-first walk from one root, marking everything below it as reached. */
+        private static void reach(String start, Map<String, Set<String>> children, Set<String> reached) {
+            if (!reached.add(start)) {
+                return;
+            }
+            Deque<String> queue = new ArrayDeque<>();
+            queue.addLast(start);
+            while (!queue.isEmpty()) {
+                for (String child : children.getOrDefault(queue.removeFirst(), Set.of())) {
+                    if (reached.add(child)) {
+                        queue.addLast(child);
+                    }
+                }
+            }
+        }
+
+        List<TreeItem<NodeValue>> rootItems() {
+            return items(roots, Set.of());
+        }
+
+        /**
+         * Rows for a set of resources, grouped into class folders once there are more of them
+         * than {@value RDFVisualisationController#HIERARCHY_CLASS_GROUP_THRESHOLD} - which is
+         * what keeps a substation with forty children browsable. A single folder would only cost
+         * a click, so it is skipped.
+         */
+        private List<TreeItem<NodeValue>> items(Collection<String> raws, Set<String> ancestors) {
+            List<String> visible = visible(raws, ancestors);
+            if (visible.size() <= HIERARCHY_CLASS_GROUP_THRESHOLD) {
+                return plainItems(visible, ancestors);
+            }
+
+            List<ClassGroup> groups = classGroups(visible.stream().map(index::get).toList());
+            if (groups.size() < 2) {
+                return plainItems(visible, ancestors);
+            }
+            List<TreeItem<NodeValue>> items = new ArrayList<>(groups.size());
+            for (ClassGroup group : groups) {
+                List<String> members = group.members().stream()
+                        .map(member -> member.subject().raw()).toList();
+                // plainItems, not items: a folder must not regroup its own members for ever.
+                items.add(new LazyItem(classNodeValue(group), () -> plainItems(members, ancestors)));
+            }
+            return items;
+        }
+
+        private List<TreeItem<NodeValue>> plainItems(List<String> raws, Set<String> ancestors) {
+            List<TreeItem<NodeValue>> items = new ArrayList<>(raws.size());
+            for (String raw : raws) {
+                items.add(item(raw, ancestors));
+            }
+            return items;
+        }
+
+        /**
+         * One resource: its nested resources first, then its own predicate rows. With nothing
+         * nested the predicate rows are inlined, because a folder holding all of them would only
+         * cost a click; with something nested they go behind a {@code properties} folder, so the
+         * structure the mode exists to show stays legible.
+         */
+        private TreeItem<NodeValue> item(String raw, Set<String> ancestors) {
+            SubjectRows subject = index.get(raw);
+            List<String> nested = visible(children.getOrDefault(raw, Set.of()), ancestors);
+            int properties = subject.triples().size();
+            String label = subject.subject().label() + "  (" + properties
+                    + (properties == 1 ? " property" : " properties")
+                    + (nested.isEmpty() ? "" : ", " + nested.size() + " nested") + ")";
+
+            if (nested.isEmpty()) {
+                return new LazyItem(NodeValue.subject(label, raw), () -> predicateItems(subject));
+            }
+            // The ancestor path travels down with the supplier, and a child already on it is
+            // skipped: without that a cycle would nest for ever. A resource shared by two parents
+            // of a DAG still appears under both, which is what a reference view should show.
+            Set<String> path = new LinkedHashSet<>(ancestors);
+            path.add(raw);
+            return new LazyItem(NodeValue.subject(label, raw), () -> {
+                List<TreeItem<NodeValue>> rows = items(nested, path);
+                rows.add(new LazyItem(NodeValue.value("properties (" + properties + ")", raw),
+                        () -> predicateItems(subject)));
+                return rows;
+            });
+        }
+
+        private List<String> visible(Collection<String> raws, Set<String> ancestors) {
+            List<String> visible = new ArrayList<>(raws.size());
+            for (String raw : raws) {
+                if (!ancestors.contains(raw)) {
+                    visible.add(raw);
+                }
+            }
+            return visible;
         }
     }
 
@@ -1128,11 +1579,12 @@ public class RDFVisualisationController implements Initializable {
             checkBox.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
                 if (bound != null && bound.isSelected() != isSelected) {
                     bound.selectedProperty().set(isSelected);
-                    // Ticking is also an act of pointing at a row, so make it the selected one.
-                    getListView().getSelectionModel().select(getIndex());
+                    // Ticking says nothing about which row is highlighted: moving the
+                    // highlight here would silently change what the graph view draws.
                     rebuildTree();
                 }
             });
+            checkBox.setTooltip(new Tooltip("Include this graph in the tree and the graph view"));
         }
 
         @Override

@@ -353,6 +353,14 @@
     -fx-font-size: 1.05em;
 }
 
+/* Caption line under a section title: an explanation the control itself cannot carry,
+   set apart from the surrounding labels. Uses the theme variable every theme defines,
+   so it needs no per-theme override. */
+.caption-text {
+    -fx-text-fill: -cimpal-text-muted;
+    -fx-font-size: 0.92em;
+}
+
 .section-box {
     -fx-spacing: 8;
     -fx-padding: 12 0 0 0;
