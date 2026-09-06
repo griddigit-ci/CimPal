@@ -972,6 +972,17 @@ public class MainController implements Initializable {
     }
 
     @FXML
+    // action on menu Help - Help Contents
+    private void actionMenuHelpContents() {
+        try {
+            HelpWindow.show();
+        } catch (RuntimeException e) {
+            // WebView construction fails hard where the native javafx-web library is unavailable.
+            GUIhelper.showUserFriendlyError("Help window error", "The help window could not be opened.", e);
+        }
+    }
+
+    @FXML
     // action on menu About
     private void actionMenuAbout() {
         try {
