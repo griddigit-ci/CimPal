@@ -36,10 +36,12 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.rdf.model.AnonId;
 import org.apache.jena.rdf.model.Literal;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.ResIterator;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
@@ -66,6 +68,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -234,6 +237,14 @@ public class RDFVisualisationController implements Initializable {
      */
     private final Map<String, SubjectRows> subjectIndex = new HashMap<>();
 
+    /**
+     * Resolutions already worked out, misses included. Every resource-valued object row asks for
+     * one as it is built, and a CGMES model asks the same questions over and over - every Terminal
+     * points at the same VoltageLevel, and every {@code rdf:type} row names a class no instance
+     * file describes. Depends on the models alone, so it is dropped only when the tree is rebuilt.
+     */
+    private final Map<String, Optional<Resolution>> resolutions = new HashMap<>();
+
     /** The steps a right-click retraces, most recent first. Cleared whenever the tree is reshaped. */
     private final Deque<NavStep> navigation = new ArrayDeque<>();
 
@@ -350,12 +361,16 @@ public class RDFVisualisationController implements Initializable {
                         + "namespace is mostly folder path - it is stood in for by loc:, so a row reads "
                         + "loc:_1234-5678. A second such namespace in the same graph becomes loc2:, a third "
                         + "loc3:. A short namespace, urn:uuid: for instance, is left as written.\n\n"
-                        + "An object row that points at a resource the tree also describes carries a "
-                        + "disclosure arrow: click it to open that resource's properties in place, and again "
-                        + "on the rows below to trace a chain without losing your place. Double-click instead "
-                        + "to jump to the resource's own row. No arrow means the reference leads nowhere "
-                        + "the tree can show, and a double click then says why. One right-click steps back, a "
-                        + "double right-click returns to where the trace started.\n\n"
+                        + "An object row that names a resource any loaded file describes carries a disclosure "
+                        + "arrow: click it to open that resource's properties in place, and again on the rows "
+                        + "below to trace a chain without losing your place. What opens is read from the models, "
+                        + "not from the tree, so it reaches resources the filters left out and graphs that are "
+                        + "not ticked, and where several files describe the resource it shows all of their "
+                        + "triples together. Across CGMES profile files, which give the same object a different "
+                        + "URI in each file, a reference falls back to matching on the local name.\n\n"
+                        + "Double-click instead to jump to the resource's own row, where it has one. No arrow "
+                        + "means nothing loaded describes it. One right-click steps back, a double right-click "
+                        + "returns to where the trace started.\n\n"
                         + "Where a graph holds more subjects than the tree shows, its last row says so and "
                         + "clicking that row rescans for 5000 more.\n\n"
                         + "Copy value puts the full URI or literal of every highlighted row on the clipboard, "
@@ -872,7 +887,12 @@ public class RDFVisualisationController implements Initializable {
 
         // Captured before the scan starts, so a show-more click during one cannot change it midway.
         int limit = subjectLimit;
+        // Every loaded graph, not only the ticked ones: a reference resolves against all of them,
+        // so all of them need their local-name index, and building it here keeps the cost on the
+        // thread that already shows a progress indicator instead of on a click.
+        List<GraphEntry> loaded = new ArrayList<>(graphEntries);
         Thread scanner = new Thread(() -> {
+            loaded.forEach(GraphEntry::warmLocalNames);
             List<GraphRows> rows = new ArrayList<>(selected.size());
             for (GraphEntry entry : selected) {
                 rows.add(scan(entry, filter, limit));
@@ -891,9 +911,10 @@ public class RDFVisualisationController implements Initializable {
     /** One pass over a graph, grouping the matching triples by subject in subject-label order. */
     private static GraphRows scan(GraphEntry entry, Filter filter, int subjectLimit) {
         Model model = entry.model();
-        // Per graph, so a namespace it had to invent a prefix for keeps that prefix for the
-        // whole scan and two rows of the same graph never disagree about what loc: means.
-        Labels labels = new Labels(model, entry.base());
+        // The graph's own Labels, kept for its lifetime rather than made fresh per scan, so a
+        // namespace it had to invent a prefix for keeps that prefix everywhere: in the rows, in
+        // a row built later from the model, and in a status message about a resource.
+        Labels labels = entry.labels();
         Map<String, SubjectRows> bySubject = new LinkedHashMap<>();
         int total = 0;
         int matched = 0;
@@ -957,6 +978,7 @@ public class RDFVisualisationController implements Initializable {
         navigation.clear();
         // First graph wins a collision: one resource described in two profile files is still one
         // resource, and the earlier graph is the one loaded first.
+        resolutions.clear();
         subjectIndex.clear();
         for (GraphRows graph : lastRows) {
             for (SubjectRows subject : graph.subjects()) {
@@ -1125,26 +1147,168 @@ public class RDFVisualisationController implements Initializable {
         return items;
     }
 
+    // ==================== resolving a reference against the models ====================
+
     /**
-     * A row for one object, followable when it points at a resource the tree also describes.
+     * One graph that describes a resource, and the URI it describes it under - which is not
+     * always the URI that was asked for, because a match may have been made on the local name.
+     */
+    private record Hit(GraphEntry graph, String subjectUri) {
+    }
+
+    /**
+     * Where a reference leads: every loaded graph that describes the resource, and whether any of
+     * them had to be matched on the local name rather than on the URI itself.
+     */
+    private record Resolution(List<Hit> hits, boolean byLocalName) {
+    }
+
+    /**
+     * Every loaded graph that describes a resource, or {@code null} when none does.
+     * <p>
+     * The models are asked, not the tree rows: a resource the filters excluded, one past the
+     * subject cap, and one in a graph that is not ticked are all still in memory, and a reference
+     * to any of them can be followed. Ticking decides what the tree <em>lists</em>; it does not
+     * decide what a reference is allowed to reach.
+     * <p>
+     * The URI is tried first. A graph that does not have it is then tried on the local name,
+     * because CGMES profile files declare no {@code xml:base}: the very same Terminal is
+     * {@code EQ.xml#_abc} in the EQ file and {@code SSH.xml#_abc} in the SSH file, so an exact
+     * match alone would never cross from one profile to the next. Only graphs that lack the exact
+     * URI are matched this way, so a file that does have the resource is never second-guessed.
+     */
+    private Resolution resolve(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        return resolutions.computeIfAbsent(raw, key -> Optional.ofNullable(resolveUncached(key)))
+                .orElse(null);
+    }
+
+    private Resolution resolveUncached(String raw) {
+        List<Hit> hits = new ArrayList<>();
+        List<GraphEntry> withoutExact = new ArrayList<>();
+        for (GraphEntry entry : graphEntries) {
+            if (describes(entry, raw)) {
+                hits.add(new Hit(entry, raw));
+            } else {
+                withoutExact.add(entry);
+            }
+        }
+
+        // A blank node is identified only within the file that declared it, so there is no local
+        // name to carry it across a graph boundary.
+        boolean byLocalName = false;
+        String local = raw.startsWith("_:") ? null : localNameOf(raw);
+        if (local != null) {
+            for (GraphEntry entry : withoutExact) {
+                String subject = entry.subjectByLocalName(local);
+                if (subject != null) {
+                    hits.add(new Hit(entry, subject));
+                    byLocalName = true;
+                }
+            }
+        }
+        return hits.isEmpty() ? null : new Resolution(List.copyOf(hits), byLocalName);
+    }
+
+    /** Whether this graph states anything about the resource, asked of the model itself. */
+    private static boolean describes(GraphEntry entry, String raw) {
+        Model model = entry.model();
+        return model.contains(resourceFor(model, raw), null, (RDFNode) null);
+    }
+
+    /** The resource a displayed value stands for, blank-node ids included. */
+    private static Resource resourceFor(Model model, String raw) {
+        return raw.startsWith("_:")
+                ? model.createResource(AnonId.create(raw.substring(2)))
+                : model.getResource(raw);
+    }
+
+    /** The part of a URI after its namespace, or {@code null} when it has none to match on. */
+    private static String localNameOf(String uri) {
+        int start = localNameStart(uri);
+        return start < 0 ? null : uri.substring(start);
+    }
+
+    /**
+     * Every triple the loaded graphs state about a resource, as display rows: the union across
+     * graphs, so a Terminal followed from the SSH file arrives carrying its EQ name and type as
+     * well as its SSH state. A triple stated identically by two graphs is listed once, and each
+     * graph's terms are shortened with that graph's own prefixes.
+     */
+    private static SubjectRows modelRows(String raw, Resolution resolution) {
+        Map<String, TripleRow> byTriple = new LinkedHashMap<>();
+        Term subject = null;
+
+        for (Hit hit : resolution.hits()) {
+            Model model = hit.graph().model();
+            Labels labels = hit.graph().labels();
+            Resource resource = resourceFor(model, hit.subjectUri());
+            if (subject == null) {
+                subject = term(resource, labels);
+            }
+            StmtIterator it = model.listStatements(resource, null, (RDFNode) null);
+            try {
+                while (it.hasNext()) {
+                    Statement statement = it.nextStatement();
+                    Term predicate = term(statement.getPredicate(), labels);
+                    Term object = term(statement.getObject(), labels);
+                    byTriple.putIfAbsent(
+                            predicate.raw() + '\u0000' + object.raw() + '\u0000' + object.resource(),
+                            new TripleRow(predicate, object));
+                }
+            } finally {
+                it.close();
+            }
+        }
+
+        List<TripleRow> triples = new ArrayList<>(byTriple.values());
+        triples.sort(Comparator.comparing((TripleRow t) -> t.predicate().label(), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(t -> t.object().label(), String.CASE_INSENSITIVE_ORDER));
+        return new SubjectRows(subject == null ? new Term(raw, raw, true) : subject, triples);
+    }
+
+    /**
+     * How a resolution reads on the status line: which graphs it drew on, and whether the local
+     * name had to stand in for the URI - which is worth saying, because that is the one step that
+     * assumes two files mean the same resource by the same name.
+     */
+    private static String describeResolution(Resolution resolution) {
+        String graphs = String.join(", ",
+                resolution.hits().stream().map(hit -> hit.graph().name()).toList());
+        if (!resolution.byLocalName()) {
+            return graphs;
+        }
+        return graphs + (resolution.hits().size() == 1
+                ? " (matched on the local name)"
+                : " (partly matched on the local name)");
+    }
+
+    /**
+     * A row for one object, followable when a loaded model describes the resource it names.
      * <p>
      * A resolvable reference is a {@link LazyItem}, which is what makes following work in both
      * directions at once: the disclosure arrow itself says the row leads somewhere, expanding it
-     * loads the target's own predicate rows, and those rows' references are branches in turn - so
-     * a chain can be traced as many levels as there are clicks. Recursion is safe because a
+     * loads the target's predicate rows, and those rows' references are branches in turn - so a
+     * chain can be traced as many levels as there are clicks. Recursion is safe because a
      * LazyItem builds nothing until it is opened, so a cycle costs one click per hop rather than
      * looping. An unresolvable reference stays a leaf, so the missing arrow says so before the
      * click.
+     * <p>
+     * What is loaded comes from the models, not from the scanned rows, so a filter, the subject
+     * cap and an unticked graph all stop deciding what a reference may reach - only whether the
+     * resource has a row of its own to jump to.
      */
     private TreeItem<NodeValue> objectItem(String label, Term object) {
         if (!object.resource()) {
             return new TreeItem<>(NodeValue.value(label, object.raw()));
         }
-        SubjectRows target = subjectIndex.get(object.raw());
-        NodeValue value = NodeValue.reference(label, object.raw());
-        return target == null
+        NodeValue value = NodeValue.reference(label, object.raw(), object.label());
+        Resolution resolution = resolve(object.raw());
+        return resolution == null
                 ? new TreeItem<>(value)
-                : new LazyItem(value, () -> predicateItems(target));
+                : new LazyItem(value, () -> predicateItems(modelRows(object.raw(), resolution)));
     }
 
     // ==================== tree controls ====================
@@ -1254,34 +1418,67 @@ public class RDFVisualisationController implements Initializable {
                 new ArrayList<>(tvGraph.getSelectionModel().getSelectedItems()), item));
         item.setExpanded(true);
         tvGraph.scrollTo(tvGraph.getRow(item));
-        setStatus("Opened " + item.getValue().raw() + " here. Right-click to step back, "
+        setStatus("Opened " + item.getValue().display() + " here. Right-click to step back, "
                 + "double right-click to return to the start of the trace.");
     }
 
     /**
      * Moves to the target's own node in the tree, wherever the current grouping put it, rather
      * than showing a copy of it under the row that referenced it.
+     * <p>
+     * Every URI the resource answers to is tried, not only the one written on the row: a
+     * cross-profile reference names it under the referencing file's base, while its own row is
+     * listed under the base of the file that declares it. Where the resource is in the models but
+     * has no row - the filters exclude it, it fell past the subject cap, or its graph is not
+     * ticked - there is nowhere to jump, so it is opened in place instead and the status line
+     * says why.
      */
     private void jumpToReference(TreeItem<NodeValue> item) {
-        String uri = item.getValue().raw();
-        if (!subjectIndex.containsKey(uri)) {
-            reportUnresolved(uri);
+        NodeValue value = item.getValue();
+        Resolution resolution = resolve(value.raw());
+        if (resolution == null) {
+            reportUnresolved(value);
             return;
         }
+
         List<TreeItem<NodeValue>> from =
                 new ArrayList<>(tvGraph.getSelectionModel().getSelectedItems());
-        TreeItem<NodeValue> target = locateSubject(uri);
-        if (target == null) {
-            setStatus("\"" + uri + "\" is in the data, but its own row could not be located in this "
-                    + "grouping. Set Group by to Subject (flat), which always finds it.");
+        for (String candidate : candidateUris(value.raw(), resolution)) {
+            if (!subjectIndex.containsKey(candidate)) {
+                continue;
+            }
+            TreeItem<NodeValue> target = locateSubject(candidate);
+            if (target == null) {
+                setStatus(value.display() + " has a row in the tree, but it could not be located in "
+                        + "this grouping. Set Group by to Subject (flat), which always finds it.");
+                return;
+            }
+            // Nothing to collapse on the way back: the jump opened the target's ancestors, and
+            // folding them again would close parts of the tree the user may have opened.
+            navigation.push(new NavStep(from, null));
+            revealAndSelect(target);
+            setStatus("Jumped to " + value.display() + ", described in "
+                    + describeResolution(resolution)
+                    + ". Right-click to step back, double right-click to return to the start.");
             return;
         }
-        // Nothing to collapse on the way back: the jump opened the target's ancestors, and folding
-        // them again would close parts of the tree the user may have opened themselves.
-        navigation.push(new NavStep(from, null));
-        revealAndSelect(target);
-        setStatus("Jumped to " + uri + ". Right-click to step back, double right-click to return "
-                + "to the start of the trace.");
+
+        followReference(item);
+        setStatus(value.display() + " is described in " + describeResolution(resolution)
+                + ", but has no row of its own in the tree - the filters exclude it, it is past the "
+                + "subject cap, or its graph is not ticked. It is shown under this row instead.");
+    }
+
+    /** Every URI the resource answers to: the one written on the row, then the ones it matched. */
+    private static List<String> candidateUris(String raw, Resolution resolution) {
+        List<String> candidates = new ArrayList<>();
+        candidates.add(raw);
+        for (Hit hit : resolution.hits()) {
+            if (!candidates.contains(hit.subjectUri())) {
+                candidates.add(hit.subjectUri());
+            }
+        }
+        return candidates;
     }
 
     /**
@@ -1350,44 +1547,19 @@ public class RDFVisualisationController implements Initializable {
     }
 
     /**
-     * Says why a reference could not be followed, which is three different situations and three
-     * different remedies: the resource is described by a ticked graph but the filters excluded it
-     * or it fell past the subject cap; it is described by a graph that is not ticked; or nothing
-     * loaded describes it at all, and the reference is genuinely dangling.
+     * Says that a reference leads nowhere. Now that resolution asks the models rather than the
+     * rows, this is the one remaining case: no loaded graph states anything about the resource,
+     * under its own URI or under its local name. Either the reference is genuinely dangling, or
+     * the file that describes the resource has not been loaded.
+     * <p>
+     * The resource is named the way its row names it - the shortened {@code loc:} form - because
+     * a full {@code file:///} URI is mostly folder path and would fill the status line with it.
      */
-    private void reportUnresolved(String uri) {
-        String inTicked = null;
-        String inUnticked = null;
-
-        // A blank-node id is not a URI and cannot be looked up in a model; the rows are the only
-        // place it could have been resolved, and those have already been checked.
-        if (!uri.startsWith("_:")) {
-            for (GraphEntry entry : graphEntries) {
-                Model model = entry.model();
-                if (!model.contains(model.getResource(uri), null, (RDFNode) null)) {
-                    continue;
-                }
-                if (entry.isSelected()) {
-                    inTicked = entry.name();
-                    break;
-                }
-                if (inUnticked == null) {
-                    inUnticked = entry.name();
-                }
-            }
-        }
-
-        if (inTicked != null) {
-            setStatus("\"" + uri + "\" is described in " + inTicked + " but is not in the tree: "
-                    + "the filters exclude it, or it fell past the subject cap. Clear the filters, "
-                    + "or click the row at the end of the graph to show more subjects.");
-        } else if (inUnticked != null) {
-            setStatus("\"" + uri + "\" is described in \"" + inUnticked + "\", which is not ticked. "
-                    + "Tick it in Named graphs to bring it into the tree.");
-        } else {
-            setStatus("\"" + uri + "\" is referenced but nothing loaded describes it - a dangling "
-                    + "reference, or the file that describes it has not been loaded.");
-        }
+    private void reportUnresolved(NodeValue value) {
+        setStatus(value.display() + " is referenced, but nothing loaded describes it"
+                + (graphEntries.size() == 1 ? "" : " - in any of the " + graphEntries.size() + " loaded graphs")
+                + ". Either the reference is dangling, or the file that describes it is not loaded."
+                + " Its full URI is " + value.raw());
     }
 
     /**
@@ -1522,7 +1694,12 @@ public class RDFVisualisationController implements Initializable {
             this.base = base;
         }
 
-        String shorten(String uri) {
+        /**
+         * Synchronized because one instance now serves the scan thread and the FX thread both:
+         * the scan renders rows off the FX thread while a click can render a row or a message on
+         * it, and the invented prefixes are assigned in order of first appearance.
+         */
+        synchronized String shorten(String uri) {
             String prefixed = model.shortForm(uri);
             if (!prefixed.equals(uri)) {
                 return prefixed;
@@ -1686,43 +1863,47 @@ public class RDFVisualisationController implements Initializable {
 
     /**
      * Value of one tree row: {@code label} is rendered, {@code raw} is what Copy value yields,
-     * {@code kind} is how the graph view reads the row, and {@code members} carries the subjects
-     * of a class folder so that highlighting the folder draws them.
+     * {@code kind} is how the graph view reads the row, {@code members} carries the subjects of a
+     * class folder so that highlighting the folder draws them, and {@code display} is the term's
+     * own shortened form for the rows that stand for a single term.
      */
-    private record NodeValue(String label, String raw, NodeKind kind, List<String> members) {
+    private record NodeValue(String label, String raw, NodeKind kind, List<String> members,
+                             String display) {
 
         static NodeValue graph(String label, String raw) {
-            return new NodeValue(label, raw, NodeKind.GRAPH, List.of());
+            return new NodeValue(label, raw, NodeKind.GRAPH, List.of(), label);
         }
 
         static NodeValue classNode(String label, String raw, List<String> members) {
-            return new NodeValue(label, raw, NodeKind.CLASS, List.copyOf(members));
+            return new NodeValue(label, raw, NodeKind.CLASS, List.copyOf(members), label);
         }
 
         static NodeValue subject(String label, String raw) {
-            return new NodeValue(label, raw, NodeKind.SUBJECT, List.of());
+            return new NodeValue(label, raw, NodeKind.SUBJECT, List.of(), label);
         }
 
         static NodeValue value(String label, String raw) {
-            return new NodeValue(label, raw, NodeKind.VALUE, List.of());
+            return new NodeValue(label, raw, NodeKind.VALUE, List.of(), label);
         }
 
         /**
          * An object row whose object is a resource. Carries the target URI as its raw value, so
-         * the graph view still treats it as a focus resource and Copy value still yields the URI.
+         * the graph view still treats it as a focus resource and Copy value still yields the URI,
+         * and the object's own shortened form as {@code display}, so a message about the row can
+         * name the resource the way the row does rather than by its full URI.
          */
-        static NodeValue reference(String label, String raw) {
-            return new NodeValue(label, raw, NodeKind.REFERENCE, List.of());
+        static NodeValue reference(String label, String raw, String display) {
+            return new NodeValue(label, raw, NodeKind.REFERENCE, List.of(), display);
         }
 
         /** The row that raises the subject cap. No value, so it draws and copies nothing. */
         static NodeValue more(String label) {
-            return new NodeValue(label, "", NodeKind.MORE, List.of());
+            return new NodeValue(label, "", NodeKind.MORE, List.of(), label);
         }
 
         /** A structural or explanatory row: nothing to copy, nothing to draw. */
         static NodeValue info(String label) {
-            return new NodeValue(label, "", NodeKind.INFO, List.of());
+            return new NodeValue(label, "", NodeKind.INFO, List.of(), label);
         }
 
         /** Rendered by the TreeView's default cell factory, which calls toString(). */
@@ -1948,12 +2129,61 @@ public class RDFVisualisationController implements Initializable {
         private final String base;
         private final long tripleCount;
         private final BooleanProperty selected = new SimpleBooleanProperty(true);
+        /** Shortening for this graph, shared by every scan and every later lookup. */
+        private final Labels labels;
+        /** Local name to the subject URI that carries it. Built on demand; see the accessor. */
+        private Map<String, String> localNames;
 
         GraphEntry(String name, Model model, String base) {
             this.name = name;
             this.model = model;
             this.base = base;
             this.tripleCount = model.size();
+            this.labels = new Labels(model, base);
+        }
+
+        Labels labels() {
+            return labels;
+        }
+
+        /**
+         * The subject of this graph whose URI ends in the given local name, or {@code null}.
+         * <p>
+         * This is what lets a reference cross from one CGMES profile file to the next, where the
+         * same resource is {@code EQ.xml#_abc} in one file and {@code SSH.xml#_abc} in another.
+         * The index costs one pass over the model, so it is built the first time it is wanted and
+         * kept: {@link #warmLocalNames()} does that on the scan thread, where a pause is expected.
+         * Synchronized because that thread builds it and the FX thread reads it.
+         */
+        synchronized String subjectByLocalName(String local) {
+            if (localNames == null) {
+                Map<String, String> index = new HashMap<>();
+                ResIterator subjects = model.listSubjects();
+                try {
+                    while (subjects.hasNext()) {
+                        Resource subject = subjects.nextResource();
+                        String uri = subject.getURI();
+                        if (uri == null) {
+                            continue; // a blank node has no local name to be found by
+                        }
+                        String name = localNameOf(uri);
+                        if (name != null) {
+                            // First wins, so a graph that states the same local name twice - two
+                            // namespaces sharing a name - resolves to the one it declared first.
+                            index.putIfAbsent(name, uri);
+                        }
+                    }
+                } finally {
+                    subjects.close();
+                }
+                localNames = index;
+            }
+            return localNames.get(local);
+        }
+
+        /** Builds the local-name index if it is not built, so a later click does not pay for it. */
+        void warmLocalNames() {
+            subjectByLocalName("");
         }
 
         String name() {
@@ -2055,7 +2285,7 @@ public class RDFVisualisationController implements Initializable {
                 if (resolvable) {
                     jumpToReference(item);
                 } else {
-                    reportUnresolved(value.raw());
+                    reportUnresolved(value);
                 }
             }
         }

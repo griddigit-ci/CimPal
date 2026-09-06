@@ -1075,11 +1075,16 @@ fewer; past that they would overlap into noise, and hovering a node shows its na
 <h4>Navigating references</h4>
 
 <p>An object row whose value is another resource &mdash; <code>Terminal.ConductingEquipment
-&rarr; loc:_abc</code> &mdash; can be followed when the tree also describes that resource. The
+&rarr; loc:_abc</code> &mdash; can be followed when any loaded file describes that resource. The
 disclosure arrow says which is which: an arrow means the reference leads somewhere, no arrow means
-it leads nowhere the tree can show, so you know before you click. Following works across graphs,
-which is what a CGMES dataset needs &mdash; a Terminal declared in the EQ file is referenced from
-the SSH file constantly.</p>
+nothing loaded describes it, so you know before you click.</p>
+
+<p>What a reference reaches is read from the models held in memory, not from the rows the tree
+happens to be showing. A resource the filters excluded, one that fell past the subject cap, and one
+belonging to a graph that is not ticked can all still be opened: ticking and filtering decide what
+the tree <em>lists</em>, not what a reference is allowed to reach. Where several files describe the
+same resource, opening it shows all of their triples together &mdash; the EQ name and type beside
+the SSH state values &mdash; and a triple stated identically by two files is listed once.</p>
 
 <table class="io">
 <tr><th>Gesture</th><th>On</th><th>Effect</th></tr>
@@ -1096,8 +1101,8 @@ the SSH file constantly.</p>
         left is opened in passing; both steps are on the trail, so right-clicking retraces
         them.</td></tr>
 <tr><td>Double-click</td><td>a reference row with no arrow</td>
-    <td>Reports why the resource cannot be found. A single click stays silent, so selecting such a
-        row merely to scope the diagram never nags.</td></tr>
+    <td>Reports that nothing loaded describes the resource, and gives its full URI. A single click
+        stays silent, so selecting such a row merely to scope the diagram never nags.</td></tr>
 <tr><td>Click</td><td>the disclosure arrow itself</td>
     <td>Expands or collapses, and nothing more. The arrow is how a followed row is closed again.</td></tr>
 <tr><td>Right-click</td><td>anywhere in the tree</td>
@@ -1107,26 +1112,36 @@ the SSH file constantly.</p>
     <td>Unwinds the whole trace and returns to where it started.</td></tr>
 </table>
 
-<p>A reference that cannot be followed gets one of three messages, because the remedy differs in
-each case:</p>
+<p><strong>References across profile files.</strong> A CGMES export normally declares no
+<code>xml:base</code>, so every file resolves <code>#_abc</code> against its own location: the same
+Terminal is <code>&hellip;/EQ.xml#_abc</code> in the equipment file and
+<code>&hellip;/SSH.xml#_abc</code> in the steady-state hypothesis file. Matching on the URI alone
+would therefore never carry a reference from one profile to the next. So a reference is resolved by
+URI first, and any graph that does <em>not</em> have that URI is then tried on the local name
+&mdash; the <code>_abc</code> part &mdash; which is what makes EQ&nbsp;/&nbsp;SSH&nbsp;/&nbsp;TP
+tracing work. Only graphs lacking the exact URI are matched this way, so a file that does have the
+resource is never second-guessed, and the status line names the graphs a reference resolved into
+and says when a local name stood in for a URI. The case to be aware of is two unrelated datasets
+loaded at once: they share their mRIDs, so their resources would be treated as one.</p>
+
+<p>A double click has two things it can report instead of jumping:</p>
 
 <table class="io">
 <tr><th>Message</th><th>What it means</th></tr>
-<tr><td>&hellip; is described in <em>graph</em> but is not in the tree</td>
-    <td>That graph is ticked, but the filters exclude the resource or it fell past the subject cap.
-        Clear the filters, or show more subjects.</td></tr>
-<tr><td>&hellip; is described in <em>graph</em>, which is not ticked</td>
-    <td>The resource is loaded, but the graph describing it is left out of the tree. Tick it in
-        <em>Named graphs</em>.</td></tr>
-<tr><td>&hellip; is referenced but nothing loaded describes it</td>
-    <td>A genuinely dangling reference &mdash; or, more often, the profile file that describes the
-        resource has simply not been loaded.</td></tr>
+<tr><td>&hellip; has no row of its own in the tree</td>
+    <td>The resource is in the models, but the tree does not list it &mdash; the filters exclude it,
+        it is past the subject cap, or its graph is not ticked. There is nowhere to jump to, so it
+        is opened under the reference row instead.</td></tr>
+<tr><td>&hellip; is referenced, but nothing loaded describes it</td>
+    <td>No loaded file states anything about the resource, under its own URI or under its local
+        name. Either the reference is dangling, or the file that describes it has not been loaded;
+        the full URI is given so it can be searched for.</td></tr>
 </table>
 
 <p>In the two nested groupings a resource&rsquo;s own row can sit deep inside a structure that has
 to be built a level at a time, so the search for it is bounded. Where the bound is reached the
-message says the resource is in the data but could not be located in this grouping;
-<em>Subject (flat)</em> always finds it.</p>
+message says the row could not be located in this grouping; <em>Subject (flat)</em> always finds
+it.</p>
 
 <h4>Outputs</h4>
 <ul>
