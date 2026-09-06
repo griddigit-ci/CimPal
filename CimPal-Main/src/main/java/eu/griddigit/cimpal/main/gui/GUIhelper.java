@@ -15,13 +15,10 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.util.Duration;
-import javafx.util.Pair;
-import org.apache.jena.rdf.model.Model;
 
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
 
 import static eu.griddigit.cimpal.main.application.MainController.foutputWindowVar;
@@ -29,9 +26,6 @@ import static eu.griddigit.cimpal.main.application.MainController.foutputWindowV
 public class GUIhelper implements IOutputHandler {
 
     private static final String GENERIC_ERROR_MESSAGE = "An unexpected error occurred. You can review and copy the technical details for support.";
-
-    /** Styles the round "?" badges; defined in css/base.css, coloured by the active theme. */
-    public static final String HELP_ICON_STYLE_CLASS = "help-badge";
 
     public static void installHelpTooltip(Label helpIcon, String text) {
         if (helpIcon == null) {
@@ -275,21 +269,6 @@ public class GUIhelper implements IOutputHandler {
 //        return dialog;
 //    }
 
-
-    public static Pair<Integer, Model> getShapeModel(String shapeModelName) {
-        Model shapeModel = null;
-        int index = 0;
-        for (int i = 0; i < MainController.shapeModelsNames.size(); i++) {
-            if (((ArrayList) MainController.shapeModelsNames.get(i)).get(0).equals(shapeModelName)) {
-                shapeModel = (Model) MainController.shapeModels.get(i);
-                index = i;
-                break;
-            }
-        }
-
-        Pair<Integer, Model> result = new Pair(index, shapeModel);
-        return result;
-    }
 
     //Append text to output window
     public void appendOutput(String valueOf, Boolean nextLine) {

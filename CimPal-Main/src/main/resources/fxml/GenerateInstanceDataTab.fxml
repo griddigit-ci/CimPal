@@ -138,7 +138,7 @@
                         <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseXlsTemplate"
                                 text="Browse" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
 
-                        <HBox alignment="TOP_LEFT" spacing="8.0" styleClass="option-label"
+                        <HBox spacing="8.0" styleClass="option-label"
                               GridPane.rowIndex="1" GridPane.columnIndex="0" GridPane.valignment="TOP">
                             <Label text="Sorting options:"/>
                             <Label fx:id="helpSortingOptions" text="?" styleClass="help-badge"/>
@@ -190,7 +190,7 @@
 
         <!-- Global Reset button for both sections -->
         <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
-            <Button fx:id="btnResetGenerateInstance"
+            <Button
                     minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBtnResetGenerateInstance"

@@ -18,7 +18,6 @@ public class ModelManipulationFactory {
 
     public static String cnNewUUIDconnect;
     public static String cnNewUUIDconnectTemp;
-    private static Map<String,Model> baseInstanceModelMapOriginal;
 
 
         //Regenerate rdf:ID and mrid, if there. This is working for an IGM - i.e. one MAS

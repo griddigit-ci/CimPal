@@ -9,7 +9,6 @@ import eu.griddigit.cimpal.core.utils.MultiplicityTools;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.UnzippedFiles;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
-import javafx.scene.control.Alert;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.jena.rdf.model.*;
@@ -35,15 +34,12 @@ import org.slf4j.LoggerFactory;
 
 public class InstanceDataFactory {
 
-    private static final Logger LOG = LoggerFactory.getLogger(InstanceDataFactory.class);
 
 
     public static Resource classResource;
     public static Resource classResourceTerminal;
     private static Map<String,Integer> terminalMap;
     private static Map<String,Integer> terminalDCMap;
-    private static Map<String,Integer> skipClassMap;
-    private static Map<String,List<String>> headerDependencyMap;
     private static ArrayList<Object> skippedClassPropertyProcessed;
     private static ArrayList<Object> addedClassPropertyProcessed;
     public static List<RDFNode> supportedProperties;
@@ -54,217 +50,8 @@ public class InstanceDataFactory {
     public static int countOfOptionalAssociations;
     public static int countOfClasses;
     public static Resource resDummyClass;
-    public static Map<String,Statement> modelSplitMap;
-    public static Map<Integer,Resource> connectivityNodeMap;
-    public static Map<Integer,Resource> topologicalNodeMap;
-    public static List<String> shuntCompensatorList;
-    public static List<String> tapChangerList;
-    public static List<String> conductingEquipmentList;
 
 
-
-    //process profile data and all elements/equipment to single node
-    private static Model processAndAddSingle(ArrayList<Object> profileData, Model instanceDataModel, Model shaclModel, String xmlBase, Integer cardinalityFlag, Boolean conform, String desiredClass, Map<String, Boolean> inputData) {
-
-
-        for (int cl = 0; cl < ((ArrayList) profileData.get(0)).size(); cl++) { //this is to loop on the classes in the profile and add class for each concrete class
-
-
-            //add a class
-            String classFullURI = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(0)).get(0).toString();
-            String classLocalName = classFullURI.split("#",2)[1];
-            /*if (classLocalName.equals("Command")){
-                int k=1;
-            }*/
-            if ((!classLocalName.equals("Terminal") && !classLocalName.equals("DCTerminal") && !classLocalName.equals("ACDCConverterDCTerminal") && !classLocalName.equals("ConnectivityNode") && !classLocalName.equals("TopologicalNode") && !skipClassMap.containsKey(classLocalName) && desiredClass==null) || (classLocalName.equals(desiredClass))) {
-                if (desiredClass==null) {
-                    //need to check if the class is already in the model; if not then it is added; if yes associations and attributes are added to it
-                    boolean classInModel = instanceDataModel.listSubjectsWithProperty(RDF.type, ResourceFactory.createResource(classFullURI)).hasNext();
-                    if (!classInModel) {
-                        instanceDataModel = addClass(profileData, instanceDataModel, xmlBase, classFullURI, cardinalityFlag, inputData);
-                    } else {
-                        classResource = instanceDataModel.listSubjectsWithProperty(RDF.type, ResourceFactory.createResource(classFullURI)).next();
-                    }
-                }else{//if desired class is defined then the class is always added.
-                    instanceDataModel = addClass(profileData, instanceDataModel, xmlBase, classFullURI, cardinalityFlag, inputData);
-                }
-
-
-
-                for (int atas = 1; atas < ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).size(); atas++) {
-                    // this is to loop on the attributes and associations (including inherited) for a given class and attributes or associations
-
-
-                    ArrayList<Object> propertyNodeFeatures = new ArrayList<>();
-                    /*
-                     * propertyNodeFeatures structure
-                     * 0 - type of check: cardinality, datatype, associationValueType
-                     * 1 - message
-                     * 2 - name
-                     * 3 - description
-                     * 4 - severity
-                     * 5 - cardinality
-                     * 6 - the primitive either it is directly a primitive or it is the primitive of the .value attribute of a CIMdatatype
-                     * in case of enumeration 6 is set to Enumeration
-                     * in case of compound 6 is set to Compound
-                     * 7 - is a list of uri of the enumeration attributes
-                     * 8 - order
-                     * 9 - group
-                     * 10 - the list of concrete classes for association - the value type at the used end
-                     * 11 - classFullURI for the targetClass of the NodeShape
-                     * 12 - the uri of the compound class to be used in sh:class
-                     * 13 - path for the attributes of the compound
-                     */
-                   /* for (int i = 0; i < 14; i++) {
-                        propertyNodeFeatures.add("");
-                    }*/
-
-                    if (((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Association")) {//if it is an association
-                        if (((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(1).toString().equals("Yes")) {
-
-                            String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(6).toString();
-                            String localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(5).toString();
-                            String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(2).toString();
-                            Property property = ResourceFactory.createProperty(propertyFullURI);
-
-
-                            //Association info for target class - only for concrete classes in the profile
-                            if (((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).size()>10) { //TODO check if this is OK. This is to avoid crash if there are no concrete classes in the profile, but something should be done for the abstract classes which are concrete in another profile
-                                //propertyNodeFeatures.set(0, "associationValueType");
-                                //String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                                //localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
-                                //propertyNodeFeatures.set(5, cardinality);
-                                //nodeShapeResource = shapeModel.getResource(nsURIprofile + localName+"ValueType");
-                                //propertyNodeFeatures.set(1, "Not correct target class.");
-                                //propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
-                                //propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
-                                //propertyNodeFeatures.set(4, "Violation");
-                                //propertyNodeFeatures.set(8, atas - 1); // this is the order
-                                //propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
-                                List<Resource> concreteClasses = (List<Resource>) ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(10);
-                                //propertyNodeFeatures.set(10, concreteClasses);
-                                //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
-                                //propertyNodeFeatures.set(11, classFullURI);
-
-                                //shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
-
-                                //check if any of the concrete classes are already in the instance model and use them. This is done also in cases where shacl is restricting
-                                instanceDataModel=selectAssociationReferenceAndAddAssociation(instanceDataModel,concreteClasses,inputData,classFullURI,property,conform,profileData,xmlBase,cardinalityFlag,cardinality, classLocalName);
-
-                            }
-
-
-
-
-                    /*    //Cardinality check
-                        propertyNodeFeatures.set(0, "cardinality");
-                        String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                        String localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
-                        propertyNodeFeatures.set(5, cardinality);
-                        Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
-                        propertyNodeFeatures.set(1, "Missing required association.");
-                        propertyNodeFeatures.set(2, localNameAssoc + "-cardinality");
-                        propertyNodeFeatures.set(3, "This constraint validates the cardinality of the association at the used direction.");
-                        propertyNodeFeatures.set(4, "Violation");
-                        propertyNodeFeatures.set(8, atas - 1); // this is the order
-                        propertyNodeFeatures.set(9, nsURIprofile + "CardinalityGroup"); // this is the group
-
-                        String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(2).toString();
-
-                        shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
-
-                        //Association check for target class - only for concrete classes in the profile
-                        if (((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).size()>10) { //TODO check if this is OK. This is to avoid crash if there are no concrete classes in the profile, but something should be done for the abstract classes which are concrete in another profile
-                            propertyNodeFeatures.set(0, "associationValueType");
-                            //String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(6).toString();
-                            //localNameAssoc = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(5).toString();
-                            //propertyNodeFeatures.set(5, cardinality);
-                            //nodeShapeResource = shapeModel.getResource(nsURIprofile + localName+"ValueType");
-                            propertyNodeFeatures.set(1, "Not correct target class.");
-                            propertyNodeFeatures.set(2, localNameAssoc + "-valueType");
-                            propertyNodeFeatures.set(3, "This constraint validates the value type of the association at the used direction.");
-                            propertyNodeFeatures.set(4, "Violation");
-                            propertyNodeFeatures.set(8, atas - 1); // this is the order
-                            propertyNodeFeatures.set(9, nsURIprofile + "AssociationsGroup"); // this is the group
-                            List<Resource> concreteClasses = (List<Resource>) ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10);
-                            propertyNodeFeatures.set(10, concreteClasses);
-                            //String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(2).toString();
-                            propertyNodeFeatures.set(11, classFullURI);
-
-                            shapeModel = ShaclTools.addPropertyNode(shapeModel, nodeShapeResource, propertyNodeFeatures, nsURIprofile, localNameAssoc, propertyFullURI);
-                        }*/
-                        }
-
-                    } else if (((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(0).toString().equals("Attribute")) {//if it is an attribute
-                        //Resource nodeShapeResource = shapeModel.getResource(nsURIprofile + localName);
-                        //String localNameAttr = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(4).toString();
-                        String propertyFullURI = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(1).toString();
-                        Property property = ResourceFactory.createProperty(propertyFullURI);
-                        String cardinality = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(5).toString();
-
-                        String datatypeType = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(8).toString();
-                        String datatypeValueString = null;
-                        Object datatypeValuesEnum = null;
-
-                       /* if (property.getLocalName().equals("Model.profile")){
-                            int k=1;
-                        }*/
-
-                        switch (datatypeType) {
-                            case "Primitive": {
-                                datatypeValueString = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(10).toString(); //this is localName e.g. String
-
-                                //propertyNodeFeatures.set(6, datatypePrimitive);
-                                //propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
-
-                                break;
-                            }
-                            case "CIMDatatype": {
-                                datatypeValueString = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
-
-                                //propertyNodeFeatures.set(6, datatypePrimitive);
-                                //propertyNodeFeatures.set(1, "The datatype is not literal or it violates the xsd datatype.");
-
-                                break;
-                            }
-                            case "Compound": {
-                                datatypeValueString = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(9).toString(); //this is localName e.g. String
-
-                                //propertyNodeFeatures.set(6, "Compound");
-                                //propertyNodeFeatures.set(1, "Blank node (compound datatype) violation. Either it is not a blank node (nested structure, compound datatype) or it is not the right class.");
-                                //propertyNodeFeatures.set(12, datatypeCompound);
-                                //break;
-                            }
-                            case "Enumeration":
-                                //propertyNodeFeatures.set(6, "Enumeration");
-                                //propertyNodeFeatures.set(1, "The datatype is not IRI (Internationalized Resource Identifier) or it is enumerated value not part of the profile.");
-                                //this adds the structure which is a list of possible enumerated values
-
-                                datatypeValuesEnum = ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(10);
-                                //propertyNodeFeatures.set(7, ((ArrayList) ((ArrayList) ((ArrayList) shapeData.get(0)).get(cl)).get(atas)).get(10));
-                                break;
-                        }
-
-                        instanceDataModel = addAttribute(instanceDataModel, property, conform, datatypeType, datatypeValueString, datatypeValuesEnum, cardinality, cardinalityFlag,classLocalName,null,inputData,classFullURI);
-                        //saveInstanceData(instanceDataModel, xmlBase);
-
-
-
-                    /*shapeModel= addPropertyNodeForAttributeSingle(shapeModel, propertyNodeFeatures, shapeData, nsURIprofile, cl, atas, nodeShapeResource,localNameAttr,propertyFullURI);
-                    //check if the attribute is datatype, if yes the whole structure of the compound should be checked and property nodes should be created
-                    // for each attribute of the compound
-                    if (((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(8).toString().equals("Compound")) {
-                        ArrayList shapeDataCompound = ((ArrayList) ((ArrayList) ((ArrayList) ((ArrayList) profileData.get(0)).get(cl)).get(atas)).get(10));
-                        shapeModel= addPropertyNodeForAttributeCompound(shapeModel, propertyNodeFeatures, shapeDataCompound, nsURIprofile, nodeShapeResource, localNameAttr,propertyFullURI);
-                    }*/
-                    }
-                }
-            }
-        }
-
-
-        return instanceDataModel;
-    }
 
     //Loads one or many models
     public static Model modelLoadShaclFiles(String[] files, String xmlBase) throws FileNotFoundException {
@@ -382,7 +169,7 @@ public class InstanceDataFactory {
             int k=1;
         }
 
-        Statement stmt = null;
+        Statement stmt;
         String attributeValue=null;
 
         Map<String,Integer> cardinalityCheckResult= cardinalityCheck(cardinality, shaclContraintResult,property);
@@ -660,7 +447,7 @@ public class InstanceDataFactory {
 
         Map<String,Integer> valuesTemp = new HashMap<>();
         int randomInt=0;
-        if(inValues.size()!=0) {
+        if(!inValues.isEmpty()) {
             valuesTemp.put("minInclusive", 0);
             valuesTemp.put("maxInclusive", inValues.size() - 1);
 
@@ -678,7 +465,7 @@ public class InstanceDataFactory {
             int maxLength=values.get("maxLength");
             len=minLength + random.nextInt((maxLength - minLength) + 1);
             if (conform) {
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
@@ -691,7 +478,7 @@ public class InstanceDataFactory {
             int minLength=values.get("minLength");
             len=minLength + random.nextInt((999 - minLength) + 1);
             if (conform) {
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
@@ -709,7 +496,7 @@ public class InstanceDataFactory {
             int maxLength=values.get("maxLength");
             len=1 + random.nextInt((maxLength - 1) + 1);
             if (conform) {
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
@@ -721,7 +508,7 @@ public class InstanceDataFactory {
         if (!values.containsKey("minLength") && !values.containsKey("maxLength")){ //there is no min and no max
             len=10;
             if (conform) {
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
@@ -743,13 +530,13 @@ public class InstanceDataFactory {
         String attributeValue = null;
         int value;
 
-      /*  if (inValues.size()!=0) {
+      /*  if (!inValues.isEmpty()) {
             if (inValues.get(0).toString().contains("ThreePhasePower")) {
                 int k = 1;
             }
         }*/
 
-        if (values.size()==0 && inValues.size()==0){//no limits defined
+        if (values.isEmpty() && inValues.isEmpty()){//no limits defined
             if (conform) {
                 value= random.nextInt((10)+1);
                 attributeValue=String.valueOf(value);
@@ -763,7 +550,7 @@ public class InstanceDataFactory {
             int maxExclusive=values.get("maxExclusive");
             if (conform) {
                 value=minExclusive+1 + random.nextInt((maxExclusive - minExclusive));
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -782,7 +569,7 @@ public class InstanceDataFactory {
             int maxInclusive=values.get("maxInclusive");
             if (conform) {
                 value=minExclusive+1 + random.nextInt((maxInclusive - minExclusive)+1);
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -800,7 +587,7 @@ public class InstanceDataFactory {
             int maxInclusive=values.get("maxInclusive");
             if (conform) {
                 value=minInclusive + random.nextInt((maxInclusive - minInclusive)+1);
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -823,7 +610,7 @@ public class InstanceDataFactory {
             int maxExclusive=values.get("maxExclusive");
             if (conform) {
                 value=minInclusive + random.nextInt((maxExclusive - minInclusive));
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -846,7 +633,7 @@ public class InstanceDataFactory {
             int minInclusive=values.get("minInclusive");
             if (conform) {
                 value=minInclusive + random.nextInt((999 - minInclusive)+1);
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -859,7 +646,7 @@ public class InstanceDataFactory {
             int minExclusive=values.get("minExclusive");
             if (conform) {
                 value=minExclusive+1 + random.nextInt((999 - minExclusive)+1);
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -872,7 +659,7 @@ public class InstanceDataFactory {
             int maxInclusive=values.get("maxInclusive");
             if (conform) {
                 value=random.nextInt(maxInclusive+1);
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -885,7 +672,7 @@ public class InstanceDataFactory {
             int maxExclusive=values.get("maxExclusive");
             if (conform) {
                 value=random.nextInt(maxExclusive);
-                if(inValues.size()==0) {
+                if(inValues.isEmpty()) {
                     attributeValue = String.valueOf(value);
                 }else{
                     attributeValue = inValues.get(0).toString();
@@ -906,7 +693,7 @@ public class InstanceDataFactory {
         float value;
         int index;
 
-        if (values.size()==0){//no limits defined
+        if (values.isEmpty()){//no limits defined
             if (conform) {
                 value= (float) (0 + random.nextFloat()*(1)+0.000001);
                 attributeValue=String.valueOf(value);
@@ -1236,7 +1023,7 @@ public class InstanceDataFactory {
         }
 
 
-        Statement stmt = null;
+        Statement stmt;
         String attributeValue=null;
 
         Map<String,Integer> cardinalityCheckResult= cardinalityCheck(cardinality, shaclContraintResult,property);

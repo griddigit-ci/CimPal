@@ -37,7 +37,7 @@
                 <Region HBox.hgrow="ALWAYS" />
             </HBox>
 
-            <HBox alignment="TOP_LEFT" spacing="8.0" styleClass="option-label"
+            <HBox spacing="8.0" styleClass="option-label"
                   GridPane.rowIndex="2" GridPane.columnIndex="0" GridPane.valignment="TOP">
                 <Label text="Operations options:" wrapText="true" />
                 <Label fx:id="helpOperationsOptions" text="?" styleClass="help-badge"/>
@@ -150,7 +150,7 @@
                            HBox.hgrow="ALWAYS" />
             </HBox>
 
-            <HBox alignment="TOP_LEFT" spacing="8.0" styleClass="option-label"
+            <HBox spacing="8.0" styleClass="option-label"
                   GridPane.rowIndex="10" GridPane.columnIndex="0" GridPane.valignment="TOP">
                 <Label text="Sorting options:" />
                 <Label fx:id="helpSortingOptions" text="?" styleClass="help-badge"/>
@@ -171,7 +171,7 @@
 
         <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
             <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrtResetRDFConvert" text="Reset" />
-            <Button fx:id="fbtnRunRDFConvert" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false" onAction="#actionBtnRunRDFConvert" text="Convert" />
+            <Button minWidth="110.0" styleClass="primary-action" mnemonicParsing="false" onAction="#actionBtnRunRDFConvert" text="Convert" />
         </HBox>
     </VBox>
   </ScrollPane>

@@ -13,7 +13,6 @@ import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
-import javafx.util.Duration;
 import org.apache.jena.datatypes.RDFDatatype;
 
 import java.io.File;
@@ -726,7 +725,7 @@ public class ValidationByMappingController {
         List<File> archives = new ArrayList<>();
         try {
             Files.walkFileTree(selectedModelsFolder.toPath(), EnumSet.noneOf(FileVisitOption.class),
-                    MODEL_SCAN_DEPTH, new SimpleFileVisitor<Path>() {
+                    MODEL_SCAN_DEPTH, new SimpleFileVisitor<>() {
                         @Override
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                             if (file.toString().endsWith(".zip")) {

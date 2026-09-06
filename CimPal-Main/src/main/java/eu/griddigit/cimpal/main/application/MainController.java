@@ -40,7 +40,6 @@ import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import eu.griddigit.cimpal.main.util.ExcelTools;
 
-import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.*;
