@@ -25,6 +25,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -52,6 +53,36 @@ public class ValidationByMappingController {
     /** Depth used when discovering model archives under the models root folder. */
     private static final int MODEL_SCAN_DEPTH = 3;
 
+    /** Shared label for the "supply your own" entry of both dropdowns. */
+    private static final String OTHER = "Other";
+
+    private static final String DATATYPE_MAP_CGMES30_NC25 = "CGMES 3.0 / NC 2.5";
+    private static final String DATATYPE_MAP_CGMES30_NC24 = "CGMES 3.0 / NC 2.4";
+    private static final String DATATYPE_MAP_CGMES24_NC22 = "CGMES 2.4 / NC 2.2";
+
+    private static final String BASE_URI_CIM17 = "CIM 17";
+
+    /**
+     * Base URIs a CIM dataset is realistically based on, in the order they are offered. The value
+     * is the URI the field is filled and locked with; {@link #OTHER} carries no value and unlocks
+     * the field instead. A LinkedHashMap so the dropdown order is this declaration order.
+     */
+    private static final Map<String, String> BASE_URI_PRESETS = new LinkedHashMap<>();
+
+    static {
+        BASE_URI_PRESETS.put("CIM 16", "http://iec.ch/TC57/2013/CIM-schema-cim16");
+        BASE_URI_PRESETS.put(BASE_URI_CIM17, "http://iec.ch/TC57/CIM100");
+        BASE_URI_PRESETS.put("Stable CIM", "https://cim.ucaiug.io/ns");
+        BASE_URI_PRESETS.put("ENTSO-E extensions prior 2021", "http://entsoe.eu/CIM/SchemaExtension/3/1");
+        BASE_URI_PRESETS.put("EU extensions prior 2026", "http://iec.ch/TC57/CIM100-European");
+        BASE_URI_PRESETS.put("EU extensions 2026 on", "https://cim.ucaiug.io/ns/eu");
+        BASE_URI_PRESETS.put("EU NC extensions", "https://cim4.eu/ns/nc");
+        BASE_URI_PRESETS.put("DCAT", "http://www.w3.org/ns/dcat");
+        BASE_URI_PRESETS.put("DCTERMS", "http://purl.org/dc/terms");
+        // Deliberately last and deliberately without a value: see updateBaseUriField().
+        BASE_URI_PRESETS.put(OTHER, null);
+    }
+
     private MainController mainController;
 
     @FXML
@@ -72,11 +103,24 @@ public class ValidationByMappingController {
     @FXML
     private ChoiceBox<String> cbDatatypeMap;
 
+    /** Shown only when the datatype map choice is "Other". */
+    @FXML
+    private TextField tfDatatypeMapFile;
+
+    @FXML
+    private Button btnBrowseDatatypeMapFile;
+
+    @FXML
+    private ChoiceBox<String> cbBaseUri;
+
     @FXML
     private TextField tfXmlBaseUri;
 
     // Previous-run comparison CSV (header: region,dataset,total).
-    // Only used by the timestamped workflow; disabled otherwise.
+    // Only used by the timestamped workflow; hidden otherwise.
+    @FXML
+    private HBox rowPreviousComparisonCsvLabel;
+
     @FXML
     private TextField tfPreviousComparisonCsv;
 
@@ -152,6 +196,7 @@ public class ValidationByMappingController {
     private File constraintsRootFolder;
     private File outputFolder;
     private File previousComparisonCsvFile;
+    private File datatypeMapFile;
     private List<File> shaclConstraintFiles;
 
     public void setMainController(MainController mainController) {
@@ -168,13 +213,21 @@ public class ValidationByMappingController {
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
 
         cbDatatypeMap.getItems().setAll(
-                "CGMES 3.0 / NC 2.5",
-                "CGMES 3.0 / NC 2.4",
-                "CGMES 2.4 / NC 2.2"
+                DATATYPE_MAP_CGMES30_NC25,
+                DATATYPE_MAP_CGMES30_NC24,
+                DATATYPE_MAP_CGMES24_NC22,
+                OTHER
         );
-        cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.5");
+        cbDatatypeMap.getSelectionModel().select(DATATYPE_MAP_CGMES30_NC25);
+        cbDatatypeMap.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldVal, newVal) -> updateDatatypeMapControls());
+        updateDatatypeMapControls();
 
-        tfXmlBaseUri.setText("http://iec.ch/TC57/CIM100");
+        cbBaseUri.getItems().setAll(BASE_URI_PRESETS.keySet());
+        cbBaseUri.getSelectionModel().select(BASE_URI_CIM17);
+        cbBaseUri.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldVal, newVal) -> updateBaseUriField());
+        updateBaseUriField();
 
         pbValidationByMapping.setProgress(0);
 
@@ -186,22 +239,50 @@ public class ValidationByMappingController {
         initializeHelpTooltips();
     }
 
+    /** Reveals the file field and Browse button only for the "Other" datatype map. */
+    private void updateDatatypeMapControls() {
+        setShown(isOtherDatatypeMap(), tfDatatypeMapFile, btnBrowseDatatypeMapFile);
+    }
+
     /**
-     * Enables the fields the selected workflow actually reads, and disables the rest.
+     * Fills the base URI field from the selected preset and locks it, or unlocks it for "Other".
+     * <p>
+     * Switching to "Other" leaves the previous preset's URI in place as a starting point rather
+     * than clearing the field, since it is usually a variant of one of the presets that is wanted.
+     */
+    private void updateBaseUriField() {
+        String selected = cbBaseUri.getSelectionModel().getSelectedItem();
+        String presetUri = selected == null ? null : BASE_URI_PRESETS.get(selected);
+
+        if (presetUri == null) {
+            tfXmlBaseUri.setEditable(true);
+        } else {
+            tfXmlBaseUri.setText(presetUri);
+            tfXmlBaseUri.setEditable(false);
+        }
+    }
+
+    /**
+     * Enables the fields the selected workflow actually reads, and disables or hides the rest.
      * <p>
      * The two mapping workflows resolve their constraint files from the mapping CSV, so the
-     * manual constraint-files row does not apply to them; the manual workflow reads neither
-     * the mapping CSV nor the constraints root, output folder, datatype map or XML base, so
-     * those are disabled in turn. Without this, {@link #validateInputs()} would demand a
-     * mapping CSV for a run that never looks at one.
+     * manual constraint-files row does not apply to them; the manual workflow reads neither the
+     * mapping CSV nor the constraints root or output folder, so those are disabled in turn.
+     * Without this, {@link #validateInputs()} would demand a mapping CSV for a run that never
+     * looks at one.
+     * <p>
+     * The datatype map and base URI are read by all three workflows: the manual one loads its
+     * models through the same datatype-mapping parser, so an untyped load there would let a
+     * numeric or boolean constraint pass a model it should reject.
      */
     private void updateWorkflowControls() {
         boolean timestamped = isTimestampedWorkflow();
         boolean manual = isManualWorkflow();
 
-        // Previous-run comparison CSV: timestamped workflow only.
-        setDisabled(!timestamped, tfPreviousComparisonCsv, btnBrowsePreviousComparisonCsv,
-                helpPreviousComparisonCsv);
+        // Previous-run comparison CSV: timestamped workflow only, and hidden rather than
+        // disabled - it is the last row, so hiding it costs no layout gap.
+        setShown(timestamped, rowPreviousComparisonCsvLabel, tfPreviousComparisonCsv,
+                btnBrowsePreviousComparisonCsv);
 
         // Manual constraint file selection: manual workflow only.
         setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
@@ -210,8 +291,7 @@ public class ValidationByMappingController {
         // Mapping-driven inputs: not read by the manual workflow.
         setDisabled(manual, tfMappingCsvFile, btnBrowseMappingCsv,
                 tfConstraintsRootFolder, btnBrowseConstraintsRootFolder,
-                tfOutputFolder, btnBrowseOutputFolder,
-                cbDatatypeMap, tfXmlBaseUri);
+                tfOutputFolder, btnBrowseOutputFolder);
 
         // The export option and the discovered-model tree only mean anything for the manual
         // workflow, so they are hidden outright rather than shown disabled.
@@ -284,22 +364,29 @@ public class ValidationByMappingController {
 
         installHelpTooltip(
                 helpDatatypeMap,
-                "Select the CGMES and NC version combination used to load the datatype mapping for validation.\n\n" +
+                "Select the CGMES and NC version combination used to load the datatype mapping for validation. " +
+                        "The map types the literals as the models are parsed, which is what lets a constraint on a " +
+                        "numeric range or a boolean value fire at all.\n\n" +
                         "CGMES 3.0 / NC 2.5 uses the CIM17 / CGMES 3 / NC 2.5 datatype map.\n\n" +
                         "CGMES 3.0 / NC 2.4 uses the CIM17 / CGMES 3 / NC 2.4 datatype map.\n\n" +
-                        "CGMES 2.4 / NC 2.2 uses the CIM16 / CGMES 2.4 / NC 2.2 datatype map."
+                        "CGMES 2.4 / NC 2.2 uses the CIM16 / CGMES 2.4 / NC 2.2 datatype map.\n\n" +
+                        "Other reveals a Browse button for a .properties datatype map of your own, in the same " +
+                        "format as the bundled ones.\n\n" +
+                        "Used by all three workflows, the manual selection one included."
         );
 
         installHelpTooltip(
                 helpXmlBaseUri,
-                "Base URI used when loading RDF/XML files.\n\n" +
-                        "The default value is normally correct for CIM100 based profiles."
+                "Base URI used when loading RDF/XML files; relative URIs in the models are resolved against it.\n\n" +
+                        "Pick the namespace the dataset is based on from the dropdown and the field is filled and " +
+                        "locked, so a typo cannot silently produce a model whose subjects resolve nowhere.\n\n" +
+                        "Select Other to type a base URI that is not in the list."
         );
 
         installHelpTooltip(
                 helpPreviousComparisonCsv,
                 "Optional CSV holding the previous run's totals, used to build the comparison workbook.\n\n" +
-                        "Only available for the timestamped workflow.\n\n" +
+                        "Shown only for the timestamped workflow, the only one that produces a comparison.\n\n" +
                         "Expected header: region,dataset,total  (total = warnings + infos + violations).\n\n" +
                         "This is the same shape the comparison workbook emits, so each run's output can feed the next.\n\n" +
                         "If left empty, the comparison is produced with an empty \"previous\" column."
@@ -338,6 +425,8 @@ public class ValidationByMappingController {
                 folder -> outputFolder = folder);
         PathMemory.bind(tfPreviousComparisonCsv, "tab.validationByMapping.previousComparisonCsv",
                 file -> previousComparisonCsvFile = file);
+        PathMemory.bind(tfDatatypeMapFile, "tab.validationByMapping.datatypeMap",
+                file -> datatypeMapFile = file);
     }
 
     @FXML
@@ -451,6 +540,35 @@ public class ValidationByMappingController {
         tfOutputFolder.setText(outputFolder.getAbsolutePath());
     }
 
+    /** Selects a user-supplied datatype map. Only reachable while the choice is "Other". */
+    @FXML
+    private void actionBrowseDatatypeMapFile() {
+        List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                true,
+                "Datatype map",
+                List.of("*.properties"),
+                "Select a datatype map (.properties)",
+                "tab.validationByMapping.datatypeMap"
+        );
+
+        if (selected == null || selected.isEmpty() || selected.get(0) == null) {
+            return;
+        }
+
+        File selectedFile = selected.get(0);
+
+        if (!selectedFile.getName().toLowerCase().endsWith(".properties")) {
+            showWarning(
+                    "Invalid datatype map",
+                    "Please select a .properties datatype map file."
+            );
+            return;
+        }
+
+        datatypeMapFile = selectedFile;
+        tfDatatypeMapFile.setText(datatypeMapFile.getAbsolutePath());
+    }
+
     @FXML
     private void actionBrowsePreviousComparisonCsv() {
         List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
@@ -488,6 +606,7 @@ public class ValidationByMappingController {
         constraintsRootFolder = null;
         outputFolder = null;
         previousComparisonCsvFile = null;
+        datatypeMapFile = null;
         shaclConstraintFiles = null;
 
         tfMappingCsvFile.clear();
@@ -511,11 +630,16 @@ public class ValidationByMappingController {
             tfPreviousComparisonCsv.clear();
         }
 
+        if (tfDatatypeMapFile != null) {
+            tfDatatypeMapFile.clear();
+        }
+
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
-        cbDatatypeMap.getSelectionModel().select("CGMES 3.0 / NC 2.5");
+        cbDatatypeMap.getSelectionModel().select(DATATYPE_MAP_CGMES30_NC25);
+        cbBaseUri.getSelectionModel().select(BASE_URI_CIM17);
 
-        tfXmlBaseUri.setText("http://iec.ch/TC57/CIM100");
-
+        updateDatatypeMapControls();
+        updateBaseUriField();
         updateWorkflowControls();
 
         pbValidationByMapping.setProgress(0);
@@ -535,10 +659,8 @@ public class ValidationByMappingController {
         }
 
         boolean runTimestampedWorkflow = isTimestampedWorkflow();
-        String datatypeMapResource = getDatatypeMapResource();
-        String xmlBase = tfXmlBaseUri.getText() == null || tfXmlBaseUri.getText().isBlank()
-                ? "http://iec.ch/TC57/CIM100"
-                : tfXmlBaseUri.getText().trim();
+        DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
+        String xmlBase = getBaseUri();
 
         int threadCount = getThreadCount(runTimestampedWorkflow);
 
@@ -555,8 +677,7 @@ public class ValidationByMappingController {
 
         new Thread(() -> {
             try {
-                Map<String, RDFDatatype> dataTypeMap =
-                        CompleteDatatypeMapLoader.loadFromResource(datatypeMapResource);
+                Map<String, RDFDatatype> dataTypeMap = datatypeMapSource.load();
 
                 if (runTimestampedWorkflow) {
                     ValidationTools.ValidationTimestampedRunSummary tsResult =
@@ -642,6 +763,8 @@ public class ValidationByMappingController {
         File selectedModelsFolder = modelsInputFolder;
         List<File> selectedConstraintFiles = shaclConstraintFiles;
         boolean exportReports = cbExportReports != null && cbExportReports.isSelected();
+        DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
+        String xmlBase = getBaseUri();
 
         List<File> archives = new ArrayList<>();
         try {
@@ -688,6 +811,10 @@ public class ValidationByMappingController {
                     }
                 });
 
+                // Same datatype mapping the mapping-driven workflows use, so a numeric or boolean
+                // constraint is evaluated against typed literals here too.
+                tester.setDatatypeMapping(datatypeMapSource.load(), xmlBase);
+
                 tester.runTests(selectedConstraintFiles, selectedModelsFolder, archives, exportReports);
 
                 Platform.runLater(() -> {
@@ -715,7 +842,12 @@ public class ValidationByMappingController {
             return false;
         }
 
-        // The manual workflow reads only the constraint files and the models root folder.
+        if (!validateDatatypeMap()) {
+            return false;
+        }
+
+        // The manual workflow reads the constraint files, the models root folder and - like the
+        // other two - the datatype map and base URI checked above.
         if (isManualWorkflow()) {
             if (shaclConstraintFiles == null || shaclConstraintFiles.isEmpty()) {
                 showWarning("Missing constraint files",
@@ -757,8 +889,31 @@ public class ValidationByMappingController {
             return false;
         }
 
+        return true;
+    }
+
+    /** Shared by all three workflows: every one of them loads its models through the map. */
+    private boolean validateDatatypeMap() {
         if (cbDatatypeMap.getSelectionModel().getSelectedItem() == null) {
             showWarning("Missing datatype map", "Please select a datatype map.");
+            return false;
+        }
+
+        if (isOtherDatatypeMap()) {
+            if (datatypeMapFile == null) {
+                showWarning("Missing datatype map file",
+                        "Datatype map is set to \"Other\". Please browse for a .properties datatype map.");
+                return false;
+            }
+            if (!datatypeMapFile.isFile()) {
+                showWarning("Datatype map not found",
+                        "The selected datatype map no longer exists:\n" + datatypeMapFile.getAbsolutePath());
+                return false;
+            }
+        }
+
+        if (getBaseUri().isBlank()) {
+            showWarning("Missing base URI", "Please select or enter a base URI.");
             return false;
         }
 
@@ -777,15 +932,47 @@ public class ValidationByMappingController {
         );
     }
 
-    private String getDatatypeMapResource() {
-        String selected = cbDatatypeMap.getSelectionModel().getSelectedItem();
+    private boolean isOtherDatatypeMap() {
+        return OTHER.equals(cbDatatypeMap.getSelectionModel().getSelectedItem());
+    }
 
-        return switch (selected) {
-            case "CGMES 2.4 / NC 2.2" -> "/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties";
-            case "CGMES 3.0 / NC 2.4" -> "/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties";
-            case "CGMES 3.0 / NC 2.5" -> "/CompleteDatatypeMap_CIM17_CGMES3_NC25.properties";
+    /**
+     * Where the datatype map is to be read from. Resolved on the FX thread so the choice cannot
+     * change under a running validation, but loaded on the worker thread - parsing a map is I/O.
+     */
+    private DatatypeMapSource getDatatypeMapSource() {
+        if (isOtherDatatypeMap()) {
+            return new DatatypeMapSource(null, datatypeMapFile);
+        }
+
+        String selected = cbDatatypeMap.getSelectionModel().getSelectedItem();
+        String resource = switch (selected) {
+            case DATATYPE_MAP_CGMES24_NC22 -> "/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties";
+            case DATATYPE_MAP_CGMES30_NC24 -> "/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties";
+            case DATATYPE_MAP_CGMES30_NC25 -> "/CompleteDatatypeMap_CIM17_CGMES3_NC25.properties";
             default -> throw new IllegalStateException("Unknown datatype map: " + selected);
         };
+        return new DatatypeMapSource(resource, null);
+    }
+
+    /** The base URI to parse models with, falling back to the CIM 17 preset if the field is empty. */
+    private String getBaseUri() {
+        String text = tfXmlBaseUri.getText();
+        return text == null || text.isBlank()
+                ? BASE_URI_PRESETS.get(BASE_URI_CIM17)
+                : text.trim();
+    }
+
+    /**
+     * A bundled datatype map (by classpath resource) or one the user supplied (by file) -
+     * exactly one of the two is set.
+     */
+    private record DatatypeMapSource(String resourcePath, File file) {
+        Map<String, RDFDatatype> load() throws IOException {
+            return file != null
+                    ? CompleteDatatypeMapLoader.loadFromFile(file.toPath())
+                    : CompleteDatatypeMapLoader.loadFromResource(resourcePath);
+        }
     }
 
     /** Previous-run comparison CSV path, or null if none selected. */

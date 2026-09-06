@@ -146,6 +146,11 @@
                     text="Browse"
                     GridPane.rowIndex="5" GridPane.columnIndex="2"/>
 
+            <!--
+              Datatype map. The bundled maps need no further input; "Other" reveals the field and
+              Browse button for a .properties map of the user's own. Those two share the row
+              rather than occupying one of their own, so choosing "Other" does not reflow the form.
+            -->
             <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="0">
                 <Label text="Datatype map:" wrapText="true"/>
                 <Label fx:id="helpDatatypeMap"
@@ -155,21 +160,55 @@
             <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="1"
                   GridPane.columnSpan="2">
                 <ChoiceBox fx:id="cbDatatypeMap" prefWidth="350.0"/>
-                <Region HBox.hgrow="ALWAYS"/>
+                <TextField fx:id="tfDatatypeMapFile"
+                           editable="false"
+                           managed="false"
+                           minWidth="0.0"
+                           promptText="Select a .properties datatype map"
+                           visible="false"
+                           HBox.hgrow="ALWAYS"/>
+                <Button fx:id="btnBrowseDatatypeMapFile"
+                        managed="false"
+                        minWidth="95.0"
+                        mnemonicParsing="false"
+                        onAction="#actionBrowseDatatypeMapFile"
+                        text="Browse"
+                        visible="false"/>
+                <!--
+                  No trailing Region filler here, unlike the workflow row above: the path field
+                  is the thing that should absorb the slack, and a filler would halve it. With the
+                  field hidden the ChoiceBox is simply left-aligned, as on every other row.
+                -->
             </HBox>
 
+            <!--
+              Base URI. The dropdown carries the namespaces a CIM dataset is actually based on;
+              picking one fills the field and locks it, because a typo in a base URI silently
+              produces a model whose subjects resolve nowhere. "Other" unlocks it for anything
+              not in the list.
+            -->
             <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="0">
-                <Label text="XML base URI:" wrapText="true"/>
+                <Label text="Base URI:" wrapText="true"/>
                 <Label fx:id="helpXmlBaseUri"
                        text="?"
                        styleClass="help-badge"/>
             </HBox>
-            <TextField fx:id="tfXmlBaseUri"
-                       maxWidth="1.7976931348623157E308"
-                       text="http://iec.ch/TC57/CIM100"
-                       GridPane.rowIndex="7" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="1"
+                  GridPane.columnSpan="2">
+                <ChoiceBox fx:id="cbBaseUri" prefWidth="260.0"/>
+                <TextField fx:id="tfXmlBaseUri"
+                           minWidth="0.0"
+                           text="http://iec.ch/TC57/CIM100"
+                           HBox.hgrow="ALWAYS"/>
+            </HBox>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="8" GridPane.columnIndex="0">
+            <!--
+              Previous comparison CSV. Hidden rather than disabled outside the timestamped
+              workflow: it is the last row of the grid, so unmanaging it takes its row height and
+              gap with it instead of leaving a dead field behind.
+            -->
+            <HBox fx:id="rowPreviousComparisonCsvLabel" spacing="8.0" alignment="CENTER_LEFT"
+                  GridPane.rowIndex="8" GridPane.columnIndex="0">
                 <Label text="Previous comparison CSV:" wrapText="true"/>
                 <Label fx:id="helpPreviousComparisonCsv"
                        text="?"
@@ -178,7 +217,7 @@
             <TextField fx:id="tfPreviousComparisonCsv"
                        editable="false"
                        maxWidth="1.7976931348623157E308"
-                       promptText="Optional - previous run totals (region,dataset,total). Timestamped workflow only."
+                       promptText="Optional - previous run totals (region,dataset,total)."
                        GridPane.rowIndex="8" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowsePreviousComparisonCsv"
                     minWidth="95.0"

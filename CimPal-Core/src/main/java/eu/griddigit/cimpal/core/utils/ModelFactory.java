@@ -14,6 +14,7 @@ import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -152,6 +153,36 @@ public class ModelFactory {
         }
 
         return result;
+    }
+
+    /**
+     * Loads one or more RDF/XML inputs - plain files or ZIP archives of them - into a single union
+     * model, applying {@code dataTypeMap} while parsing.
+     * <p>
+     * This is {@link #modelLoad(List, String, Lang, boolean, boolean)} minus the per-file keys and
+     * the header split, plus the datatype mapping: the mapping has to be applied by the parser
+     * (see {@link DataTypeStreamRDF}), so a model already read by {@code RDFDataMgr} cannot be
+     * retro-typed. Callers that need typed literals - validation, comparison - must load this way.
+     */
+    public static Model modelLoadUnionWithDatatypeMap(
+            List<File> files, Map<String, RDFDatatype> dataTypeMap, String xmlBase) throws IOException {
+
+        Model union = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+
+        for (File file : files) {
+            String ext = FilenameUtils.getExtension(file.getName()).toLowerCase();
+            List<InputStream> streams = "zip".equals(ext)
+                    ? unzip(file)
+                    : List.of(new ByteArrayInputStream(Files.readAllBytes(file.toPath())));
+
+            for (InputStream in : streams) {
+                Model model = modelLoadXMLmapping(in, dataTypeMap, xmlBase);
+                union.add(model);
+                union.setNsPrefixes(model);
+            }
+        }
+
+        return union;
     }
 
     //Loads model data with datatype mapping

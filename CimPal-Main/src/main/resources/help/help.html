@@ -1248,6 +1248,13 @@ selects one of three routes, and the rest of the form enables only the fields th
 &ldquo;Parent folder for test models&rdquo; field is now the tab's own <em>Models / input root
 folder</em>, shared with the two mapping workflows.</p>
 
+<p><strong>All three workflows load their models through the datatype map and base URI.</strong>
+The map is what gives the literals their datatypes as the RDF/XML is parsed, and a constraint on a
+numeric range or a boolean value can only fire against a typed literal &mdash; parsed untyped,
+every value is a plain string and such a constraint passes a model it should reject. The manual
+workflow therefore reads the same two fields as the mapping ones, and they stay enabled for
+it.</p>
+
 <h4>Inputs</h4>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
@@ -1282,21 +1289,45 @@ folder</em>, shared with the two mapping workflows.</p>
     <td>Lists what was found under the models root folder, so you can see what a manual run will
         cover before starting it. <strong>Manual selection only</strong> &mdash; hidden for the
         mapping workflows.</td></tr>
-<tr><td>Datatype map</td><td>choice</td>
-    <td>Disabled for manual selection. The CGMES and NC version combination whose datatype map is
-        loaded for validation:
+<tr><td>Datatype map</td><td>choice, required</td>
+    <td>The CGMES and NC version combination whose datatype map is loaded for validation:
         <em>CGMES 3.0 / NC 2.5</em> uses the CIM17 / CGMES 3 / NC 2.5 map, <em>CGMES 3.0 / NC
         2.4</em> the CIM17 / CGMES 3 / NC 2.4 map, <em>CGMES 2.4 / NC 2.2</em> the CIM16 / CGMES 2.4
-        / NC 2.2 map.</td></tr>
-<tr><td>XML base URI</td><td>text</td>
-    <td>Base URI used when loading RDF/XML files. The default is normally correct for CIM100 based
-        profiles. Disabled for manual selection.</td></tr>
+        / NC 2.2 map. <em>Other</em> reveals a field and <em>Browse</em> button for a
+        <code>.properties</code> map of your own, in the same format as the bundled ones; the run
+        refuses to start if <em>Other</em> is selected with no file chosen.
+        <strong>Used by all three workflows</strong>, manual selection included.</td></tr>
+<tr><td>Base URI</td><td>choice + text, required</td>
+    <td>Base URI used when loading RDF/XML files; relative URIs in the models resolve against it.
+        Choose the namespace the dataset is based on from the dropdown and the field is filled and
+        locked; choose <em>Other</em> and the field becomes editable for anything not in the list.
+        The presets are listed below. <strong>Used by all three workflows.</strong></td></tr>
 <tr><td>Previous comparison CSV</td><td>file, optional</td>
-    <td>CSV holding the previous run's totals, used to build the comparison workbook. Timestamped
-        workflow only. Expected header <code>region,dataset,total</code> where total = warnings +
-        infos + violations &mdash; the same shape the comparison workbook emits, so each run's
-        output can feed the next. Left empty, the comparison is produced with an empty
-        <em>previous</em> column.</td></tr>
+    <td>CSV holding the previous run's totals, used to build the comparison workbook.
+        <strong>Shown only for the timestamped workflow</strong>, the only one that produces a
+        comparison; the row is hidden entirely for the other two. Expected header
+        <code>region,dataset,total</code> where total = warnings + infos + violations &mdash; the
+        same shape the comparison workbook emits, so each run's output can feed the next. Left
+        empty, the comparison is produced with an empty <em>previous</em> column.</td></tr>
+</table>
+
+<h4>Base URI presets</h4>
+<p>Selecting any preset but <em>Other</em> fills the field and makes it read-only, so a mistyped
+base URI cannot silently produce a model whose subjects resolve nowhere.</p>
+
+<table class="io">
+<tr><th>Selection</th><th>Base URI</th></tr>
+<tr><td>CIM 16</td><td><code>http://iec.ch/TC57/2013/CIM-schema-cim16</code></td></tr>
+<tr><td>CIM 17</td><td><code>http://iec.ch/TC57/CIM100</code> &mdash; the default</td></tr>
+<tr><td>Stable CIM</td><td><code>https://cim.ucaiug.io/ns</code></td></tr>
+<tr><td>ENTSO-E extensions prior 2021</td><td><code>http://entsoe.eu/CIM/SchemaExtension/3/1</code></td></tr>
+<tr><td>EU extensions prior 2026</td><td><code>http://iec.ch/TC57/CIM100-European</code></td></tr>
+<tr><td>EU extensions 2026 on</td><td><code>https://cim.ucaiug.io/ns/eu</code></td></tr>
+<tr><td>EU NC extensions</td><td><code>https://cim4.eu/ns/nc</code></td></tr>
+<tr><td>DCAT</td><td><code>http://www.w3.org/ns/dcat</code></td></tr>
+<tr><td>DCTERMS</td><td><code>http://purl.org/dc/terms</code></td></tr>
+<tr><td>Other</td><td>Editable. Switching to <em>Other</em> keeps whatever the field already held,
+    since the URI wanted is usually a variant of one of the presets.</td></tr>
 </table>
 
 <h4>Outputs</h4>

@@ -7,6 +7,7 @@ import eu.griddigit.cimpal.core.utils.ExcelTools;
 import eu.griddigit.cimpal.core.utils.ModelFactory;
 import eu.griddigit.cimpal.core.utils.ShaclTools;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.shacl.ShaclValidator;
@@ -28,6 +29,16 @@ public class ShaclAutoTester {
     private SHACLValidationLogger logger;
     private ShaclAutoTesterCallback callback;
 
+    /**
+     * Datatype map applied while parsing the models under test, or null to parse untyped.
+     * Without it every literal arrives as a plain string, so a constraint on a numeric range or
+     * a boolean value cannot fire and the test would silently pass.
+     */
+    private Map<String, RDFDatatype> dataTypeMap;
+
+    /** Base URI for resolving relative URIs in the models under test. */
+    private String xmlBase = "";
+
     public ShaclAutoTester() {
         this(null);
     }
@@ -35,6 +46,15 @@ public class ShaclAutoTester {
     public ShaclAutoTester(ShaclAutoTesterCallback callback) {
         logger = new SHACLValidationLogger();
         this.callback = callback;
+    }
+
+    /**
+     * Sets the datatype map and base URI used to load the models under test, so this workflow
+     * types its literals the same way the mapping-driven validation workflows do.
+     */
+    public void setDatatypeMapping(Map<String, RDFDatatype> dataTypeMap, String xmlBase) {
+        this.dataTypeMap = dataTypeMap;
+        this.xmlBase = xmlBase == null ? "" : xmlBase;
     }
 
     private void updateProgress(double progress) {
@@ -91,9 +111,7 @@ public class ShaclAutoTester {
                 Model dataModel = modelCache.get(cacheKey);
                 try {
                     if (dataModel == null) {
-                        Map<String, Model> modelMap = ModelFactory.modelLoad(
-                                new ArrayList<>(List.of(conformFile)), "", Lang.RDFXML, false, false);
-                        dataModel = modelMap.get("unionModel");
+                        dataModel = loadDataModel(conformFile);
                         modelCache.put(cacheKey, dataModel);
                     }
 
@@ -140,9 +158,7 @@ public class ShaclAutoTester {
                 Model dataModel = modelCache.get(cacheKey);
                 try {
                     if (dataModel == null) {
-                        Map<String, Model> modelMap = ModelFactory.modelLoad(
-                                new ArrayList<>(List.of(nonConformFile)), "", Lang.RDFXML, false, false);
-                        dataModel = modelMap.get("unionModel");
+                        dataModel = loadDataModel(nonConformFile);
                         modelCache.put(cacheKey, dataModel);
                     }
                 } catch (Exception e) {
@@ -192,6 +208,19 @@ public class ShaclAutoTester {
         }
 
         updateProgress(1.0);
+    }
+
+    /**
+     * Loads one model under test. With a datatype map configured the parse applies it, matching
+     * how the mapping-driven workflows load their models; without one it falls back to the plain
+     * read this class used before the map became configurable.
+     */
+    private Model loadDataModel(File file) throws IOException {
+        if (dataTypeMap == null || dataTypeMap.isEmpty()) {
+            return ModelFactory.modelLoad(
+                    new ArrayList<>(List.of(file)), xmlBase, Lang.RDFXML, false, false).get("unionModel");
+        }
+        return ModelFactory.modelLoadUnionWithDatatypeMap(List.of(file), dataTypeMap, xmlBase);
     }
 
     private static Map<String, SHACLRuleTestData> getRuleTestDataMap(File selectedFolder, List<File> fileL) {
