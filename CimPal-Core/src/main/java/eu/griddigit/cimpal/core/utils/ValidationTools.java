@@ -14,6 +14,7 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ import java.time.format.DateTimeParseException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -113,6 +115,96 @@ public class ValidationTools {
 
     private ValidationTools() { }
 
+    /**
+     * Forgets what has already been fetched from a remote host, so the next fetch of each URL
+     * is checked against its origin again.
+     * <p>
+     * Both maps are keyed by URL and live as long as the process. Without clearing them, a
+     * constraint file edited upstream between two runs stays invisible until the application is
+     * restarted: the shapes model is served from {@link #REMOTE_IMPORTS_CACHE} and the model
+     * input from the file recorded in {@link #REMOTE_XML_FILE_CACHE}, neither of which consults
+     * the origin a second time. This is called at the start of every validation run, which is
+     * the boundary at which a user expects their upstream edits to be picked up.
+     * <p>
+     * The disk caches are deliberately kept: both revalidate against the origin with
+     * {@code ETag} / {@code Last-Modified} and answer an unchanged file with a 304, so keeping
+     * them costs one conditional request per URL rather than a full download. Use
+     * {@link #clearRemoteDiskCaches()} to discard those as well.
+     */
+    public static void clearRemoteCaches() {
+        int shapes = REMOTE_IMPORTS_CACHE.size();
+        int xml = REMOTE_XML_FILE_CACHE.size();
+        REMOTE_IMPORTS_CACHE.clear();
+        REMOTE_XML_FILE_CACHE.clear();
+        dbg("CACHE cleared in-memory remote caches shapesEntries=" + shapes + " xmlEntries=" + xml);
+    }
+
+    /**
+     * Deletes the on-disk remote caches, in addition to clearing the in-memory ones.
+     * <p>
+     * Only the two directories this class owns are touched, and only the files directly inside
+     * them; a subdirectory, if one ever appears there, is left alone rather than walked. Not
+     * needed for ordinary staleness - the disk caches revalidate - so this exists for the case
+     * where a cached file is corrupt, or an origin serves a changed file under an unchanged
+     * validator.
+     *
+     * @return what was cleared, for reporting back to whoever asked
+     */
+    public static RemoteCacheClearResult clearRemoteDiskCaches() {
+        int memoryEntries = REMOTE_IMPORTS_CACHE.size() + REMOTE_XML_FILE_CACHE.size();
+        clearRemoteCaches();
+
+        int deleted = 0;
+        List<String> failures = new ArrayList<>();
+        for (Path dir : List.of(REMOTE_FETCH_CONFIG.diskCacheDir(), REMOTE_XML_CACHE_DIR)) {
+            if (!Files.isDirectory(dir)) {
+                continue;
+            }
+            try (Stream<Path> entries = Files.list(dir)) {
+                for (Path entry : entries.toList()) {
+                    if (!Files.isRegularFile(entry)) {
+                        continue;
+                    }
+                    try {
+                        Files.delete(entry);
+                        deleted++;
+                    } catch (IOException e) {
+                        failures.add(entry.getFileName() + ": " + e.getMessage());
+                    }
+                }
+            } catch (IOException e) {
+                failures.add(dir + ": " + e.getMessage());
+            }
+        }
+
+        dbg("CACHE cleared remote disk caches files=" + deleted + " failures=" + failures.size());
+        return new RemoteCacheClearResult(memoryEntries, deleted, List.copyOf(failures));
+    }
+
+    /** The directories {@link #clearRemoteDiskCaches()} empties, for a confirmation prompt. */
+    public static List<Path> remoteDiskCacheDirectories() {
+        return List.of(REMOTE_FETCH_CONFIG.diskCacheDir(), REMOTE_XML_CACHE_DIR);
+    }
+
+    /** How many files {@link #clearRemoteDiskCaches()} would delete right now. */
+    public static int remoteDiskCacheFileCount() {
+        int count = 0;
+        for (Path dir : remoteDiskCacheDirectories()) {
+            if (!Files.isDirectory(dir)) {
+                continue;
+            }
+            try (Stream<Path> entries = Files.list(dir)) {
+                count += (int) entries.filter(Files::isRegularFile).count();
+            } catch (IOException e) {
+                dbg("CACHE could not count disk cache dir=" + dir + " error=" + forLog(e.getMessage()));
+            }
+        }
+        return count;
+    }
+
+    /** Outcome of {@link #clearRemoteDiskCaches()}: {@code failures} is empty on full success. */
+    public record RemoteCacheClearResult(int memoryEntries, int filesDeleted, List<String> failures) { }
+
     public static class MappingRow {
         public final String xmlInputsRaw;
         public final String ttl;
@@ -162,6 +254,9 @@ public class ValidationTools {
 
         dbg("START validateByTimestampedMapping");
         printMemory("start validateByTimestampedMapping");
+
+        //a run re-reads every input: nothing carries over from the previous one
+        clearRemoteCaches();
 
         Files.createDirectories(outputBaseDir);
 
@@ -455,6 +550,9 @@ public class ValidationTools {
 
         dbg("START validateByMapping");
         printMemory("start validateByMapping");
+
+        //a run re-reads every input: nothing carries over from the previous one
+        clearRemoteCaches();
 
         dbg("START read mapping csv: " + mappingCsvPath.toAbsolutePath());
         List<MappingRow> rows = readMappingCsv(mappingCsvPath);
@@ -1843,7 +1941,17 @@ public class ValidationTools {
 
     /**
      * Downloads an XML file from {@code url} to the local cache directory and returns its Path.
-     * Files are cached by URL hash; subsequent calls for the same URL return immediately.
+     * <p>
+     * A file already in the cache is revalidated against the origin with {@code ETag} /
+     * {@code Last-Modified} rather than trusted outright: previously the presence of the file
+     * was taken as proof it was current, so an input republished upstream was never picked up
+     * again on that workstation. An unchanged file costs one 304 and no download. A cached file
+     * with no recorded validator - written before this revalidation existed - is re-downloaded
+     * once, which then records one.
+     * <p>
+     * Within a single run the first resolution of a URL is remembered in
+     * {@link #REMOTE_XML_FILE_CACHE}, so a URL used by several mapping rows is revalidated once;
+     * {@link #clearRemoteCaches()} drops that at each run boundary.
      */
     private static Path downloadXmlToCache(String url) throws IOException {
         Path existing = REMOTE_XML_FILE_CACHE.get(url);
@@ -1857,31 +1965,108 @@ public class ValidationTools {
 
         // Defence in depth: even with a sanitised name, confirm the resolved path is inside
         // the cache directory before writing to it.
-        Path target = REMOTE_XML_CACHE_DIR.resolve(fileName).normalize();
-        if (!target.startsWith(REMOTE_XML_CACHE_DIR)) {
-            throw new IOException("Refusing to write outside the cache directory: " + target);
+        Path target = resolveInCacheDir(REMOTE_XML_CACHE_DIR, fileName);
+        Path metaFile = resolveInCacheDir(REMOTE_XML_CACHE_DIR, fileName + ".meta");
+        boolean onDisk = Files.exists(target);
+
+        if (REMOTE_FETCH_CONFIG.offline()) {
+            if (!onDisk) {
+                throw new IOException("Offline mode: URL not in disk cache: " + urlForLog(rawUrl));
+            }
+            dbg("downloadXmlToCache offline disk-hit rawUrl=" + urlForLog(rawUrl) + " local=" + target);
+            REMOTE_XML_FILE_CACHE.put(url, target);
+            return target;
         }
 
-        if (!Files.exists(target)) {
-            dbg("downloadXmlToCache fetch rawUrl=" + urlForLog(rawUrl));
-            byte[] bytes = fetchHttpBytes(rawUrl);
-            createPrivateDirectory(REMOTE_XML_CACHE_DIR);
-            Path tmp = REMOTE_XML_CACHE_DIR.resolve(fileName + ".tmp").normalize();
-            if (!tmp.startsWith(REMOTE_XML_CACHE_DIR)) {
-                throw new IOException("Refusing to write outside the cache directory: " + tmp);
-            }
-            Files.write(tmp, bytes);
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
-            dbg("downloadXmlToCache saved bytes=" + bytes.length + " local=" + target);
+        Properties meta = onDisk ? readCacheMeta(metaFile) : new Properties();
+        ConditionalFetch fetch = fetchHttpBytes(
+                rawUrl, meta.getProperty("etag"), meta.getProperty("last-modified"));
+
+        if (fetch.notModified() && onDisk) {
+            dbg("downloadXmlToCache 304 not modified, using disk cache rawUrl=" + urlForLog(rawUrl)
+                    + " local=" + target);
         } else {
-            dbg("downloadXmlToCache disk-hit rawUrl=" + urlForLog(rawUrl) + " local=" + target);
+            createPrivateDirectory(REMOTE_XML_CACHE_DIR);
+            Path tmp = resolveInCacheDir(REMOTE_XML_CACHE_DIR, fileName + ".tmp");
+            Files.write(tmp, fetch.body());
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            writeCacheMeta(metaFile, fetch.etag(), fetch.lastModified());
+            dbg("downloadXmlToCache saved bytes=" + fetch.body().length
+                    + " revalidated=" + onDisk + " local=" + target);
         }
 
         REMOTE_XML_FILE_CACHE.put(url, target);
         return target;
     }
 
-    private static byte[] fetchHttpBytes(String url) throws IOException {
+    /**
+     * Resolves {@code fileName} inside {@code cacheDir}, refusing a result that escapes it.
+     * Shared by every write into a cache directory so that no call site can forget the check.
+     */
+    private static Path resolveInCacheDir(Path cacheDir, String fileName) throws IOException {
+        Path resolved = cacheDir.resolve(fileName).normalize();
+        if (!resolved.startsWith(cacheDir)) {
+            throw new IOException("Refusing to write outside the cache directory: " + resolved);
+        }
+        return resolved;
+    }
+
+    /** The cache validators recorded for a cached file, empty when there are none or it is corrupt. */
+    private static Properties readCacheMeta(Path metaFile) {
+        Properties meta = new Properties();
+        if (!Files.exists(metaFile)) {
+            return meta;
+        }
+        try (InputStream in = Files.newInputStream(metaFile)) {
+            meta.load(in);
+        } catch (IOException e) {
+            // Corrupt or unreadable meta: treat as absent, which fetches fresh and rewrites it.
+            dbg("CACHE unreadable meta file=" + metaFile + " error=" + forLog(e.getMessage()));
+            meta.clear();
+        }
+        return meta;
+    }
+
+    /**
+     * Records the validators for a freshly written cache file, so the next run can revalidate
+     * instead of re-downloading. A failure here is not fatal: it costs a full download next
+     * time, which is the behaviour that applied before any meta was written.
+     */
+    private static void writeCacheMeta(Path metaFile, String etag, String lastModified) {
+        if (etag == null && lastModified == null) {
+            return;
+        }
+        Properties meta = new Properties();
+        if (etag != null) {
+            meta.setProperty("etag", etag);
+        }
+        if (lastModified != null) {
+            meta.setProperty("last-modified", lastModified);
+        }
+        try (OutputStream out = Files.newOutputStream(metaFile)) {
+            meta.store(out, null);
+        } catch (IOException e) {
+            dbg("CACHE meta write failed file=" + metaFile + " error=" + forLog(e.getMessage()));
+        }
+    }
+
+    /**
+     * A conditional GET result: either {@code 304 Not Modified}, in which case {@code body} is
+     * null and the caller keeps what it has, or a body plus the validators to store with it.
+     */
+    private record ConditionalFetch(byte[] body, String etag, String lastModified) {
+        boolean notModified() {
+            return body == null;
+        }
+    }
+
+    /**
+     * Fetches {@code url}, sending the given validators so an unchanged resource answers 304.
+     * Either may be null, which makes this an ordinary unconditional GET.
+     */
+    private static ConditionalFetch fetchHttpBytes(String url,
+                                                   String conditionalEtag,
+                                                   String conditionalLastMod) throws IOException {
         URI uri = requireFetchableRemoteUri(url);
         boolean credentialed = willSendGitHubCredential(uri);
 
@@ -1890,6 +2075,12 @@ public class ValidationTools {
                 .timeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.readTimeoutMs()));
 
         addGitHubAuthHeader(req, uri);
+
+        if (conditionalEtag != null) {
+            req.header("If-None-Match", conditionalEtag);
+        } else if (conditionalLastMod != null) {
+            req.header("If-Modified-Since", conditionalLastMod);
+        }
 
         HttpResponse<byte[]> response;
         try {
@@ -1901,9 +2092,17 @@ public class ValidationTools {
         }
 
         int status = response.statusCode();
+        if (status == 304) {
+            dbg("HTTP 304 Not Modified url=" + urlForLog(url));
+            return new ConditionalFetch(null, conditionalEtag, conditionalLastMod);
+        }
         if (status == 404) throw new IOException("HTTP 404 Not Found: " + urlForLog(url));
         if (status < 200 || status >= 300) throw new IOException("HTTP " + status + ": " + urlForLog(url));
-        return requireBoundedBody(response, url);
+
+        return new ConditionalFetch(
+                requireBoundedBody(response, url),
+                response.headers().firstValue("ETag").orElse(null),
+                response.headers().firstValue("Last-Modified").orElse(null));
     }
 
     /**
@@ -2336,18 +2535,13 @@ public class ValidationTools {
 
         String hash = sha256Hex(url);
         Path cacheDir = REMOTE_FETCH_CONFIG.diskCacheDir();
-        Path cachedFile = cacheDir.resolve(hash + ".ttl");
-        Path metaFile = cacheDir.resolve(hash + ".meta");
+        Path cachedFile = resolveInCacheDir(cacheDir, hash + ".ttl");
+        Path metaFile = resolveInCacheDir(cacheDir, hash + ".meta");
 
         String etag = null;
         String lastModified = null;
-        if (Files.exists(cachedFile) && Files.exists(metaFile)) {
-            Properties meta = new Properties();
-            try (InputStream in = Files.newInputStream(metaFile)) {
-                meta.load(in);
-            } catch (IOException ignore) {
-                // corrupt meta — fetch fresh
-            }
+        if (Files.exists(cachedFile)) {
+            Properties meta = readCacheMeta(metaFile);
             etag = meta.getProperty("etag");
             lastModified = meta.getProperty("last-modified");
         }
@@ -2428,20 +2622,13 @@ public class ValidationTools {
         Model m = parseTtlBytes(body, url);
 
         try {
-            Path dir = cachedFile.getParent();
-            if (dir != null) createPrivateDirectory(dir);
-            Path tmpFile = dir.resolve(cachedFile.getFileName() + ".tmp");
+            Path dir = REMOTE_FETCH_CONFIG.diskCacheDir();
+            createPrivateDirectory(dir);
+            Path tmpFile = resolveInCacheDir(dir, cachedFile.getFileName() + ".tmp");
             Files.write(tmpFile, body);
             Files.move(tmpFile, cachedFile, StandardCopyOption.REPLACE_EXISTING);
 
-            if (newEtag != null || newLastMod != null) {
-                Properties meta = new Properties();
-                if (newEtag != null) meta.setProperty("etag", newEtag);
-                if (newLastMod != null) meta.setProperty("last-modified", newLastMod);
-                try (var out = Files.newOutputStream(metaFile)) {
-                    meta.store(out, null);
-                }
-            }
+            writeCacheMeta(metaFile, newEtag, newLastMod);
         } catch (IOException cacheEx) {
             dbg("SHAPES remote disk cache write failed url=" + urlForLog(url)
                     + " error=" + cacheEx.getMessage());

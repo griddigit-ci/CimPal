@@ -415,7 +415,8 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <a class="sub" href="#tool-run-sparql">Run SPARQL Query</a>
 
   <div class="group">Settings</div>
-  <a href="#preferences">Preferences</a>
+  <a href="#pref-card">Preferences</a>
+  <a href="#clear-remote-cache">Clear cached remote data</a>
 </nav>
 
 <main>
@@ -440,8 +441,8 @@ works on three kinds of artefact and, above all, on the relationships between th
 
 <p>Everything in the application is reachable from three places: the <strong>tabs</strong> in the
 main window (interactive, multi-step work), the <strong>Tools</strong> menu (single-shot batch
-conversions and exports), and <strong>File&nbsp;&#9656;&nbsp;Preferences</strong> (namespaces and
-appearance). The tabs are grouped into three categories &mdash; <em>SHACL Generation</em>,
+conversions and exports), and the <strong>File</strong> menu (namespaces, appearance and the cache
+of downloaded files). The tabs are grouped into three categories &mdash; <em>SHACL Generation</em>,
 <em>RDF Operations</em> and <em>Dataset Operations</em> &mdash; which is also how this page is
 organised. Every operation writes progress and results to the <em>Output</em> panel at the bottom
 of the window.</p>
@@ -1316,6 +1317,29 @@ every value is a plain string and such a constraint passes a model it should rej
 workflow therefore reads the same two fields as the mapping ones, and they stay enabled for
 it.</p>
 
+<div class="note" style="margin-top:16px">
+  <strong>Remote constraints and inputs, and what is remembered</strong> &mdash; a mapping CSV may
+  name an <code>https://</code> URL where it would name a local file, and GitHub <em>blob</em>,
+  <em>raw</em> and <em>tree</em> links are accepted as written; the same applies to the
+  <code>owl:imports</code> a constraint file pulls in. Downloaded files are kept in a cache folder,
+  but nothing is reused without being checked: each run starts by discarding what it holds in
+  memory, and every cached file is revalidated against the server before it is used again. An
+  unchanged file costs one request and no download; a file edited upstream is downloaded again. So
+  editing a constraint on GitHub and re-running picks up the edit &mdash; there is no need to
+  restart CimPal or press <em>Reset</em> first.
+  <br><br>
+  One delay is outside CimPal's control: <code>raw.githubusercontent.com</code> serves its own
+  cached copy of a file for a few minutes after a commit, so a re-run inside that window can still
+  be given the previous content by GitHub. If you suspect a stale file for any other reason,
+  <a href="#clear-remote-cache">File &#9656; Clear cached remote data&hellip;</a> empties the cache
+  folders outright.
+  <br><br>
+  What the tab does remember between sessions is the <em>paths</em> you picked &mdash; mapping CSV,
+  models root, constraints root, output folder, previous comparison CSV and a custom datatype map
+  file &mdash; never validation data or results. Every run re-reads its inputs from disk or from
+  the web.
+</div>
+
 <h4>Inputs</h4>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
@@ -1910,7 +1934,7 @@ are written and run. See that tab for inputs and outputs.</p>
 
 <!-- ========================================================== PREFERENCES -->
 
-<h2 id="preferences">Preferences</h2>
+<h2 id="preferences">Settings</h2>
 
 <details class="fn" id="pref-card" open>
 <summary><span class="kind">Settings</span> File &#9656; Preferences&hellip;</summary>
@@ -1985,6 +2009,53 @@ are stored per user and persist between sessions.</p>
 
 <p class="src">Source: <code>MainController.actionMenuPreferences()</code>,
 <code>PreferencesController</code>, <code>ThemeManager</code>, <code>PathMemory</code></p>
+</div>
+</details>
+
+<details class="fn" id="clear-remote-cache">
+<summary><span class="kind">Settings</span> File &#9656; Clear cached remote data&hellip;</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Empties the two folders in which CimPal keeps files it downloaded from the web: remote SHACL
+constraint files, including everything they pull in through <code>owl:imports</code>, and remote XML
+inputs named by a mapping CSV. This is not part of normal use. A validation run already discards
+whatever it is holding in memory before it starts, and every cached file is revalidated against the
+server before it is reused, so an upstream edit is picked up on the next run by itself. The menu
+item exists for the two cases revalidation cannot cover: a cached file that is corrupt or truncated,
+and a server that serves changed content under an unchanged validator. Emptying the cache costs
+nothing but the time to download the files again.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Confirmation dialog</td><td>action</td>
+    <td>Reports how many files are currently cached and lists the exact folders that will be
+        emptied, before anything is deleted. <em>Cancel</em> leaves everything in place.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>The cache folders are emptied and the number of deleted files is reported. If a file could not
+      be deleted &mdash; typically because another program is holding it open &mdash; the message
+      names it, and the rest are still removed.</li>
+  <li>Nothing outside those two folders is touched: local constraint files, models, reports,
+      preferences and remembered locations are all unaffected. The next run downloads what it
+      needs.</li>
+</ul>
+
+<div class="note" style="margin-top:16px">
+  <strong>Where the files are</strong> &mdash; both folders sit in CimPal's own per-user data
+  directory, <code>%LOCALAPPDATA%\CimPal</code> on Windows and <code>~/.cimpal</code> elsewhere:
+  <code>shapes-cache</code> holds downloaded constraint files, <code>remote-xml-cache</code>
+  downloaded XML inputs. The confirmation dialog shows the full paths for the machine you are on.
+  Each cached file is stored next to a small <code>.meta</code> file recording the
+  <code>ETag</code> the server gave it; that is what lets the next run ask &ldquo;has this
+  changed?&rdquo; instead of downloading it again.
+</div>
+
+<p class="src">Source: <code>MainController.actionMenuClearRemoteCache()</code>,
+<code>ValidationTools.clearRemoteDiskCaches()</code>, <code>ValidationTools.clearRemoteCaches()</code></p>
 </div>
 </details>
 

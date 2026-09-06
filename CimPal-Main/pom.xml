@@ -43,6 +43,15 @@
                             <mainClass>eu.griddigit.cimpal.main.application.CimPal</mainClass>
                             <manifestEntries>
                                 <Multi-Release>true</Multi-Release>
+                                <!-- JavaFX loads its native libraries through System::load, a
+                                     restricted method. Since JDK 24 that prints a four-line
+                                     warning on every start unless native access is granted, and
+                                     a future release will block the call outright. The shaded
+                                     jar strips module-info, so everything runs in the unnamed
+                                     module: ALL-UNNAMED is the grant that applies. Honoured by
+                                     `java -jar CimPal.jar`; the .exe gets the same grant as a
+                                     JVM option below, since the wrapper does not read this. -->
+                                <Enable-Native-Access>ALL-UNNAMED</Enable-Native-Access>
                             </manifestEntries>
                         </transformer>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
@@ -161,6 +170,11 @@
                                 <minVersion>25</minVersion>
                                 <opts>
                                     <opt>-Dprism.order=sw</opt>
+                                    <!-- launch4j starts the VM itself rather than through the
+                                         java launcher, so the Enable-Native-Access manifest
+                                         attribute does not reach it; the same grant has to be
+                                         given as a VM option. -->
+                                    <opt>--enable-native-access=ALL-UNNAMED</opt>
                                 </opts>
                             </jre>
                             <versionInfo>

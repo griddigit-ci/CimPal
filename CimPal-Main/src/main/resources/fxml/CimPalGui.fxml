@@ -16,6 +16,7 @@
    <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
          <MenuItem mnemonicParsing="false" onAction="#actionMenuPreferences" text="Preferences…" />
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuClearRemoteCache" text="Clear cached remote data…" />
          <SeparatorMenuItem mnemonicParsing="false" />
          <MenuItem mnemonicParsing="false" onAction="#menuQuit" text="Quit" />
       </Menu>

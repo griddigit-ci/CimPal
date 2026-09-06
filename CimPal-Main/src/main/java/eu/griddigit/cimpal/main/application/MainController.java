@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.main.application;
 import eu.griddigit.cimpal.core.generators.ManifestGenerator;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.utils.AttributeInjector;
+import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.*;
 import eu.griddigit.cimpal.main.application.controllers.sparql.SparqlQueryTabController;
@@ -50,6 +51,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
+import java.util.stream.Collectors;
 
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.ModelManipulationFactory.LoadRDFAbout;
@@ -873,6 +875,47 @@ public class MainController implements Initializable {
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("Preferences window error", "The Preferences window could not be opened.", e);
         }
+    }
+
+    @FXML
+    // action on menu Clear cached remote data
+    private void actionMenuClearRemoteCache() {
+        // The in-memory caches are dropped at the start of every validation run, and the disk
+        // caches revalidate against the origin, so this is the escape hatch for the remaining
+        // case: a cached file that is corrupt, or an origin that serves changed content under an
+        // unchanged ETag. Nothing outside the two cache directories is touched.
+        int files = ValidationTools.remoteDiskCacheFileCount();
+
+        String directories = ValidationTools.remoteDiskCacheDirectories().stream()
+                .map(Path::toString)
+                .collect(Collectors.joining("\n"));
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Clear cached remote data");
+        confirm.setHeaderText(files == 0
+                ? "Nothing is cached on disk. Clear the in-memory cache anyway?"
+                : "Delete " + files + " cached file" + (files == 1 ? "" : "s") + "?");
+        confirm.setContentText("Downloaded constraint files and model inputs will be fetched "
+                + "again on the next run. Only these folders are emptied:\n\n" + directories);
+
+        confirm.showAndWait()
+                .filter(button -> button == ButtonType.OK)
+                .ifPresent(button -> {
+                    ValidationTools.RemoteCacheClearResult result = ValidationTools.clearRemoteDiskCaches();
+
+                    if (result.failures().isEmpty()) {
+                        GUIhelper.showInfo("Cached remote data cleared",
+                                "Deleted " + result.filesDeleted() + " cached file"
+                                        + (result.filesDeleted() == 1 ? "" : "s")
+                                        + " and dropped " + result.memoryEntries()
+                                        + " in-memory entr" + (result.memoryEntries() == 1 ? "y" : "ies") + ".");
+                    } else {
+                        GUIhelper.showWarning("Cached remote data partly cleared",
+                                "Deleted " + result.filesDeleted() + " file(s). These could not be deleted, "
+                                        + "most likely because another program has them open:\n\n"
+                                        + String.join("\n", result.failures()));
+                    }
+                });
     }
 
     @FXML
