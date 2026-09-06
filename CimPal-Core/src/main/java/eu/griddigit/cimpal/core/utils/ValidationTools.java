@@ -14,6 +14,8 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDateTime;
@@ -35,11 +37,14 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 
 import java.io.ByteArrayInputStream;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HexFormat;
@@ -50,9 +55,12 @@ public class ValidationTools {
     private static final boolean DEBUG = true;
     private static final boolean DEBUG_TO_CONSOLE = false;
 
-    private static final Path DEBUG_LOG_PATH = Paths.get(
-            "C:\\Temp\\cimpal_validation_debug.log"
-    );
+    // Diagnostic log lives under the per-user application data directory. A fixed path in a
+    // shared temp location (the previous "C:\Temp\...") is predictable and, on hosts where
+    // that directory is writable by every account, lets a local actor tamper with the audit
+    // trail or pre-create the file.
+    private static final Path DEBUG_LOG_PATH =
+            userDataDir().resolve("cimpal_validation_debug.log");
 
     private static final Object DEBUG_LOCK = new Object();
 
@@ -64,11 +72,35 @@ public class ValidationTools {
     private static final Path REMOTE_XML_CACHE_DIR = initRemoteXmlCacheDir();
     private static final Map<String, Path> REMOTE_XML_FILE_CACHE = new ConcurrentHashMap<>();
 
-    private static final String XML_REPORT_PREFIX =
-            "C:\\GitHub\\relicapgrid\\Instance\\";
+    /**
+     * Hosts the application may fetch remote shapes and instance data from. An import URI
+     * naming any other host is refused rather than fetched: without this allowlist an
+     * {@code owl:imports} statement in a third-party shapes file, or a URL cell in a
+     * third-party mapping workbook, can drive arbitrary requests from the operator's
+     * workstation (SSRF).
+     */
+    private static final Set<String> ALLOWED_REMOTE_HOSTS = Set.of(
+            "raw.githubusercontent.com",
+            "api.github.com",
+            "github.com"
+    );
 
-    private static final String CONSTRAINT_REPORT_PREFIX =
-            "C:\\SHACL-Constraints\\ApplicationLibraryValidationConfigurations\\";
+    /**
+     * Hosts that may receive the GitHub credential. Kept separate from
+     * {@link #ALLOWED_REMOTE_HOSTS} so that widening the fetch allowlist never silently
+     * widens the set of hosts the token is disclosed to.
+     */
+    private static final Set<String> GITHUB_AUTH_HOSTS = Set.of(
+            "raw.githubusercontent.com",
+            "api.github.com",
+            "github.com"
+    );
+
+    /** Hard cap on a single remote response body, to bound memory use on a hostile server. */
+    private static final long MAX_REMOTE_BODY_BYTES = 64L * 1024 * 1024;
+
+    /** Maximum length of a single untrusted value written to the diagnostic log. */
+    private static final int LOG_FIELD_MAX = 512;
 
     private static final long FUTURE_TIMEOUT_MINUTES = 60;
     private static final int DEBUG_MAX_RESULTS_PER_ROW = 5000;
@@ -469,7 +501,7 @@ public class ValidationTools {
                     return validateOneRow(idx, row, modelsBaseDir, constraintsRoot, shapesCache, dataTypeMap, xmlBase);
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName() + "][row " + idx + "]");
-                    t.printStackTrace();
+                    logError("Unhandled exception", t);
                     throw t;
                 }
             });
@@ -549,9 +581,9 @@ public class ValidationTools {
 
                     System.err.println("[EXECUTION_ERROR] future index=" + i);
                     if (ex.getCause() != null) {
-                        ex.getCause().printStackTrace();
+                        logError("Unhandled exception (cause)", ex.getCause());
                     } else {
-                        ex.printStackTrace();
+                        logError("Unhandled exception", ex);
                     }
 
                     writer.appendError(
@@ -572,7 +604,7 @@ public class ValidationTools {
                     err++;
 
                     System.err.println("[FUTURE_ERROR] future index=" + i);
-                    ex.printStackTrace();
+                    logError("Unhandled exception", ex);
 
                     writer.appendError(
                             ValidationExcelWriter.CaseFolder.UNKNOWN,
@@ -723,7 +755,7 @@ public class ValidationTools {
 
         String xmlFilesText = row.xmlInputsRaw;
         String missingXmlFilesText = "";
-        String constraintFileText = trimReportPath(ttlName, CONSTRAINT_REPORT_PREFIX);
+        String constraintFileText = trimReportPath(ttlName);
         String datasetName = "UNKNOWN";
 
         dbgRow(rowIdx, "START row ttl=" + ttlName
@@ -772,7 +804,7 @@ public class ValidationTools {
 
             dbgRow(rowIdx, "START resolveTtlPath ttlName=" + ttlName);
             Path ttlPath = resolveTtlPath(constraintsRoot, ttlName);
-            constraintFileText = trimReportPath(ttlPath.toString(), CONSTRAINT_REPORT_PREFIX);
+            constraintFileText = trimReportPath(ttlPath.toString());
             dbgRow(rowIdx, "DONE resolveTtlPath ttlPath=" + ttlPath.toAbsolutePath());
 
             if (!Files.exists(ttlPath)) {
@@ -867,7 +899,7 @@ public class ValidationTools {
             ).withDisplayName(row.notes);
         } catch (Exception ex) {
             dbgRow(rowIdx, "ERROR row dataset=" + datasetName, rowStart);
-            ex.printStackTrace();
+            logError("Unhandled exception", ex);
 
             return new ValidationTaskResult(rowIdx, caseFolder, datasetName, ttlName, xmlFilesText,missingXmlFilesText, constraintFileText, null, false, ex);
         }
@@ -899,28 +931,28 @@ public class ValidationTools {
         List<String> missingInputs = new ArrayList<>();
 
         dbg("resolveFilesForRow tokens=" + tokens.size()
-                + " raw=" + shortValue(row.xmlInputsRaw, 300));
+                + " raw=" + forLog(shortValue(row.xmlInputsRaw, 300)));
 
         for (String token : tokens) {
             long start = System.currentTimeMillis();
             List<Path> expanded;
 
             if (isUrlToken(token)) {
-                dbg("START expandUrlToken token=" + token);
+                dbg("START expandUrlToken token=" + urlForLog(token));
                 expanded = expandUrlToken(token);
-                dbg("DONE expandUrlToken token=" + token
+                dbg("DONE expandUrlToken token=" + urlForLog(token)
                         + " matches=" + expanded.size(), start);
             } else {
-                dbg("START expandToken token=" + token);
+                dbg("START expandToken token=" + forLog(token));
                 expanded = expandToken(modelsBaseDir, token);
-                dbg("DONE expandToken token=" + token
+                dbg("DONE expandToken token=" + forLog(token)
                         + " matches=" + expanded.size(), start);
             }
 
             if (expanded.isEmpty()) {
                 missingInputs.add(token);
 
-                dbg("MISSING XML input token=" + token
+                dbg("MISSING XML input token=" + forLog(token)
                         + (isUrlToken(token) ? " (URL, could not download)"
                                              : " resolvedAgainst=" + modelsBaseDir.toAbsolutePath()));
             } else {
@@ -1305,13 +1337,13 @@ public class ValidationTools {
         if (paths == null || paths.isEmpty()) return "";
         return paths.stream()
                 .filter(Objects::nonNull)
-                .map(p -> trimReportPath(p.toString(), XML_REPORT_PREFIX))
+                .map(p -> trimReportPath(p.toString()))
                 .sorted()
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("");
     }
 
-    private static String trimReportPath(String path, String prefixToRemove) {
+    private static String trimReportPath(String path) {
         if (path == null) return "";
 
         String normalizedPath = path.replace("\\", "/").trim();
@@ -1490,7 +1522,7 @@ public class ValidationTools {
             boolean ok = Files.isRegularFile(p)
                     && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".xml");
 
-            dbg("expandToken noGlob token=" + token
+            dbg("expandToken noGlob token=" + forLog(token)
                     + " resolved=" + p.toAbsolutePath()
                     + " existsRegularXml=" + ok);
 
@@ -1507,7 +1539,7 @@ public class ValidationTools {
 
         Path parentDir = modelsBaseDir.resolve(parent).normalize();
 
-        dbg("expandToken glob token=" + token
+        dbg("expandToken glob token=" + forLog(token)
                 + " parentDir=" + parentDir.toAbsolutePath()
                 + " pattern=" + pattern);
 
@@ -1548,14 +1580,177 @@ public class ValidationTools {
 
     // ---------------- remote XML download (GitHub / HTTP) ----------------
 
+    /**
+     * The per-user directory for application state: caches and the diagnostic log. Preferred
+     * over the system temp directory, which is predictable and, on POSIX hosts, writable by
+     * every local account - allowing another user to plant cache entries this application
+     * would then parse as trusted input.
+     */
+    private static Path userDataDir() {
+        String localAppData = System.getenv("LOCALAPPDATA");
+        return localAppData != null && !localAppData.isBlank()
+                ? Paths.get(localAppData, "CimPal")
+                : Paths.get(System.getProperty("user.home"), ".cimpal");
+    }
+
+    /**
+     * Creates {@code dir} and, on POSIX hosts, restricts it to the owner. On Windows the
+     * per-user profile ACL inherited from {@code LOCALAPPDATA} already provides this.
+     */
+    private static void createPrivateDirectory(Path dir) throws IOException {
+        Files.createDirectories(dir);
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            try {
+                Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+            } catch (UnsupportedOperationException ignored) {
+                // Filesystem does not support POSIX permissions; the directory is still private
+                // by virtue of living under the user's home directory.
+            }
+        }
+    }
+
     private static Path initRemoteXmlCacheDir() {
-        Path dir = Paths.get(System.getProperty("java.io.tmpdir"), "cimpal_remote_xml_cache");
+        Path dir = userDataDir().resolve("remote-xml-cache");
         try {
-            Files.createDirectories(dir);
+            createPrivateDirectory(dir);
         } catch (IOException e) {
             System.err.println("[WARN] Could not create remote XML cache dir: " + dir + " \u2013 " + e.getMessage());
         }
         return dir;
+    }
+
+    /**
+     * Egress policy gate, first tier: scheme, host allowlist and absence of embedded
+     * credentials. Performs no name resolution, so it is cheap, deterministic, and safe to
+     * apply when classifying an import as remote and when the application is running
+     * offline against its disk cache.
+     * <p>
+     * Without this an import URI supplied in a third-party shapes file, or a URL cell in a
+     * third-party mapping workbook, can be used to reach internal services, cloud
+     * instance-metadata endpoints, or to enumerate the internal network from the operator's
+     * workstation.
+     *
+     * @return the parsed URI, so callers never re-parse the raw string
+     * @throws IOException if the URL is malformed or refused by policy
+     * @see #requirePublicHost(URI) the second tier, applied immediately before a request
+     */
+    private static URI requireAllowedRemoteUri(String url) throws IOException {
+        final URI uri;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException e) {
+            throw new IOException("Malformed remote URL: " + forLog(url), e);
+        }
+
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IOException("Refusing non-HTTPS remote fetch: " + urlForLog(url));
+        }
+        if (uri.getUserInfo() != null) {
+            throw new IOException("Refusing remote fetch with embedded credentials");
+        }
+
+        String host = uri.getHost();
+        if (host == null || host.isBlank()) {
+            throw new IOException("Remote URL has no host: " + urlForLog(url));
+        }
+        if (!ALLOWED_REMOTE_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+            throw new IOException("Host is not on the remote-fetch allowlist: " + forLog(host));
+        }
+
+        return uri;
+    }
+
+    /**
+     * Egress policy gate, second tier: confirms the host does not resolve to a loopback,
+     * link-local, private or multicast address. Applied immediately before a request is
+     * issued rather than at classification time, both because it costs a DNS lookup and
+     * because a name's resolution can change between the two moments.
+     */
+    private static void requirePublicHost(URI uri) throws IOException {
+        String host = uri.getHost();
+        if (host == null || host.isBlank()) {
+            throw new IOException("Remote URL has no host");
+        }
+        try {
+            for (InetAddress addr : InetAddress.getAllByName(host)) {
+                if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()
+                        || addr.isSiteLocalAddress() || addr.isAnyLocalAddress()
+                        || addr.isMulticastAddress()) {
+                    throw new IOException(
+                            "Refusing remote fetch: host resolves to a non-public address: " + forLog(host));
+                }
+            }
+        } catch (UnknownHostException e) {
+            throw new IOException("Cannot resolve remote-fetch host: " + forLog(host), e);
+        }
+    }
+
+    /** Applies both egress policy tiers. Use at the point a request is about to be issued. */
+    private static URI requireFetchableRemoteUri(String url) throws IOException {
+        URI uri = requireAllowedRemoteUri(url);
+        requirePublicHost(uri);
+        return uri;
+    }
+
+    /**
+     * Builds an HTTP client for one request. Requests that carry a credential must never
+     * follow redirects: the JDK client forwards caller-set headers across hops, so a
+     * redirect would hand the token to the redirect target.
+     */
+    private static HttpClient newHttpClient(boolean credentialed) {
+        return HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.connectTimeoutMs()))
+                .followRedirects(credentialed
+                        ? HttpClient.Redirect.NEVER
+                        : HttpClient.Redirect.NORMAL)
+                .build();
+    }
+
+    /** True when the GitHub credential is present and this host is permitted to receive it. */
+    private static boolean willSendGitHubCredential(URI uri) {
+        String host = uri.getHost();
+        if (host == null || !GITHUB_AUTH_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+            return false;
+        }
+        String token = System.getenv("GITHUB_TOKEN");
+        return token != null && !token.isBlank();
+    }
+
+    /**
+     * Rejects a response body larger than {@link #MAX_REMOTE_BODY_BYTES}.
+     */
+    private static byte[] requireBoundedBody(HttpResponse<byte[]> response, String url) throws IOException {
+        byte[] body = response.body();
+        if (body != null && body.length > MAX_REMOTE_BODY_BYTES) {
+            throw new IOException("Remote response exceeds the size limit ("
+                    + MAX_REMOTE_BODY_BYTES + " bytes): " + urlForLog(url));
+        }
+        return body;
+    }
+
+    /**
+     * Prepares an untrusted value for the diagnostic log. Neutralises line terminators so a
+     * hostile value cannot forge additional log records, and bounds the field length.
+     */
+    private static String forLog(String value) {
+        if (value == null) {
+            return "null";
+        }
+        // U+241E SYMBOL FOR RECORD SEPARATOR: visible, and cannot start a new log line.
+        String s = value.replaceAll("[\\r\\n\\u0085\\u2028\\u2029]", "\u241e");
+        return s.length() > LOG_FIELD_MAX ? s.substring(0, LOG_FIELD_MAX) + "..." : s;
+    }
+
+    /**
+     * Prepares a URL for the diagnostic log, redacting the query string, which may carry
+     * tokens or signed-URL credentials.
+     */
+    private static String urlForLog(String url) {
+        if (url == null) {
+            return "null";
+        }
+        int q = url.indexOf('?');
+        return forLog(q >= 0 ? url.substring(0, q) + "?<redacted>" : url);
     }
 
     private static boolean isUrlToken(String token) {
@@ -1592,15 +1787,15 @@ public class ValidationTools {
 
         if (!hasGlob) {
             if (!norm.toLowerCase(Locale.ROOT).endsWith(".xml")) {
-                dbg("expandUrlToken skip non-xml url=" + norm);
+                dbg("expandUrlToken skip non-xml url=" + urlForLog(norm));
                 return List.of();
             }
             try {
                 Path p = downloadXmlToCache(norm);
-                dbg("expandUrlToken downloaded url=" + norm + " local=" + p);
+                dbg("expandUrlToken downloaded url=" + urlForLog(norm) + " local=" + p);
                 return List.of(p);
             } catch (IOException e) {
-                dbg("expandUrlToken download failed url=" + norm + " error=" + e.getMessage());
+                dbg("expandUrlToken download failed url=" + urlForLog(norm) + " error=" + forLog(e.getMessage()));
                 return List.of();
             }
         }
@@ -1612,17 +1807,17 @@ public class ValidationTools {
 
         String apiUrl = buildGitHubContentsApiUrl(dirUrl);
         if (apiUrl == null) {
-            dbg("expandUrlToken cannot map dirUrl to GitHub Contents API: " + dirUrl);
+            dbg("expandUrlToken cannot map dirUrl to GitHub Contents API: " + urlForLog(dirUrl));
             return List.of();
         }
 
-        dbg("expandUrlToken glob pattern=" + pattern + " apiUrl=" + apiUrl);
+        dbg("expandUrlToken glob pattern=" + forLog(pattern) + " apiUrl=" + urlForLog(apiUrl));
 
         List<GitHubApiEntry> entries;
         try {
             entries = fetchGitHubDirectoryContents(apiUrl);
         } catch (IOException e) {
-            dbg("expandUrlToken GitHub API fetch failed apiUrl=" + apiUrl + " error=" + e.getMessage());
+            dbg("expandUrlToken GitHub API fetch failed apiUrl=" + urlForLog(apiUrl) + " error=" + forLog(e.getMessage()));
             return List.of();
         }
 
@@ -1635,14 +1830,14 @@ public class ValidationTools {
             if (!matcher.matches(Paths.get(entry.name()))) continue;
             try {
                 matches.add(downloadXmlToCache(entry.downloadUrl()));
-                dbg("expandUrlToken glob match name=" + entry.name());
+                dbg("expandUrlToken glob match name=" + forLog(entry.name()));
             } catch (IOException e) {
-                dbg("expandUrlToken glob download failed name=" + entry.name() + " error=" + e.getMessage());
+                dbg("expandUrlToken glob download failed name=" + forLog(entry.name()) + " error=" + forLog(e.getMessage()));
             }
         }
 
         matches.sort(Comparator.comparing(p -> p.getFileName().toString()));
-        dbg("expandUrlToken glob matches=" + matches.size() + " token=" + token);
+        dbg("expandUrlToken glob matches=" + matches.size() + " token=" + urlForLog(token));
         return matches;
     }
 
@@ -1653,31 +1848,33 @@ public class ValidationTools {
     private static Path downloadXmlToCache(String url) throws IOException {
         Path existing = REMOTE_XML_FILE_CACHE.get(url);
         if (existing != null) {
-            dbg("downloadXmlToCache memory-hit url=" + url);
+            dbg("downloadXmlToCache memory-hit url=" + urlForLog(url));
             return existing;
         }
 
         String rawUrl = toRawUrl(url);
-        String hash = sha256Hex(rawUrl);
-        String fileName = rawUrl.substring(rawUrl.lastIndexOf('/') + 1);
-        int q = fileName.indexOf('?');
-        if (q >= 0) fileName = fileName.substring(0, q);
-        fileName = fileName.toLowerCase(Locale.ROOT).endsWith(".xml")
-                ? hash + "_" + fileName
-                : hash + ".xml";
+        String fileName = safeCacheFileName(rawUrl);
 
-        Path target = REMOTE_XML_CACHE_DIR.resolve(fileName);
+        // Defence in depth: even with a sanitised name, confirm the resolved path is inside
+        // the cache directory before writing to it.
+        Path target = REMOTE_XML_CACHE_DIR.resolve(fileName).normalize();
+        if (!target.startsWith(REMOTE_XML_CACHE_DIR)) {
+            throw new IOException("Refusing to write outside the cache directory: " + target);
+        }
 
         if (!Files.exists(target)) {
-            dbg("downloadXmlToCache fetch rawUrl=" + rawUrl);
+            dbg("downloadXmlToCache fetch rawUrl=" + urlForLog(rawUrl));
             byte[] bytes = fetchHttpBytes(rawUrl);
-            Path tmp = REMOTE_XML_CACHE_DIR.resolve(fileName + ".tmp");
-            Files.createDirectories(REMOTE_XML_CACHE_DIR);
+            createPrivateDirectory(REMOTE_XML_CACHE_DIR);
+            Path tmp = REMOTE_XML_CACHE_DIR.resolve(fileName + ".tmp").normalize();
+            if (!tmp.startsWith(REMOTE_XML_CACHE_DIR)) {
+                throw new IOException("Refusing to write outside the cache directory: " + tmp);
+            }
             Files.write(tmp, bytes);
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
             dbg("downloadXmlToCache saved bytes=" + bytes.length + " local=" + target);
         } else {
-            dbg("downloadXmlToCache disk-hit rawUrl=" + rawUrl + " local=" + target);
+            dbg("downloadXmlToCache disk-hit rawUrl=" + urlForLog(rawUrl) + " local=" + target);
         }
 
         REMOTE_XML_FILE_CACHE.put(url, target);
@@ -1685,29 +1882,53 @@ public class ValidationTools {
     }
 
     private static byte[] fetchHttpBytes(String url) throws IOException {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.connectTimeoutMs()))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        URI uri = requireFetchableRemoteUri(url);
+        boolean credentialed = willSendGitHubCredential(uri);
 
         HttpRequest.Builder req = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+                .uri(uri)
                 .timeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.readTimeoutMs()));
 
-        addGitHubAuthHeader(req, url);
+        addGitHubAuthHeader(req, uri);
 
         HttpResponse<byte[]> response;
         try {
-            response = client.send(req.GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+            response = newHttpClient(credentialed)
+                    .send(req.GET().build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("HTTP request interrupted: " + url, e);
+            throw new IOException("HTTP request interrupted: " + urlForLog(url), e);
         }
 
         int status = response.statusCode();
-        if (status == 404) throw new IOException("HTTP 404 Not Found: " + url);
-        if (status < 200 || status >= 300) throw new IOException("HTTP " + status + ": " + url);
-        return response.body();
+        if (status == 404) throw new IOException("HTTP 404 Not Found: " + urlForLog(url));
+        if (status < 200 || status >= 300) throw new IOException("HTTP " + status + ": " + urlForLog(url));
+        return requireBoundedBody(response, url);
+    }
+
+    /**
+     * Derives a cache file name that cannot escape the cache directory. The SHA-256 of the
+     * URL carries identity; any human-readable suffix is reduced to a conservative character
+     * set, so that neither {@code '/'} nor {@code '\'} - a path separator on Windows - can
+     * survive into the resolved path. Splitting on {@code '/'} alone, as the previous
+     * implementation did, let a URL ending {@code a\..\..\evil.xml} escape the directory.
+     */
+    private static String safeCacheFileName(String rawUrl) {
+        String hash = sha256Hex(rawUrl);
+
+        int lastSep = Math.max(rawUrl.lastIndexOf('/'), rawUrl.lastIndexOf('\\'));
+        String tail = rawUrl.substring(lastSep + 1);
+        int q = tail.indexOf('?');
+        if (q >= 0) {
+            tail = tail.substring(0, q);
+        }
+
+        if (!tail.toLowerCase(Locale.ROOT).endsWith(".xml")) {
+            return hash + ".xml";
+        }
+
+        String label = tail.replaceAll("[^A-Za-z0-9._-]", "_");
+        return label.isEmpty() || label.startsWith(".") ? hash + ".xml" : hash + "_" + label;
     }
 
     /**
@@ -1742,40 +1963,52 @@ public class ValidationTools {
     }
 
     private static List<GitHubApiEntry> fetchGitHubDirectoryContents(String apiUrl) throws IOException {
-        dbg("fetchGitHubDirectoryContents url=" + apiUrl);
+        dbg("fetchGitHubDirectoryContents url=" + urlForLog(apiUrl));
 
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.connectTimeoutMs()))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        URI uri = requireFetchableRemoteUri(apiUrl);
+        boolean credentialed = willSendGitHubCredential(uri);
 
         HttpRequest.Builder req = HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl))
+                .uri(uri)
                 .timeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.readTimeoutMs()))
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28");
 
-        addGitHubAuthHeader(req, apiUrl);
+        addGitHubAuthHeader(req, uri);
 
         HttpResponse<String> response;
         try {
-            response = client.send(req.GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            response = newHttpClient(credentialed)
+                    .send(req.GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("HTTP request interrupted: " + apiUrl, e);
+            throw new IOException("HTTP request interrupted: " + urlForLog(apiUrl), e);
         }
 
         int status = response.statusCode();
-        if (status == 404) throw new IOException("HTTP 404 Not Found: " + apiUrl);
-        if (status < 200 || status >= 300) throw new IOException("HTTP " + status + ": " + apiUrl);
+        if (status == 404) throw new IOException("HTTP 404 Not Found: " + urlForLog(apiUrl));
+        if (status < 200 || status >= 300) throw new IOException("HTTP " + status + ": " + urlForLog(apiUrl));
 
         return parseGitHubContentsJson(response.body());
     }
 
-    private static void addGitHubAuthHeader(HttpRequest.Builder req, String url) {
+    /**
+     * Attaches the GitHub credential only when the request authority is exactly a host on
+     * {@link #GITHUB_AUTH_HOSTS}.
+     * <p>
+     * The parameter is a parsed {@link URI}, not a string, by design. The previous
+     * implementation tested {@code url.contains("github.com")} against the whole URL, which
+     * is satisfied by any attacker-controlled address that merely mentions the domain -
+     * {@code https://evil.example/github.com/x.ttl} - and so disclosed the token to that
+     * host. Only the URI authority is a safe basis for this decision.
+     */
+    private static void addGitHubAuthHeader(HttpRequest.Builder req, URI uri) {
+        String host = uri.getHost();
+        if (host == null || !GITHUB_AUTH_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+            return;
+        }
         String token = System.getenv("GITHUB_TOKEN");
-        if (token != null && !token.isBlank()
-                && (url.contains("github.com") || url.contains("githubusercontent.com"))) {
+        if (token != null && !token.isBlank()) {
             req.header("Authorization", "Bearer " + token);
         }
     }
@@ -1932,7 +2165,7 @@ public class ValidationTools {
                 ShapeSource resolved = resolveImport(uri, src, constraintsRoot);
 
                 if (resolved != null) {
-                    dbg("SHAPES import uri=" + uri
+                    dbg("SHAPES import uri=" + urlForLog(uri)
                             + " resolved=" + resolved.key()
                             + " from=" + src.displayName());
                     stack.push(resolved);
@@ -1943,12 +2176,12 @@ public class ValidationTools {
                     boolean intentionalSkip = uri.startsWith("urn:")
                             || (isHttpOrHttps && detectLang(uri) == null);
                     if (intentionalSkip) {
-                        dbg("SHAPES skipping import uri=" + uri
+                        dbg("SHAPES skipping import uri=" + urlForLog(uri)
                                 + " (urn: or namespace URI without RDF extension)"
                                 + " from=" + src.displayName());
                     } else {
                         unresolvableImports++;
-                        dbg("SHAPES unresolvable import uri=" + uri
+                        dbg("SHAPES unresolvable import uri=" + urlForLog(uri)
                                 + " could not be resolved to any local or remote file"
                                 + " from=" + src.displayName());
                     }
@@ -1982,13 +2215,18 @@ public class ValidationTools {
             // and are vocabulary declarations, not downloadable shape files.  Trying to
             // fetch them breaks existing configurations and hammers third-party servers.
             if (detectLang(u) == null) {
-                dbg("resolveImport skipping non-file remote URI (no RDF extension): " + importUri);
+                dbg("resolveImport skipping non-file remote URI (no RDF extension): " + urlForLog(importUri));
                 return null;
             }
             try {
-                return new RemoteShapeSource(new URI(u));
-            } catch (URISyntaxException e) {
-                dbg("resolveImport invalid remote URI=" + importUri + " error=" + e.getMessage());
+                // Apply the egress policy at classification time as well as at fetch time, so
+                // a disallowed import is reported as unresolvable rather than attempted. An
+                // import URI comes from a third-party shapes file and is fully attacker-
+                // controlled; without this it can drive requests to arbitrary hosts.
+                return new RemoteShapeSource(requireAllowedRemoteUri(u));
+            } catch (IOException e) {
+                dbg("resolveImport refused remote URI=" + urlForLog(importUri)
+                        + " reason=" + forLog(e.getMessage()));
                 return null;
             }
         }
@@ -1996,22 +2234,30 @@ public class ValidationTools {
         if (u.startsWith("file:")) {
             try {
                 Path p = Paths.get(URI.create(u));
-                dbg("resolveImport fileUri=" + importUri + " resolved=" + p);
+                dbg("resolveImport fileUri=" + forLog(importUri) + " resolved=" + p);
                 return new LocalShapeSource(p);
             } catch (Exception ex) {
-                dbg("resolveImport invalid fileUri=" + importUri + " error=" + ex.getMessage());
+                dbg("resolveImport invalid fileUri=" + forLog(importUri) + " error=" + forLog(ex.getMessage()));
                 return null;
             }
         }
 
-        // Relative reference: if current is remote, resolve against its URI
+        // Relative reference: if current is remote, resolve against its URI. The result is
+        // re-validated because a protocol-relative reference such as "//evil.example/x.ttl"
+        // resolves to a different host and would otherwise bypass the egress policy.
         if (current instanceof RemoteShapeSource rss) {
             try {
                 URI resolved = rss.uri().resolve(u);
-                dbg("resolveImport relative-from-remote uri=" + u + " resolved=" + resolved);
-                return new RemoteShapeSource(resolved);
+                dbg("resolveImport relative-from-remote uri=" + forLog(u)
+                        + " resolved=" + urlForLog(resolved.toString()));
+                return new RemoteShapeSource(requireAllowedRemoteUri(resolved.toString()));
+            } catch (IOException e) {
+                dbg("resolveImport refused relative-from-remote uri=" + forLog(u)
+                        + " reason=" + forLog(e.getMessage()));
+                return null;
             } catch (Exception e) {
-                dbg("resolveImport relative-from-remote failed uri=" + u + " error=" + e.getMessage());
+                dbg("resolveImport relative-from-remote failed uri=" + forLog(u)
+                        + " error=" + forLog(e.getMessage()));
             }
         }
 
@@ -2041,7 +2287,7 @@ public class ValidationTools {
             return new LocalShapeSource(candidate3);
         }
 
-        dbg("resolveImport could not resolve uri=" + importUri + " from=" + current.displayName());
+        dbg("resolveImport could not resolve uri=" + forLog(importUri) + " from=" + forLog(current.displayName()));
         return null;
     }
 
@@ -2066,10 +2312,10 @@ public class ValidationTools {
             if (existing2 != null) {
                 return copyWithPrefixes(existing2);
             }
-            dbg("SHAPES remote fetch start url=" + url);
+            dbg("SHAPES remote fetch start url=" + urlForLog(url));
             long fetchStart = System.currentTimeMillis();
             Model fetched = fetchRemoteModel(url);
-            dbg("SHAPES remote fetch done url=" + url
+            dbg("SHAPES remote fetch done url=" + urlForLog(url)
                     + " triples=" + fetched.size(), fetchStart);
             REMOTE_IMPORTS_CACHE.put(url, fetched);
             return copyWithPrefixes(fetched);
@@ -2122,7 +2368,7 @@ public class ValidationTools {
                 String msg = e.getMessage();
                 if (msg != null && msg.startsWith("HTTP 404")) throw e;
                 lastEx = e;
-                dbg("SHAPES remote fetch attempt=" + attempt + " failed url=" + url
+                dbg("SHAPES remote fetch attempt=" + attempt + " failed url=" + urlForLog(url)
                         + " error=" + e.getMessage());
             }
         }
@@ -2135,14 +2381,14 @@ public class ValidationTools {
                                                 String conditionalLastMod,
                                                 Path cachedFile,
                                                 Path metaFile) throws IOException {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.connectTimeoutMs()))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        URI uri = requireFetchableRemoteUri(url);
+        boolean credentialed = willSendGitHubCredential(uri);
 
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+                .uri(uri)
                 .timeout(Duration.ofMillis(REMOTE_FETCH_CONFIG.readTimeoutMs()));
+
+        addGitHubAuthHeader(reqBuilder, uri);
 
         if (conditionalEtag != null) {
             reqBuilder.header("If-None-Match", conditionalEtag);
@@ -2152,30 +2398,30 @@ public class ValidationTools {
 
         HttpResponse<byte[]> response;
         try {
-            response = client.send(reqBuilder.GET().build(),
+            response = newHttpClient(credentialed).send(reqBuilder.GET().build(),
                     HttpResponse.BodyHandlers.ofByteArray());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("HTTP request interrupted for: " + url, e);
+            throw new IOException("HTTP request interrupted for: " + urlForLog(url), e);
         }
 
         int status = response.statusCode();
-        dbg("SHAPES remote HTTP status=" + status + " url=" + url
+        dbg("SHAPES remote HTTP status=" + status + " url=" + urlForLog(url)
                 + " bytes=" + (response.body() != null ? response.body().length : 0));
 
         if (status == 304 && Files.exists(cachedFile)) {
-            dbg("SHAPES remote 304 Not Modified, using disk cache url=" + url);
+            dbg("SHAPES remote 304 Not Modified, using disk cache url=" + urlForLog(url));
             return parseTtlBytes(Files.readAllBytes(cachedFile), url);
         }
 
         if (status == 404) {
-            throw new IOException("HTTP 404 Not Found: " + url);
+            throw new IOException("HTTP 404 Not Found: " + urlForLog(url));
         }
         if (status < 200 || status >= 300) {
-            throw new IOException("HTTP " + status + " fetching: " + url);
+            throw new IOException("HTTP " + status + " fetching: " + urlForLog(url));
         }
 
-        byte[] body = response.body();
+        byte[] body = requireBoundedBody(response, url);
         String newEtag = response.headers().firstValue("ETag").orElse(null);
         String newLastMod = response.headers().firstValue("Last-Modified").orElse(null);
 
@@ -2183,7 +2429,7 @@ public class ValidationTools {
 
         try {
             Path dir = cachedFile.getParent();
-            if (dir != null) Files.createDirectories(dir);
+            if (dir != null) createPrivateDirectory(dir);
             Path tmpFile = dir.resolve(cachedFile.getFileName() + ".tmp");
             Files.write(tmpFile, body);
             Files.move(tmpFile, cachedFile, StandardCopyOption.REPLACE_EXISTING);
@@ -2197,7 +2443,7 @@ public class ValidationTools {
                 }
             }
         } catch (IOException cacheEx) {
-            dbg("SHAPES remote disk cache write failed url=" + url
+            dbg("SHAPES remote disk cache write failed url=" + urlForLog(url)
                     + " error=" + cacheEx.getMessage());
         }
 
@@ -2210,7 +2456,7 @@ public class ValidationTools {
         if (!Files.exists(cachedFile)) {
             throw new IOException("Offline mode: URL not in disk cache: " + url);
         }
-        dbg("SHAPES offline disk cache hit url=" + url);
+        dbg("SHAPES offline disk cache hit url=" + urlForLog(url));
         return parseTtlBytes(Files.readAllBytes(cachedFile), url);
     }
 
@@ -2867,10 +3113,8 @@ public class ValidationTools {
 
             String ttlName = row.ttl.trim();
 
-            String constraintFileText = trimReportPath(
-                    resolveTtlPath(constraintsRoot, ttlName).toString(),
-                    CONSTRAINT_REPORT_PREFIX
-            );
+            String constraintFileText =
+                    trimReportPath(resolveTtlPath(constraintsRoot, ttlName).toString());
 
             String requestedInput = cleanRequestedInputForReport(row.xmlInputsRaw);
 
@@ -3296,7 +3540,7 @@ public class ValidationTools {
             try {
                 Path parent = DEBUG_LOG_PATH.getParent();
                 if (parent != null) {
-                    Files.createDirectories(parent);
+                    createPrivateDirectory(parent);
                 }
 
                 Files.writeString(
@@ -3724,10 +3968,18 @@ public class ValidationTools {
         return s;
     }
 
+    /** Maximum cumulative size written to disk when extracting one archive. */
+    private static final long MAX_EXTRACTED_BYTES = 2L * 1024 * 1024 * 1024; // 2 GiB
+    /** Maximum number of entries extracted from one archive. */
+    private static final int MAX_EXTRACTED_ENTRIES = 10_000;
+
     private static void unzipXmlFiles(Path zipPath, Path targetDir) throws IOException {
         Files.createDirectories(targetDir);
 
         int extracted = 0;
+        // Archives arrive from third parties: bound what an entry-count or expansion-ratio
+        // bomb can write, rather than filling the operator's disk.
+        long extractedBytes = 0;
 
         try (java.util.zip.ZipInputStream zis =
                      new java.util.zip.ZipInputStream(Files.newInputStream(zipPath))) {
@@ -3756,7 +4008,18 @@ public class ValidationTools {
                     Files.createDirectories(parent);
                 }
 
-                Files.copy(zis, out, StandardCopyOption.REPLACE_EXISTING);
+                if (extracted + 1 > MAX_EXTRACTED_ENTRIES) {
+                    throw new IOException("Archive exceeds the entry limit ("
+                            + MAX_EXTRACTED_ENTRIES + "): " + zipPath.getFileName());
+                }
+
+                long written = Files.copy(zis, out, StandardCopyOption.REPLACE_EXISTING);
+                extractedBytes += written;
+                if (extractedBytes > MAX_EXTRACTED_BYTES) {
+                    Files.deleteIfExists(out);
+                    throw new IOException("Archive exceeds the extracted size limit ("
+                            + MAX_EXTRACTED_BYTES + " bytes): " + zipPath.getFileName());
+                }
                 extracted++;
             }
         }
@@ -4085,7 +4348,7 @@ public class ValidationTools {
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName()
                             + "][timestamp row " + row.rowIdx + "]");
-                    t.printStackTrace();
+                    logError("Unhandled exception", t);
                     throw t;
                 }
             });
@@ -4167,6 +4430,21 @@ public class ValidationTools {
 
     private static void logError(String message) {
         dbg("ERROR " + message);
+    }
+
+    /**
+     * Records a failure and its stack trace in the diagnostic log.
+     * <p>
+     * Preferred over {@code Throwable.printStackTrace()}, which writes to {@code stderr} -
+     * discarded entirely under the windowed launcher - so the detail was lost exactly when
+     * it was needed. The message is sanitised, as it may embed untrusted values.
+     */
+    private static void logError(String message, Throwable t) {
+        StringWriter sw = new StringWriter();
+        if (t != null) {
+            t.printStackTrace(new PrintWriter(sw));
+        }
+        dbg("ERROR " + forLog(message) + (t != null ? System.lineSeparator() + sw : ""));
     }
 
     private static ValidationTaskResult validateOneResolvedRow(ResolvedMappingRow row,
@@ -4254,7 +4532,7 @@ public class ValidationTools {
                             + " timestamp=" + row.timestamp,
                     rowStart);
 
-            ex.printStackTrace();
+            logError("Unhandled exception", ex);
 
             return new ValidationTaskResult(
                     row.rowIdx,

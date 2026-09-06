@@ -244,10 +244,14 @@
             <artifactId>poi-ooxml-full</artifactId>
             <version>5.5.1</version>
         </dependency>
+        <!-- The code uses org.apache.commons.math3 (ComparisonInstanceData). Declared
+             explicitly rather than relied upon transitively via POI. Replaces a
+             commons-math4-core 4.0-beta1 pin that was unused and, being a pre-release,
+             carried no security-fix stream. -->
         <dependency>
             <groupId>org.apache.commons</groupId>
-            <artifactId>commons-math4-core</artifactId>
-            <version>4.0-beta1</version>
+            <artifactId>commons-math3</artifactId>
+            <version>3.6.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -430,25 +434,6 @@
             <version>${jena.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.jena</groupId>
-            <artifactId>jena-csv</artifactId>
-            <version>3.9.0</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>jena-cmds</artifactId>
-                    <groupId>org.apache.jena</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>slf4j-api</artifactId>
-                    <groupId>org.slf4j</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>apache-jena-libs</artifactId>
-                    <groupId>org.apache.jena</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
 
         <dependency>
             <groupId>org.apache.jena</groupId>
@@ -504,9 +489,12 @@
             <artifactId>slf4j-api</artifactId>
             <version>2.0.18</version>
         </dependency>
+        <!-- A real logging binding. slf4j-nop discarded all library output, including the
+             RDF parser, HTTP client and TLS warnings that are the only signal an operator
+             would get that a malformed or hostile input document was processed. -->
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-nop</artifactId>
+            <artifactId>slf4j-simple</artifactId>
             <version>2.0.18</version>
             <scope>compile</scope>
         </dependency>

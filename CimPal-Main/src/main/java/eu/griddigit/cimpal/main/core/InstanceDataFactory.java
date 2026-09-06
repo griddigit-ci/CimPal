@@ -28,8 +28,13 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import static eu.griddigit.cimpal.core.utils.ModelFactory.getProfileKeyword;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class InstanceDataFactory {
+
+    private static final Logger LOG = LoggerFactory.getLogger(InstanceDataFactory.class);
+
 
     public static LinkedList<String> zipfilesnames;
 
@@ -341,7 +346,7 @@ public class InstanceDataFactory {
                         inputstreamlist.add(inputStream);
                         zipfilesnames.add(entry.getName());
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        LOG.error("Unhandled exception", e);
                     }
                 }
             }
@@ -351,14 +356,17 @@ public class InstanceDataFactory {
         return inputstreamlist;
     }
 
+    /**
+     * True when {@code destPathStr} resolves strictly inside {@code targetDir}.
+     * <p>
+     * Compares normalised absolute {@link Path} objects. The previous implementation compared
+     * unnormalised strings by prefix, which is not a containment check: a relative or
+     * non-normalised {@code targetDir} makes the comparison unsound.
+     */
     private static boolean isValidDestPath(String targetDir, String destPathStr) {
-        // validate the destination path of a ZipFile entry,
-        // and return true or false telling if it's valid or not.
-
-        Path destPath           = Paths.get(destPathStr);
-        Path destPathNormalized = destPath.normalize(); //remove ../../ etc.
-
-        return destPathNormalized.toString().startsWith(targetDir + File.separator);
+        Path base = Paths.get(targetDir).toAbsolutePath().normalize();
+        Path dest = Paths.get(destPathStr).toAbsolutePath().normalize();
+        return dest.startsWith(base) && !dest.equals(base);
     }
 
     public static LinkedList<String>  getClassesForTree(Model model) {

@@ -36,9 +36,14 @@ import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class CimPalWizardController implements Initializable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CimPalWizardController.class);
+
 
     @FXML
     private AnchorPane mainWindowAnchor;
@@ -80,7 +85,7 @@ public class CimPalWizardController implements Initializable {
                 prefs = Preferences.userRoot().node("CimPal");
             }
         } catch (BackingStoreException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
         wizardContext = WizardContext.getInstance();
     }
@@ -108,7 +113,7 @@ public class CimPalWizardController implements Initializable {
             guiPrefStage.showAndWait();
 
         }catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 
@@ -202,7 +207,7 @@ public class CimPalWizardController implements Initializable {
             guiAboutStage.showAndWait();
 
         }catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 }

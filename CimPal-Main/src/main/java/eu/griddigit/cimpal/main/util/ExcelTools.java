@@ -21,8 +21,13 @@ import org.apache.poi.xssf.usermodel.*;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ExcelTools {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExcelTools.class);
+
 
     public static ArrayList<Object> importXLSX(String fileName, int sheetNum) {
         ArrayList<Object> dataExcel = new ArrayList<>();
@@ -60,7 +65,7 @@ public class ExcelTools {
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
         return dataExcel;
     }
@@ -101,7 +106,7 @@ public class ExcelTools {
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
         return dataExcel;
     }
@@ -158,7 +163,7 @@ public class ExcelTools {
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
         return dataExcel;
     }
@@ -231,7 +236,7 @@ public class ExcelTools {
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
 
         return result;
@@ -417,7 +422,7 @@ public class ExcelTools {
                 workbook.close();
                 outputStream.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         }
     }

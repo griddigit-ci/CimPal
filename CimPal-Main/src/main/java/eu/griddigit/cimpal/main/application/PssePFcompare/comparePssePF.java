@@ -15,8 +15,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class comparePssePF {
+
+    private static final Logger LOG = LoggerFactory.getLogger(comparePssePF.class);
+
 
     public static void comparePssePFresults() {
 
@@ -638,9 +643,9 @@ public class comparePssePF {
                 outputStream.flush();
                 outputStream.close();
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             } catch (IOException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         }
     }
@@ -744,9 +749,9 @@ public class comparePssePF {
                 outputStream.flush();
                 outputStream.close();
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             } catch (IOException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         }
     }

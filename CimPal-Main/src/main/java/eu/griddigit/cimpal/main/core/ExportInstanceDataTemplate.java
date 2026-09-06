@@ -28,9 +28,14 @@ import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.getRDFDataFor
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
 import static eu.griddigit.cimpal.main.core.ShaclTools.*;
 import static eu.griddigit.cimpal.main.util.ExcelTools.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ExportInstanceDataTemplate {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExportInstanceDataTemplate.class);
+
 
     public static void rdfsContent(List<File> file, boolean templateOnly) throws FileNotFoundException {
         String cimsNs = MainController.prefs.get("cimsNamespace", "");
@@ -70,7 +75,7 @@ public class ExportInstanceDataTemplate {
             try {
                 RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
 
             Map<String, String> prefMapTemp = model.getNsPrefixMap();
@@ -344,7 +349,7 @@ public class ExportInstanceDataTemplate {
                 objectMapper.writeValue(outputStream, rdfsInfo);
                 outputStream.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         }
     }
@@ -499,7 +504,7 @@ public class ExportInstanceDataTemplate {
                 try {
                     RDFDataMgr.read(model, new FileInputStream(fil), "", Lang.RDFXML);
                 } catch (FileNotFoundException e) {
-                    e.printStackTrace();
+                    LOG.error("Unhandled exception", e);
                 }
 
                 Map<String, String> prefMapTemp = model.getNsPrefixMap();
@@ -621,7 +626,7 @@ public class ExportInstanceDataTemplate {
                 try {
                     RDFDataMgr.read(model, new FileInputStream(fil), "", Lang.RDFXML);
                 } catch (FileNotFoundException e) {
-                    e.printStackTrace();
+                    LOG.error("Unhandled exception", e);
                 }
 
                 Map<String, String> prefMapTemp = model.getNsPrefixMap();

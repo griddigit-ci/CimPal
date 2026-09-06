@@ -282,43 +282,73 @@ public class ModelFactory {
         return keyword;
     }
 
+    /** Maximum cumulative uncompressed size accepted from a single archive traversal. */
+    private static final long MAX_TOTAL_UNCOMPRESSED_BYTES = 2L * 1024 * 1024 * 1024; // 2 GiB
+    /** Maximum number of entries accepted from a single archive traversal. */
+    private static final int MAX_ZIP_ENTRIES = 10_000;
+    /** Maximum depth of nested archives followed during expansion. */
+    private static final int MAX_ZIP_NESTING_DEPTH = 3;
+
+    /**
+     * Mutable expansion budget shared across one archive traversal, nested archives included.
+     * <p>
+     * Archive entries are read fully into memory and retained, so an archive that declares a
+     * small compressed size but expands enormously - or that nests archives within archives -
+     * exhausts the heap and terminates the application. CGMES datasets arrive from third
+     * parties, so the bound must be enforced rather than assumed.
+     */
+    private static final class ZipBudget {
+        private long bytes;
+        private int entries;
+
+        void account(long entryBytes) throws IOException {
+            if (++entries > MAX_ZIP_ENTRIES) {
+                throw new IOException("Archive exceeds the entry limit (" + MAX_ZIP_ENTRIES + ")");
+            }
+            bytes += entryBytes;
+            if (bytes > MAX_TOTAL_UNCOMPRESSED_BYTES) {
+                throw new IOException("Archive exceeds the total uncompressed size limit ("
+                        + MAX_TOTAL_UNCOMPRESSED_BYTES + " bytes)");
+            }
+        }
+    }
+
     public static List<InputStream> unzip(File selectedFile) {
         List<InputStream> inputstreamlist = new LinkedList<>();
         zipfilesnames = new LinkedList<>();
+        ZipBudget budget = new ZipBudget();
 
-        try {
-            ZipFile zipFile = new ZipFile(selectedFile);
+        try (ZipFile zipFile = new ZipFile(selectedFile)) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-
-                String destPath = selectedFile.getParent() + File.separator + entry.getName();
-                if (!isValidDestPath(selectedFile.getParent(), destPath)) {
-                    throw new IOException("Final file output path is invalid: " + destPath);
+                if (entry.isDirectory()) {
+                    continue;
                 }
 
                 try (InputStream inputStream = zipFile.getInputStream(entry)) {
                     byte[] content = inputStream.readAllBytes();
+                    budget.account(content.length);
+
                     String entryName = entry.getName();
-                    String ext = FilenameUtils.getExtension(entryName).toLowerCase();
+                    String ext = FilenameUtils.getExtension(entryName).toLowerCase(Locale.ROOT);
 
                     // Check if the entry is itself a ZIP file
                     if (ext.equals("zip")) {
-                        // Recursively extract nested ZIP
-                        List<InputStream> nestedStreams = unzip(new ByteArrayInputStream(content));
-                        inputstreamlist.addAll(nestedStreams);
+                        // Recursively extract nested ZIP, under the shared budget
+                        inputstreamlist.addAll(
+                                unzip(new ByteArrayInputStream(content), budget, 1));
                     } else {
                         // Add non-ZIP file to the list
                         inputstreamlist.add(new ByteArrayInputStream(content));
                     }
                     zipfilesnames.add(entryName);
-                } catch (IOException e) {
-                    e.printStackTrace();
                 }
             }
-            zipFile.close();
         } catch (IOException e) {
+            // Previously a per-entry IOException was swallowed with printStackTrace(), which
+            // yielded a silently incomplete model. Expansion failure must be visible.
             throw new RuntimeException("Error unzipping file " + selectedFile, e);
         }
 
@@ -326,6 +356,15 @@ public class ModelFactory {
     }
 
     public static List<InputStream> unzip(InputStream zipStream) {
+        return unzip(zipStream, new ZipBudget(), 0);
+    }
+
+    private static List<InputStream> unzip(InputStream zipStream, ZipBudget budget, int depth) {
+        if (depth > MAX_ZIP_NESTING_DEPTH) {
+            throw new RuntimeException(
+                    "Archive nesting exceeds the depth limit (" + MAX_ZIP_NESTING_DEPTH + ")");
+        }
+
         List<InputStream> inputstreamlist = new LinkedList<>();
 
         try (ZipInputStream zis = new ZipInputStream(zipStream)) {
@@ -337,11 +376,14 @@ public class ModelFactory {
                 }
 
                 byte[] content = zis.readAllBytes();
+                budget.account(content.length);
+
                 String entryName = entry.getName();
                 String ext = FilenameUtils.getExtension(entryName).toLowerCase(Locale.ROOT);
 
                 if (ext.equals("zip")) {
-                    inputstreamlist.addAll(unzip(new ByteArrayInputStream(content)));
+                    inputstreamlist.addAll(
+                            unzip(new ByteArrayInputStream(content), budget, depth + 1));
                 } else {
                     inputstreamlist.add(new ByteArrayInputStream(content));
                 }
@@ -355,14 +397,19 @@ public class ModelFactory {
     }
 
 
-    private static boolean isValidDestPath(String targetDir, String destPathStr) {
-        // validate the destination path of a ZipFile entry,
-        // and return true or false telling if it's valid or not.
-
-        Path destPath = Paths.get(destPathStr);
-        Path destPathNormalized = destPath.normalize(); //remove ../../ etc.
-
-        return destPathNormalized.toString().startsWith(targetDir + File.separator);
+    /**
+     * True when {@code destPathStr} resolves strictly inside {@code targetDir}. Retained for
+     * use by any future code path that extracts archive entries to disk; the expansion
+     * methods above hold entries in memory and never write, so they do not call it.
+     * <p>
+     * Compares normalised absolute {@link Path} objects. A string prefix test against an
+     * unnormalised, possibly relative directory is not a containment check and can be
+     * satisfied by a path that escapes the directory.
+     */
+    static boolean isValidDestPath(String targetDir, String destPathStr) {
+        Path base = Paths.get(targetDir).toAbsolutePath().normalize();
+        Path dest = Paths.get(destPathStr).toAbsolutePath().normalize();
+        return dest.startsWith(base) && !dest.equals(base);
     }
 
     //get the keyword for the profile

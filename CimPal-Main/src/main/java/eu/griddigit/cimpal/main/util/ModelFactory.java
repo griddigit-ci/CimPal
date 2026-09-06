@@ -37,8 +37,13 @@ import java.util.List;
 import java.util.Map;
 
 import static eu.griddigit.cimpal.main.application.MainController.prefs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ModelFactory {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ModelFactory.class);
+
 
     //Loads model data with datatype mapping
     public static Model modelLoadXMLmapping(InputStream inputStream, Map<String, RDFDatatype> dataTypeMap, String xmlBase) {
@@ -111,7 +116,7 @@ public class ModelFactory {
                 RDFDataMgr.read(model, new FileInputStream(file.get(m).toString()), Lang.RDFXML);
             }
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
 
         MainController.shapeModels.add(model);
@@ -162,14 +167,17 @@ public class ModelFactory {
         return modelUnion;
     }
 
+    /**
+     * True when {@code destPathStr} resolves strictly inside {@code targetDir}.
+     * <p>
+     * Compares normalised absolute {@link Path} objects. The previous implementation compared
+     * unnormalised strings by prefix, which is not a containment check: a relative or
+     * non-normalised {@code targetDir} makes the comparison unsound.
+     */
     private static boolean isValidDestPath(String targetDir, String destPathStr) {
-        // validate the destination path of a ZipFile entry,
-        // and return true or false telling if it's valid or not.
-
-        Path destPath = Paths.get(destPathStr);
-        Path destPathNormalized = destPath.normalize(); //remove ../../ etc.
-
-        return destPathNormalized.toString().startsWith(targetDir + File.separator);
+        Path base = Paths.get(targetDir).toAbsolutePath().normalize();
+        Path dest = Paths.get(destPathStr).toAbsolutePath().normalize();
+        return dest.startsWith(base) && !dest.equals(base);
     }
 
 

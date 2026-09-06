@@ -47,8 +47,13 @@ import static eu.griddigit.cimpal.main.application.MainController.*;
 import static eu.griddigit.cimpal.main.core.RdfConvert.modelInheritance;
 import static org.topbraid.shacl.vocabulary.SH.path;
 import static eu.griddigit.cimpal.main.util.CompareFactory.isBlankNodeAlist;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ShaclTools {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ShaclTools.class);
+
 
     private static Map<String, RDFDatatype> dataTypeMapFromProfile;
     public static Model profileDataMapAsModelTemp;
@@ -5345,7 +5350,7 @@ public class ShaclTools {
                         RestoreResult failed = RestoreResult.failed(csvFile, e);
                         results.add(failed);
                         updateMessage("Failed: " + csvFile.getName() + "\n" + e.getMessage());
-                        e.printStackTrace();
+                        LOG.error("Unhandled exception", e);
                     }
 
                     updateProgress(i + 1, total);
@@ -5413,7 +5418,7 @@ public class ShaclTools {
 
             Throwable ex = task.getException();
             if (ex != null) {
-                ex.printStackTrace();
+                LOG.error("Unhandled exception", ex);
                 showError("Restore TTL from CSV failed", ex.getMessage());
             } else {
                 showError("Restore TTL from CSV failed", "Unknown error.");

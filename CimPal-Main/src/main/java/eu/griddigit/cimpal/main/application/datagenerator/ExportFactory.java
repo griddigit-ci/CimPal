@@ -12,8 +12,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ExportFactory {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExportFactory.class);
+
 
 
     public static void exportQoCDC(List ruleName, List ruleSeverity, List ruleDescription, List ruleMessage, List ruleLevel, String sheetname, String initialFileName, String title) {
@@ -95,9 +100,9 @@ public class ExportFactory {
                 outputStream.flush();
                 outputStream.close();
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             } catch (IOException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         }
     }

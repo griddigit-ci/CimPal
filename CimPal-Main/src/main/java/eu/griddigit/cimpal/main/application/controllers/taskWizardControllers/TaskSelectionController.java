@@ -24,8 +24,13 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TaskSelectionController implements Initializable, IController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TaskSelectionController.class);
+
 
     public TableColumn removeColumn;
     @FXML
@@ -64,9 +69,9 @@ public class TaskSelectionController implements Initializable, IController {
         try {
             taskSelectionController = new TaskDependenciesEnforcer();
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         } catch (URISyntaxException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
         try {
             supportedRDFSProfiles = new SupportedRDFSProfiles();

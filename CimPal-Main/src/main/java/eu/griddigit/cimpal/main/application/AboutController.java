@@ -21,8 +21,13 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Date;
 import java.util.ResourceBundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AboutController implements Initializable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AboutController.class);
+
     @FXML
     private Button btnOK;
     @FXML
@@ -56,7 +61,7 @@ public class AboutController implements Initializable {
                     try {
                         Desktop.getDesktop().browse(new URL("https://griddigit.eu").toURI());
                     } catch (IOException | URISyntaxException e) {
-                        e.printStackTrace();
+                        LOG.error("Unhandled exception", e);
                     }
         });
 
@@ -65,7 +70,7 @@ public class AboutController implements Initializable {
             try {
                 Desktop.getDesktop().browse(new URL("mailto:cimpal@griddigit.eu").toURI());
             } catch (IOException | URISyntaxException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         });
 
@@ -73,7 +78,7 @@ public class AboutController implements Initializable {
             try {
                 Desktop.getDesktop().browse(new URL("https://cimpal.app").toURI());
             } catch (IOException | URISyntaxException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         });
 
@@ -81,7 +86,7 @@ public class AboutController implements Initializable {
             try {
                 Desktop.getDesktop().browse(new URL("https://github.com/griddigit/CimPal").toURI());
             } catch (IOException | URISyntaxException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         });
 
@@ -103,7 +108,7 @@ public class AboutController implements Initializable {
         try {
             Desktop.getDesktop().browse(new URL("https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12").toURI());
         } catch (IOException | URISyntaxException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 
@@ -135,7 +140,7 @@ public class AboutController implements Initializable {
                 file.deleteOnExit();
 
             } catch (IOException ex) {
-                ex.printStackTrace();
+                LOG.error("Unhandled exception", ex);
             }
         } else {
 
@@ -146,7 +151,7 @@ public class AboutController implements Initializable {
         try {
             Desktop.getDesktop().edit(file);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
 
 

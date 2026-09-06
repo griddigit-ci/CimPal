@@ -6,9 +6,14 @@ import javafx.concurrent.Task;
 
 import java.io.FileNotFoundException;
 import java.util.HashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // Multithreading class to manage Tasks execution on a separate thread from the UI
 public class TaskExecutionService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TaskExecutionService.class);
+
 
     // Method that marks all non completed tasks with a Cancelled label on the status screen
     public void cancelExecutionOfSelectedTasks(WizardContext wizardContext) {
@@ -34,11 +39,11 @@ public class TaskExecutionService {
                     try {
                         selectedTask.getTask().execute(selectedTask);
                     } catch (FileNotFoundException e) {
-                        e.printStackTrace();
+                        LOG.error("Unhandled exception", e);
                         GuiHelper.appendTextToOutputWindow(wizardContext.getExecutionTextArea(), "Error at Task: " + selectedTask.getName(), true);
                         GuiHelper.appendTextToOutputWindow(wizardContext.getExecutionTextArea(),e.getMessage(), true);
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        LOG.error("Unhandled exception", e);
                         GuiHelper.appendTextToOutputWindow(wizardContext.getExecutionTextArea(), "Error at Task: " + selectedTask.getName(), true);
                         GuiHelper.appendTextToOutputWindow(wizardContext.getExecutionTextArea(),e.getMessage(), true);
                     }

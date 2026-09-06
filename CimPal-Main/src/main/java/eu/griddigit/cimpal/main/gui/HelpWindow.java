@@ -159,7 +159,11 @@ public final class HelpWindow {
             default -> "light";
         };
         try {
-            engine.executeScript("document.documentElement.setAttribute('data-theme','" + key + "')");
+            // Set the attribute through the DOM rather than by concatenating the value into
+            // script source. The value is currently one of three compile-time constants and
+            // so cannot carry injected script, but building script text by concatenation is
+            // a pattern that becomes injectable the moment the value's provenance widens.
+            engine.getDocument().getDocumentElement().setAttribute("data-theme", key);
         } catch (RuntimeException e) {
             // A styling failure must never stop the user reading the help page.
             System.err.println("[WARN] Could not apply the theme to the help page: " + e.getMessage());

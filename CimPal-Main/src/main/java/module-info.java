@@ -27,10 +27,13 @@ module CimPal.Main {
     requires javafx.media;
     requires javafx.swing;
     requires javafx.web;
+    requires java.xml;
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
     requires org.slf4j;
-    requires org.slf4j.nop;
+    // A real binding, not slf4j-nop: discarding all library output also discards the
+    // security-relevant warnings emitted by the RDF parsers and the HTTP client.
+    requires org.slf4j.simple;
     requires org.apache.commons.compress;
     requires org.apache.commons.codec;
     requires org.apache.jena.tdb2;

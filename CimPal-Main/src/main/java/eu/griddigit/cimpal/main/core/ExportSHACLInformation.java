@@ -28,9 +28,14 @@ import java.util.*;
 
 import static eu.griddigit.cimpal.main.util.ExcelTools.exportMapToExcel;
 import static eu.griddigit.cimpal.main.util.ExcelTools.saveExcelFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ExportSHACLInformation {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExportSHACLInformation.class);
+
 
     public static void shaclInformationExport(boolean singleFile, List<File> file) {
         XSSFWorkbook workbook = new XSSFWorkbook();
@@ -40,7 +45,7 @@ public class ExportSHACLInformation {
             try {
                 RDFDataMgr.read(model, new FileInputStream(f), Lang.TURTLE);
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
             fileName = FilenameUtils.getBaseName(f.getAbsolutePath());
             if (!singleFile) {
@@ -186,7 +191,7 @@ public class ExportSHACLInformation {
                 Lang lang = org.apache.jena.riot.RDFLanguages.filenameToLang(f.getName());
                 RDFDataMgr.read(model, new FileInputStream(f), (lang != null ? lang : Lang.TURTLE));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
 
             String fileName = FilenameUtils.getBaseName(f.getAbsolutePath());
@@ -276,7 +281,7 @@ public class ExportSHACLInformation {
                 Lang lang = org.apache.jena.riot.RDFLanguages.filenameToLang(f.getName());
                 RDFDataMgr.read(model, new FileInputStream(f), (lang != null ? lang : Lang.TURTLE));
             } catch (Exception e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
                 continue;
             }
 
@@ -1004,12 +1009,23 @@ public class ExportSHACLInformation {
         return String.join(System.lineSeparator() + System.lineSeparator(), parts);
     }
 
+    /** Characters a spreadsheet treats as the start of a formula when it opens a CSV file. */
+    private static final String FORMULA_TRIGGERS = "=+-@\t\r";
+
     private static String csvEscape(String value) {
         if (value == null) {
             return "";
         }
 
         String s = value;
+
+        // Neutralise formula injection before quoting. RFC-4180 quoting does not prevent
+        // evaluation: Excel and LibreOffice evaluate a cell whose content begins with
+        // =, +, -, @, TAB or CR, and these values are RDF literals from third-party models.
+        // A single leading apostrophe forces literal interpretation and is not displayed.
+        if (!s.isEmpty() && FORMULA_TRIGGERS.indexOf(s.charAt(0)) >= 0) {
+            s = "'" + s;
+        }
 
         boolean mustQuote =
                 s.contains(",")
@@ -1067,7 +1083,7 @@ public class ExportSHACLInformation {
             System.out.println("Saved EA import CSV: " + outFile.getAbsolutePath());
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 

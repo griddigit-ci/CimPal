@@ -29,8 +29,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.TaskInputController.getSaveInZip;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WizardContext {
+
+    private static final Logger LOG = LoggerFactory.getLogger(WizardContext.class);
+
     // Static helper objects for singleton pattern implementation
     private static volatile WizardContext instance;
     private static Object mutex = new Object();
@@ -705,9 +710,9 @@ public class WizardContext {
             outputStream.flush();
             outputStream.close();
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 

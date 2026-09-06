@@ -20,9 +20,14 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ExportRDFSdescriptions {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExportRDFSdescriptions.class);
+
 
     public static void rdfsDescriptions(Model model) throws FileNotFoundException {
         List<String> rdfsItem = new LinkedList<>(); // list for the element - item
@@ -317,11 +322,11 @@ public class ExportRDFSdescriptions {
                     workbook.close();
                     outputStream.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    LOG.error("Unhandled exception", e);
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 
@@ -416,7 +421,7 @@ public class ExportRDFSdescriptions {
                 workbook.write(outputStream);
                 workbook.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         }
     }

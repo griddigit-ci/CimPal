@@ -43,13 +43,60 @@ class ShapeSourceTest {
         assertInstanceOf(ValidationTools.RemoteShapeSource.class, src);
     }
 
+    // ---- 1a. Egress policy: which remote imports may be fetched at all ----
+    //
+    // resolveImport applies the scheme/host tier of the egress policy, so an import URI
+    // that policy refuses is reported as unresolvable rather than fetched. An import URI
+    // comes from a third-party shapes file and is fully attacker-controlled; before this
+    // policy existed, any http(s) URI with an RDF extension was fetched, which allowed a
+    // shapes file to drive requests to internal hosts and metadata endpoints.
+
     @Test
-    void classify_http_ttl_returnsRemote() {
-        var src = ValidationTools.resolveImport(
-                "http://example.org/shapes.ttl",
+    void classify_plainHttp_refusedByEgressPolicy() {
+        // Plain HTTP is refused even for an otherwise allowlisted host: the response would
+        // be attacker-modifiable in transit, and these are constraint definitions.
+        assertNull(ValidationTools.resolveImport(
+                "http://raw.githubusercontent.com/example/repo/main/shapes.ttl",
                 new ValidationTools.LocalShapeSource(tempDir.resolve("root.ttl")),
-                tempDir);
-        assertInstanceOf(ValidationTools.RemoteShapeSource.class, src);
+                tempDir));
+    }
+
+    @Test
+    void classify_httpsNonAllowlistedHost_refusedByEgressPolicy() {
+        assertNull(ValidationTools.resolveImport(
+                "https://evil.example.com/shapes.ttl",
+                new ValidationTools.LocalShapeSource(tempDir.resolve("root.ttl")),
+                tempDir));
+    }
+
+    @Test
+    void classify_httpsHostMerelyMentioningAllowlistedDomain_refused() {
+        // The allowlist is matched against the URI authority, not by substring against the
+        // whole URL. A host that merely contains an allowlisted domain in its name, or a
+        // path that mentions it, must not pass.
+        var local = new ValidationTools.LocalShapeSource(tempDir.resolve("root.ttl"));
+        assertNull(ValidationTools.resolveImport(
+                "https://raw.githubusercontent.com.evil.example.com/shapes.ttl", local, tempDir));
+        assertNull(ValidationTools.resolveImport(
+                "https://evil.example.com/raw.githubusercontent.com/shapes.ttl", local, tempDir));
+    }
+
+    @Test
+    void classify_embeddedCredentials_refusedByEgressPolicy() {
+        assertNull(ValidationTools.resolveImport(
+                "https://user:pass@raw.githubusercontent.com/example/repo/main/shapes.ttl",
+                new ValidationTools.LocalShapeSource(tempDir.resolve("root.ttl")),
+                tempDir));
+    }
+
+    @Test
+    void classify_protocolRelativeFromRemote_refusedByEgressPolicy() {
+        // "//host/path" is not caught by the http:// or https:// prefix tests, so it reaches
+        // the relative-reference branch, where URI.resolve replaces the parent's authority.
+        // The resolved URI must therefore be re-checked against the allowlist.
+        var parent = new ValidationTools.RemoteShapeSource(
+                URI.create("https://raw.githubusercontent.com/example/repo/main/root.ttl"));
+        assertNull(ValidationTools.resolveImport("//evil.example.com/shapes.ttl", parent, tempDir));
     }
 
     @Test
@@ -202,19 +249,41 @@ class ShapeSourceTest {
         assertEquals(2, result.loadedFiles(), "Cycle must not cause infinite loop or double-load");
     }
 
-    // ---- 4. Failing remote import must throw, not silently pass ----
+    // ---- 4. A remote import refused by egress policy is not fetched ----
 
     @Test
-    void failingRemoteImport_throwsIOException() throws Exception {
-        // Points at a port with nothing listening
+    void loopbackRemoteImport_isRefusedAndNotFetched() throws Exception {
+        // A loopback import is the canonical SSRF probe: it reaches a service bound to the
+        // operator's own machine. The egress policy must decline it, and declining must be
+        // reported as an unresolvable import rather than attempted and rather than silently
+        // ignored. Nothing is listening on this port, so an attempted fetch would surface
+        // as a connection error; the assertion is that no attempt is made at all.
         Path root = tempDir.resolve("root.ttl");
         writeOntologyWithImport(root, "urn:root", "http://localhost:19999/nonexistent.ttl");
 
         Map<String, Model> cache = new HashMap<>();
-        assertThrows(IOException.class,
-                () -> ValidationTools.loadShapesWithImports(
-                        new ValidationTools.LocalShapeSource(root), tempDir, cache),
-                "A failing remote import must throw IOException, never produce a silent pass");
+        var result = ValidationTools.loadShapesWithImports(
+                new ValidationTools.LocalShapeSource(root), tempDir, cache);
+
+        assertEquals(1, result.importsFound(), "the import statement must still be counted");
+        assertEquals(1, result.unresolvableImports(),
+                "a policy-refused import must be reported as unresolvable, not silently dropped");
+        assertEquals(1, result.loadedFiles(), "only the local root may be loaded");
+    }
+
+    @Test
+    void metadataEndpointImport_isRefusedAndNotFetched() throws Exception {
+        // The cloud instance-metadata address, the other canonical SSRF target.
+        Path root = tempDir.resolve("root.ttl");
+        writeOntologyWithImport(root, "urn:root",
+                "http://169.254.169.254/latest/meta-data/iam/security-credentials/x.ttl");
+
+        Map<String, Model> cache = new HashMap<>();
+        var result = ValidationTools.loadShapesWithImports(
+                new ValidationTools.LocalShapeSource(root), tempDir, cache);
+
+        assertEquals(1, result.unresolvableImports());
+        assertEquals(1, result.loadedFiles());
     }
 
     // ---- 5. All-local regression: triple count unchanged ----

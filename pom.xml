@@ -11,6 +11,8 @@
         <jena.version>6.2.0</jena.version>
         <launch4j.version>2.7.0</launch4j.version>
         <javafx.version>25.0.3</javafx.version>
+        <cyclonedx.plugin.version>2.9.1</cyclonedx.plugin.version>
+        <dependency.check.plugin.version>12.1.0</dependency.check.plugin.version>
     </properties>
 
     <groupId>eu.griddigit.CimPal</groupId>
@@ -45,7 +47,62 @@
                     <fork>true</fork>
                 </configuration>
             </plugin>
+
+            <!-- Software Bill of Materials, emitted for every build so that a dependency
+                 advisory published after release can be correlated against what shipped. -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>${cyclonedx.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          Dependency vulnerability scanning. Kept in an opt-in profile because the plugin
+          downloads and updates a vulnerability database, which is too slow for a routine
+          incremental build. Run it in CI and before a release:
+
+              mvn -Psecurity-scan verify
+
+          Fails the build on any dependency, declared or transitive, carrying an advisory
+          with a CVSS score of 7.0 or above.
+        -->
+        <profile>
+            <id>security-scan</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>${dependency.check.plugin.version}</version>
+                        <configuration>
+                            <failBuildOnCVSS>7</failBuildOnCVSS>
+                            <formats>
+                                <format>HTML</format>
+                                <format>JSON</format>
+                            </formats>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>aggregate</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

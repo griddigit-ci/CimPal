@@ -23,9 +23,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DataTypeMaping {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DataTypeMaping.class);
+
 
 
     public static Map<String, RDFDatatype> createMap(List<String> propertyString, List<String> datatype) {
@@ -158,7 +163,7 @@ public class DataTypeMaping {
                     dataTypeMap = DataTypeMaping.createMap(propertyString, datatype);
                     //System.out.println(dataTypeMap);
                 } catch (FileNotFoundException e) {
-                    e.printStackTrace();
+                    LOG.error("Unhandled exception", e);
                 }
             }
             return dataTypeMap;

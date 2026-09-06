@@ -29,8 +29,13 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class InstanceDataFactory {
+
+    private static final Logger LOG = LoggerFactory.getLogger(InstanceDataFactory.class);
+
 
     public static Resource classResource;
     public static Resource classResourceTerminal;
@@ -1922,7 +1927,7 @@ public class InstanceDataFactory {
                     try{
                         inputStream = zipFile.getInputStream(entry);
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        LOG.error("Unhandled exception", e);
                     }
                 }
             }
@@ -1963,7 +1968,7 @@ public class InstanceDataFactory {
                         inputStreamList.add(inputStream);
                         fileNames.add(entry.getName());
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        LOG.error("Unhandled exception", e);
                     }
                 }
             }
@@ -1974,14 +1979,17 @@ public class InstanceDataFactory {
         return unzippedFiles;
     }
 
+    /**
+     * True when {@code destPathStr} resolves strictly inside {@code targetDir}.
+     * <p>
+     * Compares normalised absolute {@link Path} objects. The previous implementation compared
+     * unnormalised strings by prefix, which is not a containment check: a relative or
+     * non-normalised {@code targetDir} makes the comparison unsound.
+     */
     private static boolean isValidDestPath(String targetDir, String destPathStr) {
-        // validate the destination path of a ZipFile entry,
-        // and return true or false telling if it's valid or not.
-
-        Path destPath           = Paths.get(destPathStr);
-        Path destPathNormalized = destPath.normalize(); //remove ../../ etc.
-
-        return destPathNormalized.toString().startsWith(targetDir + File.separator);
+        Path base = Paths.get(targetDir).toAbsolutePath().normalize();
+        Path dest = Paths.get(destPathStr).toAbsolutePath().normalize();
+        return dest.startsWith(base) && !dest.equals(base);
     }
 
 

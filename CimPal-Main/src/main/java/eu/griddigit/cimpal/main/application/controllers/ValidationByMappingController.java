@@ -14,8 +14,13 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ValidationByMappingController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ValidationByMappingController.class);
+
 
     @FXML
     private ChoiceBox<String> cbValidationWorkflow;
@@ -421,7 +426,7 @@ public class ValidationByMappingController {
                 });
 
             } catch (IOException ex) {
-                ex.printStackTrace();
+                LOG.error("Unhandled exception", ex);
 
                 Platform.runLater(() -> {
                     pbValidationByMapping.setProgress(0);
@@ -430,7 +435,7 @@ public class ValidationByMappingController {
                 });
 
             } catch (Exception ex) {
-                ex.printStackTrace();
+                LOG.error("Unhandled exception", ex);
 
                 Platform.runLater(() -> {
                     pbValidationByMapping.setProgress(0);

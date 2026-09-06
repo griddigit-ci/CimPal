@@ -1,12 +1,15 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.services.TaskExecutionService;
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 
+import java.awt.Desktop;
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -49,9 +52,25 @@ public class TaskStatusController implements Initializable, IController {
         context.clearContext();
     }
 
-    public void openOutputDirectory(ActionEvent actionEvent) throws IOException {
-        var command = "explorer /open, " + context.getOutputDirectory();
-        Runtime.getRuntime().exec(command);
+    public void openOutputDirectory(ActionEvent actionEvent) {
+        File dir = context.getOutputDirectory();
+        if (dir == null || !dir.isDirectory()) {
+            GUIhelper.showUserFriendlyError("No output directory",
+                    "The task has not produced an output directory yet.", null);
+            return;
+        }
+        try {
+            // Desktop.open hands the path to the shell as a single opaque argument. The
+            // previous form built a command string and passed it to Runtime.exec(String),
+            // which tokenises on whitespace - so a path could inject extra arguments, and
+            // any path containing a space simply broke. It also named "explorer"
+            // unqualified, which Windows resolves against the application and current
+            // directories before System32, allowing a planted executable to run instead.
+            Desktop.getDesktop().open(dir.getCanonicalFile());
+        } catch (IOException | UnsupportedOperationException e) {
+            GUIhelper.showUserFriendlyError("Could not open the folder",
+                    "The output folder could not be opened: " + dir, e);
+        }
     }
 
     @Override

@@ -61,12 +61,27 @@ public class ComparisonCsvWriter {
                 .append(csvEscape(value)).append('\n');
     }
 
+    /**
+     * Characters a spreadsheet treats as the start of a formula when it opens a CSV file.
+     * See {@link #csvEscape(String)}.
+     */
+    private static final String FORMULA_TRIGGERS = "=+-@\t\r";
+
     /** Wraps a field in quotes (doubling internal quotes) when it contains a CSV-significant char. */
     private static String csvEscape(String value) {
         if (value == null) {
             return "";
         }
         String s = value;
+        // Neutralise formula injection before quoting. RFC-4180 quoting is orthogonal to this:
+        // Excel and LibreOffice evaluate a cell whose content begins with =, +, -, @, TAB or
+        // CR, and the values here are RDF literals and IRIs taken from the third-party models
+        // being compared. Without this, an exported comparison becomes a delivery vehicle for
+        // a formula that executes when a colleague or counterparty opens the report. A single
+        // leading apostrophe forces literal interpretation and is not itself displayed.
+        if (!s.isEmpty() && FORMULA_TRIGGERS.indexOf(s.charAt(0)) >= 0) {
+            s = "'" + s;
+        }
         boolean mustQuote = s.contains(",") || s.contains("\"") || s.contains("\n")
                 || s.contains("\r") || s.contains("\t") || s.contains(";");
         if (mustQuote) {
