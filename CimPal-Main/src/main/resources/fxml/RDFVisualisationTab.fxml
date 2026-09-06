@@ -5,12 +5,15 @@
  Copyright (c) 2026, gridDigIt Kft. All rights reserved.
 -->
 
+<?import eu.griddigit.cimpal.main.gui.RdfGraphView?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.TreeView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
@@ -31,10 +34,22 @@
          <FlowPane hgap="8.0" vgap="8.0">
             <Button mnemonicParsing="false" onAction="#actionLoadFiles" text="Load RDF files..."/>
             <Button mnemonicParsing="false" onAction="#actionAddFiles" text="Add files..."/>
+            <Button fx:id="btnMergeGraphs" mnemonicParsing="false" onAction="#actionMergeGraphs"
+                    text="Merge"/>
             <Button fx:id="btnRemoveGraph" mnemonicParsing="false" onAction="#actionRemoveSelectedGraph"
                     text="Remove selected"/>
             <Button fx:id="btnClearAll" mnemonicParsing="false" onAction="#actionClearAll" text="Reset"/>
             <Label fx:id="helpLoad" styleClass="help-badge" text="?"/>
+            <!--
+              The two panes on the left are removed from the SplitPane rather than merely hidden
+              when untoggled: an unmanaged SplitPane item still holds its division, so hiding
+              alone would not give the diagram the freed width.
+            -->
+            <ToggleButton fx:id="tbShowGraphs" mnemonicParsing="false" onAction="#actionTogglePanes"
+                          selected="true" text="Named graphs"/>
+            <ToggleButton fx:id="tbShowTree" mnemonicParsing="false" onAction="#actionTogglePanes"
+                          selected="true" text="Graph tree"/>
+            <Label fx:id="helpPanes" styleClass="help-badge" text="?"/>
          </FlowPane>
 
          <!--
@@ -60,8 +75,8 @@
                        promptText="any subject, predicate or object" GridPane.columnIndex="3"
                        GridPane.rowIndex="1"/>
 
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.columnIndex="4" GridPane.rowIndex="0"
-                  GridPane.rowSpan="2">
+            <HBox spacing="8.0" GridPane.columnIndex="4" GridPane.rowIndex="0"
+                  GridPane.rowSpan="2" GridPane.valignment="CENTER">
                <Button fx:id="btnApplyFilters" defaultButton="true" mnemonicParsing="false"
                        onAction="#actionApplyFilters" styleClass="primary-action" text="Apply"/>
                <Button mnemonicParsing="false" onAction="#actionClearFilters" text="Clear filters"/>
@@ -72,24 +87,28 @@
    </top>
 
    <center>
-      <SplitPane dividerPositions="0.26" minHeight="0.0" minWidth="0.0"
-                 BorderPane.alignment="CENTER">
+      <!--
+        Divider positions are set from the controller, not here: the FXML attribute is parsed as a
+        single double, so a two-divider split cannot be expressed as an attribute.
+      -->
+      <SplitPane fx:id="visualisationSplitPane" minHeight="0.0"
+                 minWidth="0.0" BorderPane.alignment="CENTER">
          <BorderPane.margin>
             <Insets bottom="8.0"/>
          </BorderPane.margin>
 
-         <VBox minHeight="0.0" minWidth="0.0" spacing="8.0">
+         <VBox fx:id="graphsPane" minHeight="0.0" minWidth="0.0" spacing="8.0">
             <padding>
                <Insets right="8.0"/>
             </padding>
-            <HBox alignment="CENTER_LEFT" spacing="8.0">
+            <HBox spacing="8.0">
                <Label styleClass="section-title" text="Named graphs"/>
                <Label fx:id="helpGraphs" styleClass="help-badge" text="?"/>
             </HBox>
             <!--
               One entry per loaded file (per entry, for ZIP archives), each with a tick box.
-              Unticking a graph removes it from the tree without unloading it, so a subset of a
-              multi-file dataset can be inspected and then the rest brought back instantly.
+              Unticking a graph removes it from the tree and the diagram without unloading it, so
+              a subset of a multi-file dataset can be inspected and then the rest brought back.
             -->
             <ListView fx:id="lvGraphs" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS"/>
             <FlowPane hgap="8.0" vgap="8.0">
@@ -98,19 +117,38 @@
             </FlowPane>
          </VBox>
 
-         <VBox minHeight="0.0" minWidth="0.0" spacing="8.0">
+         <VBox fx:id="treePane" minHeight="0.0" minWidth="0.0" spacing="8.0">
             <padding>
-               <Insets left="8.0"/>
+               <Insets left="8.0" right="8.0"/>
             </padding>
-            <HBox alignment="CENTER_LEFT" spacing="8.0">
+            <HBox spacing="8.0">
                <Label styleClass="section-title" text="Graph tree"/>
                <Label fx:id="helpTree" styleClass="help-badge" text="?"/>
-               <Region HBox.hgrow="ALWAYS"/>
+            </HBox>
+            <TreeView fx:id="tvGraph" minHeight="0.0" minWidth="0.0" showRoot="false" VBox.vgrow="ALWAYS"/>
+            <FlowPane hgap="8.0" vgap="8.0">
                <Button mnemonicParsing="false" onAction="#actionExpandSelected" text="Expand selected"/>
                <Button mnemonicParsing="false" onAction="#actionCollapseAll" text="Collapse all"/>
                <Button mnemonicParsing="false" onAction="#actionCopySelected" text="Copy value"/>
+            </FlowPane>
+         </VBox>
+
+         <VBox fx:id="graphViewPane" minHeight="0.0" minWidth="0.0" spacing="8.0">
+            <padding>
+               <Insets left="8.0"/>
+            </padding>
+            <HBox spacing="8.0">
+               <Label styleClass="section-title" text="Graph view"/>
+               <Label fx:id="helpGraphView" styleClass="help-badge" text="?"/>
+               <Region HBox.hgrow="ALWAYS"/>
+               <CheckBox fx:id="cbIncludeLiterals" mnemonicParsing="false"
+                         onAction="#actionRedrawGraphView" text="Include literals"/>
+               <Button mnemonicParsing="false" onAction="#actionZoomIn" text="+"/>
+               <Button mnemonicParsing="false" onAction="#actionZoomOut" text="-"/>
+               <Button mnemonicParsing="false" onAction="#actionFitGraphView" text="Fit"/>
             </HBox>
-            <TreeView fx:id="tvGraph" minHeight="0.0" minWidth="0.0" showRoot="false" VBox.vgrow="ALWAYS"/>
+            <RdfGraphView fx:id="graphView" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS"/>
+            <Label fx:id="lblGraphViewInfo" text="Load RDF to draw the relationships." wrapText="true"/>
          </VBox>
       </SplitPane>
    </center>

@@ -409,3 +409,48 @@
 .option-label {
     -fx-padding: 3 0 0 0;
 }
+
+/* ===================== RDF graph diagram ===================== */
+
+/*
+ * The node-link view in RDF Operations > Visualisation. Every colour comes from the theme's own
+ * variables, so the diagram follows the light/dark choice without a per-theme override; only the
+ * geometry is fixed here.
+ */
+
+.rdf-graph-view {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: -cimpal-border;
+}
+
+.rdf-graph-node {
+    -fx-fill: -fx-accent;
+    -fx-stroke: -fx-control-inner-background;
+    -fx-stroke-width: 1.5;
+    -fx-cursor: hand;
+}
+
+.rdf-graph-node:hover {
+    -fx-fill: -cimpal-warning;
+}
+
+.rdf-graph-node-text {
+    -fx-fill: -cimpal-text;
+    -fx-font-size: 11px;
+}
+
+.rdf-graph-edge {
+    -fx-stroke: -cimpal-text-muted;
+    -fx-stroke-width: 1;
+    -fx-opacity: 0.7;
+}
+
+.rdf-graph-arrow {
+    -fx-fill: -cimpal-text-muted;
+    -fx-opacity: 0.85;
+}
+
+.rdf-graph-edge-text {
+    -fx-fill: -cimpal-text-muted;
+    -fx-font-size: 9.5px;
+}

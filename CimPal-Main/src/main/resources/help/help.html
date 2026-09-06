@@ -944,6 +944,13 @@ graph per profile file. Each graph carries a tick box, so the tree can show all 
 or any subset: the EQ file alone, or EQ and SSH together, without unloading and reloading. With
 more than one graph ticked the tree gains a named-graph level above the subjects; with a single
 graph the subjects are shown directly.</p>
+<p>Alongside the tree there is a <strong>graph view</strong>: the same content drawn as a
+node-link diagram, one node per resource and one arrow per triple whose object is another
+resource. That is the view for a structural question - which classes specialise which, what a
+class is related to, where a resource sits in the model - because a hierarchy that takes a dozen
+tree expansions to trace is one picture here. Filter the predicate to
+<code>rdfs:subClassOf</code>, for instance, and the diagram is the class hierarchy of the loaded
+profile.</p>
 <p>It answers the questions the other tabs do not. <em>Comparison</em> tells you that a triple
 changed; this shows you the object it belongs to and its remaining properties. <em>SPARQL
 Query</em> answers a question you can already formulate; this is for looking around before you
@@ -963,8 +970,16 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
 <tr><td>Add files&hellip;</td><td>files</td>
     <td>The same, but keeping what is already loaded. Use it to bring a second dataset alongside
         the first for side-by-side browsing.</td></tr>
+<tr><td>Merge</td><td>action</td>
+    <td>Combines every ticked graph into a new one called <strong>Merged Graph</strong>, which is
+        added to the list and ticked. The source graphs stay loaded but are unticked, because
+        showing a merged graph next to its own sources would present every triple twice. RDF is a
+        set of triples, so a triple present in two sources appears once in the merge - the merged
+        count is normally lower than the sum of the parts. Merging again replaces the previous
+        <em>Merged Graph</em> rather than nesting one inside another.</td></tr>
 <tr><td>Remove selected</td><td>action</td>
-    <td>Unloads the graph highlighted in the <em>Named graphs</em> list.</td></tr>
+    <td>Unloads the graph highlighted in the <em>Named graphs</em> list. Click a graph's name to
+        highlight it; ticking or unticking one highlights it too.</td></tr>
 <tr><td>Reset</td><td>action</td><td>Unloads everything and clears the filters.</td></tr>
 <tr><td>Named graphs</td><td>tick boxes</td>
     <td>One row per loaded file or archive entry, with its triple count. Unticking a graph leaves
@@ -986,7 +1001,38 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
         Pressing <kbd>Enter</kbd> in any filter field does the same.</td></tr>
 <tr><td>Clear filters</td><td>action</td>
     <td>Empties all four fields and shows everything in the ticked graphs again.</td></tr>
+<tr><td>Named graphs, Graph tree</td><td>toggles</td>
+    <td>Fold either panel away to give the graph view the whole width of the tab, and press again
+        to bring it back. The panels are removed from the split rather than merely hidden, so the
+        diagram actually gains the space.</td></tr>
+<tr><td>Include literals</td><td>checkbox</td>
+    <td>Adds attribute values to the diagram as their own nodes. Off by default: with literals in,
+        even a handful of resources produces a dense fan of value nodes, and the relationships
+        between classes - the reason to look at a diagram - get lost in it.</td></tr>
+<tr><td>+, -, Fit</td><td>actions</td>
+    <td>Zoom in, zoom out, and scale the diagram so all of it is in view. Scrolling the wheel over
+        the diagram zooms about the pointer, dragging the background pans, and dragging a node
+        moves it and the arrows attached to it.</td></tr>
 </table>
+
+<h4>What the graph view shows</h4>
+
+<p>The diagram follows the filters and the selection, so it always shows the same content the tree
+does. Scope is taken from the narrowest thing selected:</p>
+
+<table class="io">
+<tr><th>Selection</th><th>The diagram shows</th></tr>
+<tr><td>A subject in the tree</td>
+    <td>That resource and its immediate neighbours - the triples where it is the subject, and the
+        triples where it is the object.</td></tr>
+<tr><td>A named graph, in the tree or in the list</td><td>Only that graph.</td></tr>
+<tr><td>Nothing selected</td><td>Everything the filters admitted, across all ticked graphs.</td></tr>
+</table>
+
+<p>Node size follows the number of relationships a resource takes part in, so the hubs of the
+model stand out. Clicking a node reports its full URI on the status line. Node labels are drawn
+while there are 120 nodes or fewer and predicate labels while there are 120 relationships or
+fewer; past that they would overlap into noise, and hovering a node shows its name instead.</p>
 
 <h4>Outputs</h4>
 <ul>
@@ -1000,7 +1046,8 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
   <li><em>Copy value</em> puts the full URI or literal of the selected row on the clipboard, ready
       to paste into a SPARQL query or into a filter field.</li>
   <li>The status line reports how many of the loaded triples the filters admitted, across how many
-      subjects and graphs.</li>
+      subjects and graphs; the line under the diagram reports how many nodes and relationships it
+      drew, and for which scope.</li>
 </ul>
 
 <h4>Notes</h4>
@@ -1015,6 +1062,12 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
       otherwise against the location the file was read from.</li>
   <li>A file that cannot be parsed does not abort the load: the remaining files are loaded, and the
       reason for each failure is written to the Output window.</li>
+  <li>The diagram is capped at 400 nodes. Past that a node-link view is an unreadable tangle well
+      before it is slow, so the cap is about legibility: narrow the filters, or select a subject to
+      see just its neighbourhood. The line under the diagram says when it has been truncated.</li>
+  <li>The layout is deterministic - the same filter and selection always produce the same
+      arrangement - and it is computed fresh on each redraw, so a node you dragged returns to its
+      computed place the next time the scope changes.</li>
 </ul>
 
 <p class="src">Source: <code>RDFVisualisationController</code></p>

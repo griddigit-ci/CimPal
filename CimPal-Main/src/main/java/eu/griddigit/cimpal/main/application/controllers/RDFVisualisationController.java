@@ -6,6 +6,7 @@ package eu.griddigit.cimpal.main.application.controllers;
 
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.RdfGraphView;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -20,11 +21,14 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TreeItem;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.VBox;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.Literal;
 import org.apache.jena.rdf.model.Model;
@@ -79,6 +83,16 @@ public class RDFVisualisationController implements Initializable {
     /** Entry-count bound for a single archive - archives arrive from third parties. */
     private static final int MAX_ZIP_ENTRIES = 10_000;
 
+    /**
+     * Nodes the diagram will draw. Past a few hundred a node-link view is an unreadable hairball
+     * well before it is slow, so the cap is about legibility: narrow the filters or select a
+     * subject in the tree to see a neighbourhood instead.
+     */
+    private static final int MAX_GRAPH_NODES = 400;
+
+    /** Name of the graph produced by Merge. Merging again replaces it. */
+    private static final String MERGED_GRAPH_NAME = "Merged Graph";
+
     private MainController mainController;
 
     @FXML
@@ -109,6 +123,30 @@ public class RDFVisualisationController implements Initializable {
     private Label helpGraphs;
     @FXML
     private Label helpTree;
+    @FXML
+    private Label helpPanes;
+    @FXML
+    private Label helpGraphView;
+    @FXML
+    private Button btnMergeGraphs;
+    @FXML
+    private ToggleButton tbShowGraphs;
+    @FXML
+    private ToggleButton tbShowTree;
+    @FXML
+    private SplitPane visualisationSplitPane;
+    @FXML
+    private VBox graphsPane;
+    @FXML
+    private VBox treePane;
+    @FXML
+    private VBox graphViewPane;
+    @FXML
+    private RdfGraphView graphView;
+    @FXML
+    private CheckBox cbIncludeLiterals;
+    @FXML
+    private Label lblGraphViewInfo;
 
     /** Loaded graphs in load order; the ListView is a view onto this list. */
     private final ObservableList<GraphEntry> graphEntries = FXCollections.observableArrayList();
@@ -122,6 +160,12 @@ public class RDFVisualisationController implements Initializable {
     /** Appended to the status line: what the last load could not read. Empty when all was well. */
     private String lastLoadNote = "";
 
+    /**
+     * The last filter result. The diagram is drawn from this rather than from the models, so what
+     * it shows is exactly what the tree shows - the filters are applied once, in one place.
+     */
+    private List<GraphRows> lastRows = List.of();
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
@@ -134,8 +178,20 @@ public class RDFVisualisationController implements Initializable {
 
         graphEntries.addListener((javafx.collections.ListChangeListener<GraphEntry>) change ->
                 updateControlsEnabled());
+
+        // Selecting in either the list or the tree narrows the diagram to that scope.
+        lvGraphs.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldValue, newValue) -> redrawGraphView());
+        tvGraph.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldValue, newValue) -> redrawGraphView());
+        graphView.setOnNodeClicked(id -> setStatus("Selected in graph view: " + id));
+
         updateControlsEnabled();
         setStatus("No data loaded. Use Load RDF files... to begin.");
+
+        // Deferred: the SplitPane has no width until it is laid out, and a position set before
+        // that is discarded.
+        Platform.runLater(() -> visualisationSplitPane.setDividerPositions(0.22, 0.5));
     }
 
     private void initializeHelpTooltips() {
@@ -158,13 +214,29 @@ public class RDFVisualisationController implements Initializable {
                         + "Untick a graph to leave it out of the tree without unloading it. When more than one "
                         + "graph is ticked the tree gets a named-graph level above the subjects; with a single "
                         + "graph the subjects are shown directly.");
+        GUIhelper.installHelpTooltip(helpPanes,
+                "Named graphs and Graph tree can each be folded away to give the graph view the whole "
+                        + "width. The panes are removed from the split rather than hidden, so the "
+                        + "diagram actually gains the space.");
+        GUIhelper.installHelpTooltip(helpGraphView,
+                "The relationships between the resources currently shown, drawn as a node-link diagram: "
+                        + "one node per resource, one arrow per triple whose object is another resource.\n\n"
+                        + "It follows the filters and the selection. Select a subject in the tree to see "
+                        + "just that resource and its immediate neighbours; select a named graph, in either "
+                        + "the list or the tree, to see only that graph; select nothing to see everything the "
+                        + "filters admitted.\n\n"
+                        + "Include literals adds attribute values as extra nodes - useful for a handful of "
+                        + "resources, overwhelming for many.\n\n"
+                        + "Scroll to zoom, drag the background to pan, drag a node to rearrange it, and use "
+                        + "Fit to bring everything back into view.");
         GUIhelper.installHelpTooltip(helpTree,
                 "Subjects of the filtered triples, each expanding to its predicates and objects. A predicate "
                         + "with one value is shown on a single line; a repeated predicate becomes a node with one "
                         + "child per value.\n\n"
                         + "URIs are shortened using the namespace prefixes declared in the source file, or written "
                         + "relative to the document base where no prefix applies. Copy value puts the full URI or "
-                        + "literal of the selected row on the clipboard.");
+                        + "literal of the selected row on the clipboard.\n\n"
+                        + "Selecting a row also narrows the graph view to it.");
     }
 
     public void setMainController(MainController mainController) {
@@ -380,11 +452,206 @@ public class RDFVisualisationController implements Initializable {
     private void actionRemoveSelectedGraph(ActionEvent event) {
         GraphEntry highlighted = lvGraphs.getSelectionModel().getSelectedItem();
         if (highlighted == null) {
-            setStatus("Highlight a graph in the list first, then press Remove selected.");
+            GUIhelper.showWarning("No graph selected",
+                    "Click a graph in the Named graphs list first, then press Remove selected.");
             return;
         }
         graphEntries.remove(highlighted);
+        lvGraphs.getSelectionModel().clearSelection();
+        setStatus("Removed graph: " + highlighted.name());
         rebuildTree();
+    }
+
+    /**
+     * Merges the ticked graphs into one called {@value #MERGED_GRAPH_NAME}, leaving the originals
+     * loaded. The sources are unticked, because a merged graph shown alongside its own sources
+     * would present every triple twice.
+     */
+    @FXML
+    private void actionMergeGraphs(ActionEvent event) {
+        List<GraphEntry> ticked = graphEntries.stream()
+                .filter(GraphEntry::isSelected)
+                .filter(entry -> !MERGED_GRAPH_NAME.equals(entry.name()))
+                .toList();
+
+        if (ticked.size() < 2) {
+            GUIhelper.showWarning("Nothing to merge",
+                    "Tick at least two graphs in the Named graphs list, then press Merge.");
+            return;
+        }
+
+        Model merged = ModelFactory.createDefaultModel();
+        for (GraphEntry entry : ticked) {
+            merged.add(entry.model());
+            // Later prefixes win, which matters only when two files disagree on one prefix.
+            merged.setNsPrefixes(entry.model().getNsPrefixMap());
+        }
+
+        suppressRebuild = true;
+        try {
+            graphEntries.removeIf(entry -> MERGED_GRAPH_NAME.equals(entry.name()));
+            ticked.forEach(entry -> entry.selectedProperty().set(false));
+            graphEntries.add(new GraphEntry(MERGED_GRAPH_NAME, merged, ticked.getFirst().base()));
+        } finally {
+            suppressRebuild = false;
+        }
+
+        lvGraphs.refresh();
+        setStatus("Merged " + ticked.size() + " graphs into \"" + MERGED_GRAPH_NAME + "\" ("
+                + merged.size() + " triples). The source graphs are kept but unticked.");
+        rebuildTree();
+    }
+
+    /**
+     * Adds or removes the two left-hand panes. They are taken out of the SplitPane rather than
+     * hidden: an unmanaged SplitPane item keeps its division, so hiding alone would leave the
+     * diagram no wider than before.
+     */
+    @FXML
+    private void actionTogglePanes(ActionEvent event) {
+        List<javafx.scene.Node> panes = new ArrayList<>(3);
+        if (tbShowGraphs.isSelected()) {
+            panes.add(graphsPane);
+        }
+        if (tbShowTree.isSelected()) {
+            panes.add(treePane);
+        }
+        panes.add(graphViewPane);
+        visualisationSplitPane.getItems().setAll(panes);
+
+        // setAll drops the divider positions, so restore a sensible split for the new item count.
+        Platform.runLater(() -> {
+            if (panes.size() == 3) {
+                visualisationSplitPane.setDividerPositions(0.22, 0.5);
+            } else if (panes.size() == 2) {
+                visualisationSplitPane.setDividerPositions(0.3);
+            }
+            graphView.fitToView();
+        });
+    }
+
+    @FXML
+    private void actionRedrawGraphView(ActionEvent event) {
+        redrawGraphView();
+    }
+
+    @FXML
+    private void actionZoomIn(ActionEvent event) {
+        graphView.zoom(1.2);
+    }
+
+    @FXML
+    private void actionZoomOut(ActionEvent event) {
+        graphView.zoom(1 / 1.2);
+    }
+
+    @FXML
+    private void actionFitGraphView(ActionEvent event) {
+        graphView.fitToView();
+    }
+
+    /**
+     * Redraws the diagram for the current filter result and selection.
+     * <p>
+     * Scope, narrowest first: a subject selected in the tree gives that resource and its
+     * immediate neighbours; a named graph selected in the tree or the list gives that graph;
+     * otherwise everything the filters admitted.
+     */
+    private void redrawGraphView() {
+        if (lastRows.isEmpty()) {
+            graphView.clear();
+            lblGraphViewInfo.setText("Load RDF to draw the relationships.");
+            return;
+        }
+
+        String selectedGraph = null;
+        String focusSubject = null;
+
+        GraphEntry listSelection = lvGraphs.getSelectionModel().getSelectedItem();
+        if (listSelection != null) {
+            selectedGraph = listSelection.name();
+        }
+
+        TreeItem<NodeValue> treeSelection = tvGraph.getSelectionModel().getSelectedItem();
+        if (treeSelection != null && treeSelection.getValue() != null) {
+            String raw = treeSelection.getValue().raw();
+            boolean isGraphNode = lastRows.stream().anyMatch(row -> row.name().equals(raw));
+            if (isGraphNode) {
+                selectedGraph = raw;
+            } else if (!raw.isEmpty()) {
+                focusSubject = raw;
+            }
+        }
+
+        final String graphScope = selectedGraph;
+        List<GraphRows> scope = graphScope == null
+                ? lastRows
+                : lastRows.stream().filter(row -> row.name().equals(graphScope)).toList();
+
+        List<RdfGraphView.Edge> edges = buildEdges(scope, focusSubject, cbIncludeLiterals.isSelected());
+        RdfGraphView.Rendered rendered = graphView.show(edges, MAX_GRAPH_NODES);
+        Platform.runLater(graphView::fitToView);
+
+        StringBuilder info = new StringBuilder();
+        if (rendered.nodeCount() == 0) {
+            info.append("Nothing to draw: the selection has no relationships between resources.");
+            if (!cbIncludeLiterals.isSelected()) {
+                info.append(" Tick Include literals to see attribute values as nodes.");
+            }
+        } else {
+            info.append(rendered.nodeCount()).append(" nodes, ")
+                    .append(rendered.edgeCount()).append(" relationships");
+            if (focusSubject != null) {
+                info.append(" around the selected resource");
+            } else if (selectedGraph != null) {
+                info.append(" in ").append(selectedGraph);
+            }
+            info.append('.');
+            if (rendered.truncated()) {
+                info.append(" Truncated at ").append(MAX_GRAPH_NODES)
+                        .append(" nodes - narrow the filters or select a subject to see less at once.");
+            }
+        }
+        lblGraphViewInfo.setText(info.toString());
+    }
+
+    /**
+     * Turns filtered rows into diagram edges.
+     *
+     * @param focusSubject when set, keep only triples touching that resource, so the diagram
+     *                     shows its immediate neighbourhood rather than the whole graph
+     * @param withLiterals include literal objects as their own nodes
+     */
+    private static List<RdfGraphView.Edge> buildEdges(
+            List<GraphRows> scope, String focusSubject, boolean withLiterals) {
+
+        List<RdfGraphView.Edge> edges = new ArrayList<>();
+        for (GraphRows graph : scope) {
+            for (SubjectRows subject : graph.subjects()) {
+                String subjectId = subject.subject().raw();
+                for (TripleRow triple : subject.triples()) {
+                    Term object = triple.object();
+                    if (!object.resource() && !withLiterals) {
+                        continue;
+                    }
+                    if (focusSubject != null
+                            && !focusSubject.equals(subjectId)
+                            && !focusSubject.equals(object.raw())) {
+                        continue;
+                    }
+                    // A literal is not identified by its value, so give each one its own node id;
+                    // two resources sharing a value must not collapse into one node.
+                    String objectId = object.resource()
+                            ? object.raw()
+                            : subjectId + " |" + triple.predicate().raw() + "| " + object.raw();
+                    edges.add(new RdfGraphView.Edge(
+                            subjectId, subject.subject().label(),
+                            objectId, object.label(),
+                            triple.predicate().label()));
+                }
+            }
+        }
+        return edges;
     }
 
     @FXML
@@ -392,6 +659,9 @@ public class RDFVisualisationController implements Initializable {
         graphEntries.clear();
         clearFilterFields();
         tvGraph.getRoot().getChildren().clear();
+        lastRows = List.of();
+        graphView.clear();
+        lblGraphViewInfo.setText("Load RDF to draw the relationships.");
         lastLoadNote = "";
         resetProgressBar();
         setStatus("No data loaded. Use Load RDF files... to begin.");
@@ -429,6 +699,9 @@ public class RDFVisualisationController implements Initializable {
         List<GraphEntry> selected = graphEntries.stream().filter(GraphEntry::isSelected).toList();
         if (selected.isEmpty()) {
             tvGraph.getRoot().getChildren().clear();
+            lastRows = List.of();
+            graphView.clear();
+            lblGraphViewInfo.setText("No graph is ticked.");
             setStatus(graphEntries.isEmpty()
                     ? "No data loaded. Use Load RDF files... to begin."
                     : "No graph is ticked. Tick at least one graph in the list to see its triples.");
@@ -506,6 +779,7 @@ public class RDFVisualisationController implements Initializable {
     }
 
     private void showRows(List<GraphRows> rows) {
+        lastRows = rows;
         TreeItem<NodeValue> root = tvGraph.getRoot();
         root.getChildren().clear();
 
@@ -525,6 +799,7 @@ public class RDFVisualisationController implements Initializable {
         }
 
         setStatus(statusText(rows));
+        redrawGraphView();
     }
 
     private static List<TreeItem<NodeValue>> subjectItems(GraphRows graph) {
@@ -632,16 +907,16 @@ public class RDFVisualisationController implements Initializable {
      */
     private static Term term(RDFNode node, Model model, String base) {
         if (node == null) {
-            return new Term("", "");
+            return new Term("", "", false);
         }
         if (node.isURIResource()) {
             String uri = node.asResource().getURI();
-            return new Term(shorten(uri, model, base), uri);
+            return new Term(shorten(uri, model, base), uri, true);
         }
         if (node.isAnon()) {
             Resource resource = node.asResource();
             String id = "_:" + resource.getId().getLabelString();
-            return new Term(id, id);
+            return new Term(id, id, true);
         }
 
         Literal literal = node.asLiteral();
@@ -657,7 +932,7 @@ public class RDFVisualisationController implements Initializable {
         } else {
             label = '"' + lexical + '"';
         }
-        return new Term(label, lexical);
+        return new Term(label, lexical, false);
     }
 
     private static String shorten(String uri, Model model, String base) {
@@ -681,6 +956,8 @@ public class RDFVisualisationController implements Initializable {
         boolean empty = graphEntries.isEmpty();
         btnRemoveGraph.setDisable(empty);
         btnClearAll.setDisable(empty);
+        // Merging needs at least two graphs to merge.
+        btnMergeGraphs.setDisable(graphEntries.size() < 2);
     }
 
     private void setLoadingControlsDisabled(boolean disabled) {
@@ -720,7 +997,7 @@ public class RDFVisualisationController implements Initializable {
     // ==================== supporting types ====================
 
     /** An RDF term as shown ({@code label}) and as matched and copied ({@code raw}). */
-    private record Term(String label, String raw) {
+    private record Term(String label, String raw, boolean resource) {
         boolean contains(String needle) {
             return label.toLowerCase(Locale.ROOT).contains(needle)
                     || raw.toLowerCase(Locale.ROOT).contains(needle);
@@ -851,6 +1128,8 @@ public class RDFVisualisationController implements Initializable {
             checkBox.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
                 if (bound != null && bound.isSelected() != isSelected) {
                     bound.selectedProperty().set(isSelected);
+                    // Ticking is also an act of pointing at a row, so make it the selected one.
+                    getListView().getSelectionModel().select(getIndex());
                     rebuildTree();
                 }
             });
@@ -867,8 +1146,10 @@ public class RDFVisualisationController implements Initializable {
             }
             checkBox.setSelected(entry.isSelected());
             bound = entry;
-            checkBox.setText(entry.name() + "  (" + entry.tripleCount() + ")");
-            setText(null);
+            // The name is the cell's own text, not the checkbox's: a checkbox carrying the whole
+            // label spans the row and consumes the click, so the row could never be selected and
+            // "Remove selected" always found an empty selection.
+            setText(entry.name() + "  (" + entry.tripleCount() + ")");
             setGraphic(checkBox);
         }
     }
