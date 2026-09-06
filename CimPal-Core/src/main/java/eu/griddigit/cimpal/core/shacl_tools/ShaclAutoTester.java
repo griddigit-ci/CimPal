@@ -26,8 +26,8 @@ import java.util.Map;
 
 public class ShaclAutoTester {
 
-    private SHACLValidationLogger logger;
-    private ShaclAutoTesterCallback callback;
+    private final SHACLValidationLogger logger;
+    private final ShaclAutoTesterCallback callback;
 
     /**
      * Datatype map applied while parsing the models under test, or null to parse untyped.
@@ -69,7 +69,7 @@ public class ShaclAutoTester {
         }
     }
 
-    public void runTests(List<File> selectedFile, File selectedFolder, List<File> fileL, boolean exportReports) throws IOException {
+    public void runTests(List<File> selectedFile, File selectedFolder, List<File> fileL, boolean exportReports) {
         // Run on a background thread
         Thread testThread = new Thread(() -> {
             try {

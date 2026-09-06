@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.main.application.datagenerator;
 import eu.griddigit.cimpal.core.utils.MultiplicityTools;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.UnzippedFiles;
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import javafx.scene.control.Alert;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -1900,83 +1901,75 @@ public class InstanceDataFactory {
         return instanceDataModel;
     }
 
+    /**
+     * The last RDF entry of the archive, as a stream detached from the archive.
+     * <p>
+     * Each entry is read fully into memory rather than handed out as a live {@code ZipFile}
+     * stream: the archive has to be closed before this returns or the handle leaks for the
+     * lifetime of the process, and a stream obtained from a closed {@code ZipFile} is dead.
+     * Returning only the last entry is long-standing behaviour of this method - use
+     * {@link #unzipToCustomClass(File)} when every entry is wanted.
+     */
     public static InputStream unzip(File selectedFile) {
-        InputStream inputStream = null;
-        try{
-            ZipFile zipFile = new ZipFile(selectedFile);
-
+        byte[] lastEntry = null;
+        try (ZipFile zipFile = new ZipFile(selectedFile)) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
-
-
-
-            while(entries.hasMoreElements()){
+            while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                if(entry.isDirectory()){
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setContentText("Selected zip file contains folder. This is a violation of data exchange standard.");
-                    alert.setHeaderText(null);
-                    alert.setTitle("Error - violation of a zip file packaging requirement.");
-                    alert.showAndWait();
-                } else {
-                    String destPath = selectedFile.getParent() + File.separator+ entry.getName();
-
-                    if(! isValidDestPath(selectedFile.getParent(), destPath)){
-                        throw new IOException("Final file output path is invalid: " + destPath);
-                    }
-
-                    try{
-                        inputStream = zipFile.getInputStream(entry);
-                    } catch (IOException e) {
-                        LOG.error("Unhandled exception", e);
-                    }
+                if (entry.isDirectory()) {
+                    warnAboutFolderInArchive();
+                    continue;
+                }
+                requireEntryInsideParent(selectedFile, entry);
+                try (InputStream in = zipFile.getInputStream(entry)) {
+                    lastEntry = in.readAllBytes();
                 }
             }
-        } catch(IOException e){
-            throw new RuntimeException("Error unzipping file " + selectedFile, e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Error unzipping file " + selectedFile, e);
         }
-        return inputStream;
+        return lastEntry == null ? null : new ByteArrayInputStream(lastEntry);
     }
 
+    /**
+     * Every RDF entry of the archive, as streams detached from the archive - see
+     * {@link #unzip(File)} for why the entries are read into memory rather than streamed.
+     */
     public static UnzippedFiles unzipToCustomClass(File selectedFile) {
-        UnzippedFiles unzippedFiles = null;
         List<InputStream> inputStreamList = new LinkedList<>();
         List<String> fileNames = new LinkedList<>();
-        InputStream inputStream = null;
 
-        try{
-            ZipFile zipFile = new ZipFile(selectedFile);
-
+        try (ZipFile zipFile = new ZipFile(selectedFile)) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
-
-            while(entries.hasMoreElements()){
+            while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                if(entry.isDirectory()){
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setContentText("Selected zip file contains folder. This is a violation of data exchange standard.");
-                    alert.setHeaderText(null);
-                    alert.setTitle("Error - violation of a zip file packaging requirement.");
-                    alert.showAndWait();
-                } else {
-                    String destPath = selectedFile.getParent() + File.separator+ entry.getName();
-
-                    if(! isValidDestPath(selectedFile.getParent(), destPath)){
-                        throw new IOException("Final file output path is invalid: " + destPath);
-                    }
-
-                    try{
-                        inputStream = zipFile.getInputStream(entry);
-                        inputStreamList.add(inputStream);
-                        fileNames.add(entry.getName());
-                    } catch (IOException e) {
-                        LOG.error("Unhandled exception", e);
-                    }
+                if (entry.isDirectory()) {
+                    warnAboutFolderInArchive();
+                    continue;
+                }
+                requireEntryInsideParent(selectedFile, entry);
+                try (InputStream in = zipFile.getInputStream(entry)) {
+                    inputStreamList.add(new ByteArrayInputStream(in.readAllBytes()));
+                    fileNames.add(entry.getName());
                 }
             }
-        } catch(IOException e){
-            throw new RuntimeException("Error unzipping file " + selectedFile, e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Error unzipping file " + selectedFile, e);
         }
-        unzippedFiles = new UnzippedFiles(inputStreamList,fileNames,inputStreamList.size()==1);
-        return unzippedFiles;
+        return new UnzippedFiles(inputStreamList, fileNames, inputStreamList.size() == 1);
+    }
+
+    private static void warnAboutFolderInArchive() {
+        GUIhelper.showError("Error - violation of a zip file packaging requirement.",
+                "Selected zip file contains folder. This is a violation of data exchange standard.");
+    }
+
+    /** Guards against a zip entry that would resolve outside the folder holding the archive. */
+    private static void requireEntryInsideParent(File archive, ZipEntry entry) throws IOException {
+        String destPath = archive.getParent() + File.separator + entry.getName();
+        if (!isValidDestPath(archive.getParent(), destPath)) {
+            throw new IOException("Final file output path is invalid: " + destPath);
+        }
     }
 
     /**

@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -29,8 +30,6 @@ public class AboutController implements Initializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(AboutController.class);
 
-    @FXML
-    private Button btnOK;
     @FXML
     private ImageView fImage;
     @FXML
@@ -66,7 +65,7 @@ public class AboutController implements Initializable {
                     }
         });
 
-        faPane.getChildren().add(0, link);
+        faPane.getChildren().addFirst(link);
         fsupportemail.setOnAction(ev -> {
             try {
                 Desktop.getDesktop().browse(URI.create("mailto:cimpal@griddigit.eu"));
@@ -122,11 +121,19 @@ public class AboutController implements Initializable {
 
 
         File file = null;
-        String resource = "/license/license.txt" ;
+        String resource = "/license/license.txt";
         URL res = getClass().getResource(resource);
+        if (res == null) {
+            GUIhelper.showError("License unavailable",
+                    "The bundled licence text could not be found in the application resources.");
+            return;
+        }
         if (res.toString().startsWith("jar:")) {
             try {
                 InputStream input = getClass().getResourceAsStream(resource);
+                if (input == null) {
+                    throw new IOException("License resource disappeared: " + resource);
+                }
                 file = File.createTempFile(new Date().getTime()+"", ".txt");
                 OutputStream out = new FileOutputStream(file);
                 int read;

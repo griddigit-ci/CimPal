@@ -95,6 +95,48 @@ public class GUIhelper implements IOutputHandler {
         showUserFriendlyError(title, GENERIC_ERROR_MESSAGE, throwable);
     }
 
+    /*
+     * The three plain dialogs below plus showUserFriendlyError are the whole reporting surface:
+     * info for "it finished", warning for "you need to supply something first", error for
+     * "it failed with no exception to show", and showUserFriendlyError for anything carrying a
+     * Throwable - only that one offers the expandable technical details and Copy button, because
+     * only that one has something worth copying. Controllers used to each keep their own private
+     * copies of these, which is why the same situation looked different from tab to tab.
+     *
+     * All four marshal onto the FX thread themselves, so a background worker can call them
+     * directly without wrapping them in Platform.runLater.
+     */
+
+    /** An operation completed. */
+    public static void showInfo(String title, String message) {
+        showAlert(Alert.AlertType.INFORMATION, title, message);
+    }
+
+    /** The user has to supply or correct something before the operation can run. */
+    public static void showWarning(String title, String message) {
+        showAlert(Alert.AlertType.WARNING, title, message);
+    }
+
+    /** An operation failed and there is no Throwable to offer; otherwise use showUserFriendlyError. */
+    public static void showError(String title, String message) {
+        showAlert(Alert.AlertType.ERROR, title, message);
+    }
+
+    private static void showAlert(Alert.AlertType type, String title, String message) {
+        Runnable showDialog = () -> {
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
+            alert.setHeaderText(title);
+            alert.setContentText(message == null ? "" : message);
+            alert.showAndWait();
+        };
+        if (Platform.isFxApplicationThread()) {
+            showDialog.run();
+        } else {
+            Platform.runLater(showDialog);
+        }
+    }
+
     private static Alert createErrorAlert(String title, String userMessage, Throwable throwable) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title == null || title.isBlank() ? "Error" : title);

@@ -145,14 +145,14 @@
                             <jar>${project.build.directory}/${project.build.finalName}.jar</jar>
                             <outfile>${project.build.directory}/${project.build.finalName}.exe</outfile>
                             <errTitle>No Java installed.</errTitle>
-                            <cmdLine></cmdLine>
+                            <cmdLine/>
                             <chdir>.</chdir>
                             <priority>normal</priority>
                             <downloadUrl>https://github.com/griddigit-ci/CimPal/releases</downloadUrl>
                             <supportUrl>https://github.com/griddigit-ci/CimPal/wiki</supportUrl>
                             <stayAlive>false</stayAlive>
                             <restartOnCrash>false</restartOnCrash>
-                            <manifest></manifest>
+                            <manifest/>
                             <icon>src/main/resources/graphics/cimpal-icon-medium.ico</icon>
                             <jre>
                                 <path>%JAVA_HOME%;%PATH%</path>

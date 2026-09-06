@@ -16,10 +16,10 @@ public final class CompleteDatatypeMapLoader {
     private CompleteDatatypeMapLoader() {}
 
     /**
-     * Loads CompleteDatatypeMap_CIM16.properties where values look like:
-     * Datatype[http://www.w3.org/2001/XMLSchema#boolean -> class java.lang.Boolean]
+     * Loads a datatype map such as {@code CompleteDatatypeMap_CIM16.properties}, whose values look
+     * like {@code Datatype[http://www.w3.org/2001/XMLSchema#boolean -> class java.lang.Boolean]}.
      *
-     * Returns map: predicateURI -> RDFDatatype
+     * @return predicate URI to {@link RDFDatatype}
      */
     public static Map<String, RDFDatatype> loadFromResource(String resourcePath) throws IOException {
         try (InputStream in = CompleteDatatypeMapLoader.class.getResourceAsStream(resourcePath)) {

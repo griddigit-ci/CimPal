@@ -758,9 +758,10 @@ public class RDFVisualisationController implements Initializable {
 
     /** Value of one tree row: {@code label} is rendered, {@code raw} is what Copy value yields. */
     private record NodeValue(String label, String raw) {
+        /** Rendered by the TreeView's default cell factory, which calls toString(). */
         @Override
         public String toString() {
-            return label;
+            return label == null ? "" : label;
         }
     }
 

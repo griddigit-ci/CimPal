@@ -68,9 +68,7 @@ public class TaskSelectionController implements Initializable, IController {
     public void initialize(URL url, ResourceBundle resourceBundle) {
         try {
             taskSelectionController = new TaskDependenciesEnforcer();
-        } catch (IOException e) {
-            LOG.error("Unhandled exception", e);
-        } catch (URISyntaxException e) {
+        } catch (IOException | URISyntaxException e) {
             LOG.error("Unhandled exception", e);
         }
         try {
@@ -154,13 +152,6 @@ public class TaskSelectionController implements Initializable, IController {
         Platform.runLater(() -> context.setCurrentController(this));
     }
 
-    public void loadBaseInputData() throws IOException {
-        context.getDataGeneratorModel().loadRDFSProfileModel();
-        if (context.getSelectedTasks().getFirst().getTask().getClass() != GenerateInstanceDataModel.class) {
-            context.getDataGeneratorModel().loadInstanceModel();
-        }
-    }
-
     @FXML
     public void browseBaseInstance(ActionEvent actionEvent) {
         //select file
@@ -210,7 +201,8 @@ public class TaskSelectionController implements Initializable, IController {
 
     //Action for choice box "Profile version" related to Instance data comparison
     private void actionCBInstanceDataProfileformat() {
-        return;
+        // Nothing to do: the profile version is read straight from the choice box when the task
+        // runs. Kept because the FXML binds it.
     }
 
     public boolean validateInputs() {

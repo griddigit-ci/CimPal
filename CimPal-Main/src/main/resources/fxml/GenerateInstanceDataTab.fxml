@@ -43,9 +43,7 @@
         <!-- Replaced Accordion with VBox so both TitledPanes can stay open -->
         <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" VBox.vgrow="ALWAYS">
 
-            <TitledPane expanded="true"
-                        collapsible="true"
-                        minHeight="0.0"
+            <TitledPane minHeight="0.0"
                         text="Create xlsx template from RDFS or dataset serialised in CIMXML"
                         VBox.vgrow="ALWAYS">
 
@@ -118,9 +116,7 @@
               out of view entirely. Pinned to its preferred height, this pane always shows in
               full and the lists give up the space instead.
             -->
-            <TitledPane expanded="true"
-                        collapsible="true"
-                        minHeight="-Infinity"
+            <TitledPane minHeight="-Infinity"
                         text="Create CIMXML dataset based on xlsx template"
                         VBox.vgrow="NEVER">
 
@@ -153,7 +149,7 @@
                                   GridPane.valignment="TOP">
                             <CheckBox fx:id="fcbSortRDFGen" mnemonicParsing="false" selected="true"
                                       text="Sort alphabetically"/>
-                            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <HBox spacing="8.0">
                                 <Label text="Sort by:"/>
                                 <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0"/>
                             </HBox>

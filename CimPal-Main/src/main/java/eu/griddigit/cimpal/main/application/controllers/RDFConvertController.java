@@ -86,8 +86,6 @@ public class RDFConvertController implements Initializable {
     @FXML
     private CheckBox fcbRDFconvertFixPackage;
     @FXML
-    private Button fbtnRunRDFConvert;
-    @FXML
     private Label helpSource;
     @FXML
     private Label helpOperationsOptions;
@@ -326,7 +324,7 @@ public class RDFConvertController implements Initializable {
         }
         String relativeURIs = "";
         if (targetFormatString.equals("RDF XML (.rdf or .xml)")) {
-            relativeURIs = fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
+            relativeURIs = fcbRelativeURIs.getSelectionModel().getSelectedItem();
         }
 
         if (sourceFormatString.equals("RDF Turtle (.ttl)")) {
@@ -351,10 +349,7 @@ public class RDFConvertController implements Initializable {
             rdfSortOptions = "true";
         }
 
-        boolean stripPrefixes = false;
-        if (fcbStripPrefixes.isSelected()) {
-            stripPrefixes = true;
-        }
+        boolean stripPrefixes = fcbStripPrefixes.isSelected();
 
         boolean modelUnionFlag = fcbRDFconvertModelUnion.isSelected();
 
@@ -421,31 +416,21 @@ public class RDFConvertController implements Initializable {
         rdfConverter.convert();
 
         // select the output file
-        String filename = "";
-        if (!modelUnionFlag && rdfConvertFile != null) {
-            filename = rdfConvertFile.getName().split("\\.", 2)[0];
-        } else {
-            filename = "MultipleModels";
-        }
-        OutputStream out = null;
-        switch (targetFormatString) {
-            case "RDF XML (.rdf or .xml)" -> {
-                out = fileSaveDialog("Save RDF XML for: " + filename, "RDF XML", "*.rdf");
-            }
-            case "RDF Turtle (.ttl)" -> {
-                out = fileSaveDialog("Save RDF Turtle for: " + filename, "RDF Turtle", "*.ttl");
-            }
-            case "JSON-LD (.jsonld)" -> {
-                out = fileSaveDialog("Save JSON-LD for: " + filename, "JSON-LD", "*.jsonld");
-            }
-        }
+        String filename = !modelUnionFlag && rdfConvertFile != null
+                ? rdfConvertFile.getName().split("\\.", 2)[0]
+                : "MultipleModels";
+        OutputStream out = switch (targetFormatString) {
+            case "RDF XML (.rdf or .xml)" -> fileSaveDialog("Save RDF XML for: " + filename, "RDF XML", "*.rdf");
+            case "RDF Turtle (.ttl)" -> fileSaveDialog("Save RDF Turtle for: " + filename, "RDF Turtle", "*.ttl");
+            case "JSON-LD (.jsonld)" -> fileSaveDialog("Save JSON-LD for: " + filename, "JSON-LD", "*.jsonld");
+            default -> null;
+        };
         // write the converted model to the output file
         rdfConverter.writeConvertedModel(out);
 
         // write the inheritance list if required
         if (options.isInheritanceList()) {
             OutputStream outInheritance = fileSaveDialog("Save inheritance for: " + filename + "Inheritance", "RDF Turtle", "*.ttl");
-            ;
 
             rdfConverter.writeInheritanceModel(outInheritance);
         }
@@ -543,7 +528,7 @@ public class RDFConvertController implements Initializable {
 
         resetProgressBar();
         if (!ftargetFormatChoiceBox.getSelectionModel().isSelected(-1)) {
-            if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().equals("RDF XML (.rdf or .xml)")) {
+            if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().equals("RDF XML (.rdf or .xml)")) {
                 fcbShowXMLDeclaration.setDisable(false);
                 fcbShowDoctypeDeclaration.setDisable(false);
                 fRDFconvertTab.setDisable(false);

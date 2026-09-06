@@ -14,7 +14,6 @@ import eu.griddigit.cimpal.core.kgcl.KgclConverter;
 import eu.griddigit.cimpal.core.kgcl.KgclRdfWriter;
 import eu.griddigit.cimpal.core.models.KgclOptions;
 import eu.griddigit.cimpal.core.models.RDFCompareResult;
-import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.ExcelExportTableView;
 import eu.griddigit.cimpal.main.gui.RDFcomparisonResultModel;
 import eu.griddigit.cimpal.main.gui.TextAreaEditTableCell;
@@ -260,10 +259,5 @@ public class rdfDiffResultController implements Initializable {
     @FXML
     private void actionBtnCancel(ActionEvent actionEvent) {
         guiRdfDiffResultsStage.close();
-    }
-
-    // kept for compatibility (not used) - prefer using the instance initData(stage,result,files)
-    public static void initData(Stage stage) {
-        // no-op to avoid breaking existing callers; prefer loader.getController().initData(...)
     }
 }

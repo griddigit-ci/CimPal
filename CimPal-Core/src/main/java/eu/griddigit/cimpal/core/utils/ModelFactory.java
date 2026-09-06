@@ -74,7 +74,7 @@ public class ModelFactory {
                     streams = unzip(file);
                     format = Lang.RDFXML;
                 } else {
-                    streams = List.of(new ByteArrayInputStream(new FileInputStream(file).readAllBytes()));
+                    streams = List.of(new ByteArrayInputStream(Files.readAllBytes(file.toPath())));
                     format = getLangFromExtension(ext, rdfSourceFormat);
                 }
 

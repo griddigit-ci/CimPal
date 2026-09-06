@@ -121,7 +121,7 @@
                <Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/>
             </padding>
             <HBox alignment="CENTER_LEFT" spacing="8.0" VBox.vgrow="NEVER">
-               <Button fx:id="btnClearOutput" mnemonicParsing="false" onAction="#actionBtnClear"
+               <Button mnemonicParsing="false" onAction="#actionBtnClear"
                        styleClass="icon-button">
                   <graphic>
                      <!-- Trash-can silhouette: lid handle, lid, body. Drawn rather than

@@ -8,8 +8,6 @@ package eu.griddigit.cimpal.main.application;
 import eu.griddigit.cimpal.core.generators.ManifestGenerator;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.utils.AttributeInjector;
-import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
-import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.*;
 import eu.griddigit.cimpal.main.application.controllers.sparql.SparqlQueryTabController;
@@ -33,7 +31,6 @@ import javafx.scene.text.Font;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.util.Callback;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
@@ -91,7 +88,6 @@ public class MainController implements Initializable {
     }
 
     private final GUIhelper guiHelper;
-    private eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController cimPalWizardController;
 
     /** Outer row of the two-level tab structure: the three categories of work. */
     @FXML
@@ -106,10 +102,6 @@ public class MainController implements Initializable {
     public Font x3;
     @FXML
     public TreeView treeViewInstanceData;
-    public TextField fPrefixGenerateTab1;
-    public TextField fshapesBaseURIDefineTab1;
-    public TextField fURIGenerateTab1;
-    public TextField fowlImportsDefineTab1;
     @FXML
     private TextArea foutputWindow;
     @FXML
@@ -122,8 +114,6 @@ public class MainController implements Initializable {
     @FXML
     private TitledPane workAreaContainer;
     public static Preferences prefs;
-    @FXML
-    private CheckBox cbShowUnionModelOnly;
 
     private double outputSourceDividerPosition = 0.8146067415730337;
 
@@ -147,11 +137,7 @@ public class MainController implements Initializable {
     public static File xlsFileExcelShacl;
     public static File TtlChangesExcelToTtl;
     public static File XlsChangesExcelToTtl;
-    public static RDFCompareResult rdfCompareResult;
-    public static List<String> rdfsCompareFiles;
 
-    private ArrayList<Object> models;
-    private ArrayList<Object> modelsNames;
     public static ArrayList<Model> RDFSmodels;
     public static List<RdfsModelDefinition> RDFSmodelsNames;
     public static ArrayList<Object> shapeModelsNames;
@@ -160,14 +146,9 @@ public class MainController implements Initializable {
     public static ArrayList<Object> shapeModels;
     private static Map<String, RDFDatatype> dataTypeMapFromShapes;
     private static int shaclNodataMap;
-    private static String defaultShapesURI;
     public static String rdfFormatInput;
 
-    public static TreeView treeViewConstraintsStatic;
     public static TreeView treeViewIDStatic;
-    private static Map<TreeItem, String> treeMapConstraints;
-    private static Map<TreeItem, String> treeMapID;
-    private static Map<String, TreeItem> treeMapConstraintsInverse;
     public static Integer shapesOnAbstractOption;
 
     public static TextArea foutputWindowVar;
@@ -199,8 +180,6 @@ public class MainController implements Initializable {
     public static Map<String, Model> InstanceModelMap;
     public static boolean treeID;
     //for the
-    private double initialX;
-    private double initialY;
 
 
     public MainController() {
@@ -220,9 +199,6 @@ public class MainController implements Initializable {
         treeID = false;
         treeViewIDStatic = treeViewInstanceData;
         foutputWindowVar = foutputWindow;
-        //initialization of the Browse and Modify table - SHACL Shapes Browse
-        Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
-
         try {
             if (!Preferences.userRoot().nodeExists("CimPal")) {
                 prefs = Preferences.userRoot().node("CimPal");
@@ -235,13 +211,7 @@ public class MainController implements Initializable {
             GUIhelper.showUserFriendlyError("Preferences error", "Preferences could not be loaded. Please review details and send them to support.", e);
         }
 
-        cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
-
         Platform.runLater(this::initializeCollapsiblePanes);
-
-
-        //TODO: see how to have this default on the screen
-        defaultShapesURI = "/Constraints";
 
 
         try {
@@ -347,7 +317,7 @@ public class MainController implements Initializable {
         }
 
         outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
-        mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, oldValue, newValue) -> {
+        mainSplitPane.getDividers().getFirst().positionProperty().addListener((obs, oldValue, newValue) -> {
             if (bothPanesExpanded()) {
                 outputSourceDividerPosition = newValue.doubleValue();
             }
@@ -458,12 +428,6 @@ public class MainController implements Initializable {
         Platform.runLater(() -> progressBar.setProgress(progress));
     }
 
-    /**
-     * Sets the progress bar to indeterminate state (animated)
-     */
-    public void setProgressBarIndeterminate() {
-        Platform.runLater(() -> progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS));
-    }
 
     /**
      * Sets the progress bar to 0 (empty)
@@ -472,32 +436,14 @@ public class MainController implements Initializable {
         Platform.runLater(() -> progressBar.setProgress(0));
     }
 
-    /**
-     * Sets the progress bar to 1 (full)
-     */
-    public void completeProgressBar() {
-        Platform.runLater(() -> progressBar.setProgress(1));
-    }
 
-    /**
-     * Gets the current progress bar value
-     */
-    public double getProgressBarValue() {
-        return progressBar.getProgress();
-    }
 
-    /**
-     * Gets the ProgressBar control (advanced use)
-     */
-    public ProgressBar getProgressBar() {
-        return progressBar;
-    }
 
     // ============ End Progress Bar Control Methods ============
 
     @FXML
     // action on menu PSSE-PowerFactory compare
-    private void actionMenuPSSEPF() throws FileNotFoundException {
+    private void actionMenuPSSEPF() {
         comparePssePF.comparePssePFresults();
     }
 
@@ -599,7 +545,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Export RDFS description
-    private void actionRDFSexportTripplesMenu() throws FileNotFoundException {
+    private void actionRDFSexportTripplesMenu() {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.xml"), "");
@@ -622,7 +568,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Export SHACL constraints information to Excel
-    private void actionMenuExportSHACLInfo() throws FileNotFoundException {
+    private void actionMenuExportSHACLInfo() {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open SHACL files
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
@@ -640,7 +586,9 @@ public class MainController implements Initializable {
                 ButtonType btnMultiple = new ButtonType("Export in multiple files");
                 alert1.getButtonTypes().setAll(btnOneFile, btnMultiple);
                 Optional<ButtonType> result1 = alert1.showAndWait();
-                if (result1.get() == btnOneFile) {
+                //dismissing the dialog leaves the choice empty; treat that as "multiple files"
+                //rather than dereferencing an absent Optional
+                if (result1.isPresent() && result1.get() == btnOneFile) {
                     singleFile = true;
                 }
             } else if (file.size() == 1) {
@@ -657,7 +605,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Export SHACL constraints information to Excel
-    private void actionMenuExportAllSHACLInfo() throws FileNotFoundException {
+    private void actionMenuExportAllSHACLInfo() {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open SHACL files
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
@@ -675,7 +623,9 @@ public class MainController implements Initializable {
                 ButtonType btnMultiple = new ButtonType("Export in multiple files");
                 alert1.getButtonTypes().setAll(btnOneFile, btnMultiple);
                 Optional<ButtonType> result1 = alert1.showAndWait();
-                if (result1.get() == btnOneFile) {
+                //dismissing the dialog leaves the choice empty; treat that as "multiple files"
+                //rather than dereferencing an absent Optional
+                if (result1.isPresent() && result1.get() == btnOneFile) {
                     singleFile = true;
                 }
             } else if (file.size() == 1) {
@@ -856,111 +806,6 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    // action on menu Generation of instance data based on xls template
-    private void actionMenuInstanceDataGenxls() throws IOException {
-
-        System.out.print("Conversion in progress.\n");
-        progressBar.setProgress(0);
-        shaclNodataMap = 1; // as this mapping should not be used for this task
-        //select file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Input template instance data XLS", List.of("*.xlsx"), "");
-
-        if (file != null) {// the file is selected
-            MainController.inputXLS = file;
-            //select file
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF profile file", List.of("*.rdf", "*.ttl"), "");
-
-            if (file != null) {// the file is selected
-                MainController.rdfProfileFileList = file;
-
-                //String xmlBase = "http://entsoe.eu/ns/nc";
-                String xmlBase = "http://iec.ch/TC57/CIM100";
-                //String xmlBase = "";
-
-                //set properties for the export
-                String formatGeneratedModel = "61970-552 CIM XML (.xml)"; //fcbGenDataFormat.getSelectionModel().getSelectedItem().toString();
-                Map<String, Object> saveProperties = new HashMap<>();
-                if (formatGeneratedModel.equals("61970-552 CIM XML (.xml)")) {
-                    saveProperties.put("filename", "test");
-                    saveProperties.put("showXmlDeclaration", "true");
-                    saveProperties.put("showDoctypeDeclaration", "false");
-                    saveProperties.put("tab", "2");
-                    saveProperties.put("relativeURIs", "same-document");
-                    saveProperties.put("showXmlEncoding", "true");
-                    saveProperties.put("xmlBase", xmlBase);
-                    saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-                    saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-                    saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-                    saveProperties.put("useFileDialog", true);
-                    saveProperties.put("fileFolder", "C:");
-                    saveProperties.put("dozip", false);
-                    saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
-                    saveProperties.put("showXmlBaseDeclaration", "true");
-                    saveProperties.put("sortRDF", "true");
-                    saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-
-                    saveProperties.put("putHeaderOnTop", true);
-                    saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
-                    saveProperties.put("extensionName", "RDF XML");
-                    saveProperties.put("fileExtension", "*.xml");
-                    saveProperties.put("fileDialogTitle", "Save RDF XML for");
-                    //RDFFormat rdfFormat=RDFFormat.RDFXML;
-                    //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
-                    //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
-                    //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-                    //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
-
-                } else if (formatGeneratedModel.equals("Custom RDF XML Plain (.xml)")) {
-                    saveProperties.put("filename", "test");
-                    saveProperties.put("showXmlDeclaration", "true");
-                    saveProperties.put("showDoctypeDeclaration", "false");
-                    saveProperties.put("tab", "2");
-                    saveProperties.put("relativeURIs", "same-document");
-                    saveProperties.put("showXmlEncoding", "true");
-                    saveProperties.put("xmlBase", xmlBase);
-                    saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-                    saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-                    saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-                    saveProperties.put("useFileDialog", true);
-                    saveProperties.put("fileFolder", "C:");
-                    saveProperties.put("dozip", false);
-                    saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
-                    saveProperties.put("showXmlBaseDeclaration", "false");
-
-                    saveProperties.put("putHeaderOnTop", true);
-                    saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
-                    saveProperties.put("extensionName", "RDF XML");
-                    saveProperties.put("fileExtension", "*.xml");
-                    saveProperties.put("fileDialogTitle", "Save RDF XML for");
-                }
-
-                boolean profileModelUnionFlag = false;
-                boolean instanceModelUnionFlag = false;
-                boolean shaclModelUnionFlag = false;
-                String eqbdID = null;
-                String tpbdID = null;
-                boolean persistentEQflag = false;
-
-                Map<String, Boolean> inputData = new HashMap<>();
-                inputData.put("rdfs", true);
-                inputData.put("baseModel", false);
-                inputData.put("shacl", false);
-
-                progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties, guiHelper);
-
-                progressBar.setProgress(1);
-                System.out.print("Conversion finished.\n");
-            } else {
-                System.out.print("Conversion terminated.\n");
-            }
-        } else {
-            System.out.print("Conversion terminated.\n");
-        }
-    }
-
-    @FXML
     //This is the menu item "Create datatypes map" - loads RDFfile(s) and creates the map
     private void actionMenuDatatypeMap() throws IOException {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -1011,8 +856,14 @@ public class MainController implements Initializable {
         try {
             Stage guiPrefStage = new Stage();
             //Scene for the menu Preferences
-            FXMLLoader fxmlLoader = new FXMLLoader();
-            Parent rootPreferences = fxmlLoader.load(getClass().getResource("/fxml/preferencesGui.fxml"));
+
+            //A missing FXML would otherwise surface as an opaque NullPointerException from
+            //inside FXMLLoader; name the resource instead.
+            URL fxmlUrl = getClass().getResource("/fxml/preferencesGui.fxml");
+            if (fxmlUrl == null) {
+                throw new IOException("FXML not found: /fxml/preferencesGui.fxml");
+            }
+            Parent rootPreferences = FXMLLoader.load(fxmlUrl);
             Scene preferences = new Scene(rootPreferences);
             guiPrefStage.setScene(preferences);
             guiPrefStage.setTitle("Preferences");
@@ -1042,8 +893,14 @@ public class MainController implements Initializable {
         try {
             Stage guiAboutStage = new Stage();
             //Scene for the menu Preferences
-            FXMLLoader fxmlLoader = new FXMLLoader();
-            Parent rootAbout = fxmlLoader.load(getClass().getResource("/fxml/aboutGui.fxml"));
+
+            //A missing FXML would otherwise surface as an opaque NullPointerException from
+            //inside FXMLLoader; name the resource instead.
+            URL fxmlUrl = getClass().getResource("/fxml/aboutGui.fxml");
+            if (fxmlUrl == null) {
+                throw new IOException("FXML not found: /fxml/aboutGui.fxml");
+            }
+            Parent rootAbout = FXMLLoader.load(fxmlUrl);
             Scene about = new Scene(rootAbout);
             guiAboutStage.setScene(about);
             guiAboutStage.setTitle("About");
@@ -1063,11 +920,9 @@ public class MainController implements Initializable {
         List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
-//            fPathIDfile1.setText(fileL.toString());
             MainController.IDModel1 = fileL;
-        } else {
-//            fPathIDfile1.clear();
         }
+
 
         List<File> fileL1 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "ap file", List.of("*.properties"), "");
 
@@ -1084,7 +939,7 @@ public class MainController implements Initializable {
 
     @FXML
     // action on menu Generate QAR
-    private void actionQARMenu() throws IOException, XMLStreamException {
+    private void actionQARMenu() throws IOException {
         //select the xlsx file
         List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel file with IDs", List.of("*.xlsx"), "Select input data: ");
 
@@ -1110,10 +965,7 @@ public class MainController implements Initializable {
                         String timestamp = fileNameParts[0];
                         String process = fileNameParts[1];
                         String tso = fileNameParts[2];
-                        String profile = fileNameParts[3];
                         String version = fileNameParts[4];
-                        String fileProfile = ((LinkedList<?>) inputXLSdata.get(row)).get(1).toString();
-                        String mas = ((LinkedList<?>) inputXLSdata.get(row)).get(2).toString();
                         String fileID_0 = ((LinkedList<?>) inputXLSdata.get(row)).get(3).toString();
                         String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row + 1)).get(3).toString();
                         String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row + 2)).get(3).toString();

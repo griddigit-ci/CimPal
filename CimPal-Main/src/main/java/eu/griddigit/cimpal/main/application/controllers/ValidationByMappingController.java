@@ -221,6 +221,35 @@ public class ValidationByMappingController {
         updateWorkflowControls();
 
         initializeHelpTooltips();
+        restoreRememberedPaths();
+    }
+
+    /**
+     * Restores the paths this tab was last used with. The consumers repeat whatever the Browse
+     * handler does besides filling the field, so a restored path leaves the tab in the same state
+     * as a fresh selection would.
+     * <p>
+     * These binds used to sit inside a private installHelpTooltip clone, so they were re-run on
+     * each of the nine tooltip installs; they belong here, and run once.
+     */
+    private void restoreRememberedPaths() {
+        PathMemory.bind(tfMappingCsvFile, "tab.validationByMapping.mappingCsv",
+                file -> mappingCsvFile = file);
+        PathMemory.bind(tfModelsInputFolder, "tab.validationByMapping.modelsInput",
+                folder -> {
+                    modelsInputFolder = folder;
+                    //the manual workflow shows the discovered models, so rebuild the tree
+                    //whenever the folder is restored, exactly as the Browse handler does
+                    GUIhelper.buildFileTree(folder, treeViewShaclFiles);
+                });
+        PathMemory.bind(tfConstraintsRootFolder, "tab.validationByMapping.constraintsRoot",
+                folder -> constraintsRootFolder = folder);
+        PathMemory.bind(tfOutputFolder, "tab.validationByMapping.outputFolder",
+                folder -> outputFolder = folder);
+        PathMemory.bind(tfPreviousComparisonCsv, "tab.validationByMapping.previousComparisonCsv",
+                file -> previousComparisonCsvFile = file);
+        PathMemory.bind(tfDatatypeMapFile, "tab.validationByMapping.datatypeMap",
+                file -> datatypeMapFile = file);
     }
 
     /** Reveals the file field and Browse button only for the "Other" datatype map. */
@@ -283,7 +312,7 @@ public class ValidationByMappingController {
     }
 
     private void initializeHelpTooltips() {
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpValidationWorkflow,
                 "Select which validation process should be executed.\n\n" +
                         "Validate by mapping file: validates the selected input model structure according to the mapping CSV and creates a validation report and ZIP files.\n\n" +
@@ -291,44 +320,44 @@ public class ValidationByMappingController {
                         "Validate by manual selection: validates every model archive found under the models root folder against the SHACL constraint files you select by hand, with no mapping file. Results are written to the Output pane."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpShaclConstraintFiles,
                 "SHACL constraint files (.ttl) used to validate the models. Several files can be selected and are combined into one shapes graph.\n\n" +
                         "Only used by the \"Validate by manual selection\" workflow; the mapping workflows resolve their constraint files from the mapping CSV instead."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpMappingCsvFile,
                 "CSV mapping file containing the XML input definitions and the SHACL constraint files.\n\n" +
                         "Only .csv files are accepted.\n\n" +
                         "Not used by the \"Validate by manual selection\" workflow."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpModelsInputFolder,
                 "For normal mapping, select the models root folder.\n\n" +
                         "For timestamped mapping, select the root folder containing timestamped XML or ZIP files.\n\n" +
                         "For manual selection, this is the parent folder that is searched for model archives to validate."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpExportReports,
                 "When checked, saves a SHACL validation report file alongside each validated model in the models root folder.\n\n" +
                         "Only used by the \"Validate by manual selection\" workflow."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpConstraintsRootFolder,
                 "Root folder where the SHACL constraint files are located.\n\n" +
                         "The mapping file constraint paths are resolved relative to this folder."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpOutputFolder,
                 "Folder where validation reports, timestamped summaries and generated ZIP files will be written."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpDatatypeMap,
                 "Select the CGMES and NC version combination used to load the datatype mapping for validation. " +
                         "The map types the literals as the models are parsed, which is what lets a constraint on a " +
@@ -341,7 +370,7 @@ public class ValidationByMappingController {
                         "Used by all three workflows, the manual selection one included."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpXmlBaseUri,
                 "Base URI used when loading RDF/XML files; relative URIs in the models are resolved against it.\n\n" +
                         "Pick the namespace the dataset is based on from the dropdown and the field is filled and " +
@@ -349,7 +378,7 @@ public class ValidationByMappingController {
                         "Select Other to type a base URI that is not in the list."
         );
 
-        installHelpTooltip(
+        GUIhelper.installHelpTooltip(
                 helpPreviousComparisonCsv,
                 "Optional CSV holding the previous run's totals, used to build the comparison workbook.\n\n" +
                         "Shown only for the timestamped workflow, the only one that produces a comparison.\n\n" +
@@ -359,41 +388,6 @@ public class ValidationByMappingController {
         );
     }
 
-    private void installHelpTooltip(Label helpIcon, String text) {
-        if (helpIcon == null) {
-            return;
-        }
-
-        Tooltip tooltip = new Tooltip(text);
-        tooltip.setWrapText(true);
-        tooltip.setMaxWidth(450);
-
-        tooltip.setShowDelay(Duration.millis(300));
-        tooltip.setHideDelay(Duration.millis(200));
-        tooltip.setShowDuration(Duration.INDEFINITE);
-
-        Tooltip.install(helpIcon, tooltip);
-
-        //restore the paths this tab was last used with; the consumers repeat what the
-        //Browse handlers do besides filling the field
-        PathMemory.bind(tfMappingCsvFile, "tab.validationByMapping.mappingCsv",
-                file -> mappingCsvFile = file);
-        PathMemory.bind(tfModelsInputFolder, "tab.validationByMapping.modelsInput",
-                folder -> {
-                    modelsInputFolder = folder;
-                    //the manual workflow shows the discovered models, so rebuild the tree
-                    //whenever the folder is restored, exactly as the Browse handler does
-                    GUIhelper.buildFileTree(folder, treeViewShaclFiles);
-                });
-        PathMemory.bind(tfConstraintsRootFolder, "tab.validationByMapping.constraintsRoot",
-                folder -> constraintsRootFolder = folder);
-        PathMemory.bind(tfOutputFolder, "tab.validationByMapping.outputFolder",
-                folder -> outputFolder = folder);
-        PathMemory.bind(tfPreviousComparisonCsv, "tab.validationByMapping.previousComparisonCsv",
-                file -> previousComparisonCsvFile = file);
-        PathMemory.bind(tfDatatypeMapFile, "tab.validationByMapping.datatypeMap",
-                file -> datatypeMapFile = file);
-    }
 
     @FXML
     private void actionBrowseMappingCsv() {
@@ -405,14 +399,14 @@ public class ValidationByMappingController {
                 "tab.validationByMapping.mappingCsv"
         );
 
-        if (selected == null || selected.isEmpty() || selected.get(0) == null) {
+        if (selected == null || selected.isEmpty() || selected.getFirst() == null) {
             return;
         }
 
-        File selectedFile = selected.get(0);
+        File selectedFile = selected.getFirst();
 
         if (!selectedFile.getName().toLowerCase().endsWith(".csv")) {
-            showWarning(
+            GUIhelper.showWarning(
                     "Invalid mapping file",
                     "Please select a CSV mapping file."
             );
@@ -517,14 +511,14 @@ public class ValidationByMappingController {
                 "tab.validationByMapping.datatypeMap"
         );
 
-        if (selected == null || selected.isEmpty() || selected.get(0) == null) {
+        if (selected == null || selected.isEmpty() || selected.getFirst() == null) {
             return;
         }
 
-        File selectedFile = selected.get(0);
+        File selectedFile = selected.getFirst();
 
         if (!selectedFile.getName().toLowerCase().endsWith(".properties")) {
-            showWarning(
+            GUIhelper.showWarning(
                     "Invalid datatype map",
                     "Please select a .properties datatype map file."
             );
@@ -545,14 +539,14 @@ public class ValidationByMappingController {
                 "tab.validationByMapping.previousComparisonCsv"
         );
 
-        if (selected == null || selected.isEmpty() || selected.get(0) == null) {
+        if (selected == null || selected.isEmpty() || selected.getFirst() == null) {
             return;
         }
 
-        File selectedFile = selected.get(0);
+        File selectedFile = selected.getFirst();
 
         if (!selectedFile.getName().toLowerCase().endsWith(".csv")) {
-            showWarning(
+            GUIhelper.showWarning(
                     "Invalid comparison file",
                     "Please select a CSV file (header: region,dataset,total)."
             );
@@ -690,7 +684,7 @@ public class ValidationByMappingController {
                 Platform.runLater(() -> {
                     setProgress(1);
                     btnRunValidationByMapping.setDisable(false);
-                    showInfo("Validation finished", "Validation report generation finished.");
+                    GUIhelper.showInfo("Validation finished", "Validation report generation finished.");
                 });
 
             } catch (IOException ex) {
@@ -699,7 +693,7 @@ public class ValidationByMappingController {
                 Platform.runLater(() -> {
                     resetProgress();
                     btnRunValidationByMapping.setDisable(false);
-                    showError("Validation failed", ex.getMessage());
+                    GUIhelper.showError("Validation failed", ex.getMessage());
                 });
 
             } catch (Exception ex) {
@@ -708,7 +702,7 @@ public class ValidationByMappingController {
                 Platform.runLater(() -> {
                     resetProgress();
                     btnRunValidationByMapping.setDisable(false);
-                    showError("Validation failed", ex.getMessage());
+                    GUIhelper.showError("Validation failed", ex.getMessage());
                 });
             }
         }, "validation-by-mapping-runner").start();
@@ -749,7 +743,7 @@ public class ValidationByMappingController {
         }
 
         if (archives.isEmpty()) {
-            showWarning("No models found",
+            GUIhelper.showWarning("No models found",
                     "No model archives (.zip) were found under the selected models root folder.");
             resetProgress();
             return;
@@ -784,7 +778,7 @@ public class ValidationByMappingController {
                 Platform.runLater(() -> {
                     setProgress(1);
                     btnRunValidationByMapping.setDisable(false);
-                    showInfo("Validation finished",
+                    GUIhelper.showInfo("Validation finished",
                             "Validated " + archives.size() + " model(s). See the Output pane for details.");
                 });
 
@@ -794,7 +788,7 @@ public class ValidationByMappingController {
                 Platform.runLater(() -> {
                     resetProgress();
                     btnRunValidationByMapping.setDisable(false);
-                    showError("Validation failed", ex.getMessage());
+                    GUIhelper.showError("Validation failed", ex.getMessage());
                 });
             }
         }, "manual-shacl-validation-runner").start();
@@ -802,7 +796,7 @@ public class ValidationByMappingController {
 
     private boolean validateInputs() {
         if (cbValidationWorkflow.getSelectionModel().getSelectedItem() == null) {
-            showWarning("Missing workflow", "Please select a validation workflow.");
+            GUIhelper.showWarning("Missing workflow", "Please select a validation workflow.");
             return false;
         }
 
@@ -814,13 +808,13 @@ public class ValidationByMappingController {
         // other two - the datatype map and base URI checked above.
         if (isManualWorkflow()) {
             if (shaclConstraintFiles == null || shaclConstraintFiles.isEmpty()) {
-                showWarning("Missing constraint files",
+                GUIhelper.showWarning("Missing constraint files",
                         "Please select one or more SHACL constraint files (.ttl).");
                 return false;
             }
 
             if (modelsInputFolder == null) {
-                showWarning("Missing models folder",
+                GUIhelper.showWarning("Missing models folder",
                         "Please select the models root folder holding the models to validate.");
                 return false;
             }
@@ -829,27 +823,27 @@ public class ValidationByMappingController {
         }
 
         if (mappingCsvFile == null) {
-            showWarning("Missing mapping file", "Please select a CSV mapping file.");
+            GUIhelper.showWarning("Missing mapping file", "Please select a CSV mapping file.");
             return false;
         }
 
         if (!mappingCsvFile.getName().toLowerCase().endsWith(".csv")) {
-            showWarning("Invalid mapping file", "The mapping file must be a CSV file.");
+            GUIhelper.showWarning("Invalid mapping file", "The mapping file must be a CSV file.");
             return false;
         }
 
         if (modelsInputFolder == null) {
-            showWarning("Missing input folder", "Please select the models or timestamped input root folder.");
+            GUIhelper.showWarning("Missing input folder", "Please select the models or timestamped input root folder.");
             return false;
         }
 
         if (constraintsRootFolder == null) {
-            showWarning("Missing constraints folder", "Please select the constraints root folder.");
+            GUIhelper.showWarning("Missing constraints folder", "Please select the constraints root folder.");
             return false;
         }
 
         if (outputFolder == null) {
-            showWarning("Missing output folder", "Please select the output folder.");
+            GUIhelper.showWarning("Missing output folder", "Please select the output folder.");
             return false;
         }
 
@@ -859,25 +853,25 @@ public class ValidationByMappingController {
     /** Shared by all three workflows: every one of them loads its models through the map. */
     private boolean validateDatatypeMap() {
         if (cbDatatypeMap.getSelectionModel().getSelectedItem() == null) {
-            showWarning("Missing datatype map", "Please select a datatype map.");
+            GUIhelper.showWarning("Missing datatype map", "Please select a datatype map.");
             return false;
         }
 
         if (isOtherDatatypeMap()) {
             if (datatypeMapFile == null) {
-                showWarning("Missing datatype map file",
+                GUIhelper.showWarning("Missing datatype map file",
                         "Datatype map is set to \"Other\". Please browse for a .properties datatype map.");
                 return false;
             }
             if (!datatypeMapFile.isFile()) {
-                showWarning("Datatype map not found",
+                GUIhelper.showWarning("Datatype map not found",
                         "The selected datatype map no longer exists:\n" + datatypeMapFile.getAbsolutePath());
                 return false;
             }
         }
 
         if (getBaseUri().isBlank()) {
-            showWarning("Missing base URI", "Please select or enter a base URI.");
+            GUIhelper.showWarning("Missing base URI", "Please select or enter a base URI.");
             return false;
         }
 
@@ -954,34 +948,11 @@ public class ValidationByMappingController {
     private int getThreadCount(boolean timestampedWorkflow) {
         int availableProcessors = Runtime.getRuntime().availableProcessors();
 
-        if (timestampedWorkflow) {
-            return Math.min(Math.max(1, availableProcessors - 1), 2);
-        }
-
-        return Math.min(Math.max(1, availableProcessors - 1), 4);
+        // One core is left for the UI, then capped: the timestamped workflow holds more models
+        // in memory per thread, so it gets the tighter cap.
+        return timestampedWorkflow
+                ? Math.clamp(availableProcessors - 1, 1, 2)
+                : Math.clamp(availableProcessors - 1, 1, 4);
     }
 
-    private void showInfo(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(message == null ? "" : message);
-        alert.showAndWait();
-    }
-
-    private void showWarning(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(message == null ? "" : message);
-        alert.showAndWait();
-    }
-
-    private void showError(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(message == null ? "" : message);
-        alert.showAndWait();
-    }
 }
