@@ -8,7 +8,7 @@
         <cimpal.version>2026.9.05.1</cimpal.version> <!-- Always sync with version tag -->
         <log4j.version>2.26.0</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jena.version>6.1.0</jena.version>
+        <jena.version>6.2.0</jena.version>
         <launch4j.version>2.7.0</launch4j.version>
         <javafx.version>25.0.3</javafx.version>
     </properties>
@@ -24,7 +24,7 @@
     </organization>
     <inceptionYear>2020</inceptionYear>
     <description>
-        CimPal helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM.
+        CimPal helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changes between different versions of CIM.
     </description>
 
     <modules>
