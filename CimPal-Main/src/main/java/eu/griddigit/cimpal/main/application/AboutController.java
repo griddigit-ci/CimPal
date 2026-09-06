@@ -16,6 +16,7 @@ import javafx.stage.Stage;
 
 import java.awt.*;
 import java.io.*;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
@@ -59,8 +60,8 @@ public class AboutController implements Initializable {
         link.setGraphic(fImage);
         link.setOnAction(ev -> {
                     try {
-                        Desktop.getDesktop().browse(new URL("https://griddigit.eu").toURI());
-                    } catch (IOException | URISyntaxException e) {
+                        Desktop.getDesktop().browse(URI.create("https://griddigit.eu"));
+                    } catch (IOException e) {
                         LOG.error("Unhandled exception", e);
                     }
         });
@@ -68,24 +69,24 @@ public class AboutController implements Initializable {
         faPane.getChildren().add(0, link);
         fsupportemail.setOnAction(ev -> {
             try {
-                Desktop.getDesktop().browse(new URL("mailto:cimpal@griddigit.eu").toURI());
-            } catch (IOException | URISyntaxException e) {
+                Desktop.getDesktop().browse(URI.create("mailto:cimpal@griddigit.eu"));
+            } catch (IOException e) {
                 LOG.error("Unhandled exception", e);
             }
         });
 
         fwebsite.setOnAction(ev -> {
             try {
-                Desktop.getDesktop().browse(new URL("https://cimpal.app").toURI());
-            } catch (IOException | URISyntaxException e) {
+                Desktop.getDesktop().browse(URI.create("https://cimpal.app"));
+            } catch (IOException e) {
                 LOG.error("Unhandled exception", e);
             }
         });
 
         fgitHub.setOnAction(ev -> {
             try {
-                Desktop.getDesktop().browse(new URL("https://github.com/griddigit/CimPal").toURI());
-            } catch (IOException | URISyntaxException e) {
+                Desktop.getDesktop().browse(URI.create("https://github.com/griddigit/CimPal"));
+            } catch (IOException e) {
                 LOG.error("Unhandled exception", e);
             }
         });
@@ -106,8 +107,8 @@ public class AboutController implements Initializable {
     //action button License
     private void actionBtnLicense(ActionEvent actionEvent) {
         try {
-            Desktop.getDesktop().browse(new URL("https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12").toURI());
-        } catch (IOException | URISyntaxException e) {
+            Desktop.getDesktop().browse(URI.create("https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12"));
+        } catch (IOException e) {
             LOG.error("Unhandled exception", e);
         }
     }

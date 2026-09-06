@@ -4,7 +4,6 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TreeView?>
@@ -243,11 +242,13 @@
         <TreeView fx:id="treeViewShaclFiles" maxWidth="1.7976931348623157E308" minHeight="100.0"
                   showRoot="false" visible="false" managed="false" VBox.vgrow="ALWAYS"/>
 
-        <Region fx:id="spacerBelowForm" VBox.vgrow="ALWAYS"/>
-
-        <!-- maxWidth, not prefWidth: prefWidth="Infinity" made the whole tab report an
-             infinite preferred width. maxWidth is what makes it stretch to the container. -->
-        <ProgressBar fx:id="pbValidationByMapping" maxWidth="Infinity" progress="0.0"/>
+        <!--
+          Pushes the action bar to the bottom of the tab. The tab used to carry its own full-width
+          ProgressBar just above the action bar; at rest it read as an empty text field, and every
+          other tab reports progress on the shared bar in the status line, so this one now does
+          too - see setProgress()/resetProgress() in the controller.
+        -->
+        <Region VBox.vgrow="ALWAYS"/>
 
         <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
             <Button minWidth="95.0"

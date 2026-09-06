@@ -20,8 +20,6 @@ import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 
 import java.io.InputStream;
 
-//import guru.nidi.graphviz.engine.Graphviz;
-//import guru.nidi.graphviz.engine.Format;
 
 import javafx.application.Platform;
 import javafx.event.ActionEvent;

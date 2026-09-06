@@ -76,7 +76,7 @@ public class rdfDiffResultController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        tableViewResults.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY);
+        tableViewResults.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         tableViewResults.setPlaceholder(new Label("No comparison details available"));
 
         //add callback - the table is not editable, but it is necessary in order to get the wrap text and text area

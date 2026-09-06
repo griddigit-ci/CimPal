@@ -533,7 +533,8 @@ CIM-based data exchange:</p>
       result messages. The bin icon above it empties the panel; hover it for the <em>Clear Output
       Window</em> tooltip.</li>
   <li><strong>Status bar</strong> &mdash; the progress bar at the very bottom shows the progress of
-      the running operation. An indeterminate bar means the operation cannot report a percentage.</li>
+      the running operation, whichever tab started it. An indeterminate bar means the operation
+      cannot report a percentage.</li>
   <li><strong>Help badges</strong> &mdash; the small <code>?</code> markers next to fields in the
       tabs show a detailed tooltip on hover. This page reproduces the same texts.</li>
   <li><strong>Reset</strong> &mdash; every tab has a <em>Reset</em> button that clears its fields
@@ -895,9 +896,16 @@ Operations</em>.</p>
 <tr><td>Target format</td><td>choice, required</td>
     <td>The output serialisation (RDF/XML, Turtle, JSON-LD, N-Triples&nbsp;&hellip;). Some output
         options are only available for certain formats.</td></tr>
-<tr><td>xml base</td><td>text</td>
-    <td>The XML base URI embedded in the serialised output; relative URIs are resolved against it.
-        Used when writing RDF/XML.</td></tr>
+<tr><td>Base URI</td><td>choice + text</td>
+    <td>The base URI embedded in the serialised output as <code>xml:base</code>; relative URIs in
+        the output are resolved against it. Used when writing RDF/XML.
+        <br>Choose one of the standard CIM namespaces from the dropdown and the field is filled and
+        locked; choose <em>Other</em> to type any base URI. The same preset list as the
+        <a href="#tab-validation-by-mapping">SHACL Validation</a> tab uses &mdash; see
+        <em>Base URI presets</em> there.
+        <br>This tab defaults to <em>Other</em> with the field empty, because here an empty field
+        means <em>omit <code>xml:base</code> from the output altogether</em>, which is often what
+        you want.</td></tr>
 <tr><td>Show Xml declaration, Show Doctype declaration, Tab, Relative URIs, RDF format</td>
     <td>checkbox / text / choice</td>
     <td>RDF/XML writer details, enabled only for the formats that support them.</td></tr>
@@ -1340,7 +1348,8 @@ base URI cannot silently produce a model whose subjects resolve nowhere.</p>
       Output window as the run proceeds, and a validation report file next to each validated model
       when <em>Export model validation reports</em> is ticked. Nothing happens, and the progress
       bar resets, if no model archives are found under the models root folder.</li>
-  <li>Progress on the tab's own progress bar and messages in the Output window.</li>
+  <li>Progress on the shared progress bar in the status line, and messages in the Output
+      window.</li>
 </ul>
 
 <p class="src">Source: <code>ValidationByMappingController.actionRunValidationByMapping()</code>,

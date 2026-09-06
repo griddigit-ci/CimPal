@@ -293,7 +293,7 @@ public class ModelManipulationFactory {
                         if (conform) {
                             attributeValue="P5Y2M10DT15H";
                         }else{
-                            attributeValue= RandomStringUtils.randomAlphabetic(10);
+                            attributeValue= RandomStringUtils.insecure().nextAlphabetic(10);
                         }
                         break;
 
@@ -323,14 +323,14 @@ public class ModelManipulationFactory {
                                     inValues = (List<RDFNode>) shaclContraintResult.get("in");
                                     attributeValue=inValues.get(0).toString();
                                 }else{
-                                    attributeValue = "http://" + RandomStringUtils.randomAlphabetic(10) + ".test/";
+                                    attributeValue = "http://" + RandomStringUtils.insecure().nextAlphabetic(10) + ".test/";
                                 }
 
                             }else {
-                                attributeValue = "http://" + RandomStringUtils.randomAlphabetic(10) + ".test/";
+                                attributeValue = "http://" + RandomStringUtils.insecure().nextAlphabetic(10) + ".test/";
                             }
                         }else{
-                            attributeValue=RandomStringUtils.randomAlphabetic(10);
+                            attributeValue=RandomStringUtils.insecure().nextAlphabetic(10);
                         }
                         break;
                 }

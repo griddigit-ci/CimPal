@@ -3,6 +3,7 @@ package eu.griddigit.cimpal.main.application.controllers;
 import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
@@ -48,6 +49,8 @@ public class RDFConvertController implements Initializable {
     private ChoiceBox<String> fsourceFormatChoiceBox;
     @FXML
     private ChoiceBox<String> ftargetFormatChoiceBox;
+    @FXML
+    private ChoiceBox<String> fcbBaseUri;
     @FXML
     private TextField frdfConvertXmlBase;
     @FXML
@@ -151,6 +154,10 @@ public class RDFConvertController implements Initializable {
                 "Sorting by prefix"
         );
 
+        // "Other" with the field left empty: this tab writes the value out as xml:base, and an
+        // empty field means omit it - the tab's existing default, which has to stay reachable.
+        BaseUriPresets.bind(fcbBaseUri, frdfConvertXmlBase, BaseUriPresets.OTHER);
+
         ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBRDFconvertTarget());
 
         rdfConvertModelUnionDetailedFiles = new LinkedList<>();
@@ -176,7 +183,12 @@ public class RDFConvertController implements Initializable {
         GUIhelper.installHelpTooltip(helpExtendedRdf, "Additional RDF file with extension data to include in processing.");
         GUIhelper.installHelpTooltip(helpSourceType, "Check if the source follows CGMES/IEC 61970-552 instance data serialisation rules. This affects how the parser interprets the RDF structure.");
         GUIhelper.installHelpTooltip(helpTargetFormat, "The output serialisation format (e.g. RDF/XML, Turtle, N-Triples). Some output options (XML declaration, tab size, etc.) are only available for certain formats.");
-        GUIhelper.installHelpTooltip(helpXmlBase, "The XML base URI embedded in the serialised output. Relative URIs in the output will be resolved against this base. Used when writing RDF/XML.");
+        GUIhelper.installHelpTooltip(helpXmlBase,
+                "The base URI embedded in the serialised output as xml:base. Relative URIs in the output are "
+                        + "resolved against it. Used when writing RDF/XML.\n\n"
+                        + "Pick a standard CIM namespace from the dropdown and the field is filled and locked; "
+                        + "pick Other to type any base URI, or leave the field empty to omit xml:base from the "
+                        + "output altogether.");
         GUIhelper.installHelpTooltip(helpSortingOptions, "Controls how output triples/subjects are ordered in the serialised file. Sorting alphabetically produces deterministic, diff-friendly output.");
     }
 
@@ -462,6 +474,7 @@ public class RDFConvertController implements Initializable {
         fsourcePathTextField.clear();
         fsourceFormatChoiceBox.getSelectionModel().clearSelection();
         ftargetFormatChoiceBox.getSelectionModel().clearSelection();
+        fcbBaseUri.getSelectionModel().select(BaseUriPresets.OTHER);
         frdfConvertXmlBase.clear();
         fcbRDFconvertModelUnion.setSelected(false);
         fcbRDFConvertInheritanceOnly.setSelected(false);

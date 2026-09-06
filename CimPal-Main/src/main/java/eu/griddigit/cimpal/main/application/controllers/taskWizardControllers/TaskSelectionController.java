@@ -141,7 +141,7 @@ public class TaskSelectionController implements Initializable, IController {
             }
         });
 
-        fcbProfileVersionIDG.getItems().addAll(supportedRDFSProfiles.getSupportedRDFSProfileNames());
+        fcbProfileVersionIDG.getItems().addAll(List.of(supportedRDFSProfiles.getSupportedRDFSProfileNames()));
 
         //Adding action to the choice box
         fcbProfileVersionIDG.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBInstanceDataProfileformat());

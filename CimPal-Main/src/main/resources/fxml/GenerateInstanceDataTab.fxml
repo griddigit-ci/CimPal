@@ -110,9 +110,19 @@
                 </HBox>
             </TitledPane>
 
+            <!--
+              minHeight USE_PREF_SIZE (-Infinity): the enclosing ScrollPane has fitToHeight, so
+              the VBox distributes exactly the viewport height and will shrink a child to its
+              minimum to make room. The pane above is the greedy one (its file lists carry
+              vgrow=ALWAYS), and without this pin the sorting and export rows below were squeezed
+              out of view entirely. Pinned to its preferred height, this pane always shows in
+              full and the lists give up the space instead.
+            -->
             <TitledPane expanded="true"
                         collapsible="true"
-                        text="Create CIMXML dataset based on xlsx template">
+                        minHeight="-Infinity"
+                        text="Create CIMXML dataset based on xlsx template"
+                        VBox.vgrow="NEVER">
 
                 <VBox minHeight="0.0" minWidth="0.0" spacing="16.0">
 
@@ -132,17 +142,19 @@
                         <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseXlsTemplate"
                                 text="Browse" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
 
-                        <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                        <HBox alignment="TOP_LEFT" spacing="8.0" styleClass="option-label"
+                              GridPane.rowIndex="1" GridPane.columnIndex="0" GridPane.valignment="TOP">
                             <Label text="Sorting options:"/>
                             <Label fx:id="helpSortingOptions" text="?" styleClass="help-badge"/>
                         </HBox>
                         <!-- FlowPane so the options reflow instead of overflowing the tab. -->
                         <FlowPane hgap="16.0" vgap="8.0" styleClass="option-flow"
-                                  GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                                  GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="2"
+                                  GridPane.valignment="TOP">
                             <CheckBox fx:id="fcbSortRDFGen" mnemonicParsing="false" selected="true"
                                       text="Sort alphabetically"/>
                             <HBox alignment="CENTER_LEFT" spacing="8.0">
-                                <Label text="Sorting options:"/>
+                                <Label text="Sort by:"/>
                                 <ChoiceBox fx:id="fcbRDFsortOptionsGen" prefWidth="200.0"/>
                             </HBox>
                             <CheckBox fx:id="fcbStripPrefixesGen" mnemonicParsing="false" selected="true"
@@ -151,7 +163,8 @@
                         </FlowPane>
 
                         <FlowPane hgap="16.0" vgap="8.0" styleClass="option-flow"
-                                  GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                                  GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2"
+                                  GridPane.valignment="TOP">
                             <CheckBox fx:id="fcbExportExtensionsGen" mnemonicParsing="false" selected="true"
                                       text="Export extensions (identified extensions in the template)"/>
                             <Label fx:id="helpExportExtensions" text="?" styleClass="help-badge"/>

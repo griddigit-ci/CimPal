@@ -398,3 +398,14 @@
     -fx-hgap: 16;
     -fx-vgap: 8;
 }
+
+/*
+ * Row label for a grid cell whose field is an .option-flow. Such a pane is taller than a single
+ * control - it reflows when narrow, and some entries carry a text field or dropdown - so a
+ * centred label drifts away from the first line of options. Pairing this class with
+ * GridPane.valignment="TOP" pins the label to the top of the row; the padding then makes up the
+ * space a CheckBox reserves above its own text, so label and first option read as one line.
+ */
+.option-label {
+    -fx-padding: 3 0 0 0;
+}

@@ -37,13 +37,15 @@
                 <Region HBox.hgrow="ALWAYS" />
             </HBox>
 
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
+            <HBox alignment="TOP_LEFT" spacing="8.0" styleClass="option-label"
+                  GridPane.rowIndex="2" GridPane.columnIndex="0" GridPane.valignment="TOP">
                 <Label text="Operations options:" wrapText="true" />
                 <Label fx:id="helpOperationsOptions" text="?" styleClass="help-badge"/>
             </HBox>
             <!-- FlowPane so the seven options reflow instead of overflowing the tab. -->
             <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0"
-                      GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                      GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2"
+                      GridPane.valignment="TOP">
                 <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" text="Union model" wrapText="true" />
                 <CheckBox fx:id="fcbRDFconvertModelUnionDetailed" mnemonicParsing="false" text="Union model detailed" wrapText="true" />
                 <CheckBox fx:id="fcbRDFconvertFixPackage" mnemonicParsing="false" text="Fix RDFS Package Assignment" wrapText="true" />
@@ -89,7 +91,7 @@
             </HBox>
 
             <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="6" GridPane.columnIndex="0">
-                <Label text="Source type::" wrapText="true"/>
+                <Label text="Source type:" wrapText="true"/>
                 <Label fx:id="helpSourceType" text="?" styleClass="help-badge"/>
             </HBox>
             <CheckBox fx:id="fcbRDFconvertInstanceData" mnemonicParsing="false"
@@ -109,9 +111,11 @@
               "Options:" used to label an empty box while the serialisation options sat in
               unlabelled rows below it. It now labels the options it was always meant to.
             -->
-            <Label text="Options:" GridPane.rowIndex="8" GridPane.columnIndex="0" />
+            <Label text="Options:" styleClass="option-label"
+                   GridPane.rowIndex="8" GridPane.columnIndex="0" GridPane.valignment="TOP" />
             <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0"
-                      GridPane.rowIndex="8" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                      GridPane.rowIndex="8" GridPane.columnIndex="1" GridPane.columnSpan="2"
+                      GridPane.valignment="TOP">
                 <CheckBox fx:id="fcbShowXMLDeclaration" disable="true" mnemonicParsing="false" selected="true" text="Show Xml declaration" />
                 <CheckBox fx:id="fcbShowDoctypeDeclaration" disable="true" mnemonicParsing="false" text="Show Doctype declaration" />
                 <HBox alignment="CENTER_LEFT" spacing="8.0">
@@ -128,22 +132,35 @@
                 </HBox>
             </FlowPane>
 
+            <!--
+              Base URI. Same dropdown of standard CIM namespaces as the SHACL Validation tab, but
+              defaulting to "Other" with the field empty: here the value is written into the output
+              as xml:base, and an empty field means "omit it" - which is this tab's existing
+              default and must stay reachable.
+            -->
             <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="9" GridPane.columnIndex="0">
-                <Label text="xml base:" wrapText="true" />
+                <Label text="Base URI:" wrapText="true" />
                 <Label fx:id="helpXmlBase" text="?" styleClass="help-badge"/>
             </HBox>
-            <TextField fx:id="frdfConvertXmlBase" maxWidth="1.7976931348623157E308"
-                       GridPane.rowIndex="9" GridPane.columnIndex="1" GridPane.columnSpan="2" />
+            <HBox alignment="CENTER_LEFT" spacing="8.0"
+                  GridPane.rowIndex="9" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <ChoiceBox fx:id="fcbBaseUri" prefWidth="260.0" />
+                <TextField fx:id="frdfConvertXmlBase" minWidth="0.0"
+                           promptText="Leave empty to omit xml:base from the output"
+                           HBox.hgrow="ALWAYS" />
+            </HBox>
 
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="10" GridPane.columnIndex="0">
+            <HBox alignment="TOP_LEFT" spacing="8.0" styleClass="option-label"
+                  GridPane.rowIndex="10" GridPane.columnIndex="0" GridPane.valignment="TOP">
                 <Label text="Sorting options:" />
                 <Label fx:id="helpSortingOptions" text="?" styleClass="help-badge"/>
             </HBox>
             <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0"
-                      GridPane.rowIndex="10" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                      GridPane.rowIndex="10" GridPane.columnIndex="1" GridPane.columnSpan="2"
+                      GridPane.valignment="TOP">
                 <CheckBox fx:id="fcbSortRDF" disable="true" mnemonicParsing="false" selected="true" text="Sort alphabetically" />
                 <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <Label text="Sorting options:" />
+                    <Label text="Sort by:" />
                     <ChoiceBox fx:id="fcbRDFsortOptions" disable="true" prefWidth="200.0" />
                 </HBox>
                 <CheckBox fx:id="fcbStripPrefixes" disable="true" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />

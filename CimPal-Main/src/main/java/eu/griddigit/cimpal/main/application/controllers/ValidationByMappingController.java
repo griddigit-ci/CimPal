@@ -5,6 +5,7 @@ import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
@@ -25,7 +26,6 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -53,35 +53,13 @@ public class ValidationByMappingController {
     /** Depth used when discovering model archives under the models root folder. */
     private static final int MODEL_SCAN_DEPTH = 3;
 
-    /** Shared label for the "supply your own" entry of both dropdowns. */
-    private static final String OTHER = "Other";
+    /** Shared label for the "supply your own" entry of the datatype map dropdown. */
+    private static final String OTHER = BaseUriPresets.OTHER;
 
     private static final String DATATYPE_MAP_CGMES30_NC25 = "CGMES 3.0 / NC 2.5";
     private static final String DATATYPE_MAP_CGMES30_NC24 = "CGMES 3.0 / NC 2.4";
     private static final String DATATYPE_MAP_CGMES24_NC22 = "CGMES 2.4 / NC 2.2";
 
-    private static final String BASE_URI_CIM17 = "CIM 17";
-
-    /**
-     * Base URIs a CIM dataset is realistically based on, in the order they are offered. The value
-     * is the URI the field is filled and locked with; {@link #OTHER} carries no value and unlocks
-     * the field instead. A LinkedHashMap so the dropdown order is this declaration order.
-     */
-    private static final Map<String, String> BASE_URI_PRESETS = new LinkedHashMap<>();
-
-    static {
-        BASE_URI_PRESETS.put("CIM 16", "http://iec.ch/TC57/2013/CIM-schema-cim16");
-        BASE_URI_PRESETS.put(BASE_URI_CIM17, "http://iec.ch/TC57/CIM100");
-        BASE_URI_PRESETS.put("Stable CIM", "https://cim.ucaiug.io/ns");
-        BASE_URI_PRESETS.put("ENTSO-E extensions prior 2021", "http://entsoe.eu/CIM/SchemaExtension/3/1");
-        BASE_URI_PRESETS.put("EU extensions prior 2026", "http://iec.ch/TC57/CIM100-European");
-        BASE_URI_PRESETS.put("EU extensions 2026 on", "https://cim.ucaiug.io/ns/eu");
-        BASE_URI_PRESETS.put("EU NC extensions", "https://cim4.eu/ns/nc");
-        BASE_URI_PRESETS.put("DCAT", "http://www.w3.org/ns/dcat");
-        BASE_URI_PRESETS.put("DCTERMS", "http://purl.org/dc/terms");
-        // Deliberately last and deliberately without a value: see updateBaseUriField().
-        BASE_URI_PRESETS.put(OTHER, null);
-    }
 
     private MainController mainController;
 
@@ -135,9 +113,6 @@ public class ValidationByMappingController {
 
     @FXML
     private Button btnBrowseOutputFolder;
-
-    @FXML
-    private ProgressBar pbValidationByMapping;
 
     @FXML
     private Button btnRunValidationByMapping;
@@ -203,6 +178,19 @@ public class ValidationByMappingController {
         this.mainController = mainController;
     }
 
+    /** Progress goes to the shared bar in the status line, as it does from every other tab. */
+    private void setProgress(double progress) {
+        if (mainController != null) {
+            mainController.setProgressBarValue(progress);
+        }
+    }
+
+    private void resetProgress() {
+        if (mainController != null) {
+            mainController.resetProgressBar();
+        }
+    }
+
     @FXML
     private void initialize() {
         cbValidationWorkflow.getItems().setAll(
@@ -223,13 +211,9 @@ public class ValidationByMappingController {
                 .addListener((obs, oldVal, newVal) -> updateDatatypeMapControls());
         updateDatatypeMapControls();
 
-        cbBaseUri.getItems().setAll(BASE_URI_PRESETS.keySet());
-        cbBaseUri.getSelectionModel().select(BASE_URI_CIM17);
-        cbBaseUri.getSelectionModel().selectedItemProperty()
-                .addListener((obs, oldVal, newVal) -> updateBaseUriField());
-        updateBaseUriField();
+        BaseUriPresets.bind(cbBaseUri, tfXmlBaseUri, BaseUriPresets.DEFAULT_SELECTION);
 
-        pbValidationByMapping.setProgress(0);
+        resetProgress();
 
         // Each workflow uses a different subset of the form; re-evaluate on every change.
         cbValidationWorkflow.getSelectionModel().selectedItemProperty()
@@ -242,24 +226,6 @@ public class ValidationByMappingController {
     /** Reveals the file field and Browse button only for the "Other" datatype map. */
     private void updateDatatypeMapControls() {
         setShown(isOtherDatatypeMap(), tfDatatypeMapFile, btnBrowseDatatypeMapFile);
-    }
-
-    /**
-     * Fills the base URI field from the selected preset and locks it, or unlocks it for "Other".
-     * <p>
-     * Switching to "Other" leaves the previous preset's URI in place as a starting point rather
-     * than clearing the field, since it is usually a variant of one of the presets that is wanted.
-     */
-    private void updateBaseUriField() {
-        String selected = cbBaseUri.getSelectionModel().getSelectedItem();
-        String presetUri = selected == null ? null : BASE_URI_PRESETS.get(selected);
-
-        if (presetUri == null) {
-            tfXmlBaseUri.setEditable(true);
-        } else {
-            tfXmlBaseUri.setText(presetUri);
-            tfXmlBaseUri.setEditable(false);
-        }
     }
 
     /**
@@ -636,18 +602,15 @@ public class ValidationByMappingController {
 
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
         cbDatatypeMap.getSelectionModel().select(DATATYPE_MAP_CGMES30_NC25);
-        cbBaseUri.getSelectionModel().select(BASE_URI_CIM17);
+        cbBaseUri.getSelectionModel().select(BaseUriPresets.DEFAULT_SELECTION);
 
         updateDatatypeMapControls();
-        updateBaseUriField();
         updateWorkflowControls();
-
-        pbValidationByMapping.setProgress(0);
     }
 
     @FXML
     private void actionRunValidationByMapping() {
-        pbValidationByMapping.setProgress(0);
+        resetProgress();
 
         if (!validateInputs()) {
             return;
@@ -668,7 +631,7 @@ public class ValidationByMappingController {
         Path previousComparisonCsv = runTimestampedWorkflow ? getPreviousComparisonCsvPath() : null;
 
         btnRunValidationByMapping.setDisable(true);
-        pbValidationByMapping.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         File selectedMappingFile = mappingCsvFile;
         File selectedModelsInputFolder = modelsInputFolder;
@@ -725,7 +688,7 @@ public class ValidationByMappingController {
                 }
 
                 Platform.runLater(() -> {
-                    pbValidationByMapping.setProgress(1);
+                    setProgress(1);
                     btnRunValidationByMapping.setDisable(false);
                     showInfo("Validation finished", "Validation report generation finished.");
                 });
@@ -734,7 +697,7 @@ public class ValidationByMappingController {
                 LOG.error("Unhandled exception", ex);
 
                 Platform.runLater(() -> {
-                    pbValidationByMapping.setProgress(0);
+                    resetProgress();
                     btnRunValidationByMapping.setDisable(false);
                     showError("Validation failed", ex.getMessage());
                 });
@@ -743,7 +706,7 @@ public class ValidationByMappingController {
                 LOG.error("Unhandled exception", ex);
 
                 Platform.runLater(() -> {
-                    pbValidationByMapping.setProgress(0);
+                    resetProgress();
                     btnRunValidationByMapping.setDisable(false);
                     showError("Validation failed", ex.getMessage());
                 });
@@ -781,26 +744,27 @@ public class ValidationByMappingController {
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("Error while searching for files",
                     "An error occurred while searching for models in the selected folder.", e);
-            pbValidationByMapping.setProgress(0);
+            resetProgress();
             return;
         }
 
         if (archives.isEmpty()) {
             showWarning("No models found",
                     "No model archives (.zip) were found under the selected models root folder.");
-            pbValidationByMapping.setProgress(0);
+            resetProgress();
             return;
         }
 
         btnRunValidationByMapping.setDisable(true);
-        pbValidationByMapping.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
         new Thread(() -> {
             try {
                 ShaclAutoTester tester = new ShaclAutoTester(new ShaclAutoTesterCallback() {
                     @Override
                     public void updateProgress(double progress) {
-                        Platform.runLater(() -> pbValidationByMapping.setProgress(progress));
+                        // setProgress already marshals onto the FX thread.
+                        setProgress(progress);
                     }
 
                     @Override
@@ -818,7 +782,7 @@ public class ValidationByMappingController {
                 tester.runTests(selectedConstraintFiles, selectedModelsFolder, archives, exportReports);
 
                 Platform.runLater(() -> {
-                    pbValidationByMapping.setProgress(1);
+                    setProgress(1);
                     btnRunValidationByMapping.setDisable(false);
                     showInfo("Validation finished",
                             "Validated " + archives.size() + " model(s). See the Output pane for details.");
@@ -828,7 +792,7 @@ public class ValidationByMappingController {
                 LOG.error("Manual SHACL validation failed", ex);
 
                 Platform.runLater(() -> {
-                    pbValidationByMapping.setProgress(0);
+                    resetProgress();
                     btnRunValidationByMapping.setDisable(false);
                     showError("Validation failed", ex.getMessage());
                 });
@@ -955,12 +919,10 @@ public class ValidationByMappingController {
         return new DatatypeMapSource(resource, null);
     }
 
-    /** The base URI to parse models with, falling back to the CIM 17 preset if the field is empty. */
+    /** The base URI to parse models with, falling back to the default preset if the field is empty. */
     private String getBaseUri() {
         String text = tfXmlBaseUri.getText();
-        return text == null || text.isBlank()
-                ? BASE_URI_PRESETS.get(BASE_URI_CIM17)
-                : text.trim();
+        return text == null || text.isBlank() ? BaseUriPresets.defaultUri() : text.trim();
     }
 
     /**

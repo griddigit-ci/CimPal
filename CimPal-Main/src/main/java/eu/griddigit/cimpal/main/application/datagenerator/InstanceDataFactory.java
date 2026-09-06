@@ -530,7 +530,7 @@ public class InstanceDataFactory {
                             if (conform) {
                                 attributeValue="P5Y2M10DT15H";
                             }else{
-                                attributeValue=RandomStringUtils.randomAlphabetic(10);
+                                attributeValue=RandomStringUtils.insecure().nextAlphabetic(10);
                             }
                             break;
 
@@ -560,14 +560,14 @@ public class InstanceDataFactory {
                                         inValues = (List<RDFNode>) shaclContraintResult.get("in");
                                         attributeValue=inValues.get(0).toString();
                                     }else{
-                                        attributeValue = "http://" + RandomStringUtils.randomAlphabetic(10) + ".test/";
+                                        attributeValue = "http://" + RandomStringUtils.insecure().nextAlphabetic(10) + ".test/";
                                     }
 
                                 }else {
-                                    attributeValue = "http://" + RandomStringUtils.randomAlphabetic(10) + ".test/";
+                                    attributeValue = "http://" + RandomStringUtils.insecure().nextAlphabetic(10) + ".test/";
                                 }
                             }else{
-                                attributeValue=RandomStringUtils.randomAlphabetic(10);
+                                attributeValue=RandomStringUtils.insecure().nextAlphabetic(10);
                             }
                             break;
                     }
@@ -678,12 +678,12 @@ public class InstanceDataFactory {
             len=minLength + random.nextInt((maxLength - minLength) + 1);
             if (conform) {
                 if(inValues.size()==0) {
-                    attributeValue=RandomStringUtils.randomAlphabetic(len);
+                    attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
                 }
             }else{
-                attributeValue=RandomStringUtils.randomAlphabetic(maxLength+1);
+                attributeValue=RandomStringUtils.insecure().nextAlphabetic(maxLength+1);
             }
         }
         if (values.containsKey("minLength") && !values.containsKey("maxLength")) { //only min
@@ -691,15 +691,15 @@ public class InstanceDataFactory {
             len=minLength + random.nextInt((999 - minLength) + 1);
             if (conform) {
                 if(inValues.size()==0) {
-                    attributeValue=RandomStringUtils.randomAlphabetic(len);
+                    attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
                 }
             }else{
                 if (minLength>=1) {
-                    attributeValue = RandomStringUtils.randomAlphabetic(minLength - 1);
+                    attributeValue = RandomStringUtils.insecure().nextAlphabetic(minLength - 1);
                 }else{
-                    attributeValue = RandomStringUtils.randomAlphabetic(minLength);
+                    attributeValue = RandomStringUtils.insecure().nextAlphabetic(minLength);
                     GuiHelper.appendTextToOutputWindow(WizardContext.getExecutionTextArea(),"[Error] Please check: non-conform value is not possible with this value of minLength = "+minLength,true);
                 }
             }
@@ -709,24 +709,24 @@ public class InstanceDataFactory {
             len=1 + random.nextInt((maxLength - 1) + 1);
             if (conform) {
                 if(inValues.size()==0) {
-                    attributeValue=RandomStringUtils.randomAlphabetic(len);
+                    attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
                 }
             }else{
-                attributeValue=RandomStringUtils.randomAlphabetic(maxLength+1);
+                attributeValue=RandomStringUtils.insecure().nextAlphabetic(maxLength+1);
             }
         }
         if (!values.containsKey("minLength") && !values.containsKey("maxLength")){ //there is no min and no max
             len=10;
             if (conform) {
                 if(inValues.size()==0) {
-                    attributeValue=RandomStringUtils.randomAlphabetic(len);
+                    attributeValue=RandomStringUtils.insecure().nextAlphabetic(len);
                 }else{
                     attributeValue = inValues.get(randomInt).toString();
                 }
             }else{
-                attributeValue=RandomStringUtils.randomAlphabetic(len+300);
+                attributeValue=RandomStringUtils.insecure().nextAlphabetic(len+300);
                 //GuiHelper.appendTextToOutputWindow("[Error] Please check: There is no min and max length for the string.",true);
             }
         }

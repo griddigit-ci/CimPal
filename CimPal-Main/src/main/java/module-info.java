@@ -24,9 +24,11 @@ module CimPal.Main {
     requires javafx.fxml;
     requires javafx.graphics;
     requires javafx.controls;
-    requires javafx.media;
-    requires javafx.swing;
     requires javafx.web;
+    // java.awt (Desktop, Taskbar) and javax.swing (JFileChooser) are used directly. This used to
+    // be readable only by accident, via javafx.swing; nothing uses javafx.embed.swing itself, so
+    // that dependency is gone and the real one is declared here.
+    requires java.desktop;
     requires java.xml;
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
@@ -35,11 +37,8 @@ module CimPal.Main {
     // security-relevant warnings emitted by the RDF parsers and the HTTP client.
     requires org.slf4j.simple;
     requires org.apache.commons.compress;
-    requires org.apache.commons.codec;
-    requires org.apache.jena.tdb2;
     requires shacl;
     requires org.apache.jena.base;
-    requires org.apache.jena.cmds;
     requires org.apache.commons.io;
     requires commons.math3;
     requires org.apache.commons.lang3;
@@ -50,7 +49,6 @@ module CimPal.Main {
     requires tools.jackson.core;
     requires tools.jackson.databind;
     requires org.apache.jena.iri;
-    requires net.sourceforge.plantuml;
     requires velocity.engine.core;
     requires org.apache.jena.shacl;
     requires CimPal.Core;
