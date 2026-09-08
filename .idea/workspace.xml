@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="bce3aea1-59af-438f-9d92-c53a79978571" name="Changes" comment="Additional fixes to visualisation part">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/java/eu/griddigit/cimpal/main/application/controllers/RDFVisualisationController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/java/eu/griddigit/cimpal/main/application/controllers/RDFVisualisationController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CimPal-Main/src/main/resources/help/help.html" beforeDir="false" afterPath="$PROJECT_DIR$/CimPal-Main/src/main/resources/help/help.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -47,23 +46,23 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.1293517976439276" />
-      <entry key="MS500" value="2.21165695572079" />
-      <entry key="S2" value="5.875192052843423" />
-      <entry key="S5" value="16.591925258812985" />
-      <entry key="S10" value="34.48269911227018" />
-      <entry key="S30" value="97.75525090486424" />
-      <entry key="S60" value="166.7653563599433" />
-      <entry key="M2" value="237.42856492043236" />
-      <entry key="M5" value="304.2716041125179" />
-      <entry key="M10" value="359.10166428362567" />
-      <entry key="M15" value="429.2223772991217" />
-      <entry key="M30" value="640.8425379922833" />
-      <entry key="H1" value="904.1768401608713" />
-      <entry key="H2" value="1155.5287908656624" />
-      <entry key="H4" value="1409.7718851804445" />
-      <entry key="D1" value="2232.647727601686" />
-      <entry key="W1" value="2628.296840786329" />
+      <entry key="MS100" value="1.0000000000006941" />
+      <entry key="MS500" value="1.0037006643382784" />
+      <entry key="S2" value="1.2466451665034994" />
+      <entry key="S5" value="1.5833261091029143" />
+      <entry key="S10" value="2.0540107175422126" />
+      <entry key="S30" value="6.1539670788450405" />
+      <entry key="S60" value="12.588482016039102" />
+      <entry key="M2" value="22.273546808415567" />
+      <entry key="M5" value="56.04473053546047" />
+      <entry key="M10" value="136.32440411146618" />
+      <entry key="M15" value="221.1625409992552" />
+      <entry key="M30" value="465.96949030447433" />
+      <entry key="H1" value="837.9550157451447" />
+      <entry key="H2" value="1244.5905108876682" />
+      <entry key="H4" value="1631.0313205539824" />
+      <entry key="D1" value="2624.6956030038264" />
+      <entry key="W1" value="3072.709050583347" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
@@ -85,23 +84,23 @@
       <entry key="W1" value="0.0" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="1.0897938416874862" />
-      <entry key="MS500" value="2.194079604302968" />
-      <entry key="S2" value="5.862095585995786" />
-      <entry key="S5" value="16.574669932357732" />
-      <entry key="S10" value="34.46418808255223" />
-      <entry key="S30" value="97.73614466809272" />
-      <entry key="S60" value="166.7480002171691" />
-      <entry key="M2" value="237.4158379565343" />
-      <entry key="M5" value="304.2649910013857" />
-      <entry key="M10" value="359.09770707298327" />
-      <entry key="M15" value="429.21908992953814" />
-      <entry key="M30" value="640.8397789789578" />
-      <entry key="H1" value="904.1746805682989" />
-      <entry key="H2" value="1155.527079164276" />
-      <entry key="H4" value="1409.7704286795888" />
-      <entry key="D1" value="2232.6471934588353" />
-      <entry key="W1" value="2628.296749209883" />
+      <entry key="MS100" value="0.027969533466548617" />
+      <entry key="MS500" value="0.49121393816521697" />
+      <entry key="S2" value="1.0523821185021283" />
+      <entry key="S5" value="1.4845704473982313" />
+      <entry key="S10" value="1.9942606275298214" />
+      <entry key="S30" value="6.105313118990443" />
+      <entry key="S60" value="12.54216823236012" />
+      <entry key="M2" value="22.23270232870183" />
+      <entry key="M5" value="56.00787062386274" />
+      <entry key="M10" value="136.2943715756615" />
+      <entry key="M15" value="221.13796575017793" />
+      <entry key="M30" value="465.9536044387189" />
+      <entry key="H1" value="837.945379593208" />
+      <entry key="H2" value="1244.5847539936487" />
+      <entry key="H4" value="1631.0277518458129" />
+      <entry key="D1" value="2624.694684897603" />
+      <entry key="W1" value="3072.7089022490454" />
     </decayedShown>
   </component>
   <component name="ProblemsViewState">
@@ -115,44 +114,44 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Application.BaseProbe.executor": "Run",
-    "Application.CimPal.executor": "Run",
-    "Application.FxmlSmokeTest.executor": "Run",
-    "Application.HelpSmokeTest.executor": "Run",
-    "Application.LabelSmokeTest.executor": "Run",
-    "Application.PathMemoryCheck.executor": "Run",
-    "Application.TabWidthTest.executor": "Run",
-    "Application.ThemeReadabilityTest.executor": "Run",
-    "Application.ThemeSmokeTest.executor": "Run",
-    "Application.VerifyProbe.executor": "Run",
-    "JUnit.ComparisonCsvWriterTest.executor": "Run",
-    "JUnit.ShapeSourceTest.executor": "Run",
-    "Maven.CimPal [clean].executor": "Run",
-    "Maven.CimPal [package].executor": "Run",
-    "Maven.CimPal-Main [package].executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "devel",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/chiva/IdeaProjects/CimPal",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Modules",
-    "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "preferences.JavaFX",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Application.BaseProbe.executor&quot;: &quot;Run&quot;,
+    &quot;Application.CimPal.executor&quot;: &quot;Run&quot;,
+    &quot;Application.FxmlSmokeTest.executor&quot;: &quot;Run&quot;,
+    &quot;Application.HelpSmokeTest.executor&quot;: &quot;Run&quot;,
+    &quot;Application.LabelSmokeTest.executor&quot;: &quot;Run&quot;,
+    &quot;Application.PathMemoryCheck.executor&quot;: &quot;Run&quot;,
+    &quot;Application.TabWidthTest.executor&quot;: &quot;Run&quot;,
+    &quot;Application.ThemeReadabilityTest.executor&quot;: &quot;Run&quot;,
+    &quot;Application.ThemeSmokeTest.executor&quot;: &quot;Run&quot;,
+    &quot;Application.VerifyProbe.executor&quot;: &quot;Run&quot;,
+    &quot;JUnit.ComparisonCsvWriterTest.executor&quot;: &quot;Run&quot;,
+    &quot;JUnit.ShapeSourceTest.executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CimPal [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CimPal [package].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CimPal-Main [package].executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;devel&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/chiva/IdeaProjects/CimPal&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.JavaFX&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\chiva\IdeaProjects\CimPal" />

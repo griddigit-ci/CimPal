@@ -425,18 +425,18 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
 <p class="tagline">A desktop workbench for CIM&nbsp;/&nbsp;CGMES semantic models &mdash; profiles,
 constraints and instance data.</p>
 
-<p class="lead">CimPal is a graphical tool for the people who build and maintain
-<strong>IEC&nbsp;CIM</strong> data exchange standards and the datasets exchanged under them. It
+<p class="lead">CimPal is an open-source Java application developed by gridDigIt to support the implementation of the Common Information Model (CIM) and Common Grid Model Exchange Standard (CGMES) profiles in the power sector. It is licensed under the EUPL-1.2-or-later. It helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM. CimPal is a graphical tool for the people who build and maintain
+<strong>CIM based</strong> data exchange standards (such as IEC CGMES or IEC 61970-45x), specifications (ENSTO-E Network Codes profiles) and the datasets exchanged under them. It
 works on three kinds of artefact and, above all, on the relationships between them:</p>
 
 <ul>
   <li><strong>RDFS profile definitions</strong> &mdash; the machine-readable description of a
       data exchange profile (which classes, which properties, which multiplicities), as produced
-      by CimSyntaxGen from a UML model.</li>
+      by CimSyntaxGen or CIMTool from a UML model.</li>
   <li><strong>SHACL constraint sets</strong> &mdash; the executable rules that decide whether a
       dataset conforms to a profile.</li>
-  <li><strong>RDF instance data</strong> &mdash; the actual exchanged models: CGMES individual and
-      common grid models (IGM&nbsp;/&nbsp;CGM), reference data, boundary sets.</li>
+  <li><strong>RDF instance data datasets</strong> &mdash; the actual exchanged models: CGMES individual and
+      common grid models (IGM&nbsp;/&nbsp;CGM), reference datasets, boundary datasets or other datasets in various serialisations.</li>
 </ul>
 
 <p>Everything in the application is reachable from three places: the <strong>tabs</strong> in the
@@ -465,6 +465,8 @@ CIM-based data exchange:</p>
   <li><strong>Validating and producing test data.</strong> Run SHACL constraint sets over whole
       folders of models and collect the reports; and generate, multiply and deliberately corrupt
       instance data in order to test the constraints themselves.</li>
+  <li><strong>Data visualisation and query.</strong> Visualising and browsing datasets and
+      querying them. Query results can be saved as .xlsx.</li>
 </ol>
 
 <h2 id="workflows">Typical workflows</h2>
@@ -550,20 +552,19 @@ CIM-based data exchange:</p>
 
 <table class="gloss">
   <tr><th>Term</th><th>Meaning</th></tr>
-  <tr><td>CIM</td><td>Common Information Model &mdash; the IEC 61970&nbsp;/&nbsp;61968 semantic
+  <tr><td>CIM</td><td>Common Information Model &mdash; the semantic
       model of the electrical power system.</td></tr>
-  <tr><td>CGMES</td><td>Common Grid Model Exchange Standard &mdash; the ENTSO-E profile family of
-      CIM used for grid model exchange in Europe.</td></tr>
-  <tr><td>NC</td><td>Network Codes profiles &mdash; the CIM-based profiles supporting the European
-      network code data exchanges.</td></tr>
+  <tr><td>CGMES</td><td>Common Grid Model Exchange Standard &mdash; the IEC standard IEC 61970-600-1 and IEC 61970-600-2.</td></tr>
+  <tr><td>NC</td><td>Network Codes profiles &mdash; the ENTSO-E CIM-based profiles supporting additional data needed for the European
+      network codes data exchanges.</td></tr>
   <tr><td>RDFS profile</td><td>The machine-readable definition of one exchange profile: its
       classes, properties, datatypes and multiplicities. CimPal reads the <em>augmented</em> RDFS
-      form produced by CimSyntaxGen.</td></tr>
+      form produced by CimSyntaxGen or CIMTool.</td></tr>
   <tr><td>SHACL</td><td>Shapes Constraint Language &mdash; the W3C language for validating RDF
       graphs. A <em>shapes graph</em> is the executable form of a profile's rules.</td></tr>
   <tr><td>IGM&nbsp;/&nbsp;CGM</td><td>Individual Grid Model (one TSO's part) and Common Grid Model
       (the assembled, merged model).</td></tr>
-  <tr><td>EQ, SSH, TP, SV, DL, GL</td><td>The CGMES profile instance files: Equipment, Steady State
+  <tr><td>EQ, SSH, TP, SV, DL, GL</td><td>The CGMES profile and instance files/datasets: Equipment, Steady State
       Hypothesis, Topology, State Variables, Diagram Layout, Geographical Location.</td></tr>
   <tr><td>mRID</td><td>Master Resource Identifier &mdash; the persistent identifier of a CIM
       object, carried as <code>IdentifiedObject.mRID</code>.</td></tr>
@@ -574,8 +575,7 @@ CIM-based data exchange:</p>
       for a model part.</td></tr>
   <tr><td>QAR</td><td>Quality Assessment Report &mdash; the CIM-based report of data quality
       findings for an exchanged model.</td></tr>
-  <tr><td>QoCDC</td><td>Quality of CGMES Data Checks &mdash; the catalogue of quality rules whose
-      XML definition CimPal can turn into a spreadsheet.</td></tr>
+  <tr><td>QoCDC</td><td>Quality of CGMES Datasets and Calculations &mdash; the ENTSO-E catalogue of quality rules applied for CGMES v2.4 based data exchanges.</td></tr>
   <tr><td>Reference data</td><td>The shared, slowly-changing datasets (codelists, boundary
       definitions) referenced by exchanged models.</td></tr>
   <tr><td>Datatype map</td><td>A properties file mapping profile property URIs to their expected
@@ -2017,7 +2017,7 @@ analysis.</p>
 <summary><span class="kind">Tool</span> QoCDC 3.2.1 xml to Excel</summary>
 <div class="fn-body">
 <h4>Business logic</h4>
-<p>Converts the Quality of CGMES Data Checks rule catalogue from its XML form into a spreadsheet.
+<p>Converts the QoCDC from its XML form into a spreadsheet.
 The XML is the authoritative machine-readable definition, but the rules have to be read, reviewed
 and cross-referenced against implemented constraints by people &mdash; which is a spreadsheet job.
 Each rule's name, severity, level, description and message are extracted.</p>
