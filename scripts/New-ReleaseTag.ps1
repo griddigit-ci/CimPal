@@ -1,8 +1,10 @@
 <#
 .SYNOPSIS
-    Bumps all pom.xml versions to a date-based release version (YYYY.MM.DD.N,
-    auto-incrementing N if a release for today already exists), commits the
-    bump, then creates and pushes the matching tag.
+    Bumps all pom.xml versions, plus the hardcoded "Version:" strings shown in
+    the GUI (main window footer and About dialog, including its release date),
+    to a date-based release version (YYYY.MM.DD.N, auto-incrementing N if a
+    release for today already exists), commits the bump, then creates and
+    pushes the matching tag.
 
 .EXAMPLE
     ./scripts/New-ReleaseTag.ps1
@@ -33,6 +35,12 @@ $pomFiles = @(
     (Join-Path $repoRoot "CimPal-CLI\pom.xml")
 )
 
+# GUI files with a hardcoded "Version: ..." string that isn't wired to the pom
+# version at build time (main window footer, About dialog) - kept in sync here.
+$mainGuiFxml = Join-Path $repoRoot "CimPal-Main\src\main\resources\fxml\CimPalGui.fxml"
+$aboutGuiFxml = Join-Path $repoRoot "CimPal-Main\src\main\resources\fxml\aboutGui.fxml"
+$versionFiles = $pomFiles + @($mainGuiFxml, $aboutGuiFxml)
+
 $rootContent = Get-Content $rootPom -Raw
 if ($rootContent -notmatch '<cimpal\.version>([^<]+)</cimpal\.version>') {
     throw "Could not find <cimpal.version> in $rootPom"
@@ -58,7 +66,7 @@ if ($DryRun) {
 }
 
 $escapedOld = [regex]::Escape($oldVersion)
-foreach ($file in $pomFiles) {
+foreach ($file in $versionFiles) {
     $content = Get-Content $file -Raw
     $updated = $content -replace $escapedOld, $newVersion
     if ($updated -eq $content) {
@@ -67,13 +75,21 @@ foreach ($file in $pomFiles) {
     Set-Content -Path $file -Value $updated -NoNewline
 }
 
+$newDate = (Get-Date).ToString("dd-MMM-yyyy", [System.Globalization.CultureInfo]::InvariantCulture)
+$aboutContent = Get-Content $aboutGuiFxml -Raw
+$updatedAbout = $aboutContent -replace 'Date: \d{2}-[A-Za-z]{3}-\d{4}', "Date: $newDate"
+if ($updatedAbout -eq $aboutContent) {
+    throw "Could not find release date pattern in $aboutGuiFxml - aborting before partial update."
+}
+Set-Content -Path $aboutGuiFxml -Value $updatedAbout -NoNewline
+
 Write-Host "Validating reactor after version bump..."
 mvn -q -N validate
 if ($LASTEXITCODE -ne 0) {
     throw "mvn validate failed after version bump - review the pom changes before committing."
 }
 
-git add $pomFiles
+git add $versionFiles
 git commit -m "Bump version to $newVersion"
 git tag -a $newVersion -m "Release $newVersion"
 
