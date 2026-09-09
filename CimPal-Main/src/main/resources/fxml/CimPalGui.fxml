@@ -153,6 +153,6 @@
       </Label>
       <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0" HBox.hgrow="NEVER" />
       <Region HBox.hgrow="ALWAYS" />
-      <Label font="$x3" text="Version: 2026.9.05.1" HBox.hgrow="NEVER" />
+      <Label font="$x3" text="Version: 2026.9.9.1" HBox.hgrow="NEVER" />
    </HBox>
 </VBox>

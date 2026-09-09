@@ -26,7 +26,7 @@
          <Image url="@../graphics/Logo_gridDigIt.png" />
       </ImageView>
       <Separator maxWidth="1.7976931348623157E308" />
-      <Label contentDisplay="TOP" maxWidth="1.7976931348623157E308" text="CimPal&#10;Version: 2026.9.05.1&#10;Date: 05-Sep-2026&#10;&#10;Based on &#10;- Apache Jena (Apache License v2.0), &#10;- TopBraid SHACL API (Apache License v2.0), and &#10;- JAVAFX (GPLv2+CE license)&#10;&#10;CimPal is licensed under  EUPL-1.2-or-later&#10;Copyright 2020, gridDigIt Kft. All rights reserved.&#10;&#10;gridDigIt aims at providing support and further enhancement of the CimPal. &#10;Please address any requests either via the support email or in GitHub." textAlignment="CENTER" wrapText="true">
+      <Label contentDisplay="TOP" maxWidth="1.7976931348623157E308" text="CimPal&#10;Version: 2026.9.9.1&#10;Date: 09-Sep-2026&#10;&#10;Based on &#10;- Apache Jena (Apache License v2.0), &#10;- TopBraid SHACL API (Apache License v2.0), and &#10;- JAVAFX (GPLv2+CE license)&#10;&#10;CimPal is licensed under  EUPL-1.2-or-later&#10;Copyright 2020, gridDigIt Kft. All rights reserved.&#10;&#10;gridDigIt aims at providing support and further enhancement of the CimPal. &#10;Please address any requests either via the support email or in GitHub." textAlignment="CENTER" wrapText="true">
          <font>
             <Font name="System Bold" size="18.0" />
          </font>
