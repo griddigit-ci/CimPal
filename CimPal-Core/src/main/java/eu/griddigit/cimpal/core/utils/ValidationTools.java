@@ -5058,6 +5058,87 @@ public class ValidationTools {
         }
     }
 
+    /**
+     * Re-creates the comparison XLSX from the per-timestamp reports already written to
+     * {@code outputBaseDir} by a previous full run, without re-running validation.
+     *
+     * <p>Reads the most recent {@code timestamped_validation_summary__*.xlsx} found in
+     * {@code outputBaseDir} to discover which per-timestamp reports exist and which country
+     * each one belongs to, then feeds their statistics into a fresh
+     * {@link ValidationExcelWriter.ComparisonExcelWriter} together with whatever historical
+     * data {@code previousComparisonXlsx} carries, and saves the result to {@code outputBaseDir}.
+     *
+     * @param outputBaseDir       folder that holds the per-region subdirectories and the summary
+     * @param previousComparisonXlsx  previous {@code validation_comparison__*.xlsx}, or null
+     * @return path of the newly written {@code validation_comparison__*.xlsx}
+     */
+    public static Path regenerateComparisonXlsx(Path outputBaseDir,
+                                                Path previousComparisonXlsx) throws IOException {
+        // 1. Find the most recent all-countries summary file.
+        Path summaryXlsx;
+        try (Stream<Path> ls = Files.list(outputBaseDir)) {
+            summaryXlsx = ls
+                    .filter(p -> p.getFileName().toString()
+                            .startsWith("timestamped_validation_summary__")
+                            && p.getFileName().toString().endsWith(".xlsx"))
+                    .max(Comparator.comparing(p -> p.getFileName().toString()))
+                    .orElseThrow(() -> new IOException(
+                            "No timestamped_validation_summary__*.xlsx found in " + outputBaseDir));
+        }
+
+        // 2. Read TimestampOverview.
+        List<ValidationExcelWriter.TimestampOverviewRow> overview =
+                ValidationExcelWriter.readTimestampOverview(summaryXlsx);
+
+        if (overview.isEmpty()) {
+            throw new IOException("TimestampOverview sheet is empty in " + summaryXlsx);
+        }
+
+        // 3. Derive a human-readable month label from the first timestamp encountered.
+        String monthLabel = overview.stream()
+                .map(r -> monthYearFromInstant(r.timestamp()))
+                .filter(l -> l != null)
+                .findFirst()
+                .orElse("Current");
+
+        // 4. Feed statistics into the comparison writer.
+        try (ValidationExcelWriter.ComparisonExcelWriter compWriter =
+                     new ValidationExcelWriter.ComparisonExcelWriter(
+                             previousComparisonXlsx, "Previous", "Current")) {
+            compWriter.setCurrentLabel(monthLabel);
+
+            for (ValidationExcelWriter.TimestampOverviewRow row : overview) {
+                String country    = row.country();
+                String timestamp  = row.timestamp();
+                String reportFile = row.reportFileName();
+
+                if (reportFile.isBlank()) {
+                    continue;
+                }
+
+                Path reportPath = outputBaseDir
+                        .resolve(sanitizePathPart(country))
+                        .resolve(reportFile);
+
+                if (!Files.isRegularFile(reportPath)) {
+                    logWarn("regenerateComparison: report not found: " + reportPath);
+                    continue;
+                }
+
+                List<ValidationExcelWriter.StatisticsRow> stats =
+                        ValidationExcelWriter.readStatisticsSheet(reportPath);
+
+                for (ValidationExcelWriter.StatisticsRow stat : stats) {
+                    compWriter.addTimestampDataset(
+                            country, timestamp, stat.label(),
+                            stat.warnings(), stat.infos(), stat.violations());
+                }
+            }
+
+            return compWriter.saveTo(outputBaseDir);
+        }
+    }
+
     // ---- ShapeSource: abstraction over local path or remote URL ----
 
     sealed interface ShapeSource permits LocalShapeSource, RemoteShapeSource {

@@ -114,6 +114,9 @@ public class ValidationByMappingController {
     private Button btnBrowseOutputFolder;
 
     @FXML
+    private Button btnRegenerateComparison;
+
+    @FXML
     private Button btnRunValidationByMapping;
 
     @FXML
@@ -273,10 +276,9 @@ public class ValidationByMappingController {
         boolean timestamped = isTimestampedWorkflow();
         boolean manual = isManualWorkflow();
 
-        // Previous-run comparison CSV: timestamped workflow only, and hidden rather than
-        // disabled - it is the last row, so hiding it costs no layout gap.
+        // Previous-run comparison CSV and Regenerate button: timestamped workflow only.
         setShown(timestamped, rowPreviousComparisonCsvLabel, tfPreviousComparisonCsv,
-                btnBrowsePreviousComparisonCsv);
+                btnBrowsePreviousComparisonCsv, btnRegenerateComparison);
 
         // Manual constraint file selection: manual workflow only.
         setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
@@ -379,11 +381,12 @@ public class ValidationByMappingController {
 
         GUIhelper.installHelpTooltip(
                 helpPreviousComparisonCsv,
-                "Optional CSV holding the previous run's totals, used to build the comparison workbook.\n\n" +
+                "Optional XLSX holding the previous run's totals, used to build the comparison workbook.\n\n" +
                         "Shown only for the timestamped workflow, the only one that produces a comparison.\n\n" +
-                        "Expected header: region,dataset,total  (total = warnings + infos + violations).\n\n" +
-                        "This is the same shape the comparison workbook emits, so each run's output can feed the next.\n\n" +
-                        "If left empty, the comparison is produced with an empty \"previous\" column."
+                        "Supply the validation_comparison__*.xlsx file produced by a previous run.\n\n" +
+                        "All date-time named sheets from that file are carried over into the new comparison workbook, " +
+                        "and the most recent one is used as the comparison baseline (\"Previous\" column in the charts).\n\n" +
+                        "If left empty, no historical data is included and the % distribution chart is produced without a delta chart."
         );
     }
 
@@ -532,9 +535,9 @@ public class ValidationByMappingController {
     private void actionBrowsePreviousComparisonCsv() {
         List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
                 true,
-                "Previous comparison CSV",
-                List.of("*.csv"),
-                "Previous comparison CSV",
+                "Previous comparison XLSX",
+                List.of("*.xlsx"),
+                "Previous comparison XLSX",
                 "tab.validationByMapping.previousComparisonCsv"
         );
 
@@ -544,10 +547,10 @@ public class ValidationByMappingController {
 
         File selectedFile = selected.getFirst();
 
-        if (!selectedFile.getName().toLowerCase().endsWith(".csv")) {
+        if (!selectedFile.getName().toLowerCase().endsWith(".xlsx")) {
             GUIhelper.showWarning(
                     "Invalid comparison file",
-                    "Please select a CSV file (header: region,dataset,total)."
+                    "Please select an XLSX file produced by a previous validation run."
             );
             return;
         }
@@ -556,6 +559,50 @@ public class ValidationByMappingController {
         if (tfPreviousComparisonCsv != null) {
             tfPreviousComparisonCsv.setText(previousComparisonCsvFile.getAbsolutePath());
         }
+    }
+
+    @FXML
+    private void actionRegenerateComparison() {
+        if (outputFolder == null) {
+            GUIhelper.showWarning("Missing output folder",
+                    "Please select the output folder that contains the previous run's reports.");
+            return;
+        }
+
+        Path previousComparisonPath = getPreviousComparisonCsvPath();
+
+        btnRegenerateComparison.setDisable(true);
+        btnRunValidationByMapping.setDisable(true);
+        setProgress(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        File selectedOutputFolder = outputFolder;
+
+        new Thread(() -> {
+            try {
+                Path result = ValidationTools.regenerateComparisonXlsx(
+                        selectedOutputFolder.toPath(),
+                        previousComparisonPath
+                );
+
+                Platform.runLater(() -> {
+                    setProgress(1);
+                    btnRegenerateComparison.setDisable(false);
+                    btnRunValidationByMapping.setDisable(false);
+                    GUIhelper.showInfo("Comparison regenerated",
+                            "Comparison workbook written to:\n" + result);
+                });
+
+            } catch (IOException ex) {
+                LOG.error("Regenerate comparison failed", ex);
+
+                Platform.runLater(() -> {
+                    resetProgress();
+                    btnRegenerateComparison.setDisable(false);
+                    btnRunValidationByMapping.setDisable(false);
+                    GUIhelper.showError("Regeneration failed", ex.getMessage());
+                });
+            }
+        }, "regenerate-comparison-runner").start();
     }
 
     @FXML

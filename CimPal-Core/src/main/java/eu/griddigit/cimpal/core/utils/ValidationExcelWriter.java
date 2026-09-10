@@ -5,11 +5,10 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -569,6 +568,87 @@ public class ValidationExcelWriter implements Closeable {
         style.setBorderBottom(BorderStyle.THIN);
         style.setBorderLeft(BorderStyle.THIN);
         return style;
+    }
+
+    // ============================================================================
+    // Static reader utilities (used by regenerateComparisonXlsx)
+    // ============================================================================
+
+    public record TimestampOverviewRow(String country, String timestamp, String reportFileName) {}
+
+    public record StatisticsRow(String label, int warnings, int infos, int violations) {}
+
+    /**
+     * Reads every data row from the {@code TimestampOverview} sheet in a
+     * {@code timestamped_validation_summary__*.xlsx} file produced by a previous run.
+     */
+    public static List<TimestampOverviewRow> readTimestampOverview(Path summaryXlsx) throws IOException {
+        List<TimestampOverviewRow> rows = new ArrayList<>();
+        try (InputStream is = Files.newInputStream(summaryXlsx);
+             Workbook wb = WorkbookFactory.create(is)) {
+            Sheet sheet = wb.getSheet(TIMESTAMP_OVERVIEW_SHEET_NAME);
+            if (sheet == null) {
+                return rows;
+            }
+            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                String country    = cellStr(row, 0);
+                String timestamp  = cellStr(row, 1);
+                String reportFile = cellStr(row, 2);
+                if (country.isBlank() && timestamp.isBlank()) continue;
+                rows.add(new TimestampOverviewRow(country, timestamp, reportFile));
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * Reads every statistics row from a per-timestamp {@code validation_report_*.xlsx} file.
+     * The label is taken from the Chart-name column (col 10) when non-blank, otherwise from
+     * the Dataset column (col 0). Rows with blank labels are skipped.
+     */
+    public static List<StatisticsRow> readStatisticsSheet(Path reportXlsx) throws IOException {
+        List<StatisticsRow> rows = new ArrayList<>();
+        try (InputStream is = Files.newInputStream(reportXlsx);
+             Workbook wb = WorkbookFactory.create(is)) {
+            Sheet sheet = wb.getSheet(STATISTICS_SHEET_NAME);
+            if (sheet == null) {
+                return rows;
+            }
+            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                String chartName = cellStr(row, 10);
+                String dataset   = cellStr(row, 0);
+                String label = chartName.isBlank() ? dataset : chartName;
+                if (label.isBlank()) continue;
+                int warnings   = (int) Math.round(cellNum(row, 4));
+                int infos      = (int) Math.round(cellNum(row, 5));
+                int violations = (int) Math.round(cellNum(row, 6));
+                rows.add(new StatisticsRow(label, warnings, infos, violations));
+            }
+        }
+        return rows;
+    }
+
+    private static String cellStr(Row row, int col) {
+        Cell cell = row.getCell(col);
+        if (cell == null) return "";
+        if (cell.getCellType() == CellType.STRING) return safe(cell.getStringCellValue());
+        if (cell.getCellType() == CellType.NUMERIC) return String.valueOf(cell.getNumericCellValue());
+        return "";
+    }
+
+    private static double cellNum(Row row, int col) {
+        Cell cell = row.getCell(col);
+        if (cell == null) return 0;
+        if (cell.getCellType() == CellType.NUMERIC) return cell.getNumericCellValue();
+        if (cell.getCellType() == CellType.STRING) {
+            try { return Double.parseDouble(cell.getStringCellValue()); }
+            catch (NumberFormatException ignore) { return 0; }
+        }
+        return 0;
     }
 
     private static void autosize(Sheet sheet, int columnCount) {
@@ -1274,16 +1354,18 @@ public class ValidationExcelWriter implements Closeable {
      *   - a "Charts" sheet holding, for each region, the comparison table
      *     (Chart dataset | previous total | current total | delta) plus a Delta bar chart.
      *
-     * The previous run's totals are read from a CSV (the new CSV input) with the header:
-     *
-     *     region,dataset,total
-     *
-     * where {@code total = warnings + infos + violations}. The current run emits exactly this
-     * shape into each region sheet, so today's output can feed tomorrow's comparison.
+     * The previous run's totals are read from the previous comparison XLSX produced by an
+     * earlier run. Each region sheet (sheet name = region) provides the dataset and total
+     * columns (Dataset = col 1, Total = col 5). The Charts sheet is skipped.
      */
     public static final class ComparisonExcelWriter implements Closeable {
 
         private static final String CHARTS_SHEET_NAME = "Charts";
+        private static final Pattern DATE_TIME_SHEET_PATTERN = Pattern.compile("\\d{8}_\\d{6}");
+
+        private static final byte[] COLOR_WARNINGS   = new byte[]{(byte) 0x44, (byte) 0x72, (byte) 0xC4};
+        private static final byte[] COLOR_INFOS      = new byte[]{(byte) 0xED, (byte) 0x7D, (byte) 0x31};
+        private static final byte[] COLOR_VIOLATIONS = new byte[]{(byte) 0x70, (byte) 0xAD, (byte) 0x47};
 
         private static final byte[][] DELTA_PALETTE = new byte[][]{
                 {(byte) 0x44, (byte) 0x72, (byte) 0xC4},
@@ -1295,33 +1377,27 @@ public class ValidationExcelWriter implements Closeable {
                 {(byte) 0x26, (byte) 0x44, (byte) 0x78},
         };
 
-        private final Workbook wb = new XSSFWorkbook();
-        private final CellStyle headerStyle;
-
         private final String previousLabel;
         private String currentLabel;
 
-        // region -> dataset -> total (from previous run CSV)
+        // region -> dataset -> total (W+I+V) from the most recent previous run sheet
         private final Map<String, Map<String, Integer>> previousTotals = new LinkedHashMap<>();
-        // region -> per-timestamp raw records (current run)
+        // date-time label -> recs for every previous run sheet carried over from the previous XLSX
+        private final LinkedHashMap<String, List<Rec>> historicalSheets = new LinkedHashMap<>();
+        // region -> recs for the current run
         private final Map<String, List<Rec>> currentRaw = new LinkedHashMap<>();
-        // region -> dataset -> aggregated total (current run)
+        // region -> dataset -> aggregated total for the current run
         private final Map<String, Map<String, Integer>> currentTotals = new LinkedHashMap<>();
 
-        public ComparisonExcelWriter(Path previousCsv, String previousLabel, String currentLabel) throws IOException {
+        public ComparisonExcelWriter(Path previousXlsx, String previousLabel, String currentLabel)
+                throws IOException {
             this.previousLabel = blankTo(previousLabel, "Previous");
-            this.currentLabel = blankTo(currentLabel, "Current");
-            this.headerStyle = createHeaderStyle(wb);
-            if (previousCsv != null && Files.isRegularFile(previousCsv)) {
-                loadPreviousCsv(previousCsv);
+            this.currentLabel  = blankTo(currentLabel,  "Current");
+            if (previousXlsx != null && Files.isRegularFile(previousXlsx)) {
+                loadPreviousData(previousXlsx);
             }
         }
 
-        /**
-         * Overrides the label used for the "current" column and the delta chart title.
-         * Call this once the analysis name has been derived from the data (mid-process).
-         * Ignored if blank.
-         */
         public void setCurrentLabel(String label) {
             if (label != null && !label.isBlank()) {
                 this.currentLabel = label;
@@ -1336,11 +1412,11 @@ public class ValidationExcelWriter implements Closeable {
                                         int infos,
                                         int violations) {
             String reg = blankTo(region, "UNKNOWN");
-            String ds = blankTo(dataset, "UNKNOWN");
-            int total = warnings + infos + violations;
+            String ds  = blankTo(dataset, "UNKNOWN");
+            int total  = warnings + infos + violations;
 
             currentRaw.computeIfAbsent(reg, k -> new ArrayList<>())
-                    .add(new Rec(safe(timestamp), ds, warnings, infos, violations));
+                    .add(new Rec(reg, safe(timestamp), ds, warnings, infos, violations));
 
             currentTotals.computeIfAbsent(reg, k -> new LinkedHashMap<>())
                     .merge(ds, total, Integer::sum);
@@ -1349,60 +1425,81 @@ public class ValidationExcelWriter implements Closeable {
         public Path saveTo(Path outputBaseDir) throws IOException {
             Files.createDirectories(outputBaseDir);
 
-            // Region order = current regions first, then any previous-only region.
-            LinkedHashSet<String> regions = new LinkedHashSet<>(currentRaw.keySet());
-            regions.addAll(previousTotals.keySet());
+            String currentTs = LocalDateTime.now()
+                    .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            Path out = outputBaseDir.resolve("validation_comparison__" + currentTs + ".xlsx");
 
-            for (String region : regions) {
-                writeRegionSheet(region);
-            }
+            try (XSSFWorkbook wb = new XSSFWorkbook()) {
+                CellStyle hStyle = createHeaderStyle(wb);
 
-            writeChartsSheet(regions);
+                // Write historical run sheets first (oldest → newest).
+                for (Map.Entry<String, List<Rec>> entry : historicalSheets.entrySet()) {
+                    writeRunSheet(wb, hStyle, entry.getKey(), entry.getValue());
+                }
 
-            if (wb.getNumberOfSheets() == 0) {
-                wb.createSheet("Comparison");
-            }
+                // Write the current run as a single date-time named sheet.
+                List<Rec> currentRecs = currentRaw.values().stream()
+                        .flatMap(List::stream)
+                        .toList();
+                writeRunSheet(wb, hStyle, currentTs, currentRecs);
 
-            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            Path out = outputBaseDir.resolve("validation_comparison__" + ts + ".xlsx");
-            try (OutputStream os = Files.newOutputStream(out)) {
-                wb.write(os);
+                // Build region list for charts (current first, then previous-only regions).
+                LinkedHashSet<String> regions = new LinkedHashSet<>(currentRaw.keySet());
+                regions.addAll(previousTotals.keySet());
+
+                writeChartsSheet(wb, hStyle, regions, currentTs);
+
+                if (wb.getNumberOfSheets() == 0) {
+                    wb.createSheet("Comparison");
+                }
+
+                try (OutputStream os = Files.newOutputStream(out)) {
+                    wb.write(os);
+                }
             }
             return out;
         }
 
         @Override
         public void close() throws IOException {
-            wb.close();
+            // Workbook is created and closed inside saveTo(); nothing to release here.
         }
 
-        // ---------------- region (per-timestamp) sheets ----------------
+        // ---- single run sheet (date-time named, one row per region/timestamp/dataset) ----
 
-        private void writeRegionSheet(String region) {
-            Sheet sheet = wb.createSheet(sanitizeSheetName(region));
+        private static void writeRunSheet(XSSFWorkbook wb,
+                                          CellStyle hStyle,
+                                          String dateTimeLabel,
+                                          List<Rec> recs) {
+            Sheet sheet = wb.createSheet(sanitizeSheetName(dateTimeLabel));
 
-            String[] header = {"Timestamp", "Dataset", "Warnings", "Infos", "Violations", "Total"};
+            String[] header = {"Region", "Timestamp", "Dataset",
+                               "Warnings", "Infos", "Violations", "Total"};
             Row hdr = sheet.createRow(0);
             for (int c = 0; c < header.length; c++) {
                 Cell cell = hdr.createCell(c);
                 cell.setCellValue(header[c]);
-                cell.setCellStyle(headerStyle);
+                cell.setCellStyle(hStyle);
             }
             sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, header.length - 1));
             sheet.createFreezePane(0, 1);
 
-            List<Rec> recs = new ArrayList<>(currentRaw.getOrDefault(region, List.of()));
-            recs.sort(Comparator.comparing((Rec r) -> r.timestamp).thenComparing(r -> r.dataset));
+            List<Rec> sorted = recs.stream()
+                    .sorted(Comparator.comparing((Rec r) -> r.region)
+                            .thenComparing(r -> r.timestamp)
+                            .thenComparing(r -> r.dataset))
+                    .toList();
 
             int r = 1;
-            for (Rec rec : recs) {
+            for (Rec rec : sorted) {
                 Row row = sheet.createRow(r++);
-                row.createCell(0).setCellValue(rec.timestamp);
-                row.createCell(1).setCellValue(rec.dataset);
-                row.createCell(2).setCellValue(rec.warnings);
-                row.createCell(3).setCellValue(rec.infos);
-                row.createCell(4).setCellValue(rec.violations);
-                row.createCell(5).setCellValue(rec.total());
+                row.createCell(0).setCellValue(rec.region);
+                row.createCell(1).setCellValue(rec.timestamp);
+                row.createCell(2).setCellValue(rec.dataset);
+                row.createCell(3).setCellValue(rec.warnings);
+                row.createCell(4).setCellValue(rec.infos);
+                row.createCell(5).setCellValue(rec.violations);
+                row.createCell(6).setCellValue(rec.total());
             }
 
             for (int c = 0; c < header.length; c++) {
@@ -1413,103 +1510,203 @@ public class ValidationExcelWriter implements Closeable {
             }
         }
 
-        // ---------------- charts sheet (prev vs current + delta) ----------------
+        // ---- charts sheet: per region distribution + delta, then compliance rate ----
 
-        private void writeChartsSheet(Collection<String> regions) {
+        private void writeChartsSheet(XSSFWorkbook wb,
+                                      CellStyle hStyle,
+                                      Collection<String> regions,
+                                      String currentTs) {
             XSSFSheet sheet = (XSSFSheet) wb.createSheet(CHARTS_SHEET_NAME);
 
+            // Pre-compute compliance rates for every run (historical + current).
+            LinkedHashMap<String, Map<String, Double>> allRunCompliance = new LinkedHashMap<>();
+            for (Map.Entry<String, List<Rec>> entry : historicalSheets.entrySet()) {
+                allRunCompliance.put(entry.getKey(), computeComplianceRates(entry.getValue()));
+            }
+            List<Rec> currentAll = currentRaw.values().stream().flatMap(List::stream).toList();
+            if (!currentAll.isEmpty()) {
+                allRunCompliance.put(currentTs, computeComplianceRates(currentAll));
+            }
+
             int blockTop = 0;
-            int regionIndex = 0;
+            boolean anyData = false;
 
             for (String region : regions) {
-                // union of datasets seen in current and previous runs for this region
-                LinkedHashSet<String> datasets = new LinkedHashSet<>(
-                        currentTotals.getOrDefault(region, Map.of()).keySet());
-                datasets.addAll(previousTotals.getOrDefault(region, Map.of()).keySet());
+                // Aggregate current run metrics per dataset.
+                Map<String, int[]> curMetrics = new LinkedHashMap<>();
+                for (Rec rec : currentRaw.getOrDefault(region, List.of())) {
+                    curMetrics.merge(rec.dataset,
+                            new int[]{rec.warnings, rec.infos, rec.violations},
+                            (a, b) -> new int[]{a[0] + b[0], a[1] + b[1], a[2] + b[2]});
+                }
 
-                if (datasets.isEmpty()) {
+                Map<String, Integer> prevByDs = previousTotals.getOrDefault(region, Map.of());
+
+                LinkedHashSet<String> dsSet = new LinkedHashSet<>(curMetrics.keySet());
+                dsSet.addAll(prevByDs.keySet());
+                if (dsSet.isEmpty()) {
                     continue;
                 }
 
-                List<String> sorted = new ArrayList<>(datasets);
+                List<String> sorted = new ArrayList<>(dsSet);
                 sorted.sort(Comparator.naturalOrder());
 
-                // title row
+                anyData = true;
+                boolean hasPrev = !prevByDs.isEmpty();
+
+                // Combined totals for the % calculation (current and previous runs).
+                long combinedCur  = curMetrics.values().stream()
+                        .mapToLong(m -> m[0] + m[1] + m[2]).sum();
+                long combinedPrev = prevByDs.values().stream()
+                        .mapToLong(Integer::longValue).sum();
+
+                // Title row.
                 Row titleRow = sheet.createRow(blockTop);
                 Cell titleCell = titleRow.createCell(0);
                 titleCell.setCellValue(region);
-                titleCell.setCellStyle(headerStyle);
+                titleCell.setCellStyle(hStyle);
 
-                // header row
+                // Header row.
+                // Col 0: Dataset
+                // Col 1: <current> total    Col 2: <current> %
+                // Col 3: <previous> total   Col 4: <previous> %   (conditional on hasPrev)
+                // Col 5: Delta%             (conditional on hasPrev)
                 int headerRow = blockTop + 1;
-                Row hdr = sheet.createRow(headerRow);
-                String[] cols = {
-                        "Chart dataset",
-                        previousLabel + " total",
-                        currentLabel + " total",
-                        "Delta " + currentLabel + "-" + previousLabel
-                };
-                for (int c = 0; c < cols.length; c++) {
-                    Cell cell = hdr.createCell(c);
-                    cell.setCellValue(cols[c]);
-                    cell.setCellStyle(headerStyle);
+                Row hdrRow = sheet.createRow(headerRow);
+                setCellHdr(hdrRow, hStyle, 0, "Dataset");
+                setCellHdr(hdrRow, hStyle, 1, currentLabel + " total");
+                setCellHdr(hdrRow, hStyle, 2, currentLabel + " %");
+                if (hasPrev) {
+                    setCellHdr(hdrRow, hStyle, 3, previousLabel + " total");
+                    setCellHdr(hdrRow, hStyle, 4, previousLabel + " %");
+                    setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)");
                 }
 
                 int firstDataRow = headerRow + 1;
                 int r = firstDataRow;
 
                 for (String ds : sorted) {
-                    int prev = previousTotals.getOrDefault(region, Map.of()).getOrDefault(ds, 0);
-                    int cur = currentTotals.getOrDefault(region, Map.of()).getOrDefault(ds, 0);
+                    int[] m   = curMetrics.getOrDefault(ds, new int[]{0, 0, 0});
+                    int cur   = m[0] + m[1] + m[2];
+                    int prev  = prevByDs.getOrDefault(ds, 0);
+                    double curPct  = combinedCur  > 0 ? cur  * 100.0 / combinedCur  : 0.0;
+                    double prevPct = combinedPrev > 0 ? prev * 100.0 / combinedPrev : 0.0;
                     int delta = cur - prev;
 
                     Row row = sheet.createRow(r++);
                     row.createCell(0).setCellValue(ds);
-                    row.createCell(1).setCellValue(prev);
-                    row.createCell(2).setCellValue(cur);
-                    row.createCell(3).setCellValue(delta);
+                    row.createCell(1).setCellValue(cur);
+                    row.createCell(2).setCellValue(curPct);
+                    if (hasPrev) {
+                        row.createCell(3).setCellValue(prev);
+                        row.createCell(4).setCellValue(prevPct);
+                        row.createCell(5).setCellValue(delta);
+                    }
                 }
 
                 int lastDataRow = r - 1;
+                int chartBot = Math.max(blockTop + 22, lastDataRow + 4);
 
-                // Delta chart to the right of the table.
-                int chartTopRow = blockTop;
-                createDeltaChart(
-                        sheet,
-                        region + " - Delta " + currentLabel + " vs " + previousLabel,
-                        firstDataRow,
-                        lastDataRow,
-                        6, chartTopRow, 22, chartTopRow + 22
-                );
+                // Chart A: % share of combined hits per dataset (current vs previous).
+                createDistributionChart(sheet,
+                        region + " – % of total hits",
+                        firstDataRow, lastDataRow, hasPrev,
+                        7, blockTop, 20, chartBot);
 
-                int rows = sorted.size();
-                int stride = Math.max(rows + 4, 24);
-                blockTop += stride;
-                regionIndex++;
+                // Chart B: absolute delta per dataset vs. most recent previous run.
+                if (hasPrev) {
+                    createDeltaPctChart(sheet,
+                            region + " – Delta " + currentLabel + " vs " + previousLabel,
+                            firstDataRow, lastDataRow,
+                            21, blockTop, 34, chartBot);
+                }
+
+                blockTop = chartBot + 2;
             }
 
-            for (int c = 0; c <= 3; c++) {
+            // Compliance rate section (one line per region over all runs).
+            if (!allRunCompliance.isEmpty()) {
+                LinkedHashSet<String> compRegions = new LinkedHashSet<>();
+                for (Map<String, Double> m : allRunCompliance.values()) compRegions.addAll(m.keySet());
+                List<String> sortedCompRegions = new ArrayList<>(compRegions);
+                sortedCompRegions.sort(Comparator.naturalOrder());
+                if (!sortedCompRegions.isEmpty()) {
+                    writeComplianceSection(sheet, hStyle, blockTop, allRunCompliance, sortedCompRegions);
+                    anyData = true;
+                }
+            }
+
+            for (int c = 0; c <= 5; c++) {
                 try {
                     sheet.autoSizeColumn(c);
                 } catch (Exception ignore) {
                 }
             }
 
-            if (regionIndex == 0) {
-                Row row = sheet.createRow(0);
-                row.createCell(0).setCellValue("No comparison data available.");
+            if (!anyData) {
+                sheet.createRow(0).createCell(0).setCellValue("No comparison data available.");
             }
         }
 
-        private void createDeltaChart(XSSFSheet sheet,
-                                      String title,
-                                      int firstDataRow,
-                                      int lastDataRow,
-                                      int anchorCol1,
-                                      int anchorRow1,
-                                      int anchorCol2,
-                                      int anchorRow2) {
+        private static void setCellHdr(Row row, CellStyle hStyle, int col, String value) {
+            Cell cell = row.createCell(col);
+            cell.setCellValue(value);
+            cell.setCellStyle(hStyle);
+        }
 
+        private void createDistributionChart(XSSFSheet sheet,
+                                              String title,
+                                              int firstDataRow,
+                                              int lastDataRow,
+                                              boolean hasPrev,
+                                              int anchorCol1,
+                                              int anchorRow1,
+                                              int anchorCol2,
+                                              int anchorRow2) {
+            XSSFDrawing drawing = sheet.createDrawingPatriarch();
+            XSSFClientAnchor anchor = drawing.createAnchor(
+                    0, 0, 0, 0, anchorCol1, anchorRow1, anchorCol2, anchorRow2);
+
+            XSSFChart chart = drawing.createChart(anchor);
+            chart.setTitleText(title);
+            chart.setTitleOverlay(false);
+            chart.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
+
+            XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+            bottomAxis.setTitle("Profile");
+            XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
+            leftAxis.setTitle("% of total hits (all profiles = 100%)");
+            leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+            leftAxis.setNumberFormat("0.00");
+
+            // Single series: current run % of combined total (col 2).
+            XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
+                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
+            XDDFNumericalDataSource<Double> curShares = XDDFDataSourcesFactory.fromNumericCellRange(
+                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, 2, 2));
+
+            XDDFBarChartData data = (XDDFBarChartData) chart.createData(
+                    ChartTypes.BAR, bottomAxis, leftAxis);
+            data.setBarDirection(BarDirection.COL);
+            data.setVaryColors(true);
+
+            XDDFBarChartData.Series curSeries = (XDDFBarChartData.Series) data.addSeries(categories, curShares);
+            curSeries.setTitle(currentLabel + " % share", null);
+
+            chart.plot(data);
+            addValueDataLabels(chart);
+            setDataLabelNumberFormat(chart, "0.00");
+            colorEachBar(chart, lastDataRow - firstDataRow + 1);
+        }
+
+        private void createDeltaPctChart(XSSFSheet sheet,
+                                         String title,
+                                         int firstDataRow,
+                                         int lastDataRow,
+                                         int anchorCol1,
+                                         int anchorRow1,
+                                         int anchorCol2,
+                                         int anchorRow2) {
             XSSFDrawing drawing = sheet.createDrawingPatriarch();
             XSSFClientAnchor anchor = drawing.createAnchor(
                     0, 0, 0, 0, anchorCol1, anchorRow1, anchorCol2, anchorRow2);
@@ -1521,31 +1718,301 @@ public class ValidationExcelWriter implements Closeable {
 
             XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
             bottomAxis.setTitle("Dataset");
-
             XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
-            leftAxis.setTitle("Delta in the number of triggered constraints");
+            leftAxis.setTitle("Violation count difference (current − previous)");
             leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
 
+            // Categories at col 0, delta at col 5 (table layout: 0=Dataset, 2=Cur%, 4=Prev%, 5=Delta).
             XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
                     sheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
-
             XDDFNumericalDataSource<Double> deltas = XDDFDataSourcesFactory.fromNumericCellRange(
-                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, 3, 3));
+                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, 5, 5));
 
-            XDDFBarChartData data = (XDDFBarChartData) chart.createData(ChartTypes.BAR, bottomAxis, leftAxis);
+            XDDFBarChartData data = (XDDFBarChartData) chart.createData(
+                    ChartTypes.BAR, bottomAxis, leftAxis);
             data.setBarDirection(BarDirection.COL);
             data.setVaryColors(true);
 
             XDDFBarChartData.Series series = (XDDFBarChartData.Series) data.addSeries(categories, deltas);
-            series.setTitle("Delta " + currentLabel + "-" + previousLabel, null);
+            series.setTitle("Delta " + currentLabel + " − " + previousLabel, null);
 
             chart.plot(data);
-
             addValueDataLabels(chart);
             colorEachBar(chart, lastDataRow - firstDataRow + 1);
         }
 
-        // ---------------- POI low-level helpers ----------------
+        // ---- compliance rate section (line chart, one line per region over all runs) ----
+
+        private static void writeComplianceSection(XSSFSheet sheet,
+                                                   CellStyle hStyle,
+                                                   int blockTop,
+                                                   LinkedHashMap<String, Map<String, Double>> allRunCompliance,
+                                                   List<String> sortedRegions) {
+            // Title.
+            Row titleRow = sheet.createRow(blockTop);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("Compliance Rate by Region");
+            titleCell.setCellStyle(hStyle);
+
+            // Header row: Run | R1 | R2 | R3 ...
+            int headerRow = blockTop + 1;
+            Row hdr = sheet.createRow(headerRow);
+            Cell runHdr = hdr.createCell(0); runHdr.setCellValue("Run"); runHdr.setCellStyle(hStyle);
+            for (int c = 0; c < sortedRegions.size(); c++) {
+                Cell cell = hdr.createCell(1 + c);
+                cell.setCellValue(sortedRegions.get(c));
+                cell.setCellStyle(hStyle);
+            }
+
+            int firstDataRow = headerRow + 1;
+            int r = firstDataRow;
+
+            for (Map.Entry<String, Map<String, Double>> entry : allRunCompliance.entrySet()) {
+                Row row = sheet.createRow(r++);
+                row.createCell(0).setCellValue(entry.getKey());
+                for (int c = 0; c < sortedRegions.size(); c++) {
+                    double rate = entry.getValue().getOrDefault(sortedRegions.get(c), 0.0);
+                    row.createCell(1 + c).setCellValue(rate);
+                }
+            }
+
+            int lastDataRow = r - 1;
+            int numRuns = allRunCompliance.size();
+            int chartBot = blockTop + Math.max(25, numRuns + 6);
+            int chartStartCol = sortedRegions.size() + 2;
+
+            createComplianceLineChart(sheet,
+                    "Compliance Rate by Region (%)",
+                    firstDataRow, lastDataRow,
+                    sortedRegions,
+                    chartStartCol, blockTop, chartStartCol + 16, chartBot);
+        }
+
+        private static void createComplianceLineChart(XSSFSheet sheet,
+                                                      String title,
+                                                      int firstDataRow,
+                                                      int lastDataRow,
+                                                      List<String> regionNames,
+                                                      int anchorCol1,
+                                                      int anchorRow1,
+                                                      int anchorCol2,
+                                                      int anchorRow2) {
+            XSSFDrawing drawing = sheet.createDrawingPatriarch();
+            XSSFClientAnchor anchor = drawing.createAnchor(
+                    0, 0, 0, 0, anchorCol1, anchorRow1, anchorCol2, anchorRow2);
+
+            XSSFChart chart = drawing.createChart(anchor);
+            chart.setTitleText(title);
+            chart.setTitleOverlay(false);
+            chart.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
+
+            XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+            bottomAxis.setTitle("Run");
+            XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
+            leftAxis.setTitle("Compliance rate (%)");
+            leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+            leftAxis.setNumberFormat("0.0\"%\"");
+
+            XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
+                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
+
+            XDDFLineChartData data = (XDDFLineChartData) chart.createData(
+                    ChartTypes.LINE, bottomAxis, leftAxis);
+
+            byte[][] lineColors = {
+                    COLOR_WARNINGS, COLOR_VIOLATIONS, COLOR_INFOS,
+                    DELTA_PALETTE[3], DELTA_PALETTE[4], DELTA_PALETTE[5], DELTA_PALETTE[6]
+            };
+
+            for (int i = 0; i < regionNames.size(); i++) {
+                XDDFNumericalDataSource<Double> values = XDDFDataSourcesFactory.fromNumericCellRange(
+                        sheet, new CellRangeAddress(firstDataRow, lastDataRow, 1 + i, 1 + i));
+
+                XDDFLineChartData.Series series =
+                        (XDDFLineChartData.Series) data.addSeries(categories, values);
+                series.setTitle(regionNames.get(i), null);
+                series.setSmooth(false);
+                series.setMarkerStyle(MarkerStyle.CIRCLE);
+
+                // Set line colour via shape properties.
+                byte[] rgb = lineColors[i % lineColors.length];
+                XDDFSolidFillProperties fill = new XDDFSolidFillProperties(XDDFColor.from(rgb));
+                XDDFShapeProperties sp = series.getShapeProperties();
+                if (sp == null) sp = new XDDFShapeProperties();
+                sp.setFillProperties(fill);
+                series.setShapeProperties(sp);
+            }
+
+            chart.plot(data);
+        }
+
+        // ---- compliance rate helper ----
+
+        private static Map<String, Double> computeComplianceRates(List<Rec> recs) {
+            // region -> dataset -> total violations (SHACL Violation severity)
+            Map<String, Map<String, Integer>> regionDatasetViol = new LinkedHashMap<>();
+            for (Rec rec : recs) {
+                regionDatasetViol.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
+                        .merge(rec.dataset, rec.violations, Integer::sum);
+            }
+            Map<String, Double> compliance = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, Integer>> entry : regionDatasetViol.entrySet()) {
+                long good  = entry.getValue().values().stream().filter(v -> v == 0).count();
+                long total = entry.getValue().size();
+                compliance.put(entry.getKey(), total > 0 ? good * 100.0 / total : 0.0);
+            }
+            return compliance;
+        }
+
+        // ---- loading previous run data ----
+
+        private void loadPreviousData(Path xlsx) throws IOException {
+            try (InputStream is = Files.newInputStream(xlsx);
+                 Workbook prevWb = WorkbookFactory.create(is)) {
+
+                List<String> dateTimeNames = new ArrayList<>();
+                List<String> legacyNames   = new ArrayList<>();
+
+                for (int i = 0; i < prevWb.getNumberOfSheets(); i++) {
+                    String name = prevWb.getSheetAt(i).getSheetName();
+                    if (CHARTS_SHEET_NAME.equalsIgnoreCase(name)) {
+                        continue;
+                    }
+                    if (DATE_TIME_SHEET_PATTERN.matcher(name).matches()) {
+                        dateTimeNames.add(name);
+                    } else {
+                        legacyNames.add(name);
+                    }
+                }
+
+                if (!dateTimeNames.isEmpty()) {
+                    // New format: sheets named by date-time, cols: Region=0, Timestamp=1,
+                    // Dataset=2, Warnings=3, Infos=4, Violations=5, Total=6.
+                    dateTimeNames.sort(Comparator.naturalOrder());
+                    for (String name : dateTimeNames) {
+                        historicalSheets.put(name, readRunSheet(prevWb.getSheet(name)));
+                    }
+                    // Most recent date-time sheet provides the comparison baseline.
+                    String mostRecent = dateTimeNames.get(dateTimeNames.size() - 1);
+                    for (Rec rec : historicalSheets.get(mostRecent)) {
+                        previousTotals.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
+                                .merge(rec.dataset, rec.total(), Integer::sum);
+                    }
+
+                } else if (!legacyNames.isEmpty()) {
+                    // Legacy format: sheet name = region, cols: Timestamp=0, Dataset=1,
+                    // Warnings=2, Infos=3, Violations=4, Total=5 (no Region column).
+                    String syntheticName = deriveLegacySheetName(xlsx);
+                    List<Rec> recs = new ArrayList<>();
+                    for (String regionName : legacyNames) {
+                        Sheet sheet = prevWb.getSheet(regionName);
+                        for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+                            Row row = sheet.getRow(r);
+                            if (row == null) {
+                                continue;
+                            }
+                            String timestamp = getCellStr(row, 0);
+                            String dataset   = getCellStr(row, 1);
+                            if (dataset.isBlank()) {
+                                continue;
+                            }
+                            int warnings   = (int) Math.round(getCellNum(row, 2));
+                            int infos      = (int) Math.round(getCellNum(row, 3));
+                            int violations = (int) Math.round(getCellNum(row, 4));
+                            recs.add(new Rec(regionName, timestamp, dataset,
+                                    warnings, infos, violations));
+                            previousTotals.computeIfAbsent(regionName, k -> new LinkedHashMap<>())
+                                    .merge(dataset, warnings + infos + violations, Integer::sum);
+                        }
+                    }
+                    if (!recs.isEmpty()) {
+                        historicalSheets.put(syntheticName, recs);
+                    }
+                }
+            }
+        }
+
+        private static List<Rec> readRunSheet(Sheet sheet) {
+            List<Rec> recs = new ArrayList<>();
+            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) {
+                    continue;
+                }
+                String region    = getCellStr(row, 0);
+                String timestamp = getCellStr(row, 1);
+                String dataset   = getCellStr(row, 2);
+                if (dataset.isBlank()) {
+                    continue;
+                }
+                int warnings   = (int) Math.round(getCellNum(row, 3));
+                int infos      = (int) Math.round(getCellNum(row, 4));
+                int violations = (int) Math.round(getCellNum(row, 5));
+                recs.add(new Rec(region, timestamp, dataset, warnings, infos, violations));
+            }
+            return recs;
+        }
+
+        private static String deriveLegacySheetName(Path xlsx) {
+            String fileName = xlsx.getFileName().toString();
+            Matcher m = DATE_TIME_SHEET_PATTERN.matcher(fileName);
+            return m.find() ? m.group() : "legacy_run";
+        }
+
+        // ---- POI low-level helpers ----
+
+        private static String getCellStr(Row row, int col) {
+            Cell cell = row.getCell(col);
+            if (cell == null) {
+                return "";
+            }
+            if (cell.getCellType() == CellType.STRING) {
+                return safe(cell.getStringCellValue());
+            }
+            if (cell.getCellType() == CellType.NUMERIC) {
+                return String.valueOf(cell.getNumericCellValue());
+            }
+            return "";
+        }
+
+        private static double getCellNum(Row row, int col) {
+            Cell cell = row.getCell(col);
+            if (cell == null) {
+                return 0;
+            }
+            if (cell.getCellType() == CellType.NUMERIC) {
+                return cell.getNumericCellValue();
+            }
+            if (cell.getCellType() == CellType.STRING) {
+                try {
+                    return Double.parseDouble(cell.getStringCellValue());
+                } catch (NumberFormatException ignore) {
+                    return 0;
+                }
+            }
+            return 0;
+        }
+
+        private static void setSeriesColor(XDDFChartData.Series series, byte[] rgb) {
+            XDDFSolidFillProperties fill = new XDDFSolidFillProperties(XDDFColor.from(rgb));
+            XDDFShapeProperties properties = series.getShapeProperties();
+            if (properties == null) {
+                properties = new XDDFShapeProperties();
+            }
+            properties.setFillProperties(fill);
+            series.setShapeProperties(properties);
+        }
+
+        private static void setDataLabelNumberFormat(XSSFChart chart, String formatCode) {
+            var plotArea = chart.getCTChart().getPlotArea();
+            if (plotArea.sizeOfBarChartArray() == 0) return;
+            var barChart = plotArea.getBarChartArray(0);
+            if (!barChart.isSetDLbls()) return;
+            var dLbls = barChart.getDLbls();
+            var numFmt = dLbls.isSetNumFmt() ? dLbls.getNumFmt() : dLbls.addNewNumFmt();
+            numFmt.setFormatCode(formatCode);
+            numFmt.setSourceLinked(false);
+        }
 
         private static void addValueDataLabels(XSSFChart chart) {
             var plotArea = chart.getCTChart().getPlotArea();
@@ -1555,19 +2022,32 @@ public class ValidationExcelWriter implements Closeable {
             var barChart = plotArea.getBarChartArray(0);
             org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls dLbls =
                     barChart.isSetDLbls() ? barChart.getDLbls() : barChart.addNewDLbls();
-            setShow(dLbls.isSetShowVal() ? dLbls.getShowVal() : dLbls.addNewShowVal(), true);
-            setShow(dLbls.isSetShowLegendKey() ? dLbls.getShowLegendKey() : dLbls.addNewShowLegendKey(), false);
-            setShow(dLbls.isSetShowCatName() ? dLbls.getShowCatName() : dLbls.addNewShowCatName(), false);
-            setShow(dLbls.isSetShowSerName() ? dLbls.getShowSerName() : dLbls.addNewShowSerName(), false);
-            setShow(dLbls.isSetShowPercent() ? dLbls.getShowPercent() : dLbls.addNewShowPercent(), false);
+            setShow(dLbls.isSetShowVal()        ? dLbls.getShowVal()        : dLbls.addNewShowVal(),        true);
+            setShow(dLbls.isSetShowLegendKey()  ? dLbls.getShowLegendKey()  : dLbls.addNewShowLegendKey(),  false);
+            setShow(dLbls.isSetShowCatName()    ? dLbls.getShowCatName()    : dLbls.addNewShowCatName(),    false);
+            setShow(dLbls.isSetShowSerName()    ? dLbls.getShowSerName()    : dLbls.addNewShowSerName(),    false);
+            setShow(dLbls.isSetShowPercent()    ? dLbls.getShowPercent()    : dLbls.addNewShowPercent(),    false);
             setShow(dLbls.isSetShowBubbleSize() ? dLbls.getShowBubbleSize() : dLbls.addNewShowBubbleSize(), false);
         }
 
-        private static void setShow(org.openxmlformats.schemas.drawingml.x2006.chart.CTBoolean bool, boolean value) {
+        private static void setShow(
+                org.openxmlformats.schemas.drawingml.x2006.chart.CTBoolean bool, boolean value) {
             bool.setVal(value);
         }
 
-        /** Applies per-point colours (dPt) so a single-series bar chart shows multicoloured bars. */
+        private static void setBarOverlap(XSSFChart chart, byte overlapPercent) {
+            var plotArea = chart.getCTChart().getPlotArea();
+            if (plotArea.sizeOfBarChartArray() == 0) {
+                return;
+            }
+            var barChart = plotArea.getBarChartArray(0);
+            if (barChart.isSetOverlap()) {
+                barChart.getOverlap().setVal(overlapPercent);
+            } else {
+                barChart.addNewOverlap().setVal(overlapPercent);
+            }
+        }
+
         private static void colorEachBar(XSSFChart chart, int pointCount) {
             var plotArea = chart.getCTChart().getPlotArea();
             if (plotArea.sizeOfBarChartArray() == 0 || pointCount <= 0) {
@@ -1578,7 +2058,6 @@ public class ValidationExcelWriter implements Closeable {
                 return;
             }
             var ser = barChart.getSerArray(0);
-
             for (int i = 0; i < pointCount; i++) {
                 byte[] rgb = DELTA_PALETTE[i % DELTA_PALETTE.length];
                 var dPt = ser.addNewDPt();
@@ -1586,80 +2065,9 @@ public class ValidationExcelWriter implements Closeable {
                 dPt.addNewInvertIfNegative().setVal(false);
                 dPt.addNewBubble3D().setVal(false);
                 var spPr = dPt.addNewSpPr();
-                var solidFill = spPr.addNewSolidFill();
-                var srgb = solidFill.addNewSrgbClr();
-                srgb.setVal(rgb);
+                spPr.addNewSolidFill().addNewSrgbClr().setVal(rgb);
             }
         }
-
-        // ---------------- previous run CSV ----------------
-
-        private void loadPreviousCsv(Path csv) throws IOException {
-            boolean headerSkipped = false;
-
-            try (BufferedReader br = Files.newBufferedReader(csv, StandardCharsets.UTF_8)) {
-                String line;
-                while ((line = br.readLine()) != null) {
-                    line = line.trim();
-                    if (line.isEmpty() || line.startsWith("#")) {
-                        continue;
-                    }
-
-                    if (!headerSkipped) {
-                        String lower = line.replace("\uFEFF", "").toLowerCase(Locale.ROOT);
-                        if (lower.startsWith("region")) {
-                            headerSkipped = true;
-                            continue;
-                        }
-                        headerSkipped = true;
-                    }
-
-                    List<String> cols = parseCsvLine(line);
-                    if (cols.size() < 3) {
-                        continue;
-                    }
-
-                    String region = blankTo(cols.get(0).replace("\uFEFF", "").trim(), "UNKNOWN");
-                    String dataset = blankTo(cols.get(1).replace("\uFEFF", "").trim(), "UNKNOWN");
-                    int total;
-                    try {
-                        total = (int) Math.round(Double.parseDouble(cols.get(2).trim()));
-                    } catch (NumberFormatException ex) {
-                        continue;
-                    }
-
-                    previousTotals.computeIfAbsent(region, k -> new LinkedHashMap<>())
-                            .merge(dataset, total, Integer::sum);
-                }
-            }
-        }
-
-        private static List<String> parseCsvLine(String line) {
-            List<String> cols = new ArrayList<>();
-            StringBuilder cur = new StringBuilder();
-            boolean inQuotes = false;
-
-            for (int i = 0; i < line.length(); i++) {
-                char c = line.charAt(i);
-                if (c == '"') {
-                    if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
-                        cur.append('"');
-                        i++;
-                    } else {
-                        inQuotes = !inQuotes;
-                    }
-                } else if (c == ',' && !inQuotes) {
-                    cols.add(cur.toString());
-                    cur.setLength(0);
-                } else {
-                    cur.append(c);
-                }
-            }
-            cols.add(cur.toString());
-            return cols;
-        }
-
-        // ---------------- misc ----------------
 
         private static CellStyle createHeaderStyle(Workbook workbook) {
             CellStyle style = workbook.createCellStyle();
@@ -1679,7 +2087,7 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         private static String sanitizeSheetName(String name) {
-            String s = blankTo(name, "Region");
+            String s = blankTo(name, "Run");
             s = s.replaceAll("[\\\\/:*?\\[\\]]", "_");
             if (s.length() > 31) {
                 s = s.substring(0, 31);
@@ -1696,17 +2104,20 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         private static final class Rec {
+            final String region;
             final String timestamp;
             final String dataset;
             final int warnings;
             final int infos;
             final int violations;
 
-            Rec(String timestamp, String dataset, int warnings, int infos, int violations) {
+            Rec(String region, String timestamp, String dataset,
+                int warnings, int infos, int violations) {
+                this.region    = region;
                 this.timestamp = timestamp;
-                this.dataset = dataset;
-                this.warnings = warnings;
-                this.infos = infos;
+                this.dataset   = dataset;
+                this.warnings  = warnings;
+                this.infos     = infos;
                 this.violations = violations;
             }
 

@@ -256,6 +256,13 @@
                     onAction="#actionResetValidationByMapping"
                     text="Reset"/>
 
+            <Button fx:id="btnRegenerateComparison"
+                    minWidth="175.0"
+                    mnemonicParsing="false"
+                    onAction="#actionRegenerateComparison"
+                    text="Regenerate comparison"
+                    visible="false" managed="false"/>
+
             <Button fx:id="btnRunValidationByMapping"
                     minWidth="110.0"
                     styleClass="primary-action"
