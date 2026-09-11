@@ -1437,11 +1437,19 @@ public class ValidationExcelWriter implements Closeable {
                     writeRunSheet(wb, hStyle, entry.getKey(), entry.getValue());
                 }
 
-                // Write the current run as a single date-time named sheet.
+                // Write the current run. Use month label as sheet name (e.g. "July 2026"),
+                // falling back to the creation datetime only if label was never set.
                 List<Rec> currentRecs = currentRaw.values().stream()
                         .flatMap(List::stream)
                         .toList();
-                writeRunSheet(wb, hStyle, currentTs, currentRecs);
+                String sheetLabel = currentLabel.equals("Current") ? currentTs : currentLabel;
+                // Avoid duplicate sheet names if the previous XLSX already has this month.
+                String uniqueLabel = sheetLabel;
+                int dupIdx = 2;
+                while (wb.getSheet(sanitizeSheetName(uniqueLabel)) != null) {
+                    uniqueLabel = sheetLabel + " (" + dupIdx++ + ")";
+                }
+                writeRunSheet(wb, hStyle, uniqueLabel, currentRecs);
 
                 // Build region list for charts (current first, then previous-only regions).
                 LinkedHashSet<String> regions = new LinkedHashSet<>(currentRaw.keySet());
@@ -1518,14 +1526,18 @@ public class ValidationExcelWriter implements Closeable {
                                       String currentTs) {
             XSSFSheet sheet = (XSSFSheet) wb.createSheet(CHARTS_SHEET_NAME);
 
-            // Pre-compute compliance rates for every run (historical + current).
+            // Pre-compute compliance rates (per-region + combined) for every run.
             LinkedHashMap<String, Map<String, Double>> allRunCompliance = new LinkedHashMap<>();
             for (Map.Entry<String, List<Rec>> entry : historicalSheets.entrySet()) {
-                allRunCompliance.put(entry.getKey(), computeComplianceRates(entry.getValue()));
+                Map<String, Double> rates = computeComplianceRates(entry.getValue());
+                rates.put("Combined", computeCombinedComplianceRate(entry.getValue()));
+                allRunCompliance.put(entry.getKey(), rates);
             }
             List<Rec> currentAll = currentRaw.values().stream().flatMap(List::stream).toList();
             if (!currentAll.isEmpty()) {
-                allRunCompliance.put(currentTs, computeComplianceRates(currentAll));
+                Map<String, Double> rates = computeComplianceRates(currentAll);
+                rates.put("Combined", computeCombinedComplianceRate(currentAll));
+                allRunCompliance.put(currentTs, rates);
             }
 
             int blockTop = 0;
@@ -1607,10 +1619,10 @@ public class ValidationExcelWriter implements Closeable {
                 int lastDataRow = r - 1;
                 int chartBot = Math.max(blockTop + 22, lastDataRow + 4);
 
-                // Chart A: % share of combined hits per dataset (current vs previous).
+                // Chart A: % share of combined hits per dataset (current run only).
                 createDistributionChart(sheet,
-                        region + " – % of total hits",
-                        firstDataRow, lastDataRow, hasPrev,
+                        region + " – " + currentLabel + " (% of total hits)",
+                        firstDataRow, lastDataRow, 2, currentLabel,
                         7, blockTop, 20, chartBot);
 
                 // Chart B: absolute delta per dataset vs. most recent previous run.
@@ -1624,12 +1636,19 @@ public class ValidationExcelWriter implements Closeable {
                 blockTop = chartBot + 2;
             }
 
-            // Compliance rate section (one line per region over all runs).
+            // Combined section (all regions aggregated into one set of charts).
+            blockTop = writeCombinedSection(sheet, hStyle, blockTop) + 2;
+
+            // Compliance rate section: per-region lines + Combined line.
             if (!allRunCompliance.isEmpty()) {
                 LinkedHashSet<String> compRegions = new LinkedHashSet<>();
                 for (Map<String, Double> m : allRunCompliance.values()) compRegions.addAll(m.keySet());
-                List<String> sortedCompRegions = new ArrayList<>(compRegions);
-                sortedCompRegions.sort(Comparator.naturalOrder());
+                // Real regions alphabetically, Combined always last.
+                List<String> sortedCompRegions = compRegions.stream()
+                        .filter(r -> !r.equals("Combined"))
+                        .sorted()
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+                if (compRegions.contains("Combined")) sortedCompRegions.add("Combined");
                 if (!sortedCompRegions.isEmpty()) {
                     writeComplianceSection(sheet, hStyle, blockTop, allRunCompliance, sortedCompRegions);
                     anyData = true;
@@ -1654,15 +1673,17 @@ public class ValidationExcelWriter implements Closeable {
             cell.setCellStyle(hStyle);
         }
 
-        private void createDistributionChart(XSSFSheet sheet,
-                                              String title,
-                                              int firstDataRow,
-                                              int lastDataRow,
-                                              boolean hasPrev,
-                                              int anchorCol1,
-                                              int anchorRow1,
-                                              int anchorCol2,
-                                              int anchorRow2) {
+        /** Single-series distribution bar chart. {@code dataCol} is 2 for current, 4 for previous. */
+        private static void createDistributionChart(XSSFSheet sheet,
+                                                    String title,
+                                                    int firstDataRow,
+                                                    int lastDataRow,
+                                                    int dataCol,
+                                                    String seriesLabel,
+                                                    int anchorCol1,
+                                                    int anchorRow1,
+                                                    int anchorCol2,
+                                                    int anchorRow2) {
             XSSFDrawing drawing = sheet.createDrawingPatriarch();
             XSSFClientAnchor anchor = drawing.createAnchor(
                     0, 0, 0, 0, anchorCol1, anchorRow1, anchorCol2, anchorRow2);
@@ -1670,7 +1691,7 @@ public class ValidationExcelWriter implements Closeable {
             XSSFChart chart = drawing.createChart(anchor);
             chart.setTitleText(title);
             chart.setTitleOverlay(false);
-            chart.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
+            // No legend — single series, title is self-explanatory.
 
             XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
             bottomAxis.setTitle("Profile");
@@ -1679,24 +1700,24 @@ public class ValidationExcelWriter implements Closeable {
             leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
             leftAxis.setNumberFormat("0.00");
 
-            // Single series: current run % of combined total (col 2).
             XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
                     sheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
-            XDDFNumericalDataSource<Double> curShares = XDDFDataSourcesFactory.fromNumericCellRange(
-                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, 2, 2));
+            XDDFNumericalDataSource<Double> shares = XDDFDataSourcesFactory.fromNumericCellRange(
+                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, dataCol, dataCol));
 
             XDDFBarChartData data = (XDDFBarChartData) chart.createData(
                     ChartTypes.BAR, bottomAxis, leftAxis);
             data.setBarDirection(BarDirection.COL);
             data.setVaryColors(true);
 
-            XDDFBarChartData.Series curSeries = (XDDFBarChartData.Series) data.addSeries(categories, curShares);
-            curSeries.setTitle(currentLabel + " % share", null);
+            XDDFBarChartData.Series series = (XDDFBarChartData.Series) data.addSeries(categories, shares);
+            series.setTitle(seriesLabel, null);
 
             chart.plot(data);
             addValueDataLabels(chart);
             setDataLabelNumberFormat(chart, "0.00");
             colorEachBar(chart, lastDataRow - firstDataRow + 1);
+            setXAxisLabelPositionLow(chart);
         }
 
         private void createDeltaPctChart(XSSFSheet sheet,
@@ -1714,7 +1735,7 @@ public class ValidationExcelWriter implements Closeable {
             XSSFChart chart = drawing.createChart(anchor);
             chart.setTitleText(title);
             chart.setTitleOverlay(false);
-            chart.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
+            // No legend — single series.
 
             XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
             bottomAxis.setTitle("Dataset");
@@ -1739,6 +1760,108 @@ public class ValidationExcelWriter implements Closeable {
             chart.plot(data);
             addValueDataLabels(chart);
             colorEachBar(chart, lastDataRow - firstDataRow + 1);
+            setXAxisLabelPositionLow(chart);
+        }
+
+        // ---- combined (all-regions) section ----
+
+        private int writeCombinedSection(XSSFSheet sheet, CellStyle hStyle, int blockTop) {
+            // Aggregate current metrics across all regions.
+            Map<String, int[]> combinedCurMetrics = new LinkedHashMap<>();
+            for (Rec rec : currentRaw.values().stream().flatMap(List::stream).toList()) {
+                combinedCurMetrics.merge(rec.dataset,
+                        new int[]{rec.warnings, rec.infos, rec.violations},
+                        (a, b) -> new int[]{a[0] + b[0], a[1] + b[1], a[2] + b[2]});
+            }
+
+            // Aggregate previous totals across all regions.
+            Map<String, Integer> combinedPrevTotals = new LinkedHashMap<>();
+            for (Map<String, Integer> byDs : previousTotals.values()) {
+                byDs.forEach((ds, v) -> combinedPrevTotals.merge(ds, v, Integer::sum));
+            }
+
+            LinkedHashSet<String> dsSet = new LinkedHashSet<>(combinedCurMetrics.keySet());
+            dsSet.addAll(combinedPrevTotals.keySet());
+            if (dsSet.isEmpty()) {
+                return blockTop;
+            }
+
+            List<String> sorted = new ArrayList<>(dsSet);
+            sorted.sort(Comparator.naturalOrder());
+
+            boolean hasPrev = !combinedPrevTotals.isEmpty();
+
+            long combinedCurTotal  = combinedCurMetrics.values().stream()
+                    .mapToLong(m -> m[0] + m[1] + m[2]).sum();
+            long combinedPrevTotal = combinedPrevTotals.values().stream()
+                    .mapToLong(Integer::longValue).sum();
+
+            // Title row.
+            Row titleRow = sheet.createRow(blockTop);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("Combined (all regions)");
+            titleCell.setCellStyle(hStyle);
+
+            // Header: Dataset | Cur total | Cur% | Prev total | Prev% | Delta
+            int headerRow = blockTop + 1;
+            Row hdrRow = sheet.createRow(headerRow);
+            setCellHdr(hdrRow, hStyle, 0, "Dataset");
+            setCellHdr(hdrRow, hStyle, 1, currentLabel + " total");
+            setCellHdr(hdrRow, hStyle, 2, currentLabel + " %");
+            if (hasPrev) {
+                setCellHdr(hdrRow, hStyle, 3, previousLabel + " total");
+                setCellHdr(hdrRow, hStyle, 4, previousLabel + " %");
+                setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)");
+            }
+
+            int firstDataRow = headerRow + 1;
+            int r = firstDataRow;
+
+            for (String ds : sorted) {
+                int[] m   = combinedCurMetrics.getOrDefault(ds, new int[]{0, 0, 0});
+                int cur   = m[0] + m[1] + m[2];
+                int prev  = combinedPrevTotals.getOrDefault(ds, 0);
+                double curPct  = combinedCurTotal  > 0 ? cur  * 100.0 / combinedCurTotal  : 0.0;
+                double prevPct = combinedPrevTotal > 0 ? prev * 100.0 / combinedPrevTotal : 0.0;
+                int delta = cur - prev;
+
+                Row row = sheet.createRow(r++);
+                row.createCell(0).setCellValue(ds);
+                row.createCell(1).setCellValue(cur);
+                row.createCell(2).setCellValue(curPct);
+                if (hasPrev) {
+                    row.createCell(3).setCellValue(prev);
+                    row.createCell(4).setCellValue(prevPct);
+                    row.createCell(5).setCellValue(delta);
+                }
+            }
+
+            int lastDataRow = r - 1;
+            int chartBot = Math.max(blockTop + 22, lastDataRow + 4);
+
+            // Chart 1: current run % distribution.
+            createDistributionChart(sheet,
+                    "Combined – " + currentLabel + " (% of total hits)",
+                    firstDataRow, lastDataRow, 2, currentLabel,
+                    7, blockTop, 18, chartBot);
+
+            // Chart 2: previous run % distribution.
+            if (hasPrev) {
+                createDistributionChart(sheet,
+                        "Combined – " + previousLabel + " (% of total hits)",
+                        firstDataRow, lastDataRow, 4, previousLabel,
+                        19, blockTop, 30, chartBot);
+            }
+
+            // Chart 3: absolute delta (current − previous).
+            if (hasPrev) {
+                createDeltaPctChart(sheet,
+                        "Combined – Delta " + currentLabel + " vs " + previousLabel,
+                        firstDataRow, lastDataRow,
+                        31, blockTop, 42, chartBot);
+            }
+
+            return chartBot;
         }
 
         // ---- compliance rate section (line chart, one line per region over all runs) ----
@@ -1769,7 +1892,7 @@ public class ValidationExcelWriter implements Closeable {
 
             for (Map.Entry<String, Map<String, Double>> entry : allRunCompliance.entrySet()) {
                 Row row = sheet.createRow(r++);
-                row.createCell(0).setCellValue(entry.getKey());
+                row.createCell(0).setCellValue(dateTimeToMonthLabel(entry.getKey()));
                 for (int c = 0; c < sortedRegions.size(); c++) {
                     double rate = entry.getValue().getOrDefault(sortedRegions.get(c), 0.0);
                     row.createCell(1 + c).setCellValue(rate);
@@ -1846,22 +1969,54 @@ public class ValidationExcelWriter implements Closeable {
             chart.plot(data);
         }
 
-        // ---- compliance rate helper ----
+        // ---- x-axis label position helper ----
+
+        private static void setXAxisLabelPositionLow(XSSFChart chart) {
+            var plotArea = chart.getCTChart().getPlotArea();
+            for (int i = 0; i < plotArea.sizeOfCatAxArray(); i++) {
+                var catAx = plotArea.getCatAxArray(i);
+                var tlp = catAx.isSetTickLblPos() ? catAx.getTickLblPos() : catAx.addNewTickLblPos();
+                tlp.setVal(org.openxmlformats.schemas.drawingml.x2006.chart.STTickLblPos.LOW);
+            }
+        }
+
+        // ---- compliance rate helpers ----
 
         private static Map<String, Double> computeComplianceRates(List<Rec> recs) {
-            // region -> dataset -> total violations (SHACL Violation severity)
-            Map<String, Map<String, Integer>> regionDatasetViol = new LinkedHashMap<>();
+            // region -> dataset -> total hits (W+I+V); good = dataset where total == 0
+            Map<String, Map<String, Integer>> regionDatasetTotal = new LinkedHashMap<>();
             for (Rec rec : recs) {
-                regionDatasetViol.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
-                        .merge(rec.dataset, rec.violations, Integer::sum);
+                regionDatasetTotal.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
+                        .merge(rec.dataset, rec.total(), Integer::sum);
             }
             Map<String, Double> compliance = new LinkedHashMap<>();
-            for (Map.Entry<String, Map<String, Integer>> entry : regionDatasetViol.entrySet()) {
+            for (Map.Entry<String, Map<String, Integer>> entry : regionDatasetTotal.entrySet()) {
                 long good  = entry.getValue().values().stream().filter(v -> v == 0).count();
                 long total = entry.getValue().size();
                 compliance.put(entry.getKey(), total > 0 ? good * 100.0 / total : 0.0);
             }
             return compliance;
+        }
+
+        private static double computeCombinedComplianceRate(List<Rec> recs) {
+            // Each (region, dataset) pair counted independently; good = total hits == 0.
+            Map<String, Integer> totalPerCombo = new LinkedHashMap<>();
+            for (Rec rec : recs) {
+                totalPerCombo.merge(rec.region + "\0" + rec.dataset, rec.total(), Integer::sum);
+            }
+            long good  = totalPerCombo.values().stream().filter(v -> v == 0).count();
+            long total = totalPerCombo.size();
+            return total > 0 ? good * 100.0 / total : 0.0;
+        }
+
+        private static String dateTimeToMonthLabel(String dt) {
+            if (dt == null || dt.length() < 15) return safe(dt);
+            try {
+                return LocalDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+                        .format(DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.ENGLISH));
+            } catch (Exception ignore) {
+                return safe(dt);
+            }
         }
 
         // ---- loading previous run data ----
@@ -1870,30 +2025,34 @@ public class ValidationExcelWriter implements Closeable {
             try (InputStream is = Files.newInputStream(xlsx);
                  Workbook prevWb = WorkbookFactory.create(is)) {
 
-                List<String> dateTimeNames = new ArrayList<>();
-                List<String> legacyNames   = new ArrayList<>();
+                // Detect format by the header row: new format has "Region" in cell (0,0).
+                List<String> newFormatNames = new ArrayList<>();
+                List<String> legacyNames    = new ArrayList<>();
 
                 for (int i = 0; i < prevWb.getNumberOfSheets(); i++) {
-                    String name = prevWb.getSheetAt(i).getSheetName();
+                    Sheet sh = prevWb.getSheetAt(i);
+                    String name = sh.getSheetName();
                     if (CHARTS_SHEET_NAME.equalsIgnoreCase(name)) {
                         continue;
                     }
-                    if (DATE_TIME_SHEET_PATTERN.matcher(name).matches()) {
-                        dateTimeNames.add(name);
+                    Row hdr = sh.getRow(0);
+                    if (hdr != null && "Region".equalsIgnoreCase(getCellStr(hdr, 0))) {
+                        newFormatNames.add(name);
                     } else {
                         legacyNames.add(name);
                     }
                 }
 
-                if (!dateTimeNames.isEmpty()) {
-                    // New format: sheets named by date-time, cols: Region=0, Timestamp=1,
-                    // Dataset=2, Warnings=3, Infos=4, Violations=5, Total=6.
-                    dateTimeNames.sort(Comparator.naturalOrder());
-                    for (String name : dateTimeNames) {
+                if (!newFormatNames.isEmpty()) {
+                    // New format: cols Region=0, Timestamp=1, Dataset=2, Warnings=3, Infos=4,
+                    // Violations=5, Total=6. Sheet names may be month labels or datetimes.
+                    // Sort: datetime-named sheets sort correctly; month labels sort lexically.
+                    newFormatNames.sort(Comparator.naturalOrder());
+                    for (String name : newFormatNames) {
                         historicalSheets.put(name, readRunSheet(prevWb.getSheet(name)));
                     }
-                    // Most recent date-time sheet provides the comparison baseline.
-                    String mostRecent = dateTimeNames.get(dateTimeNames.size() - 1);
+                    // Most recent sheet (last alphabetically) provides the comparison baseline.
+                    String mostRecent = newFormatNames.get(newFormatNames.size() - 1);
                     for (Rec rec : historicalSheets.get(mostRecent)) {
                         previousTotals.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
                                 .merge(rec.dataset, rec.total(), Integer::sum);
