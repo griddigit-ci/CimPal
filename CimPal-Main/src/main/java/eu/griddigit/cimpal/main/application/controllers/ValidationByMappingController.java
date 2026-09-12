@@ -4,6 +4,7 @@ import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
+import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
@@ -144,6 +145,24 @@ public class ValidationByMappingController {
     private Label helpPreviousComparisonCsv;
 
     @FXML
+    private HBox rowValidationEngineLabel;
+
+    @FXML
+    private ChoiceBox<ValidationEngine> cbValidationEngine;
+
+    @FXML
+    private Label helpValidationEngine;
+
+    @FXML
+    private HBox rowValidationWorkersLabel;
+
+    @FXML
+    private ChoiceBox<String> cbValidationWorkers;
+
+    @FXML
+    private Label helpValidationWorkers;
+
+    @FXML
     private HBox rowLimitValidationResults;
 
     @FXML
@@ -151,6 +170,15 @@ public class ValidationByMappingController {
 
     @FXML
     private Label helpLimitValidationResults;
+
+    @FXML
+    private HBox rowValidationDebug;
+
+    @FXML
+    private CheckBox cbValidationDebug;
+
+    @FXML
+    private Label helpValidationDebug;
 
     // ---- manual-selection workflow controls, formerly the SHACL tester tab ----
     @FXML
@@ -210,6 +238,19 @@ public class ValidationByMappingController {
                 WORKFLOW_MANUAL
         );
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
+
+        cbValidationEngine.getItems().setAll(ValidationEngine.values());
+        cbValidationEngine.getSelectionModel().select(ValidationEngine.APACHE_JENA);
+        if (cbValidationDebug != null) {
+            cbValidationDebug.setSelected(false);
+        }
+
+        int maximumWorkers = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+        cbValidationWorkers.getItems().add("Auto (memory-aware)");
+        for (int workerCount = 1; workerCount <= maximumWorkers; workerCount++) {
+            cbValidationWorkers.getItems().add(Integer.toString(workerCount));
+        }
+        cbValidationWorkers.getSelectionModel().selectFirst();
 
         cbDatatypeMap.getItems().setAll(
                 DATATYPE_MAP_CGMES30_NC25,
@@ -288,7 +329,9 @@ public class ValidationByMappingController {
         // Previous-run comparison CSV and Regenerate button: timestamped workflow only.
         setShown(timestamped, rowPreviousComparisonCsvLabel, tfPreviousComparisonCsv,
                 btnBrowsePreviousComparisonCsv, btnRegenerateComparison);
-        setShown(timestamped, rowLimitValidationResults);
+        setShown(!manual, rowValidationEngineLabel, cbValidationEngine);
+        setShown(true, rowValidationWorkersLabel, cbValidationWorkers,
+                rowLimitValidationResults, rowValidationDebug);
 
         // Manual constraint file selection: manual workflow only.
         setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
@@ -400,11 +443,46 @@ public class ValidationByMappingController {
         );
 
         GUIhelper.installHelpTooltip(
+                helpValidationEngine,
+                "Apache Jena is the default and production engine. It runs inside CimPal and is " +
+                        "validated against the supplied Coreso/QoCDC shape sets.\n\n" +
+                        "The three Python choices are experimental comparison engines. CimPal gives " +
+                        "them the same fully resolved shapes graph and datatype-enhanced data graph " +
+                        "through memory pipes, so they do not change the mapping combinations or write " +
+                        "ZIP/XML model data to disk.\n\n" +
+                        "pySHACL (RDFLib) uses RDFLib SPARQL. pySHACL + Oxigraph uses Oxigraph for " +
+                        "SPARQL acceleration. SHACL (Rust Python binding) uses the PyPI Rust binding. " +
+                        "Some supplied SPARQL constraints or shape-graph structures are not compatible " +
+                        "with these engines, and their results and timing must be compared to Jena.\n\n" +
+                        "Install Python options with: py -3 -m pip install \"pyshacl[oxigraph]\" shacl\n\n" +
+                        "In the mapping workflows, the 10-result sampling option interrupts Jena early. " +
+                        "Python engines complete their validation before CimPal applies the same report limit.");
+        GUIhelper.installHelpTooltip(
+                helpValidationWorkers,
+                "Number of independent model validations CimPal runs concurrently. Each worker " +
+                        "uses a separate combined data graph and can use a CPU core.\n\n" +
+                        "Auto sizes Jena workers from the Java heap: roughly one worker per 6 GB, " +
+                        "up to 8 timestamped or 12 normal mapping workers. Python engines default " +
+                        "to half those limits because every worker is a Python process with another " +
+                        "in-memory graph. Select a number explicitly to override Auto.\n\n" +
+                        "Increase gradually while observing memory use; selecting every available " +
+                        "core may exhaust memory before it improves throughput.");
+        GUIhelper.installHelpTooltip(
                 helpLimitValidationResults,
-                "When selected, CimPal stops a target shape after it has produced 10 failing results, "
-                        + "counting violations, warnings and information results alike. "
-                        + "The report marks affected validations as Partial, because checks after the limit were not run. "
+                "When selected, CimPal retains at most 10 findings for each source shape, counting "
+                        + "violations, warnings and information results alike. The mapping workflows stop "
+                        + "Jena after that limit and mark affected validations as Partial, because checks "
+                        + "after the limit were not run. The manual-selection workflow applies the same "
+                        + "cap to its exported findings while retaining its complete pass/fail rule check.\n\n"
                         + "Use this for quick investigation; clear it to run the complete validation."
+        );
+        GUIhelper.installHelpTooltip(
+                helpValidationDebug,
+                "Writes a detailed diagnostic log for the selected validation workflow. The log includes " +
+                        "the selected options, input loading, shape loading, validation and report-writing timings. " +
+                        "It is saved as cimpal_validation_debug.log in CimPal's per-user application-data folder.\n\n" +
+                        "Logging serializes worker events to one file, so leave it off for normal performance runs " +
+                        "and turn it on when investigating a slow run or an unexpected result."
         );
     }
 
@@ -659,6 +737,9 @@ public class ValidationByMappingController {
         }
 
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
+
+        cbValidationEngine.getItems().setAll(ValidationEngine.values());
+        cbValidationEngine.getSelectionModel().select(ValidationEngine.APACHE_JENA);
         cbDatatypeMap.getSelectionModel().select(DATATYPE_MAP_CGMES30_NC25);
         cbBaseUri.getSelectionModel().select(BaseUriPresets.DEFAULT_SELECTION);
 
@@ -674,6 +755,9 @@ public class ValidationByMappingController {
             return;
         }
 
+        ValidationTools.setValidationDebugEnabled(
+                cbValidationDebug != null && cbValidationDebug.isSelected());
+
         if (isManualWorkflow()) {
             runManualValidation();
             return;
@@ -683,12 +767,14 @@ public class ValidationByMappingController {
         DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
         String xmlBase = getBaseUri();
 
-        int threadCount = getThreadCount(runTimestampedWorkflow);
+        ValidationEngine validationEngine = cbValidationEngine == null
+                ? ValidationEngine.APACHE_JENA : cbValidationEngine.getValue();
+        int threadCount = getThreadCount(runTimestampedWorkflow, validationEngine);
 
-        // Only meaningful for the timestamped workflow; null when none selected.
+        // Only the timestamped workflow uses a previous comparison workbook.
         Path previousComparisonCsv = runTimestampedWorkflow ? getPreviousComparisonCsvPath() : null;
-        int maxResultsPerConstraint = runTimestampedWorkflow
-                && cbLimitValidationResults != null && cbLimitValidationResults.isSelected() ? 10 : 0;
+        int maxResultsPerConstraint = cbLimitValidationResults != null
+                && cbLimitValidationResults.isSelected() ? 10 : 0;
 
         btnRunValidationByMapping.setDisable(true);
         setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -713,7 +799,8 @@ public class ValidationByMappingController {
                             dataTypeMap,
                             xmlBase,
                             previousComparisonCsv,
-                            maxResultsPerConstraint
+                            maxResultsPerConstraint,
+                            validationEngine
                     );
                     List<Path> reports = tsResult.reports();
 
@@ -730,7 +817,9 @@ public class ValidationByMappingController {
                             selectedOutputFolder.toPath(),
                             threadCount,
                             dataTypeMap,
-                            xmlBase
+                            xmlBase,
+                            maxResultsPerConstraint,
+                            validationEngine
                     );
                     Path report = result.reportPath();
 
@@ -789,6 +878,9 @@ public class ValidationByMappingController {
         boolean exportReports = cbExportReports != null && cbExportReports.isSelected();
         DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
         String xmlBase = getBaseUri();
+        int workerCount = getThreadCount(false, ValidationEngine.APACHE_JENA);
+        int maxResultsPerConstraint = cbLimitValidationResults != null
+                && cbLimitValidationResults.isSelected() ? 10 : 0;
 
         List<File> archives = new ArrayList<>();
         try {
@@ -839,8 +931,11 @@ public class ValidationByMappingController {
                 // Same datatype mapping the mapping-driven workflows use, so a numeric or boolean
                 // constraint is evaluated against typed literals here too.
                 tester.setDatatypeMapping(datatypeMapSource.load(), xmlBase);
+                tester.setValidationOptions(workerCount, maxResultsPerConstraint);
+                ValidationTools.startValidationDebugRun("manual SHACL validation workers=" + workerCount
+                        + " resultLimit=" + maxResultsPerConstraint);
 
-                tester.runTests(selectedConstraintFiles, selectedModelsFolder, archives, exportReports);
+                tester.runTestsInternal(selectedConstraintFiles, selectedModelsFolder, archives, exportReports);
 
                 Platform.runLater(() -> {
                     setProgress(1);
@@ -1012,14 +1107,24 @@ public class ValidationByMappingController {
         return null;
     }
 
-    private int getThreadCount(boolean timestampedWorkflow) {
-        int availableProcessors = Runtime.getRuntime().availableProcessors();
+    private int getThreadCount(boolean timestampedWorkflow, ValidationEngine engine) {
+        String selection = cbValidationWorkers == null ? "Auto (memory-aware)" : cbValidationWorkers.getValue();
+        if (selection != null && !selection.startsWith("Auto")) {
+            try {
+                return Math.clamp(Integer.parseInt(selection), 1,
+                        Math.max(1, Runtime.getRuntime().availableProcessors() - 1));
+            } catch (NumberFormatException ignored) {
+                // Fall through to the resource-aware default.
+            }
+        }
 
-        // One core is left for the UI, then capped: the timestamped workflow holds more models
-        // in memory per thread, so it gets the tighter cap.
-        return timestampedWorkflow
-                ? Math.clamp(availableProcessors - 1, 1, 2)
-                : Math.clamp(availableProcessors - 1, 1, 4);
+        int availableWorkers = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+        long heapGiB = Math.max(1, Runtime.getRuntime().maxMemory() / (1024L * 1024L * 1024L));
+        int memoryWorkers = Math.max(1, (int) (heapGiB / 6));
+        int engineCap = engine == ValidationEngine.APACHE_JENA
+                ? (timestampedWorkflow ? 8 : 12)
+                : (timestampedWorkflow ? 4 : 6);
+        return Math.clamp(Math.min(availableWorkers, Math.min(memoryWorkers, engineCap)), 1, engineCap);
     }
 
 }

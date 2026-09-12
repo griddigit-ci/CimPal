@@ -1452,6 +1452,12 @@ every value is a plain string and such a constraint passes a model it should rej
 workflow therefore reads the same two fields as the mapping ones, and they stay enabled for
 it.</p>
 
+<p><strong>ZIP model archives are read directly from their entries into memory.</strong> CimPal
+does not extract input XML files into temporary local folders. After a timestamp or model has been
+validated, its data graph can be released while the resolved shapes remain available for the next
+validation. The ZIP files created in the output folder by mapping validation are intentional
+deliverables, not extracted input data.</p>
+
 <div class="note" style="margin-top:16px">
   <strong>Remote constraints and inputs, and what is remembered</strong> &mdash; a mapping CSV may
   name an <code>https://</code> URL where it would name a local file, and GitHub <em>blob</em>,
@@ -1529,6 +1535,30 @@ it.</p>
         <code>region,dataset,total</code> where total = warnings + infos + violations &mdash; the
         same shape the comparison workbook emits, so each run's output can feed the next. Left
         empty, the comparison is produced with an empty <em>previous</em> column.</td></tr>
+<tr><td>SHACL validation engine</td><td>choice</td>
+    <td><em>Apache Jena</em> is CimPal's production engine and the default. The three Python
+        choices are experimental comparison engines: pySHACL (RDFLib), pySHACL + Oxigraph, and
+        the SHACL Rust Python binding. They receive the same resolved shapes graph and
+        datatype-enhanced data graph as Jena, so the mapping logic does not change. The Python
+        engines may reject shape constructs accepted by Jena or run more slowly. This control is
+        used by the mapping workflows; manual selection uses Jena.</td></tr>
+<tr><td>Parallel validation workers</td><td>choice</td>
+    <td>Number of independent model validations run concurrently. <em>Auto (memory-aware)</em>
+        chooses a value from available CPU cores and Java heap size. It is used by all three
+        workflows. Increase explicit values gradually: each worker holds its own combined data
+        graph, and Python engines also start a Python process.</td></tr>
+<tr><td>Sample validation: stop after 10 results per shape</td><td>checkbox</td>
+    <td>Retains at most ten findings for each source shape, across violations, warnings and
+        information results. In the mapping workflows, Jena stops that target shape and marks the
+        affected report as <em>Partial</em>. Python engines complete validation before applying
+        the same report cap. Manual selection caps exported findings while retaining its complete
+        pass/fail rule check.</td></tr>
+<tr><td>Write validation diagnostic log</td><td>checkbox</td>
+    <td>Writes detailed input-loading, shape-loading, validation and report-writing timings for
+        the selected workflow to <code>cimpal_validation_debug.log</code> in CimPal's per-user
+        application-data folder (normally <code>C:\Users\&lt;user&gt;\AppData\Local\CimPal</code>).
+        Use it to investigate a slow run or unexpected result. It serializes worker log writes,
+        so leave it off for ordinary performance runs.</td></tr>
 </table>
 
 <h4>Base URI presets</h4>

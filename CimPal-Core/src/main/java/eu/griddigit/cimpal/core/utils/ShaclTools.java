@@ -21,8 +21,16 @@ public class ShaclTools {
      * @param shapesModel the shapes model used for validation (so we can read sh:name/sh:order/sh:group and use prefixes)
      */
     public static List<SHACLValidationResult> extractSHACLValidationResults(ValidationReport report, Model shapesModel) {
+        return extractSHACLValidationResults(report.getModel(), shapesModel);
+    }
+
+    /**
+     * Extracts results from any RDF SHACL validation report. Python engines return the
+     * specification's {@code sh:ValidationReport} graph directly, whereas Apache Jena wraps
+     * the same graph in {@link ValidationReport}; both use this shared reporting path.
+     */
+    public static List<SHACLValidationResult> extractSHACLValidationResults(Model reportModel, Model shapesModel) {
         List<SHACLValidationResult> resultsList = new ArrayList<>();
-        Model reportModel = report.getModel();
 
         // Prefer shapes model for prefixing, fall back to report model
         Model prefixModel = (shapesModel != null) ? shapesModel : reportModel;

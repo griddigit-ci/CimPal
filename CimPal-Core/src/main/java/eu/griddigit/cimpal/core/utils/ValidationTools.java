@@ -72,7 +72,7 @@ public class ValidationTools {
      * off in ordinary runs avoids serialising validation workers on that file I/O lock. Enable
      * it for a diagnostic run with {@code -Dcimpal.validation.debug=true}.
      */
-    private static final boolean DEBUG = Boolean.getBoolean("cimpal.validation.debug");
+    private static volatile boolean DEBUG = Boolean.getBoolean("cimpal.validation.debug");
     private static final boolean DEBUG_TO_CONSOLE = false;
 
     // Diagnostic log lives under the per-user application data directory. A fixed path in a
@@ -132,6 +132,33 @@ public class ValidationTools {
             DateTimeFormatter.ofPattern("LLLL yyyy", Locale.ENGLISH);
 
     private ValidationTools() { }
+
+    /** Enables or disables detailed validation diagnostics for the current application session. */
+    public static void setValidationDebugEnabled(boolean enabled) {
+        DEBUG = enabled;
+    }
+
+    /** Starts a fresh diagnostic log for workflows that do not use mapping validation. */
+    public static void startValidationDebugRun(String workflow) {
+        if (!DEBUG) return;
+        try {
+            Files.deleteIfExists(DEBUG_LOG_PATH);
+        } catch (IOException e) {
+            System.err.println("[DBG_LOG_ERROR] Could not delete old debug log: " + e.getMessage());
+        }
+        dbg("START " + workflow);
+        printMemory("start " + workflow);
+    }
+
+    /** Adds a workflow-level event to the optional validation diagnostic log. */
+    public static void logValidationDebug(String message) {
+        dbg(message);
+    }
+
+    /** Location of the optional validation diagnostic log. */
+    public static Path getValidationDebugLogPath() {
+        return DEBUG_LOG_PATH;
+    }
 
     /**
      * Forgets what has already been fetched from a remote host, so the next fetch of each URL
@@ -260,7 +287,7 @@ public class ValidationTools {
                                                           Path previousComparisonCsv)    // NEW  nullable
             throws IOException {
         return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot,
-                outputBaseDir, threadCount, dataTypeMap, xmlBase, previousComparisonCsv, 0);
+                outputBaseDir, threadCount, dataTypeMap, xmlBase, previousComparisonCsv, 0, ValidationEngine.APACHE_JENA);
     }
 
     /**
@@ -280,11 +307,33 @@ public class ValidationTools {
                                                           Path previousComparisonCsv,
                                                           int maxResultsPerConstraint)
             throws IOException {
+        return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, previousComparisonCsv, maxResultsPerConstraint,
+                ValidationEngine.APACHE_JENA);
+    }
+
+    /**
+     * Timestamped mapping validation using the selected engine. The mapping resolution,
+     * datatype mapping, import resolution, report generation and Excel writers are shared by
+     * every engine; only the final validation of each selected graph pair changes.
+     */
+    public static ValidationTimestampedRunSummary validateByTimestampedMapping(Path mappingCsvPath,
+                                                          Path inputPath,
+                                                          Path constraintsRoot,
+                                                          Path outputBaseDir,
+                                                          int threadCount,
+                                                          Map<String, RDFDatatype> dataTypeMap,
+                                                          String xmlBase,
+                                                          Path previousComparisonCsv,
+                                                          int maxResultsPerConstraint,
+                                                          ValidationEngine validationEngine)
+            throws IOException {
 
         if (maxResultsPerConstraint < 0) {
             throw new IllegalArgumentException("maxResultsPerConstraint must be zero or greater");
         }
 
+        validationEngine = validationEngine == null ? ValidationEngine.APACHE_JENA : validationEngine;
         long allStart = System.currentTimeMillis();
 
         if (DEBUG) {
@@ -295,7 +344,9 @@ public class ValidationTools {
             }
         }
 
-        dbg("START validateByTimestampedMapping");
+        dbg("START validateByTimestampedMapping engine=" + validationEngine
+                + " workers=" + threadCount
+                + " resultLimit=" + maxResultsPerConstraint);
         printMemory("start validateByTimestampedMapping");
 
         //a run re-reads every input: nothing carries over from the previous one
@@ -318,6 +369,7 @@ public class ValidationTools {
         consoleInput("threads=" + threads);
         consoleInput("max results per constraint="
                 + (maxResultsPerConstraint == 0 ? "unlimited" : maxResultsPerConstraint));
+        consoleInput("validation engine=" + validationEngine.displayName());
 
         Map<String, CachedShapes> shapesCache = new ConcurrentHashMap<>();
         List<Path> createdReports = new ArrayList<>();
@@ -421,7 +473,8 @@ public class ValidationTools {
                                     threads,
                                     dataTypeMap,
                                     xmlBase,
-                                    maxResultsPerConstraint
+                                    maxResultsPerConstraint,
+                                    validationEngine
                             );
                         } finally {
                             timestampXmlModelCache.clear();
@@ -603,6 +656,38 @@ public class ValidationTools {
                                          Map<String, RDFDatatype> dataTypeMap,
                                          String xmlBase
     ) throws IOException {
+        return validateByMapping(mappingCsvPath, modelsBaseDir, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, 0, ValidationEngine.APACHE_JENA);
+    }
+
+    /** Mapping validation using the same resolved graph pairs with the selected SHACL engine. */
+    public static ValidationRunSummary validateByMapping(Path mappingCsvPath,
+                                         Path modelsBaseDir,
+                                         Path constraintsRoot,
+                                         Path outputBaseDir,
+                                         int threadCount,
+                                         Map<String, RDFDatatype> dataTypeMap,
+                                         String xmlBase,
+                                         ValidationEngine validationEngine
+    ) throws IOException {
+        return validateByMapping(mappingCsvPath, modelsBaseDir, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, 0, validationEngine);
+    }
+
+    /** Mapping validation with optional per-source-shape result sampling. */
+    public static ValidationRunSummary validateByMapping(Path mappingCsvPath,
+                                         Path modelsBaseDir,
+                                         Path constraintsRoot,
+                                         Path outputBaseDir,
+                                         int threadCount,
+                                         Map<String, RDFDatatype> dataTypeMap,
+                                         String xmlBase,
+                                         int maxResultsPerConstraint,
+                                         ValidationEngine validationEngine
+    ) throws IOException {
+
+        validationEngine = validationEngine == null ? ValidationEngine.APACHE_JENA : validationEngine;
+        final ValidationEngine selectedValidationEngine = validationEngine;
 
         long allStart = System.currentTimeMillis();
 
@@ -614,7 +699,9 @@ public class ValidationTools {
             }
         }
 
-        dbg("START validateByMapping");
+        dbg("START validateByMapping engine=" + selectedValidationEngine
+                + " workers=" + threadCount
+                + " resultLimit=" + maxResultsPerConstraint);
         printMemory("start validateByMapping");
 
         //a run re-reads every input: nothing carries over from the previous one
@@ -662,7 +749,8 @@ public class ValidationTools {
 
             tasks.add(() -> {
                 try {
-                    return validateOneRow(idx, row, modelsBaseDir, constraintsRoot, shapesCache, dataTypeMap, xmlBase);
+                    return validateOneRow(idx, row, modelsBaseDir, constraintsRoot, shapesCache,
+                            dataTypeMap, xmlBase, maxResultsPerConstraint, selectedValidationEngine);
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName() + "][row " + idx + "]");
                     logError("Unhandled exception", t);
@@ -826,7 +914,8 @@ public class ValidationTools {
 */
                     writer.appendValidation(
                             sheet, r.datasetName, r.xmlFiles, r.missingXmlFiles, r.constraintFile,
-                            r.results, r.conforms, r.displayName);
+                            r.results, r.conforms, r.displayName,
+                            r.partialValidation, maxResultsPerConstraint);
                     dbgRow(r.rowIdx, "DONE writer.appendValidation dataset=" + r.datasetName,
                             appendStart);
                 }
@@ -916,7 +1005,9 @@ public class ValidationTools {
                                                        Path constraintsRoot,
                                                        Map<String, Model> shapesCache,
                                                        Map<String, RDFDatatype> dataTypeMap,
-                                                       String xmlBase) {
+                                                       String xmlBase,
+                                                       int maxResultsPerConstraint,
+                                                       ValidationEngine validationEngine) {
 
         long rowStart = System.currentTimeMillis();
 
@@ -1040,9 +1131,13 @@ public class ValidationTools {
             dbgRow(rowIdx, "START SHACL validation");
             long validationStart = System.currentTimeMillis();
 
-            ValidationReport report = ShaclValidator.get().validate(shapesModel.getGraph(), dataModel.getGraph());
+            LimitedValidationOutcome validationOutcome = validateWithSelectedEngine(
+                    validationEngine, Shapes.parse(shapesModel.getGraph()), dataModel.getGraph(), shapesModel,
+                    maxResultsPerConstraint, rowIdx);
+            List<SHACLValidationResult> results = validationOutcome.results();
+            boolean conforms = validationOutcome.conforms();
 
-            dbgRow(rowIdx, "DONE SHACL validation conforms=" + report.conforms(),
+            dbgRow(rowIdx, "DONE SHACL validation conforms=" + conforms,
                     validationStart);
 
             printMemory("[row " + rowIdx + "] after SHACL validation");
@@ -1050,23 +1145,20 @@ public class ValidationTools {
             dbgRow(rowIdx, "START extractSHACLValidationResults");
             long extractStart = System.currentTimeMillis();
 
-            List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results =
-                    ShaclTools.extractSHACLValidationResults(report, shapesModel);
-
             dbgRow(rowIdx, "DONE extractSHACLValidationResults resultCount="
                             + (results == null ? "null" : results.size()),
                     extractStart);
 
             dbgRow(rowIdx, "DONE row dataset=" + datasetName
-                            + " conforms=" + report.conforms()
+                            + " conforms=" + conforms
                             + " resultCount=" + (results == null ? "null" : results.size()),
                     rowStart);
 
             return new ValidationTaskResult(
                     rowIdx, caseFolder, datasetName, ttlName,
                     xmlFilesText, missingXmlFilesText, constraintFileText,
-                    results, report.conforms(), null
-            ).withDisplayName(row.notes);
+                    results, conforms, null
+            ).withDisplayName(row.notes).withPartialValidation(validationOutcome.partial());
         } catch (Exception ex) {
             dbgRow(rowIdx, "ERROR row dataset=" + datasetName, rowStart);
             logError("Unhandled exception", ex);
@@ -4881,7 +4973,8 @@ public class ValidationTools {
                                                                   int threads,
                                                                   Map<String, RDFDatatype> dataTypeMap,
                                                                   String xmlBase,
-                                                                  int maxResultsPerConstraint) throws IOException {
+                                                                  int maxResultsPerConstraint,
+                                                                  ValidationEngine validationEngine) throws IOException {
 
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         List<Callable<ValidationTaskResult>> tasks = new ArrayList<>();
@@ -4898,7 +4991,8 @@ public class ValidationTools {
                             zipEntriesByVirtualPath,
                             dataTypeMap,
                             xmlBase,
-                            maxResultsPerConstraint
+                            maxResultsPerConstraint,
+                            validationEngine
                     );
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName()
@@ -5010,7 +5104,8 @@ public class ValidationTools {
                                                                Map<Path, ZipXmlEntry> zipEntriesByVirtualPath,
                                                                Map<String, RDFDatatype> dataTypeMap,
                                                                String xmlBase,
-                                                               int maxResultsPerConstraint) {
+                                                               int maxResultsPerConstraint,
+                                                               ValidationEngine validationEngine) {
 
         long rowStart = System.currentTimeMillis();
 
@@ -5074,10 +5169,9 @@ public class ValidationTools {
             dbgRow(row.rowIdx, "DONE load timestamped data graph", dataStart);
 
             long validationStart = System.currentTimeMillis();
-            LimitedValidationOutcome limitedOutcome = maxResultsPerConstraint == 0
-                    ? validateCompletely(cachedShapes.shapes(), dataGraph, shapesModel)
-                    : validateWithResultLimit(cachedShapes.shapes(), dataGraph, shapesModel,
-                            maxResultsPerConstraint, row.rowIdx);
+            LimitedValidationOutcome limitedOutcome = validateWithSelectedEngine(
+                    validationEngine, cachedShapes.shapes(), dataGraph, shapesModel,
+                    maxResultsPerConstraint, row.rowIdx);
             dbgRow(row.rowIdx, "DONE timestamped SHACL validation"
                     + " conforms=" + limitedOutcome.conforms()
                     + (limitedOutcome.partial() ? " partial=true" : ""), validationStart);
@@ -5148,6 +5242,32 @@ public class ValidationTools {
                                             boolean conforms,
                                             boolean partial) {}
 
+    private static LimitedValidationOutcome validateWithSelectedEngine(ValidationEngine engine,
+                                                                        Shapes shapes,
+                                                                        Graph dataGraph,
+                                                                        Model shapesModel,
+                                                                        int maxResultsPerConstraint,
+                                                                        int rowIdx)
+            throws IOException, InterruptedException {
+        if (engine == ValidationEngine.APACHE_JENA) {
+            return maxResultsPerConstraint == 0
+                    ? validateCompletely(shapes, dataGraph, shapesModel)
+                    : validateWithResultLimit(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx);
+        }
+
+        PythonShaclValidator.Outcome outcome = PythonShaclValidator.validate(
+                engine, shapesModel, ModelFactory.createModelForGraph(dataGraph));
+        List<SHACLValidationResult> allResults = outcome.results();
+        // Python engines have no public equivalent of Jena's per-source-shape interruption
+        // callback. They run the complete graph and the shared reporting layer samples the
+        // returned findings, preserving the report's Partial marker without suppressing checks.
+        if (maxResultsPerConstraint == 0) {
+            return new LimitedValidationOutcome(allResults, outcome.conforms(), false);
+        }
+        List<SHACLValidationResult> limited = limitResultsPerConstraint(allResults, maxResultsPerConstraint);
+        boolean partial = limited.size() < allResults.size();
+        return new LimitedValidationOutcome(limited, !partial && outcome.conforms(), partial);
+    }
     private static LimitedValidationOutcome validateCompletely(Shapes shapes,
                                                                 Graph dataGraph,
                                                                 Model shapesModel) {

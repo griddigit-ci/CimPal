@@ -6,6 +6,7 @@ import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import eu.griddigit.cimpal.core.utils.ExcelTools;
 import eu.griddigit.cimpal.core.utils.ModelFactory;
 import eu.griddigit.cimpal.core.utils.ShaclTools;
+import eu.griddigit.cimpal.core.utils.ValidationTools;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
@@ -21,8 +22,14 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class ShaclAutoTester {
 
@@ -38,6 +45,9 @@ public class ShaclAutoTester {
 
     /** Base URI for resolving relative URIs in the models under test. */
     private String xmlBase = "";
+
+    private int validationWorkers = 1;
+    private int maxResultsPerConstraint;
 
     public ShaclAutoTester() {
         this(null);
@@ -55,6 +65,12 @@ public class ShaclAutoTester {
     public void setDatatypeMapping(Map<String, RDFDatatype> dataTypeMap, String xmlBase) {
         this.dataTypeMap = dataTypeMap;
         this.xmlBase = xmlBase == null ? "" : xmlBase;
+    }
+
+    /** Applies the shared validation controls used by all workflows. */
+    public void setValidationOptions(int validationWorkers, int maxResultsPerConstraint) {
+        this.validationWorkers = Math.max(1, validationWorkers);
+        this.maxResultsPerConstraint = Math.max(0, maxResultsPerConstraint);
     }
 
     private void updateProgress(double progress) {
@@ -83,14 +99,58 @@ public class ShaclAutoTester {
     }
 
     public void runTestsInternal(List<File> selectedFile, File selectedFolder, List<File> fileL, boolean exportReports) throws IOException {
+        long runStart = System.currentTimeMillis();
+        ValidationTools.logValidationDebug("manual: start shapes=" + selectedFile.size()
+                + " archives=" + fileL.size());
         Map<String, Model> shaclMap = ModelFactory.modelLoad(selectedFile, "http://iec.ch/TC57/2013/CIM-schema-cim16", Lang.TURTLE, true, false);
         Model shaclModel = shaclMap.get("shacl");
         Map<String, SHACLRuleTestData> ruleTestDataMap = getRuleTestDataMap(selectedFolder, fileL);
 
         // shaclModel.getProperty(ResourceFactory.createResource("http://iec.ch/TC57/ns/CIM/constraints/QoCDC/Level3-IGM#ACDCTerminal.sequenceNumber-numbering"), ResourceFactory.createProperty("http://www.w3.org/ns/shacl#name"))
 
-        Map<String, Model> modelCache = new HashMap<>();
-        Map<String, ValidationReport> validationCache = new HashMap<>();
+        Map<String, Model> modelCache = new ConcurrentHashMap<>();
+        Map<String, ValidationReport> validationCache = new ConcurrentHashMap<>();
+
+        // A model is shared by several rule folders. Load and validate each distinct archive once,
+        // in parallel, before the rule-by-rule comparison below consumes the cached report.
+        Set<File> uniqueModels = new HashSet<>();
+        for (SHACLRuleTestData data : ruleTestDataMap.values()) {
+            uniqueModels.addAll(data.getConformFiles());
+            uniqueModels.addAll(data.getNonConformFiles());
+        }
+        ValidationTools.logValidationDebug("manual: prevalidate models=" + uniqueModels.size()
+                + " workers=" + validationWorkers + " resultLimit=" + maxResultsPerConstraint);
+        long validationStart = System.currentTimeMillis();
+        ExecutorService validationPool = Executors.newFixedThreadPool(validationWorkers);
+        try {
+            for (File modelFile : uniqueModels) {
+                validationPool.submit(() -> {
+                    String cacheKey = modelFile.getName();
+                    try {
+                        Model dataModel = loadDataModel(modelFile);
+                        modelCache.put(cacheKey, dataModel);
+                        validationCache.put(cacheKey, ShaclValidator.get().validate(
+                                shaclModel.getGraph(), dataModel.getGraph()));
+                    } catch (Exception e) {
+                        logger.logValidationError(modelFile.getName(), e.getMessage());
+                        ValidationTools.logValidationDebug("manual: validation error "
+                                + modelFile.getName() + ": " + e.getMessage());
+                    }
+                });
+            }
+        } finally {
+            validationPool.shutdown();
+            try {
+                if (!validationPool.awaitTermination(60, TimeUnit.MINUTES)) {
+                    throw new IOException("Manual validation workers timed out after 60 minutes");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Manual validation interrupted", e);
+            }
+        }
+        ValidationTools.logValidationDebug("manual: prevalidation completed in "
+                + (System.currentTimeMillis() - validationStart) + " ms");
 
         ValidationReport report;
         int i = 0;
@@ -134,7 +194,8 @@ public class ShaclAutoTester {
 
                 testData.addReport(conformFile.getName(), report, true);
 
-                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report, shaclModel);
+                List<SHACLValidationResult> validationResults = limitResults(
+                        ShaclTools.extractSHACLValidationResults(report, shaclModel));
 
                 boolean found = validationResults.stream()
                         .anyMatch(result -> shaclModel.getProperty(ResourceFactory.createResource(result.getSourceShape()), SH.name)
@@ -180,7 +241,8 @@ public class ShaclAutoTester {
 
                 testData.addReport(nonConformFile.getName(), report, false);
 
-                List<SHACLValidationResult> validationResults = ShaclTools.extractSHACLValidationResults(report, shaclModel);
+                List<SHACLValidationResult> validationResults = limitResults(
+                        ShaclTools.extractSHACLValidationResults(report, shaclModel));
 
                 boolean found = validationResults.stream()
                         .anyMatch(result -> shaclModel.getProperty(ResourceFactory.createResource(result.getSourceShape()), SH.name)
@@ -208,6 +270,8 @@ public class ShaclAutoTester {
         }
 
         updateProgress(1.0);
+        ValidationTools.logValidationDebug("manual: completed in "
+                + (System.currentTimeMillis() - runStart) + " ms");
     }
 
     /**
@@ -221,6 +285,21 @@ public class ShaclAutoTester {
                     new ArrayList<>(List.of(file)), xmlBase, Lang.RDFXML, false, false).get("unionModel");
         }
         return ModelFactory.modelLoadUnionWithDatatypeMap(List.of(file), dataTypeMap, xmlBase);
+    }
+
+    private List<SHACLValidationResult> limitResults(List<SHACLValidationResult> results) {
+        if (maxResultsPerConstraint == 0) return results;
+        Map<String, Integer> retained = new HashMap<>();
+        List<SHACLValidationResult> limited = new ArrayList<>();
+        for (SHACLValidationResult result : results) {
+            String sourceShape = result.getSourceShape() == null ? "" : result.getSourceShape();
+            int count = retained.getOrDefault(sourceShape, 0);
+            if (count < maxResultsPerConstraint) {
+                limited.add(result);
+                retained.put(sourceShape, count + 1);
+            }
+        }
+        return limited;
     }
 
     private static Map<String, SHACLRuleTestData> getRuleTestDataMap(File selectedFolder, List<File> fileL) {
