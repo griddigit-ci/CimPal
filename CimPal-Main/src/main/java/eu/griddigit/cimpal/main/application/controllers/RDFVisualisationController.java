@@ -8,6 +8,7 @@ import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.RdfGraphView;
+import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -18,6 +19,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.SelectionMode;
@@ -29,6 +31,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseButton;
@@ -98,9 +101,8 @@ import javafx.stage.FileChooser;
 public class RDFVisualisationController implements Initializable {
 
     /**
-     * Subjects collected per graph before the tree is truncated. A CGMES EQ file holds tens of
-     * thousands of subjects; past a few thousand tree rows the view stops being browsable, and
-     * the filters are the intended way to narrow it. The status line reports the truncation.
+     * Browser subject cap. The table can still query all matching data, and the browser header
+     * offers an explicit all-subjects toggle for occasions where that is needed.
      */
     private static final int MAX_SUBJECTS_PER_GRAPH = 5_000;
 
@@ -153,6 +155,9 @@ public class RDFVisualisationController implements Initializable {
     /** Name of the graph produced by Merge. Merging again replaces it. */
     private static final String MERGED_GRAPH_NAME = "Merged Graph";
 
+    /** Common RDF/XML base used by the dedicated SPARQL Query tab. */
+    private static final String SPARQL_COMPATIBLE_XML_BASE = "http://iec.ch/TC57/2013/CIM-schema-cim16";
+
     private MainController mainController;
 
     @FXML
@@ -166,7 +171,13 @@ public class RDFVisualisationController implements Initializable {
     @FXML
     private TextArea taSparqlFilter;
     @FXML
+    private ChoiceBox<String> cbBaseUri;
+    @FXML
+    private TextField tfBaseUri;
+    @FXML
     private Button btnApplyFilters;
+    @FXML
+    private Label lblGraphScope;
     @FXML
     private Button btnRemoveGraph;
     @FXML
@@ -208,7 +219,11 @@ public class RDFVisualisationController implements Initializable {
     @FXML
     private Button btnToggleGraphContent;
     @FXML
+    private CheckBox cbAutoRefresh;
+    @FXML
     private Button btnExportTable;
+    @FXML
+    private Button btnToggleAllSubjects;
     @FXML
     private Button btnToggleGraphMetadata;
 
@@ -218,6 +233,8 @@ public class RDFVisualisationController implements Initializable {
     private String graphViewSummary = "";
     private String tableViewSummary = "";
     private boolean graphMetadataVisible;
+    /** Named graphs used by the most recent Apply; empty means every loaded graph. */
+    private Set<String> activeGraphNames = Set.of();
 
     /** Loaded graphs in load order; their names form the top level of the graph browser. */
     private final ObservableList<GraphEntry> graphEntries = FXCollections.observableArrayList();
@@ -268,10 +285,12 @@ public class RDFVisualisationController implements Initializable {
      * raised by that much again each time the show-more row is clicked; <em>Reset</em> puts it back.
      */
     private int subjectLimit = MAX_SUBJECTS_PER_GRAPH;
+    private boolean allSubjectsVisible;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
+        BaseUriPresets.bind(cbBaseUri, tfBaseUri, "CIM 16");
 
         tvGraph.setRoot(new TreeItem<>(NodeValue.info("")));
         tvGraph.setShowRoot(false);
@@ -300,8 +319,10 @@ public class RDFVisualisationController implements Initializable {
         // Highlighting a named graph or a resource in the browser narrows the diagram to that scope.
         tvGraph.getSelectionModel().getSelectedItems()
                 .addListener((ListChangeListener<TreeItem<NodeValue>>) change -> {
-                    redrawGraphView();
-                    refreshTable();
+                    updateSelectedScopeLabel();
+                    if (cbAutoRefresh.isSelected()) {
+                        if (tableViewVisible) refreshTable(); else redrawGraphView();
+                    }
                 });
         tvGraphData.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         graphView.setOnNodeClicked(id -> setStatus("Selected in graph view: " + id));
@@ -331,8 +352,9 @@ public class RDFVisualisationController implements Initializable {
                         + "Filters are applied when you press Enter in a field or press Apply - not on every "
                         + "keystroke, because a large dataset has to be rescanned each time.");
         GUIhelper.installHelpTooltip(helpSparqlFilter,
-                "Optional SPARQL SELECT filter. The query must project a ?s variable; subjects returned by it "
-                        + "are kept in the tree and graph view. Apply runs it after the text filters, over the "
+                "Optional SPARQL SELECT query. When it projects a ?s variable, subjects returned by it "
+                        + "are kept in the tree and graph view. Any other SELECT query remains available in "
+                        + "Table view, while the tree keeps its current text-filter result. Apply runs it after the text filters, over the "
                         + "ticked graphs. The filtered graphs are available both as the default union graph and "
                         + "as named graphs, so GRAPH ?g { ... } is supported. Load query imports a .rq or .sparql file.");
         GUIhelper.installHelpTooltip(helpPanes,
@@ -494,11 +516,12 @@ public class RDFVisualisationController implements Initializable {
             return null;
         }
         String base = file.toURI().toString();
+        String parseBase = lang == Lang.RDFXML ? selectedBaseUri() : base;
         Model model = ModelFactory.createDefaultModel();
         try (InputStream in = new FileInputStream(file)) {
-            RDFDataMgr.read(model, in, base, lang);
+            RDFDataMgr.read(model, in, parseBase, lang);
         }
-        return new GraphEntry(file.getName(), model, documentBase(model, base));
+        return new GraphEntry(file.getName(), model, documentBase(model, parseBase));
     }
 
     /**
@@ -530,10 +553,11 @@ public class RDFVisualisationController implements Initializable {
 
                 String graphName = file.getName() + " ! " + entry.getName();
                 String base = file.toURI() + "!/" + entry.getName();
+                String parseBase = lang == Lang.RDFXML ? selectedBaseUri() : base;
                 try (InputStream in = zip.getInputStream(entry)) {
                     Model model = ModelFactory.createDefaultModel();
-                    RDFDataMgr.read(model, in, base, lang);
-                    loaded.add(new GraphEntry(graphName, model, documentBase(model, base)));
+                    RDFDataMgr.read(model, in, parseBase, lang);
+                    loaded.add(new GraphEntry(graphName, model, documentBase(model, parseBase)));
                 } catch (Exception e) {
                     problems.add(graphName + ": " + describe(e));
                 }
@@ -573,6 +597,11 @@ public class RDFVisualisationController implements Initializable {
         return declared != null && !declared.isBlank() ? declared : fallback;
     }
 
+    private String selectedBaseUri() {
+        String value = tfBaseUri == null ? "" : tfBaseUri.getText();
+        return value == null || value.isBlank() ? SPARQL_COMPATIBLE_XML_BASE : value.trim();
+    }
+
     private static String describe(Throwable t) {
         String message = t.getMessage();
         return message == null || message.isBlank() ? t.getClass().getSimpleName() : message;
@@ -605,13 +634,18 @@ public class RDFVisualisationController implements Initializable {
      */
     @FXML
     private void actionMergeGraphs(ActionEvent event) {
-        List<GraphEntry> ticked = selectedGraphEntries().stream()
+        List<GraphEntry> explicitlySelected = selectedGraphEntries();
+        List<GraphEntry> mergeScope = explicitlySelected.isEmpty() && !activeGraphNames.isEmpty()
+                ? graphEntries.stream().filter(entry -> activeGraphNames.contains(entry.name())).toList()
+                : explicitlySelected;
+        List<GraphEntry> ticked = mergeScope.stream()
                 .filter(entry -> !MERGED_GRAPH_NAME.equals(entry.name()))
                 .toList();
 
         if (ticked.size() < 2) {
             GUIhelper.showWarning("Nothing to merge",
-                    "Select at least two named graphs in the graph browser, then press Merge.");
+                    "Select at least two named graphs in the graph browser, then press Merge. "
+                            + "The graph scope used by the last Apply can also be merged.");
             return;
         }
 
@@ -624,6 +658,11 @@ public class RDFVisualisationController implements Initializable {
 
         graphEntries.removeIf(entry -> MERGED_GRAPH_NAME.equals(entry.name()));
         graphEntries.add(new GraphEntry(MERGED_GRAPH_NAME, merged, ticked.getFirst().base()));
+        // The previous Apply may have scoped the browser to just the source graphs. Clear that
+        // scope so the newly created named graph is immediately visible alongside its sources.
+        tvGraph.getSelectionModel().clearSelection();
+        activeGraphNames = Set.of();
+        updateSelectedScopeLabel();
 
         setStatus("Merged " + ticked.size() + " graphs into \"" + MERGED_GRAPH_NAME + "\" ("
                 + merged.size() + " triples). Source graphs remain available in the browser.");
@@ -668,9 +707,46 @@ public class RDFVisualisationController implements Initializable {
     }
 
     @FXML
+    private void actionRefreshGraph(ActionEvent event) {
+        redrawGraphView();
+    }
+
+    @FXML
+    private void actionRefreshTable(ActionEvent event) {
+        refreshTable();
+    }
+
+    @FXML
+    private void actionAutoRefreshChanged(ActionEvent event) {
+        if (!cbAutoRefresh.isSelected()) {
+            graphView.clear();
+            tvGraphData.getColumns().clear();
+            tvGraphData.getItems().clear();
+            graphViewSummary = "Automatic graph updates are paused.";
+            tableViewSummary = "Automatic table updates are paused.";
+            updateViewStatus();
+        } else if (tableViewVisible) {
+            refreshTable();
+        } else {
+            redrawGraphView();
+        }
+    }
+
+    @FXML
     private void actionChangeGraphLayout(ActionEvent event) {
         graphView.setLayoutMode(cbGraphLayout.getValue());
         redrawGraphView();
+    }
+
+    @FXML
+    private void actionToggleAllSubjects(ActionEvent event) {
+        allSubjectsVisible = !allSubjectsVisible;
+        subjectLimit = allSubjectsVisible ? Integer.MAX_VALUE : MAX_SUBJECTS_PER_GRAPH;
+        btnToggleAllSubjects.setText(allSubjectsVisible ? "5k" : "∞");
+        btnToggleAllSubjects.setTooltip(new Tooltip(allSubjectsVisible
+                ? "Limit the browser to 5,000 subjects per graph"
+                : "Show all matching subjects in the browser"));
+        rebuildTree();
     }
 
     @FXML
@@ -691,9 +767,21 @@ public class RDFVisualisationController implements Initializable {
         graphView.setVisible(!tableViewVisible);
         graphView.setManaged(!tableViewVisible);
         btnToggleGraphContent.setText(tableViewVisible ? "Graph view" : "Table view");
-        if (tableViewVisible) {
-            refreshTable();
+        if (cbAutoRefresh.isSelected()) {
+            if (tableViewVisible) {
+                refreshTable();
+            } else {
+                redrawGraphView();
+            }
         } else {
+            graphView.clear();
+            tvGraphData.getColumns().clear();
+            tvGraphData.getItems().clear();
+            graphViewSummary = "Automatic graph updates are paused.";
+            tableViewSummary = "Automatic table updates are paused.";
+            updateViewStatus();
+        }
+        if (!tableViewVisible && cbAutoRefresh.isSelected()) {
             Platform.runLater(graphView::fitToView);
         }
     }
@@ -724,6 +812,19 @@ public class RDFVisualisationController implements Initializable {
         return graphEntries.stream().filter(entry -> names.contains(entry.name())).toList();
     }
 
+    /** Shows the scope that the next Apply will use; no selected named graph means all graphs. */
+    private void updateSelectedScopeLabel() {
+        if (lblGraphScope == null) return;
+        int count = selectedGraphEntries().size();
+        if (count > 0) {
+            lblGraphScope.setText("Scope: " + count + " selected graph(s)");
+        } else if (!activeGraphNames.isEmpty()) {
+            lblGraphScope.setText("Applied scope: " + activeGraphNames.size() + " selected graph(s)");
+        } else {
+            lblGraphScope.setText("Scope: all loaded graphs");
+        }
+    }
+
     /**
      * Redraws the diagram for the current filter result and the highlighted rows.
      * <p>
@@ -733,6 +834,10 @@ public class RDFVisualisationController implements Initializable {
      * neighbours; a class folder contributes all of its instances.
      */
     private void redrawGraphView() {
+        if (!cbAutoRefresh.isSelected()) {
+            graphView.clear();
+            return;
+        }
         if (lastRows.isEmpty()) {
             graphView.clear();
             setStatus("Load RDF to draw the relationships.");
@@ -838,10 +943,9 @@ public class RDFVisualisationController implements Initializable {
         try {
             String query = taSparqlFilter.getText() == null ? "" : taSparqlFilter.getText().trim();
             if (!query.isBlank()) {
-                Model union = ModelFactory.createDefaultModel();
-                List<GraphEntry> scope = selectedGraphEntries();
-                (scope.isEmpty() ? graphEntries : scope).forEach(entry -> union.add(entry.model()));
-                tableResults = SparqlTools.executeSparqlQuery(query, union);
+                List<GraphEntry> scope = activeGraphNames.isEmpty() ? List.copyOf(graphEntries)
+                        : graphEntries.stream().filter(entry -> activeGraphNames.contains(entry.name())).toList();
+                tableResults = executeVisualisationTableQuery(query, scope);
             } else {
                 tableResults = treeRowsAsTable();
             }
@@ -852,6 +956,45 @@ public class RDFVisualisationController implements Initializable {
             tvGraphData.getItems().clear();
             setStatus("Table query failed: " + describe(ex));
         }
+    }
+
+    /** Executes the table query over the same union and named-graph dataset used by Apply. */
+    private static SparqlTools.QueryResults executeVisualisationTableQuery(String queryText, List<GraphEntry> entries) {
+        Query query = QueryFactory.create(queryText);
+        if (!query.isSelectType()) throw new IllegalArgumentException("The visualisation query must be a SELECT query");
+        // Match the dedicated SPARQL tab exactly for ordinary queries: it executes against one
+        // combined default model. Named-graph support below is reserved for queries that ask for it.
+        if (!queryText.toUpperCase(Locale.ROOT).contains("GRAPH")) {
+            Model combined = ModelFactory.createDefaultModel();
+            entries.forEach(entry -> combined.add(entry.model()));
+            try {
+                return SparqlTools.executeSparqlQuery(queryText, combined);
+            } catch (Exception ex) {
+                throw new IllegalArgumentException(describe(ex), ex);
+            }
+        }
+        Dataset dataset = DatasetFactory.createTxnMem();
+        Model union = ModelFactory.createDefaultModel();
+        for (int i = 0; i < entries.size(); i++) {
+            dataset.addNamedModel("urn:cimpal:visualisation:graph:" + i, entries.get(i).model());
+            union.add(entries.get(i).model());
+        }
+        dataset.setDefaultModel(union);
+        List<String> columns = query.getResultVars();
+        List<Map<String, String>> rows = new ArrayList<>();
+        try (QueryExecution execution = QueryExecutionFactory.create(query, dataset)) {
+            ResultSet result = execution.execSelect();
+            while (result.hasNext()) {
+                QuerySolution solution = result.nextSolution();
+                Map<String, String> row = new LinkedHashMap<>();
+                for (String column : columns) {
+                    RDFNode value = solution.get(column);
+                    row.put(column, value == null ? "" : value.toString());
+                }
+                rows.add(row);
+            }
+        }
+        return new SparqlTools.QueryResults(columns, rows);
     }
 
     /** Turns the selected tree scope into one row per subject, with predicates as columns. */
@@ -867,25 +1010,34 @@ public class RDFVisualisationController implements Initializable {
         }
         Map<String, Map<String, String>> rowsBySubject = new LinkedHashMap<>();
         Set<String> predicates = new LinkedHashSet<>();
-        for (GraphRows graph : lastRows) {
+        Filter filter = new Filter(text(tfSubjectFilter), text(tfPredicateFilter), text(tfObjectFilter), text(tfFullTextSearch));
+        for (GraphEntry graph : graphEntries) {
             if (!graphNames.isEmpty() && !graphNames.contains(graph.name())) continue;
-            for (SubjectRows subject : graph.subjects()) {
-                if (!subjects.isEmpty() && !subjects.contains(subject.subject().raw())) continue;
+            StmtIterator statements = graph.model().listStatements();
+            try {
+                while (statements.hasNext()) {
+                    Statement statement = statements.nextStatement();
+                    Term subject = term(statement.getSubject(), graph.labels());
+                    Term predicateTerm = term(statement.getPredicate(), graph.labels());
+                    Term object = term(statement.getObject(), graph.labels());
+                    if (!filter.accepts(subject, predicateTerm, object)
+                            || (!subjects.isEmpty() && !subjects.contains(subject.raw()))) continue;
                 String rowKey = graphMetadataVisible
-                        ? graph.name() + "\u0000" + subject.subject().raw()
-                        : subject.subject().raw();
+                        ? graph.name() + "\u0000" + subject.raw()
+                        : subject.raw();
                 Map<String, String> row = rowsBySubject.computeIfAbsent(rowKey, ignored -> {
                             Map<String, String> values = new LinkedHashMap<>();
-                            values.put("Subject", subject.subject().label());
+                            values.put("Subject", subject.label());
                             if (graphMetadataVisible) values.put("Graph", graph.name());
                             return values;
                         });
-                for (TripleRow triple : subject.triples()) {
-                    String predicate = triple.predicate().label();
+                    String predicate = predicateTerm.label();
                     predicates.add(predicate);
-                    row.merge(predicate, triple.object().label(),
+                    row.merge(predicate, object.label(),
                             (first, next) -> first.equals(next) ? first : first + " | " + next);
                 }
+            } finally {
+                statements.close();
             }
         }
         List<String> columns = new ArrayList<>();
@@ -898,6 +1050,11 @@ public class RDFVisualisationController implements Initializable {
     private void displayTableResults(SparqlTools.QueryResults results) {
         tvGraphData.getColumns().clear();
         tvGraphData.getItems().clear();
+        if (!cbAutoRefresh.isSelected()) {
+            tableViewSummary = "Automatic table updates are paused.";
+            updateViewStatus();
+            return;
+        }
         for (String name : results.columns) {
             TableColumn<Map<String, String>, String> column = new TableColumn<>(name);
             column.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
@@ -906,8 +1063,10 @@ public class RDFVisualisationController implements Initializable {
             tvGraphData.getColumns().add(column);
         }
         tvGraphData.getItems().setAll(results.rows);
-        tableViewSummary = (taSparqlFilter.getText() == null || taSparqlFilter.getText().isBlank()
-                ? "Tree selection" : "SPARQL query") + ": " + results.rows.size() + " row(s), "
+        boolean query = taSparqlFilter.getText() != null && !taSparqlFilter.getText().isBlank();
+        int selectedGraphCount = activeGraphNames.size();
+        String scope = selectedGraphCount == 0 ? "all loaded graphs" : selectedGraphCount + " selected graph(s)";
+        tableViewSummary = (query ? "SPARQL query in " + scope : "Tree selection") + ": " + results.rows.size() + " row(s), "
                 + results.columns.size() + " column(s).";
         updateViewStatus();
     }
@@ -937,6 +1096,8 @@ public class RDFVisualisationController implements Initializable {
         graphEntries.clear();
         clearFilterFields();
         subjectLimit = MAX_SUBJECTS_PER_GRAPH;
+        allSubjectsVisible = false;
+        btnToggleAllSubjects.setText("∞");
         lastRows = List.of();
         buildTreeItems();
         graphView.clear();
@@ -989,7 +1150,15 @@ public class RDFVisualisationController implements Initializable {
      * lazily, as the user expands nodes.
      */
     private void rebuildTree() {
+        List<GraphEntry> selectedByUser = selectedGraphEntries();
+        List<GraphEntry> queryScope = selectedByUser.isEmpty() ? List.copyOf(graphEntries) : selectedByUser;
+        // Always keep every loaded graph at the browser's top level. The scope limits the query,
+        // not whether source graphs disappear after Apply.
         List<GraphEntry> selected = List.copyOf(graphEntries);
+        activeGraphNames = selectedByUser.stream().map(GraphEntry::name)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        lblGraphScope.setText(activeGraphNames.isEmpty() ? "Scope: all loaded graphs"
+                : "Scope: " + activeGraphNames.size() + " selected graph(s)");
         if (selected.isEmpty()) {
             lastRows = List.of();
             buildTreeItems();
@@ -1004,7 +1173,7 @@ public class RDFVisualisationController implements Initializable {
                 text(tfSubjectFilter), text(tfPredicateFilter), text(tfObjectFilter), text(tfFullTextSearch));
         String sparqlQuery = taSparqlFilter.getText() == null ? "" : taSparqlFilter.getText().trim();
 
-        setStatus("Filtering...");
+        setStatus("Filtering " + (activeGraphNames.isEmpty() ? "all loaded graphs" : activeGraphNames.size() + " selected graph(s)") + "...");
         setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
         btnApplyFilters.setDisable(true);
 
@@ -1018,14 +1187,20 @@ public class RDFVisualisationController implements Initializable {
             try {
                 loaded.forEach(GraphEntry::warmLocalNames);
                 Set<String> sparqlSubjects = sparqlQuery.isBlank() ? null
-                        : executeSparqlSubjectFilter(sparqlQuery, selected, filter);
+                        : executeSparqlSubjectFilter(sparqlQuery, queryScope, filter);
+                // Evaluate the result table from the captured in-memory scope here, alongside
+                // filtering, rather than later from whichever tree rows happen to be visible.
+                SparqlTools.QueryResults queryResults = sparqlQuery.isBlank() ? null
+                        : executeVisualisationTableQuery(sparqlQuery, queryScope);
                 List<GraphRows> rows = new ArrayList<>(selected.size());
                 for (GraphEntry entry : selected) {
-                    rows.add(scan(entry, filter, sparqlSubjects, limit));
+                    Set<String> entrySubjects = activeGraphNames.isEmpty() || activeGraphNames.contains(entry.name())
+                            ? sparqlSubjects : null;
+                    rows.add(scan(entry, filter, entrySubjects, limit));
                 }
 
                 Platform.runLater(() -> {
-                    showRows(rows);
+                    showRows(rows, queryResults);
                     btnApplyFilters.setDisable(false);
                     resetProgressBar();
                 });
@@ -1053,6 +1228,7 @@ public class RDFVisualisationController implements Initializable {
         Map<String, SubjectRows> bySubject = new LinkedHashMap<>();
         int total = 0;
         int matched = 0;
+        Set<String> matchingSubjects = new HashSet<>();
         boolean truncated = false;
 
         StmtIterator it = model.listStatements();
@@ -1072,6 +1248,7 @@ public class RDFVisualisationController implements Initializable {
                     continue;
                 }
                 matched++;
+                matchingSubjects.add(subject.raw());
 
                 SubjectRows rowsForSubject = bySubject.get(subject.raw());
                 if (rowsForSubject == null) {
@@ -1094,14 +1271,20 @@ public class RDFVisualisationController implements Initializable {
                 Comparator.comparing((TripleRow t) -> t.predicate().label(), String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(t -> t.object().label(), String.CASE_INSENSITIVE_ORDER)));
 
-        return new GraphRows(entry.name(), subjects, matched, total, truncated);
+        return new GraphRows(entry.name(), subjects, matchingSubjects.size(), matched, total, truncated);
     }
 
     /** Runs a SELECT ?s query over the textual-filter result, as both union and named graphs. */
     private static Set<String> executeSparqlSubjectFilter(String queryText, List<GraphEntry> entries, Filter filter) {
         Query query = QueryFactory.create(queryText);
-        if (!query.isSelectType() || !query.getResultVars().contains("s")) {
-            throw new IllegalArgumentException("The visualisation SPARQL filter must be a SELECT query that returns ?s");
+        if (!query.isSelectType()) {
+            throw new IllegalArgumentException("The visualisation query must be a SELECT query");
+        }
+        // A query with no ?s is still useful in Table view (for example SELECT ?class ?count).
+        // It cannot say which tree subjects to retain, so leave the tree governed by its other
+        // filters while the table shows the query's result columns and rows.
+        if (!query.getResultVars().contains("s")) {
+            return null;
         }
         Dataset dataset = DatasetFactory.createTxnMem();
         Model union = ModelFactory.createDefaultModel();
@@ -1144,11 +1327,17 @@ public class RDFVisualisationController implements Initializable {
                 : "_:" + node.asResource().getId().getLabelString();
     }
 
-    private void showRows(List<GraphRows> rows) {
+    private void showRows(List<GraphRows> rows, SparqlTools.QueryResults queryResults) {
         lastRows = rows;
         buildTreeItems();
         setStatus(statusText(rows));
         redrawGraphView();
+        if (queryResults != null) {
+            tableResults = queryResults;
+            displayTableResults(queryResults);
+        } else {
+            refreshTable();
+        }
     }
 
     /**
@@ -1184,8 +1373,9 @@ public class RDFVisualisationController implements Initializable {
         {
             List<TreeItem<NodeValue>> graphItems = new ArrayList<>(lastRows.size());
             for (GraphRows graph : lastRows) {
-                String label = graph.name() + "  (" + graph.subjects().size() + " subject"
-                        + (graph.subjects().size() == 1 ? "" : "s") + ", "
+                String label = graph.name() + "  (" + graph.subjectCount() + " subject"
+                        + (graph.subjectCount() == 1 ? "" : "s")
+                        + (graph.truncated() ? ", showing first " + graph.subjects().size() : "") + ", "
                         + graph.matched() + " of " + graph.total() + " triples)";
                 graphItems.add(new LazyItem(NodeValue.graph(label, graph.name()),
                         () -> groupedItems(graph)));
@@ -2037,7 +2227,7 @@ public class RDFVisualisationController implements Initializable {
     private record SubjectRows(Term subject, List<TripleRow> triples) {
     }
 
-    private record GraphRows(String name, List<SubjectRows> subjects, int matched, int total,
+    private record GraphRows(String name, List<SubjectRows> subjects, int subjectCount, int matched, int total,
                              boolean truncated) {
     }
 

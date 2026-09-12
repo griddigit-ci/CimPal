@@ -4,6 +4,7 @@ import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.PathMemory;
+import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.util.ModelFactory;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -12,6 +13,8 @@ import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TextArea;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -42,6 +45,10 @@ public class SparqlQueryTabController implements Initializable {
 
     @FXML
     private Label lblModelFiles;
+    @FXML
+    private ChoiceBox<String> cbBaseUri;
+    @FXML
+    private TextField tfBaseUri;
 
     @FXML
     private Label helpSelectModels;
@@ -54,6 +61,7 @@ public class SparqlQueryTabController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
+        BaseUriPresets.bind(cbBaseUri, tfBaseUri, "CIM 16");
         setStatus("Ready to edit or import a SPARQL SELECT query.");
         setCurrentQueryFile(null);
         updateModelFilesLabel();
@@ -66,6 +74,11 @@ public class SparqlQueryTabController implements Initializable {
 
     public void setMainController(MainController mainController) {
         this.mainController = mainController;
+    }
+
+    private String selectedBaseUri() {
+        String value = tfBaseUri == null ? "" : tfBaseUri.getText();
+        return value == null || value.isBlank() ? DEFAULT_XML_BASE : value.trim();
     }
 
     private void setProgressBar(double progress) {
@@ -236,7 +249,7 @@ public class SparqlQueryTabController implements Initializable {
             }
 
             setStatus("Loading RDF models...");
-            Model combinedModel = eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(selectedModelFiles, DEFAULT_XML_BASE);
+            Model combinedModel = eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(selectedModelFiles, selectedBaseUri());
             if (combinedModel == null || combinedModel.isEmpty()) {
                 throw new IllegalStateException("Failed to load RDF models from the selected files.");
             }

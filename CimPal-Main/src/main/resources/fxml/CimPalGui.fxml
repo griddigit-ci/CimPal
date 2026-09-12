@@ -69,11 +69,8 @@
    </MenuBar>
    <SplitPane fx:id="mainSplitPane" dividerPositions="0.8146067415730337" minHeight="0.0" minWidth="0.0" orientation="VERTICAL" VBox.vgrow="ALWAYS">
       <!--
-        The ten functions are grouped into three categories, so the landing view shows the three
-        areas of work rather than one row of ten equally-weighted tabs. The outer TabPane carries
-        the "category-tabs" class purely so base.css can weight its labels more heavily than the
-        inner row's - two identically styled header bands would read as a single confusing block.
-
+        One Operations toolbar keeps transversal tools (Visualise, Convert and SPARQL) visible
+        while category menus retain the context needed for distinct RDF and Dataset comparisons.
         Both halves of the SplitPane are TitledPanes: collapsing either one gives the whole height
         to the other, which is what lets the Output pane be read full-window without a resize drag.
         maxHeight is unbounded on both for that to work - a SplitPane never grows an item past its
@@ -83,31 +80,38 @@
       -->
       <TitledPane fx:id="workAreaContainer" animated="false" maxHeight="1.7976931348623157E308"
                   minHeight="0.0" minWidth="0.0" styleClass="pane-flush" text="Operations">
-         <TabPane fx:id="tabPaneMainCategories" minHeight="0.0" minWidth="0.0"
-                  styleClass="category-tabs" tabClosingPolicy="UNAVAILABLE">
-            <Tab text="SHACL Generation">
-               <TabPane minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
+         <VBox minHeight="0.0" minWidth="0.0" spacing="8.0">
+            <padding><Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/></padding>
+            <FlowPane hgap="8.0" vgap="8.0">
+               <Button mnemonicParsing="false" onAction="#actionShowVisualisation" styleClass="primary-action" text="Visualise"/>
+               <Button mnemonicParsing="false" onAction="#actionShowConvert" text="Convert"/>
+               <Button mnemonicParsing="false" onAction="#actionShowSparql" text="SPARQL"/>
+               <Separator orientation="VERTICAL"/>
+               <MenuButton mnemonicParsing="false" text="SHACL">
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfsToShacl" text="RDFS to SHACL"/><MenuItem mnemonicParsing="false" onAction="#actionShowConstraints" text="Constraints Operations"/></items>
+               </MenuButton>
+               <MenuButton mnemonicParsing="false" text="RDF">
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfComparison" text="Comparison"/></items>
+               </MenuButton>
+               <MenuButton mnemonicParsing="false" text="Dataset">
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowDatasetComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowGenerate" text="Generate"/><MenuItem mnemonicParsing="false" onAction="#actionShowTaskWizard" text="Task Wizard"/><MenuItem mnemonicParsing="false" onAction="#actionShowValidation" text="SHACL Validation"/></items>
+               </MenuButton>
+            </FlowPane>
+            <TabPane fx:id="tabPaneWorkspace" minHeight="0.0" minWidth="0.0" styleClass="workspace-tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+               <tabs>
+                  <Tab fx:id="tabRDFVisualisation" text="Visualisation"/>
+                  <Tab fx:id="tabRDFConvert" text="Convert"/>
+                  <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
                   <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
                   <Tab fx:id="tabExcelToSHACL" text="Constraints Operations"/>
-               </TabPane>
-            </Tab>
-            <Tab text="RDF Operations">
-               <TabPane minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
-                  <Tab fx:id="tabCreateCompleteSM1" text="Comparison"/>
-                  <Tab fx:id="tabRDFConvert" text="Convert"/>
-                  <Tab fx:id="tabRDFVisualisation" text="Visualisation"/>
-               </TabPane>
-            </Tab>
-            <Tab text="Dataset Operations">
-               <TabPane minHeight="0.0" minWidth="0.0" tabClosingPolicy="UNAVAILABLE">
-                  <Tab fx:id="tabInstanceDataComparison" text="Comparison"/>
+                  <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
+                  <Tab fx:id="tabInstanceDataComparison" text="Dataset Comparison"/>
                   <Tab fx:id="tabGenerateInstanceData" text="Generate"/>
                   <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
-                  <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
                   <Tab fx:id="tabValidationByMapping" text="SHACL Validation"/>
-               </TabPane>
-            </Tab>
-         </TabPane>
+               </tabs>
+            </TabPane>
+         </VBox>
       </TitledPane>
       <TitledPane fx:id="outputSourceContainer" animated="false" maxHeight="1.7976931348623157E308"
                   minHeight="0.0" minWidth="0.0" text="Output">

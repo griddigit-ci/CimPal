@@ -92,7 +92,7 @@ public class MainController implements Initializable {
 
     /** Outer row of the two-level tab structure: the three categories of work. */
     @FXML
-    private TabPane tabPaneMainCategories;
+    private TabPane tabPaneWorkspace;
     public Tab tabCreateCompleteSM1;
     public Tab tabInstanceDataComparison;
     public Tab tabExcelToSHACL;
@@ -378,28 +378,27 @@ public class MainController implements Initializable {
     }
 
     /**
-     * Brings a function tab to the front, selecting its category tab first. Used by the
-     * Tools menu items that only navigate; a plain {@code select(tab)} on the inner TabPane
-     * would leave the tab hidden behind another category.
+     * Brings a function workspace to the front from the single Operations toolbar.
      */
     private void selectFunctionTab(Tab functionTab) {
         if (functionTab == null) {
             return;
         }
-        TabPane functionPane = functionTab.getTabPane();
-        if (functionPane == null) {
-            return;
+        if (tabPaneWorkspace != null) {
+            tabPaneWorkspace.getSelectionModel().select(functionTab);
         }
-        if (tabPaneMainCategories != null) {
-            for (Tab category : tabPaneMainCategories.getTabs()) {
-                if (category.getContent() == functionPane) {
-                    tabPaneMainCategories.getSelectionModel().select(category);
-                    break;
-                }
-            }
-        }
-        functionPane.getSelectionModel().select(functionTab);
     }
+
+    @FXML private void actionShowVisualisation(ActionEvent event) { selectFunctionTab(tabRDFVisualisation); }
+    @FXML private void actionShowConvert(ActionEvent event) { selectFunctionTab(tabRDFConvert); }
+    @FXML private void actionShowSparql(ActionEvent event) { selectFunctionTab(tabSPARQLQuery); }
+    @FXML private void actionShowRdfsToShacl(ActionEvent event) { selectFunctionTab(tabRDFStoSHACL); }
+    @FXML private void actionShowConstraints(ActionEvent event) { selectFunctionTab(tabExcelToSHACL); }
+    @FXML private void actionShowRdfComparison(ActionEvent event) { selectFunctionTab(tabCreateCompleteSM1); }
+    @FXML private void actionShowDatasetComparison(ActionEvent event) { selectFunctionTab(tabInstanceDataComparison); }
+    @FXML private void actionShowGenerate(ActionEvent event) { selectFunctionTab(tabGenerateInstanceData); }
+    @FXML private void actionShowTaskWizard(ActionEvent event) { selectFunctionTab(tabTaskWizard); }
+    @FXML private void actionShowValidation(ActionEvent event) { selectFunctionTab(tabValidationByMapping); }
 
     private void initializeValidationByMappingTab() {
         try {
