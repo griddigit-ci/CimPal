@@ -1544,9 +1544,14 @@ deliverables, not extracted input data.</p>
         used by the mapping workflows; manual selection uses Jena.</td></tr>
 <tr><td>Parallel validation workers</td><td>choice</td>
     <td>Number of independent model validations run concurrently. <em>Auto (memory-aware)</em>
-        chooses a value from available CPU cores and Java heap size. It is used by all three
-        workflows. Increase explicit values gradually: each worker holds its own combined data
-        graph, and Python engines also start a Python process.</td></tr>
+        chooses a total work budget from available CPU cores and Java heap size. It first divides
+        that budget between concurrent timestamp validations, then gives unused workers to
+        independent SHACL target shapes for a single graph. Each target-shape worker retains the
+        complete resolved shapes graph, so imports, property-shape references, deactivated
+        constraints, prefixes and messages remain correct; CimPal merges the findings into the
+        usual report. This fallback also applies when there is only one timestamp or one data
+        graph to validate. It is used by all three workflows. Increase explicit values gradually:
+        each worker holds validation state, and Python engines also start a Python process.</td></tr>
 <tr><td>Sample validation: stop after 10 results per shape</td><td>checkbox</td>
     <td>Retains at most ten findings for each source shape, across violations, warnings and
         information results. In the mapping workflows, Jena stops that target shape and marks the

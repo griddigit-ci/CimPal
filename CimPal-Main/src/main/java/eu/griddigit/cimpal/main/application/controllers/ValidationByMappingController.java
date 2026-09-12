@@ -1118,6 +1118,12 @@ public class ValidationByMappingController {
             }
         }
 
+        // The core timestamped workflow needs to distinguish Auto from a user-selected worker
+        // count so it can divide its bounded budget between row and target-shape validation.
+        if (timestampedWorkflow) {
+            return 0;
+        }
+
         int availableWorkers = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
         long heapGiB = Math.max(1, Runtime.getRuntime().maxMemory() / (1024L * 1024L * 1024L));
         int memoryWorkers = Math.max(1, (int) (heapGiB / 6));

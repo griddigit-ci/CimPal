@@ -12,6 +12,7 @@ import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.shacl.ShaclValidator;
+import org.apache.jena.shacl.Shapes;
 import org.apache.jena.shacl.ValidationReport;
 import org.topbraid.shacl.vocabulary.SH;
 
@@ -73,6 +74,12 @@ public class ShaclAutoTester {
         this.maxResultsPerConstraint = Math.max(0, maxResultsPerConstraint);
     }
 
+    private static int workersForModel(int totalWorkers, int activeModels, int modelNumber) {
+        int baseWorkers = totalWorkers / activeModels;
+        int extraWorkers = totalWorkers % activeModels;
+        return baseWorkers + (modelNumber < extraWorkers ? 1 : 0);
+    }
+
     private void updateProgress(double progress) {
         if (callback != null) {
             callback.updateProgress(progress);
@@ -121,16 +128,19 @@ public class ShaclAutoTester {
         ValidationTools.logValidationDebug("manual: prevalidate models=" + uniqueModels.size()
                 + " workers=" + validationWorkers + " resultLimit=" + maxResultsPerConstraint);
         long validationStart = System.currentTimeMillis();
-        ExecutorService validationPool = Executors.newFixedThreadPool(validationWorkers);
+        int activeModels = Math.min(validationWorkers, uniqueModels.size());
+        ExecutorService validationPool = Executors.newFixedThreadPool(Math.max(1, activeModels));
         try {
+            int modelNumber = 0;
             for (File modelFile : uniqueModels) {
+                int targetShapeWorkers = workersForModel(validationWorkers, Math.max(1, activeModels), modelNumber++);
                 validationPool.submit(() -> {
                     String cacheKey = modelFile.getName();
                     try {
                         Model dataModel = loadDataModel(modelFile);
                         modelCache.put(cacheKey, dataModel);
-                        validationCache.put(cacheKey, ShaclValidator.get().validate(
-                                shaclModel.getGraph(), dataModel.getGraph()));
+                        validationCache.put(cacheKey, ValidationTools.validateJenaTargetShapes(
+                                Shapes.parse(shaclModel.getGraph()), dataModel.getGraph(), targetShapeWorkers));
                     } catch (Exception e) {
                         logger.logValidationError(modelFile.getName(), e.getMessage());
                         ValidationTools.logValidationDebug("manual: validation error "
@@ -183,8 +193,8 @@ public class ShaclAutoTester {
                 report = validationCache.get(cacheKey);
                 try {
                     if (report == null) {
-                        report = ShaclValidator.get().validate(
-                                shaclModel.getGraph(), dataModel.getGraph());
+                        report = ValidationTools.validateJenaTargetShapes(
+                                Shapes.parse(shaclModel.getGraph()), dataModel.getGraph(), validationWorkers);
                         validationCache.put(cacheKey, report);
                     }
                 } catch (Exception e) {
@@ -230,8 +240,8 @@ public class ShaclAutoTester {
                 report = validationCache.get(cacheKey);
                 try {
                     if (report == null) {
-                        report = ShaclValidator.get().validate(
-                                shaclModel.getGraph(), dataModel.getGraph());
+                        report = ValidationTools.validateJenaTargetShapes(
+                                Shapes.parse(shaclModel.getGraph()), dataModel.getGraph(), validationWorkers);
                         validationCache.put(cacheKey, report);
                     }
                 } catch (Exception e) {

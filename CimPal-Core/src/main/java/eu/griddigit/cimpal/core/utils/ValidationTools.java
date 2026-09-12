@@ -356,9 +356,8 @@ public class ValidationTools {
 
         List<MappingRow> mappingRows = readMappingCsv(mappingCsvPath);
 
-        int threads = (threadCount > 0)
-                ? threadCount
-                : Math.min(Math.max(1, Runtime.getRuntime().availableProcessors() - 1), 6);
+        TimestampExecutionPlan executionPlan = TimestampExecutionPlan.create(threadCount, validationEngine);
+        int threads = executionPlan.rowWorkers();
 
         consoleInput("validateByTimestampedMapping");
         consoleInput("mappingCsvPath=" + mappingCsvPath.toAbsolutePath());
@@ -366,7 +365,8 @@ public class ValidationTools {
         consoleInput("constraintsRoot=" + constraintsRoot.toAbsolutePath());
         consoleInput("outputBaseDir=" + outputBaseDir.toAbsolutePath());
         consoleInput("mapping rows=" + mappingRows.size());
-        consoleInput("threads=" + threads);
+        consoleInput("timestamp parallelism=" + executionPlan.timestampWorkers()
+                + " row workers per timestamp=" + threads);
         consoleInput("max results per constraint="
                 + (maxResultsPerConstraint == 0 ? "unlimited" : maxResultsPerConstraint));
         consoleInput("validation engine=" + validationEngine.displayName());
@@ -422,6 +422,29 @@ public class ValidationTools {
 
                 try (ValidationExcelWriter summaryWriter = ValidationExcelWriter.createTimestampedSummaryWriter()) {
 
+                    // Resolve and record input checks on this (writer-owning) thread.  The
+                    // resulting graph validations are independent and can safely share only the
+                    // concurrent shape/static-model caches.
+                    Map<TimestampGroup, ResolvedRowsAndInputChecks> plannedTimestamps = new LinkedHashMap<>();
+                    for (TimestampGroup timestampGroup : tsoIndex.byTimestamp.values()) {
+                        ResolvedRowsAndInputChecks resolved = buildResolvedRowsForTimestampKeepingPairings(
+                                mappingRows, tsoIndex, timestampGroup, constraintsRoot);
+                        appendMappingRowInputChecks(summaryWriter, resolved.inputChecks);
+                        appendMappingRowInputChecks(allCountriesSummaryWriter, resolved.inputChecks);
+                        if (resolved.resolvedRows.isEmpty()) {
+                            logWarn("No resolved validation rows for inputGroup=" + inputGroup.name
+                                    + " timestamp=" + timestampGroup.timestamp);
+                        } else {
+                            plannedTimestamps.put(timestampGroup, resolved);
+                        }
+                    }
+
+                    Map<TimestampGroup, List<ValidationTaskResult>> timestampResults =
+                            executeTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
+                                    shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
+                                    dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
+                                    threadCount <= 0, inputGroup.name);
+
                     for (TimestampGroup timestampGroup : tsoIndex.byTimestamp.values()) {
                         long timestampStart = System.currentTimeMillis();
 
@@ -431,57 +454,11 @@ public class ValidationTools {
                         printMemory("before timestamp run "
                                 + inputGroup.name + " " + timestampGroup.timestamp);
 
-                        ResolvedRowsAndInputChecks resolved =
-                                buildResolvedRowsForTimestampKeepingPairings(
-                                        mappingRows,
-                                        tsoIndex,
-                                        timestampGroup,
-                                        constraintsRoot
-                                );
+                        ResolvedRowsAndInputChecks resolved = plannedTimestamps.get(timestampGroup);
+                        if (resolved == null) continue;
 
                         List<ResolvedMappingRow> resolvedRows = resolved.resolvedRows;
-
-                        appendMappingRowInputChecks(
-                                summaryWriter,
-                                resolved.inputChecks
-                        );
-
-                        appendMappingRowInputChecks(
-                                allCountriesSummaryWriter,
-                                resolved.inputChecks
-                        );
-
-                        if (resolvedRows.isEmpty()) {
-                            logWarn("No resolved validation rows for inputGroup="
-                                    + inputGroup.name + " timestamp=" + timestampGroup.timestamp);
-
-                            continue;
-                        }
-
-                        Map<Path, Model> timestampXmlModelCache = new ConcurrentHashMap<>();
-
-                        List<ValidationTaskResult> results;
-
-                        try {
-                            results = executeResolvedRows(
-                                    resolvedRows,
-                                    constraintsRoot,
-                                    shapesCache,
-                                    staticXmlModelCache,
-                                    timestampXmlModelCache,
-                                    inputGroup.zipEntriesByVirtualPath,
-                                    threads,
-                                    dataTypeMap,
-                                    xmlBase,
-                                    maxResultsPerConstraint,
-                                    validationEngine
-                            );
-                        } finally {
-                            timestampXmlModelCache.clear();
-
-                            printMemory("after clearing timestampXmlModelCache "
-                                    + inputGroup.name + " " + timestampGroup.timestamp);
-                        }
+                        List<ValidationTaskResult> results = timestampResults.get(timestampGroup);
 
                         for (ValidationTaskResult r : results) {
                             if (r.error != null) totalErrors++;
@@ -729,12 +706,12 @@ public class ValidationTools {
 
         Map<String, Model> shapesCache = new ConcurrentHashMap<>();
 
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
         List<Callable<ValidationTaskResult>> tasks = new ArrayList<>();
 
         dbg("START create validation tasks");
 
         int rowIdx = 0;
+        List<Map.Entry<Integer, MappingRow>> runnableRows = new ArrayList<>();
         for (MappingRow row : rows) {
             rowIdx++;
             final int idx = rowIdx;
@@ -746,11 +723,21 @@ public class ValidationTools {
             }
 
             dbgRow(idx, "ADD task ttl=" + row.ttl + " xmlRaw=" + shortValue(row.xmlInputsRaw, 300));
+            runnableRows.add(Map.entry(idx, row));
+        }
 
+        int activeRows = Math.min(threads, runnableRows.size());
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, activeRows));
+        for (int taskNumber = 0; taskNumber < runnableRows.size(); taskNumber++) {
+            Map.Entry<Integer, MappingRow> runnableRow = runnableRows.get(taskNumber);
+            MappingRow row = runnableRow.getValue();
+            int idx = runnableRow.getKey();
+            int targetShapeWorkers = activeRows == 0 ? 1 : workersForRow(threads, activeRows, taskNumber);
             tasks.add(() -> {
                 try {
                     return validateOneRow(idx, row, modelsBaseDir, constraintsRoot, shapesCache,
-                            dataTypeMap, xmlBase, maxResultsPerConstraint, selectedValidationEngine);
+                            dataTypeMap, xmlBase, maxResultsPerConstraint, selectedValidationEngine,
+                            targetShapeWorkers);
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName() + "][row " + idx + "]");
                     logError("Unhandled exception", t);
@@ -1007,7 +994,8 @@ public class ValidationTools {
                                                        Map<String, RDFDatatype> dataTypeMap,
                                                        String xmlBase,
                                                        int maxResultsPerConstraint,
-                                                       ValidationEngine validationEngine) {
+                                                       ValidationEngine validationEngine,
+                                                       int targetShapeWorkers) {
 
         long rowStart = System.currentTimeMillis();
 
@@ -1133,7 +1121,7 @@ public class ValidationTools {
 
             LimitedValidationOutcome validationOutcome = validateWithSelectedEngine(
                     validationEngine, Shapes.parse(shapesModel.getGraph()), dataModel.getGraph(), shapesModel,
-                    maxResultsPerConstraint, rowIdx);
+                    maxResultsPerConstraint, rowIdx, targetShapeWorkers);
             List<SHACLValidationResult> results = validationOutcome.results();
             boolean conforms = validationOutcome.conforms();
 
@@ -3091,6 +3079,28 @@ public class ValidationTools {
     }
 
     /**
+     * Keeps Auto's worker budget bounded. When a timestamp has fewer mapping rows than the
+     * budget, spare workers validate independent SHACL target shapes for those rows.
+     * Explicit worker selections remain a fixed row-worker budget for backwards compatibility.
+     */
+    private record TimestampExecutionPlan(int timestampWorkers, int rowWorkers) {
+        static TimestampExecutionPlan create(int requestedWorkers, ValidationEngine engine) {
+            if (requestedWorkers > 0) {
+                return new TimestampExecutionPlan(1, requestedWorkers);
+            }
+            int cores = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+            long heapGiB = Math.max(1, Runtime.getRuntime().maxMemory() / (1024L * 1024L * 1024L));
+            int heapWorkers = Math.max(1, (int) (heapGiB / 6));
+            int engineCap = engine == ValidationEngine.APACHE_JENA ? 8 : 4;
+            int budget = Math.clamp(Math.min(cores, Math.min(heapWorkers, engineCap)), 1, engineCap);
+            // The total budget remains bounded: a batch with N active timestamps gives each a
+            // share of these workers.  Do not impose a second timestamp cap here; spare capacity
+            // should be usable by further independent timestamps when memory and CPU allow it.
+            return new TimestampExecutionPlan(budget, budget);
+        }
+    }
+
+    /**
      * Produces one parsed Jena Shapes object for the exact set of roots selected by a mapping
      * row. Each root still contributes its full owl:imports closure; RDF set semantics remove
      * overlapping imported triples. The canonical cache key makes the combination reusable for
@@ -4974,12 +4984,17 @@ public class ValidationTools {
                                                                   Map<String, RDFDatatype> dataTypeMap,
                                                                   String xmlBase,
                                                                   int maxResultsPerConstraint,
-                                                                  ValidationEngine validationEngine) throws IOException {
+                                                                  ValidationEngine validationEngine,
+                                                                  boolean useSpareWorkersForTargetShapes) throws IOException {
 
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        int activeRows = Math.min(threads, resolvedRows.size());
+        ExecutorService pool = Executors.newFixedThreadPool(activeRows);
         List<Callable<ValidationTaskResult>> tasks = new ArrayList<>();
 
-        for (ResolvedMappingRow row : resolvedRows) {
+        for (int rowNumber = 0; rowNumber < resolvedRows.size(); rowNumber++) {
+            ResolvedMappingRow row = resolvedRows.get(rowNumber);
+            int targetShapeWorkers = useSpareWorkersForTargetShapes
+                    ? workersForRow(threads, activeRows, rowNumber) : 1;
             tasks.add(() -> {
                 try {
                     return validateOneResolvedRow(
@@ -4992,7 +5007,8 @@ public class ValidationTools {
                             dataTypeMap,
                             xmlBase,
                             maxResultsPerConstraint,
-                            validationEngine
+                            validationEngine,
+                            targetShapeWorkers
                     );
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName()
@@ -5061,6 +5077,78 @@ public class ValidationTools {
         return results;
     }
 
+    /**
+     * Runs timestamp graphs in small bounded batches.  The plan's row-worker budget is split
+     * between only the timestamps that are active in a batch, so two concurrent timestamps do
+     * not each create a full worker pool.
+     */
+    private static Map<TimestampGroup, List<ValidationTaskResult>> executeTimestampBatches(
+            Map<TimestampGroup, ResolvedRowsAndInputChecks> plannedTimestamps,
+            TimestampExecutionPlan plan,
+            Path constraintsRoot,
+            Map<String, CachedShapes> shapesCache,
+            Map<Path, Model> staticXmlModelCache,
+            Map<Path, ZipXmlEntry> zipEntriesByVirtualPath,
+            Map<String, RDFDatatype> dataTypeMap,
+            String xmlBase,
+            int maxResultsPerConstraint,
+            ValidationEngine validationEngine,
+            boolean useSpareWorkersForTargetShapes,
+            String inputGroupName) throws IOException {
+        Map<TimestampGroup, List<ValidationTaskResult>> results = new LinkedHashMap<>();
+        List<Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks>> entries =
+                new ArrayList<>(plannedTimestamps.entrySet());
+        for (int first = 0; first < entries.size(); first += plan.timestampWorkers()) {
+            List<Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks>> batch = entries.subList(first,
+                    Math.min(entries.size(), first + plan.timestampWorkers()));
+            ExecutorService pool = Executors.newFixedThreadPool(batch.size());
+            try {
+                List<Future<List<ValidationTaskResult>>> futures = new ArrayList<>();
+                for (int timestampNumber = 0; timestampNumber < batch.size(); timestampNumber++) {
+                    Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks> entry = batch.get(timestampNumber);
+                    int rowBudget = workersForRow(plan.rowWorkers(), batch.size(), timestampNumber);
+                    futures.add(pool.submit(() -> {
+                        TimestampGroup group = entry.getKey();
+                        Map<Path, Model> timestampXmlModelCache = new ConcurrentHashMap<>();
+                        try {
+                            logInfo("START timestamp validation batch inputGroup=" + inputGroupName
+                                    + " timestamp=" + group.timestamp + " rowWorkers=" + rowBudget);
+                            return executeResolvedRows(entry.getValue().resolvedRows, constraintsRoot, shapesCache,
+                                    staticXmlModelCache, timestampXmlModelCache, zipEntriesByVirtualPath, rowBudget,
+                                    dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
+                                    useSpareWorkersForTargetShapes);
+                        } finally {
+                            timestampXmlModelCache.clear();
+                            printMemory("after clearing timestampXmlModelCache " + inputGroupName
+                                    + " " + group.timestamp);
+                        }
+                    }));
+                }
+                for (int i = 0; i < futures.size(); i++) {
+                    try {
+                        results.put(batch.get(i).getKey(), futures.get(i).get(FUTURE_TIMEOUT_MINUTES,
+                                TimeUnit.MINUTES));
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Timestamp batch validation interrupted", ex);
+                    } catch (ExecutionException | TimeoutException ex) {
+                        futures.get(i).cancel(true);
+                        throw new IOException("Timestamp batch validation failed", ex);
+                    }
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+        }
+        return results;
+    }
+
+    private static int workersForRow(int totalWorkers, int activeRows, int rowNumber) {
+        int baseWorkers = totalWorkers / activeRows;
+        int extraWorkers = totalWorkers % activeRows;
+        return baseWorkers + (rowNumber < extraWorkers ? 1 : 0);
+    }
+
     private static void consoleInput(String message) {
         System.out.println("[INPUT] " + message);
     }
@@ -5105,7 +5193,8 @@ public class ValidationTools {
                                                                Map<String, RDFDatatype> dataTypeMap,
                                                                String xmlBase,
                                                                int maxResultsPerConstraint,
-                                                               ValidationEngine validationEngine) {
+                                                               ValidationEngine validationEngine,
+                                                               int targetShapeWorkers) {
 
         long rowStart = System.currentTimeMillis();
 
@@ -5171,7 +5260,7 @@ public class ValidationTools {
             long validationStart = System.currentTimeMillis();
             LimitedValidationOutcome limitedOutcome = validateWithSelectedEngine(
                     validationEngine, cachedShapes.shapes(), dataGraph, shapesModel,
-                    maxResultsPerConstraint, row.rowIdx);
+                    maxResultsPerConstraint, row.rowIdx, targetShapeWorkers);
             dbgRow(row.rowIdx, "DONE timestamped SHACL validation"
                     + " conforms=" + limitedOutcome.conforms()
                     + (limitedOutcome.partial() ? " partial=true" : ""), validationStart);
@@ -5247,12 +5336,14 @@ public class ValidationTools {
                                                                         Graph dataGraph,
                                                                         Model shapesModel,
                                                                         int maxResultsPerConstraint,
-                                                                        int rowIdx)
+                                                                        int rowIdx,
+                                                                        int targetShapeWorkers)
             throws IOException, InterruptedException {
         if (engine == ValidationEngine.APACHE_JENA) {
             return maxResultsPerConstraint == 0
-                    ? validateCompletely(shapes, dataGraph, shapesModel)
-                    : validateWithResultLimit(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx);
+                    ? validateCompletely(shapes, dataGraph, shapesModel, rowIdx, targetShapeWorkers)
+                    : validateWithResultLimit(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx,
+                            targetShapeWorkers);
         }
 
         PythonShaclValidator.Outcome outcome = PythonShaclValidator.validate(
@@ -5270,13 +5361,10 @@ public class ValidationTools {
     }
     private static LimitedValidationOutcome validateCompletely(Shapes shapes,
                                                                 Graph dataGraph,
-                                                                Model shapesModel) {
-        ValidationReport report = ShaclValidator.get().validate(shapes, dataGraph);
-        return new LimitedValidationOutcome(
-                ShaclTools.extractSHACLValidationResults(report, shapesModel),
-                report.conforms(),
-                false
-        );
+                                                                Model shapesModel,
+                                                                int rowIdx,
+                                                                int targetShapeWorkers) {
+        return validateTargetShapes(shapes, dataGraph, shapesModel, 0, rowIdx, targetShapeWorkers);
     }
 
     /**
@@ -5293,42 +5381,125 @@ public class ValidationTools {
                                                                       Graph dataGraph,
                                                                       Model shapesModel,
                                                                       int maxResultsPerConstraint,
-                                                                      int rowIdx) {
-        List<SHACLValidationResult> combinedResults = new ArrayList<>();
-        boolean partial = false;
-
-        for (Shape targetShape : shapes.getTargetShapes()) {
-            long targetShapeStart = System.currentTimeMillis();
-            int focusNodeCount = 0;
-            boolean targetShapePartial = false;
-            ResultLimitListener listener = new ResultLimitListener(maxResultsPerConstraint);
-            ValidationContext context = ValidationContext.create(shapes, dataGraph, listener);
-
-            try {
-                for (org.apache.jena.graph.Node focusNode : VLib.focusNodes(dataGraph, targetShape)) {
-                    focusNodeCount++;
-                    ValidationProc.execValidateShape(context, dataGraph, targetShape, focusNode);
-                }
-            } catch (ResultLimitReached ex) {
-                partial = true;
-                targetShapePartial = true;
-            }
-
-            ValidationReport targetReport = context.generateReport();
-            List<SHACLValidationResult> targetResults =
-                    ShaclTools.extractSHACLValidationResults(targetReport, shapesModel);
-            combinedResults.addAll(targetResults);
-            dbgRow(rowIdx, "DONE sampled target shape=" + targetShape.getShapeNode()
-                    + " focusNodes=" + focusNodeCount
-                    + " resultCount=" + targetResults.size()
-                    + (targetShapePartial ? " partial=true" : ""), targetShapeStart);
-        }
-
-        List<SHACLValidationResult> distinctResults = new ArrayList<>(new LinkedHashSet<>(combinedResults));
-        List<SHACLValidationResult> limitedResults = limitResultsPerConstraint(
-                distinctResults, maxResultsPerConstraint);
-        return new LimitedValidationOutcome(limitedResults, !partial && limitedResults.isEmpty(), partial);
+                                                                      int rowIdx,
+                                                                      int targetShapeWorkers) {
+        return validateTargetShapes(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx,
+                targetShapeWorkers);
     }
+
+    /** Validates independent Jena target shapes concurrently without exceeding a row's budget. */
+    private static LimitedValidationOutcome validateTargetShapes(Shapes shapes, Graph dataGraph, Model shapesModel,
+                                                                   int maxResultsPerConstraint, int rowIdx,
+                                                                   int targetShapeWorkers) {
+        List<Shape> targetShapes = new ArrayList<>(shapes.getTargetShapes());
+        if (targetShapes.isEmpty()) return new LimitedValidationOutcome(List.of(), true, false);
+        int workerCount = Math.min(Math.max(1, targetShapeWorkers), targetShapes.size());
+        if (workerCount == 1) {
+            return mergeTargetShapeOutcomes(targetShapes.stream().map(shape -> validateTargetShape(
+                    shapes, dataGraph, shapesModel, shape, maxResultsPerConstraint, rowIdx)).toList(),
+                    maxResultsPerConstraint);
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<TargetShapeOutcome>> futures = new ArrayList<>();
+            for (Shape targetShape : targetShapes) futures.add(pool.submit(() -> validateTargetShape(
+                    shapes, dataGraph, shapesModel, targetShape, maxResultsPerConstraint, rowIdx)));
+            List<TargetShapeOutcome> outcomes = new ArrayList<>();
+            for (Future<TargetShapeOutcome> future : futures) {
+                try {
+                    outcomes.add(future.get(FUTURE_TIMEOUT_MINUTES, TimeUnit.MINUTES));
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Target-shape validation interrupted", ex);
+                } catch (ExecutionException | TimeoutException ex) {
+                    future.cancel(true);
+                    throw new IOException("Target-shape validation failed", ex);
+                }
+            }
+            return mergeTargetShapeOutcomes(outcomes, maxResultsPerConstraint);
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static TargetShapeOutcome validateTargetShape(Shapes shapes, Graph dataGraph, Model shapesModel,
+                                                            Shape targetShape, int maxResultsPerConstraint,
+                                                            int rowIdx) {
+        long started = System.currentTimeMillis();
+        int focusNodeCount = 0;
+        boolean partial = false;
+        ValidationContext context = maxResultsPerConstraint == 0
+                ? ValidationContext.create(shapes, dataGraph)
+                : ValidationContext.create(shapes, dataGraph, new ResultLimitListener(maxResultsPerConstraint));
+        try {
+            for (org.apache.jena.graph.Node focusNode : VLib.focusNodes(dataGraph, targetShape)) {
+                focusNodeCount++;
+                ValidationProc.execValidateShape(context, dataGraph, targetShape, focusNode);
+            }
+        } catch (ResultLimitReached ex) {
+            partial = true;
+        }
+        ValidationReport report = context.generateReport();
+        List<SHACLValidationResult> results = ShaclTools.extractSHACLValidationResults(report, shapesModel);
+        dbgRow(rowIdx, "DONE target shape=" + targetShape.getShapeNode() + " focusNodes=" + focusNodeCount
+                + " resultCount=" + results.size() + (partial ? " partial=true" : ""), started);
+        return new TargetShapeOutcome(results, report, report.conforms(), partial);
+    }
+
+    private static LimitedValidationOutcome mergeTargetShapeOutcomes(List<TargetShapeOutcome> outcomes,
+                                                                       int maxResultsPerConstraint) {
+        List<SHACLValidationResult> combined = new ArrayList<>();
+        boolean partial = false;
+        boolean conforms = true;
+        for (TargetShapeOutcome outcome : outcomes) {
+            combined.addAll(outcome.results());
+            partial |= outcome.partial();
+            conforms &= outcome.conforms();
+        }
+        List<SHACLValidationResult> distinct = new ArrayList<>(new LinkedHashSet<>(combined));
+        List<SHACLValidationResult> results = maxResultsPerConstraint == 0 ? distinct
+                : limitResultsPerConstraint(distinct, maxResultsPerConstraint);
+        return new LimitedValidationOutcome(results, !partial && conforms, partial);
+    }
+
+    /**
+     * Validates a graph by independent target shapes, for workflows that do not have mapping
+     * rows to parallelise (for example manual rule testing).
+     */
+    public static ValidationReport validateJenaTargetShapes(Shapes shapes, Graph dataGraph, int workers) {
+        List<Shape> targetShapes = new ArrayList<>(shapes.getTargetShapes());
+        if (targetShapes.isEmpty()) return ValidationReport.reportConformsTrue();
+        int workerCount = Math.min(Math.max(1, workers), targetShapes.size());
+        ExecutorService pool = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<TargetShapeOutcome>> futures = new ArrayList<>();
+            Model shapesModel = ModelFactory.createModelForGraph(shapes.getGraph());
+            for (Shape targetShape : targetShapes) futures.add(pool.submit(() -> validateTargetShape(
+                    shapes, dataGraph, shapesModel, targetShape, 0, -1)));
+            ValidationReport.Builder merged = ValidationReport.create();
+            for (Future<TargetShapeOutcome> future : futures) {
+                try {
+                    for (var entry : future.get(FUTURE_TIMEOUT_MINUTES, TimeUnit.MINUTES).report().getEntries()) {
+                        merged.addReportEntry(entry);
+                    }
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Target-shape validation interrupted", ex);
+                } catch (ExecutionException | TimeoutException ex) {
+                    future.cancel(true);
+                    throw new IllegalStateException("Target-shape validation failed", ex);
+                }
+            }
+            return merged.build();
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private record TargetShapeOutcome(List<SHACLValidationResult> results, ValidationReport report,
+                                      boolean conforms, boolean partial) {}
 
     /** Keeps the first {@code maxResultsPerConstraint} report rows for each SHACL source shape. */
     private static List<SHACLValidationResult> limitResultsPerConstraint(
