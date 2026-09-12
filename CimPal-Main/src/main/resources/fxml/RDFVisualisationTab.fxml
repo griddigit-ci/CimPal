@@ -47,6 +47,8 @@
             <Button fx:id="btnRemoveGraph" mnemonicParsing="false" onAction="#actionRemoveSelectedGraph"
                     text="Remove selected"/>
             <Button fx:id="btnClearAll" mnemonicParsing="false" onAction="#actionClearAll" text="Reset"/>
+            <Button fx:id="btnPreparePowsybl" mnemonicParsing="false" onAction="#actionPreparePowsybl" text="Prepare PowsyBl"/>
+            <Button fx:id="btnReleasePowsybl" mnemonicParsing="false" onAction="#actionReleasePowsybl" text="Release PowsyBl"/>
             <Button fx:id="btnToggleTreePane" mnemonicParsing="false"
                     onAction="#actionToggleTreePane" text="Hide graph browser"/>
             <Label fx:id="helpPanes" styleClass="help-badge" text="?"/>
@@ -130,7 +132,7 @@
                <Insets left="8.0" right="8.0"/>
             </padding>
             <HBox alignment="CENTER_LEFT" spacing="8.0">
-               <Label styleClass="section-title" text="Graph browser"/>
+               <ComboBox fx:id="cbBrowserMode" onAction="#actionBrowserModeChanged" prefWidth="155.0"/>
                <Label fx:id="helpTree" styleClass="help-badge" text="?"/>
                <Region HBox.hgrow="ALWAYS"/>
                <Label text="Group by:"/>
@@ -177,6 +179,16 @@
                        styleClass="icon-button" text="G">
                   <tooltip><Tooltip text="Show or hide graph metadata in the table"/></tooltip>
                </Button>
+               <ComboBox fx:id="cbGridDiagram" onAction="#actionGridDiagramChanged" prefWidth="175.0"
+                         visible="false" managed="false"/>
+               <Button fx:id="btnGenerateGrid" mnemonicParsing="false" onAction="#actionGenerateGrid"
+                       styleClass="icon-button" text="▶" visible="false" managed="false">
+                  <tooltip><Tooltip text="Generate the selected PowsyBl diagram"/></tooltip>
+               </Button>
+               <Button fx:id="btnPowerFlow" mnemonicParsing="false" onAction="#actionShowPowerFlowSettings"
+                       styleClass="icon-button" text="⚙" visible="false" managed="false">
+                  <tooltip><Tooltip text="Configure and run Powsybl power flow"/></tooltip>
+               </Button>
                <Button fx:id="btnExportTable" mnemonicParsing="false" onAction="#actionExportTable"
                        styleClass="icon-button" text="XLS" visible="false" managed="false">
                   <tooltip><Tooltip text="Export the current table to Excel"/></tooltip>
@@ -190,6 +202,10 @@
             <StackPane minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
                <RdfGraphView fx:id="graphView" minHeight="0.0" minWidth="0.0"/>
                <TableView fx:id="tvGraphData" managed="false" minHeight="0.0" minWidth="0.0" visible="false"/>
+               <!-- WebView may only be constructed on the FX application thread. MainGUI loads
+                    this FXML during Application.init(), so the controller creates it later and
+                    inserts it into this host once JavaFX is running. -->
+               <StackPane fx:id="gridViewHost" managed="false" minHeight="0.0" minWidth="0.0" visible="false"/>
             </StackPane>
          </VBox>
       </SplitPane>

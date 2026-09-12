@@ -18,6 +18,18 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.powsybl</groupId>
+                <artifactId>powsybl-dependencies</artifactId>
+                <version>${powsybl.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
 
     <build>
         <finalName>CimPal</finalName>
@@ -212,6 +224,41 @@
         </plugins>
     </build>
     <dependencies>
+        <!-- CGMES import, SVG diagram generation and the OpenLoadFlow implementation. -->
+        <dependency>
+            <groupId>com.powsybl</groupId>
+            <artifactId>powsybl-cgmes-conversion</artifactId>
+        </dependency>
+        <!-- CGMES conversion selects its triple-store implementation through ServiceLoader.
+             The RDF4J provider is test-scoped upstream, so embedded applications must add it. -->
+        <dependency>
+            <groupId>com.powsybl</groupId>
+            <artifactId>powsybl-triple-store-impl-rdf4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.powsybl</groupId>
+            <artifactId>powsybl-iidm-impl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.powsybl</groupId>
+            <artifactId>powsybl-open-loadflow</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.powsybl</groupId>
+            <artifactId>powsybl-single-line-diagram-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.powsybl</groupId>
+            <artifactId>powsybl-network-area-diagram</artifactId>
+        </dependency>
+        <!-- powsybl-commons exposes a ServiceLoader importer that uses Zstandard streams.
+             It is optional upstream, but cannot be optional in CimPal because the shaded app
+             discovers every registered importer at runtime. -->
+        <dependency>
+            <groupId>com.github.luben</groupId>
+            <artifactId>zstd-jni</artifactId>
+            <version>1.5.7-10</version>
+        </dependency>
         <dependency>
             <groupId>eu.griddigit.CimPal</groupId>
             <artifactId>CimPal-Core</artifactId>

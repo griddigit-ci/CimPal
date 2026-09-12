@@ -53,6 +53,13 @@ module CimPal.Main {
     requires org.apache.jena.shacl;
     requires CimPal.Core;
     requires CimPal.CustomWriter;
+    // PowsyBl's ServiceLoader discovers its compressed-network importer at runtime.  The
+    // importer references ZstdInputStream, so a named CimPal module must resolve zstd-jni even
+    // though application code does not import it directly.
+    requires com.github.luben.zstd_jni;
+    // CGMES import obtains this RDF4J implementation through ServiceLoader. It is an automatic
+    // module, so named CimPal launches must explicitly bring it into the module graph.
+    requires com.powsybl.triplestore.impl.rdf4j;
 
     //requires smartgraph;
 }

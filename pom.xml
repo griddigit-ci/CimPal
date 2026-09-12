@@ -13,6 +13,8 @@
         <javafx.version>25.0.3</javafx.version>
         <cyclonedx.plugin.version>2.9.1</cyclonedx.plugin.version>
         <dependency.check.plugin.version>12.1.0</dependency.check.plugin.version>
+        <!-- Keep every PowSyBl module on one compatible release train. -->
+        <powsybl.version>2026.1.0</powsybl.version>
     </properties>
 
     <groupId>eu.griddigit.CimPal</groupId>

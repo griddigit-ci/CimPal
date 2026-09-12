@@ -8,6 +8,7 @@ import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.RdfGraphView;
+import eu.griddigit.cimpal.main.gui.PowsyblBridge;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -19,9 +20,12 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Alert;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
@@ -37,6 +41,8 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.web.WebView;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.DatasetFactory;
@@ -182,6 +188,8 @@ public class RDFVisualisationController implements Initializable {
     private Button btnRemoveGraph;
     @FXML
     private Button btnClearAll;
+    @FXML private Button btnPreparePowsybl;
+    @FXML private Button btnReleasePowsybl;
     @FXML
     private TreeView<NodeValue> tvGraph;
     @FXML
@@ -202,6 +210,8 @@ public class RDFVisualisationController implements Initializable {
     private Button btnToggleTreePane;
     @FXML
     private ComboBox<Grouping> cbGrouping;
+    @FXML
+    private ComboBox<BrowserMode> cbBrowserMode;
     @FXML
     private SplitPane visualisationSplitPane;
     @FXML
@@ -226,8 +236,24 @@ public class RDFVisualisationController implements Initializable {
     private Button btnToggleAllSubjects;
     @FXML
     private Button btnToggleGraphMetadata;
+    @FXML
+    private StackPane gridViewHost;
+    @FXML
+    private ComboBox<PowsyblBridge.Diagram> cbGridDiagram;
+    @FXML
+    private Button btnGenerateGrid;
+    @FXML
+    private Button btnPowerFlow;
 
     private boolean tableViewVisible;
+    private boolean gridViewVisible;
+    private final PowsyblBridge powsybl = new PowsyblBridge();
+    /** Created after Application.start(): WebView construction is illegal in Application.init(). */
+    private WebView gridView;
+    private double gridZoom = 1.0;
+    private BrowserMode browserMode = BrowserMode.RDF;
+    private List<PowsyblBridge.Profile> preparedProfiles = List.of();
+    private PowsyblBridge.IidmElement iidmRoot;
 
     private SparqlTools.QueryResults tableResults = new SparqlTools.QueryResults(List.of(), List.of());
     private String graphViewSummary = "";
@@ -306,12 +332,20 @@ public class RDFVisualisationController implements Initializable {
 
         cbGrouping.getItems().setAll(Grouping.values());
         cbGrouping.setValue(Grouping.FLAT);
+        cbBrowserMode.getItems().setAll(BrowserMode.values());
+        cbBrowserMode.setValue(BrowserMode.RDF);
         // Grouping reshapes rows that are already scanned and filtered, so it rebuilds the tree
         // without touching the models.
-        cbGrouping.valueProperty().addListener((obs, oldValue, newValue) -> buildTreeItems());
+        cbGrouping.valueProperty().addListener((obs, oldValue, newValue) -> {
+            if (browserMode == BrowserMode.POWSYBL && iidmRoot != null) showIidmTree(); else buildTreeItems();
+        });
         cbGraphLayout.getItems().setAll(RdfGraphView.LayoutMode.values());
         cbGraphLayout.setValue(RdfGraphView.LayoutMode.FORCE_DIRECTED);
         graphView.setLayoutMode(RdfGraphView.LayoutMode.FORCE_DIRECTED);
+        cbGridDiagram.getItems().setAll(PowsyblBridge.Diagram.values());
+        cbGridDiagram.setValue(PowsyblBridge.Diagram.NETWORK_AREA);
+        cbAutoRefresh.setSelected(true);
+        Platform.runLater(this::createGridView);
 
         graphEntries.addListener((ListChangeListener<GraphEntry>) change ->
                 updateControlsEnabled());
@@ -321,7 +355,9 @@ public class RDFVisualisationController implements Initializable {
                 .addListener((ListChangeListener<TreeItem<NodeValue>>) change -> {
                     updateSelectedScopeLabel();
                     if (cbAutoRefresh.isSelected()) {
-                        if (tableViewVisible) refreshTable(); else redrawGraphView();
+                    if (gridViewVisible) {
+                        setStatus("Grid selection changed. Press ▶ to generate the selected PowsyBl diagram.");
+                    } else if (tableViewVisible) refreshTable(); else redrawGraphView();
                     }
                 });
         tvGraphData.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
@@ -521,7 +557,7 @@ public class RDFVisualisationController implements Initializable {
         try (InputStream in = new FileInputStream(file)) {
             RDFDataMgr.read(model, in, parseBase, lang);
         }
-        return new GraphEntry(file.getName(), model, documentBase(model, parseBase));
+        return new GraphEntry(file.getName(), model, documentBase(model, parseBase), file.toPath());
     }
 
     /**
@@ -557,7 +593,7 @@ public class RDFVisualisationController implements Initializable {
                 try (InputStream in = zip.getInputStream(entry)) {
                     Model model = ModelFactory.createDefaultModel();
                     RDFDataMgr.read(model, in, parseBase, lang);
-                    loaded.add(new GraphEntry(graphName, model, documentBase(model, parseBase)));
+                    loaded.add(new GraphEntry(graphName, model, documentBase(model, parseBase), file.toPath()));
                 } catch (Exception e) {
                     problems.add(graphName + ": " + describe(e));
                 }
@@ -603,8 +639,10 @@ public class RDFVisualisationController implements Initializable {
     }
 
     private static String describe(Throwable t) {
-        String message = t.getMessage();
-        return message == null || message.isBlank() ? t.getClass().getSimpleName() : message;
+        Throwable root = t;
+        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        String message = root.getMessage();
+        return message == null || message.isBlank() ? root.getClass().getSimpleName() : message;
     }
 
     // ==================== named-graph actions ====================
@@ -657,7 +695,7 @@ public class RDFVisualisationController implements Initializable {
         }
 
         graphEntries.removeIf(entry -> MERGED_GRAPH_NAME.equals(entry.name()));
-        graphEntries.add(new GraphEntry(MERGED_GRAPH_NAME, merged, ticked.getFirst().base()));
+        graphEntries.add(new GraphEntry(MERGED_GRAPH_NAME, merged, ticked.getFirst().base(), null));
         // The previous Apply may have scoped the browser to just the source graphs. Clear that
         // scope so the newly created named graph is immediately visible alongside its sources.
         tvGraph.getSelectionModel().clearSelection();
@@ -722,9 +760,14 @@ public class RDFVisualisationController implements Initializable {
             graphView.clear();
             tvGraphData.getColumns().clear();
             tvGraphData.getItems().clear();
+            if (!gridViewVisible) {
+                showGridHtml("<html><body><p>Automatic updates are paused.</p></body></html>");
+            }
             graphViewSummary = "Automatic graph updates are paused.";
             tableViewSummary = "Automatic table updates are paused.";
             updateViewStatus();
+        } else if (gridViewVisible) {
+            setStatus("Grid view is ready. Select one or more source graphs, then press ▶ to generate.");
         } else if (tableViewVisible) {
             refreshTable();
         } else {
@@ -759,15 +802,31 @@ public class RDFVisualisationController implements Initializable {
     /** Switches the graph content in-place instead of consuming vertical space with nested tabs. */
     @FXML
     private void actionToggleGraphContent(ActionEvent event) {
-        tableViewVisible = !tableViewVisible;
+        // Graph -> Table -> Grid -> Graph.  Grid is intentionally a third peer view, not a
+        // filtered variant of the RDF graph: PowSyBl always imports the full loaded CGMES set.
+        if (!tableViewVisible && !gridViewVisible) tableViewVisible = true;
+        else if (tableViewVisible && browserMode == BrowserMode.POWSYBL) { tableViewVisible = false; gridViewVisible = true; }
+        else if (tableViewVisible) tableViewVisible = false;
+        else gridViewVisible = false;
         tvGraphData.setVisible(tableViewVisible);
         tvGraphData.setManaged(tableViewVisible);
         btnExportTable.setVisible(tableViewVisible);
         btnExportTable.setManaged(tableViewVisible);
-        graphView.setVisible(!tableViewVisible);
-        graphView.setManaged(!tableViewVisible);
-        btnToggleGraphContent.setText(tableViewVisible ? "Graph view" : "Table view");
-        if (cbAutoRefresh.isSelected()) {
+        graphView.setVisible(!tableViewVisible && !gridViewVisible);
+        graphView.setManaged(!tableViewVisible && !gridViewVisible);
+        gridViewHost.setVisible(gridViewVisible);
+        gridViewHost.setManaged(gridViewVisible);
+        cbGridDiagram.setVisible(gridViewVisible);
+        cbGridDiagram.setManaged(gridViewVisible);
+        btnPowerFlow.setVisible(gridViewVisible);
+        btnPowerFlow.setManaged(gridViewVisible);
+        btnGenerateGrid.setVisible(gridViewVisible);
+        btnGenerateGrid.setManaged(gridViewVisible);
+        btnToggleGraphContent.setText(tableViewVisible ? "Grid view" : gridViewVisible ? "Graph view" : "Table view");
+        if (gridViewVisible) {
+            showGridHtml("<html><body><p>Select one or more source graphs, then press &#9654; to generate a PowsyBl diagram.</p></body></html>");
+            setStatus("Grid view is ready. Press ▶ to generate the selected PowsyBl diagram.");
+        } else if (cbAutoRefresh.isSelected()) {
             if (tableViewVisible) {
                 refreshTable();
             } else {
@@ -777,28 +836,454 @@ public class RDFVisualisationController implements Initializable {
             graphView.clear();
             tvGraphData.getColumns().clear();
             tvGraphData.getItems().clear();
+            showGridHtml("<html><body><p>Automatic updates are paused.</p></body></html>");
             graphViewSummary = "Automatic graph updates are paused.";
             tableViewSummary = "Automatic table updates are paused.";
             updateViewStatus();
         }
-        if (!tableViewVisible && cbAutoRefresh.isSelected()) {
+        if (!tableViewVisible && !gridViewVisible && cbAutoRefresh.isSelected()) {
             Platform.runLater(graphView::fitToView);
         }
     }
 
     @FXML
+    private void actionGridDiagramChanged(ActionEvent event) {
+        if (gridViewVisible) setStatus("Diagram type changed. Press ▶ to generate it for the selected graph(s).");
+    }
+
+    @FXML
+    private void actionGenerateGrid(ActionEvent event) {
+        if (!powsybl.available()) { setStatus("PowSyBl is not available in this CimPal distribution."); return; }
+        List<PowsyblBridge.Profile> profiles = selectedGridProfiles();
+        if (!powsybl.isPreparedFor(profiles)) { setStatus("Prepare the selected CGMES study before generating a diagram."); return; }
+        renderGridView(profiles, selectedEquipmentId(), cbGridDiagram.getValue());
+    }
+
+    @FXML
+    private void actionPreparePowsybl(ActionEvent event) {
+        List<GraphEntry> entries = selectedGridEntries();
+        String issue = cgmesStudyIssue(entries);
+        if (issue != null) { setStatus("CGMES study is not ready: " + issue); return; }
+        List<PowsyblBridge.Profile> profiles = entries.stream()
+                .map(entry -> new PowsyblBridge.Profile(entry.name(), entry.source())).toList();
+        setStatus("Preparing consistent CGMES study for PowsyBl...");
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread task = new Thread(() -> {
+            try {
+                powsybl.importCgmes(profiles);
+                Platform.runLater(() -> { preparedProfiles = profiles; resetProgressBar(); setStatus("PowsyBl network prepared for " + profiles.size() + " profile(s). Switch the left browser to PowsyBl to explore it."); });
+            } catch (Exception e) { Platform.runLater(() -> { resetProgressBar(); setStatus("PowsyBl preparation failed: " + describe(e)); }); }
+        }, "powsybl-prepare-network");
+        task.setDaemon(true); task.start();
+    }
+
+    @FXML
+    private void actionReleasePowsybl(ActionEvent event) {
+        try { powsybl.release(); preparedProfiles = List.of(); if (browserMode == BrowserMode.POWSYBL) showRdfBrowser(); setStatus("Released the prepared PowsyBl network and its temporary data."); }
+        catch (Exception e) { setStatus("Could not release PowsyBl data: " + describe(e)); }
+    }
+
+    @FXML
+    private void actionShowPowerFlowSettings(ActionEvent event) {
+        if (!powsybl.available()) {
+            setStatus("PowSyBl is not available in this CimPal distribution.");
+            return;
+        }
+        List<PowsyblBridge.Profile> profiles = selectedGridProfiles();
+        if (profiles.isEmpty()) { setStatus("Select at least one graph before running power flow."); return; }
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread runner = new Thread(() -> {
+            try {
+                if (!powsybl.isPreparedFor(profiles)) throw new IllegalStateException("Prepare the selected CGMES study first.");
+                Platform.runLater(() -> {
+                    try {
+                        Object parameters = powsybl.configurePowerFlow();
+                        if (parameters == null) { resetProgressBar(); setStatus("Power flow cancelled."); return; }
+                        Thread flow = new Thread(() -> {
+                            try {
+                                String result = powsybl.runPowerFlow(parameters);
+                                Platform.runLater(() -> {
+                                    resetProgressBar(); setStatus("PowsyBl power flow completed.");
+                                    new Alert(Alert.AlertType.INFORMATION, "Power flow completed.\n" + result).showAndWait();
+                                });
+                            } catch (Exception e) {
+                                Platform.runLater(() -> { resetProgressBar(); setStatus("Power flow failed: " + describe(e)); });
+                            }
+                        }, "powsybl-power-flow-run");
+                        flow.setDaemon(true); flow.start();
+                    } catch (Exception e) { resetProgressBar(); setStatus("Power-flow settings failed: " + describe(e)); }
+                });
+            } catch (Exception e) { Platform.runLater(() -> { resetProgressBar(); setStatus("Unable to import CGMES for power flow: " + describe(e)); }); }
+        }, "powsybl-load-flow");
+        runner.setDaemon(true); runner.start();
+    }
+
+    private void renderGridView(List<PowsyblBridge.Profile> profiles, String equipmentId,
+                                PowsyblBridge.Diagram diagram) {
+        if (profiles.isEmpty()) { setStatus("Select at least one graph before generating a PowsyBl diagram."); return; }
+        setStatus("Building the PowsyBl " + diagram
+                + " from the complete CGMES network (the first CGMES import can take a while)...");
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread renderer = new Thread(() -> {
+            try {
+                if (!powsybl.isPreparedFor(profiles)) throw new IllegalStateException("Prepare the selected CGMES study first.");
+                String svg = powsybl.draw(diagram, equipmentId);
+                Platform.runLater(() -> {
+                    gridZoom = 1.0;
+                    showGridHtml(interactiveGridHtml(svg));
+                    resetProgressBar(); setStatus("Showing " + diagram + " for " + profiles.size() + " selected graph(s).");
+                });
+            } catch (Exception e) { Platform.runLater(() -> { resetProgressBar(); setStatus("Unable to render PowsyBl diagram: " + describe(e)); }); }
+        }, "powsybl-diagram");
+        renderer.setDaemon(true); renderer.start();
+    }
+
+    /**
+     * Top-level graph selection scopes PowsyBl input. With no graph selected, all source profiles
+     * are used. A selected merged graph already contains its sources, so it is used by itself.
+     */
+    private List<GraphEntry> selectedGridEntries() {
+        List<GraphEntry> selected = selectedGraphEntries();
+        List<GraphEntry> source;
+        if (selected.stream().anyMatch(entry -> MERGED_GRAPH_NAME.equals(entry.name()))) {
+            source = selected.stream().filter(entry -> MERGED_GRAPH_NAME.equals(entry.name())).toList();
+        } else if (!selected.isEmpty()) {
+            source = selected;
+        } else {
+            source = graphEntries.stream().filter(entry -> !MERGED_GRAPH_NAME.equals(entry.name())).toList();
+        }
+        return source;
+    }
+
+    private List<PowsyblBridge.Profile> selectedGridProfiles() {
+        if (browserMode == BrowserMode.POWSYBL && !preparedProfiles.isEmpty()) return preparedProfiles;
+        return selectedGridEntries().stream()
+                .filter(entry -> entry.source() != null)
+                .map(entry -> new PowsyblBridge.Profile(entry.name(), entry.source())).toList();
+    }
+
+    /** Lightweight header validation before allocating RDF4J/IIDM memory. */
+    private static String cgmesStudyIssue(List<GraphEntry> entries) {
+        if (entries.isEmpty()) return "no source profiles are selected";
+        if (entries.stream().anyMatch(entry -> entry.source() == null)) return "Merged Graph is derived; select its original source profiles";
+        Set<String> kinds = new HashSet<>();
+        for (GraphEntry entry : entries) {
+            StmtIterator statements = entry.model().listStatements();
+            try {
+                while (statements.hasNext()) {
+                    Statement statement = statements.nextStatement();
+                    if (!statement.getPredicate().getURI().endsWith("Model.profile")) continue;
+                    String value = statement.getObject().isLiteral() ? statement.getString() : statement.getObject().toString();
+                    String lower = value.toLowerCase(Locale.ROOT);
+                    if (lower.contains("equipment")) kinds.add("EQ");
+                    if (lower.contains("topology")) kinds.add("TP");
+                    if (lower.contains("steadystate")) kinds.add("SSH");
+                }
+            } finally { statements.close(); }
+        }
+        List<String> missing = new ArrayList<>();
+        for (String required : List.of("EQ", "TP", "SSH")) if (!kinds.contains(required)) missing.add(required);
+        return missing.isEmpty() ? null : "missing required profile(s): " + String.join(", ", missing);
+    }
+
+    /** A resource selection supplies an optional diagram focus; graph rows determine network input. */
+    private String selectedEquipmentId() {
+        for (TreeItem<NodeValue> item : tvGraph.getSelectionModel().getSelectedItems()) {
+            if (item != null && item.getValue() != null && item.getValue().kind() == NodeKind.SUBJECT) return item.getValue().raw();
+        }
+        return null;
+    }
+
+    @FXML
+    private void actionBrowserModeChanged(ActionEvent event) {
+        BrowserMode selected = cbBrowserMode.getValue();
+        if (selected == BrowserMode.POWSYBL && preparedProfiles.isEmpty()) {
+            cbBrowserMode.setValue(BrowserMode.RDF);
+            setStatus("Prepare a consistent PowsyBl network before opening its browser.");
+            return;
+        }
+        browserMode = selected;
+        if (browserMode == BrowserMode.POWSYBL) showPowsyblBrowser(); else showRdfBrowser();
+        if (browserMode == BrowserMode.RDF && gridViewVisible) actionToggleGraphContent(new ActionEvent());
+    }
+
+    private void showRdfBrowser() {
+        browserMode = BrowserMode.RDF;
+        cbGrouping.setDisable(false);
+        buildTreeItems();
+    }
+
+    private void showPowsyblBrowser() {
+        cbGrouping.setDisable(false);
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread treeTask = new Thread(() -> {
+            try {
+                PowsyblBridge.IidmElement root = powsybl.iidmTree();
+                Platform.runLater(() -> { iidmRoot = root; showIidmTree(); resetProgressBar(); setStatus("Browsing the prepared IIDM network."); });
+            } catch (Exception e) { Platform.runLater(() -> { cbBrowserMode.setValue(BrowserMode.RDF); showRdfBrowser(); resetProgressBar(); setStatus("Could not build PowsyBl browser: " + describe(e)); }); }
+        }, "powsybl-iidm-browser");
+        treeTask.setDaemon(true); treeTask.start();
+    }
+
+    private static TreeItem<NodeValue> iidmItem(PowsyblBridge.IidmElement element) {
+        TreeItem<NodeValue> item = new TreeItem<>(NodeValue.subject(element.label(), element.id()));
+        for (PowsyblBridge.IidmElement child : element.children()) item.getChildren().add(iidmItem(child));
+        return item;
+    }
+
+    private void showIidmTree() {
+        if (cbGrouping.getValue() != Grouping.CLASS) {
+            tvGraph.setRoot(iidmItem(iidmRoot)); tvGraph.setShowRoot(true); return;
+        }
+        TreeItem<NodeValue> root = new TreeItem<>(NodeValue.info("IIDM network by type"));
+        Map<String, List<PowsyblBridge.IidmElement>> byType = new java.util.TreeMap<>();
+        collectIidmByType(iidmRoot, byType);
+        for (Map.Entry<String, List<PowsyblBridge.IidmElement>> entry : byType.entrySet()) {
+            List<String> ids = entry.getValue().stream().map(PowsyblBridge.IidmElement::id).filter(id -> !id.isBlank()).toList();
+            TreeItem<NodeValue> folder = new TreeItem<>(NodeValue.classNode(entry.getKey() + " (" + ids.size() + ")", entry.getKey(), ids));
+            for (PowsyblBridge.IidmElement element : entry.getValue()) folder.getChildren().add(iidmItem(element));
+            root.getChildren().add(folder);
+        }
+        tvGraph.setRoot(root); tvGraph.setShowRoot(false);
+    }
+
+    private static void collectIidmByType(PowsyblBridge.IidmElement element,
+                                          Map<String, List<PowsyblBridge.IidmElement>> byType) {
+        if (!element.id().isBlank()) byType.computeIfAbsent(element.type(), ignored -> new ArrayList<>()).add(element);
+        for (PowsyblBridge.IidmElement child : element.children()) collectIidmByType(child, byType);
+    }
+
+    /** Must run on the FX thread; called through Platform.runLater from FXML initialization. */
+    private void createGridView() {
+        if (gridView != null) return;
+        gridView = new WebView();
+        gridView.setMinSize(0, 0);
+        // WebEngine exposes window.status as a regular JavaFX event.  It gives the local SVG
+        // interaction layer a supported callback channel without the deprecated JSObject API.
+        gridView.getEngine().setOnStatusChanged(event -> handleGridStatus(event.getData()));
+        gridView.getEngine().getLoadWorker().stateProperty().addListener((obs, oldState, state) -> {
+            if (state == javafx.concurrent.Worker.State.SUCCEEDED) {
+                applyGridZoom();
+            }
+        });
+        gridViewHost.getChildren().setAll(gridView);
+    }
+
+    /** A Grid render can finish before deferred WebView creation; retain it rather than losing it. */
+    private void showGridHtml(String html) {
+        if (gridView == null) {
+            Platform.runLater(() -> showGridHtml(html));
+            return;
+        }
+        gridView.getEngine().loadContent(html);
+    }
+
+    /**
+     * PowsyBl produces a static SVG.  Wrap it in a small, local interaction layer rather than
+     * relying on WebView's document zoom, which is inconsistent across JavaFX/WebKit releases.
+     * Wheel zoom is centred on the pointer; drag pans the drawing; the JavaFX toolbar calls the
+     * exposed setZoom/fit functions below.
+     */
+    private static String interactiveGridHtml(String svg) {
+        return """
+                <!doctype html>
+                <html><head><meta charset='utf-8'>
+                <style>
+                  html,body,#stage { margin:0; width:100%%; height:100%%; overflow:hidden; background:white; }
+                  #stage { position:relative; }
+                  /* PowsyBl may emit width='100%%' and height='100%%'. Give those percentages
+                     a real parent size before the SVG is placed in a transformed layer. */
+                  #canvas { position:absolute; left:0; top:0; width:100%%; height:100%%; transform-origin:0 0; cursor:grab; user-select:none; }
+                  #canvas svg { display:block; min-width:100%%; min-height:100%%; }
+                </style></head><body>
+                <div id='stage'><div id='canvas'>%s</div></div>
+                <script>
+                (() => {
+                  const stage = document.getElementById('stage');
+                  const canvas = document.getElementById('canvas');
+                  const svg = canvas.querySelector('svg');
+                  let scale = 1, x = 0, y = 0, drag = null;
+                  const clamp = value => Math.max(0.08, Math.min(12, value));
+                  const apply = () => canvas.style.transform = `translate(${x}px,${y}px) scale(${scale})`;
+                  const zoomAt = (target, px, py) => {
+                    target = clamp(target);
+                    const bounds = stage.getBoundingClientRect();
+                    const pointX = px - bounds.left, pointY = py - bounds.top;
+                    x = pointX - (pointX - x) * target / scale;
+                    y = pointY - (pointY - y) * target / scale;
+                    scale = target; apply(); return scale;
+                  };
+                  const fit = () => {
+                    if (!svg) { scale = 1; x = y = 0; apply(); return scale; }
+                    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+                    const width = (viewBox && viewBox.width) || svg.width.baseVal.value || svg.getBBox().width || 1;
+                    const height = (viewBox && viewBox.height) || svg.height.baseVal.value || svg.getBBox().height || 1;
+                    scale = clamp(Math.min(stage.clientWidth / width, stage.clientHeight / height));
+                    x = (stage.clientWidth - width * scale) / 2;
+                    y = (stage.clientHeight - height * scale) / 2;
+                    apply(); return scale;
+                  };
+                  window.cimpalSetZoom = target => zoomAt(target, stage.getBoundingClientRect().left + stage.clientWidth / 2,
+                                                           stage.getBoundingClientRect().top + stage.clientHeight / 2);
+                  window.cimpalFit = fit;
+                  stage.addEventListener('wheel', event => {
+                    event.preventDefault();
+                    zoomAt(scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15), event.clientX, event.clientY);
+                  }, {passive:false});
+                  stage.addEventListener('pointerdown', event => {
+                    drag = {pointerId:event.pointerId, x:event.clientX, y:event.clientY, originX:x, originY:y};
+                    stage.setPointerCapture(event.pointerId); canvas.style.cursor = 'grabbing';
+                  });
+                  stage.addEventListener('pointermove', event => {
+                    if (!drag || drag.pointerId !== event.pointerId) return;
+                    x = drag.originX + event.clientX - drag.x; y = drag.originY + event.clientY - drag.y; apply();
+                  });
+                  const stopDrag = event => {
+                    if (!drag || drag.pointerId !== event.pointerId) return;
+                    drag = null; canvas.style.cursor = 'grab';
+                  };
+                  stage.addEventListener('pointerup', stopDrag); stage.addEventListener('pointercancel', stopDrag);
+                  stage.addEventListener('contextmenu', event => {
+                    const target = event.target.closest('[data-iidm-id],[id]');
+                    const id = target && (target.dataset.iidmId || target.id);
+                    if (!id || id === 'stage' || id === 'canvas') return;
+                    event.preventDefault();
+                    window.status = 'cimpal-menu|' + encodeURIComponent(String(id)) + '|'
+                        + event.screenX + '|' + event.screenY;
+                  });
+                  // Start in the SVG's own native viewport. This is important for percentage-sized
+                  // PowsyBl SVGs; Fit remains available from the toolbar after it has rendered.
+                  apply();
+                })();
+                </script></body></html>
+                """.formatted(svg);
+    }
+
+    @FXML
     private void actionZoomIn(ActionEvent event) {
+        if (gridViewVisible) { setGridZoom(gridZoom * 1.2); return; }
         graphView.zoom(1.2);
     }
 
     @FXML
     private void actionZoomOut(ActionEvent event) {
+        if (gridViewVisible) { setGridZoom(gridZoom / 1.2); return; }
         graphView.zoom(1 / 1.2);
     }
 
     @FXML
     private void actionFitGraphView(ActionEvent event) {
+        if (gridViewVisible) { fitGridView(); return; }
         graphView.fitToView();
+    }
+
+    private void setGridZoom(double zoom) {
+        gridZoom = Math.max(0.1, Math.min(8.0, zoom));
+        applyGridZoom();
+        setStatus("Grid diagram zoom: " + Math.round(gridZoom * 100) + "% (mouse wheel zooms; drag to pan).");
+    }
+
+    private void applyGridZoom() {
+        if (gridView == null) return;
+        try { gridView.getEngine().executeScript("window.cimpalSetZoom && window.cimpalSetZoom(" + gridZoom + ")"); }
+        catch (Exception ignored) { }
+    }
+
+    /** Receives local SVG context-menu requests through WebEngine's supported status callback. */
+    private void handleGridStatus(String status) {
+        if (status == null || !status.startsWith("cimpal-menu|")) return;
+        String[] parts = status.split("\\|", 4);
+        if (parts.length != 4) return;
+        try {
+            String id = java.net.URLDecoder.decode(parts[1], StandardCharsets.UTF_8);
+            showGridElementMenu(id, Double.parseDouble(parts[2]), Double.parseDouble(parts[3]));
+        } catch (IllegalArgumentException ignored) {
+            // A malformed status message must not affect diagram interaction.
+        }
+    }
+
+    private void showGridElementMenu(String graphicId, double screenX, double screenY) {
+        String iidmId = resolveIidmId(graphicId);
+        ContextMenu menu = new ContextMenu();
+        MenuItem identity = new MenuItem(iidmId == null
+                ? "Diagram element: " + graphicId
+                : "IIDM element: " + iidmId);
+        identity.setDisable(true);
+        menu.getItems().add(identity);
+        if (iidmId == null) {
+            MenuItem unavailable = new MenuItem("No IIDM identity is attached to this SVG primitive");
+            unavailable.setDisable(true);
+            menu.getItems().add(unavailable);
+        } else {
+            MenuItem properties = new MenuItem("Show IIDM properties in table");
+            properties.setOnAction(event -> showIidmPropertiesFromDiagram(iidmId));
+            MenuItem reveal = new MenuItem("Reveal in PowsyBl browser");
+            reveal.setOnAction(event -> revealIidmElement(iidmId));
+            menu.getItems().addAll(properties, reveal);
+        }
+        menu.show(gridView, screenX, screenY);
+    }
+
+    /** SVG writers sometimes decorate an IIDM id; accept an exact id first, then a unique suffix match. */
+    private String resolveIidmId(String graphicId) {
+        if (graphicId == null || graphicId.isBlank() || iidmRoot == null) return null;
+        List<String> ids = new ArrayList<>();
+        collectIidmIds(iidmRoot, ids);
+        if (ids.contains(graphicId)) return graphicId;
+        List<String> matches = ids.stream().filter(id -> graphicId.endsWith(id)).toList();
+        return matches.size() == 1 ? matches.getFirst() : null;
+    }
+
+    private static void collectIidmIds(PowsyblBridge.IidmElement element, List<String> target) {
+        if (!element.id().isBlank()) target.add(element.id());
+        for (PowsyblBridge.IidmElement child : element.children()) collectIidmIds(child, target);
+    }
+
+    private void revealIidmElement(String id) {
+        if (iidmRoot == null) { setStatus("The PowsyBl browser is still being prepared."); return; }
+        if (browserMode != BrowserMode.POWSYBL) {
+            browserMode = BrowserMode.POWSYBL;
+            cbBrowserMode.setValue(BrowserMode.POWSYBL);
+        }
+        showIidmTree();
+        TreeItem<NodeValue> target = findIidmTreeItem(tvGraph.getRoot(), id);
+        if (target == null) { setStatus("The diagram element '" + id + "' is not present in the IIDM browser."); return; }
+        revealAndSelect(target);
+        setStatus("Revealed IIDM element: " + id);
+    }
+
+    private static TreeItem<NodeValue> findIidmTreeItem(TreeItem<NodeValue> item, String id) {
+        if (item == null) return null;
+        if (item.getValue() != null && id.equals(item.getValue().raw())) return item;
+        for (TreeItem<NodeValue> child : item.getChildren()) {
+            TreeItem<NodeValue> match = findIidmTreeItem(child, id);
+            if (match != null) return match;
+        }
+        return null;
+    }
+
+    private void showIidmPropertiesFromDiagram(String id) {
+        revealIidmElement(id);
+        tableViewVisible = true;
+        gridViewVisible = false;
+        tvGraphData.setVisible(true); tvGraphData.setManaged(true);
+        btnExportTable.setVisible(true); btnExportTable.setManaged(true);
+        graphView.setVisible(false); graphView.setManaged(false);
+        gridViewHost.setVisible(false); gridViewHost.setManaged(false);
+        cbGridDiagram.setVisible(false); cbGridDiagram.setManaged(false);
+        btnPowerFlow.setVisible(false); btnPowerFlow.setManaged(false);
+        btnGenerateGrid.setVisible(false); btnGenerateGrid.setManaged(false);
+        btnToggleGraphContent.setText("Grid view");
+        refreshIidmTable();
+    }
+
+
+    private void fitGridView() {
+        if (gridView == null) return;
+        try { gridView.getEngine().executeScript("window.cimpalFit && window.cimpalFit()"); }
+        catch (Exception ignored) { }
+        gridZoom = 1.0;
+        setStatus("Grid diagram fitted to the available view (mouse wheel zooms; drag to pan).");
     }
 
     /** Resolves selected top-level named-graph rows to their backing entries. */
@@ -833,7 +1318,54 @@ public class RDFVisualisationController implements Initializable {
      * is a focus resource, and the diagram is narrowed to those resources and their immediate
      * neighbours; a class folder contributes all of its instances.
      */
+    private void refreshIidmTable() {
+        TreeItem<NodeValue> selected = tvGraph.getSelectionModel().getSelectedItem();
+        if (selected == null || selected.getValue() == null || selected.getValue().raw().isBlank()) {
+            tvGraphData.getColumns().clear(); tvGraphData.getItems().clear();
+            setStatus("Select an IIDM element in the PowsyBl Browser to inspect its properties.");
+            return;
+        }
+        List<String> ids = selected.getValue().kind() == NodeKind.CLASS
+                ? selected.getValue().members() : List.of(selected.getValue().raw());
+        Thread task = new Thread(() -> {
+            try {
+                List<Map<String, String>> rows = new ArrayList<>();
+                Set<String> columns = new LinkedHashSet<>(); columns.add("Identifier");
+                for (String id : ids) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (PowsyblBridge.Property property : powsybl.iidmProperties(id)) row.put(property.name(), property.value());
+                    columns.addAll(row.keySet()); rows.add(row);
+                }
+                Platform.runLater(() -> displayTableResults(new SparqlTools.QueryResults(new ArrayList<>(columns), rows)));
+            } catch (Exception e) { Platform.runLater(() -> setStatus("Could not read IIDM properties: " + describe(e))); }
+        }, "powsybl-iidm-properties");
+        task.setDaemon(true); task.start();
+    }
+
+    private void redrawIidmGraph() {
+        TreeItem<NodeValue> root = tvGraph.getRoot();
+        if (root == null) { graphView.clear(); return; }
+        List<RdfGraphView.Edge> edges = new ArrayList<>();
+        iidmEdges(root, "iidm-network", "IIDM network", edges);
+        graphView.show(edges, MAX_GRAPH_NODES);
+        Platform.runLater(graphView::fitToView);
+        graphViewSummary = "IIDM containment graph: " + edges.size() + " relationship(s).";
+        updateViewStatus();
+    }
+
+    private static void iidmEdges(TreeItem<NodeValue> parent, String parentId, String parentLabel,
+                                  List<RdfGraphView.Edge> edges) {
+        for (TreeItem<NodeValue> child : parent.getChildren()) {
+            NodeValue value = child.getValue();
+            if (value == null) continue;
+            String id = value.raw().isBlank() ? parentId + "/" + value.label() : value.raw();
+            edges.add(new RdfGraphView.Edge(parentId, parentLabel, id, value.label(), "contains"));
+            iidmEdges(child, id, value.label(), edges);
+        }
+    }
+
     private void redrawGraphView() {
+        if (browserMode == BrowserMode.POWSYBL) { redrawIidmGraph(); return; }
         if (!cbAutoRefresh.isSelected()) {
             graphView.clear();
             return;
@@ -940,6 +1472,7 @@ public class RDFVisualisationController implements Initializable {
     /** Rebuilds the table from the current graph-browser selection or the optional SELECT query. */
     private void refreshTable() {
         if (tvGraphData == null) return;
+        if (browserMode == BrowserMode.POWSYBL) { refreshIidmTable(); return; }
         try {
             String query = taSparqlFilter.getText() == null ? "" : taSparqlFilter.getText().trim();
             if (!query.isBlank()) {
@@ -2117,6 +2650,8 @@ public class RDFVisualisationController implements Initializable {
         btnClearAll.setDisable(empty);
         // Merging needs at least two graphs to merge.
         btnMergeGraphs.setDisable(graphEntries.size() < 2);
+        btnPreparePowsybl.setDisable(empty);
+        btnReleasePowsybl.setDisable(empty);
     }
 
     private void setLoadingControlsDisabled(boolean disabled) {
@@ -2192,6 +2727,13 @@ public class RDFVisualisationController implements Initializable {
         public String toString() {
             return label;
         }
+    }
+
+    private enum BrowserMode {
+        RDF("RDF Browser"), POWSYBL("PowsyBl Browser");
+        private final String label;
+        BrowserMode(String label) { this.label = label; }
+        @Override public String toString() { return label; }
     }
 
     /** An RDF term as shown ({@code label}) and as matched and copied ({@code raw}). */
@@ -2512,16 +3054,19 @@ public class RDFVisualisationController implements Initializable {
         private final String name;
         private final Model model;
         private final String base;
+        /** Original XML/RDF file or ZIP used for direct PowSyBl import; null for derived merges. */
+        private final java.nio.file.Path source;
         private final long tripleCount;
         /** Shortening for this graph, shared by every scan and every later lookup. */
         private final Labels labels;
         /** Local name to the subject URI that carries it. Built on demand; see the accessor. */
         private Map<String, String> localNames;
 
-        GraphEntry(String name, Model model, String base) {
+        GraphEntry(String name, Model model, String base, java.nio.file.Path source) {
             this.name = name;
             this.model = model;
             this.base = base;
+            this.source = source;
             this.tripleCount = model.size();
             this.labels = new Labels(model, base);
         }
@@ -2581,6 +3126,8 @@ public class RDFVisualisationController implements Initializable {
         String base() {
             return base;
         }
+
+        java.nio.file.Path source() { return source; }
 
         long tripleCount() {
             return tripleCount;

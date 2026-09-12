@@ -107,6 +107,23 @@ public class MainGUI extends Application {
 
     public static void main(String[] args) {
         //Application.launch(args);
+        // PowSyBl can be embedded without an optional PlatformConfig provider.  Its resulting
+        // INFO startup message is not an application problem, and was obscuring useful output.
+        // Set this before any SLF4J logger is created (not when Grid is first opened).
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl", "warn");
+        // CGMES conversion logs a full UUID-to-IIDM map as one warning when node containers are
+        // merged. On real datasets that is megabytes of routine diagnostics and can overwhelm
+        // the JavaFX Output control; the conversion itself remains valid.
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl.cgmes.conversion.NodeContainerMapping", "error");
+        // Embedded CimPal deliberately has no on-disk PowSyBl platform configuration.  PowSyBl
+        // then loads its bundled base-voltages.yml successfully, so this message is a repeated
+        // implementation detail, not a missing configuration or diagram error.
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl.commons.config.BaseVoltagesConfig", "error");
+        // The SLD grid-layout algorithm may report a few bus nodes which cannot be assigned to
+        // one of its visual cells for a partially described CGMES voltage level.  It still emits
+        // the SVG and does not change the imported IIDM network or any power-flow result. Keep
+        // actual drawing/conversion warnings visible while avoiding this noisy per-render notice.
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl.sld.model.graphs.VoltageLevelGraph", "error");
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) ->
                 GUIhelper.showUserFriendlyError("Unexpected application error", throwable)
         );
