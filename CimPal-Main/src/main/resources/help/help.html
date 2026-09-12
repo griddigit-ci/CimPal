@@ -523,10 +523,10 @@ CIM-based data exchange:</p>
 <h2 id="using">Using the window</h2>
 
 <ul>
-  <li><strong>Two rows of tabs</strong> &mdash; the upper row selects one of the three categories
-      of work, the lower row the function within it. Switching category does not disturb the other
-      categories: each remembers which of its functions you last had open, and no tab loses its
-      loaded models or field values when you navigate away.</li>
+  <li><strong>Operations toolbar</strong> &mdash; <em>Visualise</em>, <em>Convert</em> and
+      <em>SPARQL</em> are transversal tools and are always available as direct buttons. The
+      <em>SHACL</em>, <em>RDF</em> and <em>Dataset</em> menus contain the operations that are
+      specific to that area. The content itself keeps its state when you move between tools.</li>
   <li><strong>Collapsing either half of the window</strong> &mdash; both <em>Operations</em> (the
       tabs) and <em>Output</em> are collapsible panels. Click the title of either one to fold it
       away and give the whole height to the other: fold <em>Operations</em> to read a long
@@ -535,9 +535,9 @@ CIM-based data exchange:</p>
   <li><strong>Output panel</strong> &mdash; the panel at the bottom receives all progress and
       result messages. The bin icon above it empties the panel; hover it for the <em>Clear Output
       Window</em> tooltip.</li>
-  <li><strong>Status bar</strong> &mdash; the progress bar at the very bottom shows the progress of
-      the running operation, whichever tab started it. An indeterminate bar means the operation
-      cannot report a percentage.</li>
+  <li><strong>Status bar</strong> &mdash; the progress bar and status message at the very bottom
+      show operation progress, load/filter scope, and graph/table summaries. An indeterminate bar
+      means the operation cannot report a percentage.</li>
   <li><strong>Help badges</strong> &mdash; the small <code>?</code> markers next to fields in the
       tabs show a detailed tooltip on hover. This page reproduces the same texts.</li>
   <li><strong>Reset</strong> &mdash; every tab has a <em>Reset</em> button that clears its fields
@@ -935,25 +935,24 @@ Operations</em>.</p>
 <h4>Business logic</h4>
 <p>A read-only browser for RDF, for the moment when a comparison report or a validation message
 names a resource and the next question is simply what that object actually looks like. It loads
-RDF in any syntax Apache Jena can parse and presents it as a
-subject&nbsp;&rarr;&nbsp;predicate&nbsp;&rarr;&nbsp;object tree, with filters on each of the three
-positions and a full text search across all of them. That tree can be left flat, grouped by
-<code>rdf:type</code>, or nested by the references between resources, which is what turns a list of
-several thousand subjects into a structure you can walk. Nothing is written: neither the loaded
-models nor any file on disk is modified.</p>
+RDF in any syntax Apache Jena can parse and presents one unified <strong>Graph browser</strong>:
+the top level is the named graph and the levels below it are subjects, predicates and objects.
+Filters can be expanded only when needed, leaving more room for browsing. The tree can be left
+flat, grouped by <code>rdf:type</code>, or nested by references between resources. Nothing is
+written to the loaded source files.</p>
 <p>Every loaded file becomes its own <strong>named graph</strong> &mdash; and every RDF entry of a
-loaded ZIP archive likewise, so a complete CGMES dataset delivered as one archive arrives as one
-graph per profile file. Each graph carries a tick box, so the tree can show all of them together
-or any subset: the EQ file alone, or EQ and SSH together, without unloading and reloading. With
-more than one graph ticked the tree gains a named-graph level above the subjects; with a single
-graph the subjects are shown directly.</p>
-<p>Alongside the tree there is a <strong>graph view</strong>: the same content drawn as a
+loaded ZIP archive likewise. All named graphs remain in the browser until you explicitly remove
+them. Select one or more top-level graph rows to make them the scope for merge, filtering and
+SPARQL; select a resource or folder to focus the active view on that part of the tree.</p>
+<p>Alongside the tree there is a switchable <strong>Graph view / Table view</strong>. Graph view
+draws the current content as a
 node-link diagram, one node per resource and one arrow per triple whose object is another
 resource. That is the view for a structural question - which classes specialise which, what a
 class is related to, where a resource sits in the model - because a hierarchy that takes a dozen
 tree expansions to trace is one picture here. Filter the predicate to
 <code>rdfs:subClassOf</code>, for instance, and the diagram is the class hierarchy of the loaded
-profile.</p>
+profile. Table view pivots the selected resources: subjects are rows and predicates are columns.
+The optional <em>G</em> control adds graph metadata when it is useful.</p>
 <p>It answers the questions the other tabs do not. <em>Comparison</em> tells you that a triple
 changed; this shows you the object it belongs to and its remaining properties. <em>SPARQL
 Query</em> answers a question you can already formulate; this is for looking around before you
@@ -970,29 +969,27 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
         (<code>.trig</code>), JSON-LD (<code>.jsonld</code>), RDF/JSON (<code>.rj</code>), TriX
         (<code>.trix</code>) &mdash; and <code>.zip</code> archives of them. The syntax is taken
         from the file extension; non-RDF entries of an archive are skipped.</td></tr>
+<tr><td>Base URI</td><td>choice and text</td>
+    <td>Select a preset or enter a common base URI before loading RDF/XML. Use the same base for
+        related CGMES profile files so relative identifiers resolve consistently across EQ, SSH,
+        TP and SV. The SPARQL Query tool offers the same control for consistent results.</td></tr>
 <tr><td>Add files&hellip;</td><td>files</td>
     <td>The same, but keeping what is already loaded. Use it to bring a second dataset alongside
         the first for side-by-side browsing.</td></tr>
 <tr><td>Merge</td><td>action</td>
-    <td>Combines every ticked graph into a new one called <strong>Merged Graph</strong>, which is
-        added to the list and ticked. The source graphs stay loaded but are unticked, because
-        showing a merged graph next to its own sources would present every triple twice. RDF is a
-        set of triples, so a triple present in two sources appears once in the merge - the merged
-        count is normally lower than the sum of the parts. Merging again replaces the previous
-        <em>Merged Graph</em> rather than nesting one inside another.</td></tr>
+    <td>Combines the selected top-level named graphs into a new <strong>Merged Graph</strong>.
+        The source graphs remain in the browser; no graph disappears unless you remove it. RDF is
+        a set of triples, so a duplicate triple appears once in the merged model.</td></tr>
 <tr><td>Remove selected</td><td>action</td>
-    <td>Unloads every graph highlighted in the <em>Named graphs</em> list. Click a graph's name to
-        highlight it, <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click for several. Ticking a graph
-        does not highlight it, so this never unloads a graph you only meant to hide.</td></tr>
+    <td>Unloads every named graph highlighted in the <em>Graph browser</em>. Click a graph's name to
+        highlight it, <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click for several.</td></tr>
 <tr><td>Reset</td><td>action</td><td>Unloads everything and clears the filters.</td></tr>
-<tr><td>Named graphs</td><td>tick boxes and a multi-select list</td>
-    <td>One row per loaded file or archive entry, with its triple count. The tick box and the row
-        highlight do two different things, which is what the caption above the list states.
-        <strong>Ticking</strong> includes a graph in the tree and the diagram; unticking leaves it
-        out without unloading it, and <em>Tick all</em> and <em>Untick all</em> act on every row at
-        once. <strong>Highlighting</strong> a row &mdash; clicking its name, <kbd>Ctrl</kbd>-click
-        or <kbd>Shift</kbd>-click for several &mdash; narrows the graph view to those graphs and
-        tells <em>Remove selected</em> what to unload. Neither action triggers the other.</td></tr>
+<tr><td>Graph browser</td><td>multi-select tree</td>
+    <td>One top-level row per loaded graph, with actual subject and triple counts. Select graph
+        rows with <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click to set a multi-graph scope.
+        Select subjects, class folders, or reference branches to focus a view. The browser initially
+        shows the first 5,000 matching subjects per graph for responsiveness; the <code>&infin;</code>
+        button switches to all matching subjects.</td></tr>
 <tr><td>Subject contains, Predicate contains, Object contains</td><td>text</td>
     <td>Keeps only the triples whose corresponding term contains the text. Matched
         case-insensitively against both the shortened form shown in the tree and the full URI or
@@ -1003,12 +1000,20 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
     <td>Keeps a triple when <em>any one</em> of its subject, predicate or object matches. This is
         the field to use when you have an mRID or a value and do not know which position it
         occupies.</td></tr>
+<tr><td>SPARQL subject filter</td><td>optional SELECT query</td>
+    <td>Load or enter a SPARQL <code>SELECT</code> query. It is executed against the complete
+        in-memory model of the selected named graph or graphs, rather than only the first 5,000
+        tree subjects. A query that returns <code>?s</code> also narrows the browser; any other
+        SELECT query is displayed in Table view. With no graph selected, all loaded graphs are in
+        scope. The label beside Apply states the scope used.</td></tr>
 <tr><td>Apply</td><td>action</td>
-    <td>Runs the filters. They are applied on demand rather than as you type, because each run
-        rescans every ticked graph and a CGMES dataset is hundreds of thousands of triples.
+    <td>Runs the filters and optional SPARQL query. They are applied on demand rather than as you
+        type, because each run rescans the selected in-memory graph models and a CGMES dataset is
+        hundreds of thousands of triples.
         Pressing <kbd>Enter</kbd> in any filter field does the same.</td></tr>
 <tr><td>Clear filters</td><td>action</td>
-    <td>Empties all four fields and shows everything in the ticked graphs again.</td></tr>
+    <td>Empties the text and SPARQL filters and shows the selected graph scope again (or all loaded
+        graphs when no graph is selected).</td></tr>
 <tr><td>Group by</td><td>choice</td>
     <td>How the tree arranges the subjects of each graph. It reshapes rows that have already been
         scanned, so changing it takes effect at once and never rescans the models &mdash; there is
@@ -1030,15 +1035,28 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
             <td>Nests each resource under what it points <em>to</em>, following the references as
                 written. The view for seeing what an object depends on.</td></tr>
         </table></td></tr>
-<tr><td>Hide Named graphs, Hide Graph tree</td><td>actions</td>
-    <td>Fold either panel away to give the graph view the whole width of the tab; the label then
-        reads <em>Show</em>, so bringing the panel back is never a hunt. The <code>&#171;</code>
-        chevron in a panel's own header does the same for that panel. The panels are removed from
-        the split rather than merely hidden, so the diagram actually gains the space.</td></tr>
+<tr><td>Hide graph browser</td><td>action</td>
+    <td><em>Hide graph browser</em> folds the unified browser away, giving the active Graph or
+        Table view the full width. Use <em>Show graph browser</em> or the <code>&#171;</code>
+        button to restore it.</td></tr>
+<tr><td>Graph view / Table view</td><td>switch button</td>
+    <td>Switches the right-hand area in place, without consuming another row for tabs. In Table
+        view, predicates become columns and object values become cells. The <em>XLS</em> icon
+        exports the current table with a light formatted header, filters, appropriate column
+        widths and its first row frozen.</td></tr>
+<tr><td>Refresh icon</td><td>checkbox</td>
+    <td>Controls automatic updates from browser selection. It is off by default to avoid expensive
+        redraws while browsing large models. When off, both Graph and Table view stay empty; when
+        turned on, the active view refreshes immediately and thereafter refreshes whenever the
+        selection changes. Switching Graph/Table follows the same setting.</td></tr>
 <tr><td>Include literals</td><td>checkbox</td>
     <td>Adds attribute values to the diagram as their own nodes. Off by default: with literals in,
         even a handful of resources produces a dense fan of value nodes, and the relationships
         between classes - the reason to look at a diagram - get lost in it.</td></tr>
+<tr><td>Layout</td><td>choice</td>
+    <td>Choose Force-directed, Radial or Grid arrangement for Graph view. Use the layout most
+        readable for the selected scope; the diagram is capped for readability, so select a graph,
+        class or resource when a full dataset would be too dense.</td></tr>
 <tr><td>+, -, Fit</td><td>actions</td>
     <td>Zoom in, zoom out, and scale the diagram so all of it is in view. Scrolling the wheel over
         the diagram zooms about the pointer, dragging the background pans, and dragging a node
@@ -1047,9 +1065,9 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
 
 <h4>What the graph view shows</h4>
 
-<p>The diagram follows the filters and the highlight, so it always shows the same content the tree
-does. Scope is taken from the narrowest thing highlighted, and from the union of them when several
-rows are:</p>
+<p>The active view follows the filters and the selected tree scope. It is updated automatically
+only while the refresh checkbox is enabled. Scope is taken from the narrowest thing selected, and
+from the union when several rows are selected:</p>
 
 <table class="io">
 <tr><th>Highlighted</th><th>The diagram shows</th></tr>
@@ -1064,7 +1082,7 @@ rows are:</p>
         <code>Breaker</code> population at once, for instance.</td></tr>
 <tr><td>A named graph, in the tree or in the list</td><td>Only that graph.</td></tr>
 <tr><td>Several named graphs</td><td>Those graphs together.</td></tr>
-<tr><td>Nothing highlighted</td><td>Everything the filters admitted, across all ticked graphs.</td></tr>
+<tr><td>Nothing selected</td><td>Everything the filters admitted, across all loaded graphs.</td></tr>
 </table>
 
 <p>Node size follows the number of relationships a resource takes part in, so the hubs of the
@@ -1080,9 +1098,9 @@ disclosure arrow says which is which: an arrow means the reference leads somewhe
 nothing loaded describes it, so you know before you click.</p>
 
 <p>What a reference reaches is read from the models held in memory, not from the rows the tree
-happens to be showing. A resource the filters excluded, one that fell past the subject cap, and one
-belonging to a graph that is not ticked can all still be opened: ticking and filtering decide what
-the tree <em>lists</em>, not what a reference is allowed to reach. Where several files describe the
+happens to be showing. A resource the filters excluded or one that fell past the subject cap can
+still be opened: filtering decides what the tree <em>lists</em>, not what a reference is allowed to
+reach. Where several files describe the
 same resource, opening it shows all of their triples together &mdash; the EQ name and type beside
 the SSH state values &mdash; and a triple stated identically by two files is listed once.</p>
 
@@ -1129,8 +1147,8 @@ loaded at once: they share their mRIDs, so their resources would be treated as o
 <table class="io">
 <tr><th>Message</th><th>What it means</th></tr>
 <tr><td>&hellip; has no row of its own in the tree</td>
-    <td>The resource is in the models, but the tree does not list it &mdash; the filters exclude it,
-        it is past the subject cap, or its graph is not ticked. There is nowhere to jump to, so it
+    <td>The resource is in the models, but the tree does not list it &mdash; the filters exclude it or
+        it is past the subject cap. There is nowhere to jump to, so it
         is opened under the reference row instead.</td></tr>
 <tr><td>&hellip; is referenced, but nothing loaded describes it</td>
     <td>No loaded file states anything about the resource, under its own URI or under its local
@@ -1145,7 +1163,8 @@ it.</p>
 
 <h4>Outputs</h4>
 <ul>
-  <li>The graph tree. Subjects sort alphabetically by their displayed form and expand to their
+  <li>The unified graph browser. Named graphs remain at the top level; subjects sort alphabetically
+      by their displayed form and expand to their
       predicates; a predicate with a single value is shown on one line, a repeated predicate
       becomes a node with one child per value.</li>
   <li>URIs are shortened using the namespace prefixes declared in the source file. Where no prefix
@@ -1161,27 +1180,27 @@ it.</p>
       Literals are shown quoted, with their language tag or datatype where they have one.</li>
   <li><em>Copy value</em> puts the full URI or literal of every highlighted row on the clipboard,
       one per line, ready to paste into a SPARQL query or into a filter field.</li>
-  <li>The status line reports how many of the loaded triples the filters admitted, across how many
-      subjects and graphs; the line under the diagram reports how many nodes and relationships it
-      drew, and for which scope.</li>
+  <li>Graph or table content, depending on the active right-hand view. The status bar reports the
+      active selection/query scope, node and relationship counts, or table row and column counts.</li>
 </ul>
 
 <h4>Notes</h4>
 <ul>
-  <li><em>Expand selected</em> opens every highlighted branch and everything below it, stopping
+  <li>The browser toolbar provides icon buttons for <em>Expand selected</em>, <em>Collapse all</em>
+      and <em>Copy value</em>; pause over an icon to see its tooltip. Expand selected opens every
+      highlighted branch and everything below it, stopping
       after 1000 nodes across all of them so that a large subtree cannot lock up the view; expand
       the remaining branches individually. <em>Collapse all</em> closes everything. It deliberately
       stops at reference rows: opening one loads the target&rsquo;s properties, whose own references
       would be opened in turn, and a single press would chase them across the whole graph until the
       budget ran out. Following a reference stays a deliberate click.</li>
-  <li>Each graph is truncated at 5000 subjects, and the last row of a truncated graph says so:
-      clicking that row raises the cap by another 5000 and rescans, exactly as <em>Apply</em> does,
-      so the tree collapses and reopens with more in it. The raised cap holds until <em>Reset</em>.
-      Narrowing the filters remains the quicker route when the resource can be named in one &mdash;
-      a tree of tens of thousands of rows is not browsable in any case &mdash; but the row is there
-      for the resource that cannot be.</li>
-  <li>Relative URIs are resolved against the document's own declared base where it has one, and
-      otherwise against the location the file was read from.</li>
+  <li>Each graph initially displays the first 5,000 matching subjects to keep browsing responsive.
+      The <code>&infin;</code> button switches the browser between this limit and all matching
+      subjects. Table and SPARQL operations always work from the complete in-memory selected
+      graph scope.</li>
+  <li>For related RDF/XML files, choose or enter a common Base URI before loading. This is
+      particularly important for CGMES profile files containing relative identifiers, because it
+      lets references and SPARQL joins resolve across profiles consistently.</li>
   <li>A file that cannot be parsed does not abort the load: the remaining files are loaded, and the
       reason for each failure is written to the Output window.</li>
   <li>The diagram is capped at 400 nodes. Past that a node-link view is an unreadable tangle well
@@ -1381,7 +1400,7 @@ and an output location. The twelve available tasks are:</p>
 </details>
 
 <details class="fn" id="tab-sparql-query">
-<summary><span class="kind">Tab</span> Dataset Operations &#9656; SPARQL Query</summary>
+<summary><span class="kind">Tool</span> SPARQL Query</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
@@ -1396,6 +1415,10 @@ Queries can be saved and reloaded, so a useful investigation becomes a reusable 
 <tr><td>Select models</td><td>files, required</td>
     <td>One or more RDF/XML files or ZIP archives containing CGMES model data to query. The files
         are loaded as a combined RDF dataset.</td></tr>
+<tr><td>Base URI</td><td>choice and text</td>
+    <td>Select a preset or enter a common base URI before loading related RDF/XML files. This is
+        shared in purpose with the Visualisation Base URI: a consistent base lets relative CGMES
+        identifiers join across profile files.</td></tr>
 <tr><td>SPARQL query</td><td>text, required</td>
     <td>A SPARQL SELECT query to execute against the loaded model files. Use <em>Load query</em> to
         import an existing <code>.sparql</code> or <code>.rq</code> file, or type and edit the query
@@ -1408,7 +1431,8 @@ Queries can be saved and reloaded, so a useful investigation becomes a reusable 
 <h4>Outputs</h4>
 <ul>
   <li>A results window presenting the SELECT bindings as a table, with an <em>Export</em> button to
-      write them to a file.</li>
+      write them to Excel. The export has a light-blue filtered header, practical column widths and
+      a frozen first row.</li>
   <li>Query parse errors and execution messages in the Output window.</li>
 </ul>
 
