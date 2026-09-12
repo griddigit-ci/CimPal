@@ -11,15 +11,18 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.control.TreeView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
@@ -33,13 +36,16 @@
 
          <FlowPane hgap="8.0" vgap="8.0">
             <Button mnemonicParsing="false" onAction="#actionLoadFiles" text="Load RDF files..."/>
+            <Label fx:id="helpLoad" styleClass="help-badge" text="?"/>
             <Button mnemonicParsing="false" onAction="#actionAddFiles" text="Add files..."/>
             <Button fx:id="btnMergeGraphs" mnemonicParsing="false" onAction="#actionMergeGraphs"
                     text="Merge"/>
             <Button fx:id="btnRemoveGraph" mnemonicParsing="false" onAction="#actionRemoveSelectedGraph"
                     text="Remove selected"/>
             <Button fx:id="btnClearAll" mnemonicParsing="false" onAction="#actionClearAll" text="Reset"/>
-            <Label fx:id="helpLoad" styleClass="help-badge" text="?"/>
+            <Button fx:id="btnToggleTreePane" mnemonicParsing="false"
+                    onAction="#actionToggleTreePane" text="Hide graph browser"/>
+            <Label fx:id="helpPanes" styleClass="help-badge" text="?"/>
          </FlowPane>
 
          <!--
@@ -50,6 +56,8 @@
            A FlowPane rather than a grid: four short fields fit on one line on a normal window
            and reflow onto a second line when the window is narrow, instead of clipping.
          -->
+         <TitledPane animated="false" text="Filters (expand to edit)" expanded="false">
+         <VBox spacing="8.0">
          <FlowPane hgap="12.0" vgap="8.0">
             <HBox alignment="CENTER_LEFT" spacing="6.0">
                <Label text="Subject contains:"/>
@@ -71,6 +79,20 @@
                <TextField fx:id="tfFullTextSearch" onAction="#actionApplyFilters" prefWidth="170.0"
                           promptText="any subject, predicate or object"/>
             </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+               <Label text="SPARQL subject filter:"/>
+               <Button mnemonicParsing="false" onAction="#actionLoadSparqlQuery" text="Load query..."/>
+               <Label fx:id="helpSparqlFilter" styleClass="help-badge" text="?"/>
+               <TextArea fx:id="taSparqlFilter" prefColumnCount="32" prefRowCount="2"
+                         promptText="Optional SELECT ?s WHERE { ... }" wrapText="false"/>
+            </HBox>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+               <Button fx:id="btnApplyFilters" defaultButton="true" mnemonicParsing="false"
+                       onAction="#actionApplyFilters" styleClass="primary-action" text="Apply"/>
+               <Button mnemonicParsing="false" onAction="#actionClearFilters" text="Clear filters"/>
+               <Label fx:id="helpFilters" styleClass="help-badge" text="?"/>
+            </HBox>
          </FlowPane>
 
          <!--
@@ -82,18 +104,8 @@
            what pressing them will do, so restoring a folded-away pane is never a hunt. Each
            pane header also carries a chevron for collapsing that pane in place.
          -->
-         <HBox alignment="CENTER_LEFT" spacing="8.0">
-            <Button fx:id="btnApplyFilters" defaultButton="true" mnemonicParsing="false"
-                    onAction="#actionApplyFilters" styleClass="primary-action" text="Apply"/>
-            <Button mnemonicParsing="false" onAction="#actionClearFilters" text="Clear filters"/>
-            <Label fx:id="helpFilters" styleClass="help-badge" text="?"/>
-            <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="btnToggleGraphsPane" mnemonicParsing="false"
-                    onAction="#actionToggleGraphsPane" text="Hide Named graphs"/>
-            <Button fx:id="btnToggleTreePane" mnemonicParsing="false"
-                    onAction="#actionToggleTreePane" text="Hide Graph tree"/>
-            <Label fx:id="helpPanes" styleClass="help-badge" text="?"/>
-         </HBox>
+         </VBox>
+         </TitledPane>
       </VBox>
    </top>
 
@@ -108,64 +120,34 @@
             <Insets bottom="8.0"/>
          </BorderPane.margin>
 
-         <VBox fx:id="graphsPane" minHeight="0.0" minWidth="0.0" spacing="8.0">
-            <padding>
-               <Insets right="8.0"/>
-            </padding>
-            <HBox alignment="CENTER_LEFT" spacing="8.0">
-               <Label styleClass="section-title" text="Named graphs"/>
-               <Label fx:id="helpGraphs" styleClass="help-badge" text="?"/>
-               <Region HBox.hgrow="ALWAYS"/>
-               <Button mnemonicParsing="false" onAction="#actionToggleGraphsPane"
-                       styleClass="icon-button" text="&#171;">
-                  <tooltip>
-                     <Tooltip text="Fold this pane away (Show Named graphs brings it back)"/>
-                  </tooltip>
-               </Button>
-            </HBox>
-            <!--
-              The tick box and the row highlight are two independent controls, so the caption
-              spells out which does what: "select" reads as highlighting, and the two used to be
-              conflated by ticking a row also highlighting it.
-            -->
-            <Label styleClass="caption-text" wrapText="true"
-                   text="Tick = include in the tree &#183; Highlight (Ctrl/Shift for several) = draw in the Graph view"/>
-            <!--
-              One entry per loaded file (per entry, for ZIP archives), each with a tick box.
-              Unticking a graph removes it from the tree and the diagram without unloading it, so
-              a subset of a multi-file dataset can be inspected and then the rest brought back.
-            -->
-            <ListView fx:id="lvGraphs" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS"/>
-            <FlowPane hgap="8.0" vgap="8.0">
-               <Button mnemonicParsing="false" onAction="#actionTickAllGraphs" text="Tick all"/>
-               <Button mnemonicParsing="false" onAction="#actionUntickAllGraphs" text="Untick all"/>
-            </FlowPane>
-         </VBox>
-
          <VBox fx:id="treePane" minHeight="0.0" minWidth="0.0" spacing="8.0">
             <padding>
                <Insets left="8.0" right="8.0"/>
             </padding>
             <HBox alignment="CENTER_LEFT" spacing="8.0">
-               <Label styleClass="section-title" text="Graph tree"/>
+               <Label styleClass="section-title" text="Graph browser"/>
                <Label fx:id="helpTree" styleClass="help-badge" text="?"/>
                <Region HBox.hgrow="ALWAYS"/>
                <Label text="Group by:"/>
                <!-- Reshapes the rows already scanned, so changing it never rescans the models. -->
                <ComboBox fx:id="cbGrouping" prefWidth="200.0"/>
+               <Button mnemonicParsing="false" onAction="#actionExpandSelected" styleClass="icon-button" text="↕">
+                  <tooltip><Tooltip text="Expand selected"/></tooltip>
+               </Button>
+               <Button mnemonicParsing="false" onAction="#actionCollapseAll" styleClass="icon-button" text="⇱">
+                  <tooltip><Tooltip text="Collapse all"/></tooltip>
+               </Button>
+               <Button mnemonicParsing="false" onAction="#actionCopySelected" styleClass="icon-button" text="⧉">
+                  <tooltip><Tooltip text="Copy selected value"/></tooltip>
+               </Button>
                <Button mnemonicParsing="false" onAction="#actionToggleTreePane"
                        styleClass="icon-button" text="&#171;">
                   <tooltip>
-                     <Tooltip text="Fold this pane away (Show Graph tree brings it back)"/>
+                     <Tooltip text="Fold this pane away (Show graph browser brings it back)"/>
                   </tooltip>
                </Button>
             </HBox>
             <TreeView fx:id="tvGraph" minHeight="0.0" minWidth="0.0" showRoot="false" VBox.vgrow="ALWAYS"/>
-            <FlowPane hgap="8.0" vgap="8.0">
-               <Button mnemonicParsing="false" onAction="#actionExpandSelected" text="Expand selected"/>
-               <Button mnemonicParsing="false" onAction="#actionCollapseAll" text="Collapse all"/>
-               <Button mnemonicParsing="false" onAction="#actionCopySelected" text="Copy value"/>
-            </FlowPane>
          </VBox>
 
          <VBox fx:id="graphViewPane" minHeight="0.0" minWidth="0.0" spacing="8.0">
@@ -173,26 +155,32 @@
                <Insets left="8.0"/>
             </padding>
             <HBox alignment="CENTER_LEFT" spacing="8.0">
-               <Label styleClass="section-title" text="Graph view"/>
+               <Button fx:id="btnToggleGraphContent" mnemonicParsing="false"
+                       onAction="#actionToggleGraphContent" styleClass="section-title" text="Table view"/>
                <Label fx:id="helpGraphView" styleClass="help-badge" text="?"/>
                <Region HBox.hgrow="ALWAYS"/>
+               <Label text="Layout:"/>
+               <ComboBox fx:id="cbGraphLayout" onAction="#actionChangeGraphLayout" prefWidth="140.0"/>
+               <Button fx:id="btnToggleGraphMetadata" mnemonicParsing="false" onAction="#actionToggleGraphMetadata"
+                       styleClass="icon-button" text="G">
+                  <tooltip><Tooltip text="Show or hide graph metadata in the table"/></tooltip>
+               </Button>
+               <Button fx:id="btnExportTable" mnemonicParsing="false" onAction="#actionExportTable"
+                       styleClass="icon-button" text="XLS" visible="false" managed="false">
+                  <tooltip><Tooltip text="Export the current table to Excel"/></tooltip>
+               </Button>
                <CheckBox fx:id="cbIncludeLiterals" mnemonicParsing="false"
                          onAction="#actionRedrawGraphView" text="Include literals"/>
                <Button mnemonicParsing="false" onAction="#actionZoomIn" text="+"/>
                <Button mnemonicParsing="false" onAction="#actionZoomOut" text="-"/>
                <Button mnemonicParsing="false" onAction="#actionFitGraphView" text="Fit"/>
             </HBox>
-            <RdfGraphView fx:id="graphView" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS"/>
-            <Label fx:id="lblGraphViewInfo" text="Load RDF to draw the relationships." wrapText="true"/>
+            <StackPane minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
+               <RdfGraphView fx:id="graphView" minHeight="0.0" minWidth="0.0"/>
+               <TableView fx:id="tvGraphData" managed="false" minHeight="0.0" minWidth="0.0" visible="false"/>
+            </StackPane>
          </VBox>
       </SplitPane>
    </center>
 
-   <bottom>
-      <VBox spacing="8.0" BorderPane.alignment="CENTER_LEFT">
-         <Label text="Tip: load any RDF syntax Jena supports (.rdf, .xml, .ttl, .nt, .nq, .trig, .jsonld, .rj, .trix) or a ZIP of them. Each file becomes a named graph."
-                wrapText="true"/>
-         <Label fx:id="lblStatus" text="No data loaded." wrapText="true"/>
-      </VBox>
-   </bottom>
 </BorderPane>

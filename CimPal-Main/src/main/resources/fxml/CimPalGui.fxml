@@ -151,6 +151,7 @@
             <Font size="11.0" fx:id="x3" />
          </font>
       </Label>
+      <Label fx:id="lblStatus" maxWidth="1.7976931348623157E308" text="Ready" HBox.hgrow="ALWAYS" />
       <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0" HBox.hgrow="NEVER" />
       <Region HBox.hgrow="ALWAYS" />
       <Label font="$x3" text="Version: 2026.9.10.1" HBox.hgrow="NEVER" />

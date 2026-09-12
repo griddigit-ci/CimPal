@@ -107,6 +107,8 @@ public class MainController implements Initializable {
     private TextArea foutputWindow;
     @FXML
     private ProgressBar progressBar;
+    @FXML
+    private Label lblStatus;
 
     @FXML
     private SplitPane mainSplitPane;
@@ -185,6 +187,13 @@ public class MainController implements Initializable {
 
     public MainController() {
         guiHelper = new GUIhelper();
+    }
+
+    /** Updates the application-wide status area at the bottom of the window. */
+    public void setStatusMessage(String message) {
+        if (lblStatus != null) {
+            lblStatus.setText(message == null ? "" : message);
+        }
     }
 
     @Override
@@ -1980,4 +1989,3 @@ public class MainController implements Initializable {
 
 
 }
-
