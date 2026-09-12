@@ -4,6 +4,7 @@ import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -44,6 +45,8 @@ public class ValidationExcelWriter implements Closeable {
     private static final String TIMESTAMP_CONSTRAINT_SHEET_NAME = "TopConstraints";
     private static final String INPUT_COMPLETENESS_SHEET_NAME = "InputCompleteness";
     private static final boolean AUTO_SIZE_COLUMNS = false;
+    /** Raw validation rows kept in memory before SXSSF flushes them to compressed temporary files. */
+    private static final int RAW_RESULTS_ROW_WINDOW = 200;
 
     private static final String VALIDATION_RESULTS_SHEET_NAME = "Validation results";
     private static final String CHARTS_SHEET_NAME = "Charts";
@@ -56,7 +59,8 @@ public class ValidationExcelWriter implements Closeable {
     private static final String[] TIMESTAMP_OVERVIEW_HEADER = new String[]{
             "Country", "Timestamp", "Report file",
             "Validation count", "Conform validations", "Non-conform validations", "Validation errors",
-            "Total results", "Violations", "Warnings", "Infos", "Worst severity", "Check priority"
+            "Total results", "Violations", "Warnings", "Infos", "Worst severity", "Check priority",
+            "Partial validations", "Result limit"
     };
 
     private static final String[] TIMESTAMP_CONSTRAINT_HEADER = new String[]{
@@ -98,7 +102,8 @@ public class ValidationExcelWriter implements Closeable {
             "Conforms",
             "Validation error",
             "Missing XML files",
-            "Chart name"
+            "Chart name",
+            "Validation scope"
     };
 
     private static final int STAT_COL_DATASET = 0;
@@ -114,6 +119,7 @@ public class ValidationExcelWriter implements Closeable {
     };
 
     private final Workbook wb;
+    private final SXSSFWorkbook streamingWorkbook;
     private Sheet validationResultsSheet;
     private Sheet chartsSheet;
     private int nextValidationResultsRow = 1;
@@ -147,6 +153,7 @@ public class ValidationExcelWriter implements Closeable {
         CellStyle headerStyle = createHeaderStyle(wb);
 
         if (timestampedSummaryMode) {
+            streamingWorkbook = null;
             timestampOverviewSheet = wb.createSheet(TIMESTAMP_OVERVIEW_SHEET_NAME);
             writeHeader(timestampOverviewSheet, TIMESTAMP_OVERVIEW_HEADER, headerStyle);
             timestampOverviewSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TIMESTAMP_OVERVIEW_HEADER.length - 1));
@@ -183,6 +190,12 @@ public class ValidationExcelWriter implements Closeable {
         statisticsConstraintSheet.createFreezePane(0, 1);
 
         chartsSheet = wb.createSheet(CHARTS_SHEET_NAME);
+
+        // Keep headers, statistics and charts in the XSSF template so chart building
+        // can read them. Append only raw result rows through SXSSF, with bounded heap
+        // and compressed temporary files. Never append through both views of a sheet.
+        streamingWorkbook = new SXSSFWorkbook((XSSFWorkbook) wb, RAW_RESULTS_ROW_WINDOW, true, false);
+        validationResultsSheet = streamingWorkbook.getSheet(VALIDATION_RESULTS_SHEET_NAME);
     }
 
     public static ValidationExcelWriter createTimestampedSummaryWriter() {
@@ -213,6 +226,23 @@ public class ValidationExcelWriter implements Closeable {
                                  List<SHACLValidationResult> results,
                                  boolean conforms,
                                  String displayName) {
+        appendValidation(cf, datasetName, xmlFiles, missingXmlFiles, constraintFile, results,
+                conforms, displayName, false, 0);
+    }
+
+    /**
+     * Appends validation results and records whether the validation was intentionally cut short.
+     */
+    public void appendValidation(CaseFolder cf,
+                                 String datasetName,
+                                 String xmlFiles,
+                                 String missingXmlFiles,
+                                 String constraintFile,
+                                 List<SHACLValidationResult> results,
+                                 boolean conforms,
+                                 String displayName,
+                                 boolean partial,
+                                 int resultLimit) {
 
         String reportXmlFiles = toReportFileNames(xmlFiles);
         String reportConstraintFile = toReportFileNames(constraintFile);
@@ -230,7 +260,9 @@ public class ValidationExcelWriter implements Closeable {
                 conforms,
                 null,
                 missingXmlFiles,
-                displayName
+                displayName,
+                partial,
+                resultLimit
         );
         if (results == null || results.isEmpty()) {
             return;
@@ -390,7 +422,9 @@ public class ValidationExcelWriter implements Closeable {
                 false,
                 safeThrowable(error),
                 missingXmlFiles,
-                displayName
+                displayName,
+                false,
+                0
         );
     }
 
@@ -426,7 +460,9 @@ public class ValidationExcelWriter implements Closeable {
                                     boolean conforms,
                                     String validationError,
                                     String missingXmlFiles,
-                                    String displayName) {
+                                    String displayName,
+                                    boolean partial,
+                                    int resultLimit) {
         int vio = 0, warn = 0, info = 0;
 
         if (results != null) {
@@ -452,6 +488,9 @@ public class ValidationExcelWriter implements Closeable {
         row.createCell(8).setCellValue(safe(validationError));
         row.createCell(9).setCellValue(formatMissingXmlFiles(missingXmlFiles));
         row.createCell(STAT_COL_CHART_NAME).setCellValue(safe(displayName));
+        row.createCell(11).setCellValue(partial
+                ? "Partial — stopped after " + resultLimit + " results per shape"
+                : "Complete");
     }
 
     private void addConstraintStatistic(String dataset,
@@ -534,14 +573,19 @@ public class ValidationExcelWriter implements Closeable {
         Path out = outputBaseDir.resolve("validation_report__" + ts + ".xlsx");
 
         try (OutputStream os = Files.newOutputStream(out)) {
-            wb.write(os);
+            streamingWorkbook.write(os);
         }
         return out;
     }
 
     @Override
     public void close() throws IOException {
-        wb.close();
+        if (streamingWorkbook != null) {
+            // POI 5.5.1 closes the template and deletes SXSSF temporary files here.
+            streamingWorkbook.close();
+        } else {
+            wb.close();
+        }
     }
 
     private static void writeHeader(Sheet sheet, String[] header, CellStyle headerStyle) {
@@ -862,7 +906,9 @@ public class ValidationExcelWriter implements Closeable {
                                         int totalResults,
                                         int violationCount,
                                         int warningCount,
-                                        int infoCount) {
+                                        int infoCount,
+                                        int partialValidationCount,
+                                        int resultLimit) {
         ensureTimestampedSummaryMode();
 
         String worstSeverity = "";
@@ -901,6 +947,10 @@ public class ValidationExcelWriter implements Closeable {
         row.createCell(10).setCellValue(infoCount);
         row.createCell(11).setCellValue(worstSeverity);
         row.createCell(12).setCellValue(priority);
+        row.createCell(13).setCellValue(partialValidationCount);
+        row.createCell(14).setCellValue(partialValidationCount > 0
+                ? resultLimit + " results per shape"
+                : "");
     }
 
     public void collectTimestampConstraintStatistics(String country,

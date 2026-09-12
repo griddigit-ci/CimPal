@@ -166,10 +166,16 @@
                             <jre>
                                 <path>%JAVA_HOME%;%PATH%</path>
                                 <requiresJdk>false</requiresJdk>
-                                <requires64Bit>false</requires64Bit>
+                                <!-- CGMES timestamped validation can retain large RDF models.
+                                     A 64-bit JVM is required for multi-gigabyte heaps. -->
+                                <requires64Bit>true</requires64Bit>
                                 <minVersion>25</minVersion>
                                 <opts>
                                     <opt>-Dprism.order=sw</opt>
+                                    <!-- The default JVM heap is about one quarter of physical RAM.
+                                         Leave headroom for Windows, JavaFX and native libraries while
+                                         allowing large timestamped models to use the host capacity. -->
+                                    <opt>-XX:MaxRAMPercentage=85.0</opt>
                                     <!-- launch4j starts the VM itself rather than through the
                                          java launcher, so the Enable-Native-Access manifest
                                          attribute does not reach it; the same grant has to be

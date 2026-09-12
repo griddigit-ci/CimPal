@@ -159,6 +159,22 @@ class ShapeSourceTest {
     }
 
     @Test
+    void classify_windowsDriveStyleImport_resolvesAsAbsolutePath() throws Exception {
+        Path dep = tempDir.resolve("dep.ttl").toAbsolutePath();
+        Files.writeString(dep, "# placeholder");
+        String importUri = dep.toString().replace("\\", "/")
+                .replaceFirst("^([A-Za-z]):/", "$1://");
+
+        var src = ValidationTools.resolveImport(
+                importUri,
+                new ValidationTools.LocalShapeSource(tempDir.resolve("root.ttl")),
+                tempDir);
+
+        assertInstanceOf(ValidationTools.LocalShapeSource.class, src);
+        assertEquals(dep.normalize(), ((ValidationTools.LocalShapeSource) src).path().toAbsolutePath().normalize());
+    }
+
+    @Test
     void classify_relativeFromRemote_resolvesAgainstParentUri() {
         // A relative ".ttl" reference from a remote parent resolves to a remote .ttl URL.
         var parent = new ValidationTools.RemoteShapeSource(

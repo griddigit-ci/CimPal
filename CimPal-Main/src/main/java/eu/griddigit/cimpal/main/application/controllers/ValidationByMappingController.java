@@ -143,6 +143,15 @@ public class ValidationByMappingController {
     @FXML
     private Label helpPreviousComparisonCsv;
 
+    @FXML
+    private HBox rowLimitValidationResults;
+
+    @FXML
+    private CheckBox cbLimitValidationResults;
+
+    @FXML
+    private Label helpLimitValidationResults;
+
     // ---- manual-selection workflow controls, formerly the SHACL tester tab ----
     @FXML
     private HBox rowShaclConstraintFilesLabel;
@@ -279,6 +288,7 @@ public class ValidationByMappingController {
         // Previous-run comparison CSV and Regenerate button: timestamped workflow only.
         setShown(timestamped, rowPreviousComparisonCsvLabel, tfPreviousComparisonCsv,
                 btnBrowsePreviousComparisonCsv, btnRegenerateComparison);
+        setShown(timestamped, rowLimitValidationResults);
 
         // Manual constraint file selection: manual workflow only.
         setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
@@ -387,6 +397,14 @@ public class ValidationByMappingController {
                         "All date-time named sheets from that file are carried over into the new comparison workbook, " +
                         "and the most recent one is used as the comparison baseline (\"Previous\" column in the charts).\n\n" +
                         "If left empty, no historical data is included and the % distribution chart is produced without a delta chart."
+        );
+
+        GUIhelper.installHelpTooltip(
+                helpLimitValidationResults,
+                "When selected, CimPal stops a target shape after it has produced 10 failing results, "
+                        + "counting violations, warnings and information results alike. "
+                        + "The report marks affected validations as Partial, because checks after the limit were not run. "
+                        + "Use this for quick investigation; clear it to run the complete validation."
         );
     }
 
@@ -669,6 +687,8 @@ public class ValidationByMappingController {
 
         // Only meaningful for the timestamped workflow; null when none selected.
         Path previousComparisonCsv = runTimestampedWorkflow ? getPreviousComparisonCsvPath() : null;
+        int maxResultsPerConstraint = runTimestampedWorkflow
+                && cbLimitValidationResults != null && cbLimitValidationResults.isSelected() ? 10 : 0;
 
         btnRunValidationByMapping.setDisable(true);
         setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -692,7 +712,8 @@ public class ValidationByMappingController {
                             threadCount,
                             dataTypeMap,
                             xmlBase,
-                            previousComparisonCsv
+                            previousComparisonCsv,
+                            maxResultsPerConstraint
                     );
                     List<Path> reports = tsResult.reports();
 

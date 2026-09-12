@@ -224,6 +224,13 @@
                     onAction="#actionBrowsePreviousComparisonCsv"
                     text="Browse"
                     GridPane.rowIndex="8" GridPane.columnIndex="2"/>
+
+            <HBox fx:id="rowLimitValidationResults" spacing="8.0" alignment="CENTER_LEFT"
+                  GridPane.rowIndex="9" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <CheckBox fx:id="cbLimitValidationResults" mnemonicParsing="false"
+                          text="Sample validation: stop after 10 results per shape"/>
+                <Label fx:id="helpLimitValidationResults" text="?" styleClass="help-badge"/>
+            </HBox>
         </GridPane>
 
         <!--
