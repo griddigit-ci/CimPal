@@ -12,6 +12,7 @@ import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.*;
 import eu.griddigit.cimpal.main.application.controllers.sparql.SparqlQueryTabController;
+import eu.griddigit.cimpal.main.application.controllers.ai.AiAssistantTabController;
 import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
@@ -98,6 +99,9 @@ public class MainController implements Initializable {
     public Tab tabExcelToSHACL;
     public Tab tabRDFConvert;
     public Tab tabSPARQLQuery;
+    private SparqlQueryTabController sparqlQueryTabController;
+    @FXML
+    private Tab tabAiAssistant;
     @FXML
     private Tab tabRDFVisualisation;
     public Font x3;
@@ -292,8 +296,18 @@ public class MainController implements Initializable {
             tabSPARQLQuery.setContent(loader.load());
             SparqlQueryTabController controller = loader.getController();
             controller.setMainController(this);
+            sparqlQueryTabController = controller;
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("SPARQL Query tab error", "The SPARQL Query tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/AiAssistantTab.fxml"));
+            tabAiAssistant.setContent(loader.load());
+            AiAssistantTabController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("AI Assistant tab error", "The AI Assistant tab could not be loaded.", e);
         }
 
         try {
@@ -392,6 +406,7 @@ public class MainController implements Initializable {
     @FXML private void actionShowVisualisation(ActionEvent event) { selectFunctionTab(tabRDFVisualisation); }
     @FXML private void actionShowConvert(ActionEvent event) { selectFunctionTab(tabRDFConvert); }
     @FXML private void actionShowSparql(ActionEvent event) { selectFunctionTab(tabSPARQLQuery); }
+    @FXML private void actionShowAiAssistant(ActionEvent event) { selectFunctionTab(tabAiAssistant); }
     @FXML private void actionShowRdfsToShacl(ActionEvent event) { selectFunctionTab(tabRDFStoSHACL); }
     @FXML private void actionShowConstraints(ActionEvent event) { selectFunctionTab(tabExcelToSHACL); }
     @FXML private void actionShowRdfComparison(ActionEvent event) { selectFunctionTab(tabCreateCompleteSM1); }
@@ -399,6 +414,15 @@ public class MainController implements Initializable {
     @FXML private void actionShowGenerate(ActionEvent event) { selectFunctionTab(tabGenerateInstanceData); }
     @FXML private void actionShowTaskWizard(ActionEvent event) { selectFunctionTab(tabTaskWizard); }
     @FXML private void actionShowValidation(ActionEvent event) { selectFunctionTab(tabValidationByMapping); }
+
+    /** Opens a generated query or review-only repair script in CimPal's SPARQL editor. */
+    public void openGeneratedSparql(String query) {
+        if (sparqlQueryTabController == null) {
+            throw new IllegalStateException("The SPARQL Query tab is not available.");
+        }
+        sparqlQueryTabController.setGeneratedQuery(query);
+        selectFunctionTab(tabSPARQLQuery);
+    }
 
     private void initializeValidationByMappingTab() {
         try {
@@ -434,15 +458,28 @@ public class MainController implements Initializable {
      * Sets the progress bar value (0.0 to 1.0, or use ProgressIndicator.INDETERMINATE_PROGRESS)
      */
     public void setProgressBarValue(double progress) {
-        Platform.runLater(() -> progressBar.setProgress(progress));
+        Platform.runLater(() -> {
+            progressBar.setStyle("");
+            progressBar.setProgress(progress);
+        });
     }
 
+    /** Marks a completed operation distinctly from an idle/empty progress bar. */
+    public void completeProgressBar() {
+        Platform.runLater(() -> {
+            progressBar.setStyle("-fx-accent: #45c46b;");
+            progressBar.setProgress(1);
+        });
+    }
 
     /**
      * Sets the progress bar to 0 (empty)
      */
     public void resetProgressBar() {
-        Platform.runLater(() -> progressBar.setProgress(0));
+        Platform.runLater(() -> {
+            progressBar.setStyle("");
+            progressBar.setProgress(0);
+        });
     }
 
 

@@ -194,16 +194,10 @@ public class ValidationByMappingController {
     private Label helpShaclConstraintFiles;
 
     @FXML
-    private HBox rowExportModelReports;
-
-    @FXML
-    private CheckBox cbExportReports;
+    private CheckBox cbExportReportsTurtle;
 
     @FXML
     private Label helpExportReports;
-
-    @FXML
-    private TreeView<String> treeViewShaclFiles;
 
     private File mappingCsvFile;
     private File modelsInputFolder;
@@ -290,9 +284,6 @@ public class ValidationByMappingController {
         PathMemory.bind(tfModelsInputFolder, "tab.validationByMapping.modelsInput",
                 folder -> {
                     modelsInputFolder = folder;
-                    //the manual workflow shows the discovered models, so rebuild the tree
-                    //whenever the folder is restored, exactly as the Browse handler does
-                    GUIhelper.buildFileTree(folder, treeViewShaclFiles);
                 });
         PathMemory.bind(tfConstraintsRootFolder, "tab.validationByMapping.constraintsRoot",
                 folder -> constraintsRootFolder = folder);
@@ -342,9 +333,6 @@ public class ValidationByMappingController {
                 tfConstraintsRootFolder, btnBrowseConstraintsRootFolder,
                 tfOutputFolder, btnBrowseOutputFolder);
 
-        // The export option and the discovered-model tree only mean anything for the manual
-        // workflow, so they are hidden outright rather than shown disabled.
-        setShown(manual, rowExportModelReports, treeViewShaclFiles);
     }
 
     private static void setDisabled(boolean disabled, Node... nodes) {
@@ -396,8 +384,9 @@ public class ValidationByMappingController {
 
         GUIhelper.installHelpTooltip(
                 helpExportReports,
-                "When checked, saves a SHACL validation report file alongside each validated model in the models root folder.\n\n" +
-                        "Only used by the \"Validate by manual selection\" workflow."
+                "Saves the standard SHACL ValidationReport graph as a Turtle (.ttl) file for each validation result. " +
+                        "Turtle reports can be selected later in the AI Assistant for targeted explanations and repair proposals.\n\n" +
+                        "Applies to all validation workflows."
         );
 
         GUIhelper.installHelpTooltip(
@@ -533,8 +522,6 @@ public class ValidationByMappingController {
         modelsInputFolder = selected;
         tfModelsInputFolder.setText(modelsInputFolder.getAbsolutePath());
 
-        //the manual workflow lists what was found under this folder
-        GUIhelper.buildFileTree(modelsInputFolder, treeViewShaclFiles);
     }
 
     /**
@@ -720,14 +707,6 @@ public class ValidationByMappingController {
             tfShaclConstraintFiles.clear();
         }
 
-        if (treeViewShaclFiles != null) {
-            treeViewShaclFiles.setRoot(null);
-        }
-
-        if (cbExportReports != null) {
-            cbExportReports.setSelected(true);
-        }
-
         if (tfPreviousComparisonCsv != null) {
             tfPreviousComparisonCsv.clear();
         }
@@ -775,6 +754,7 @@ public class ValidationByMappingController {
         Path previousComparisonCsv = runTimestampedWorkflow ? getPreviousComparisonCsvPath() : null;
         int maxResultsPerConstraint = cbLimitValidationResults != null
                 && cbLimitValidationResults.isSelected() ? 10 : 0;
+        ValidationTools.setExportTurtleValidationReports(cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected());
 
         btnRunValidationByMapping.setDisable(true);
         setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -875,7 +855,10 @@ public class ValidationByMappingController {
     private void runManualValidation() {
         File selectedModelsFolder = modelsInputFolder;
         List<File> selectedConstraintFiles = shaclConstraintFiles;
-        boolean exportReports = cbExportReports != null && cbExportReports.isSelected();
+        // Manual validation has historically created its Excel reports by default; retain
+        // that behaviour while exposing Turtle as the single optional report format.
+        boolean exportReports = true;
+        boolean exportTurtleReports = cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected();
         DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
         String xmlBase = getBaseUri();
         int workerCount = getThreadCount(false, ValidationEngine.APACHE_JENA);
@@ -935,7 +918,7 @@ public class ValidationByMappingController {
                 ValidationTools.startValidationDebugRun("manual SHACL validation workers=" + workerCount
                         + " resultLimit=" + maxResultsPerConstraint);
 
-                tester.runTestsInternal(selectedConstraintFiles, selectedModelsFolder, archives, exportReports);
+                tester.runTestsInternal(selectedConstraintFiles, selectedModelsFolder, archives, exportReports, exportTurtleReports);
 
                 Platform.runLater(() -> {
                     setProgress(1);

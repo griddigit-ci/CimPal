@@ -13,21 +13,33 @@ import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputDialog;
 import javafx.stage.FileChooser;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import org.apache.jena.rdf.model.Model;
+import org.apache.jena.query.QueryFactory;
+import org.apache.jena.update.UpdateAction;
+import org.apache.jena.update.UpdateFactory;
+import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.riot.RDFFormat;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.FileOutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 public class SparqlQueryTabController implements Initializable {
     private MainController mainController;
@@ -38,42 +50,58 @@ public class SparqlQueryTabController implements Initializable {
     private TextArea txtSparqlQuery;
 
     @FXML
-    private Label lblQueryFile;
-
-    @FXML
-    private Label lblStatus;
-
-    @FXML
-    private Label lblModelFiles;
-    @FXML
     private ChoiceBox<String> cbBaseUri;
     @FXML
     private TextField tfBaseUri;
+    @FXML
+    private ChoiceBox<String> cbRepairOutputFormat;
 
     @FXML
     private Label helpSelectModels;
     @FXML
     private Label helpSparqlQuery;
+    @FXML
+    private Label lblRepairRepository;
 
     private final List<File> selectedModelFiles = new ArrayList<>();
     private File currentQueryFile;
+    private File repairOutputRepository;
+    private File lastRepairOutputFile;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
         BaseUriPresets.bind(cbBaseUri, tfBaseUri, "CIM 16");
-        setStatus("Ready to edit or import a SPARQL SELECT query.");
+        cbRepairOutputFormat.getItems().setAll("CIM XML / RDF/XML (IEC 61970-552)", "RDF/XML", "Turtle", "N-Triples", "N-Quads", "TriG", "JSON-LD", "RDF/JSON");
+        cbRepairOutputFormat.setValue("CIM XML / RDF/XML (IEC 61970-552)");
+        String rememberedRepository = MainController.prefs.get("sparql.repair.outputRepository", "");
+        if (!rememberedRepository.isBlank()) {
+            File repository = new File(rememberedRepository);
+            if (isGitRepository(repository)) repairOutputRepository = repository;
+        }
+        updateRepairRepositoryLabel();
         setCurrentQueryFile(null);
-        updateModelFilesLabel();
     }
 
     private void initializeHelpTooltips() {
         GUIhelper.installHelpTooltip(helpSelectModels, "Select one or more RDF/XML files or ZIP archives containing CGMES model data to query. The files are loaded as a combined RDF dataset.");
-        GUIhelper.installHelpTooltip(helpSparqlQuery, "Write a SPARQL SELECT query to execute against the loaded model files.\n\nUse Load query to import an existing .sparql or .rq file, or type/edit the query directly in the text area below.");
+        GUIhelper.installHelpTooltip(helpSparqlQuery, "Write a SPARQL SELECT query or a SPARQL Update repair script.\n\nUse Load query to import .sparql, .rq, or .ru files. Updates run only after confirmation, use a temporary in-memory model, and may be saved only as a new RDF/XML output file.");
     }
 
     public void setMainController(MainController mainController) {
         this.mainController = mainController;
+        setStatus("Ready to edit or import a SPARQL query or repair script.");
+    }
+
+    /** Receives a review-approved query or repair script generated in the AI Assistant tab. */
+    public void setGeneratedQuery(String query) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException("The generated SPARQL query is empty.");
+        }
+        txtSparqlQuery.setText(query);
+        setCurrentQueryFile(null);
+        setStatus(isUpdate(query) ? "Generated SPARQL repair loaded. Review it, then run it against the selected model files."
+                : "Generated SPARQL query loaded. Review it, then run it against the selected model files.");
     }
 
     private String selectedBaseUri() {
@@ -98,21 +126,21 @@ public class SparqlQueryTabController implements Initializable {
         List<File> modelFiles = ModelFactory.fileChooserCustom(
                 false,
                 "Instance files",
-                List.of("*.xml", "*.zip"),
-                "Select RDF/XML or ZIP model files",
+                List.of("*.rdf", "*.xml", "*.ttl", "*.n3", "*.nt", "*.nq", "*.trig", "*.trix", "*.jsonld", "*.json", "*.rj", "*.zip"),
+                "Select Jena RDF, CIM XML, or ZIP model files",
                 "dialog.sparqlModelFiles"
         );
 
         if (modelFiles == null || modelFiles.isEmpty()) {
-            setStatus("No RDF/XML or ZIP model files were selected.");
+            setStatus("No RDF, CIM XML, or ZIP model files were selected.");
             return;
         }
 
         selectedModelFiles.clear();
         selectedModelFiles.addAll(modelFiles);
         MainController.IDModel1 = new ArrayList<>(modelFiles);
-        updateModelFilesLabel();
-        setStatus("Selected " + selectedModelFiles.size() + " model file(s).");
+        completeProgressBar();
+        setStatus("Selected " + selectedModelFiles.size() + " model file(s). Ready to run a SPARQL query.");
     }
 
     @FXML
@@ -120,7 +148,7 @@ public class SparqlQueryTabController implements Initializable {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Open SPARQL query");
         chooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql"),
+                new FileChooser.ExtensionFilter("SPARQL files", "*.rq", "*.sparql", "*.ru"),
                 new FileChooser.ExtensionFilter("All files", "*.*")
         );
 
@@ -152,10 +180,10 @@ public class SparqlQueryTabController implements Initializable {
             File targetFile = currentQueryFile;
             if (targetFile == null) {
                 FileChooser chooser = new FileChooser();
-                chooser.setTitle("Save SPARQL query");
+                chooser.setTitle("Save SPARQL script");
                 chooser.setInitialFileName("query.rq");
                 chooser.getExtensionFilters().addAll(
-                        new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql"),
+                        new FileChooser.ExtensionFilter("SPARQL files", "*.rq", "*.sparql", "*.ru"),
                         new FileChooser.ExtensionFilter("All files", "*.*")
                 );
                 PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
@@ -172,8 +200,8 @@ public class SparqlQueryTabController implements Initializable {
                 return;
             }
 
-            if (!targetFile.getName().toLowerCase().endsWith(".rq") && !targetFile.getName().toLowerCase().endsWith(".sparql")) {
-                targetFile = new File(targetFile.getAbsolutePath() + ".rq");
+            if (!hasSparqlExtension(targetFile)) {
+                targetFile = new File(targetFile.getAbsolutePath() + (isUpdate(queryText) ? ".ru" : ".rq"));
             }
 
             Files.writeString(targetFile.toPath(), queryText, StandardCharsets.UTF_8);
@@ -192,10 +220,10 @@ public class SparqlQueryTabController implements Initializable {
     private void actionSaveAsQuery(ActionEvent actionEvent) {
         try {
             FileChooser chooser = new FileChooser();
-            chooser.setTitle("Save SPARQL query as");
+            chooser.setTitle("Save SPARQL script as");
             chooser.setInitialFileName("query.rq");
             chooser.getExtensionFilters().addAll(
-                    new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql"),
+                    new FileChooser.ExtensionFilter("SPARQL files", "*.rq", "*.sparql", "*.ru"),
                     new FileChooser.ExtensionFilter("All files", "*.*")
             );
             PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
@@ -211,8 +239,8 @@ public class SparqlQueryTabController implements Initializable {
                 return;
             }
 
-            if (!targetFile.getName().toLowerCase().endsWith(".rq") && !targetFile.getName().toLowerCase().endsWith(".sparql")) {
-                targetFile = new File(targetFile.getAbsolutePath() + ".rq");
+            if (!hasSparqlExtension(targetFile)) {
+                targetFile = new File(targetFile.getAbsolutePath() + (isUpdate(queryText) ? ".ru" : ".rq"));
             }
 
             Files.writeString(targetFile.toPath(), queryText, StandardCharsets.UTF_8);
@@ -244,24 +272,34 @@ public class SparqlQueryTabController implements Initializable {
 
         try {
             if (selectedModelFiles.isEmpty()) {
-                setStatus("Please select RDF/XML or ZIP model files first.");
+                setStatus("Please select RDF, CIM XML, or ZIP model files first.");
                 return;
             }
 
+            setProgressBar(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
             setStatus("Loading RDF models...");
             Model combinedModel = eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(selectedModelFiles, selectedBaseUri());
             if (combinedModel == null || combinedModel.isEmpty()) {
                 throw new IllegalStateException("Failed to load RDF models from the selected files.");
             }
 
+            if (isUpdate(queryText)) {
+                runUpdate(queryText, combinedModel);
+                completeProgressBar();
+                return;
+            }
+
+            QueryFactory.create(queryText);
             setStatus("Running SPARQL query...");
             SparqlTools.QueryResults results = SparqlTools.executeSparqlQuery(queryText, combinedModel);
 
             setStatus("SPARQL query completed: " + results.rows.size() + " result(s).");
+            completeProgressBar();
 
             // Open results window
             showResultsWindow(results);
         } catch (Exception e) {
+            resetProgressBar();
             setStatus("SPARQL query failed.");
             GUIhelper.showUserFriendlyError(
                     "SPARQL query failed",
@@ -297,24 +335,173 @@ public class SparqlQueryTabController implements Initializable {
 
     private void setCurrentQueryFile(File file) {
         currentQueryFile = file;
-        if (lblQueryFile != null) {
-            lblQueryFile.setText(file == null ? "No query loaded" : file.getAbsolutePath());
+    }
+
+    private void runUpdate(String updateText, Model combinedModel) throws IOException {
+        ensureSafeUpdate(updateText);
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Run this SPARQL Update on a temporary in-memory copy of the selected model files?\n\n"
+                        + "The original files will not be modified. You will be asked where to save a new repaired RDF/XML copy afterwards.",
+                ButtonType.OK, ButtonType.CANCEL);
+        confirm.setTitle("Run SPARQL repair");
+        confirm.setHeaderText("Review-approved repair required");
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+            resetProgressBar();
+            setStatus("SPARQL repair cancelled. No model data was changed.");
+            return;
+        }
+        Model original = org.apache.jena.rdf.model.ModelFactory.createDefaultModel().add(combinedModel);
+        UpdateAction.execute(UpdateFactory.create(updateText), combinedModel);
+        long removed = original.difference(combinedModel).size();
+        long added = combinedModel.difference(original).size();
+        FileChooser chooser = new FileChooser();
+        OutputFormat outputFormat = selectedOutputFormat();
+        chooser.setTitle("Save repaired model copy");
+        chooser.setInitialFileName("repaired-model" + outputFormat.extension);
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(outputFormat.description, "*" + outputFormat.extension));
+        PathMemory.prepare(chooser, "dialog.sparqlRepairOutput");
+        if (repairOutputRepository != null && repairOutputRepository.isDirectory()) chooser.setInitialDirectory(repairOutputRepository);
+        File target = chooser.showSaveDialog(txtSparqlQuery.getScene().getWindow());
+        if (target == null) {
+            setStatus("Repair ran only in memory; output was not saved. Original model files were not changed.");
+            return;
+        }
+        if (!target.getName().toLowerCase().endsWith(outputFormat.extension)) target = new File(target.getAbsolutePath() + outputFormat.extension);
+        try (FileOutputStream output = new FileOutputStream(target)) {
+            RDFDataMgr.write(output, combinedModel, outputFormat.rdfFormat);
+        }
+        PathMemory.remember("dialog.sparqlRepairOutput", target);
+        lastRepairOutputFile = target;
+        setStatus("SPARQL repair saved as " + target.getName() + " (" + removed + " removed, " + added + " added triple(s)). Original files were not changed.");
+    }
+
+    @FXML
+    private void actionChooseOutputRepository(ActionEvent event) {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Select local Git repository for repaired output");
+        if (repairOutputRepository != null && repairOutputRepository.isDirectory()) chooser.setInitialDirectory(repairOutputRepository);
+        File selected = chooser.showDialog(txtSparqlQuery.getScene().getWindow());
+        if (selected == null) return;
+        if (!isGitRepository(selected)) {
+            GUIhelper.showUserFriendlyError("Not a Git repository", "Choose the root folder of a local cloned Git repository (a folder containing .git).", null);
+            return;
+        }
+        repairOutputRepository = selected;
+        MainController.prefs.put("sparql.repair.outputRepository", selected.getAbsolutePath());
+        updateRepairRepositoryLabel();
+        setStatus("Repair output repository selected: " + selected.getName() + ". Repaired files remain uncommitted until you choose Commit saved repair.");
+    }
+
+    @FXML
+    private void actionCommitRepairOutput(ActionEvent event) {
+        if (repairOutputRepository == null) {
+            setStatus("Select a local output repository first.");
+            return;
+        }
+        if (lastRepairOutputFile == null || !lastRepairOutputFile.isFile()) {
+            setStatus("Save a repaired output file in this CimPal session before committing it.");
+            return;
+        }
+        java.nio.file.Path repositoryPath = repairOutputRepository.toPath().toAbsolutePath().normalize();
+        java.nio.file.Path outputPath = lastRepairOutputFile.toPath().toAbsolutePath().normalize();
+        if (!outputPath.startsWith(repositoryPath)) {
+            setStatus("The saved repair is outside the selected repository. Save it inside the repository before committing.");
+            return;
+        }
+        String relativePath = repositoryPath.relativize(outputPath).toString();
+        TextInputDialog messageDialog = new TextInputDialog("Repair " + lastRepairOutputFile.getName());
+        messageDialog.setTitle("Commit repaired model");
+        messageDialog.setHeaderText("Commit only " + relativePath + " to " + repairOutputRepository.getName());
+        messageDialog.setContentText("Commit message:");
+        Optional<String> entered = messageDialog.showAndWait();
+        if (entered.isEmpty() || entered.get().trim().isBlank()) return;
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Stage and commit only this repaired output file?\n\nRepository: " + repairOutputRepository.getAbsolutePath()
+                        + "\nFile: " + relativePath,
+                ButtonType.OK, ButtonType.CANCEL);
+        confirm.setTitle("Confirm Git commit");
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+        try {
+            runGit(List.of("git", "-C", repositoryPath.toString(), "add", "--", relativePath));
+            runGit(List.of("git", "-C", repositoryPath.toString(), "commit", "-m", entered.get().trim(), "--", relativePath));
+            setStatus("Committed repaired output " + relativePath + " to " + repairOutputRepository.getName() + ".");
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("Git commit failed", "The repaired output was not committed. Check Git status and the repository configuration.", e);
         }
     }
+
+    private static boolean isGitRepository(File folder) {
+        return folder != null && folder.isDirectory() && new File(folder, ".git").exists();
+    }
+
+    private void updateRepairRepositoryLabel() {
+        lblRepairRepository.setText(repairOutputRepository == null ? "No output repository selected" : "Output repository: " + repairOutputRepository.getName());
+    }
+
+    private static void runGit(List<String> command) throws IOException {
+        try {
+            Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException("Git command timed out.");
+            }
+            if (process.exitValue() != 0) {
+                String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+                throw new IOException(output.isBlank() ? "Git command failed." : output);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Git command was interrupted.", e);
+        }
+    }
+
+    private static boolean isUpdate(String text) {
+        try {
+            UpdateFactory.create(text);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static boolean hasSparqlExtension(File file) {
+        String name = file.getName().toLowerCase();
+        return name.endsWith(".rq") || name.endsWith(".sparql") || name.endsWith(".ru");
+    }
+
+    private static void ensureSafeUpdate(String update) {
+        if (update.matches("(?is).*\\b(LOAD|SERVICE|CLEAR|DROP|CREATE|MOVE|COPY|ADD)\\b.*")) {
+            throw new IllegalArgumentException("For safety, this tab does not run remote or graph-management SPARQL operations.");
+        }
+        if (!update.matches("(?is).*\\b(INSERT|DELETE)\\b.*")) {
+            throw new IllegalArgumentException("The script does not contain an INSERT or DELETE operation.");
+        }
+    }
+
+    private OutputFormat selectedOutputFormat() {
+        return switch (cbRepairOutputFormat.getValue()) {
+            case "Turtle" -> new OutputFormat(".ttl", "Turtle files", RDFFormat.TURTLE_PRETTY);
+            case "N-Triples" -> new OutputFormat(".nt", "N-Triples files", RDFFormat.NTRIPLES_UTF8);
+            case "N-Quads" -> new OutputFormat(".nq", "N-Quads files", RDFFormat.NQUADS_UTF8);
+            case "TriG" -> new OutputFormat(".trig", "TriG files", RDFFormat.TRIG_PRETTY);
+            case "JSON-LD" -> new OutputFormat(".jsonld", "JSON-LD files", RDFFormat.JSONLD_PRETTY);
+            case "RDF/JSON" -> new OutputFormat(".rj", "RDF/JSON files", RDFFormat.RDFJSON);
+            case "RDF/XML" -> new OutputFormat(".rdf", "RDF/XML files", RDFFormat.RDFXML_PRETTY);
+            default -> new OutputFormat(".rdf", "CIM XML / RDF/XML files", RDFFormat.RDFXML_PRETTY);
+        };
+    }
+
+    private record OutputFormat(String extension, String description, RDFFormat rdfFormat) { }
 
     private void setStatus(String message) {
-        if (lblStatus != null) {
-            lblStatus.setText(message);
+        if (mainController != null) {
+            mainController.setStatusMessage(message);
         }
     }
 
-    private void updateModelFilesLabel() {
-        if (lblModelFiles != null) {
-            if (selectedModelFiles.isEmpty()) {
-                lblModelFiles.setText("No model files selected");
-            } else {
-                lblModelFiles.setText(selectedModelFiles.size() + " model file(s) selected");
-            }
+    private void completeProgressBar() {
+        if (mainController != null) {
+            mainController.completeProgressBar();
         }
     }
 }

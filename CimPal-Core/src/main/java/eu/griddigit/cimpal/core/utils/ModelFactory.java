@@ -7,6 +7,9 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFParser;
+import org.apache.jena.riot.RDFLanguages;
+import org.apache.jena.query.Dataset;
+import org.apache.jena.query.DatasetFactory;
 import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.vocabulary.DCAT;
 import org.apache.jena.vocabulary.OWL2;
@@ -245,7 +248,7 @@ public class ModelFactory {
 
                                 try (InputStream in = zipFile.getInputStream(entry)) {
                                     Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-                                    RDFDataMgr.read(model, in, xmlBase, lang);
+                                    readIntoModel(model, in, xmlBase, lang);
                                     result.put(entryName, model);
                                 }
                             } catch (IOException e) {
@@ -257,7 +260,7 @@ public class ModelFactory {
                     Lang lang = getLangFromExtension(ext, defaultLang);
                     try (InputStream in = new FileInputStream(file)) {
                         Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-                        RDFDataMgr.read(model, in, xmlBase, lang);
+                        readIntoModel(model, in, xmlBase, lang);
                         result.put(file.getName(), model);
                     }
                 }
@@ -288,12 +291,20 @@ public class ModelFactory {
     }
 
     private static Lang getLangFromExtension(String ext, Lang fallback) {
-        return switch (ext) {
-            case "rdf", "xml" -> Lang.RDFXML;
-            case "ttl" -> Lang.TURTLE;
-            case "jsonld" -> Lang.JSONLD;
-            default -> fallback;
-        };
+        Lang detected = RDFLanguages.filenameToLang("input." + ext);
+        return detected == null ? fallback : detected;
+    }
+
+    /** Loads both graph and dataset syntaxes into CimPal's combined graph model. */
+    private static void readIntoModel(Model target, InputStream in, String xmlBase, Lang lang) {
+        if (RDFLanguages.isQuads(lang)) {
+            Dataset dataset = DatasetFactory.createTxnMem();
+            RDFDataMgr.read(dataset, in, xmlBase, lang);
+            target.add(dataset.getDefaultModel());
+            dataset.listNames().forEachRemaining(name -> target.add(dataset.getNamedModel(name)));
+        } else {
+            RDFDataMgr.read(target, in, xmlBase, lang);
+        }
     }
 
     private static String buildModelKey(File file, String keyword, boolean isZip, int index, boolean treeID) {

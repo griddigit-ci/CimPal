@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Licensed under the EUPL-1.2-or-later. Copyright (c) 2026, gridDigIt Kft. -->
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.ai.AiAssistantTabController" styleClass="tab-root">
+    <top>
+        <VBox spacing="8.0">
+            <padding><Insets bottom="8.0"/></padding>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                <Label text="Local Ollama server:"/>
+                <TextField fx:id="tfEndpoint" prefWidth="290.0" HBox.hgrow="ALWAYS"/>
+                <Button mnemonicParsing="false" onAction="#actionCheckConnection" text="Check connection"/>
+                <Label fx:id="lblConnection" wrapText="true"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                <Label text="Task:"/>
+                <ChoiceBox fx:id="cbTask" prefWidth="190.0"/>
+                <Label text="Model:"/>
+                <ChoiceBox fx:id="cbModel" prefWidth="260.0"/>
+                <Label text="Response:"/>
+                <ChoiceBox fx:id="cbResponseMode" prefWidth="105.0"/>
+                <CheckBox fx:id="cbUseDatasetContext" mnemonicParsing="false" text="Use selected model summary"/>
+                <Button mnemonicParsing="false" onAction="#actionInspectDataset" text="Inspect selected model"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                <Label text="Validation problem:"/>
+                <ChoiceBox fx:id="cbValidationProblem" prefWidth="520.0"/>
+            </HBox>
+        </VBox>
+    </top>
+    <center>
+        <SplitPane dividerPositions="0.42" orientation="VERTICAL">
+            <items>
+                <VBox spacing="6.0"><Label text="Request"/><TextArea fx:id="txtRequest" minHeight="0.0" wrapText="true" VBox.vgrow="ALWAYS"/></VBox>
+                <VBox spacing="6.0"><Label text="Assistant proposal — review before use"/><TextArea fx:id="txtResponse" editable="false" minHeight="0.0" wrapText="true" VBox.vgrow="ALWAYS"/></VBox>
+            </items>
+        </SplitPane>
+    </center>
+    <bottom>
+        <VBox spacing="8.0"><padding><Insets top="8.0"/></padding><HBox spacing="8.0"><Button fx:id="btnSend" defaultButton="true" mnemonicParsing="false" onAction="#actionSend" styleClass="primary-action" text="Generate proposal"/><Button mnemonicParsing="false" onAction="#actionChooseValidationReport" text="Choose validation report..."/><Button mnemonicParsing="false" onAction="#actionVerifyDraft" text="Verify draft locally"/><Button mnemonicParsing="false" onAction="#actionTestShacl" text="Test SHACL on selected model"/><Button mnemonicParsing="false" onAction="#actionPreviewRepair" text="Preview repair locally"/><Button mnemonicParsing="false" onAction="#actionSaveShacl" text="Save draft..."/><Button mnemonicParsing="false" onAction="#actionUseInSparql" text="Use in SPARQL tab"/><Button mnemonicParsing="false" onAction="#actionClear" text="Clear"/></HBox></VBox>
+    </bottom>
+</BorderPane>

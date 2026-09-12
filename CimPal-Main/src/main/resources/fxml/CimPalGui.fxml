@@ -86,6 +86,7 @@
                <Button mnemonicParsing="false" onAction="#actionShowVisualisation" styleClass="primary-action" text="Visualise"/>
                <Button mnemonicParsing="false" onAction="#actionShowConvert" text="Convert"/>
                <Button mnemonicParsing="false" onAction="#actionShowSparql" text="SPARQL"/>
+               <Button mnemonicParsing="false" onAction="#actionShowAiAssistant" styleClass="primary-action" text="AI Assistant"/>
                <Separator orientation="VERTICAL"/>
                <MenuButton mnemonicParsing="false" text="SHACL">
                   <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfsToShacl" text="RDFS to SHACL"/><MenuItem mnemonicParsing="false" onAction="#actionShowConstraints" text="Constraints Operations"/></items>
@@ -102,6 +103,7 @@
                   <Tab fx:id="tabRDFVisualisation" text="Visualisation"/>
                   <Tab fx:id="tabRDFConvert" text="Convert"/>
                   <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
+                  <Tab fx:id="tabAiAssistant" text="AI Assistant"/>
                   <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
                   <Tab fx:id="tabExcelToSHACL" text="Constraints Operations"/>
                   <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>

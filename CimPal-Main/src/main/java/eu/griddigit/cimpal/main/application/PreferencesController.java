@@ -7,6 +7,8 @@ package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.gui.ThemeManager;
+import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.ai.AiKnowledgeSearch;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -16,14 +18,19 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.CheckBox;
+import javafx.concurrent.Task;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.stage.DirectoryChooser;
 import org.apache.commons.io.FileUtils;
 
 import java.net.URL;
 import java.util.ResourceBundle;
+import java.io.File;
 
 public class PreferencesController implements Initializable {
     @FXML
@@ -52,6 +59,26 @@ public class PreferencesController implements Initializable {
     private ToggleGroup themeToggleGroup;
     @FXML
     private VBox themeRadioContainer;
+    @FXML
+    private TextField fAiFastTokens;
+    @FXML
+    private TextField fAiNormalTokens;
+    @FXML
+    private TextField fAiCompleteTokens;
+    @FXML
+    private Label helpAiResponseTokens;
+    @FXML
+    private TextArea fAiKnowledgeSources;
+    @FXML
+    private CheckBox cbAiUseRemoteSources;
+    @FXML
+    private CheckBox cbAiRefreshRemoteOnStartup;
+    @FXML
+    private Label lblAiKnowledgeStatus;
+    @FXML
+    private TextField fAiValidationMaxResults;
+    @FXML
+    private TextField fAiValidationMaxProperties;
 
     /** The theme that was active when the dialog opened, restored if the user cancels. */
     private ThemeManager.Theme themeOnOpen;
@@ -68,6 +95,11 @@ public class PreferencesController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         buildThemeRadios();
+        GUIhelper.installHelpTooltip(helpAiResponseTokens,
+                "Set the maximum number of generated tokens for each response profile.\n\n"
+                        + "Choose Fast, Normal, or Complete beside the model in the AI Assistant tab. "
+                        + "Higher values allow longer SPARQL/SHACL drafts but take longer on a CPU-only model. "
+                        + "Allowed range: 16 to 8,192.");
 
         themeOnOpen = ThemeManager.get().getCurrent();
 
@@ -94,6 +126,19 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("uriEU", furiEU.getText());
         MainController.prefs.put("prefixOther", fprefixOther.getText());
         MainController.prefs.put("uriOther", furiOther.getText());
+        try {
+            MainController.prefs.putInt("ai.fastResponseTokens", parseTokenLimit(fAiFastTokens, "Fast"));
+            MainController.prefs.putInt("ai.normalResponseTokens", parseTokenLimit(fAiNormalTokens, "Normal"));
+            MainController.prefs.putInt("ai.completeResponseTokens", parseTokenLimit(fAiCompleteTokens, "Complete"));
+            MainController.prefs.put("ai.knowledge.sources", fAiKnowledgeSources.getText().trim());
+            MainController.prefs.putBoolean("ai.knowledge.includeRemote", cbAiUseRemoteSources.isSelected());
+            MainController.prefs.putBoolean("ai.knowledge.refreshOnStartup", cbAiRefreshRemoteOnStartup.isSelected());
+            MainController.prefs.putInt("ai.validation.maxResults", parseBoundedLimit(fAiValidationMaxResults, "Validation results", 1, 200));
+            MainController.prefs.putInt("ai.validation.maxProperties", parseBoundedLimit(fAiValidationMaxProperties, "Properties per focus node", 1, 200));
+        } catch (IllegalArgumentException e) {
+            GUIhelper.showUserFriendlyError("AI response length", e.getMessage(), e);
+            return;
+        }
 
         //keep the theme that is currently previewed
         ThemeManager.get().save();
@@ -132,6 +177,38 @@ public class PreferencesController implements Initializable {
     }
 
     @FXML
+    private void actionAddKnowledgeFolder(ActionEvent actionEvent) {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Add local AI knowledge folder");
+        File selected = chooser.showDialog(guiPrefStage);
+        if (selected == null) return;
+        String source = selected.getAbsolutePath();
+        boolean exists = fAiKnowledgeSources.getText().lines().map(String::trim).anyMatch(source::equalsIgnoreCase);
+        if (!exists) {
+            String current = fAiKnowledgeSources.getText().trim();
+            fAiKnowledgeSources.setText(current.isBlank() ? source : current + System.lineSeparator() + source);
+        }
+    }
+
+    @FXML
+    private void actionRefreshRemoteSources(ActionEvent actionEvent) {
+        String sources = fAiKnowledgeSources.getText().trim();
+        if (sources.isBlank()) {
+            lblAiKnowledgeStatus.setText("Add one or more public HTTPS URLs first.");
+            return;
+        }
+        lblAiKnowledgeStatus.setText("Refreshing public sources...");
+        Task<String> task = new Task<>() {
+            @Override protected String call() { return AiKnowledgeSearch.refreshRemoteSources(sources, true); }
+        };
+        task.setOnSucceeded(ignored -> lblAiKnowledgeStatus.setText(task.getValue()));
+        task.setOnFailed(ignored -> lblAiKnowledgeStatus.setText("Could not refresh remote sources."));
+        Thread thread = new Thread(task, "cimpal-ai-knowledge-refresh");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    @FXML
     //action button Default
     private void actionBtnDefault(ActionEvent actionEvent) {
         prefDefault();
@@ -161,6 +238,15 @@ public class PreferencesController implements Initializable {
         PathMemory.clearAll();
         MainController.prefs.put("LastWorkingFolder", String.valueOf(FileUtils.getUserDirectory())); // it was "C:" before but this was causing issue for MAC
         MainController.prefs.put(ThemeManager.PREF_KEY, ThemeManager.Theme.DEFAULT.id());
+        MainController.prefs.putInt("ai.fastResponseTokens", 128);
+        MainController.prefs.putInt("ai.normalResponseTokens", MainController.prefs.getInt("ai.responseTokens", 512));
+        MainController.prefs.putInt("ai.completeResponseTokens", 1024);
+        MainController.prefs.put("ai.responseMode", "Normal");
+        MainController.prefs.put("ai.knowledge.sources", "");
+        MainController.prefs.putBoolean("ai.knowledge.includeRemote", false);
+        MainController.prefs.putBoolean("ai.knowledge.refreshOnStartup", true);
+        MainController.prefs.putInt("ai.validation.maxResults", 10);
+        MainController.prefs.putInt("ai.validation.maxProperties", 20);
 
     }
 
@@ -186,6 +272,16 @@ public class PreferencesController implements Initializable {
         furiEU.setText(MainController.prefs.get("uriEU",""));
         fprefixOther.setText(MainController.prefs.get("prefixOther",""));
         furiOther.setText(MainController.prefs.get("uriOther",""));
+        fAiFastTokens.setText(String.valueOf(MainController.prefs.getInt("ai.fastResponseTokens", 128)));
+        fAiNormalTokens.setText(String.valueOf(MainController.prefs.getInt("ai.normalResponseTokens",
+                MainController.prefs.getInt("ai.responseTokens", 512))));
+        fAiCompleteTokens.setText(String.valueOf(MainController.prefs.getInt("ai.completeResponseTokens", 1024)));
+        fAiKnowledgeSources.setText(MainController.prefs.get("ai.knowledge.sources", ""));
+        cbAiUseRemoteSources.setSelected(MainController.prefs.getBoolean("ai.knowledge.includeRemote", false));
+        cbAiRefreshRemoteOnStartup.setSelected(MainController.prefs.getBoolean("ai.knowledge.refreshOnStartup", true));
+        lblAiKnowledgeStatus.setText("");
+        fAiValidationMaxResults.setText(String.valueOf(MainController.prefs.getInt("ai.validation.maxResults", 10)));
+        fAiValidationMaxProperties.setText(String.valueOf(MainController.prefs.getInt("ai.validation.maxProperties", 20)));
 
         showRememberedLocationCount();
     }
@@ -196,6 +292,26 @@ public class PreferencesController implements Initializable {
         lblRememberedLocations.setText(count == 0
                 ? "Nothing remembered yet."
                 : count + (count == 1 ? " location" : " locations") + " remembered.");
+    }
+
+    private static int parseTokenLimit(TextField field, String profile) {
+        try {
+            int tokens = Integer.parseInt(field.getText().trim());
+            if (tokens < 16 || tokens > 8192) throw new IllegalArgumentException();
+            return tokens;
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(profile + " response tokens must be a whole number from 16 to 8,192.");
+        }
+    }
+
+    private static int parseBoundedLimit(TextField field, String label, int min, int max) {
+        try {
+            int value = Integer.parseInt(field.getText().trim());
+            if (value < min || value > max) throw new IllegalArgumentException();
+            return value;
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(label + " must be a whole number from " + min + " to " + max + ".");
+        }
     }
 
     //build one radio button per ThemeManager.Theme, grouped under its group() heading

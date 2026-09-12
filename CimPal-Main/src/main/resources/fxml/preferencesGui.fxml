@@ -14,6 +14,8 @@
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.layout.ColumnConstraints?>
@@ -120,6 +122,34 @@
                      </HBox>
                   </VBox>
                </TitledPane>
+            </VBox>
+         </Tab>
+         <Tab text="AI Assistant">
+            <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" styleClass="tab-root">
+               <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+                  <columnConstraints>
+                     <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0"/>
+                     <ColumnConstraints hgrow="ALWAYS" minWidth="0.0"/>
+                  </columnConstraints>
+                  <Label text="Fast response tokens:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                  <TextField fx:id="fAiFastTokens" prefWidth="140.0" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                  <Label text="Normal response tokens:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                  <TextField fx:id="fAiNormalTokens" prefWidth="140.0" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                  <Label text="Complete response tokens:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                  <TextField fx:id="fAiCompleteTokens" prefWidth="140.0" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                  <Label fx:id="helpAiResponseTokens" text="?" styleClass="help-badge" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                  <Label text="Validation results to include:" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+                  <TextField fx:id="fAiValidationMaxResults" prefWidth="140.0" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+                  <Label text="Properties per focus node:" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+                  <TextField fx:id="fAiValidationMaxProperties" prefWidth="140.0" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+                  <Label text="Knowledge sources:" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+                  <TextArea fx:id="fAiKnowledgeSources" prefRowCount="5" promptText="One local folder, public URL, or GitHub repository URL[#branch] per line" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+                  <HBox spacing="8.0" GridPane.rowIndex="7" GridPane.columnIndex="1"><Button mnemonicParsing="false" onAction="#actionAddKnowledgeFolder" text="Add local folder..."/><CheckBox fx:id="cbAiUseRemoteSources" mnemonicParsing="false" text="Include configured public remote sources"/></HBox>
+                  <HBox spacing="8.0" GridPane.rowIndex="8" GridPane.columnIndex="1"><Button mnemonicParsing="false" onAction="#actionRefreshRemoteSources" text="Refresh remote sources now"/><CheckBox fx:id="cbAiRefreshRemoteOnStartup" mnemonicParsing="false" text="Refresh at application start"/></HBox>
+                  <Label fx:id="lblAiKnowledgeStatus" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
+                  <Label text="Local folders are searched on this computer. GitHub repositories are shallow-cloned into CimPal's local cache; public URLs are fetched only when enabled. Neither your model data nor your question is sent to them." wrapText="true" GridPane.rowIndex="10" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
+               </GridPane>
+               <Region VBox.vgrow="ALWAYS"/>
             </VBox>
          </Tab>
       </TabPane>

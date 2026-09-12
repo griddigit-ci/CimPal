@@ -9,6 +9,7 @@ module CimPal.Main {
     exports eu.griddigit.cimpal.main.interfaces;
     exports eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
     opens eu.griddigit.cimpal.main.application.controllers;
+    opens eu.griddigit.cimpal.main.application.controllers.ai to javafx.fxml;
     exports eu.griddigit.cimpal.main.application.PssePFcompare;
     exports eu.griddigit.cimpal.main.application.tasks;
     opens eu.griddigit.cimpal.main.application.tasks;
@@ -30,6 +31,7 @@ module CimPal.Main {
     // that dependency is gone and the real one is declared here.
     requires java.desktop;
     requires java.xml;
+    requires java.net.http;
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
     requires org.slf4j;

@@ -36,27 +36,23 @@
             <Button mnemonicParsing="false" onAction="#actionSaveAsQuery" text="Save as..."/>
             <Button mnemonicParsing="false" onAction="#actionClearQuery" text="Clear"/>
             <Button defaultButton="true" mnemonicParsing="false" onAction="#actionRunQuery" styleClass="primary-action"
-                    text="Run query"/>
+                    text="Run query / update"/>
+            <Button mnemonicParsing="false" onAction="#actionChooseOutputRepository" text="Select output repository..."/>
+            <Button mnemonicParsing="false" onAction="#actionCommitRepairOutput" text="Commit saved repair..."/>
+            <Label fx:id="lblRepairRepository" wrapText="true"/>
             <Label fx:id="helpSparqlQuery" text="?" styleClass="help-badge"/>
          </FlowPane>
-         <HBox spacing="8.0">
-            <Label text="Model files:"/>
-            <Label fx:id="lblModelFiles" maxWidth="1.7976931348623157E308" text="No model files selected"
-                   wrapText="true"/>
-         </HBox>
          <HBox alignment="CENTER_LEFT" spacing="8.0">
             <Label text="Base URI:"/>
             <ChoiceBox fx:id="cbBaseUri" prefWidth="180.0"/>
             <TextField fx:id="tfBaseUri" prefWidth="500.0" HBox.hgrow="ALWAYS"/>
-         </HBox>
-         <HBox spacing="8.0">
-            <Label text="Current query:"/>
-            <Label fx:id="lblQueryFile" maxWidth="1.7976931348623157E308" text="No query loaded" wrapText="true"/>
+            <Label text="Repair output:"/>
+            <ChoiceBox fx:id="cbRepairOutputFormat" prefWidth="220.0"/>
          </HBox>
       </VBox>
    </top>
    <center>
-      <TextArea fx:id="txtSparqlQuery" promptText="Write a SPARQL SELECT query here, or load one and edit it."
+      <TextArea fx:id="txtSparqlQuery" promptText="Write a SPARQL SELECT query or a review-approved SPARQL Update (.ru) here."
                 BorderPane.alignment="CENTER"
                 minHeight="0.0" minWidth="0.0">
          <BorderPane.margin>
@@ -64,11 +60,4 @@
          </BorderPane.margin>
       </TextArea>
    </center>
-   <bottom>
-      <VBox spacing="8.0" BorderPane.alignment="CENTER_LEFT">
-         <Label text="Tip: load a query, edit it in the text area, then run it against selected RDF/XML or ZIP files."
-                wrapText="true"/>
-         <Label fx:id="lblStatus" text="Ready." wrapText="true"/>
-      </VBox>
-   </bottom>
 </BorderPane>

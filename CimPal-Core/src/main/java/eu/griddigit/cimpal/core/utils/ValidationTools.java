@@ -9,6 +9,7 @@ import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFParser;
+import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.Shapes;
 import org.apache.jena.shacl.ValidationReport;
@@ -65,6 +66,9 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
 public class ValidationTools {
+    private static volatile boolean exportTurtleValidationReports;
+
+    public static void setExportTurtleValidationReports(boolean enabled) { exportTurtleValidationReports = enabled; }
 
 
     /**
@@ -477,6 +481,9 @@ public class ValidationTools {
                             timestampWriter.setReportContext(analysisName, inputGroup.name, timestampGroup.timestamp); // NEW
                             long reportRowsStart = System.currentTimeMillis();
                             appendTaskResultsToWriter(timestampWriter, results, maxResultsPerConstraint);
+                            if (exportTurtleValidationReports) {
+                                for (ValidationTaskResult result : results) saveValidationReportTurtle(groupOutputDir, result);
+                            }
                             dbg("DONE append timestamp report rows inputGroup=" + inputGroup.name
                                     + " timestamp=" + timestampGroup.timestamp, reportRowsStart);
 
@@ -903,6 +910,7 @@ public class ValidationTools {
                             sheet, r.datasetName, r.xmlFiles, r.missingXmlFiles, r.constraintFile,
                             r.results, r.conforms, r.displayName,
                             r.partialValidation, maxResultsPerConstraint);
+                    if (exportTurtleValidationReports) saveValidationReportTurtle(outputBaseDir, r);
                     dbgRow(r.rowIdx, "DONE writer.appendValidation dataset=" + r.datasetName,
                             appendStart);
                 }
@@ -5323,8 +5331,36 @@ public class ValidationTools {
                         r.caseFolder, r.datasetName, r.xmlFiles, "", r.constraintFile,
                         r.results, r.conforms, r.displayName,
                         r.partialValidation, maxResultsPerConstraint);
+                // Timestamped callers save their Turtle reports beside the timestamp workbook.
             }
         }
+    }
+
+    private static void saveValidationReportTurtle(Path folder, ValidationTaskResult r) throws IOException {
+        if (r.error != null) return;
+        Model model = ModelFactory.createDefaultModel();
+        String sh = "http://www.w3.org/ns/shacl#";
+        org.apache.jena.rdf.model.Resource report = model.createResource();
+        report.addProperty(org.apache.jena.vocabulary.RDF.type, model.createResource(sh + "ValidationReport"));
+        report.addLiteral(model.createProperty(sh + "conforms"), r.conforms);
+        if (r.results != null) for (SHACLValidationResult finding : r.results) {
+            org.apache.jena.rdf.model.Resource result = model.createResource();
+            result.addProperty(org.apache.jena.vocabulary.RDF.type, model.createResource(sh + "ValidationResult"));
+            report.addProperty(model.createProperty(sh + "result"), result);
+            addReportValue(result, model, sh + "focusNode", finding.getFocusNode());
+            addReportValue(result, model, sh + "resultPath", finding.getPath());
+            addReportValue(result, model, sh + "resultMessage", finding.getMessage());
+            addReportValue(result, model, sh + "sourceShape", finding.getSourceShape());
+            addReportValue(result, model, sh + "sourceConstraintComponent", finding.getConstraintComponent());
+            addReportValue(result, model, sh + "value", finding.getValue());
+        }
+        Files.createDirectories(folder);
+        String name = (r.datasetName + "__" + r.constraintFile).replaceAll("[^A-Za-z0-9._-]+", "_");
+        try (OutputStream out = Files.newOutputStream(folder.resolve(name + "__report.ttl"))) { RDFDataMgr.write(out, model, RDFFormat.TURTLE_PRETTY); }
+    }
+
+    private static void addReportValue(org.apache.jena.rdf.model.Resource result, Model model, String property, String value) {
+        if (value != null && !value.isBlank()) result.addLiteral(model.createProperty(property), value);
     }
 
     private record LimitedValidationOutcome(List<SHACLValidationResult> results,

@@ -96,7 +96,7 @@ public class ShaclAutoTester {
         // Run on a background thread
         Thread testThread = new Thread(() -> {
             try {
-                runTestsInternal(selectedFile, selectedFolder, fileL, exportReports);
+                runTestsInternal(selectedFile, selectedFolder, fileL, exportReports, false);
             } catch (IOException e) {
                 appendOutput("Error during testing: " + e.getMessage() + "\n");
             }
@@ -106,6 +106,10 @@ public class ShaclAutoTester {
     }
 
     public void runTestsInternal(List<File> selectedFile, File selectedFolder, List<File> fileL, boolean exportReports) throws IOException {
+        runTestsInternal(selectedFile, selectedFolder, fileL, exportReports, false);
+    }
+
+    public void runTestsInternal(List<File> selectedFile, File selectedFolder, List<File> fileL, boolean exportReports, boolean exportTurtleReports) throws IOException {
         long runStart = System.currentTimeMillis();
         ValidationTools.logValidationDebug("manual: start shapes=" + selectedFile.size()
                 + " archives=" + fileL.size());
@@ -163,6 +167,7 @@ public class ShaclAutoTester {
                 + (System.currentTimeMillis() - validationStart) + " ms");
 
         ValidationReport report;
+        Set<String> turtleReportsWritten = new HashSet<>();
         int i = 0;
         for (Map.Entry<String, SHACLRuleTestData> ruleTestDataEntry : ruleTestDataMap.entrySet()) {
             updateProgress((double) i / (double) ruleTestDataMap.size());
@@ -220,6 +225,9 @@ public class ShaclAutoTester {
                 if (exportReports) {
                     ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getConformFolderPath()), FilenameUtils.removeExtension(conformFile.getName()) + "_report.xlsx");
                 }
+                if (exportTurtleReports && turtleReportsWritten.add(conformFile.getAbsolutePath())) {
+                    saveTurtleReport(report, new File(testData.getConformFolderPath()), FilenameUtils.removeExtension(conformFile.getName()) + "_report.ttl");
+                }
             }
 
             for (File nonConformFile : testData.getNonConformFiles()) {
@@ -266,6 +274,9 @@ public class ShaclAutoTester {
                 if (exportReports) {
                     ExcelTools.exportSHACLValidationToExcel(validationResults, new File(testData.getNonConformFolderPath()), FilenameUtils.removeExtension(nonConformFile.getName()) + "_report.xlsx");
                 }
+                if (exportTurtleReports && turtleReportsWritten.add(nonConformFile.getAbsolutePath())) {
+                    saveTurtleReport(report, new File(testData.getNonConformFolderPath()), FilenameUtils.removeExtension(nonConformFile.getName()) + "_report.ttl");
+                }
             }
             i++;
         }
@@ -282,6 +293,12 @@ public class ShaclAutoTester {
         updateProgress(1.0);
         ValidationTools.logValidationDebug("manual: completed in "
                 + (System.currentTimeMillis() - runStart) + " ms");
+    }
+
+    private static void saveTurtleReport(ValidationReport report, File folder, String filename) throws IOException {
+        try (java.io.FileOutputStream output = new java.io.FileOutputStream(new File(folder, filename))) {
+            org.apache.jena.riot.RDFDataMgr.write(output, report.getModel(), org.apache.jena.riot.RDFFormat.TURTLE_PRETTY);
+        }
     }
 
     /**

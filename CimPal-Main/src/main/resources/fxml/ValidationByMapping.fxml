@@ -256,21 +256,12 @@
             </HBox>
         </GridPane>
 
-        <!--
-          Manual-selection extras. Unlike the constraint-files row above these are hidden
-          rather than disabled: an empty file tree and an inapplicable export option are
-          noise in the two mapping workflows, and both are unmanaged when hidden so they
-          give their space back to the tab rather than leaving a gap.
-        -->
-        <HBox fx:id="rowExportModelReports" spacing="8.0" alignment="CENTER_LEFT"
-              visible="false" managed="false" VBox.vgrow="NEVER">
-            <CheckBox fx:id="cbExportReports" mnemonicParsing="false" selected="true"
-                      text="Export model validation reports"/>
+        <!-- Optional RDF report export applies to every validation workflow. -->
+        <HBox spacing="8.0" alignment="CENTER_LEFT" VBox.vgrow="NEVER">
+            <CheckBox fx:id="cbExportReportsTurtle" mnemonicParsing="false"
+                      text="Also save each validation report as Turtle (.ttl)"/>
             <Label fx:id="helpExportReports" text="?" styleClass="help-badge"/>
         </HBox>
-
-        <TreeView fx:id="treeViewShaclFiles" maxWidth="1.7976931348623157E308" minHeight="100.0"
-                  showRoot="false" visible="false" managed="false" VBox.vgrow="ALWAYS"/>
 
         <!--
           Pushes the action bar to the bottom of the tab. The tab used to carry its own full-width
