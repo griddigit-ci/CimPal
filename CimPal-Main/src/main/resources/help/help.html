@@ -351,7 +351,7 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
 <nav id="sidebar" aria-label="Contents">
   <div class="brand">
     <div class="name">CimPal Help</div>
-    <div class="sub">Version 2026.9.05.1</div>
+    <div class="sub">Version 2026.9.10.1</div>
   </div>
 
   <div class="filter-wrap">
@@ -371,19 +371,21 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <a href="#using">Using the window</a>
   <a href="#glossary">Glossary</a>
 
-  <div class="group">Main GUI tabs</div>
-  <div class="subgroup">SHACL Generation</div>
+  <div class="group">Operations</div>
+  <div class="subgroup">Quick actions</div>
+  <a class="sub" href="#tab-rdf-visualisation">Visualise</a>
+  <a class="sub" href="#tab-rdf-convert">Convert</a>
+  <a class="sub" href="#tab-sparql-query">SPARQL</a>
+  <a class="sub" href="#tab-ai-assistant">AI Assistant</a>
+  <div class="subgroup">SHACL</div>
   <a class="sub" href="#tab-rdfs-to-shacl">RDFS to SHACL</a>
   <a class="sub" href="#tab-excel-to-shacl">Constraints Operations</a>
-  <div class="subgroup">RDF Operations</div>
+  <div class="subgroup">RDF</div>
   <a class="sub" href="#tab-rdf-comparison">Comparison</a>
-  <a class="sub" href="#tab-rdf-convert">Convert</a>
-  <a class="sub" href="#tab-rdf-visualisation">Visualisation</a>
-  <div class="subgroup">Dataset Operations</div>
+  <div class="subgroup">Dataset</div>
   <a class="sub" href="#tab-instance-data-comparison">Comparison</a>
   <a class="sub" href="#tab-generate-instance-data">Generate</a>
   <a class="sub" href="#tab-task-wizard">Task Wizard</a>
-  <a class="sub" href="#tab-sparql-query">SPARQL Query</a>
   <a class="sub" href="#tab-validation-by-mapping">SHACL Validation</a>
 
   <div class="group">Tools menu</div>
@@ -537,7 +539,8 @@ CIM-based data exchange:</p>
       Window</em> tooltip.</li>
   <li><strong>Status bar</strong> &mdash; the progress bar and status message at the very bottom
       show operation progress, load/filter scope, and graph/table summaries. An indeterminate bar
-      means the operation cannot report a percentage.</li>
+      means the operation cannot report a percentage; a full green bar indicates a successfully
+      completed operation.</li>
   <li><strong>Help badges</strong> &mdash; the small <code>?</code> markers next to fields in the
       tabs show a detailed tooltip on hover. This page reproduces the same texts.</li>
   <li><strong>Reset</strong> &mdash; every tab has a <em>Reset</em> button that clears its fields
@@ -953,6 +956,11 @@ tree expansions to trace is one picture here. Filter the predicate to
 <code>rdfs:subClassOf</code>, for instance, and the diagram is the class hierarchy of the loaded
 profile. Table view pivots the selected resources: subjects are rows and predicates are columns.
 The optional <em>G</em> control adds graph metadata when it is useful.</p>
+<p>For a consistent CGMES study, CimPal can also prepare a native <strong>PowsyBl IIDM</strong>
+network directly from the selected original profiles. Switch the left-hand browser from
+<em>RDF Browser</em> to <em>PowsyBl Browser</em> to inspect that IIDM hierarchy. It adds a
+third, explicitly generated <strong>Grid view</strong> for PowsyBl Network-Area and
+Single-Line diagrams, while retaining Graph and Table views for the IIDM selection.</p>
 <p>It answers the questions the other tabs do not. <em>Comparison</em> tells you that a triple
 changed; this shows you the object it belongs to and its remaining properties. <em>SPARQL
 Query</em> answers a question you can already formulate; this is for looking around before you
@@ -984,6 +992,23 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
     <td>Unloads every named graph highlighted in the <em>Graph browser</em>. Click a graph's name to
         highlight it, <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click for several.</td></tr>
 <tr><td>Reset</td><td>action</td><td>Unloads everything and clears the filters.</td></tr>
+<tr><td>Prepare PowsyBl</td><td>action</td>
+    <td>Builds one cached IIDM network from the selected original CGMES source files. The selected
+        set must contain EQ, TP and SSH profiles belonging to the same study; include SV when it
+        is available. This reads the original files/archive entries directly and does not convert
+        the in-memory RDF/Jena graph through XML. A Merged Graph is derived data, so select its
+        original profile rows instead. Preparing can take time and memory for a large study, but
+        it is performed once per selected profile set and reused by browsing, diagrams and power
+        flow.</td></tr>
+<tr><td>Release PowsyBl</td><td>action</td>
+    <td>Releases the cached IIDM network and its temporary source staging. Use it before preparing
+        a different study or when memory is needed.</td></tr>
+<tr><td>Browser</td><td>choice</td>
+    <td><em>RDF Browser</em> shows the loaded RDF named graphs. <em>PowsyBl Browser</em> is
+        available after preparation and shows the IIDM containment structure
+        (Network, Substation, Voltage level and equipment). Its <em>Class</em> grouping collects
+        IIDM elements by their actual type. The remaining grouping choices retain the containment
+        hierarchy.</td></tr>
 <tr><td>Graph browser</td><td>multi-select tree</td>
     <td>One top-level row per loaded graph, with actual subject and triple counts. Select graph
         rows with <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click to set a multi-graph scope.
@@ -1039,11 +1064,28 @@ N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
     <td><em>Hide graph browser</em> folds the unified browser away, giving the active Graph or
         Table view the full width. Use <em>Show graph browser</em> or the <code>&#171;</code>
         button to restore it.</td></tr>
-<tr><td>Graph view / Table view</td><td>switch button</td>
-    <td>Switches the right-hand area in place, without consuming another row for tabs. In Table
-        view, predicates become columns and object values become cells. The <em>XLS</em> icon
-        exports the current table with a light formatted header, filters, appropriate column
-        widths and its first row frozen.</td></tr>
+<tr><td>Graph view / Table view / Grid view</td><td>switch button</td>
+    <td>Switches the right-hand area in place, without consuming another row for tabs. RDF Browser
+        offers Graph and Table views. PowsyBl Browser additionally offers Grid view. In either
+        Table view, properties become columns and the selected elements become rows. The
+        <em>XLS</em> icon exports the current table with a light formatted header, filters,
+        appropriate column widths and its first row frozen.</td></tr>
+<tr><td>Grid diagram</td><td>choice + Generate (&blacktriangleright;)</td>
+    <td>Available only in PowsyBl Browser. Select <em>Network-Area diagram</em> to draw the
+        complete prepared IIDM network, or <em>Single-Line diagram</em> to draw the selected
+        Substation or Voltage level (falling back to the first Substation when no suitable
+        selection exists). Press Generate deliberately; changing selection or diagram type never
+        starts a potentially expensive render automatically.</td></tr>
+<tr><td>Grid interaction</td><td>mouse + toolbar</td>
+    <td>In a generated Grid view, use the mouse wheel to zoom at the pointer and drag the
+        background to pan. The +, &minus; and Fit controls use the same viewport. Right-click a
+        diagram primitive with an IIDM identity to show its properties in Table view or reveal it
+        in the PowsyBl Browser tree. Not every SVG primitive represents a single IIDM element;
+        CimPal reports this rather than jumping to an unrelated item.</td></tr>
+<tr><td>Power flow (&gear;)</td><td>action</td>
+    <td>Opens the PowsyBl load-flow settings exposed by the installed API and then runs power flow
+        against the prepared IIDM network in the background. Completion or failure is reported in
+        the status bar and result dialog. It never changes the loaded RDF source files.</td></tr>
 <tr><td>Refresh icon</td><td>checkbox</td>
     <td>Controls automatic updates from browser selection. It is off by default to avoid expensive
         redraws while browsing large models. When off, both Graph and Table view stay empty; when
@@ -1180,8 +1222,11 @@ it.</p>
       Literals are shown quoted, with their language tag or datatype where they have one.</li>
   <li><em>Copy value</em> puts the full URI or literal of every highlighted row on the clipboard,
       one per line, ready to paste into a SPARQL query or into a filter field.</li>
-  <li>Graph or table content, depending on the active right-hand view. The status bar reports the
+<li>Graph or table content, depending on the active right-hand view. The status bar reports the
       active selection/query scope, node and relationship counts, or table row and column counts.</li>
+  <li>When PowsyBl is prepared, an IIDM browser and manually generated interactive SVG grid
+      diagrams. PowsyBl layout notices for a few unplaced visual cells do not change the imported
+      IIDM network or power-flow calculation.</li>
 </ul>
 
 <h4>Notes</h4>
@@ -1404,27 +1449,30 @@ and an output location. The twelve available tasks are:</p>
 <div class="fn-body">
 
 <h4>Business logic</h4>
-<p>The escape hatch for questions no report anticipates. Load any set of models as one combined RDF
-dataset and run a SPARQL SELECT query over it &mdash; to count objects matching a condition, find
-the instances behind a validation failure, or extract a tabular slice of a model for a colleague.
-Queries can be saved and reloaded, so a useful investigation becomes a reusable check.</p>
+<p>The escape hatch for questions no report anticipates. Select any set of models, load them as one
+combined RDF dataset when the query runs, and execute a SPARQL SELECT query &mdash; to count objects
+matching a condition, find the instances behind a validation failure, or extract a tabular slice
+of a model for a colleague. Queries can be saved and reloaded, so a useful investigation becomes a
+reusable check. File selection, loading, completion and errors are reported in the shared status
+bar at the bottom of CimPal; the tab intentionally does not duplicate those messages.</p>
 
 <h4>Inputs</h4>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Select models</td><td>files, required</td>
-    <td>One or more RDF/XML files or ZIP archives containing CGMES model data to query. The files
-        are loaded as a combined RDF dataset.</td></tr>
+<tr><td>Select model files&hellip;</td><td>files, required</td>
+    <td>One or more RDF/XML / CIM XML files, Turtle, N-Triples, N-Quads, TriG, JSON-LD, RDF/JSON,
+        TriX or ZIP archives containing those RDF files. The files are loaded as a combined RDF
+        dataset.</td></tr>
 <tr><td>Base URI</td><td>choice and text</td>
     <td>Select a preset or enter a common base URI before loading related RDF/XML files. This is
         shared in purpose with the Visualisation Base URI: a consistent base lets relative CGMES
         identifiers join across profile files.</td></tr>
 <tr><td>SPARQL query</td><td>text, required</td>
-    <td>A SPARQL SELECT query to execute against the loaded model files. Use <em>Load query</em> to
-        import an existing <code>.sparql</code> or <code>.rq</code> file, or type and edit the query
-        directly in the text area.</td></tr>
+    <td>A SPARQL SELECT query to execute against the selected model files. Use
+        <em>Load query</em> to import an existing <code>.sparql</code> or <code>.rq</code> file,
+        or type and edit the query directly in the text area.</td></tr>
 <tr><td>Save / Save as</td><td>buttons</td>
-    <td>Write the current query text back to its file, or to a new <code>.sparql</code> /
+    <td>Write the current query text back to its file, or to a new <code>.sparql</code> or
         <code>.rq</code> file.</td></tr>
 </table>
 
@@ -1433,11 +1481,66 @@ Queries can be saved and reloaded, so a useful investigation becomes a reusable 
   <li>A results window presenting the SELECT bindings as a table, with an <em>Export</em> button to
       write them to Excel. The export has a light-blue filtered header, practical column widths and
       a frozen first row.</li>
-  <li>Query parse errors and execution messages in the Output window.</li>
+  <li>Query parse errors and execution failures in the shared status bar and a diagnostic dialog.</li>
+  <li>The shared status bar shows the selected-file count, loading/query state and result count.
+      A completed model selection or successful query is indicated by a full green progress bar.</li>
 </ul>
 
 <p class="src">Source: <code>SparqlQueryTabController.actionRunQuery()</code>;
 <code>SparqlResultsWindowController.actionExport()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-ai-assistant">
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; AI Assistant</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>The AI Assistant is an optional, local-first helper for CIM, CGMES, RDF, SHACL and SPARQL work.
+It connects only to the Ollama address configured at the top of the tab; CimPal does not send the
+selected model, validation data or question to a cloud model. The assistant produces proposals for
+review &mdash; it never changes a model or runs a repair automatically.</p>
+
+<h4>Before you begin</h4>
+<ol>
+  <li>Install and start <a href="https://ollama.com/">Ollama</a> on the same computer.</li>
+  <li>Pull a model, for example <code>ollama pull qwen3:1.7b</code>, then use <em>Check connection</em>.
+      The model list is populated from the local Ollama server.</li>
+  <li>Choose a response length. <em>Fast</em>, <em>Normal</em> and <em>Complete</em> are named
+      profiles whose token limits can be changed in <em>File &#9656; Preferences &#9656; AI Assistant</em>.</li>
+</ol>
+
+<h4>Tasks and actions</h4>
+<table class="io">
+<tr><th>Control</th><th>Meaning</th></tr>
+<tr><td>Ask CimPal</td><td>Answers a general CIM/CGMES/RDF/SHACL/SPARQL question.</td></tr>
+<tr><td>Draft SHACL</td><td>Creates a proposed Turtle SHACL shapes graph. Use <em>Verify draft locally</em> to parse it, and <em>Test SHACL on selected model</em> to run it in memory against the selected SPARQL-model files.</td></tr>
+<tr><td>Draft SPARQL</td><td>Creates one read-only <code>SELECT</code> query. <em>Run &amp; revise SELECT</em> executes the query locally and asks the model to revise it using the local execution result. <em>Use in SPARQL tab</em> transfers the reviewed query to the normal SPARQL workflow.</td></tr>
+<tr><td>Draft SPARQL repair</td><td>Creates a narrow, review-only SPARQL Update proposal. <em>Preview repair locally</em> reports its effect without changing files; save it as <code>.ru</code> or transfer it to the SPARQL tab for explicit review, confirmation and output-file selection.</td></tr>
+<tr><td>Explain validation report</td><td>After <em>Choose validation report...</em>, explains a selected local SHACL report. The <em>Validation problem</em> list can narrow the explanation to one reported finding.</td></tr>
+<tr><td>Use selected model summary</td><td>Adds a compact, local summary of the files selected in the SPARQL tab, including observed namespaces, types and predicates. It improves grounding but may increase response time.</td></tr>
+</table>
+
+<h4>Validation reports</h4>
+<p>In the SHACL Validation tab, select <em>Also save each validation report as Turtle (.ttl)</em>
+before running any workflow. Each report can then be selected in the AI Assistant and used to focus
+an explanation or repair proposal on an individual violation.</p>
+
+<h4>Knowledge sources and privacy</h4>
+<p>Configure knowledge sources in <em>File &#9656; Preferences &#9656; AI Assistant</em>. Add one local
+folder, public URL, or public GitHub repository URL (optionally followed by <code>#branch</code>) per
+line. Local folders are searched on the computer. GitHub sources are shallow-cloned into CimPal's
+local cache and public URLs are cached as public reference material. Enable remote sources and use
+<em>Refresh remote sources now</em> when wanted; <em>Refresh at application start</em> checks them
+when CimPal opens. Neither private model data nor the user's request is sent to those sources.</p>
+
+<div class="note" style="margin-top:16px"><strong>Review is required.</strong> Generated SHACL,
+SPARQL and repair text can be wrong for a particular profile or model. Verify and test drafts first;
+read-only SELECT queries are the only assistant-generated operations that can be executed as part
+of the assisted revision flow. Updates require the normal SPARQL confirmation and save workflow.</div>
+
+<p class="src">Source: <code>AiAssistantTabController</code>, <code>OllamaClient</code>,
+<code>AiDatasetInspector</code>, <code>AiKnowledgeSearch</code></p>
 </div>
 </details>
 
@@ -1531,14 +1634,11 @@ deliverables, not extracted input data.</p>
 <tr><td>Output folder</td><td>folder</td>
     <td>Folder where validation reports, timestamped summaries and generated ZIP files are
         written. Required for both mapping workflows; disabled for manual selection.</td></tr>
-<tr><td>Export model validation reports</td><td>checkbox</td>
-    <td>When checked, saves a SHACL validation report file alongside each validated model in the
-        models root folder. <strong>Manual selection only</strong> &mdash; hidden for the mapping
-        workflows.</td></tr>
-<tr><td>Discovered models tree</td><td>read-only</td>
-    <td>Lists what was found under the models root folder, so you can see what a manual run will
-        cover before starting it. <strong>Manual selection only</strong> &mdash; hidden for the
-        mapping workflows.</td></tr>
+<tr><td>Also save each validation report as Turtle (.ttl)</td><td>checkbox</td>
+    <td>Writes the standard SHACL <code>ValidationReport</code> graph as a Turtle file for every
+        validation result. It is available for all three workflows and allows a particular report
+        and finding to be selected in the AI Assistant. Manual validation continues to produce its
+        normal Excel reports.</td></tr>
 <tr><td>Datatype map</td><td>choice, required</td>
     <td>The CGMES and NC version combination whose datatype map is loaded for validation:
         <em>CGMES 3.0 / NC 2.5</em> uses the CIM17 / CGMES 3 / NC 2.5 map, <em>CGMES 3.0 / NC
@@ -1612,13 +1712,14 @@ base URI cannot silently produce a model whose subjects resolve nowhere.</p>
 <h4>Outputs</h4>
 <ul>
   <li>Mapping workflows: validation report files per input, written into the output folder, plus
-      ZIP deliverables assembled from the reports.</li>
+      ZIP deliverables assembled from the reports. When Turtle export is selected, each validation
+      also has a separate <code>*.ttl</code> SHACL report.</li>
   <li>Timestamped workflow: additionally timestamp-based summaries and a comparison workbook
       against the previous run's totals.</li>
   <li>Manual selection: per-model conformance results and validation messages streamed to the
-      Output window as the run proceeds, and a validation report file next to each validated model
-      when <em>Export model validation reports</em> is ticked. Nothing happens, and the progress
-      bar resets, if no model archives are found under the models root folder.</li>
+      Output window as the run proceeds, with normal Excel reports and optional Turtle SHACL
+      reports beside each validated model. Nothing happens, and the progress bar resets, if no
+      model archives are found under the models root folder.</li>
   <li>Progress on the shared progress bar in the status line, and messages in the Output
       window.</li>
 </ul>

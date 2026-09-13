@@ -65,6 +65,7 @@ public final class AiAssistantTabController implements Initializable {
     private final OllamaClient client = new OllamaClient();
     private MainController mainController;
     private File validationReportFile;
+    private File validationShapesFile;
 
     public void setMainController(MainController mainController) {
         this.mainController = mainController;
@@ -84,8 +85,12 @@ public final class AiAssistantTabController implements Initializable {
         cbResponseMode.valueProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null && MainController.prefs != null) MainController.prefs.put("ai.responseMode", newValue);
         });
-        cbTask.valueProperty().addListener((observable, oldValue, newValue) -> updatePromptHint());
+        cbTask.valueProperty().addListener((observable, oldValue, newValue) -> {
+            updatePromptHint();
+            updateGroundingMode();
+        });
         updatePromptHint();
+        updateGroundingMode();
         lblConnection.setText("Local model not checked");
         refreshRemoteKnowledgeOnStartup();
     }
@@ -122,6 +127,14 @@ public final class AiAssistantTabController implements Initializable {
         String model = cbModel.getValue();
         if (request.isBlank()) { setStatus("Describe the CIM, SHACL, SPARQL, or data-repair task first."); return; }
         if (model == null || model.isBlank()) { setStatus("Check the local Ollama connection and select a model first."); return; }
+        if (requiresSchemaGrounding() && !AiDatasetInspector.hasSelectedModels()) {
+            setStatus("Select instance model files in the SPARQL Query tab first. Draft SHACL and SPARQL are grounded in the selected model's actual vocabulary.");
+            return;
+        }
+        if ("Draft SPARQL repair".equals(cbTask.getValue()) && (validationReportFile == null || selectedValidationProblem() < 0)) {
+            setStatus("Choose the SHACL validation report and one affected problem before generating a repair proposal.");
+            return;
+        }
         if (cbUseDatasetContext.isSelected()) {
             try {
                 String instantAnswer = answerLocallyIfSupported(request);
@@ -141,7 +154,7 @@ public final class AiAssistantTabController implements Initializable {
         txtResponse.clear();
         Task<String> task = new Task<>() {
             @Override protected String call() throws Exception {
-                String context = cbUseDatasetContext.isSelected()
+                String context = (cbUseDatasetContext.isSelected() || requiresSchemaGrounding())
                         ? "\n\nUse this bounded, local dataset summary as evidence. Do not infer facts not present in it:\n"
                         + AiDatasetInspector.inspectSelectedModels() : "";
                 if ("Explain validation report".equals(cbTask.getValue()) || ("Draft SPARQL repair".equals(cbTask.getValue()) && validationReportFile != null)) {
@@ -161,7 +174,8 @@ public final class AiAssistantTabController implements Initializable {
                 String sources = MainController.prefs.get("ai.knowledge.sources", "");
                 if (!sources.isBlank()) {
                     context += "\n\n" + AiKnowledgeSearch.findRelevantSources(sources, request,
-                            MainController.prefs.getBoolean("ai.knowledge.includeRemote", false));
+                            MainController.prefs.getBoolean("ai.knowledge.includeRemote", false), tfEndpoint.getText(),
+                            MainController.prefs.get("ai.knowledge.embeddingModel", "nomic-embed-text"));
                 }
                 return client.chatStreaming(tfEndpoint.getText(), model, SYSTEM_PROMPT,
                         taskInstruction() + context + "\n\nUser request:\n" + request,
@@ -173,7 +187,7 @@ public final class AiAssistantTabController implements Initializable {
         start(task);
     }
 
-    @FXML private void actionClear(ActionEvent event) { txtRequest.clear(); txtResponse.clear(); validationReportFile = null; cbValidationProblem.getItems().setAll("All report problems"); cbValidationProblem.setValue("All report problems"); setStatus("Ready."); }
+    @FXML private void actionClear(ActionEvent event) { txtRequest.clear(); txtResponse.clear(); validationReportFile = null; validationShapesFile = null; cbValidationProblem.getItems().setAll("All report problems"); cbValidationProblem.setValue("All report problems"); setStatus("Ready."); }
 
     @FXML
     private void actionChooseValidationReport(ActionEvent event) {
@@ -192,6 +206,24 @@ public final class AiAssistantTabController implements Initializable {
         } catch (Exception e) {
             validationReportFile = null;
             setStatus("Could not read this validation report: " + rootMessage(e));
+        }
+    }
+
+    @FXML
+    private void actionChooseValidationShapes(ActionEvent event) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Choose SHACL shapes used for validation");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("SHACL Turtle files", "*.ttl", "*.shacl"));
+        File selected = chooser.showOpenDialog(txtResponse.getScene().getWindow());
+        if (selected == null) return;
+        try {
+            Model shapes = ModelFactory.createDefaultModel();
+            RDFParser.fromString(Files.readString(selected.toPath(), StandardCharsets.UTF_8), Lang.TURTLE).parse(shapes);
+            validationShapesFile = selected;
+            setStatus("SHACL shapes selected for in-memory repair validation: " + selected.getName());
+        } catch (Exception exception) {
+            validationShapesFile = null;
+            setStatus("Could not read SHACL shapes: " + rootMessage(exception));
         }
     }
 
@@ -246,6 +278,64 @@ public final class AiAssistantTabController implements Initializable {
         }
     }
 
+    /**
+     * Runs a generated SELECT only against CimPal's in-memory selected model, then asks the
+     * local model for one evidence-based revision. SPARQL Update is deliberately excluded.
+     */
+    @FXML
+    private void actionAssistSparql(ActionEvent event) {
+        if (!"Draft SPARQL".equals(cbTask.getValue())) {
+            setStatus("Choose Draft SPARQL before running the assisted read-only execution loop.");
+            return;
+        }
+        String draft = generatedDraft();
+        String model = cbModel.getValue();
+        if (draft == null) {
+            setStatus("Generate a SPARQL SELECT proposal first.");
+            return;
+        }
+        if (model == null || model.isBlank()) {
+            setStatus("Check the local Ollama connection and select a model first.");
+            return;
+        }
+        if (!AiDatasetInspector.hasSelectedModels()) {
+            setStatus("Select instance model files in the SPARQL Query tab first.");
+            return;
+        }
+        final String normalizedDraft;
+        try {
+            normalizedDraft = normalizeSparql(draft);
+            ensureSafeReadOnlyQuery(normalizedDraft);
+        } catch (Exception e) {
+            setStatus("The draft cannot be run safely: " + rootMessage(e));
+            return;
+        }
+        saveEndpoint();
+        int maxRows = MainController.prefs == null ? 50 : MainController.prefs.getInt("ai.assistedQuery.maxRows", 50);
+        setBusy(true, "Running the generated SELECT locally and preparing an evidence-based revision...");
+        Task<String> task = new Task<>() {
+            @Override protected String call() throws Exception {
+                String evidence;
+                try {
+                    evidence = AiDatasetInspector.inspectReadOnlyQuery(normalizedDraft, Math.max(1, maxRows));
+                } catch (Exception exception) {
+                    evidence = "Local read-only execution failed. Error: " + rootMessage(exception);
+                }
+                final String localEvidence = evidence;
+                String prompt = "Revise the following SPARQL SELECT using only the selected model schema and local execution evidence. "
+                        + "Return only one fenced SPARQL SELECT code block. Do not use SERVICE, LOAD, INSERT, DELETE, or other write/network operations.\n\n"
+                        + AiDatasetInspector.inspectSelectedModels() + "\n\nOriginal draft:\n```sparql\n" + normalizedDraft
+                        + "\n```\n\n" + localEvidence;
+                Platform.runLater(() -> txtResponse.setText("Local execution evidence (no data changed):\n" + localEvidence + "\nRevised proposal:\n"));
+                return client.chatStreaming(tfEndpoint.getText(), model, SYSTEM_PROMPT, prompt,
+                        maxTokensForTask(), text -> Platform.runLater(() -> txtResponse.appendText(text)));
+            }
+        };
+        task.setOnSucceeded(ignored -> setBusy(false, "Read-only execution and one evidence-based revision are complete. Review the revised SELECT before use."));
+        task.setOnFailed(ignored -> setBusy(false, "Assisted SELECT revision failed: " + rootMessage(task.getException())));
+        start(task);
+    }
+
     /** Transfers a locally syntax-checked SELECT query into the existing SPARQL workflow. */
     @FXML
     private void actionUseInSparql(ActionEvent event) {
@@ -280,6 +370,10 @@ public final class AiAssistantTabController implements Initializable {
             setStatus("Choose Draft SPARQL repair to preview a repair proposal.");
             return;
         }
+        if (validationReportFile == null || validationShapesFile == null) {
+            setStatus("Choose both the originating validation report and its SHACL shapes before previewing a repair.");
+            return;
+        }
         String draft = generatedDraft();
         if (draft == null) {
             setStatus("Generate a SPARQL repair proposal first.");
@@ -292,13 +386,13 @@ public final class AiAssistantTabController implements Initializable {
             setStatus("Repair preview is unavailable: " + rootMessage(e));
             return;
         }
-        setBusy(true, "Previewing the repair against an in-memory copy of the selected model...");
+        setBusy(true, "Previewing and validating the repair against an in-memory copy of the selected model...");
         Task<String> task = new Task<>() {
-            @Override protected String call() throws Exception { return AiDatasetInspector.previewSparqlRepair(draft); }
+            @Override protected String call() throws Exception { return AiDatasetInspector.previewAndValidateSparqlRepair(draft, validationShapesFile); }
         };
         task.setOnSucceeded(ignored -> {
             txtResponse.appendText("\n\n" + task.getValue());
-            setBusy(false, "Repair preview ready. No selected file or loaded model was changed.");
+            setBusy(false, "Repair preview and SHACL validation are ready. No selected file or loaded model was changed.");
         });
         task.setOnFailed(ignored -> setBusy(false, "Repair preview failed: " + rootMessage(task.getException())));
         start(task);
@@ -385,6 +479,21 @@ public final class AiAssistantTabController implements Initializable {
             case "Explain validation report" -> "Choose a local validation report, then ask what the violations mean or how to repair them.";
             default -> "Ask about CIM, CGMES, RDF, SHACL, SPARQL, or a validation result.";
         });
+    }
+
+    /** Drafts must be grounded in the selected model rather than a generic CIM vocabulary. */
+    private void updateGroundingMode() {
+        boolean required = requiresSchemaGrounding();
+        if (required) cbUseDatasetContext.setSelected(true);
+        cbUseDatasetContext.setDisable(required);
+        cbUseDatasetContext.setText(required
+                ? "Selected-model grounding (required for drafts)"
+                : "Use selected model summary");
+    }
+
+    private boolean requiresSchemaGrounding() {
+        String task = cbTask.getValue();
+        return "Draft SHACL".equals(task) || "Draft SPARQL".equals(task) || "Draft SPARQL repair".equals(task);
     }
 
     private void saveEndpoint() { MainController.prefs.put("ai.ollama.endpoint", tfEndpoint.getText().trim()); }
@@ -502,6 +611,14 @@ public final class AiAssistantTabController implements Initializable {
         }
         if (!draft.matches("(?is).*\\b(INSERT|DELETE)\\b.*")) {
             throw new IllegalArgumentException("A repair draft must contain an INSERT or DELETE operation.");
+        }
+    }
+
+    private static void ensureSafeReadOnlyQuery(String queryText) {
+        Query query = QueryFactory.create(queryText);
+        if (!query.isSelectType()) throw new IllegalArgumentException("Only SELECT queries can be run in the assisted loop.");
+        if (queryText.matches("(?is).*\\b(SERVICE|LOAD|INSERT|DELETE|CLEAR|DROP|CREATE|MOVE|COPY|ADD)\\b.*")) {
+            throw new IllegalArgumentException("The assisted loop permits only local, read-only SELECT queries.");
         }
     }
 }

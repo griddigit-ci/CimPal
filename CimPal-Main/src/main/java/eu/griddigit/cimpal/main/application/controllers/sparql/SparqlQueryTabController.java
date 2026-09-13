@@ -6,6 +6,8 @@ import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.util.ModelFactory;
+import eu.griddigit.cimpal.main.workspace.WorkspaceArtifactRegistry;
+import eu.griddigit.cimpal.main.workspace.WorkspaceRdfStore;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -39,6 +41,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Optional;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.concurrent.TimeUnit;
 
 public class SparqlQueryTabController implements Initializable {
@@ -64,6 +69,7 @@ public class SparqlQueryTabController implements Initializable {
     private Label lblRepairRepository;
 
     private final List<File> selectedModelFiles = new ArrayList<>();
+    private final List<String> selectedWorkspaceArtifactKeys = new ArrayList<>();
     private File currentQueryFile;
     private File repairOutputRepository;
     private File lastRepairOutputFile;
@@ -137,10 +143,57 @@ public class SparqlQueryTabController implements Initializable {
         }
 
         selectedModelFiles.clear();
+        selectedWorkspaceArtifactKeys.clear();
         selectedModelFiles.addAll(modelFiles);
         MainController.IDModel1 = new ArrayList<>(modelFiles);
+        WorkspaceArtifactRegistry.registerFiles("sparql-selected-input", WorkspaceArtifactRegistry.Type.INSTANCE_DATA,
+                "SPARQL / AI selected input", "SPARQL Query", "source files selected", modelFiles);
         completeProgressBar();
         setStatus("Selected " + selectedModelFiles.size() + " model file(s). Ready to run a SPARQL query.");
+    }
+
+    /** Selects a published visualisation/derived graph without re-reading its source file. */
+    @FXML
+    private void actionSelectWorkspaceModel(ActionEvent actionEvent) {
+        Map<String, WorkspaceArtifactRegistry.Artifact> choices = new LinkedHashMap<>();
+        WorkspaceArtifactRegistry.snapshot().stream()
+                .filter(WorkspaceArtifactRegistry.Artifact::inMemory)
+                .filter(artifact -> WorkspaceRdfStore.isLoaded(artifact.key()))
+                .filter(artifact -> artifact.type() == WorkspaceArtifactRegistry.Type.INSTANCE_DATA
+                        || artifact.type() == WorkspaceArtifactRegistry.Type.VISUALISATION_GRAPH
+                        || artifact.type() == WorkspaceArtifactRegistry.Type.DERIVED_MODEL)
+                .forEach(artifact -> choices.put(artifact.key(), artifact));
+        if (choices.isEmpty()) {
+            String message = "There are no reusable models in workspace memory. Load files in SPARQL or Visualisation first, or use Workspace artifacts → Restore.";
+            setStatus(message);
+            new Alert(Alert.AlertType.INFORMATION, message, ButtonType.OK).showAndWait();
+            return;
+        }
+        javafx.scene.control.Dialog<ButtonType> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Use workspace models");
+        dialog.setHeaderText("Select one or more in-memory graphs for the SPARQL working model");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        javafx.scene.layout.VBox options = new javafx.scene.layout.VBox(6);
+        Map<String, javafx.scene.control.CheckBox> checks = new LinkedHashMap<>();
+        choices.forEach((key, artifact) -> {
+            javafx.scene.control.CheckBox check = new javafx.scene.control.CheckBox(artifact.type() + " — " + artifact.name() + " (" + artifact.triples() + " triples)");
+            check.setSelected(selectedWorkspaceArtifactKeys.contains(key));
+            check.setWrapText(true);
+            checks.put(key, check);
+            options.getChildren().add(check);
+        });
+        javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(options);
+        scroll.setFitToWidth(true);
+        scroll.setPrefViewportHeight(280);
+        dialog.getDialogPane().setContent(scroll);
+        dialog.showAndWait().filter(button -> button == ButtonType.OK).ifPresent(button -> {
+            selectedWorkspaceArtifactKeys.clear();
+            checks.forEach((key, check) -> { if (check.isSelected()) selectedWorkspaceArtifactKeys.add(key); });
+            selectedModelFiles.clear();
+            setStatus(selectedWorkspaceArtifactKeys.isEmpty()
+                    ? "No workspace models selected."
+                    : "Using " + selectedWorkspaceArtifactKeys.size() + " workspace model(s). Source files will not be read again.");
+        });
     }
 
     @FXML
@@ -271,14 +324,35 @@ public class SparqlQueryTabController implements Initializable {
         }
 
         try {
-            if (selectedModelFiles.isEmpty()) {
-                setStatus("Please select RDF, CIM XML, or ZIP model files first.");
+            if (selectedModelFiles.isEmpty() && selectedWorkspaceArtifactKeys.isEmpty()) {
+                setStatus("Select model files or choose an in-memory workspace model first.");
+                return;
+            }
+            if (!selectedWorkspaceArtifactKeys.isEmpty()
+                    && selectedWorkspaceArtifactKeys.stream().anyMatch(key -> !WorkspaceRdfStore.isLoaded(key))) {
+                selectedWorkspaceArtifactKeys.clear();
+                setStatus("A selected workspace model was released or is stale. Choose it again from the ◫ workspace picker.");
                 return;
             }
 
             setProgressBar(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
-            setStatus("Loading RDF models...");
-            Model combinedModel = eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(selectedModelFiles, selectedBaseUri());
+            setStatus(selectedWorkspaceArtifactKeys.isEmpty() ? "Loading RDF models..." : "Using in-memory workspace model(s)...");
+            Model combinedModel;
+            if (selectedWorkspaceArtifactKeys.isEmpty()) {
+                // Preserve the established file-loading path; caching must never make a query unavailable.
+                combinedModel = eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(selectedModelFiles, selectedBaseUri());
+                if (combinedModel != null && !combinedModel.isEmpty()) {
+                    try {
+                        WorkspaceRdfStore.publishModel("sparql-selected-input", WorkspaceArtifactRegistry.Type.INSTANCE_DATA,
+                                "SPARQL / AI selected input", "SPARQL Query", "loaded in shared memory", combinedModel,
+                                selectedModelFiles.stream().map(File::getAbsolutePath).toList());
+                    } catch (RuntimeException ignored) {
+                        // The query still runs when the optional workspace cache cannot be updated.
+                    }
+                }
+            } else {
+                combinedModel = WorkspaceRdfStore.copyAll(selectedWorkspaceArtifactKeys);
+            }
             if (combinedModel == null || combinedModel.isEmpty()) {
                 throw new IllegalStateException("Failed to load RDF models from the selected files.");
             }
@@ -289,7 +363,19 @@ public class SparqlQueryTabController implements Initializable {
                 return;
             }
 
-            QueryFactory.create(queryText);
+            org.apache.jena.query.Query parsedQuery = QueryFactory.create(queryText);
+            if (parsedQuery.isSelectType() && parsedQuery.getLimit() < 0 && combinedModel.size() > 100_000) {
+                Alert warning = new Alert(Alert.AlertType.CONFIRMATION,
+                        "This SELECT has no LIMIT and will run against " + combinedModel.size() + " triples. It may return a very large result set.\n\nRun it anyway?",
+                        ButtonType.OK, ButtonType.CANCEL);
+                warning.setTitle("Large SPARQL result risk");
+                warning.setHeaderText("Consider adding LIMIT before running");
+                if (warning.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+                    resetProgressBar();
+                    setStatus("SPARQL query cancelled before execution.");
+                    return;
+                }
+            }
             setStatus("Running SPARQL query...");
             SparqlTools.QueryResults results = SparqlTools.executeSparqlQuery(queryText, combinedModel);
 

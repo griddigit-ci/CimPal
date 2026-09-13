@@ -70,6 +70,8 @@ public class PreferencesController implements Initializable {
     @FXML
     private TextArea fAiKnowledgeSources;
     @FXML
+    private TextField fAiEmbeddingModel;
+    @FXML
     private CheckBox cbAiUseRemoteSources;
     @FXML
     private CheckBox cbAiRefreshRemoteOnStartup;
@@ -131,6 +133,7 @@ public class PreferencesController implements Initializable {
             MainController.prefs.putInt("ai.normalResponseTokens", parseTokenLimit(fAiNormalTokens, "Normal"));
             MainController.prefs.putInt("ai.completeResponseTokens", parseTokenLimit(fAiCompleteTokens, "Complete"));
             MainController.prefs.put("ai.knowledge.sources", fAiKnowledgeSources.getText().trim());
+            MainController.prefs.put("ai.knowledge.embeddingModel", fAiEmbeddingModel.getText().trim());
             MainController.prefs.putBoolean("ai.knowledge.includeRemote", cbAiUseRemoteSources.isSelected());
             MainController.prefs.putBoolean("ai.knowledge.refreshOnStartup", cbAiRefreshRemoteOnStartup.isSelected());
             MainController.prefs.putInt("ai.validation.maxResults", parseBoundedLimit(fAiValidationMaxResults, "Validation results", 1, 200));
@@ -243,6 +246,7 @@ public class PreferencesController implements Initializable {
         MainController.prefs.putInt("ai.completeResponseTokens", 1024);
         MainController.prefs.put("ai.responseMode", "Normal");
         MainController.prefs.put("ai.knowledge.sources", "");
+        MainController.prefs.put("ai.knowledge.embeddingModel", "nomic-embed-text");
         MainController.prefs.putBoolean("ai.knowledge.includeRemote", false);
         MainController.prefs.putBoolean("ai.knowledge.refreshOnStartup", true);
         MainController.prefs.putInt("ai.validation.maxResults", 10);
@@ -277,6 +281,7 @@ public class PreferencesController implements Initializable {
                 MainController.prefs.getInt("ai.responseTokens", 512))));
         fAiCompleteTokens.setText(String.valueOf(MainController.prefs.getInt("ai.completeResponseTokens", 1024)));
         fAiKnowledgeSources.setText(MainController.prefs.get("ai.knowledge.sources", ""));
+        fAiEmbeddingModel.setText(MainController.prefs.get("ai.knowledge.embeddingModel", "nomic-embed-text"));
         cbAiUseRemoteSources.setSelected(MainController.prefs.getBoolean("ai.knowledge.includeRemote", false));
         cbAiRefreshRemoteOnStartup.setSelected(MainController.prefs.getBoolean("ai.knowledge.refreshOnStartup", true));
         lblAiKnowledgeStatus.setText("");

@@ -51,6 +51,9 @@
             <Button fx:id="btnReleasePowsybl" mnemonicParsing="false" onAction="#actionReleasePowsybl" text="Release PowsyBl"/>
             <Button fx:id="btnToggleTreePane" mnemonicParsing="false"
                     onAction="#actionToggleTreePane" text="Hide graph browser"/>
+            <Button mnemonicParsing="false" onAction="#actionShowModelInsights" styleClass="icon-button" text="◫">
+               <tooltip><Tooltip text="Open selected-model schema insights"/></tooltip>
+            </Button>
             <Label fx:id="helpPanes" styleClass="help-badge" text="?"/>
          </FlowPane>
 

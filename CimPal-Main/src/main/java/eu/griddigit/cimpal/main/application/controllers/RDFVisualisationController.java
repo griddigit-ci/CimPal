@@ -5,12 +5,16 @@
 package eu.griddigit.cimpal.main.application.controllers;
 
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.ai.AiDatasetInspector;
+import eu.griddigit.cimpal.main.workspace.WorkspaceArtifactRegistry;
+import eu.griddigit.cimpal.main.workspace.WorkspaceRdfStore;
 import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.RdfGraphView;
 import eu.griddigit.cimpal.main.gui.PowsyblBridge;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
@@ -93,6 +97,8 @@ import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
+import javafx.scene.Scene;
 
 /**
  * Controller for the <em>RDF Operations &#9656; Visualisation</em> tab.
@@ -469,6 +475,42 @@ public class RDFVisualisationController implements Initializable {
 
     // ==================== loading ====================
 
+    /** Opens the shared selected-model schema summary without adding another workspace tab. */
+    @FXML
+    private void actionShowModelInsights(ActionEvent event) {
+        TextArea content = new TextArea("Loading selected-model schema insights...");
+        content.setEditable(false);
+        content.setWrapText(false);
+        content.setPrefColumnCount(92);
+        content.setPrefRowCount(30);
+        Stage dialog = new Stage();
+        dialog.setTitle("Model insights");
+        dialog.setScene(new Scene(new VBox(content)));
+        dialog.setMinWidth(760);
+        dialog.setMinHeight(560);
+        dialog.initOwner(tfBaseUri.getScene().getWindow());
+        dialog.show();
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        setStatus("Inspecting the selected model's schema locally...");
+        Task<String> task = new Task<>() {
+            @Override protected String call() throws Exception { return AiDatasetInspector.inspectSelectedModels(); }
+        };
+        task.setOnSucceeded(ignored -> {
+            content.setText(task.getValue());
+            resetProgressBar();
+            setStatus("Model insights are ready. No data was changed or sent to the AI.");
+        });
+        task.setOnFailed(ignored -> {
+            content.setText("Model insights are unavailable:\n" + describe(task.getException())
+                    + "\n\nSelect instance-model files in the SPARQL Query tab, then try again.");
+            resetProgressBar();
+            setStatus("Model insights are unavailable.");
+        });
+        Thread thread = new Thread(task, "cimpal-model-insights");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
     @FXML
     private void actionLoadFiles(ActionEvent event) {
         loadFiles(true);
@@ -525,6 +567,15 @@ public class RDFVisualisationController implements Initializable {
                     graphEntries.clear();
                 }
                 graphEntries.addAll(loaded);
+                for (GraphEntry entry : loaded) {
+                    try {
+                        WorkspaceRdfStore.publishModel("visualisation-" + entry.name, WorkspaceArtifactRegistry.Type.VISUALISATION_GRAPH,
+                                entry.name, "RDF Visualisation", "loaded for browsing", entry.model,
+                                entry.source == null ? List.of() : List.of(entry.source.toAbsolutePath().toString()));
+                    } catch (RuntimeException ignored) {
+                        // Visualisation remains usable even when the optional shared cache is unavailable.
+                    }
+                }
                 setLoadingControlsDisabled(false);
                 resetProgressBar();
 

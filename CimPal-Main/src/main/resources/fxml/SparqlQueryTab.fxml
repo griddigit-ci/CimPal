@@ -11,6 +11,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
@@ -30,6 +31,9 @@
          -->
          <FlowPane hgap="8.0" vgap="8.0">
             <Button mnemonicParsing="false" onAction="#actionSelectModelFiles" text="Select model files..."/>
+            <Button mnemonicParsing="false" onAction="#actionSelectWorkspaceModel" styleClass="icon-button" text="◫">
+               <tooltip><Tooltip text="Use an in-memory workspace model"/></tooltip>
+            </Button>
             <Label fx:id="helpSelectModels" text="?" styleClass="help-badge"/>
             <Button mnemonicParsing="false" onAction="#actionLoadQuery" text="Load query..."/>
             <Button mnemonicParsing="false" onAction="#actionSaveQuery" text="Save query..."/>

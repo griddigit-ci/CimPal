@@ -16,6 +16,9 @@ import eu.griddigit.cimpal.main.application.controllers.ai.AiAssistantTabControl
 import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
+import eu.griddigit.cimpal.main.workspace.WorkspaceArtifactRegistry;
+import eu.griddigit.cimpal.main.workspace.WorkspaceRdfStore;
+import eu.griddigit.cimpal.main.workspace.WorkspaceTdbStore;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 
 import java.io.InputStream;
@@ -30,6 +33,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.text.Font;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -84,6 +88,173 @@ import java.io.FileOutputStream;
 
 
 public class MainController implements Initializable {
+
+    /** Shows registered sources and in-memory RDF artifacts without exposing a mutable global model. */
+    @FXML
+    private void actionShowWorkspace() {
+        VBox artifactList = new VBox(4);
+        ScrollPane inventory = new ScrollPane(artifactList);
+        inventory.setFitToWidth(true);
+        inventory.setPrefViewportWidth(900);
+        inventory.setPrefViewportHeight(560);
+        Set<String> selectedKeys = new LinkedHashSet<>();
+        Runnable refreshArtifacts = () -> {
+            WorkspaceArtifactRegistry.synchronizeLegacyInventory();
+            artifactList.getChildren().clear();
+            List<WorkspaceArtifactRegistry.Artifact> artifacts = WorkspaceArtifactRegistry.snapshot().stream()
+                    .filter(artifact -> WorkspaceRdfStore.isLoaded(artifact.key()) || WorkspaceTdbStore.isStored(artifact.key())).toList();
+            if (artifacts.isEmpty()) {
+                artifactList.getChildren().add(new Label("No graphs are loaded in memory or stored locally. Load model files or use Restore."));
+                return;
+            }
+            for (WorkspaceArtifactRegistry.Artifact artifact : artifacts) {
+                boolean loaded = WorkspaceRdfStore.isLoaded(artifact.key());
+                boolean stored = WorkspaceTdbStore.isStored(artifact.key());
+                String availability = loaded && stored ? artifact.triples() + " triples in memory + stored" : loaded
+                        ? artifact.triples() + " triples in memory" : "stored locally (not loaded)";
+                CheckBox item = new CheckBox(artifact.type() + "  |  " + artifact.name() + "  |  " + availability);
+                item.setSelected(selectedKeys.contains(artifact.key()));
+                item.setUserData(artifact.key());
+                item.setTooltip(new Tooltip("Owner: " + artifact.owner() + "\nState: " + artifact.state()
+                        + "\nSources: " + (artifact.sources().isEmpty() ? "not recorded" : String.join("\n", artifact.sources()))));
+                item.selectedProperty().addListener((ignored, wasSelected, isSelected) -> {
+                    if (isSelected) selectedKeys.add(artifact.key()); else selectedKeys.remove(artifact.key());
+                });
+                artifactList.getChildren().add(item);
+            }
+        };
+        Button refresh = new Button("↻");
+        refresh.setTooltip(new Tooltip("Refresh workspace inventory"));
+        refresh.setOnAction(event -> refreshArtifacts.run());
+        Button selectAll = new Button("✓");
+        selectAll.setTooltip(new Tooltip("Check all loaded workspace graphs"));
+        selectAll.setOnAction(event -> {
+            artifactList.getChildren().stream().filter(CheckBox.class::isInstance).map(CheckBox.class::cast)
+                    .forEach(check -> check.setSelected(true));
+        });
+        Button clearSelection = new Button("□");
+        clearSelection.setTooltip(new Tooltip("Uncheck all workspace graphs"));
+        clearSelection.setOnAction(event -> {
+            artifactList.getChildren().stream().filter(CheckBox.class::isInstance).map(CheckBox.class::cast)
+                    .forEach(check -> check.setSelected(false));
+        });
+        Button release = new Button("−");
+        release.setTooltip(new Tooltip("Release checked artifacts from memory; source files remain untouched"));
+        release.setOnAction(event -> {
+            List<String> loadedSelection = selectedKeys.stream().filter(WorkspaceRdfStore::isLoaded).toList();
+            if (loadedSelection.isEmpty()) {
+                new Alert(Alert.AlertType.INFORMATION, "Check one or more artifacts that are currently in memory.", ButtonType.OK).showAndWait();
+                return;
+            }
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            loadedSelection.forEach(WorkspaceRdfStore::release);
+            selectedKeys.removeAll(loadedSelection);
+            refreshArtifacts.run();
+            completeProgressBar();
+        });
+        Button clearMemory = new Button("×");
+        clearMemory.setTooltip(new Tooltip("Release all workspace graphs from memory; source files remain untouched"));
+        clearMemory.setOnAction(event -> {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Release all CimPal workspace graphs from memory? Source files on disk will not be deleted.", ButtonType.OK, ButtonType.CANCEL);
+            confirm.setTitle("Clear workspace memory");
+            confirm.setHeaderText("This only clears the in-memory workspace cache");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+                setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+                WorkspaceRdfStore.clearMemoryArtifacts();
+                selectedKeys.clear();
+                refreshArtifacts.run();
+                completeProgressBar();
+            }
+        });
+        Button store = new Button("Store");
+        store.setTooltip(new Tooltip("Persist checked in-memory graphs for a later application session"));
+        store.setOnAction(event -> {
+            List<String> loadedSelection = selectedKeys.stream().filter(WorkspaceRdfStore::isLoaded).toList();
+            if (loadedSelection.isEmpty()) {
+                new Alert(Alert.AlertType.INFORMATION, "Check one or more artifacts that are currently in memory before storing them.", ButtonType.OK).showAndWait();
+                return;
+            }
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                int count = WorkspaceTdbStore.persist(loadedSelection);
+                new Alert(Alert.AlertType.INFORMATION, count + " artifact(s) stored in:\n" + WorkspaceTdbStore.storePath(), ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not store workspace artifacts:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button restore = new Button("Restore");
+        restore.setTooltip(new Tooltip("Restore all persisted workspace graphs into memory"));
+        restore.setOnAction(event -> {
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                List<String> restored = WorkspaceTdbStore.restoreAll();
+                refreshArtifacts.run();
+                new Alert(Alert.AlertType.INFORMATION, restored.isEmpty()
+                        ? "No persisted workspace graphs were found in:\n" + WorkspaceTdbStore.storePath()
+                        : restored.size() + " artifact(s) restored from:\n" + WorkspaceTdbStore.storePath(), ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not restore workspace artifacts:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button forgetStored = new Button("Forget");
+        forgetStored.setTooltip(new Tooltip("Delete persisted copies of checked graphs; leaves memory and source files unchanged"));
+        forgetStored.setOnAction(event -> {
+            if (selectedKeys.isEmpty()) {
+                new Alert(Alert.AlertType.INFORMATION, "Check one or more restored artifacts to remove their stored copies.", ButtonType.OK).showAndWait();
+                return;
+            }
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Delete the persisted copies of the checked artifacts? Their in-memory graphs and source files will remain.", ButtonType.OK, ButtonType.CANCEL);
+            confirm.setTitle("Forget stored workspace artifacts");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                int removed = WorkspaceTdbStore.remove(selectedKeys);
+                refreshArtifacts.run();
+                new Alert(Alert.AlertType.INFORMATION, removed + " stored artifact(s) removed.", ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not remove stored workspace artifacts:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button clearStore = new Button("Clear store");
+        clearStore.setTooltip(new Tooltip("Delete all persisted TDB2 workspace graphs; leaves memory and source files unchanged"));
+        clearStore.setOnAction(event -> {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Delete all persisted workspace graphs from the local TDB2 store? In-memory graphs and source files will remain.", ButtonType.OK, ButtonType.CANCEL);
+            confirm.setTitle("Clear persistent workspace store");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                int removed = WorkspaceTdbStore.clear();
+                selectedKeys.clear();
+                refreshArtifacts.run();
+                new Alert(Alert.AlertType.INFORMATION, removed + " stored artifact(s) removed.", ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not clear the persistent workspace store:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button help = new Button("?");
+        help.setTooltip(new Tooltip("− and × affect only memory. Store and Restore manage saved workspace graphs. Forget removes checked persisted copies; Clear store removes all persisted graphs. Source files are never deleted."));
+        javafx.scene.layout.HBox controls = new javafx.scene.layout.HBox(8, refresh, selectAll, clearSelection, release, clearMemory, store, restore, forgetStored, clearStore, help);
+        VBox content = new VBox(8, controls, inventory);
+        Stage dialog = new Stage();
+        dialog.setTitle("Workspace artifacts");
+        dialog.setScene(new Scene(content));
+        dialog.setMinWidth(850);
+        dialog.setMinHeight(620);
+        if (foutputWindow != null && foutputWindow.getScene() != null) dialog.initOwner(foutputWindow.getScene().getWindow());
+        refreshArtifacts.run();
+        dialog.show();
+    }
 
     public GUIhelper getGuiHelper() {
         return guiHelper;

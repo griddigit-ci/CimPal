@@ -34,6 +34,7 @@ module CimPal.Main {
     requires java.net.http;
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
+    requires org.apache.jena.tdb2;
     requires org.slf4j;
     // A real binding, not slf4j-nop: discarding all library output also discards the
     // security-relevant warnings emitted by the RDF parsers and the HTTP client.

@@ -10,6 +10,7 @@ import eu.griddigit.cimpal.core.utils.SparqlTools;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFParser;
+import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.update.UpdateAction;
@@ -20,8 +21,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 /** Produces a bounded, read-only description of the selected instance-model files. */
 public final class AiDatasetInspector {
@@ -29,10 +33,16 @@ public final class AiDatasetInspector {
     private static final int MAX_TYPES = 60;
     private static final int MAX_PREFIXES = 40;
     private static final int MAX_PROPERTIES = 80;
+    private static final int MAX_PROFILES = 20;
     private static String cachedFingerprint;
     private static Model cachedModel;
 
     private AiDatasetInspector() { }
+
+    public static boolean hasSelectedModels() {
+        List<File> files = MainController.IDModel1;
+        return files != null && !files.isEmpty();
+    }
 
     public static String inspectSelectedModels() throws Exception {
         List<File> files = MainController.IDModel1;
@@ -49,40 +59,67 @@ public final class AiDatasetInspector {
         summary.append(files.stream().map(File::getName).sorted().reduce((a, b) -> a + ", " + b).orElse("none"));
         summary.append("\nTriples: ").append(model.size()).append('\n');
 
-        summary.append("Namespaces:\n");
+        summary.append("Declared namespace prefixes:\n");
         model.getNsPrefixMap().entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .limit(MAX_PREFIXES)
                 .forEach(entry -> summary.append("- ").append(entry.getKey()).append(": ").append(entry.getValue()).append('\n'));
 
-        TreeSet<String> types = new TreeSet<>();
-        StmtIterator iterator = model.listStatements(null, RDF.type, (RDFNode) null);
+        Map<String, Long> typeCounts = new HashMap<>();
+        Map<String, Long> propertyCounts = new HashMap<>();
+        Map<String, Long> namespaceCounts = new HashMap<>();
+        TreeSet<String> declaredProfiles = new TreeSet<>();
+        StmtIterator iterator = model.listStatements();
         try {
-            while (iterator.hasNext() && types.size() < MAX_TYPES) {
+            while (iterator.hasNext()) {
                 Statement statement = iterator.next();
+                String predicateUri = statement.getPredicate().getURI();
+                increment(propertyCounts, model.shortForm(predicateUri));
+                increment(namespaceCounts, namespaceOf(predicateUri));
                 RDFNode object = statement.getObject();
-                if (object.isResource() && object.asResource().isURIResource()) {
-                    types.add(model.shortForm(object.asResource().getURI()));
+                if (RDF.type.getURI().equals(predicateUri) && object.isResource() && object.asResource().isURIResource()) {
+                    String typeUri = object.asResource().getURI();
+                    increment(typeCounts, model.shortForm(typeUri));
+                    increment(namespaceCounts, namespaceOf(typeUri));
+                }
+                if ("profile".equalsIgnoreCase(statement.getPredicate().getLocalName())) {
+                    declaredProfiles.add(object.isURIResource() ? object.asResource().getURI() : object.toString());
                 }
             }
         } finally {
             iterator.close();
         }
-        summary.append("Observed RDF types (up to ").append(MAX_TYPES).append("):\n");
-        if (types.isEmpty()) summary.append("- none found\n");
-        else types.forEach(type -> summary.append("- ").append(type).append('\n'));
-        TreeSet<String> properties = new TreeSet<>();
-        StmtIterator predicateIterator = model.listStatements();
-        try {
-            while (predicateIterator.hasNext() && properties.size() < MAX_PROPERTIES) {
-                properties.add(model.shortForm(predicateIterator.next().getPredicate().getURI()));
-            }
-        } finally {
-            predicateIterator.close();
-        }
-        summary.append("Observed predicates (up to ").append(MAX_PROPERTIES).append("):\n");
-        properties.forEach(property -> summary.append("- ").append(property).append('\n'));
+        summary.append("Observed namespaces by predicate/type use (up to ").append(MAX_PREFIXES).append("):\n");
+        appendCounts(summary, namespaceCounts, MAX_PREFIXES);
+        summary.append("Declared model profiles (up to ").append(MAX_PROFILES).append("):\n");
+        if (declaredProfiles.isEmpty()) summary.append("- none declared in RDF; selected files are the model scope\n");
+        else declaredProfiles.stream().limit(MAX_PROFILES).forEach(profile -> summary.append("- ").append(profile).append('\n'));
+        summary.append("Observed RDF classes with instance counts (up to ").append(MAX_TYPES).append("):\n");
+        appendCounts(summary, typeCounts, MAX_TYPES);
+        summary.append("Observed predicates with triple counts (up to ").append(MAX_PROPERTIES).append("):\n");
+        appendCounts(summary, propertyCounts, MAX_PROPERTIES);
         return summary.toString();
+    }
+
+    private static void increment(Map<String, Long> counts, String value) {
+        counts.merge(value, 1L, Long::sum);
+    }
+
+    private static String namespaceOf(String uri) {
+        int separator = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+        return separator >= 0 ? uri.substring(0, separator + 1) : uri;
+    }
+
+    private static void appendCounts(StringBuilder summary, Map<String, Long> counts, int limit) {
+        if (counts.isEmpty()) {
+            summary.append("- none found\n");
+            return;
+        }
+        List<Map.Entry<String, Long>> entries = new ArrayList<>(counts.entrySet());
+        entries.sort(Comparator.<Map.Entry<String, Long>, Long>comparing(Map.Entry::getValue).reversed()
+                .thenComparing(Map.Entry::getKey));
+        entries.stream().limit(limit).forEach(entry -> summary.append("- ").append(entry.getKey())
+                .append(" (").append(entry.getValue()).append(")\n"));
     }
 
     /** Resolves the CIM namespace from the selected data instead of assuming a CIM version. */
@@ -105,6 +142,24 @@ public final class AiDatasetInspector {
 
     public static int countQueryResults(String query) throws Exception {
         return SparqlTools.executeSparqlQuery(query, selectedModel(requireSelectedFiles())).rows.size();
+    }
+
+    /** Executes a bounded SELECT locally and returns evidence suitable for a draft revision prompt. */
+    public static String inspectReadOnlyQuery(String query, int maxRows) throws Exception {
+        org.apache.jena.query.Query parsed = org.apache.jena.query.QueryFactory.create(query);
+        if (!parsed.isSelectType()) throw new IllegalArgumentException("Only SELECT queries can be inspected.");
+        long originalLimit = parsed.getLimit();
+        if (originalLimit < 0 || originalLimit > maxRows) parsed.setLimit(maxRows);
+        SparqlTools.QueryResults results = SparqlTools.executeSparqlQuery(parsed.toString(), selectedModel(requireSelectedFiles()));
+        StringBuilder evidence = new StringBuilder("Local read-only execution evidence:\n")
+                .append("Rows returned").append(originalLimit > maxRows || originalLimit < 0 ? " (capped at " + maxRows + ")" : "")
+                .append(": ").append(results.rows.size()).append('\n')
+                .append("Columns: ").append(String.join(", ", results.columns)).append('\n');
+        int samples = Math.min(3, results.rows.size());
+        for (int index = 0; index < samples; index++) {
+            evidence.append("Sample ").append(index + 1).append(": ").append(results.rows.get(index)).append('\n');
+        }
+        return evidence.toString();
     }
 
     /**
@@ -182,6 +237,32 @@ public final class AiDatasetInspector {
         appendPreviewStatements(preview, "Removed", removed);
         appendPreviewStatements(preview, "Added", added);
         return preview.toString();
+    }
+
+    /** Applies a repair only to a copy, then compares SHACL conformance before and after it. */
+    public static String previewAndValidateSparqlRepair(String updateText, File shapesFile) throws Exception {
+        if (shapesFile == null || !shapesFile.isFile()) throw new IllegalArgumentException("Choose the SHACL shapes file used for validation first.");
+        Model original = selectedModel(requireSelectedFiles());
+        Model repaired = org.apache.jena.rdf.model.ModelFactory.createDefaultModel().add(original);
+        Model shapes = RDFDataMgr.loadModel(shapesFile.toURI().toString());
+        ValidationReport before = ShaclValidator.get().validate(original.getGraph(), shapes.getGraph());
+        UpdateAction.execute(UpdateFactory.create(updateText), repaired);
+        ValidationReport after = ShaclValidator.get().validate(repaired.getGraph(), shapes.getGraph());
+        Model removed = original.difference(repaired);
+        Model added = repaired.difference(original);
+        StringBuilder preview = new StringBuilder("Repair preview and SHACL validation — no selected file or loaded model was changed.\n")
+                .append("Shapes: ").append(shapesFile.getName()).append('\n')
+                .append("Before repair: ").append(validationOutcome(before)).append('\n')
+                .append("After repair: ").append(validationOutcome(after)).append('\n')
+                .append("Triples removed: ").append(removed.size()).append('\n')
+                .append("Triples added: ").append(added.size()).append('\n');
+        appendPreviewStatements(preview, "Removed", removed);
+        appendPreviewStatements(preview, "Added", added);
+        return preview.toString();
+    }
+
+    private static String validationOutcome(ValidationReport report) {
+        return report.conforms() ? "conforms" : "does not conform (" + report.getModel().size() + " report statement(s))";
     }
 
     private static void appendPreviewStatements(StringBuilder preview, String title, Model model) {

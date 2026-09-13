@@ -68,6 +68,29 @@ public final class OllamaClient {
         return content;
     }
 
+    /** Generates vectors on the local Ollama server for RAG retrieval; no remote endpoint is accepted. */
+    public List<double[]> embed(String endpoint, String model, List<String> inputs) throws IOException, InterruptedException {
+        if (model == null || model.isBlank()) throw new IllegalArgumentException("Choose a local embedding model first.");
+        if (inputs == null || inputs.isEmpty()) return List.of();
+        ObjectNode payload = JSON.createObjectNode();
+        payload.put("model", model);
+        ArrayNode input = payload.putArray("input");
+        inputs.forEach(input::add);
+        HttpRequest request = HttpRequest.newBuilder(apiUri(endpoint, "/api/embed"))
+                .timeout(TIMEOUT).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString())).build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        requireSuccess(response);
+        List<double[]> vectors = new ArrayList<>();
+        for (JsonNode embedding : JSON.readTree(response.body()).path("embeddings")) {
+            double[] vector = new double[embedding.size()];
+            for (int index = 0; index < embedding.size(); index++) vector[index] = embedding.get(index).asDouble();
+            vectors.add(vector);
+        }
+        if (vectors.size() != inputs.size()) throw new IOException("Ollama returned an unexpected number of embeddings.");
+        return vectors;
+    }
+
     /** Streams visible response text as Ollama emits it, while returning the complete response. */
     public String chatStreaming(String endpoint, String model, String systemPrompt, String userPrompt,
                                 int maxTokens, Consumer<String> onText) throws IOException, InterruptedException {

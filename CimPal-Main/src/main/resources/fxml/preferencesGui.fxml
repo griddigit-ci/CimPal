@@ -142,12 +142,14 @@
                   <TextField fx:id="fAiValidationMaxResults" prefWidth="140.0" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
                   <Label text="Properties per focus node:" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
                   <TextField fx:id="fAiValidationMaxProperties" prefWidth="140.0" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
-                  <Label text="Knowledge sources:" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
-                  <TextArea fx:id="fAiKnowledgeSources" prefRowCount="5" promptText="One local folder, public URL, or GitHub repository URL[#branch] per line" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1"/>
-                  <HBox spacing="8.0" GridPane.rowIndex="7" GridPane.columnIndex="1"><Button mnemonicParsing="false" onAction="#actionAddKnowledgeFolder" text="Add local folder..."/><CheckBox fx:id="cbAiUseRemoteSources" mnemonicParsing="false" text="Include configured public remote sources"/></HBox>
-                  <HBox spacing="8.0" GridPane.rowIndex="8" GridPane.columnIndex="1"><Button mnemonicParsing="false" onAction="#actionRefreshRemoteSources" text="Refresh remote sources now"/><CheckBox fx:id="cbAiRefreshRemoteOnStartup" mnemonicParsing="false" text="Refresh at application start"/></HBox>
-                  <Label fx:id="lblAiKnowledgeStatus" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
-                  <Label text="Local folders are searched on this computer. GitHub repositories are shallow-cloned into CimPal's local cache; public URLs are fetched only when enabled. Neither your model data nor your question is sent to them." wrapText="true" GridPane.rowIndex="10" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
+                  <Label text="Local embedding model:" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+                  <TextField fx:id="fAiEmbeddingModel" promptText="nomic-embed-text" GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+                  <Label text="Knowledge sources:" GridPane.rowIndex="7" GridPane.columnIndex="0"/>
+                  <TextArea fx:id="fAiKnowledgeSources" prefRowCount="5" promptText="One local folder, public URL, or GitHub repository URL[#branch] per line" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1"/>
+                  <HBox spacing="8.0" GridPane.rowIndex="8" GridPane.columnIndex="1"><Button mnemonicParsing="false" onAction="#actionAddKnowledgeFolder" text="Add local folder..."/><CheckBox fx:id="cbAiUseRemoteSources" mnemonicParsing="false" text="Include configured public remote sources"/></HBox>
+                  <HBox spacing="8.0" GridPane.rowIndex="9" GridPane.columnIndex="1"><Button mnemonicParsing="false" onAction="#actionRefreshRemoteSources" text="Refresh remote sources now"/><CheckBox fx:id="cbAiRefreshRemoteOnStartup" mnemonicParsing="false" text="Refresh at application start"/></HBox>
+                  <Label fx:id="lblAiKnowledgeStatus" wrapText="true" GridPane.rowIndex="10" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
+                  <Label text="Local folders are searched on this computer. An installed local embedding model improves semantic retrieval; if unavailable, CimPal uses its offline index. GitHub repositories are shallow-cloned into CimPal's local cache; public URLs are fetched only when enabled. Neither your model data nor your question is sent to them." wrapText="true" GridPane.rowIndex="11" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
                </GridPane>
                <Region VBox.vgrow="ALWAYS"/>
             </VBox>
