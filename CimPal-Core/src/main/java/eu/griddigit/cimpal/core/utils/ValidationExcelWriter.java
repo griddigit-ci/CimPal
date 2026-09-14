@@ -1507,7 +1507,7 @@ public class ValidationExcelWriter implements Closeable {
                 LinkedHashSet<String> regions = new LinkedHashSet<>(currentRaw.keySet());
                 regions.addAll(previousTotals.keySet());
 
-                writeChartsSheet(wb, hStyle, regions, currentTs);
+                writeChartsSheet(wb, hStyle, regions, uniqueLabel);
 
                 if (wb.getNumberOfSheets() == 0) {
                     wb.createSheet("Comparison");
