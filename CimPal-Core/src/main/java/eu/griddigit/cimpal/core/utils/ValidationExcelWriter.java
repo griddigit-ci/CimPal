@@ -1430,8 +1430,10 @@ public class ValidationExcelWriter implements Closeable {
         private final String previousLabel;
         private String currentLabel;
 
-        // region -> dataset -> total (W+I+V) from the most recent previous run sheet
-        private final Map<String, Map<String, Integer>> previousTotals = new LinkedHashMap<>();
+        // region -> dataset -> total (W+V) from the most recent previous run sheet
+        private final Map<String, Map<String, Integer>> previousTotals    = new LinkedHashMap<>();
+        private final Map<String, Map<String, Integer>> previousWarnings   = new LinkedHashMap<>();
+        private final Map<String, Map<String, Integer>> previousViolations = new LinkedHashMap<>();
         // date-time label -> recs for every previous run sheet carried over from the previous XLSX
         private final LinkedHashMap<String, List<Rec>> historicalSheets = new LinkedHashMap<>();
         // region -> recs for the current run
@@ -1577,17 +1579,25 @@ public class ValidationExcelWriter implements Closeable {
             XSSFSheet sheet = (XSSFSheet) wb.createSheet(CHARTS_SHEET_NAME);
 
             // Pre-compute compliance rates (per-region + combined) for every run.
-            LinkedHashMap<String, Map<String, Double>> allRunCompliance = new LinkedHashMap<>();
+            LinkedHashMap<String, Map<String, Double>> allRunCompliance     = new LinkedHashMap<>(); // W+V=0
+            LinkedHashMap<String, Map<String, Double>> allRunViolCompliance = new LinkedHashMap<>(); // V=0
+            LinkedHashMap<String, Map<String, Double>> allRunWarnCompliance = new LinkedHashMap<>(); // W=0
+
+            java.util.function.ToIntFunction<Rec> totalMetric = r -> r.warnings + r.violations;
+            java.util.function.ToIntFunction<Rec> violMetric  = r -> r.violations;
+            java.util.function.ToIntFunction<Rec> warnMetric  = r -> r.warnings;
+
             for (Map.Entry<String, List<Rec>> entry : historicalSheets.entrySet()) {
-                Map<String, Double> rates = computeComplianceRates(entry.getValue());
-                rates.put("Combined", computeCombinedComplianceRate(entry.getValue()));
-                allRunCompliance.put(entry.getKey(), rates);
+                List<Rec> runRecs = entry.getValue();
+                populateCompliance(allRunCompliance,     entry.getKey(), runRecs, totalMetric);
+                populateCompliance(allRunViolCompliance, entry.getKey(), runRecs, violMetric);
+                populateCompliance(allRunWarnCompliance, entry.getKey(), runRecs, warnMetric);
             }
             List<Rec> currentAll = currentRaw.values().stream().flatMap(List::stream).toList();
             if (!currentAll.isEmpty()) {
-                Map<String, Double> rates = computeComplianceRates(currentAll);
-                rates.put("Combined", computeCombinedComplianceRate(currentAll));
-                allRunCompliance.put(currentTs, rates);
+                populateCompliance(allRunCompliance,     currentTs, currentAll, totalMetric);
+                populateCompliance(allRunViolCompliance, currentTs, currentAll, violMetric);
+                populateCompliance(allRunWarnCompliance, currentTs, currentAll, warnMetric);
             }
 
             int blockTop = 0;
@@ -1616,71 +1626,88 @@ public class ValidationExcelWriter implements Closeable {
                 anyData = true;
                 boolean hasPrev = !prevByDs.isEmpty();
 
-                // Combined totals for the % calculation (current and previous runs).
-                long combinedCur  = curMetrics.values().stream()
-                        .mapToLong(m -> m[0] + m[1] + m[2]).sum();
-                long combinedPrev = prevByDs.values().stream()
-                        .mapToLong(Integer::longValue).sum();
-
                 // Title row.
                 Row titleRow = sheet.createRow(blockTop);
                 Cell titleCell = titleRow.createCell(0);
                 titleCell.setCellValue(region);
                 titleCell.setCellStyle(hStyle);
 
-                // Header row.
-                // Col 0: Dataset
-                // Col 1: <current> total    Col 2: <current> %
-                // Col 3: <previous> total   Col 4: <previous> %   (conditional on hasPrev)
-                // Col 5: Delta%             (conditional on hasPrev)
+                // Header row: 10 columns.
                 int headerRow = blockTop + 1;
                 Row hdrRow = sheet.createRow(headerRow);
                 setCellHdr(hdrRow, hStyle, 0, "Dataset");
-                setCellHdr(hdrRow, hStyle, 1, currentLabel + " total");
-                setCellHdr(hdrRow, hStyle, 2, currentLabel + " %");
+                setCellHdr(hdrRow, hStyle, 1, currentLabel + " W+V total");
+                setCellHdr(hdrRow, hStyle, 2, currentLabel + " W+V %");
+                setCellHdr(hdrRow, hStyle, 3, currentLabel + " Warnings");
+                setCellHdr(hdrRow, hStyle, 4, currentLabel + " Warnings %");
+                setCellHdr(hdrRow, hStyle, 5, currentLabel + " Violations");
+                setCellHdr(hdrRow, hStyle, 6, currentLabel + " Violations %");
                 if (hasPrev) {
-                    setCellHdr(hdrRow, hStyle, 3, previousLabel + " total");
-                    setCellHdr(hdrRow, hStyle, 4, previousLabel + " %");
-                    setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)");
+                    setCellHdr(hdrRow, hStyle, 7, previousLabel + " W+V total");
+                    setCellHdr(hdrRow, hStyle, 8, previousLabel + " W+V %");
+                    setCellHdr(hdrRow, hStyle, 9, "Delta (cur−prev)");
                 }
 
                 int firstDataRow = headerRow + 1;
+                int lastDataRow  = firstDataRow + sorted.size() - 1;
+
+                Map<String, Integer> prevWarnByDs = previousWarnings.getOrDefault(region, Map.of());
+                Map<String, Integer> prevViolByDs = previousViolations.getOrDefault(region, Map.of());
+
                 int r = firstDataRow;
 
                 for (String ds : sorted) {
-                    int[] m   = curMetrics.getOrDefault(ds, new int[]{0, 0, 0});
-                    int cur   = m[0] + m[1] + m[2];
-                    int prev  = prevByDs.getOrDefault(ds, 0);
-                    double curPct  = combinedCur  > 0 ? cur  * 100.0 / combinedCur  : 0.0;
-                    double prevPct = combinedPrev > 0 ? prev * 100.0 / combinedPrev : 0.0;
-                    int delta = cur - prev;
+                    int[] m  = curMetrics.getOrDefault(ds, new int[]{0, 0, 0});
+                    int cur  = m[0] + m[2];   // W+V
+                    int curW = m[0];           // warnings
+                    int curV = m[2];           // violations
+                    int prev = prevByDs.getOrDefault(ds, 0);
 
-                    Row row = sheet.createRow(r++);
+                    Row row = sheet.createRow(r);
+
                     row.createCell(0).setCellValue(ds);
                     row.createCell(1).setCellValue(cur);
-                    row.createCell(2).setCellValue(curPct);
+                    row.createCell(3).setCellValue(curW);
+                    row.createCell(5).setCellValue(curV);
                     if (hasPrev) {
-                        row.createCell(3).setCellValue(prev);
-                        row.createCell(4).setCellValue(prevPct);
-                        row.createCell(5).setCellValue(delta);
+                        row.createCell(7).setCellValue(prev);
                     }
+
+                    // Formula cells (use 1-based row number = r+1)
+                    writePctFormula(row, 2, 1, firstDataRow, lastDataRow);
+                    writePctFormula(row, 4, 3, firstDataRow, lastDataRow);
+                    writePctFormula(row, 6, 5, firstDataRow, lastDataRow);
+                    if (hasPrev) {
+                        writePctFormula(row, 8, 7, firstDataRow, lastDataRow);
+                        writeDeltaFormula(row, 9, 1, 7);
+                    }
+
+                    r++;
                 }
 
-                int lastDataRow = r - 1;
                 int chartBot = Math.max(blockTop + 22, lastDataRow + 4);
 
-                // Chart A: % share of combined hits per dataset (current run only).
-                createDistributionChart(sheet,
-                        region + " – " + currentLabel + " (% of total hits)",
-                        firstDataRow, lastDataRow, 2, currentLabel,
-                        7, blockTop, 20, chartBot);
+                // Chart 1: W+V % distribution (col 2)
+                createDistributionChart(sheet, region + " – " + currentLabel + " W+V % of total",
+                        firstDataRow, lastDataRow, 2, currentLabel + " W+V %",
+                        11, blockTop, 22, chartBot);
 
-                // Chart B: absolute delta per dataset vs. most recent previous run.
+                // Chart 2: Warnings % (col 4)
+                createDistributionChart(sheet, region + " – " + currentLabel + " Warnings % of total",
+                        firstDataRow, lastDataRow, 4, currentLabel + " Warnings %",
+                        23, blockTop, 34, chartBot);
+
+                // Chart 3: Violations % (col 6)
+                createDistributionChart(sheet, region + " – " + currentLabel + " Violations % of total",
+                        firstDataRow, lastDataRow, 6, currentLabel + " Violations %",
+                        35, blockTop, 46, chartBot);
+
+                // Chart 4: Delta (col 9)
                 if (hasPrev) {
                     createDeltaPctChart(sheet,
                             region + " – Delta " + currentLabel + " vs " + previousLabel,
-                            firstDataRow, lastDataRow,
-                            21, blockTop, 34, chartBot);
+                            firstDataRow, lastDataRow, 9,
+                            47, blockTop, 58, chartBot);
                 }
 
                 blockTop = chartBot + 2;
@@ -1700,12 +1727,13 @@ public class ValidationExcelWriter implements Closeable {
                         .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
                 if (compRegions.contains("Combined")) sortedCompRegions.add("Combined");
                 if (!sortedCompRegions.isEmpty()) {
-                    writeComplianceSection(sheet, hStyle, blockTop, allRunCompliance, sortedCompRegions);
+                    writeComplianceSection(sheet, hStyle, blockTop,
+                            allRunCompliance, allRunViolCompliance, allRunWarnCompliance, sortedCompRegions);
                     anyData = true;
                 }
             }
 
-            for (int c = 0; c <= 5; c++) {
+            for (int c = 0; c <= 9; c++) {
                 try {
                     sheet.autoSizeColumn(c);
                 } catch (Exception ignore) {
@@ -1721,6 +1749,32 @@ public class ValidationExcelWriter implements Closeable {
             Cell cell = row.createCell(col);
             cell.setCellValue(value);
             cell.setCellStyle(hStyle);
+        }
+
+        private static void writePctFormula(Row row, int pctCol, int rawCol,
+                                            int firstDataRow, int lastDataRow) {
+            String rawColStr = org.apache.poi.ss.util.CellReference.convertNumToColString(rawCol);
+            int rowNum = row.getRowNum() + 1; // 1-based
+            String formula = rawColStr + rowNum
+                    + "/SUM($" + rawColStr + "$" + (firstDataRow + 1)
+                    + ":$" + rawColStr + "$" + (lastDataRow + 1) + ")*100";
+            row.createCell(pctCol).setCellFormula(formula);
+        }
+
+        private static void writeDeltaFormula(Row row, int deltaCol, int curCol, int prevCol) {
+            int rowNum = row.getRowNum() + 1;
+            String formula = org.apache.poi.ss.util.CellReference.convertNumToColString(curCol) + rowNum
+                    + "-"
+                    + org.apache.poi.ss.util.CellReference.convertNumToColString(prevCol) + rowNum;
+            row.createCell(deltaCol).setCellFormula(formula);
+        }
+
+        private void populateCompliance(LinkedHashMap<String, Map<String, Double>> map,
+                                        String runKey, List<Rec> recs,
+                                        java.util.function.ToIntFunction<Rec> metric) {
+            Map<String, Double> rates = computeComplianceRates(recs, metric);
+            rates.put("Combined", computeCombinedComplianceRate(recs, metric));
+            map.put(runKey, rates);
         }
 
         /** Single-series distribution bar chart. {@code dataCol} is 2 for current, 4 for previous. */
@@ -1774,6 +1828,7 @@ public class ValidationExcelWriter implements Closeable {
                                          String title,
                                          int firstDataRow,
                                          int lastDataRow,
+                                         int deltaCol,
                                          int anchorCol1,
                                          int anchorRow1,
                                          int anchorCol2,
@@ -1793,11 +1848,11 @@ public class ValidationExcelWriter implements Closeable {
             leftAxis.setTitle("Violation count difference (current − previous)");
             leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
 
-            // Categories at col 0, delta at col 5 (table layout: 0=Dataset, 2=Cur%, 4=Prev%, 5=Delta).
+            // Categories at col 0, delta at deltaCol.
             XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
                     sheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
             XDDFNumericalDataSource<Double> deltas = XDDFDataSourcesFactory.fromNumericCellRange(
-                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, 5, 5));
+                    sheet, new CellRangeAddress(firstDataRow, lastDataRow, deltaCol, deltaCol));
 
             XDDFBarChartData data = (XDDFBarChartData) chart.createData(
                     ChartTypes.BAR, bottomAxis, leftAxis);
@@ -1841,65 +1896,62 @@ public class ValidationExcelWriter implements Closeable {
 
             boolean hasPrev = !combinedPrevTotals.isEmpty();
 
-            long combinedCurTotal  = combinedCurMetrics.values().stream()
-                    .mapToLong(m -> m[0] + m[1] + m[2]).sum();
-            long combinedPrevTotal = combinedPrevTotals.values().stream()
-                    .mapToLong(Integer::longValue).sum();
-
             // Title row.
             Row titleRow = sheet.createRow(blockTop);
             Cell titleCell = titleRow.createCell(0);
             titleCell.setCellValue("Combined (all regions)");
             titleCell.setCellStyle(hStyle);
 
-            // Header: Dataset | Cur total | Cur% | Prev total | Prev% | Delta
+            // Header: Dataset | Cur W+V total | Cur W+V% | Prev W+V total | Prev W+V% | Delta
             int headerRow = blockTop + 1;
             Row hdrRow = sheet.createRow(headerRow);
             setCellHdr(hdrRow, hStyle, 0, "Dataset");
-            setCellHdr(hdrRow, hStyle, 1, currentLabel + " total");
-            setCellHdr(hdrRow, hStyle, 2, currentLabel + " %");
+            setCellHdr(hdrRow, hStyle, 1, currentLabel + " W+V total");
+            setCellHdr(hdrRow, hStyle, 2, currentLabel + " W+V %");
             if (hasPrev) {
-                setCellHdr(hdrRow, hStyle, 3, previousLabel + " total");
-                setCellHdr(hdrRow, hStyle, 4, previousLabel + " %");
+                setCellHdr(hdrRow, hStyle, 3, previousLabel + " W+V total");
+                setCellHdr(hdrRow, hStyle, 4, previousLabel + " W+V %");
                 setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)");
             }
 
             int firstDataRow = headerRow + 1;
+            int lastDataRow  = firstDataRow + sorted.size() - 1;
             int r = firstDataRow;
 
             for (String ds : sorted) {
-                int[] m   = combinedCurMetrics.getOrDefault(ds, new int[]{0, 0, 0});
-                int cur   = m[0] + m[1] + m[2];
-                int prev  = combinedPrevTotals.getOrDefault(ds, 0);
-                double curPct  = combinedCurTotal  > 0 ? cur  * 100.0 / combinedCurTotal  : 0.0;
-                double prevPct = combinedPrevTotal > 0 ? prev * 100.0 / combinedPrevTotal : 0.0;
-                int delta = cur - prev;
+                int[] m  = combinedCurMetrics.getOrDefault(ds, new int[]{0, 0, 0});
+                int cur  = m[0] + m[2];   // W+V
+                int prev = combinedPrevTotals.getOrDefault(ds, 0);
 
-                Row row = sheet.createRow(r++);
+                Row row = sheet.createRow(r);
                 row.createCell(0).setCellValue(ds);
                 row.createCell(1).setCellValue(cur);
-                row.createCell(2).setCellValue(curPct);
                 if (hasPrev) {
                     row.createCell(3).setCellValue(prev);
-                    row.createCell(4).setCellValue(prevPct);
-                    row.createCell(5).setCellValue(delta);
                 }
+
+                writePctFormula(row, 2, 1, firstDataRow, lastDataRow);
+                if (hasPrev) {
+                    writePctFormula(row, 4, 3, firstDataRow, lastDataRow);
+                    writeDeltaFormula(row, 5, 1, 3);
+                }
+
+                r++;
             }
 
-            int lastDataRow = r - 1;
             int chartBot = Math.max(blockTop + 22, lastDataRow + 4);
 
-            // Chart 1: current run % distribution.
+            // Chart 1: current run W+V % distribution.
             createDistributionChart(sheet,
-                    "Combined – " + currentLabel + " (% of total hits)",
-                    firstDataRow, lastDataRow, 2, currentLabel,
+                    "Combined – " + currentLabel + " W+V % of total",
+                    firstDataRow, lastDataRow, 2, currentLabel + " W+V %",
                     7, blockTop, 18, chartBot);
 
-            // Chart 2: previous run % distribution.
+            // Chart 2: previous run W+V % distribution.
             if (hasPrev) {
                 createDistributionChart(sheet,
-                        "Combined – " + previousLabel + " (% of total hits)",
-                        firstDataRow, lastDataRow, 4, previousLabel,
+                        "Combined – " + previousLabel + " W+V % of total",
+                        firstDataRow, lastDataRow, 4, previousLabel + " W+V %",
                         19, blockTop, 30, chartBot);
             }
 
@@ -1907,7 +1959,7 @@ public class ValidationExcelWriter implements Closeable {
             if (hasPrev) {
                 createDeltaPctChart(sheet,
                         "Combined – Delta " + currentLabel + " vs " + previousLabel,
-                        firstDataRow, lastDataRow,
+                        firstDataRow, lastDataRow, 5,
                         31, blockTop, 42, chartBot);
             }
 
@@ -1920,11 +1972,27 @@ public class ValidationExcelWriter implements Closeable {
                                                    CellStyle hStyle,
                                                    int blockTop,
                                                    LinkedHashMap<String, Map<String, Double>> allRunCompliance,
+                                                   LinkedHashMap<String, Map<String, Double>> allRunViolCompliance,
+                                                   LinkedHashMap<String, Map<String, Double>> allRunWarnCompliance,
                                                    List<String> sortedRegions) {
+            int bp = writeOneComplianceBlock(sheet, hStyle, blockTop, allRunCompliance, sortedRegions,
+                    "Compliance Rate (W+V = 0) by Region");
+            bp = writeOneComplianceBlock(sheet, hStyle, bp + 2, allRunViolCompliance, sortedRegions,
+                    "Violations Compliance Rate (V = 0) by Region");
+            writeOneComplianceBlock(sheet, hStyle, bp + 2, allRunWarnCompliance, sortedRegions,
+                    "Warnings Compliance Rate (W = 0) by Region");
+        }
+
+        private static int writeOneComplianceBlock(XSSFSheet sheet,
+                                                   CellStyle hStyle,
+                                                   int blockTop,
+                                                   LinkedHashMap<String, Map<String, Double>> data,
+                                                   List<String> sortedRegions,
+                                                   String title) {
             // Title.
             Row titleRow = sheet.createRow(blockTop);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("Compliance Rate by Region");
+            titleCell.setCellValue(title);
             titleCell.setCellStyle(hStyle);
 
             // Header row: Run | R1 | R2 | R3 ...
@@ -1940,7 +2008,7 @@ public class ValidationExcelWriter implements Closeable {
             int firstDataRow = headerRow + 1;
             int r = firstDataRow;
 
-            for (Map.Entry<String, Map<String, Double>> entry : allRunCompliance.entrySet()) {
+            for (Map.Entry<String, Map<String, Double>> entry : data.entrySet()) {
                 Row row = sheet.createRow(r++);
                 row.createCell(0).setCellValue(dateTimeToMonthLabel(entry.getKey()));
                 for (int c = 0; c < sortedRegions.size(); c++) {
@@ -1950,15 +2018,17 @@ public class ValidationExcelWriter implements Closeable {
             }
 
             int lastDataRow = r - 1;
-            int numRuns = allRunCompliance.size();
+            int numRuns = data.size();
             int chartBot = blockTop + Math.max(25, numRuns + 6);
             int chartStartCol = sortedRegions.size() + 2;
 
             createComplianceLineChart(sheet,
-                    "Compliance Rate by Region (%)",
+                    title + " (%)",
                     firstDataRow, lastDataRow,
                     sortedRegions,
                     chartStartCol, blockTop, chartStartCol + 16, chartBot);
+
+            return chartBot;
         }
 
         private static void createComplianceLineChart(XSSFSheet sheet,
@@ -2032,15 +2102,15 @@ public class ValidationExcelWriter implements Closeable {
 
         // ---- compliance rate helpers ----
 
-        private static Map<String, Double> computeComplianceRates(List<Rec> recs) {
-            // region -> dataset -> total hits (W+I+V); good = dataset where total == 0
-            Map<String, Map<String, Integer>> regionDatasetTotal = new LinkedHashMap<>();
+        private static Map<String, Double> computeComplianceRates(
+                List<Rec> recs, java.util.function.ToIntFunction<Rec> metric) {
+            Map<String, Map<String, Integer>> regionDatasetCount = new LinkedHashMap<>();
             for (Rec rec : recs) {
-                regionDatasetTotal.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
-                        .merge(rec.dataset, rec.total(), Integer::sum);
+                regionDatasetCount.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
+                        .merge(rec.dataset, metric.applyAsInt(rec), Integer::sum);
             }
             Map<String, Double> compliance = new LinkedHashMap<>();
-            for (Map.Entry<String, Map<String, Integer>> entry : regionDatasetTotal.entrySet()) {
+            for (Map.Entry<String, Map<String, Integer>> entry : regionDatasetCount.entrySet()) {
                 long good  = entry.getValue().values().stream().filter(v -> v == 0).count();
                 long total = entry.getValue().size();
                 compliance.put(entry.getKey(), total > 0 ? good * 100.0 / total : 0.0);
@@ -2048,14 +2118,14 @@ public class ValidationExcelWriter implements Closeable {
             return compliance;
         }
 
-        private static double computeCombinedComplianceRate(List<Rec> recs) {
-            // Each (region, dataset) pair counted independently; good = total hits == 0.
-            Map<String, Integer> totalPerCombo = new LinkedHashMap<>();
+        private static double computeCombinedComplianceRate(
+                List<Rec> recs, java.util.function.ToIntFunction<Rec> metric) {
+            Map<String, Integer> countPerCombo = new LinkedHashMap<>();
             for (Rec rec : recs) {
-                totalPerCombo.merge(rec.region + "\0" + rec.dataset, rec.total(), Integer::sum);
+                countPerCombo.merge(rec.region + "\0" + rec.dataset, metric.applyAsInt(rec), Integer::sum);
             }
-            long good  = totalPerCombo.values().stream().filter(v -> v == 0).count();
-            long total = totalPerCombo.size();
+            long good  = countPerCombo.values().stream().filter(v -> v == 0).count();
+            long total = countPerCombo.size();
             return total > 0 ? good * 100.0 / total : 0.0;
         }
 
@@ -2095,17 +2165,22 @@ public class ValidationExcelWriter implements Closeable {
 
                 if (!newFormatNames.isEmpty()) {
                     // New format: cols Region=0, Timestamp=1, Dataset=2, Warnings=3, Infos=4,
-                    // Violations=5, Total=6. Sheet names may be month labels or datetimes.
-                    // Sort: datetime-named sheets sort correctly; month labels sort lexically.
-                    newFormatNames.sort(Comparator.naturalOrder());
+                    // Violations=5, Total=6. Sheet names are month labels (e.g. "July 2026").
+                    // Preserve workbook order — the previous file's sheets are already in
+                    // chronological order (oldest first). Sorting by name would break for months
+                    // because alphabetical order != chronological order ("June" > "July").
                     for (String name : newFormatNames) {
                         historicalSheets.put(name, readRunSheet(prevWb.getSheet(name)));
                     }
-                    // Most recent sheet (last alphabetically) provides the comparison baseline.
+                    // The last sheet in workbook order is the most recent previous run.
                     String mostRecent = newFormatNames.get(newFormatNames.size() - 1);
                     for (Rec rec : historicalSheets.get(mostRecent)) {
                         previousTotals.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
-                                .merge(rec.dataset, rec.total(), Integer::sum);
+                                .merge(rec.dataset, rec.warnings + rec.violations, Integer::sum);  // W+V only
+                        previousWarnings.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
+                                .merge(rec.dataset, rec.warnings, Integer::sum);
+                        previousViolations.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
+                                .merge(rec.dataset, rec.violations, Integer::sum);
                     }
 
                 } else if (!legacyNames.isEmpty()) {
@@ -2131,7 +2206,11 @@ public class ValidationExcelWriter implements Closeable {
                             recs.add(new Rec(regionName, timestamp, dataset,
                                     warnings, infos, violations));
                             previousTotals.computeIfAbsent(regionName, k -> new LinkedHashMap<>())
-                                    .merge(dataset, warnings + infos + violations, Integer::sum);
+                                    .merge(dataset, warnings + violations, Integer::sum);
+                            previousWarnings.computeIfAbsent(regionName, k -> new LinkedHashMap<>())
+                                    .merge(dataset, warnings, Integer::sum);
+                            previousViolations.computeIfAbsent(regionName, k -> new LinkedHashMap<>())
+                                    .merge(dataset, violations, Integer::sum);
                         }
                     }
                     if (!recs.isEmpty()) {
