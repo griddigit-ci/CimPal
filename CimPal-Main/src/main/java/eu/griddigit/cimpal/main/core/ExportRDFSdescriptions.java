@@ -45,7 +45,7 @@ public class ExportRDFSdescriptions {
             Resource resItem = i.next();
             int mult =0;
 
-            rdfsItem.add(resItem.toString().split("#", 2)[1]);
+            rdfsItem.add(resItem.isAnon() ? resItem.toString() : resItem.getLocalName());
 
             try {
                 String rdfsComment = resItem.getRequiredProperty(RDFS.comment).getObject().toString().split("\\^\\^", 0)[0];

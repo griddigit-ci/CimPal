@@ -92,6 +92,8 @@ public class ExportSHACLInformation {
             //iterate on all PropertyShape
             for (StmtIterator i = model.listStatements(null, RDF.type, SH.PropertyShape); i.hasNext(); ) {
                 Statement stmtPS = i.next();
+                // skip deactivated shapes and helper shapes (sh:not / sh:qualifiedValueShape guards) that have no sh:name
+                if (!model.listStatements(stmtPS.getSubject(), SH.name, (RDFNode) null).hasNext()) continue;
                 propertyShapeID.add(model.getNsURIPrefix(stmtPS.getSubject().getNameSpace()) + ":" + stmtPS.getSubject().getLocalName());
                 String name = model.listStatements(stmtPS.getSubject(), SH.name, (RDFNode) null).next().getObject().toString();
                 propertyShapeName.add(name);
