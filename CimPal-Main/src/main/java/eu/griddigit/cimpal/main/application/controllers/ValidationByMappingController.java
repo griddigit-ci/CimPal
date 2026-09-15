@@ -268,6 +268,7 @@ public class ValidationByMappingController {
 
         initializeHelpTooltips();
         restoreRememberedPaths();
+        restoreRememberedSettings();
     }
 
     /**
@@ -293,6 +294,49 @@ public class ValidationByMappingController {
                 file -> previousComparisonCsvFile = file);
         PathMemory.bind(tfDatatypeMapFile, "tab.validationByMapping.datatypeMap",
                 file -> datatypeMapFile = file);
+    }
+
+    /**
+     * Restores ChoiceBox selections and the custom base-URI field. Runs after path restore so
+     * the workflow controls reflect the saved state immediately. Listeners are added here (not
+     * in initialize) so that the initial programmatic selections do not trigger premature saves.
+     */
+    private void restoreRememberedSettings() {
+        // Validation workflow
+        String savedWorkflow = PathMemory.recallValue("tab.validationByMapping.workflow", null);
+        if (savedWorkflow != null && cbValidationWorkflow.getItems().contains(savedWorkflow)) {
+            cbValidationWorkflow.getSelectionModel().select(savedWorkflow);
+        }
+        cbValidationWorkflow.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldVal, newVal) -> PathMemory.rememberValue(
+                        "tab.validationByMapping.workflow", newVal));
+
+        // Datatype map
+        String savedDatatypeMap = PathMemory.recallValue("tab.validationByMapping.datatypeMapChoice", null);
+        if (savedDatatypeMap != null && cbDatatypeMap.getItems().contains(savedDatatypeMap)) {
+            cbDatatypeMap.getSelectionModel().select(savedDatatypeMap);
+        }
+        cbDatatypeMap.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldVal, newVal) -> PathMemory.rememberValue(
+                        "tab.validationByMapping.datatypeMapChoice", newVal));
+
+        // Base URI preset choice
+        String savedBaseUri = PathMemory.recallValue("tab.validationByMapping.baseUriChoice", null);
+        if (savedBaseUri != null && cbBaseUri.getItems().contains(savedBaseUri)) {
+            cbBaseUri.getSelectionModel().select(savedBaseUri);
+        }
+        cbBaseUri.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldVal, newVal) -> PathMemory.rememberValue(
+                        "tab.validationByMapping.baseUriChoice", newVal));
+
+        // Custom base URI text (only meaningful when "Other" is selected)
+        String savedBaseUriText = PathMemory.recallValue("tab.validationByMapping.baseUriText", null);
+        if (savedBaseUriText != null && !savedBaseUriText.isBlank()) {
+            tfXmlBaseUri.setText(savedBaseUriText);
+        }
+        tfXmlBaseUri.textProperty().addListener((obs, oldVal, newVal) ->
+                PathMemory.rememberValue("tab.validationByMapping.baseUriText",
+                        newVal == null ? "" : newVal));
     }
 
     /** Reveals the file field and Browse button only for the "Other" datatype map. */
