@@ -501,8 +501,14 @@ public class ValidationExcelWriter implements Closeable {
             return;
         }
 
+        // ClassCount constraints are global (not per-dataset); aggregate under "All".
+        String effectiveDataset = safe(res.getConstraintComponent())
+                .toLowerCase(Locale.ROOT).contains("classcount")
+                ? "All"
+                : safe(dataset);
+
         ConstraintStatisticKey key = new ConstraintStatisticKey(
-                safe(dataset),
+                effectiveDataset,
                 safe(res.getPath()),
                 safe(res.getSourceShape()),
                 safe(res.getConstraintComponent()),
@@ -1636,15 +1642,15 @@ public class ValidationExcelWriter implements Closeable {
                 int headerRow = blockTop + 1;
                 Row hdrRow = sheet.createRow(headerRow);
                 setCellHdr(hdrRow, hStyle, 0, "Dataset");
-                setCellHdr(hdrRow, hStyle, 1, currentLabel + " W+V total");
-                setCellHdr(hdrRow, hStyle, 2, currentLabel + " W+V %");
+                setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total");
+                setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %");
                 setCellHdr(hdrRow, hStyle, 3, currentLabel + " Warnings");
                 setCellHdr(hdrRow, hStyle, 4, currentLabel + " Warnings %");
                 setCellHdr(hdrRow, hStyle, 5, currentLabel + " Violations");
                 setCellHdr(hdrRow, hStyle, 6, currentLabel + " Violations %");
                 if (hasPrev) {
-                    setCellHdr(hdrRow, hStyle, 7, previousLabel + " W+V total");
-                    setCellHdr(hdrRow, hStyle, 8, previousLabel + " W+V %");
+                    setCellHdr(hdrRow, hStyle, 7, previousLabel + " Warnings+Violations total");
+                    setCellHdr(hdrRow, hStyle, 8, previousLabel + " Warnings+Violations %");
                     setCellHdr(hdrRow, hStyle, 9, "Delta (cur−prev)");
                 }
 
@@ -1688,8 +1694,8 @@ public class ValidationExcelWriter implements Closeable {
                 int chartBot = Math.max(blockTop + 22, lastDataRow + 4);
 
                 // Chart 1: W+V % distribution (col 2)
-                createDistributionChart(sheet, region + " – " + currentLabel + " W+V % of total",
-                        firstDataRow, lastDataRow, 2, currentLabel + " W+V %",
+                createDistributionChart(sheet, region + " – " + currentLabel + " Warnings+Violations % of total",
+                        firstDataRow, lastDataRow, 2, currentLabel + " Warnings+Violations %",
                         11, blockTop, 22, chartBot);
 
                 // Chart 2: Warnings % (col 4)
@@ -1798,7 +1804,7 @@ public class ValidationExcelWriter implements Closeable {
             // No legend — single series, title is self-explanatory.
 
             XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
-            bottomAxis.setTitle("Profile");
+            bottomAxis.setTitle("Dataset");
             XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
             leftAxis.setTitle("% of total hits (all profiles = 100%)");
             leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
@@ -1906,11 +1912,11 @@ public class ValidationExcelWriter implements Closeable {
             int headerRow = blockTop + 1;
             Row hdrRow = sheet.createRow(headerRow);
             setCellHdr(hdrRow, hStyle, 0, "Dataset");
-            setCellHdr(hdrRow, hStyle, 1, currentLabel + " W+V total");
-            setCellHdr(hdrRow, hStyle, 2, currentLabel + " W+V %");
+            setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total");
+            setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %");
             if (hasPrev) {
-                setCellHdr(hdrRow, hStyle, 3, previousLabel + " W+V total");
-                setCellHdr(hdrRow, hStyle, 4, previousLabel + " W+V %");
+                setCellHdr(hdrRow, hStyle, 3, previousLabel + " Warnings+Violations total");
+                setCellHdr(hdrRow, hStyle, 4, previousLabel + " Warnings+Violations %");
                 setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)");
             }
 
@@ -1943,15 +1949,15 @@ public class ValidationExcelWriter implements Closeable {
 
             // Chart 1: current run W+V % distribution.
             createDistributionChart(sheet,
-                    "Combined – " + currentLabel + " W+V % of total",
-                    firstDataRow, lastDataRow, 2, currentLabel + " W+V %",
+                    "Combined – " + currentLabel + " Warnings+Violations % of total",
+                    firstDataRow, lastDataRow, 2, currentLabel + " Warnings+Violations %",
                     7, blockTop, 18, chartBot);
 
             // Chart 2: previous run W+V % distribution.
             if (hasPrev) {
                 createDistributionChart(sheet,
-                        "Combined – " + previousLabel + " W+V % of total",
-                        firstDataRow, lastDataRow, 4, previousLabel + " W+V %",
+                        "Combined – " + previousLabel + " Warnings+Violations % of total",
+                        firstDataRow, lastDataRow, 4, previousLabel + " Warnings+Violations %",
                         19, blockTop, 30, chartBot);
             }
 
@@ -1976,11 +1982,11 @@ public class ValidationExcelWriter implements Closeable {
                                                    LinkedHashMap<String, Map<String, Double>> allRunWarnCompliance,
                                                    List<String> sortedRegions) {
             int bp = writeOneComplianceBlock(sheet, hStyle, blockTop, allRunCompliance, sortedRegions,
-                    "Compliance Rate (W+V = 0) by Region");
+                    "Compliance Rate (Warnings and Violations) by Region");
             bp = writeOneComplianceBlock(sheet, hStyle, bp + 2, allRunViolCompliance, sortedRegions,
-                    "Violations Compliance Rate (V = 0) by Region");
+                    "Violations Compliance Rate (Violations) by Region");
             writeOneComplianceBlock(sheet, hStyle, bp + 2, allRunWarnCompliance, sortedRegions,
-                    "Warnings Compliance Rate (W = 0) by Region");
+                    "Warnings Compliance Rate (Warnings) by Region");
         }
 
         private static int writeOneComplianceBlock(XSSFSheet sheet,

@@ -244,6 +244,36 @@ public final class PathMemory {
         });
     }
 
+    /**
+     * Saves an arbitrary string value (not a file path) under {@code key} in a dedicated
+     * {@code settings} child node, separate from the path store so the two can be wiped
+     * independently.
+     */
+    public static void rememberValue(String key, String value) {
+        Preferences root = MainController.prefs;
+        if (root == null || key == null) return;
+        try {
+            Preferences node = root.node("settings");
+            if (value == null || value.isBlank()) {
+                node.remove(key);
+            } else {
+                node.put(key, value);
+            }
+        } catch (RuntimeException ignore) {}
+    }
+
+    /** Returns the string saved by {@link #rememberValue}, or {@code defaultValue} if absent. */
+    public static String recallValue(String key, String defaultValue) {
+        Preferences root = MainController.prefs;
+        if (root == null || key == null) return defaultValue;
+        try {
+            String stored = root.node("settings").get(key, null);
+            return stored != null ? stored : defaultValue;
+        } catch (RuntimeException ignore) {
+            return defaultValue;
+        }
+    }
+
     /** How many paths are currently remembered. Shown in Preferences, Remembered locations. */
     public static int count() {
         Preferences store = store();
