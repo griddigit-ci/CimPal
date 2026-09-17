@@ -1,5 +1,6 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
+import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.application.services.TaskInputElementsFactory;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.main.gui.PathMemory;
@@ -17,6 +18,7 @@ import javafx.stage.DirectoryChooser;
 import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
+import java.util.prefs.Preferences;
 
 public class TaskInputController  implements Initializable, IController {
 
@@ -37,13 +39,22 @@ public class TaskInputController  implements Initializable, IController {
         taskInputElementsFactory = new TaskInputElementsFactory();
         taskInputElementsFactory.constructTaskInputElements(vBoxForTaskInputs, context);
 
-        if (!CimPalWizardController.prefs.get("DefOutputDir", "").equals("")){
-            File outputDir = new File(CimPalWizardController.prefs.get("DefOutputDir",""));
-            context.setOutputDirectory(outputDir);
-        }
-        if (!CimPalWizardController.prefs.get("DefWorkingDir", "").equals("")){
-            File workingDir = new File(CimPalWizardController.prefs.get("DefWorkingDir",""));
-            context.setWorkingDirectory(workingDir);
+        // These defaults used to be read from CimPalWizardController.prefs. That controller is
+        // bound to no FXML and constructed by no code, so its initialize() - the only place that
+        // assigns the static - never runs and the field is always null: opening this page threw.
+        // MainController.prefs is the live handle on the same "CimPal" preferences node, so
+        // defaults stored by earlier versions are still picked up. It stays null if reading the
+        // preferences store failed at startup, hence the guard.
+        Preferences prefs = MainController.prefs;
+        if (prefs != null) {
+            String outputDir = prefs.get("DefOutputDir", "");
+            if (!outputDir.isEmpty()) {
+                context.setOutputDirectory(new File(outputDir));
+            }
+            String workingDir = prefs.get("DefWorkingDir", "");
+            if (!workingDir.isEmpty()) {
+                context.setWorkingDirectory(new File(workingDir));
+            }
         }
 
         saveInZip = saveToZip.isSelected();

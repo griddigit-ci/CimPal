@@ -1,6 +1,6 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
-import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.stage.FileChooser;
 import org.apache.poi.xssf.usermodel.XSSFRow;
@@ -91,7 +91,12 @@ public class ExportFactory {
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
-            CimPalWizardController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            // Same dead-static problem as the wizard's task input page: CimPalWizardController is
+            // bound to no FXML and never constructed, so its prefs field is null and saving a
+            // QoCDC export threw. MainController.prefs is the live handle on the same node.
+            if (MainController.prefs != null) {
+                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            }
             PathMemory.remember("dialog.qocdcXlsxExport", saveFile);
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);

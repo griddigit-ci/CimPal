@@ -224,7 +224,7 @@ public class WizardContext {
     }
 
     // Save instance model based
-    public void saveInstanceModel(HashMap<String, Object> saveProperties, String taskName, boolean saveWorkingDir) throws IOException {
+    public void saveInstanceModel(Map<String, Object> saveProperties, String taskName, boolean saveWorkingDir) throws IOException {
         File pathToSaveInstanceModel;
         if (null != taskName) {
             String folderName = taskName.replaceAll("[^a-zA-Z0-9]", " ");
