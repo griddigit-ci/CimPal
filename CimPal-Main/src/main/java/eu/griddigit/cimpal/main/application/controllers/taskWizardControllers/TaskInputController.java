@@ -39,12 +39,16 @@ public class TaskInputController  implements Initializable, IController {
         taskInputElementsFactory = new TaskInputElementsFactory();
         taskInputElementsFactory.constructTaskInputElements(vBoxForTaskInputs, context);
 
-        // These defaults used to be read from CimPalWizardController.prefs. That controller is
-        // bound to no FXML and constructed by no code, so its initialize() - the only place that
-        // assigns the static - never runs and the field is always null: opening this page threw.
-        // MainController.prefs is the live handle on the same "CimPal" preferences node, so
-        // defaults stored by earlier versions are still picked up. It stays null if reading the
-        // preferences store failed at startup, hence the guard.
+        // These defaults used to be read from CimPalWizardController.prefs, a leftover of the
+        // standalone CimPal Wizard. That controller was bound to no FXML and constructed by no
+        // code, so its initialize() - the only place that assigned the static - never ran and the
+        // field was always null: opening this page threw. It has since been deleted.
+        // MainController.prefs is the live handle on the same "CimPal" preferences node, so the
+        // keys written by the old standalone wizard are still honoured. Nothing writes them any
+        // more: the two directories are chosen on this page and remembered per dialog by
+        // PathMemory, so on a fresh profile both reads fall through and validateInputs() asks for
+        // an output directory. prefs stays null if reading the preferences store failed at
+        // startup, hence the guard.
         Preferences prefs = MainController.prefs;
         if (prefs != null) {
             String outputDir = prefs.get("DefOutputDir", "");

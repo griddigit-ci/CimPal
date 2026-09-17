@@ -91,9 +91,10 @@ public class ExportFactory {
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
-            // Same dead-static problem as the wizard's task input page: CimPalWizardController is
-            // bound to no FXML and never constructed, so its prefs field is null and saving a
-            // QoCDC export threw. MainController.prefs is the live handle on the same node.
+            // Same dead-static problem as the wizard's task input page: CimPalWizardController
+            // was bound to no FXML and never constructed, so its prefs field was null and saving
+            // a QoCDC export threw. That class is now deleted; MainController.prefs is the live
+            // handle on the same node.
             if (MainController.prefs != null) {
                 MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
             }
