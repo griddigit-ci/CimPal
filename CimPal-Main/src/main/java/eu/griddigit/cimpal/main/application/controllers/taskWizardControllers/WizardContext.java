@@ -254,6 +254,7 @@ public class WizardContext {
             String tab = saveProperties.get("tab").toString();
             String relativeURIs = saveProperties.get("relativeURIs").toString();
             String showXmlEncoding = saveProperties.get("showXmlEncoding").toString();
+            String showXmlBaseDeclaration = saveProperties.get("showXmlBaseDeclaration").toString();
             String xmlBase = this.dataGeneratorModel.getRdfsProfileVersion().getBaseNamespace();
             RDFFormat rdfFormat = (RDFFormat) saveProperties.get("rdfFormat");
             boolean useAboutRules = (boolean) saveProperties.get("useAboutRules");   //switch to trigger file chooser and adding the property
@@ -282,6 +283,7 @@ public class WizardContext {
                         properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
                         properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
                         properties.put("sortRDF",sortRDF);
+                        properties.put("showXmlBaseDeclaration", showXmlBaseDeclaration);
                         //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
                         //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
                         //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
