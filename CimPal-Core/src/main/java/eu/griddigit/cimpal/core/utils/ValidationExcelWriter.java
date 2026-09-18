@@ -65,7 +65,7 @@ public class ValidationExcelWriter implements Closeable {
 
     private static final String[] TIMESTAMP_CONSTRAINT_HEADER = new String[]{
             "Country", "Timestamp", "Report file",
-            "Constraint file", "Source", "Constraint Component", "Message", "Severity", "Count"
+            "Constraint file", "Source", "Constraint Component", "Description", "Message", "Severity", "Count"
     };
 
     private static final String[] INPUT_COMPLETENESS_HEADER = new String[]{
@@ -985,6 +985,7 @@ public class ValidationExcelWriter implements Closeable {
                     reportConstraintFile,
                     safe(res.getSourceShape()),
                     safe(res.getConstraintComponent()),
+                    safe(res.getDescription()),
                     cleanValidationMessage(res.getMessage()),
                     safe(res.getSeverity())
             );
@@ -1010,9 +1011,10 @@ public class ValidationExcelWriter implements Closeable {
             row.createCell(3).setCellValue(key.constraintFile);
             row.createCell(4).setCellValue(key.source);
             row.createCell(5).setCellValue(key.constraintComponent);
-            row.createCell(6).setCellValue(key.message);
-            row.createCell(7).setCellValue(key.severity);
-            row.createCell(8).setCellValue(entry.getValue());
+            row.createCell(6).setCellValue(key.description);
+            row.createCell(7).setCellValue(key.message);
+            row.createCell(8).setCellValue(key.severity);
+            row.createCell(9).setCellValue(entry.getValue());
         }
     }
 
@@ -1056,6 +1058,8 @@ public class ValidationExcelWriter implements Closeable {
         private final String constraintFile;
         private final String source;
         private final String constraintComponent;
+        private final String description;
+        /** Not part of the grouping key — stores the first message seen for this description group. */
         private final String message;
         private final String severity;
 
@@ -1065,6 +1069,7 @@ public class ValidationExcelWriter implements Closeable {
                                        String constraintFile,
                                        String source,
                                        String constraintComponent,
+                                       String description,
                                        String message,
                                        String severity) {
             this.country = country;
@@ -1073,6 +1078,7 @@ public class ValidationExcelWriter implements Closeable {
             this.constraintFile = constraintFile;
             this.source = source;
             this.constraintComponent = constraintComponent;
+            this.description = description;
             this.message = message;
             this.severity = severity;
         }
@@ -1088,13 +1094,13 @@ public class ValidationExcelWriter implements Closeable {
                     && Objects.equals(constraintFile, that.constraintFile)
                     && Objects.equals(source, that.source)
                     && Objects.equals(constraintComponent, that.constraintComponent)
-                    && Objects.equals(message, that.message)
+                    && Objects.equals(description, that.description)
                     && Objects.equals(severity, that.severity);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(country, timestamp, reportFile, constraintFile, source, constraintComponent, message, severity);
+            return Objects.hash(country, timestamp, reportFile, constraintFile, source, constraintComponent, description, severity);
         }
     }
 
