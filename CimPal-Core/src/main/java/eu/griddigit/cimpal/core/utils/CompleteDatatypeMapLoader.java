@@ -49,7 +49,6 @@ public final class CompleteDatatypeMapLoader {
         props.load(in);
 
         Map<String, RDFDatatype> out = new HashMap<>();
-        TypeMapper.reset();
         TypeMapper tm = TypeMapper.getInstance();
 
         for (String key : props.stringPropertyNames()) {
@@ -57,10 +56,8 @@ public final class CompleteDatatypeMapLoader {
             String dtUri = extractDatatypeUri(raw);
             if (dtUri == null || dtUri.isBlank()) continue;
 
-            RDFDatatype dt = tm.getTypeByName(dtUri);
+            RDFDatatype dt = tm.getSafeTypeByName(dtUri);
             if (dt == null) {
-                // If unknown datatype URI, skip (or log).
-                // System.err.println("[WARN] Unknown datatype URI: " + dtUri + " for key " + key);
                 continue;
             }
             out.put(key, dt);
