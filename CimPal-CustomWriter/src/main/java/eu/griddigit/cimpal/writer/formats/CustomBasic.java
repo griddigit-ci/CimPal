@@ -92,7 +92,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
     private void writeRDFHeader(Model model, PrintWriter writer) {
         String xmlns = xmlnsDecl();
         writer.print("<" + rdfEl("RDF") + xmlns);
-        if (null != xmlBase && !xmlBase.isEmpty() && this.showXmlBaseDeclaration.equals("true"))
+        if (null != xmlBase && !xmlBase.isEmpty() && "true".equals(this.showXmlBaseDeclaration))
             writer.print("\n  xml:base=" + substitutedAttribute(xmlBase));
         writer.println(" > ");
     }
