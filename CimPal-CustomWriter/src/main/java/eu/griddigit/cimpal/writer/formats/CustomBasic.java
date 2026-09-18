@@ -100,7 +100,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
     protected void writeRDFStatements(Model model, PrintWriter writer) {
         writePleasingRDFStatements(model, writer);
 
-        if (this.sortRDF.equals("true")) {
+        if ("true".equals(this.sortRDF)) {
             List<Resource> subjects = getSortedSubjects(model);
 
             Set<Resource> writtenSubjects = new HashSet<>();
@@ -129,7 +129,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
 
         List<Resource> subjects = new ArrayList<>(subjectSet);
 
-        if (this.instanceData.equals("true")) {
+        if ("true".equals(this.instanceData)) {
             subjects.sort(
                     Comparator.comparing(subject -> sortKey(model, subject))
             );
@@ -176,7 +176,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
             localName = resource.getURI();
         }
 
-        if (this.sortRDFprefix.equals("true")) {
+        if ("true".equals(this.sortRDFprefix)) {
             String prefix = model.getNsURIPrefix(resource.getNameSpace());
             if (prefix != null && !prefix.isEmpty()) {
                 return prefix + ":" + localName;
@@ -213,7 +213,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
         }
 
         writeDescriptionHeader(subject, writer);
-        if (this.sortRDF.equals("true")) {
+        if ("true".equals(this.sortRDF)) {
             //get list of all triples of the rdf:type and these need to be sorted by object
             Set<Map.Entry<String, Property>> entries = CustomBasicPretty.sortRDFprepare(model, subject, this.sortRDFprefix);
             for (Map.Entry<String, Property> entry : entries) {
@@ -320,7 +320,7 @@ public class CustomBasic extends CustomBaseXMLWriter {
                     url = url.substring(1);//deletes the leading #
                 }
             }
-            if (instanceData.equals("true")) {
+            if ("true".equals(instanceData)) {
                 if (!url.contains("urn:uuid:") & url.startsWith("http")) {
                     if (url.contains("#")) {
                         url = r.getLocalName();
