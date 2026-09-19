@@ -93,7 +93,7 @@
                   <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfsToShacl" text="RDFS to SHACL"/><MenuItem mnemonicParsing="false" onAction="#actionShowConstraints" text="Constraints Operations"/></items>
                </MenuButton>
                <MenuButton mnemonicParsing="false" text="RDF">
-                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfComparison" text="Comparison"/></items>
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowRdfsUnion" text="RDFS Union"/></items>
                </MenuButton>
                <MenuButton mnemonicParsing="false" text="Dataset">
                   <items><MenuItem mnemonicParsing="false" onAction="#actionShowDatasetComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowGenerate" text="Generate"/><MenuItem mnemonicParsing="false" onAction="#actionShowTaskWizard" text="Task Wizard"/><MenuItem mnemonicParsing="false" onAction="#actionShowValidation" text="SHACL Validation"/></items>
@@ -103,6 +103,7 @@
                <tabs>
                   <Tab fx:id="tabRDFVisualisation" text="Visualisation"/>
                   <Tab fx:id="tabRDFConvert" text="Convert"/>
+                  <Tab fx:id="tabRdfsUnion" text="RDFS Union"/>
                   <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
                   <Tab fx:id="tabAiAssistant" text="AI Assistant"/>
                   <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>

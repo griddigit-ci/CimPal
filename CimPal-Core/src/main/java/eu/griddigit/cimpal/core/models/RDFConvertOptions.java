@@ -1,9 +1,11 @@
 package eu.griddigit.cimpal.core.models;
 
 import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.graph.Node;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 public class RDFConvertOptions {
     public enum RDFFormats {
@@ -33,6 +35,10 @@ public class RDFConvertOptions {
     private final String convertInstanceData;
     private final boolean modelUnionFixPackage;
     private final boolean keepOntologyHeaders;
+    private final String detailedUnionPackageUri;
+    private final String detailedUnionOntologyUri;
+    private final String detailedUnionDeletionStereotype;
+    private final Map<String, List<Node>> detailedUnionOntologyMetadata;
 
     // private constructor takes the Builder
     private RDFConvertOptions(Builder b) {
@@ -59,6 +65,10 @@ public class RDFConvertOptions {
         this.convertInstanceData = b.convertInstanceData;
         this.modelUnionFixPackage = b.modelUnionFixPackage;
         this.keepOntologyHeaders = b.keepOntologyHeaders;
+        this.detailedUnionPackageUri = b.detailedUnionPackageUri;
+        this.detailedUnionOntologyUri = b.detailedUnionOntologyUri;
+        this.detailedUnionDeletionStereotype = b.detailedUnionDeletionStereotype;
+        this.detailedUnionOntologyMetadata = Map.copyOf(b.detailedUnionOntologyMetadata);
     }
 
     // static entry-point for the builder
@@ -158,6 +168,22 @@ public class RDFConvertOptions {
         return keepOntologyHeaders;
     }
 
+    /** Exact URI (or a prefix-qualified identifier) for the Detailed Union package. */
+    public String getDetailedUnionPackageUri() {
+        return detailedUnionPackageUri;
+    }
+
+    /** Exact URI (or a prefix-qualified identifier) for the Detailed Union ontology. */
+    public String getDetailedUnionOntologyUri() {
+        return detailedUnionOntologyUri;
+    }
+
+    /** Explicit Detailed Union deletion stereotype; blank requests automatic detection. */
+    public String getDetailedUnionDeletionStereotype() {
+        return detailedUnionDeletionStereotype;
+    }
+    public Map<String, List<Node>> getDetailedUnionOntologyMetadata() { return detailedUnionOntologyMetadata; }
+
 
     // ============ the Builder ============
 
@@ -186,6 +212,10 @@ public class RDFConvertOptions {
          private String convertInstanceData = null;
          private boolean modelUnionFixPackage = false;
          private boolean keepOntologyHeaders = true;
+         private String detailedUnionPackageUri = "";
+         private String detailedUnionOntologyUri = "";
+         private String detailedUnionDeletionStereotype = "";
+         private Map<String, List<Node>> detailedUnionOntologyMetadata = Map.of();
 
         public Builder sourceFile(File sourceFile) {
             this.sourceFile = sourceFile;
@@ -300,6 +330,25 @@ public class RDFConvertOptions {
 
         public Builder keepOntologyHeaders(boolean keep) {
             this.keepOntologyHeaders = keep;
+            return this;
+        }
+
+        public Builder detailedUnionPackageUri(String uri) {
+            this.detailedUnionPackageUri = uri == null ? "" : uri;
+            return this;
+        }
+
+        public Builder detailedUnionOntologyUri(String uri) {
+            this.detailedUnionOntologyUri = uri == null ? "" : uri;
+            return this;
+        }
+
+        public Builder detailedUnionDeletionStereotype(String stereotype) {
+            this.detailedUnionDeletionStereotype = stereotype == null ? "" : stereotype;
+            return this;
+        }
+        public Builder detailedUnionOntologyMetadata(Map<String, List<Node>> metadata) {
+            this.detailedUnionOntologyMetadata = metadata == null ? Map.of() : metadata;
             return this;
         }
 

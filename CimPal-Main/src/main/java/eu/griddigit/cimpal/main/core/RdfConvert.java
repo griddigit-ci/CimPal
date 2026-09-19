@@ -39,7 +39,12 @@ public class RdfConvert {
 //        filechooserS.setInitialFileName(title.split(": ", 2)[1]);
 //        filechooserS.setInitialDirectory(new File(MainController.prefs.get("LastWorkingFolder","")));
 //        filechooserS.setTitle(title);
-        File saveFile = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom(extensionName, List.of(extension), title, title.split(": ", 2)[1]);
+        // Most existing callers include a descriptive file name after ": ", but
+        // newer workflows (such as RDFS Union) use a concise dialog title.
+        // Derive an initial filename safely in either case.
+        String[] titleParts = title.split(": ", 2);
+        String initialFileName = titleParts.length > 1 ? titleParts[1] : title;
+        File saveFile = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom(extensionName, List.of(extension), title, initialFileName);
         try {
 //            try {
 //                saveFile = filechooserS.showSaveDialog(null);
