@@ -1070,7 +1070,15 @@ public class RDFVisualisationController implements Initializable {
         Thread treeTask = new Thread(() -> {
             try {
                 PowsyblBridge.IidmElement root = powsybl.iidmTree();
-                Platform.runLater(() -> { iidmRoot = root; showIidmTree(); resetProgressBar(); setStatus("Browsing the prepared IIDM network."); });
+                Platform.runLater(() -> {
+                    iidmRoot = root;
+                    showIidmTree();
+                    resetProgressBar();
+                    setStatus("Browsing the prepared IIDM network.");
+                    // The Table view may have been selected while the IIDM tree was loading.
+                    // Render its current state now rather than leaving a stale empty table.
+                    if (tableViewVisible) refreshIidmTable();
+                });
             } catch (Exception e) { Platform.runLater(() -> { cbBrowserMode.setValue(BrowserMode.RDF); showRdfBrowser(); resetProgressBar(); setStatus("Could not build PowsyBl browser: " + describe(e)); }); }
         }, "powsybl-iidm-browser");
         treeTask.setDaemon(true); treeTask.start();
@@ -1372,6 +1380,7 @@ public class RDFVisualisationController implements Initializable {
     private void refreshIidmTable() {
         TreeItem<NodeValue> selected = tvGraph.getSelectionModel().getSelectedItem();
         if (selected == null || selected.getValue() == null || selected.getValue().raw().isBlank()) {
+            tableResults = new SparqlTools.QueryResults(List.of(), List.of());
             tvGraphData.getColumns().clear(); tvGraphData.getItems().clear();
             setStatus("Select an IIDM element in the PowsyBl Browser to inspect its properties.");
             return;
@@ -1384,10 +1393,14 @@ public class RDFVisualisationController implements Initializable {
                 Set<String> columns = new LinkedHashSet<>(); columns.add("Identifier");
                 for (String id : ids) {
                     Map<String, String> row = new LinkedHashMap<>();
+                    row.put("Identifier", id);
                     for (PowsyblBridge.Property property : powsybl.iidmProperties(id)) row.put(property.name(), property.value());
                     columns.addAll(row.keySet()); rows.add(row);
                 }
-                Platform.runLater(() -> displayTableResults(new SparqlTools.QueryResults(new ArrayList<>(columns), rows)));
+                Platform.runLater(() -> {
+                    tableResults = new SparqlTools.QueryResults(new ArrayList<>(columns), rows);
+                    displayTableResults(tableResults);
+                });
             } catch (Exception e) { Platform.runLater(() -> setStatus("Could not read IIDM properties: " + describe(e))); }
         }, "powsybl-iidm-properties");
         task.setDaemon(true); task.start();
@@ -1634,11 +1647,6 @@ public class RDFVisualisationController implements Initializable {
     private void displayTableResults(SparqlTools.QueryResults results) {
         tvGraphData.getColumns().clear();
         tvGraphData.getItems().clear();
-        if (!cbAutoRefresh.isSelected()) {
-            tableViewSummary = "Automatic table updates are paused.";
-            updateViewStatus();
-            return;
-        }
         for (String name : results.columns) {
             TableColumn<Map<String, String>, String> column = new TableColumn<>(name);
             column.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
