@@ -2,9 +2,11 @@ package eu.griddigit.cimpal.core.converters;
 
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
+import com.apicatalog.jsonld.JsonLdOptions;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.sparql.util.Context;
+import org.apache.jena.riot.system.jsonld.TitaniumJsonLdOptions;
 import org.apache.jena.vocabulary.*;
 import org.topbraid.shacl.vocabulary.SH;
 
@@ -42,12 +44,6 @@ public class RDFConverter {
         String configuredOntologyUri = options.getDetailedUnionOntologyUri().trim();
         String configuredDeletionStereotype = options.getDetailedUnionDeletionStereotype().trim();
 
-        Lang rdfSourceFormat = switch (sourceFormat) {
-            case RDFConvertOptions.RDFFormats.RDFXML -> Lang.RDFXML;
-            case RDFConvertOptions.RDFFormats.TURTLE -> Lang.TURTLE;
-            case RDFConvertOptions.RDFFormats.JSONLD -> Lang.JSONLD;
-            default -> throw new IllegalStateException("Unexpected value: " + sourceFormat);
-        };
         List<File> modelFiles = new LinkedList<File>();
         boolean keepHeaders = options.isKeepOntologyHeaders();
         if (!modelUnionFlagDetailed) {
@@ -196,7 +192,12 @@ public class RDFConverter {
             model.setNsPrefixes(prefixMap);
         } else {
             // load all models
-            model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles, xmlBase, rdfSourceFormat, false, false).get("unionModel");
+            model = ModelFactory.createDefaultModel();
+            for (File modelFile : modelFiles) {
+                // The source syntax is inferred per file by Jena. This permits a mixed batch
+                // (for example RDF/XML, Turtle and JSON-LD) without a source-format control.
+                RDFDataMgr.read(model, modelFile.toURI().toString());
+            }
         }
 
 
@@ -583,6 +584,7 @@ public class RDFConverter {
         }
 
         RDFConvertOptions.RDFFormats targetFormat = options.getTargetFormat();
+        RDFFormat jenaTargetFormat = options.getJenaTargetFormat();
         RDFFormat rdfFormat = options.getRdfXmlFormat();
         String xmlBase = options.getXmlBase();
         String showXmlDeclaration = options.getShowXmlDeclaration();
@@ -592,6 +594,25 @@ public class RDFConverter {
         String convertInstanceData = options.getConvertInstanceData();
         String sortRDF = options.getSortRDF();
         String rdfSortOptions = options.getRdfSortOptions();
+
+        if (jenaTargetFormat != null) {
+            try (outputStream) {
+                RDFWriterBuilder writer = RDFWriter.create().base(xmlBase).format(jenaTargetFormat).source(convertedModel);
+                if (isJsonLd(jenaTargetFormat)) {
+                    JsonLdOptions jsonLd = new JsonLdOptions();
+                    jsonLd.setUseNativeTypes(options.isJsonLdUseNativeTypes());
+                    jsonLd.setUseRdfType(options.isJsonLdUseRdfType());
+                    jsonLd.setCompactArrays(options.isJsonLdCompactArrays());
+                    jsonLd.setOrdered(options.isJsonLdOrdered());
+                    if (!options.getJsonLdContext().isBlank()) jsonLd.setExpandContext(options.getJsonLdContext().trim());
+                    Context context = new Context();
+                    context.set(TitaniumJsonLdOptions.JSONLD_OPTIONS, jsonLd);
+                    writer.context(context);
+                }
+                writer.output(outputStream);
+            }
+            return;
+        }
 
         switch (targetFormat) {
             case RDFConvertOptions.RDFFormats.RDFXML -> {
@@ -699,6 +720,10 @@ public class RDFConverter {
 
             }
         }
+    }
+
+    private boolean isJsonLd(RDFFormat format) {
+        return format.getLang().equals(Lang.JSONLD) || format.getLang().equals(Lang.JSONLD11);
     }
 
     public void writeInheritanceModel(OutputStream outputStream) throws IOException {

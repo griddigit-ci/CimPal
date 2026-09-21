@@ -17,6 +17,13 @@ public class RDFConvertOptions {
     private final List<File> modelUnionDetailedFiles;
     private final RDFFormats sourceFormat;
     private final RDFFormats targetFormat;
+    /** Optional direct Jena graph writer. When present it takes precedence over targetFormat. */
+    private final RDFFormat jenaTargetFormat;
+    private final String jsonLdContext;
+    private final boolean jsonLdUseNativeTypes;
+    private final boolean jsonLdUseRdfType;
+    private final boolean jsonLdCompactArrays;
+    private final boolean jsonLdOrdered;
     private final String xmlBase;
     private final RDFFormat rdfXmlFormat;
     private final String showXmlDeclaration;
@@ -47,6 +54,12 @@ public class RDFConvertOptions {
         this.modelUnionDetailedFiles = b.modelUnionDetailedFiles;
         this.sourceFormat = b.sourceFormat;
         this.targetFormat = b.targetFormat;
+        this.jenaTargetFormat = b.jenaTargetFormat;
+        this.jsonLdContext = b.jsonLdContext;
+        this.jsonLdUseNativeTypes = b.jsonLdUseNativeTypes;
+        this.jsonLdUseRdfType = b.jsonLdUseRdfType;
+        this.jsonLdCompactArrays = b.jsonLdCompactArrays;
+        this.jsonLdOrdered = b.jsonLdOrdered;
         this.xmlBase = b.xmlBase;
         this.rdfXmlFormat = b.rdfXmlFormat;
         this.showXmlDeclaration = b.showXmlDeclaration;
@@ -95,6 +108,12 @@ public class RDFConvertOptions {
     public RDFFormats getTargetFormat() {
         return targetFormat;
     }
+    public RDFFormat getJenaTargetFormat() { return jenaTargetFormat; }
+    public String getJsonLdContext() { return jsonLdContext; }
+    public boolean isJsonLdUseNativeTypes() { return jsonLdUseNativeTypes; }
+    public boolean isJsonLdUseRdfType() { return jsonLdUseRdfType; }
+    public boolean isJsonLdCompactArrays() { return jsonLdCompactArrays; }
+    public boolean isJsonLdOrdered() { return jsonLdOrdered; }
 
     public String getXmlBase() {
         return xmlBase;
@@ -194,6 +213,12 @@ public class RDFConvertOptions {
         private List<File> modelUnionDetailedFiles = null;
         private RDFFormats sourceFormat = null;
         private RDFFormats targetFormat = null;
+        private RDFFormat jenaTargetFormat = null;
+        private String jsonLdContext = "";
+        private boolean jsonLdUseNativeTypes = false;
+        private boolean jsonLdUseRdfType = false;
+        private boolean jsonLdCompactArrays = true;
+        private boolean jsonLdOrdered = false;
         private String xmlBase = null;
         private RDFFormat rdfXmlFormat = null;
         private String showXmlDeclaration = null;
@@ -332,6 +357,16 @@ public class RDFConvertOptions {
             this.keepOntologyHeaders = keep;
             return this;
         }
+
+        public Builder jenaTargetFormat(RDFFormat jenaTargetFormat) {
+            this.jenaTargetFormat = jenaTargetFormat;
+            return this;
+        }
+        public Builder jsonLdContext(String context) { this.jsonLdContext = context == null ? "" : context; return this; }
+        public Builder jsonLdUseNativeTypes(boolean value) { this.jsonLdUseNativeTypes = value; return this; }
+        public Builder jsonLdUseRdfType(boolean value) { this.jsonLdUseRdfType = value; return this; }
+        public Builder jsonLdCompactArrays(boolean value) { this.jsonLdCompactArrays = value; return this; }
+        public Builder jsonLdOrdered(boolean value) { this.jsonLdOrdered = value; return this; }
 
         public Builder detailedUnionPackageUri(String uri) {
             this.detailedUnionPackageUri = uri == null ? "" : uri;
