@@ -283,7 +283,9 @@ public class RDFConvertController implements Initializable {
         String targetFormatString = ftargetFormatChoiceBox.getSelectionModel().getSelectedItem();
         RDFConvertOptions.RDFFormats targetFormat = RDFConvertOptions.RDFFormats.RDFXML;
         //xmlBase
-        String xmlBase = null;
+        // An empty base URI means that xml:base is omitted. The options object deliberately
+        // distinguishes this valid value from an absent setting.
+        String xmlBase = "";
 
         if (!frdfConvertXmlBase.getText().isBlank()) {
             xmlBase = frdfConvertXmlBase.getText();

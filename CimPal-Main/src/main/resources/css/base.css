@@ -75,6 +75,16 @@
     -fx-text-fill: -cimpal-text-on-accent;
 }
 
+/* Comparison-result cells use a wrapping Text graphic, whose foreground is
+   controlled by -fx-fill rather than the TableCell's -fx-text-fill. */
+.table-cell .cimpal-table-cell-text {
+    -fx-fill: -cimpal-text;
+}
+
+.table-row-cell:filled:selected .table-cell .cimpal-table-cell-text {
+    -fx-fill: -cimpal-text-on-accent;
+}
+
 /* ===================== disabled state ===================== */
 /*
  * Modena dims disabled controls with -fx-opacity: 0.4. Compositing light text at 40%

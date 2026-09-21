@@ -11,6 +11,7 @@ module CimPal.Core {
 
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
+    requires titanium.json.ld;
     requires CimPal.CustomWriter;
     requires org.apache.jena.shacl;
     requires org.apache.commons.io;

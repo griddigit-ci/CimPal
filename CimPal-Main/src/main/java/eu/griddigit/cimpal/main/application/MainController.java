@@ -269,6 +269,7 @@ public class MainController implements Initializable {
     public Tab tabInstanceDataComparison;
     public Tab tabExcelToSHACL;
     public Tab tabRDFConvert;
+    @FXML private Tab tabRdfsUnion;
     public Tab tabSPARQLQuery;
     private SparqlQueryTabController sparqlQueryTabController;
     @FXML
@@ -438,10 +439,19 @@ public class MainController implements Initializable {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFConvertTab.fxml"));
             tabRDFConvert.setContent(loader.load());
-            RDFConvertController controller = loader.getController();
+            RDFSimpleConvertController controller = loader.getController();
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("RDF Convert tab error", "The RDF Convert tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFSUnionTab.fxml"));
+            tabRdfsUnion.setContent(loader.load());
+            RDFSUnionController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("RDFS Union tab error", "The RDFS Union tab could not be loaded.", e);
         }
 
         try {
@@ -581,6 +591,7 @@ public class MainController implements Initializable {
     @FXML private void actionShowRdfsToShacl(ActionEvent event) { selectFunctionTab(tabRDFStoSHACL); }
     @FXML private void actionShowConstraints(ActionEvent event) { selectFunctionTab(tabExcelToSHACL); }
     @FXML private void actionShowRdfComparison(ActionEvent event) { selectFunctionTab(tabCreateCompleteSM1); }
+    @FXML private void actionShowRdfsUnion(ActionEvent event) { selectFunctionTab(tabRdfsUnion); }
     @FXML private void actionShowDatasetComparison(ActionEvent event) { selectFunctionTab(tabInstanceDataComparison); }
     @FXML private void actionShowGenerate(ActionEvent event) { selectFunctionTab(tabGenerateInstanceData); }
     @FXML private void actionShowTaskWizard(ActionEvent event) { selectFunctionTab(tabTaskWizard); }

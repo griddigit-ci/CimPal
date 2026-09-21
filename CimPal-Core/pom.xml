@@ -76,6 +76,12 @@
             <artifactId>jena-arq</artifactId>
             <version>${jena.version}</version>
         </dependency>
+        <!-- Direct dependency: JSON-LD writer options are exposed by Jena via Titanium. -->
+        <dependency>
+            <groupId>com.apicatalog</groupId>
+            <artifactId>titanium-json-ld</artifactId>
+            <version>1.7.0</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.jena</groupId>
             <artifactId>jena-cmds</artifactId>

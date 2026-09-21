@@ -2,9 +2,11 @@ package eu.griddigit.cimpal.core.converters;
 
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
+import com.apicatalog.jsonld.JsonLdOptions;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
 import org.apache.jena.sparql.util.Context;
+import org.apache.jena.riot.system.jsonld.TitaniumJsonLdOptions;
 import org.apache.jena.vocabulary.*;
 import org.topbraid.shacl.vocabulary.SH;
 
@@ -38,13 +40,10 @@ public class RDFConverter {
         boolean modelUnionFlagDetailed = options.isModelUnionFlagDetailed();
         boolean stripPrefixes = options.isStripPrefixes();
         boolean modelUnionFixPackage = options.isModelUnionFixPackage();
+        String configuredPackageUri = options.getDetailedUnionPackageUri().trim();
+        String configuredOntologyUri = options.getDetailedUnionOntologyUri().trim();
+        String configuredDeletionStereotype = options.getDetailedUnionDeletionStereotype().trim();
 
-        Lang rdfSourceFormat = switch (sourceFormat) {
-            case RDFConvertOptions.RDFFormats.RDFXML -> Lang.RDFXML;
-            case RDFConvertOptions.RDFFormats.TURTLE -> Lang.TURTLE;
-            case RDFConvertOptions.RDFFormats.JSONLD -> Lang.JSONLD;
-            default -> throw new IllegalStateException("Unexpected value: " + sourceFormat);
-        };
         List<File> modelFiles = new LinkedList<File>();
         boolean keepHeaders = options.isKeepOntologyHeaders();
         if (!modelUnionFlagDetailed) {
@@ -72,8 +71,10 @@ public class RDFConverter {
             int count = 1;
             for (File modelFile : modelFiles) {
                 Model modelPart = ModelFactory.createDefaultModel();
-                InputStream inputStream = new FileInputStream(modelFile.toString());
-                RDFDataMgr.read(modelPart, inputStream, xmlBase, rdfSourceFormat);
+                // Union input may contain different RDF syntaxes. Reading by URI lets Jena
+                // choose a parser from each file's extension instead of applying one format
+                // chosen for the whole batch.
+                RDFDataMgr.read(modelPart, modelFile.toURI().toString());
                 prefixMap.putAll(modelPart.getNsPrefixMap());
                 model.add(modelPart);
                 if (count == 1) {
@@ -83,10 +84,14 @@ public class RDFConverter {
             }
             model.setNsPrefixes(prefixMap);
 
+            String deletionStereotype = configuredDeletionStereotype.isBlank()
+                    ? findNotDefinedStereotype(model)
+                    : configuredDeletionStereotype;
+
             List<Statement> stmtToDeleteClass = new LinkedList<>();
             for (StmtIterator i = model.listStatements(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "belongsToCategory"), (RDFNode) null); i.hasNext(); ) {
                 Statement stmt = i.next();
-                if (stmt.getObject().asResource().getLocalName().equals("Package_LTDSnotDefined")) {
+                if (matchesDeletionStereotype(stmt.getObject(), deletionStereotype, true)) {
                     //delete all classes
                     List<Statement> stdelete = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                     stmtToDeleteClass.addAll(stdelete);
@@ -98,6 +103,23 @@ public class RDFConverter {
                             for (Statement stmpPropEn : stdeleteProp) {
                                 List<Statement> stdeletePropEn = model.listStatements(stmpProp.getSubject(), null, (RDFNode) null).toList();
                                 stmtToDeleteClass.addAll(stdeletePropEn);
+                            }
+                        }
+                        // Some source profiles encode enumeration members using the
+                        // "EnumName.member" identifier and cims:stereotype="enum",
+                        // but omit rdf:type.  The type-based removal above cannot
+                        // find them, leaving orphan values after their enumeration
+                        // class is removed.  Remove those members by their naming
+                        // convention as well.
+                        String enumerationMemberPrefix = stmt.getSubject().getLocalName() + ".";
+                        Property stereotype = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype");
+                        for (StmtIterator enumStmts = model.listStatements(null, stereotype, (RDFNode) null); enumStmts.hasNext(); ) {
+                            Statement enumStmt = enumStmts.next();
+                            Resource enumMember = enumStmt.getSubject();
+                            if (enumStmt.getObject().isLiteral()
+                                    && "enum".equals(enumStmt.getObject().asLiteral().getString())
+                                    && enumMember.getLocalName().startsWith(enumerationMemberPrefix)) {
+                                stmtToDeleteClass.addAll(model.listStatements(enumMember, null, (RDFNode) null).toList());
                             }
                         }
                     } else {
@@ -124,10 +146,12 @@ public class RDFConverter {
                 }
             }
 
-            for (StmtIterator i = model.listStatements(null, RDFS.label, ResourceFactory.createLangLiteral("LTDSnotDefined", "en")); i.hasNext(); ) {
+            for (StmtIterator i = model.listStatements(null, RDFS.label, (RDFNode) null); i.hasNext(); ) {
                 Statement stmt = i.next();
-                List<Statement> stdelete = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
-                stmtToDeleteClass.addAll(stdelete);
+                if (matchesDeletionStereotype(stmt.getObject(), deletionStereotype, false)) {
+                    List<Statement> stdelete = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
+                    stmtToDeleteClass.addAll(stdelete);
+                }
             }
 
             model.remove(stmtToDeleteClass);
@@ -135,7 +159,7 @@ public class RDFConverter {
             List<Statement> stmtToDeleteProperty = new LinkedList<>();
             for (StmtIterator i = model.listStatements(null, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype"), (RDFNode) null); i.hasNext(); ) {
                 Statement stmt = i.next();
-                if (stmt.getObject().toString().equals("LTDSnotDefined")) {
+                if (matchesDeletionStereotype(stmt.getObject(), deletionStereotype, false)) {
                     List<Statement> stdelete = model.listStatements(stmt.getSubject(), null, (RDFNode) null).toList();
                     stmtToDeleteProperty.addAll(stdelete);
                 }
@@ -156,9 +180,24 @@ public class RDFConverter {
 
             model.remove(stmtToDeleteProperty);
 
+        } else if (modelUnionFlag) {
+            model = ModelFactory.createDefaultModel();
+            Map<String, String> prefixMap = model.getNsPrefixMap();
+            for (File modelFile : modelFiles) {
+                Model modelPart = ModelFactory.createDefaultModel();
+                RDFDataMgr.read(modelPart, modelFile.toURI().toString());
+                prefixMap.putAll(modelPart.getNsPrefixMap());
+                model.add(modelPart);
+            }
+            model.setNsPrefixes(prefixMap);
         } else {
             // load all models
-            model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(modelFiles, xmlBase, rdfSourceFormat, false, false).get("unionModel");
+            model = ModelFactory.createDefaultModel();
+            for (File modelFile : modelFiles) {
+                // The source syntax is inferred per file by Jena. This permits a mixed batch
+                // (for example RDF/XML, Turtle and JSON-LD) without a source-format control.
+                RDFDataMgr.read(model, modelFile.toURI().toString());
+            }
         }
 
 
@@ -233,6 +272,11 @@ public class RDFConverter {
                 }
                 model.add(stmtToAddOntology);
             }
+
+            if (!configuredOntologyUri.isBlank()) {
+                replaceOntologyUri(model, resolveIdentifier(configuredOntologyUri, model.getNsPrefixMap()));
+            }
+            applyOntologyMetadata(model, options.getDetailedUnionOntologyMetadata());
         }
 
         //optimise prefixes, strip unused prefixes
@@ -268,17 +312,26 @@ public class RDFConverter {
             }
         }
 
-        if (modelUnionFixPackage) {
+        if (modelUnionFixPackage || !configuredPackageUri.isBlank()) {
             //add package statements
             String packageName = "";
             String packageURI = "";
-            for (StmtIterator i = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")); i.hasNext(); ) {
-                Statement stmt = i.next();
-                for (StmtIterator k = model.listStatements(stmt.getSubject(), null, (RDFNode) null); k.hasNext(); ) {
-                    Statement stmtP = k.next();
-                    if (stmtP.getPredicate().equals(DCAT.keyword)) {
-                        packageName = stmtP.getObject().asLiteral().getString();
-                        packageURI = stmtP.getSubject().getNameSpace();
+            if (!configuredPackageUri.isBlank()) {
+                String resolvedPackageUri = resolveIdentifier(configuredPackageUri, model.getNsPrefixMap());
+                Resource configuredPackage = ResourceFactory.createResource(resolvedPackageUri);
+                packageURI = configuredPackage.getNameSpace();
+                packageName = configuredPackage.getLocalName()
+                        .replaceFirst("^Package_", "")
+                        .replaceFirst("Profile$", "");
+            } else {
+                for (StmtIterator i = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://www.w3.org/2002/07/owl#Ontology")); i.hasNext(); ) {
+                    Statement stmt = i.next();
+                    for (StmtIterator k = model.listStatements(stmt.getSubject(), null, (RDFNode) null); k.hasNext(); ) {
+                        Statement stmtP = k.next();
+                        if (stmtP.getPredicate().equals(DCAT.keyword)) {
+                            packageName = stmtP.getObject().asLiteral().getString();
+                            packageURI = stmtP.getSubject().getNameSpace();
+                        }
                     }
                 }
             }
@@ -294,7 +347,9 @@ public class RDFConverter {
             model.remove(stmtToDeleteOldPackage);
 
             //add the new package
-            Resource packageRes = ResourceFactory.createResource(packageURI + "Package_" + packageName + "Profile");
+            Resource packageRes = ResourceFactory.createResource(configuredPackageUri.isBlank()
+                    ? packageURI + "Package_" + packageName + "Profile"
+                    : resolveIdentifier(configuredPackageUri, model.getNsPrefixMap()));
             model.add(ResourceFactory.createStatement(packageRes, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory")));
             model.add(ResourceFactory.createStatement(packageRes, RDFS.comment, ResourceFactory.createPlainLiteral("This is a package for the " + packageName + " profile.")));
             model.add(ResourceFactory.createStatement(packageRes, RDFS.label, ResourceFactory.createLangLiteral(packageName + "Profile", "en")));
@@ -329,8 +384,115 @@ public class RDFConverter {
             model.remove(statementsToDelete);
         }
 
+        normaliseDctermsPrefix(model);
+
         this.convertedModel = model;
 
+    }
+
+    /** Finds the first configured RDFS stereotype whose lexical value contains "notDefined". */
+    private static String findNotDefinedStereotype(Model model) {
+        Property stereotype = ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#", "stereotype");
+        for (StmtIterator statements = model.listStatements(null, stereotype, (RDFNode) null); statements.hasNext(); ) {
+            RDFNode value = statements.next().getObject();
+            String lexical = lexicalValue(value);
+            if (lexical.toLowerCase(Locale.ROOT).contains("notdefined")) {
+                return lexical;
+            }
+        }
+        return "";
+    }
+
+    private static boolean matchesDeletionStereotype(RDFNode value, String stereotype, boolean packageReference) {
+        if (stereotype == null || stereotype.isBlank()) {
+            return false;
+        }
+        String lexical = lexicalValue(value);
+        if (lexical.equals(stereotype) || lexical.equalsIgnoreCase(stereotype)) {
+            return true;
+        }
+        if (value.isResource()) {
+            String localName = value.asResource().getLocalName();
+            String expectedLocalName = localPart(stereotype);
+            return localName.equals(expectedLocalName)
+                    || localName.equalsIgnoreCase(expectedLocalName)
+                    || (packageReference && localName.equalsIgnoreCase("Package_" + expectedLocalName));
+        }
+        return false;
+    }
+
+    private static String localPart(String identifier) {
+        int separator = Math.max(identifier.lastIndexOf('#'), Math.max(identifier.lastIndexOf('/'), identifier.lastIndexOf(':')));
+        return separator < 0 ? identifier : identifier.substring(separator + 1);
+    }
+
+    private static String lexicalValue(RDFNode value) {
+        if (value.isLiteral()) {
+            return value.asLiteral().getString();
+        }
+        return value.asResource().getURI();
+    }
+
+    /** Expands prefix:name against the merged model's prefix map; absolute URIs pass through unchanged. */
+    private static String resolveIdentifier(String identifier, Map<String, String> prefixes) {
+        String value = identifier.trim();
+        int separator = value.indexOf(':');
+        if (separator <= 0 || value.startsWith("http://") || value.startsWith("https://") || value.startsWith("urn:")) {
+            return value;
+        }
+        String namespace = prefixes.get(value.substring(0, separator));
+        if (namespace == null) {
+            throw new IllegalArgumentException("Unknown RDFS prefix in identifier: " + value);
+        }
+        return namespace + value.substring(separator + 1);
+    }
+
+    /** Retains the selected ontology header's facts while giving it the requested resource URI. */
+    private static void replaceOntologyUri(Model model, String targetUri) {
+        Resource target = model.createResource(targetUri);
+        List<Resource> ontologies = model.listSubjectsWithProperty(RDF.type, OWL2.Ontology).toList();
+        if (ontologies.isEmpty()) {
+            model.add(target, RDF.type, OWL2.Ontology);
+            return;
+        }
+        Resource source = ontologies.getFirst();
+        if (source.equals(target)) {
+            return;
+        }
+        List<Statement> replacement = new ArrayList<>();
+        for (StmtIterator statements = model.listStatements(source, null, (RDFNode) null); statements.hasNext(); ) {
+            Statement statement = statements.next();
+            replacement.add(model.createStatement(target, statement.getPredicate(), statement.getObject()));
+        }
+        List<Statement> incoming = model.listStatements(null, null, source).toList();
+        for (Statement statement : incoming) {
+            replacement.add(model.createStatement(statement.getSubject(), statement.getPredicate(), target));
+        }
+        model.remove(model.listStatements(source, null, (RDFNode) null));
+        model.remove(incoming);
+        model.add(replacement);
+    }
+
+    /** Uses the conventional dcterms prefix regardless of the prefix used by an input dataset. */
+    private static void normaliseDctermsPrefix(Model model) {
+        List<String> aliases = model.getNsPrefixMap().entrySet().stream()
+                .filter(entry -> DCTerms.NS.equals(entry.getValue()) && !"dcterms".equals(entry.getKey()))
+                .map(Map.Entry::getKey)
+                .toList();
+        aliases.forEach(model::removeNsPrefix);
+        model.setNsPrefix("dcterms", DCTerms.NS);
+    }
+
+    private static void applyOntologyMetadata(Model model, Map<String, List<org.apache.jena.graph.Node>> metadata) {
+        if (metadata.isEmpty()) return;
+        List<Resource> ontologies = model.listSubjectsWithProperty(RDF.type, OWL2.Ontology).toList();
+        if (ontologies.isEmpty()) return;
+        Resource ontology = ontologies.getFirst();
+        metadata.forEach((propertyUri, nodes) -> {
+            Property property = model.createProperty(propertyUri);
+            model.remove(model.listStatements(ontology, property, (RDFNode) null));
+            for (org.apache.jena.graph.Node node : nodes) model.add(ontology, property, model.asRDFNode(node));
+        });
     }
 
     public static Model removeDuplicateShDeclareBlankNodes(Model model) {
@@ -422,6 +584,7 @@ public class RDFConverter {
         }
 
         RDFConvertOptions.RDFFormats targetFormat = options.getTargetFormat();
+        RDFFormat jenaTargetFormat = options.getJenaTargetFormat();
         RDFFormat rdfFormat = options.getRdfXmlFormat();
         String xmlBase = options.getXmlBase();
         String showXmlDeclaration = options.getShowXmlDeclaration();
@@ -431,6 +594,25 @@ public class RDFConverter {
         String convertInstanceData = options.getConvertInstanceData();
         String sortRDF = options.getSortRDF();
         String rdfSortOptions = options.getRdfSortOptions();
+
+        if (jenaTargetFormat != null) {
+            try (outputStream) {
+                RDFWriterBuilder writer = RDFWriter.create().base(xmlBase).format(jenaTargetFormat).source(convertedModel);
+                if (isJsonLd(jenaTargetFormat)) {
+                    JsonLdOptions jsonLd = new JsonLdOptions();
+                    jsonLd.setUseNativeTypes(options.isJsonLdUseNativeTypes());
+                    jsonLd.setUseRdfType(options.isJsonLdUseRdfType());
+                    jsonLd.setCompactArrays(options.isJsonLdCompactArrays());
+                    jsonLd.setOrdered(options.isJsonLdOrdered());
+                    if (!options.getJsonLdContext().isBlank()) jsonLd.setExpandContext(options.getJsonLdContext().trim());
+                    Context context = new Context();
+                    context.set(TitaniumJsonLdOptions.JSONLD_OPTIONS, jsonLd);
+                    writer.context(context);
+                }
+                writer.output(outputStream);
+            }
+            return;
+        }
 
         switch (targetFormat) {
             case RDFConvertOptions.RDFFormats.RDFXML -> {
@@ -538,6 +720,10 @@ public class RDFConverter {
 
             }
         }
+    }
+
+    private boolean isJsonLd(RDFFormat format) {
+        return format.getLang().equals(Lang.JSONLD) || format.getLang().equals(Lang.JSONLD11);
     }
 
     public void writeInheritanceModel(OutputStream outputStream) throws IOException {
