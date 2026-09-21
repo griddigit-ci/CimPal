@@ -1,0 +1,36 @@
+{
+  "_comment": "Template: Compare two CGMES instance-data model sets.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar compare-instances --config this-file.json",
+
+  "modelsA": [
+    "REPLACE_WITH_PATH/before/EQ.xml",
+    "REPLACE_WITH_PATH/before/TP.xml",
+    "REPLACE_WITH_PATH/before/SV.xml"
+  ],
+  "_note_modelsA": "First (before / reference) model set. All files are merged into one combined graph. Accepts .xml, .rdf, .ttl, or .zip containing RDF/XML.",
+
+  "modelsB": [
+    "REPLACE_WITH_PATH/after/EQ.xml",
+    "REPLACE_WITH_PATH/after/TP.xml",
+    "REPLACE_WITH_PATH/after/SV.xml"
+  ],
+  "_note_modelsB": "Second (after / changed) model set. Same format as modelsA.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for parsing RDF/XML files. For CGMES 3.0/CIM17: http://iec.ch/TC57/CIM100. For CGMES 2.4/CIM16: http://iec.ch/TC57/2013/CIM-schema-cim16.",
+
+  "ignoreSv": false,
+  "_note_ignoreSv": "true to ignore SvVoltage, SvPowerFlow, SvInjection, SvStatus, SvSwitch, SvTapStep, SvShuntCompensatorSections, TopologicalIsland. Useful when comparing EQ models across time steps where power-flow results differ.",
+
+  "ignoreTp": false,
+  "_note_ignoreTp": "true to ignore TP (topology) profile differences.",
+
+  "ignoreDl": false,
+  "_note_ignoreDl": "true to ignore DL (diagram layout) profile differences.",
+
+  "output": "REPLACE_WITH_PATH/instance-diff.xlsx",
+  "_note_output": "Where to write the diff report. Use .xlsx for Excel (recommended); any other extension for CSV. Remove this field to print to stdout instead.",
+
+  "format": "text",
+  "_note_format": "Only used when 'output' is not set. Options: text (pipe-separated table), json, csv."
+}

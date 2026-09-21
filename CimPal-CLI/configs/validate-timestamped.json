@@ -1,0 +1,41 @@
+{
+  "_comment": "Template: Timestamped validation workflow. Groups model files by timestamp in filename, produces per-timestamp reports, and builds a comparison workbook against the previous run.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar validate --config this-file.json",
+  "_when_to_use": "Use this when model files are named with a date/time stamp (e.g. 20260918T120000Z_EQ.xml) and you want to track how violations change over time across multiple submission batches.",
+
+  "workflow": "timestamped",
+  "_note_workflow": "The timestamped workflow discovers timestamp metadata from the model files, groups them by timestamp (and by TSO/region if present), runs the mapping once per group, and produces one report per group plus an aggregated summary.",
+
+  "mappingCsv": "REPLACE_WITH_PATH/mapping.csv",
+  "_note_mappingCsv": "Same format as the mapping workflow: three columns — model file name patterns, constraint .ttl path relative to constraintsRoot, and a label. The timestamp workflow applies the mapping to each discovered timestamp group.",
+
+  "modelsDir": "REPLACE_WITH_PATH/timestamped-input",
+  "_note_modelsDir": "Root folder (or a ZIP file) containing the timestamped model files. The CLI discovers the timestamp from each file's md:FullModel.md:scenarioTime or md:FullModel.md:created metadata, not just the filename. Can be a folder or a .zip archive.",
+
+  "constraintsRoot": "REPLACE_WITH_PATH/constraints",
+  "_note_constraintsRoot": "Same as the mapping workflow — root folder for .ttl constraint files. Mapping CSV column 2 paths are relative to this.",
+
+  "outputDir": "REPLACE_WITH_PATH/output",
+  "_note_outputDir": "Where to write all output. Produces: one validation_report__<timestamp>.xlsx per timestamp group, one per-TSO aggregated report, and one validation_comparison__<timestamp>.xlsx workbook if previousComparison is set.",
+
+  "previousComparison": "REPLACE_WITH_PATH/validation_comparison__previous.xlsx",
+  "_note_previousComparison": "Path to the comparison workbook from the previous run (the validation_comparison__*.xlsx file from outputDir of the last run). The CLI reads all existing date-time sheets from this file, appends the current run as a new sheet, and generates delta charts. Leave this field empty (or remove it) on the first run — no comparison will be made and the output will still be produced.",
+
+  "datatypeMap": "CGMES30NC25",
+  "_note_datatypeMap": "Must match the CGMES version of the submitted models. CGMES30NC25 for CGMES 3.0/NC 2.5. CGMES24NC22 for CGMES 2.4/NC 2.2.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for parsing model files. For CIM17/CGMES 3.0: http://iec.ch/TC57/CIM100. For CIM16/CGMES 2.4: http://iec.ch/TC57/2013/CIM-schema-cim16.",
+
+  "engine": "APACHE_JENA",
+  "_note_engine": "Use APACHE_JENA for all production runs. The timestamped workflow uses more complex parallelism internally — do not use Python engines here unless specifically testing engine compatibility.",
+
+  "workers": 0,
+  "_note_workers": "0 = auto. The timestamped workflow has two levels of parallelism (timestamp workers and row workers per timestamp). 0 lets the CLI balance them automatically based on available heap. On a CI machine with limited RAM, set to 1 or 2.",
+
+  "maxResultsPerConstraint": 0,
+  "_note_maxResultsPerConstraint": "0 = collect all violations (recommended for trend tracking). 10 = quick check mode, marks validations as Partial. For official submissions use 0.",
+
+  "exportTurtle": false,
+  "_note_exportTurtle": "For large timestamped batches, false is recommended unless you need the .ttl reports for AI analysis. Each validation produces one .ttl per model — this can be many files."
+}

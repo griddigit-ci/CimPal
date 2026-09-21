@@ -1,0 +1,20 @@
+{
+  "_comment": "Template: Reorganize SHACL constraint files per an Excel mapping template.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar organize --config this-file.json",
+  "_when_to_use": "After generating or editing SHACL shapes, use this to split them into the canonical file layout defined by your constraint library structure.",
+
+  "shaclFiles": [
+    "REPLACE_WITH_PATH/shapes/EQ.ttl",
+    "REPLACE_WITH_PATH/shapes/TP.ttl"
+  ],
+  "_note_shaclFiles": "One or more SHACL .ttl or .rdf files. All are loaded and merged into one combined shapes graph before the template is applied. The template then extracts each constraint by sh:name and routes it to the correct output file.",
+
+  "templateXlsx": "REPLACE_WITH_PATH/organize-template.xlsx",
+  "_note_templateXlsx": "Excel template (.xlsx) with one row per constraint. Column layout: A=constraint name (must match sh:name in the loaded shapes), B=subdirectory in outputDir, C=output filename (no extension), D=namespace prefix, E=namespace URI (use 'skip' to exclude a constraint), F=base URI, G=group URI, H=group name.",
+
+  "outputDir": "REPLACE_WITH_PATH/organized",
+  "_note_outputDir": "Root directory for reorganized output files. Subdirectories per column B are created automatically. Files are written as Turtle (.ttl).",
+
+  "xmlBase": "",
+  "_note_xmlBase": "Only needed when loading .rdf (RDF/XML) format SHACL files. Leave empty for .ttl Turtle files."
+}

@@ -20,4 +20,6 @@ module CimPal.Core {
     requires java.prefs;
     requires java.xml;
     requires java.net.http;
+    requires org.apache.commons.lang3;
+    requires commons.math3;
 }

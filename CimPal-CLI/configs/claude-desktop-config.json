@@ -1,0 +1,20 @@
+{
+  "_comment": "Add this to your Claude Desktop configuration to enable the CimPal MCP server.",
+  "_location": "Windows: %APPDATA%\\Claude\\claude_desktop_config.json  |  macOS: ~/Library/Application Support/Claude/claude_desktop_config.json",
+  "_how_to_use": "Merge the 'mcpServers' block into your existing claude_desktop_config.json. Replace REPLACE_WITH_PATH with the absolute path to CimPal-CLI.jar.",
+
+  "mcpServers": {
+    "cimpal": {
+      "command": "java",
+      "args": [
+        "-jar",
+        "REPLACE_WITH_PATH/CimPal-CLI.jar",
+        "mcp"
+      ],
+      "_note_args": "Replace REPLACE_WITH_PATH with the absolute path to the CimPal-CLI.jar file, e.g. C:/Tools/CimPal/CimPal-CLI.jar. The 'mcp' argument starts the MCP server on stdio.",
+
+      "_note_memory": "For large CGMES models, add JVM memory flags before -jar: [\"-Xmx8g\", \"-jar\", \"...\"] to give the server 8 GB heap.",
+      "_note_debug": "To see MCP message traffic, add '--debug' after 'mcp': [..., \"mcp\", \"--debug\"]. Debug output goes to stderr, not the MCP channel."
+    }
+  }
+}
