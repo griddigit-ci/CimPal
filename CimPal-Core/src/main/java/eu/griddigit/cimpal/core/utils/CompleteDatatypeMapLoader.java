@@ -42,6 +42,22 @@ public final class CompleteDatatypeMapLoader {
         }
     }
 
+    /**
+     * The map a set of validation options selects: an explicit map, else a map file, else a
+     * bundled preset. With none of them set the result is empty.
+     */
+    static Map<String, RDFDatatype> resolve(DatatypeMapPreset preset,
+                                            Path file,
+                                            Map<String, RDFDatatype> map) throws IOException {
+        if (map != null) {
+            return map;
+        }
+        if (file != null) {
+            return loadFromFile(file);
+        }
+        return preset == null ? Map.of() : preset.load();
+    }
+
     private static Map<String, RDFDatatype> load(InputStream in) throws IOException {
         JenaSystem.init();
 

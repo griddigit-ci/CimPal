@@ -2,6 +2,7 @@ module CimPal.Core {
     exports eu.griddigit.cimpal.core.interfaces;
     exports eu.griddigit.cimpal.core.comparators;
     exports eu.griddigit.cimpal.core.models;
+    exports eu.griddigit.cimpal.core.presets;
     exports eu.griddigit.cimpal.core.utils;
     exports eu.griddigit.cimpal.core.converters;
     exports eu.griddigit.cimpal.core.shacl_tools;

@@ -1,8 +1,12 @@
 package eu.griddigit.cimpal.main.application.controllers;
 
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
+import eu.griddigit.cimpal.core.models.MappingValidationOptions;
+import eu.griddigit.cimpal.core.models.MappingValidationSummary;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
+import eu.griddigit.cimpal.core.utils.DatatypeMapPreset;
+import eu.griddigit.cimpal.core.utils.MappingValidator;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.main.application.MainController;
@@ -798,7 +802,7 @@ public class ValidationByMappingController {
         Path previousComparisonCsv = runTimestampedWorkflow ? getPreviousComparisonCsvPath() : null;
         int maxResultsPerConstraint = cbLimitValidationResults != null
                 && cbLimitValidationResults.isSelected() ? 10 : 0;
-        ValidationTools.setExportTurtleValidationReports(cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected());
+        boolean exportTurtleReports = cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected();
 
         btnRunValidationByMapping.setDisable(true);
         setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -810,23 +814,24 @@ public class ValidationByMappingController {
 
         new Thread(() -> {
             try {
-                Map<String, RDFDatatype> dataTypeMap = datatypeMapSource.load();
+                MappingValidationOptions options = MappingValidationOptions.builder()
+                        .mappingCsv(selectedMappingFile.toPath())
+                        .modelsInput(selectedModelsInputFolder.toPath())
+                        .constraintsRoot(selectedConstraintsRootFolder.toPath())
+                        .outputDir(selectedOutputFolder.toPath())
+                        .timestamped(runTimestampedWorkflow)
+                        .previousComparisonCsv(previousComparisonCsv)
+                        .datatypeMap(datatypeMapSource.load())
+                        .xmlBase(xmlBase)
+                        .engine(validationEngine)
+                        .maxResultsPerConstraint(maxResultsPerConstraint)
+                        .threads(threadCount)
+                        .exportTurtleReports(exportTurtleReports)
+                        .build();
+                MappingValidationSummary summary = new MappingValidator(options).validate();
 
                 if (runTimestampedWorkflow) {
-                    ValidationTools.ValidationTimestampedRunSummary tsResult =
-                            ValidationTools.validateByTimestampedMapping(
-                            selectedMappingFile.toPath(),
-                            selectedModelsInputFolder.toPath(),
-                            selectedConstraintsRootFolder.toPath(),
-                            selectedOutputFolder.toPath(),
-                            threadCount,
-                            dataTypeMap,
-                            xmlBase,
-                            previousComparisonCsv,
-                            maxResultsPerConstraint,
-                            validationEngine
-                    );
-                    List<Path> reports = tsResult.reports();
+                    List<Path> reports = summary.reports();
 
                     System.out.println("Created report count: " + reports.size());
                     for (Path report : reports) {
@@ -834,20 +839,7 @@ public class ValidationByMappingController {
                     }
 
                 } else {
-                    ValidationTools.ValidationRunSummary result = ValidationTools.validateByMapping(
-                            selectedMappingFile.toPath(),
-                            selectedModelsInputFolder.toPath(),
-                            selectedConstraintsRootFolder.toPath(),
-                            selectedOutputFolder.toPath(),
-                            threadCount,
-                            dataTypeMap,
-                            xmlBase,
-                            maxResultsPerConstraint,
-                            validationEngine
-                    );
-                    Path report = result.reportPath();
-
-                    System.out.println("Report saved to: " + report);
+                    System.out.println("Report saved to: " + summary.reports().getFirst());
 
                     List<Path> createdZips = ValidationTools.zipByMapping(
                             selectedMappingFile.toPath(),
@@ -1093,13 +1085,13 @@ public class ValidationByMappingController {
         }
 
         String selected = cbDatatypeMap.getSelectionModel().getSelectedItem();
-        String resource = switch (selected) {
-            case DATATYPE_MAP_CGMES24_NC22 -> "/CompleteDatatypeMap_CIM16_CGMES24_NC22.properties";
-            case DATATYPE_MAP_CGMES30_NC24 -> "/CompleteDatatypeMap_CIM17_CGMES3_NC24.properties";
-            case DATATYPE_MAP_CGMES30_NC25 -> "/CompleteDatatypeMap_CIM17_CGMES3_NC25.properties";
+        DatatypeMapPreset preset = switch (selected) {
+            case DATATYPE_MAP_CGMES24_NC22 -> DatatypeMapPreset.CGMES24_NC22;
+            case DATATYPE_MAP_CGMES30_NC24 -> DatatypeMapPreset.CGMES30_NC24;
+            case DATATYPE_MAP_CGMES30_NC25 -> DatatypeMapPreset.CGMES30_NC25;
             default -> throw new IllegalStateException("Unknown datatype map: " + selected);
         };
-        return new DatatypeMapSource(resource, null);
+        return new DatatypeMapSource(preset, null);
     }
 
     /** The base URI to parse models with, falling back to the default preset if the field is empty. */
@@ -1109,14 +1101,13 @@ public class ValidationByMappingController {
     }
 
     /**
-     * A bundled datatype map (by classpath resource) or one the user supplied (by file) -
-     * exactly one of the two is set.
+     * A bundled datatype map or one the user supplied (by file) - exactly one of the two is set.
      */
-    private record DatatypeMapSource(String resourcePath, File file) {
+    private record DatatypeMapSource(DatatypeMapPreset preset, File file) {
         Map<String, RDFDatatype> load() throws IOException {
             return file != null
                     ? CompleteDatatypeMapLoader.loadFromFile(file.toPath())
-                    : CompleteDatatypeMapLoader.loadFromResource(resourcePath);
+                    : preset.load();
         }
     }
 
