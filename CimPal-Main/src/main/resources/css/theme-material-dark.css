@@ -1,0 +1,125 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: Material Dark
+ * Material elevation surfaces (#121212 base, lighter overlays for raised surfaces),
+ * purple/teal accents, flat with 4px corner radii.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #1e1e1e;
+    -fx-background:                   #121212;
+    -fx-control-inner-background:     #1e1e1e;
+    -fx-control-inner-background-alt: #242424;
+    -fx-accent:                       #6a3ab2;
+    -fx-focus-color:                  #bb86fc;
+    -fx-faint-focus-color:            #bb86fc22;
+    -fx-selection-bar:                #4a24a0;
+    -fx-selection-bar-non-focused:    #2c2c2c;
+    -fx-default-button:               #4a24a0;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #e6e1e5;
+    -fx-dark-text-color:              #121212;
+    -fx-text-base-color:              #e6e1e5;
+    -fx-text-background-color:        #e6e1e5;
+    -fx-text-inner-color:             #e6e1e5;
+    -fx-mid-text-color:               #b0aab4;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #e6e1e5;
+    -cimpal-text-muted:      #b0aab4;
+    -cimpal-text-disabled:   #9b95a0;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #1e1e1e;
+    -cimpal-surface-2:       #2c2c2c;
+    -cimpal-border:          #4a4a4a;
+    -cimpal-badge-bg:        #2c2c2c;
+    -cimpal-badge-border:    #bb86fc;
+    -cimpal-badge-text:      #d7bafd;
+    -cimpal-warning:         #f2a1ad;
+}
+
+/* --- flat, no borders, 4px radii --- */
+.button, .toggle-button, .menu-button {
+    -fx-background-color: -cimpal-surface-2;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-padding: 6 14 6 14;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover {
+    -fx-background-color: derive(-cimpal-surface-2, 12%);
+}
+
+.button:default {
+    -fx-background-color: -fx-selection-bar;
+    -fx-text-fill: -cimpal-text-on-accent;
+}
+
+.choice-box, .combo-box-base, .text-field, .text-area {
+    -fx-background-color: -cimpal-surface-2;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+}
+
+.text-field:focused, .text-area:focused {
+    -fx-border-color: transparent transparent -fx-focus-color transparent;
+    -fx-border-width: 0 0 2 0;
+}
+
+.text-area .content {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.table-view, .tree-table-view, .list-view, .tree-view {
+    -fx-background-color: -cimpal-surface;
+    -fx-background-radius: 4;
+    -fx-border-color: transparent;
+}
+
+.table-view .column-header,
+.tree-table-view .column-header {
+    -fx-border-color: transparent;
+}
+
+.titled-pane > .title {
+    -fx-background-color: -cimpal-surface-2;
+    -fx-background-radius: 4 4 0 0;
+    -fx-border-color: transparent;
+}
+
+.titled-pane > .content {
+    -fx-background-color: -cimpal-surface;
+    -fx-border-color: transparent;
+    -fx-background-radius: 0 0 4 4;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-text-fill: -fx-focus-color;
+}
+
+.scroll-bar,
+.scroll-bar > .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-radius: 8;
+}
+
+.progress-bar > .bar,
+.progress-bar > .track {
+    -fx-background-radius: 4;
+}
+
+.check-box:selected > .box,
+.radio-button:selected > .radio {
+    -fx-background-color: -fx-focus-color;
+}

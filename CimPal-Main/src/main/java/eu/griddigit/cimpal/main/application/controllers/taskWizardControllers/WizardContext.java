@@ -1,6 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.application.tasks.*;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
@@ -28,8 +29,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.TaskInputController.getSaveInZip;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WizardContext {
+
+    private static final Logger LOG = LoggerFactory.getLogger(WizardContext.class);
+
     // Static helper objects for singleton pattern implementation
     private static volatile WizardContext instance;
     private static Object mutex = new Object();
@@ -210,16 +216,21 @@ public class WizardContext {
         this.outputDirectory = outputDirectory;
     }
 
+    //the wizard shares one remembered folder with the rest of the application. The field
+    //is still kept in step so nothing that reads it directly changes behaviour, but the
+    //value handed out is validated: if the folder has been deleted, the nearest existing
+    //parent is returned instead of a path that would make the dialog throw.
     public File getLastOpenedDir() {
-        return lastOpenedDir;
+        return PathMemory.resolveDirectory("wizard.lastDir");
     }
 
     public void setLastOpenedDir(File lastOpenedDir) {
         this.lastOpenedDir = lastOpenedDir;
+        PathMemory.remember("wizard.lastDir", lastOpenedDir);
     }
 
     // Save instance model based
-    public void saveInstanceModel(HashMap<String, Object> saveProperties, String taskName, boolean saveWorkingDir) throws IOException {
+    public void saveInstanceModel(Map<String, Object> saveProperties, String taskName, boolean saveWorkingDir) throws IOException {
         File pathToSaveInstanceModel;
         if (null != taskName) {
             String folderName = taskName.replaceAll("[^a-zA-Z0-9]", " ");
@@ -249,6 +260,9 @@ public class WizardContext {
             String tab = saveProperties.get("tab").toString();
             String relativeURIs = saveProperties.get("relativeURIs").toString();
             String showXmlEncoding = saveProperties.get("showXmlEncoding").toString();
+            String showXmlBaseDeclaration = saveProperties.get("showXmlBaseDeclaration").toString();
+            String instanceData = saveProperties.get("instanceData").toString();
+            String sortRDFprefix = saveProperties.get("sortRDFprefix").toString();
             String xmlBase = this.dataGeneratorModel.getRdfsProfileVersion().getBaseNamespace();
             RDFFormat rdfFormat = (RDFFormat) saveProperties.get("rdfFormat");
             boolean useAboutRules = (boolean) saveProperties.get("useAboutRules");   //switch to trigger file chooser and adding the property
@@ -277,6 +291,9 @@ public class WizardContext {
                         properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
                         properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
                         properties.put("sortRDF",sortRDF);
+                        properties.put("showXmlBaseDeclaration", showXmlBaseDeclaration);
+                        properties.put("instanceData", instanceData);
+                        properties.put("sortRDFprefix",sortRDFprefix);
                         //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
                         //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
                         //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
@@ -705,9 +722,9 @@ public class WizardContext {
             outputStream.flush();
             outputStream.close();
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 

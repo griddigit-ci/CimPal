@@ -1,0 +1,97 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: High-contrast Cyberpunk
+ * Near-black violet base, cyan primary accent, magenta secondary. Square corners,
+ * heavy borders, glow on focus.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #17082e;
+    -fx-background:                   #0d0221;
+    -fx-control-inner-background:     #1b0b33;
+    -fx-control-inner-background-alt: #150827;
+    -fx-accent:                       #0a5f5c;
+    -fx-focus-color:                  #00fff5;
+    -fx-faint-focus-color:            #00fff533;
+    -fx-selection-bar:                #a3104a;
+    -fx-selection-bar-non-focused:    #2a1050;
+    -fx-default-button:               #2a1050;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #f2f2ff;
+    -fx-dark-text-color:              #0d0221;
+    -fx-text-base-color:              #f2f2ff;
+    -fx-text-background-color:        #f2f2ff;
+    -fx-text-inner-color:             #f2f2ff;
+    -fx-mid-text-color:               #b9a9e0;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #f2f2ff;
+    -cimpal-text-muted:      #b9a9e0;
+    -cimpal-text-disabled:   #9d8cc4;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #14062a;
+    -cimpal-surface-2:       #241145;
+    -cimpal-border:          #8a4bff;
+    -cimpal-badge-bg:        #1b0b33;
+    -cimpal-badge-border:    #00fff5;
+    -cimpal-badge-text:      #00fff5;
+    -cimpal-warning:         #ff5c8d;
+}
+
+/* --- square, bordered, glowing --- */
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 0;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover {
+    -fx-background-color: -fx-focus-color, -fx-base;
+    -fx-text-fill: -fx-focus-color;
+}
+
+.button:focused, .toggle-button:focused, .text-field:focused, .text-area:focused,
+.choice-box:focused, .combo-box-base:focused, .check-box:focused, .radio-button:focused {
+    -fx-effect: dropshadow(gaussian, #00fff5, 8, 0.4, 0, 0);
+}
+
+.text-field, .text-area {
+    -fx-border-color: -cimpal-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 0;
+}
+
+.menu-bar {
+    -fx-border-color: transparent transparent -fx-focus-color transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.titled-pane > .title > .text {
+    -fx-fill: -fx-focus-color;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-border-color: -fx-focus-color -cimpal-border -fx-focus-color transparent;
+    -fx-border-width: 2 1 2 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label,
+.table-view .column-header .label,
+.tree-table-view .column-header .label {
+    -fx-text-fill: -fx-focus-color;
+}
+
+.scroll-bar > .thumb,
+.titled-pane > .title,
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 0;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: -cimpal-warning;
+    -fx-background-radius: 0;
+}

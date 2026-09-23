@@ -8,6 +8,7 @@ import eu.griddigit.cimpal.core.models.RDFCompareResult;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.application.rdfDiffResultController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -76,6 +77,13 @@ public class RDFComparisonController implements Initializable {
         fcbRDFSformat.getSelectionModel().selectLast();
         fcbRDFSformat.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> actionCBfcbRDFSformat());
         actionCBfcbRDFSformat();
+
+        PathMemory.bind(fPathRdffile1, "tab.rdfComparison.file1", file -> MainController.rdfModel1 = file);
+        PathMemory.bind(fPathRdffile2, "tab.rdfComparison.file2", file -> MainController.rdfModel2 = file);
+        //the Browse handlers enable Run as soon as both files are set; restoring them is the same state
+        if (!fPathRdffile1.getText().isEmpty() && !fPathRdffile2.getText().isEmpty()) {
+            btnRunRDFcompare.setDisable(false);
+        }
     }
 
     public void setMainController(MainController mainController) {
@@ -131,9 +139,9 @@ public class RDFComparisonController implements Initializable {
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool")) {
             //select file 1
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "", "tab.rdfComparison.file1");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "", "tab.rdfComparison.file1");
         } else return;
 
         if (!file.isEmpty() && file.getFirst() != null) {// the file is selected
@@ -157,9 +165,9 @@ public class RDFComparisonController implements Initializable {
         if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen") ||
                 fcbRDFSformat.getSelectionModel().getSelectedItem().equals("RDFS (augmented) by CimSyntaxGen with CIMTool")) {
             //select file 2
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.legacy-rdfs-augmented"), "", "tab.rdfComparison.file2");
         } else if (fcbRDFSformat.getSelectionModel().getSelectedItem().equals("Universal method inlc. SHACL Shapes")) {
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Universal method inlc. SHACL Shapes", List.of("*.rdf", "*.ttl"), "", "tab.rdfComparison.file2");
         } else return;
 
         if (!file.isEmpty() && file.getFirst() != null) {// the file is selected

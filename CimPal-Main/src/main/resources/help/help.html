@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<!--
+ Licensed under the EUPL-1.2-or-later.
+ Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+
+ CimPal user documentation. This page is displayed inside a JavaFX WebView by
+ eu.griddigit.cimpal.main.gui.HelpWindow, and is also usable stand-alone in any browser.
+
+ IMPORTANT - keep this file self-contained: all CSS and JavaScript inline, no images, no web
+ fonts, no external links. When CimPal runs from the shaded jar this document is loaded over a
+ "jar:file:...!/help/help.html" URL, and relative sub-resource resolution under that scheme is
+ unreliable. The only hrefs allowed here are in-page #fragment anchors.
+
+ The palette is switched by a data-theme attribute that HelpWindow sets from
+ ThemeManager.Theme.group(): "light" (default), "dark" or "hc".
+-->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CimPal Help</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #1a1d21;
+  --muted: #5b6570;
+  --border: #d8dee4;
+  --card: #f7f9fb;
+  --card-head: #eff4f9;
+  --accent: #0a6cbd;
+  --accent-soft: #e3eefa;
+  --code-bg: #eef2f6;
+  --nav-bg: #f3f6f9;
+  --shadow: rgba(16, 24, 40, 0.06);
+}
+[data-theme="dark"] {
+  --bg: #1e2228;
+  --fg: #e6e9ed;
+  --muted: #9aa4b0;
+  --border: #39414b;
+  --card: #262b33;
+  --card-head: #2d333c;
+  --accent: #5ab0f5;
+  --accent-soft: #23313f;
+  --code-bg: #2d333c;
+  --nav-bg: #23272e;
+  --shadow: rgba(0, 0, 0, 0.35);
+}
+[data-theme="hc"] {
+  --bg: #000000;
+  --fg: #ffffff;
+  --muted: #e0e0e0;
+  --border: #ffffff;
+  --card: #000000;
+  --card-head: #000000;
+  --accent: #ffff00;
+  --accent-soft: #333300;
+  --code-bg: #000000;
+  --nav-bg: #000000;
+  --shadow: transparent;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  align-items: start;
+}
+
+/* ---------- sidebar ---------- */
+
+nav {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--nav-bg);
+  border-right: 1px solid var(--border);
+  padding: 20px 0 40px 0;
+}
+
+.brand {
+  padding: 0 18px 14px 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.brand .name {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.brand .sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.filter-wrap { padding: 0 18px 12px 18px; }
+
+#filter {
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+#filter:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.bulk { padding: 0 18px 14px 18px; display: flex; gap: 8px; }
+.bulk button {
+  flex: 1;
+  padding: 5px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.bulk button:hover { border-color: var(--accent); color: var(--accent); }
+
+nav .group {
+  padding: 14px 18px 4px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+nav a {
+  display: block;
+  padding: 5px 18px 5px 18px;
+  font-size: 13.5px;
+  color: var(--fg);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+nav a:hover { background: var(--accent-soft); }
+nav a.active {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+nav a.hidden { display: none; }
+nav .group.hidden { display: none; }
+
+/* Submenu heading: same voice as .group but quieter, so the sidebar mirrors the
+   two levels of the Tools menu instead of one flat list. */
+nav .subgroup {
+  padding: 11px 18px 3px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+nav .subgroup.hidden { display: none; }
+nav a.sub { padding-left: 30px; }
+
+.nav-empty {
+  display: none;
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+.nav-empty.show { display: block; }
+
+/* ---------- main ---------- */
+
+main {
+  padding: 30px 42px 90px 42px;
+  max-width: 1000px;
+}
+
+h1 {
+  font-size: 30px;
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+}
+h2 {
+  font-size: 21px;
+  margin: 42px 0 12px 0;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+  scroll-margin-top: 12px;
+}
+h3 { font-size: 17px; margin: 26px 0 8px 0; }
+h4 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 18px 0 6px 0;
+}
+p { margin: 0 0 12px 0; }
+ul, ol { margin: 0 0 12px 0; padding-left: 22px; }
+li { margin-bottom: 4px; }
+
+.lead { font-size: 16.5px; color: var(--fg); }
+.tagline { color: var(--muted); margin-bottom: 22px; }
+
+code, kbd {
+  font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+  font-size: 0.88em;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+kbd { font-weight: 600; }
+
+.note {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  background: var(--card);
+  border-radius: 5px;
+  padding: 11px 14px;
+  margin: 0 0 16px 0;
+}
+.note strong { color: var(--accent); }
+
+/* ---------- function cards ---------- */
+
+details.fn {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  margin: 0 0 12px 0;
+  box-shadow: 0 1px 2px var(--shadow);
+  scroll-margin-top: 12px;
+}
+details.fn.hidden { display: none; }
+
+details.fn > summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--card-head);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+details.fn > summary:hover { color: var(--accent); }
+details.fn > summary:focus-visible { outline: 2px solid var(--accent); }
+details.fn[open] > summary {
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+
+.kind {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  flex: none;
+}
+
+.fn-body { padding: 4px 16px 16px 16px; }
+.fn-body > h4:first-child { margin-top: 12px; }
+
+table.io {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 12px 0;
+  font-size: 13.5px;
+}
+table.io th, table.io td {
+  border: 1px solid var(--border);
+  padding: 6px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+table.io th {
+  background: var(--card-head);
+  font-size: 11.5px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+table.io td:nth-child(2) { white-space: nowrap; color: var(--muted); }
+
+.src {
+  margin: 16px 0 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+table.gloss {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+table.gloss th, table.gloss td {
+  border: 1px solid var(--border);
+  padding: 6px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+table.gloss th { background: var(--card-head); white-space: nowrap; }
+table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
+
+.footer {
+  margin-top: 50px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---------- narrow window: single column ---------- */
+
+@media (max-width: 900px) {
+  body { grid-template-columns: minmax(0, 1fr); }
+  nav {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  main { padding: 22px 20px 70px 20px; }
+}
+</style>
+</head>
+<body>
+
+<nav id="sidebar" aria-label="Contents">
+  <div class="brand">
+    <div class="name">CimPal Help</div>
+    <div class="sub">Version 2026.9.10.1</div>
+  </div>
+
+  <div class="filter-wrap">
+    <input id="filter" type="search" placeholder="Filter topics&hellip;" autocomplete="off"
+           aria-label="Filter topics">
+  </div>
+  <div class="bulk">
+    <button type="button" id="expandAll">Expand all</button>
+    <button type="button" id="collapseAll">Collapse all</button>
+  </div>
+  <p class="nav-empty" id="navEmpty">No topic matches that text.</p>
+
+  <div class="group">Getting started</div>
+  <a href="#overview">What CimPal is</a>
+  <a href="#purpose">Core purpose</a>
+  <a href="#workflows">Typical workflows</a>
+  <a href="#using">Using the window</a>
+  <a href="#glossary">Glossary</a>
+
+  <div class="group">Operations</div>
+  <div class="subgroup">Quick actions</div>
+  <a class="sub" href="#tab-rdf-visualisation">Visualise</a>
+  <a class="sub" href="#tab-rdf-convert">Convert</a>
+  <a class="sub" href="#tab-sparql-query">SPARQL</a>
+  <a class="sub" href="#tab-ai-assistant">AI Assistant</a>
+  <div class="subgroup">SHACL</div>
+  <a class="sub" href="#tab-rdfs-to-shacl">RDFS to SHACL</a>
+  <a class="sub" href="#tab-excel-to-shacl">Constraints Operations</a>
+  <div class="subgroup">RDF</div>
+  <a class="sub" href="#tab-rdf-comparison">Comparison</a>
+  <div class="subgroup">Dataset</div>
+  <a class="sub" href="#tab-instance-data-comparison">Comparison</a>
+  <a class="sub" href="#tab-generate-instance-data">Generate</a>
+  <a class="sub" href="#tab-task-wizard">Task Wizard</a>
+  <a class="sub" href="#tab-validation-by-mapping">SHACL Validation</a>
+
+  <div class="group">Tools menu</div>
+  <div class="subgroup">RDFS Profiles</div>
+  <a class="sub" href="#tool-export-rdfs-descriptions">Export RDFS descriptions</a>
+  <a class="sub" href="#tool-export-triples">Export RDF tripples to xls</a>
+  <a class="sub" href="#tool-gen-info-from-rdfs">Generate information from RDFS</a>
+  <a class="sub" href="#tool-properties-info-from-rdfs">Generate properties info from RDFS</a>
+  <a class="sub" href="#tool-datatypes-map">Create datatypes map</a>
+  <div class="subgroup">SHACL Constraints</div>
+  <a class="sub" href="#tool-export-shacl-info">Export SHACL constraints information to Excel</a>
+  <a class="sub" href="#tool-export-all-shacl-info">Export All SHACL constraints information</a>
+  <a class="sub" href="#tool-validate-shacl-shapes">Validate SHACL shapes</a>
+  <a class="sub" href="#tool-restore-ttl">Restore ttl from constraint csv</a>
+  <div class="subgroup">Reference Data</div>
+  <a class="sub" href="#tool-convert-reference-data">Convert Reference Data</a>
+  <a class="sub" href="#tool-ref-to-common-data">Convert Reference data to Common data</a>
+  <div class="subgroup">Instance Data &amp; Models</div>
+  <a class="sub" href="#tool-model-transformation">Model transformation</a>
+  <a class="sub" href="#tool-populate-attributes">Populate missing attributes</a>
+  <a class="sub" href="#tool-generate-manifest">Generate Manifest</a>
+  <a class="sub" href="#tool-psse-pf">PSSE-PowerFactory compare</a>
+  <div class="subgroup">Quality Reports</div>
+  <a class="sub" href="#tool-generate-qar">Generate QAR based on xls</a>
+  <a class="sub" href="#tool-qar-template">Create xlsx template from QAR</a>
+  <a class="sub" href="#tool-qocdc">QoCDC 3.2.1 xml to Excel</a>
+  <div class="subgroup">Top level</div>
+  <a class="sub" href="#tool-validate-by-mapping">Validate by mapping file</a>
+  <a class="sub" href="#tool-run-sparql">Run SPARQL Query</a>
+
+  <div class="group">Settings</div>
+  <a href="#pref-card">Preferences</a>
+  <a href="#clear-remote-cache">Clear cached remote data</a>
+</nav>
+
+<main>
+
+<h1 id="overview">CimPal</h1>
+<p class="tagline">A desktop workbench for CIM&nbsp;/&nbsp;CGMES semantic models &mdash; profiles,
+constraints and instance data.</p>
+
+<p class="lead">CimPal is an open-source Java application developed by gridDigIt to support the implementation of the Common Information Model (CIM) and Common Grid Model Exchange Standard (CGMES) profiles in the power sector. It is licensed under the EUPL-1.2-or-later. It helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM. CimPal is a graphical tool for the people who build and maintain
+<strong>CIM based</strong> data exchange standards (such as IEC CGMES or IEC 61970-45x), specifications (ENSTO-E Network Codes profiles) and the datasets exchanged under them. It
+works on three kinds of artefact and, above all, on the relationships between them:</p>
+
+<ul>
+  <li><strong>RDFS profile definitions</strong> &mdash; the machine-readable description of a
+      data exchange profile (which classes, which properties, which multiplicities), as produced
+      by CimSyntaxGen or CIMTool from a UML model.</li>
+  <li><strong>SHACL constraint sets</strong> &mdash; the executable rules that decide whether a
+      dataset conforms to a profile.</li>
+  <li><strong>RDF instance data datasets</strong> &mdash; the actual exchanged models: CGMES individual and
+      common grid models (IGM&nbsp;/&nbsp;CGM), reference datasets, boundary datasets or other datasets in various serialisations.</li>
+</ul>
+
+<p>Everything in the application is reachable from three places: the <strong>tabs</strong> in the
+main window (interactive, multi-step work), the <strong>Tools</strong> menu (single-shot batch
+conversions and exports), and the <strong>File</strong> menu (namespaces, appearance and the cache
+of downloaded files). The tabs are grouped into three categories &mdash; <em>SHACL Generation</em>,
+<em>RDF Operations</em> and <em>Dataset Operations</em> &mdash; which is also how this page is
+organised. Every operation writes progress and results to the <em>Output</em> panel at the bottom
+of the window.</p>
+
+<h2 id="purpose">Core purpose</h2>
+
+<p>CimPal exists to remove the hand-work from four recurring jobs in CIM standardisation and
+CIM-based data exchange:</p>
+
+<ol>
+  <li><strong>Deriving constraints from a profile.</strong> A profile expressed as RDFS is
+      declarative but not executable. CimPal generates the corresponding SHACL shapes graph from
+      it, so the profile and the validation rules cannot drift apart.</li>
+  <li><strong>Converting and normalising models.</strong> RDF/XML, Turtle and JSON-LD in, the same
+      in any other serialisation out &mdash; with deterministic, diff-friendly ordering, controlled
+      namespace prefixes and CGMES-compliant (IEC&nbsp;61970-552) instance data serialisation.</li>
+  <li><strong>Comparing two versions.</strong> Whether two profile releases or two instance
+      datasets, CimPal reports what was added, removed and changed instead of leaving you with a
+      textual diff of two large XML files.</li>
+  <li><strong>Validating and producing test data.</strong> Run SHACL constraint sets over whole
+      folders of models and collect the reports; and generate, multiply and deliberately corrupt
+      instance data in order to test the constraints themselves.</li>
+  <li><strong>Data visualisation and query.</strong> Visualising and browsing datasets and
+      querying them. Query results can be saved as .xlsx.</li>
+</ol>
+
+<h2 id="workflows">Typical workflows</h2>
+
+<h3>Publishing a constraint set for a new profile version</h3>
+<ol>
+  <li><a href="#tab-rdfs-to-shacl">RDFS to SHACL</a> &mdash; load the profile RDFS files, select the
+      profiles in the tree, set the shapes namespace and base URI, press <em>Create</em>, save the
+      generated <code>.ttl</code> shapes.</li>
+  <li><a href="#tool-validate-shacl-shapes">Tools &#9656; SHACL Constraints &#9656; Validate SHACL
+      shapes</a> &mdash; confirm
+      the generated shapes are themselves conformant (or simply leave <em>Validate generated SHACL
+      shapes</em> ticked in step 1).</li>
+  <li><a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> &mdash; with the
+      <em>Validate by manual selection</em> workflow, run the new shapes over a folder of
+      known-good models and check that nothing conformant is rejected.</li>
+  <li><a href="#tool-export-shacl-info">Tools &#9656; SHACL Constraints &#9656; Export SHACL
+      constraints information to Excel</a> &mdash; produce the human-readable constraint
+      documentation that accompanies the release.</li>
+</ol>
+
+<h3>Reviewing what changed between two profile releases</h3>
+<ol>
+  <li><a href="#tab-rdf-comparison">RDF Operations &#9656; Comparison</a> &mdash; load the two RDFS profile files,
+      choose the matching format, run the comparison and read the difference report.</li>
+  <li><a href="#tab-rdf-convert">RDF Operations &#9656; Convert</a> &mdash; optionally normalise both files to sorted
+      Turtle first, so any remaining textual diff is meaningful.</li>
+</ol>
+
+<h3>Checking a received dataset</h3>
+<ol>
+  <li><a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> &mdash; validate the
+      model against the applicable constraint set. Use <em>Validate by manual selection</em> when
+      you pick the constraint files yourself, or one of the mapping workflows when a CSV drives
+      which constraints apply to which input.</li>
+  <li><a href="#tab-instance-data-comparison">Dataset Operations &#9656; Comparison</a> &mdash; compare the
+      dataset against the reference or previous version.</li>
+  <li><a href="#tab-rdf-visualisation">RDF Operations &#9656; Visualisation</a> &mdash; open the
+      objects the validation report or the comparison named, and look at their remaining
+      properties in context.</li>
+  <li><a href="#tab-sparql-query">Dataset Operations &#9656; SPARQL Query</a> &mdash; answer any
+      ad-hoc question the reports did not cover.</li>
+</ol>
+
+<h3>Producing test data for a constraint set</h3>
+<ol>
+  <li><a href="#tab-generate-instance-data">Dataset Operations &#9656; Generate</a> &mdash; create an Excel
+      template from the profile, fill it in, convert it to CIMXML.</li>
+  <li><a href="#tab-task-wizard">Dataset Operations &#9656; Task Wizard</a> &mdash; multiply the base model, regenerate
+      identifiers, or deliberately introduce non-conformities to prove that the constraints catch
+      them.</li>
+</ol>
+
+<h2 id="using">Using the window</h2>
+
+<ul>
+  <li><strong>Operations toolbar</strong> &mdash; <em>Visualise</em>, <em>Convert</em> and
+      <em>SPARQL</em> are transversal tools and are always available as direct buttons. The
+      <em>SHACL</em>, <em>RDF</em> and <em>Dataset</em> menus contain the operations that are
+      specific to that area. The content itself keeps its state when you move between tools.</li>
+  <li><strong>Collapsing either half of the window</strong> &mdash; both <em>Operations</em> (the
+      tabs) and <em>Output</em> are collapsible panels. Click the title of either one to fold it
+      away and give the whole height to the other: fold <em>Operations</em> to read a long
+      validation log full-window, then click its title again to return to exactly the split you had
+      before. The divider between them can also be dragged as usual.</li>
+  <li><strong>Output panel</strong> &mdash; the panel at the bottom receives all progress and
+      result messages. The bin icon above it empties the panel; hover it for the <em>Clear Output
+      Window</em> tooltip.</li>
+  <li><strong>Status bar</strong> &mdash; the progress bar and status message at the very bottom
+      show operation progress, load/filter scope, and graph/table summaries. An indeterminate bar
+      means the operation cannot report a percentage; a full green bar indicates a successfully
+      completed operation.</li>
+  <li><strong>Help badges</strong> &mdash; the small <code>?</code> markers next to fields in the
+      tabs show a detailed tooltip on hover. This page reproduces the same texts.</li>
+  <li><strong>Reset</strong> &mdash; every tab has a <em>Reset</em> button that clears its fields
+      and loaded models without touching the other tabs.</li>
+  <li><strong>This help window</strong> &mdash; opened with <kbd>F1</kbd> or
+      <em>Help&nbsp;&#9656;&nbsp;Help Contents</em>. It is not modal, so you can keep it open while
+      working. Use the toolbar to navigate, change the text size, or open this page in your system
+      browser for printing.</li>
+</ul>
+
+<h2 id="glossary">Glossary</h2>
+
+<table class="gloss">
+  <tr><th>Term</th><th>Meaning</th></tr>
+  <tr><td>CIM</td><td>Common Information Model &mdash; the semantic
+      model of the electrical power system.</td></tr>
+  <tr><td>CGMES</td><td>Common Grid Model Exchange Standard &mdash; the IEC standard IEC 61970-600-1 and IEC 61970-600-2.</td></tr>
+  <tr><td>NC</td><td>Network Codes profiles &mdash; the ENTSO-E CIM-based profiles supporting additional data needed for the European
+      network codes data exchanges.</td></tr>
+  <tr><td>RDFS profile</td><td>The machine-readable definition of one exchange profile: its
+      classes, properties, datatypes and multiplicities. CimPal reads the <em>augmented</em> RDFS
+      form produced by CimSyntaxGen or CIMTool.</td></tr>
+  <tr><td>SHACL</td><td>Shapes Constraint Language &mdash; the W3C language for validating RDF
+      graphs. A <em>shapes graph</em> is the executable form of a profile's rules.</td></tr>
+  <tr><td>IGM&nbsp;/&nbsp;CGM</td><td>Individual Grid Model (one TSO's part) and Common Grid Model
+      (the assembled, merged model).</td></tr>
+  <tr><td>EQ, SSH, TP, SV, DL, GL</td><td>The CGMES profile and instance files/datasets: Equipment, Steady State
+      Hypothesis, Topology, State Variables, Diagram Layout, Geographical Location.</td></tr>
+  <tr><td>mRID</td><td>Master Resource Identifier &mdash; the persistent identifier of a CIM
+      object, carried as <code>IdentifiedObject.mRID</code>.</td></tr>
+  <tr><td><code>rdf:ID</code></td><td>The identifier of a resource within the serialised instance
+      file. Normally the same value as the mRID, which is why several tools exist to reconcile the
+      two.</td></tr>
+  <tr><td>MAS</td><td>Modelling Authority Set &mdash; the header field declaring who is responsible
+      for a model part.</td></tr>
+  <tr><td>QAR</td><td>Quality Assessment Report &mdash; the CIM-based report of data quality
+      findings for an exchanged model.</td></tr>
+  <tr><td>QoCDC</td><td>Quality of CGMES Datasets and Calculations &mdash; the ENTSO-E catalogue of quality rules applied for CGMES v2.4 based data exchanges.</td></tr>
+  <tr><td>Reference data</td><td>The shared, slowly-changing datasets (codelists, boundary
+      definitions) referenced by exchanged models.</td></tr>
+  <tr><td>Datatype map</td><td>A properties file mapping profile property URIs to their expected
+      datatypes, used to type-check values during comparison and validation.</td></tr>
+</table>
+
+<!-- ================================================================= TABS -->
+
+<h2>Main GUI tabs</h2>
+
+<p>The main window groups its ten functions into three categories, shown as the upper row of
+tabs; the functions of the selected category are the lower row. The categories reflect what the
+function operates on, not what it produces:</p>
+
+<ul>
+  <li><strong>SHACL Generation</strong> &mdash; deriving and maintaining constraint sets from
+      RDFS profile definitions.</li>
+  <li><strong>RDF Operations</strong> &mdash; syntax-level work that applies to any RDF graph,
+      whether it is a profile definition or a dataset: comparing, converting, browsing.</li>
+  <li><strong>Dataset Operations</strong> &mdash; work specific to instance data: comparing,
+      generating, transforming, querying and validating exchanged models.</li>
+</ul>
+
+<p>The categories are listed below in the order they appear, and the functions within each
+category likewise.</p>
+
+<h3>SHACL Generation</h3>
+
+<details class="fn" id="tab-rdfs-to-shacl">
+<summary><span class="kind">Tab</span> SHACL Generation &#9656; RDFS to SHACL</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>The primary function of the application: it turns an RDFS profile definition into an executable
+SHACL shapes graph. Load one or more profile RDFS files, pick the profiles to process from the
+tree, decide how associations, inheritance, abstract classes and cross-profile references should be
+constrained, and CimPal writes a Turtle shapes file per profile. Because the shapes are derived
+from the profile rather than written by hand, the constraint set cannot drift away from the profile
+it is supposed to enforce.</p>
+<p>The tab also generates the optional companions to a constraint release: a datatype map for later
+instance-data validation, a separate datatypes-only shapes file, and the class inheritance tree.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Load RDFS profiles</td><td>files, required</td>
+    <td>One or more profile RDFS files (<code>.rdf</code>). Loading them populates the
+        <em>Profiles</em> tree and enables the option controls.</td></tr>
+<tr><td>Profiles tree</td><td>selection, required</td>
+    <td>The profiles to generate shapes for. Nothing selected produces the error
+        <em>&ldquo;Error - no profile selected&rdquo;</em>.</td></tr>
+<tr><td>Save datatypes map</td><td>choice</td>
+    <td>During the conversion process a datatype mapping can be generated.
+        <em>No map; No save</em> skips it entirely; <em>All profiles in one map</em> generates a
+        single map file covering all loaded profiles; <em>Per profile</em> prompts for a save
+        location after each profile's shapes are created. The datatype map can later be used to
+        validate instance data against shape graphs.</td></tr>
+<tr><td>Profile(s) version</td><td>choice</td>
+    <td>The CGMES/CIM version of the loaded RDFS profiles. Affects how namespaces, datatypes and
+        profile relationships are resolved during generation. Choose the version matching the
+        standard the profiles were created for.</td></tr>
+<tr><td>Shapes namespace</td><td>text (prefix + URI)</td>
+    <td>The namespace of the generated shapes graph. <em>Apply default namespace</em> takes it from
+        Preferences; otherwise give the short Turtle alias (e.g. <code>cim-sh</code>) and the full
+        URI it expands to.</td></tr>
+<tr><td>Shapes base URI</td><td>text</td>
+    <td>The base URI (IRI) of the generated shapes graph. <em>Apply default base URI</em> takes it
+        from Preferences; otherwise enter the graph IRI directly.</td></tr>
+<tr><td>Shapes owl:imports URIs</td><td>text</td>
+    <td>Comma-separated list of URIs to include as <code>owl:imports</code> in the generated header,
+        declaring that the shapes graph imports other ontologies or shape libraries.</td></tr>
+<tr><td>RDFS format</td><td>choice</td>
+    <td>The syntax format of the loaded profiles: <em>RDFS (augmented, v2020)</em> &mdash; current
+        CimSyntaxGen format; <em>RDFS (augmented, v2019)</em> &mdash; older CimSyntaxGen format;
+        <em>Merged OWL CIMTool</em> &mdash; not yet supported, and rejected with an explicit
+        message.</td></tr>
+<tr><td>Generate shapes for local properties of concrete and abstract classes</td><td>checkbox</td>
+    <td>Does <em>not</em> trace inheritance: generates property shapes only for properties directly
+        defined on each class, not inherited ones.</td></tr>
+<tr><td>Export inheritance tree</td><td>checkbox</td>
+    <td>Adds the class hierarchy structure to the output, saved as a separate model.</td></tr>
+<tr><td>Use sh:in for association value type constraint</td><td>checkbox</td>
+    <td>When an association allows several value types, generates <code>sh:in</code> with a list of
+        all allowed classes instead of <code>sh:class</code> and <code>sh:or</code>.</td></tr>
+<tr><td>Use sh:class &hellip; in case value type is one class only</td><td>checkbox</td>
+    <td>If only one value type is allowed, uses the simpler <code>sh:class</code> instead of
+        <code>sh:in</code>.</td></tr>
+<tr><td>Exclude IdentifiedObject.mRID for Description stereotypes</td><td>checkbox</td>
+    <td>Omits the mRID constraint for classes carrying the CIM <em>Description</em> stereotype:
+        these are not individually identifiable, so an mRID constraint is not applicable.</td></tr>
+<tr><td>Consider related profiles for cross profile value type shapes</td><td>checkbox</td>
+    <td>When an association's target class is defined in another loaded profile, uses that
+        profile's shapes for the value type constraint. Ticking this prompts for the related profile
+        file set. A 2nd and 3rd set can be added the same way.</td></tr>
+<tr><td>Ignore namespace if class not found in base profile</td><td>checkbox</td>
+    <td>Falls back to matching by class local name only when the full namespace URI match fails in
+        the related profile.</td></tr>
+<tr><td>Create constraints for checking multiplicity of inverse association's end</td><td>checkbox</td>
+    <td>Generates <code>sh:minCount</code>&nbsp;/&nbsp;<code>sh:maxCount</code> for the inverse end
+        of bidirectional associations.</td></tr>
+<tr><td>Create constraints for checking presence of additional properties</td><td>checkbox</td>
+    <td>Generates closed-world constraints that flag any property on an instance that is not
+        defined in the profile.</td></tr>
+<tr><td>Create sh:Info constraints to count number of classes</td><td>checkbox</td>
+    <td>Generates informational shapes reporting the instance count of each class &mdash; useful
+        for statistics. <em>Namespace type</em> decides whether those count shapes use the profile's
+        own namespace or the custom prefix and URI given next to it.</td></tr>
+<tr><td>Treat URI datatype as rdf:resource</td><td>checkbox</td>
+    <td>Maps properties typed as <em>URI</em> to <code>rdf:resource</code> references rather than
+        <code>xsd:anyURI</code> typed literals.</td></tr>
+<tr><td>Skip value type checks for associations to nc:PropertyReference</td><td>checkbox</td>
+    <td>Suppresses value type constraints for associations whose target is
+        <code>nc:PropertyReference</code>.</td></tr>
+<tr><td>Validate generated SHACL shapes</td><td>checkbox</td>
+    <td>Runs SHACL-on-SHACL validation on the output to verify the shapes are themselves
+        conformant.</td></tr>
+<tr><td>Generate separate SHACL shapes for datatypes validation</td><td>checkbox</td>
+    <td>Creates an additional output file containing only the datatype validation shapes, separate
+        from the structural shapes.</td></tr>
+<tr><td>Apply</td><td>button</td>
+    <td>Applies the namespace prefix, namespace URI and base URI currently in the fields to the
+        single profile selected in the tree, so different profiles can carry different
+        namespaces.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>One SHACL shapes file (Turtle) per selected profile, written to the output folder you are
+      asked for after generation.</li>
+  <li>A datatypes-only shapes file per profile (name prefixed <code>datatype-</code>) when
+      <em>Generate separate SHACL shapes for datatypes validation</em> is ticked.</li>
+  <li>An inheritance model file when <em>Export inheritance tree</em> is ticked.</li>
+  <li>A datatype map file (<code>.properties</code>) according to the <em>Save datatypes map</em>
+      choice.</li>
+  <li>SHACL-on-SHACL validation reports printed to the Output window when validation is
+      enabled.</li>
+</ul>
+
+<p class="src">Source: <code>RDFStoSHACLController.actionOpenRDFS()</code>,
+<code>actionBtnApply()</code>, <code>actionBtnRDFStoShacl()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-excel-to-shacl">
+<summary><span class="kind">Tab</span> SHACL Generation &#9656; Constraints Operations</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>The spreadsheet-driven operations on a constraint set, for the cases the automatic
+RDFS&nbsp;&rarr;&nbsp;SHACL derivation cannot cover. Three related routines share the tab, each in
+its own collapsible section with its own <em>Reset</em> and <em>Run</em>; filling in one does not
+affect the others, and only one section is open at a time.</p>
+<ol>
+  <li><strong>Generate SHACL constraints based on Excel template</strong> takes an RDFS ontology
+      plus a spreadsheet in which each row defines one constraint, and builds the corresponding
+      SHACL shapes graph &mdash; letting domain experts author constraints in a familiar tool.</li>
+  <li><strong>Modify SHACL .ttl based on Excel input</strong> takes a spreadsheet of modifications
+      and applies them to an already-published shapes file, which is how targeted corrections are
+      made to a released constraint set without regenerating it.</li>
+  <li><strong>Split SHACL Constraints .ttl based on Excel template</strong> restructures a
+      constraint set into separate deliverable files according to a spreadsheet plan.</li>
+</ol>
+
+<p class="note">The third routine was previously a separate <em>SHACL Organizer</em> tab.</p>
+
+<h4>Inputs</h4>
+
+<p><strong>1. Generate SHACL constraints based on Excel template</strong>:</p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDF file</td><td>file, required</td>
+    <td>The RDFS ontology file (<code>.xml</code>, <code>.rdf</code>) containing CIM class and
+        property definitions. Used as the base for generating SHACL shapes from the Excel
+        constraints.</td></tr>
+<tr><td>RDFS format</td><td>choice</td>
+    <td>The format/version of the RDFS profile (for example the augmented CimSyntaxGen
+        format).</td></tr>
+<tr><td>Input - Excel file</td><td>file, required</td>
+    <td>Excel file (<code>.xls</code>/<code>.xlsx</code>) containing SHACL constraint definitions.
+        Each row defines a constraint derived from the RDFS model.</td></tr>
+<tr><td>Base URI - Shape graph</td><td>text</td>
+    <td>The base URI (IRI) for the generated SHACL shapes graph, used as the graph name in the
+        output.</td></tr>
+<tr><td>Prefix / Namespace</td><td>text</td>
+    <td>The namespace prefix and URI for the generated shapes graph: the prefix is the short Turtle
+        alias, the URI the full namespace it expands to.</td></tr>
+</table>
+
+<p><strong>2. Modify SHACL .ttl based on Excel input</strong>:</p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Input from Excel .xlsx</td><td>file, required</td>
+    <td>Excel file (<code>.xlsx</code>) containing the constraint modifications to apply. Each row
+        specifies one change to the constraints file selected below.</td></tr>
+<tr><td>Constraints .ttl to modify</td><td>file, required</td>
+    <td>The existing SHACL constraints file (<code>.ttl</code>) that the changes from the Excel
+        input are applied to. The result is written to a new file you choose when the routine
+        finishes; this file is not overwritten in place.</td></tr>
+</table>
+
+<p><strong>3. Split SHACL Constraints .ttl based on Excel template</strong>:</p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>SHACL Constraints files (.ttl)</td><td>files, required</td>
+    <td>Input SHACL constraints files (<code>.ttl</code>) to be split according to the Excel
+        template. Several files can be selected and are combined before splitting.</td></tr>
+<tr><td>Excel template file</td><td>file, required</td>
+    <td>Excel template (<code>.xlsx</code>) defining how the constraints are grouped into the
+        resulting files. Produced by the SHACL constraints information export, or created
+        manually. The first worksheet is read.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>Routine 1: a SHACL shapes file written to the location chosen in the <em>Save as for shape
+      model</em> dialog.</li>
+  <li>Routine 2: an updated Turtle file saved through a standard save dialog.</li>
+  <li>Routine 3: the reorganised SHACL Turtle files, split as the spreadsheet specifies.</li>
+  <li>Progress in the status bar and any problems reported in the Output window.</li>
+</ul>
+
+<p class="src">Source: <code>ExcelToSHACLController.actionBtnRunExcelShape()</code>,
+<code>actionBtnRunExcelToTtl()</code>, <code>actionBtnRunShaclOrganizer()</code></p>
+</div>
+</details>
+
+<h3>RDF Operations</h3>
+
+<details class="fn" id="tab-rdf-comparison">
+<summary><span class="kind">Tab</span> RDF Operations &#9656; Comparison</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Compares two RDFS profile definitions &mdash; typically two releases of the same profile &mdash;
+and reports the semantic differences: classes and properties added or removed, changed
+multiplicities, changed datatypes and value types. This answers &ldquo;what actually changed in this
+release?&rdquo; without reading a textual diff of two large RDF files, and works across a namespace
+change so that a version bump does not appear as a wholesale rewrite.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Model A</td><td>file, required</td>
+    <td>First RDF model file to compare. Supports RDF/XML (<code>.xml</code>, <code>.rdf</code>),
+        Turtle (<code>.ttl</code>) or ZIP archives containing model files.</td></tr>
+<tr><td>Model B</td><td>file, required</td>
+    <td>Second RDF model file to compare against Model A.</td></tr>
+<tr><td>Scope / RDFS format</td><td>choice, required</td>
+    <td>The version/format of the RDFS profile describing the models. Choose the one matching your
+        input files: <em>RDFS (augmented) by CimSyntaxGen</em>, <em>RDFS (augmented) by
+        CimSyntaxGen with CIMTool</em>, or <em>Universal method incl. SHACL Shapes</em> &mdash; the
+        last also compares SHACL shape graphs.</td></tr>
+<tr><td>Same CIM namespace</td><td>checkbox</td>
+    <td>Treats both models as using the same CIM base namespace even if their actual namespace URIs
+        differ slightly (for example a different version suffix).</td></tr>
+<tr><td>Profile namespace</td><td>checkbox + prefix</td>
+    <td>Ignores differences in the profile/ontology namespace URI and normalises comparisons using
+        the specified prefix.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>A modal <em>Comparison RDFS profiles</em> result window listing the differences, with the two
+      compared file names as column headings.</li>
+  <li>If nothing differs beyond the namespace, the information message <em>&ldquo;The two models are
+      identical if the CIM namespace would be the same.&rdquo;</em></li>
+  <li>An error message if a file has no header and its profile namespace prefix is not
+      declared.</li>
+</ul>
+
+<p class="src">Source: <code>RDFComparisonController.actionBtnRunRDFcompare()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-rdf-convert">
+<summary><span class="kind">Tab</span> RDF Operations &#9656; Convert</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>The general-purpose serialisation and model-surgery workbench. It reads RDF in any supported
+syntax and writes it out in another, but the reason to use it is usually one of the processing
+options: merging a set of files into a single union model, correcting RDFS package assignments,
+extracting or listing the class inheritance tree, or adding OWL declarations. Its sorting and
+prefix-stripping options produce deterministic output, which is what makes generated artefacts
+reviewable in a version control diff.</p>
+
+<p><strong>Also the converter for datasets and instance data.</strong> This tab sits under
+<em>RDF Operations</em> because conversion is a syntax-level operation that does not care what the
+graph means, and it is deliberately the only place in the application that converts. It is
+therefore the tab to use for CGMES instance data as well as for profile definitions: tick
+<em>Source type</em> and it applies the CGMES&nbsp;/&nbsp;IEC&nbsp;61970-552 instance data
+serialisation rules on output. There is no separate converter under <em>Dataset
+Operations</em>.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Source</td><td>file or folder, required</td>
+    <td>Input RDF file, or a folder of RDF files processed together.</td></tr>
+<tr><td>Format</td><td>choice</td><td>The syntax of the source.</td></tr>
+<tr><td>Operations options</td><td>checkboxes</td>
+    <td>Processing operations to apply: <em>Union model</em> merges all input files into a single
+        model; <em>Union model detailed</em> adds provenance information; <em>Fix RDFS Package
+        Assignment</em> corrects package assignments in RDFS files; <em>Process only inheritance
+        related properties</em> limits processing to class hierarchy properties; <em>Generate
+        inheritance list in Turtle</em> outputs the inheritance tree; <em>Inherited members - only
+        concrete classes</em> limits that list to non-abstract classes; <em>Add OWL</em> adds OWL
+        ontology declarations.</td></tr>
+<tr><td>Main RDF file</td><td>file</td>
+    <td>Primary RDF file for operations needing a reference model, such as deviation
+        comparison.</td></tr>
+<tr><td>Deviation RDF file</td><td>file</td>
+    <td>Secondary RDF file representing deviations from the main model.</td></tr>
+<tr><td>Extended RDF file</td><td>file</td>
+    <td>Additional RDF file with extension data to include in processing.</td></tr>
+<tr><td>Source type</td><td>checkbox</td>
+    <td>Tick when the source follows CGMES&nbsp;/&nbsp;IEC&nbsp;61970-552 instance data
+        serialisation rules; this changes how the parser interprets the RDF structure.</td></tr>
+<tr><td>Target format</td><td>choice, required</td>
+    <td>The output serialisation (RDF/XML, Turtle, JSON-LD, N-Triples&nbsp;&hellip;). Some output
+        options are only available for certain formats.</td></tr>
+<tr><td>Base URI</td><td>choice + text</td>
+    <td>The base URI embedded in the serialised output as <code>xml:base</code>; relative URIs in
+        the output are resolved against it. Used when writing RDF/XML.
+        <br>Choose one of the standard CIM namespaces from the dropdown and the field is filled and
+        locked; choose <em>Other</em> to type any base URI. The same preset list as the
+        <a href="#tab-validation-by-mapping">SHACL Validation</a> tab uses &mdash; see
+        <em>Base URI presets</em> there.
+        <br>This tab defaults to <em>Other</em> with the field empty, because here an empty field
+        means <em>omit <code>xml:base</code> from the output altogether</em>, which is often what
+        you want.</td></tr>
+<tr><td>Show Xml declaration, Show Doctype declaration, Tab, Relative URIs, RDF format</td>
+    <td>checkbox / text / choice</td>
+    <td>RDF/XML writer details, enabled only for the formats that support them.</td></tr>
+<tr><td>Sorting options</td><td>checkbox + choice</td>
+    <td>Controls how output triples and subjects are ordered. Sorting alphabetically produces
+        deterministic, diff-friendly output. <em>Strip declaration of unused prefixes</em> removes
+        namespace declarations the output does not use.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>The converted model, saved through a save dialog offering <code>.rdf</code>,
+      <code>.ttl</code> or <code>.jsonld</code> as appropriate to the target format.</li>
+  <li>A separate inheritance list Turtle file when the inheritance list option is used.</li>
+  <li>Progress and any parse or write problems in the Output window.</li>
+</ul>
+
+<p class="src">Source: <code>RDFConvertController.actionBtnRunRDFConvert()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-rdf-visualisation">
+<summary><span class="kind">Tab</span> RDF Operations &#9656; Visualisation</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>A read-only browser for RDF, for the moment when a comparison report or a validation message
+names a resource and the next question is simply what that object actually looks like. It loads
+RDF in any syntax Apache Jena can parse and presents one unified <strong>Graph browser</strong>:
+the top level is the named graph and the levels below it are subjects, predicates and objects.
+Filters can be expanded only when needed, leaving more room for browsing. The tree can be left
+flat, grouped by <code>rdf:type</code>, or nested by references between resources. Nothing is
+written to the loaded source files.</p>
+<p>Every loaded file becomes its own <strong>named graph</strong> &mdash; and every RDF entry of a
+loaded ZIP archive likewise. All named graphs remain in the browser until you explicitly remove
+them. Select one or more top-level graph rows to make them the scope for merge, filtering and
+SPARQL; select a resource or folder to focus the active view on that part of the tree.</p>
+<p>Alongside the tree there is a switchable <strong>Graph view / Table view</strong>. Graph view
+draws the current content as a
+node-link diagram, one node per resource and one arrow per triple whose object is another
+resource. That is the view for a structural question - which classes specialise which, what a
+class is related to, where a resource sits in the model - because a hierarchy that takes a dozen
+tree expansions to trace is one picture here. Filter the predicate to
+<code>rdfs:subClassOf</code>, for instance, and the diagram is the class hierarchy of the loaded
+profile. Table view pivots the selected resources: subjects are rows and predicates are columns.
+The optional <em>G</em> control adds graph metadata when it is useful.</p>
+<p>For a consistent CGMES study, CimPal can also prepare a native <strong>PowsyBl IIDM</strong>
+network directly from the selected original profiles. Switch the left-hand browser from
+<em>RDF Browser</em> to <em>PowsyBl Browser</em> to inspect that IIDM hierarchy. It adds a
+third, explicitly generated <strong>Grid view</strong> for PowsyBl Network-Area and
+Single-Line diagrams, while retaining Graph and Table views for the IIDM selection.</p>
+<p>It answers the questions the other tabs do not. <em>Comparison</em> tells you that a triple
+changed; this shows you the object it belongs to and its remaining properties. <em>SPARQL
+Query</em> answers a question you can already formulate; this is for looking around before you
+can. And because it accepts every Jena syntax, it will open a Turtle constraints file or an
+N-Quads dump just as readily as a CGMES RDF/XML profile file.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Load RDF files&hellip;</td><td>files, required</td>
+    <td>Replaces whatever is loaded with the chosen files. Accepts every syntax Jena has a parser
+        for &mdash; RDF/XML (<code>.rdf</code>, <code>.xml</code>, <code>.owl</code>), Turtle
+        (<code>.ttl</code>), N-Triples (<code>.nt</code>), N-Quads (<code>.nq</code>), TriG
+        (<code>.trig</code>), JSON-LD (<code>.jsonld</code>), RDF/JSON (<code>.rj</code>), TriX
+        (<code>.trix</code>) &mdash; and <code>.zip</code> archives of them. The syntax is taken
+        from the file extension; non-RDF entries of an archive are skipped.</td></tr>
+<tr><td>Base URI</td><td>choice and text</td>
+    <td>Select a preset or enter a common base URI before loading RDF/XML. Use the same base for
+        related CGMES profile files so relative identifiers resolve consistently across EQ, SSH,
+        TP and SV. The SPARQL Query tool offers the same control for consistent results.</td></tr>
+<tr><td>Add files&hellip;</td><td>files</td>
+    <td>The same, but keeping what is already loaded. Use it to bring a second dataset alongside
+        the first for side-by-side browsing.</td></tr>
+<tr><td>Merge</td><td>action</td>
+    <td>Combines the selected top-level named graphs into a new <strong>Merged Graph</strong>.
+        The source graphs remain in the browser; no graph disappears unless you remove it. RDF is
+        a set of triples, so a duplicate triple appears once in the merged model.</td></tr>
+<tr><td>Remove selected</td><td>action</td>
+    <td>Unloads every named graph highlighted in the <em>Graph browser</em>. Click a graph's name to
+        highlight it, <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click for several.</td></tr>
+<tr><td>Reset</td><td>action</td><td>Unloads everything and clears the filters.</td></tr>
+<tr><td>Prepare PowsyBl</td><td>action</td>
+    <td>Builds one cached IIDM network from the selected original CGMES source files. The selected
+        set must contain EQ, TP and SSH profiles belonging to the same study; include SV when it
+        is available. This reads the original files/archive entries directly and does not convert
+        the in-memory RDF/Jena graph through XML. A Merged Graph is derived data, so select its
+        original profile rows instead. Preparing can take time and memory for a large study, but
+        it is performed once per selected profile set and reused by browsing, diagrams and power
+        flow.</td></tr>
+<tr><td>Release PowsyBl</td><td>action</td>
+    <td>Releases the cached IIDM network and its temporary source staging. Use it before preparing
+        a different study or when memory is needed.</td></tr>
+<tr><td>Browser</td><td>choice</td>
+    <td><em>RDF Browser</em> shows the loaded RDF named graphs. <em>PowsyBl Browser</em> is
+        available after preparation and shows the IIDM containment structure
+        (Network, Substation, Voltage level and equipment). Its <em>Class</em> grouping collects
+        IIDM elements by their actual type. The remaining grouping choices retain the containment
+        hierarchy.</td></tr>
+<tr><td>Graph browser</td><td>multi-select tree</td>
+    <td>One top-level row per loaded graph, with actual subject and triple counts. Select graph
+        rows with <kbd>Ctrl</kbd>-click or <kbd>Shift</kbd>-click to set a multi-graph scope.
+        Select subjects, class folders, or reference branches to focus a view. The browser initially
+        shows the first 5,000 matching subjects per graph for responsiveness; the <code>&infin;</code>
+        button switches to all matching subjects.</td></tr>
+<tr><td>Subject contains, Predicate contains, Object contains</td><td>text</td>
+    <td>Keeps only the triples whose corresponding term contains the text. Matched
+        case-insensitively against both the shortened form shown in the tree and the full URI or
+        literal value, so either a prefixed name (<code>cim:Breaker.normalOpen</code>) or a
+        fragment of the full URI finds the same triples. Non-empty fields combine: all of them
+        must match.</td></tr>
+<tr><td>Full text search</td><td>text</td>
+    <td>Keeps a triple when <em>any one</em> of its subject, predicate or object matches. This is
+        the field to use when you have an mRID or a value and do not know which position it
+        occupies.</td></tr>
+<tr><td>SPARQL subject filter</td><td>optional SELECT query</td>
+    <td>Load or enter a SPARQL <code>SELECT</code> query. It is executed against the complete
+        in-memory model of the selected named graph or graphs, rather than only the first 5,000
+        tree subjects. A query that returns <code>?s</code> also narrows the browser; any other
+        SELECT query is displayed in Table view. With no graph selected, all loaded graphs are in
+        scope. The label beside Apply states the scope used.</td></tr>
+<tr><td>Apply</td><td>action</td>
+    <td>Runs the filters and optional SPARQL query. They are applied on demand rather than as you
+        type, because each run rescans the selected in-memory graph models and a CGMES dataset is
+        hundreds of thousands of triples.
+        Pressing <kbd>Enter</kbd> in any filter field does the same.</td></tr>
+<tr><td>Clear filters</td><td>action</td>
+    <td>Empties the text and SPARQL filters and shows the selected graph scope again (or all loaded
+        graphs when no graph is selected).</td></tr>
+<tr><td>Group by</td><td>choice</td>
+    <td>How the tree arranges the subjects of each graph. It reshapes rows that have already been
+        scanned, so changing it takes effect at once and never rescans the models &mdash; there is
+        nothing to <em>Apply</em> afterwards, and the status line does not change.
+        <table class="io">
+        <tr><th>Mode</th><th>Arrangement</th></tr>
+        <tr><td>Subject (flat)</td>
+            <td>Every subject at one level, sorted by its displayed form. The default, and the view
+                for finding a particular resource by name.</td></tr>
+        <tr><td>Class (rdf:type)</td>
+            <td>A folder per <code>rdf:type</code> holding the subjects that declare it, with the
+                member count beside the name. A subject with two types appears under both; one with
+                none goes to a <em>(no rdf:type)</em> folder, sorted last.</td></tr>
+        <tr><td>Containment (incoming)</td>
+            <td>Nests each resource under the resources that point <em>at</em> it, which is what
+                makes a CGMES dataset read as Region &#9656; Substation &#9656; VoltageLevel
+                &#9656; Bay. The view for seeing where an object sits in the model.</td></tr>
+        <tr><td>References (outgoing)</td>
+            <td>Nests each resource under what it points <em>to</em>, following the references as
+                written. The view for seeing what an object depends on.</td></tr>
+        </table></td></tr>
+<tr><td>Hide graph browser</td><td>action</td>
+    <td><em>Hide graph browser</em> folds the unified browser away, giving the active Graph or
+        Table view the full width. Use <em>Show graph browser</em> or the <code>&#171;</code>
+        button to restore it.</td></tr>
+<tr><td>Graph view / Table view / Grid view</td><td>switch button</td>
+    <td>Switches the right-hand area in place, without consuming another row for tabs. RDF Browser
+        offers Graph and Table views. PowsyBl Browser additionally offers Grid view. In either
+        Table view, properties become columns and the selected elements become rows. The
+        <em>XLS</em> icon exports the current table with a light formatted header, filters,
+        appropriate column widths and its first row frozen.</td></tr>
+<tr><td>Grid diagram</td><td>choice + Generate (&blacktriangleright;)</td>
+    <td>Available only in PowsyBl Browser. Select <em>Network-Area diagram</em> to draw the
+        complete prepared IIDM network, or <em>Single-Line diagram</em> to draw the selected
+        Substation or Voltage level (falling back to the first Substation when no suitable
+        selection exists). Press Generate deliberately; changing selection or diagram type never
+        starts a potentially expensive render automatically.</td></tr>
+<tr><td>Grid interaction</td><td>mouse + toolbar</td>
+    <td>In a generated Grid view, use the mouse wheel to zoom at the pointer and drag the
+        background to pan. The +, &minus; and Fit controls use the same viewport. Right-click a
+        diagram primitive with an IIDM identity to show its properties in Table view or reveal it
+        in the PowsyBl Browser tree. Not every SVG primitive represents a single IIDM element;
+        CimPal reports this rather than jumping to an unrelated item.</td></tr>
+<tr><td>Power flow (&gear;)</td><td>action</td>
+    <td>Opens the PowsyBl load-flow settings exposed by the installed API and then runs power flow
+        against the prepared IIDM network in the background. Completion or failure is reported in
+        the status bar and result dialog. It never changes the loaded RDF source files.</td></tr>
+<tr><td>Refresh icon</td><td>checkbox</td>
+    <td>Controls automatic updates from browser selection. It is off by default to avoid expensive
+        redraws while browsing large models. When off, both Graph and Table view stay empty; when
+        turned on, the active view refreshes immediately and thereafter refreshes whenever the
+        selection changes. Switching Graph/Table follows the same setting.</td></tr>
+<tr><td>Include literals</td><td>checkbox</td>
+    <td>Adds attribute values to the diagram as their own nodes. Off by default: with literals in,
+        even a handful of resources produces a dense fan of value nodes, and the relationships
+        between classes - the reason to look at a diagram - get lost in it.</td></tr>
+<tr><td>Layout</td><td>choice</td>
+    <td>Choose Force-directed, Radial or Grid arrangement for Graph view. Use the layout most
+        readable for the selected scope; the diagram is capped for readability, so select a graph,
+        class or resource when a full dataset would be too dense.</td></tr>
+<tr><td>+, -, Fit</td><td>actions</td>
+    <td>Zoom in, zoom out, and scale the diagram so all of it is in view. Scrolling the wheel over
+        the diagram zooms about the pointer, dragging the background pans, and dragging a node
+        moves it and the arrows attached to it.</td></tr>
+</table>
+
+<h4>What the graph view shows</h4>
+
+<p>The active view follows the filters and the selected tree scope. It is updated automatically
+only while the refresh checkbox is enabled. Scope is taken from the narrowest thing selected, and
+from the union when several rows are selected:</p>
+
+<table class="io">
+<tr><th>Highlighted</th><th>The diagram shows</th></tr>
+<tr><td>A subject in the tree</td>
+    <td>That resource and its immediate neighbours - the triples where it is the subject, and the
+        triples where it is the object.</td></tr>
+<tr><td>Several subjects (<kbd>Ctrl</kbd>- or <kbd>Shift</kbd>-click)</td>
+    <td>All of them and their immediate neighbours in one diagram, which is how two resources get
+        compared or a connection between them found.</td></tr>
+<tr><td>A class folder, in a class or a nested grouping</td>
+    <td>Every subject in that folder and their immediate neighbours &mdash; the whole
+        <code>Breaker</code> population at once, for instance.</td></tr>
+<tr><td>A named graph, in the tree or in the list</td><td>Only that graph.</td></tr>
+<tr><td>Several named graphs</td><td>Those graphs together.</td></tr>
+<tr><td>Nothing selected</td><td>Everything the filters admitted, across all loaded graphs.</td></tr>
+</table>
+
+<p>Node size follows the number of relationships a resource takes part in, so the hubs of the
+model stand out. Clicking a node reports its full URI on the status line. Node labels are drawn
+while there are 120 nodes or fewer and predicate labels while there are 120 relationships or
+fewer; past that they would overlap into noise, and hovering a node shows its name instead.</p>
+
+<h4>Navigating references</h4>
+
+<p>An object row whose value is another resource &mdash; <code>Terminal.ConductingEquipment
+&rarr; loc:_abc</code> &mdash; can be followed when any loaded file describes that resource. The
+disclosure arrow says which is which: an arrow means the reference leads somewhere, no arrow means
+nothing loaded describes it, so you know before you click.</p>
+
+<p>What a reference reaches is read from the models held in memory, not from the rows the tree
+happens to be showing. A resource the filters excluded or one that fell past the subject cap can
+still be opened: filtering decides what the tree <em>lists</em>, not what a reference is allowed to
+reach. Where several files describe the
+same resource, opening it shows all of their triples together &mdash; the EQ name and type beside
+the SSH state values &mdash; and a triple stated identically by two files is listed once.</p>
+
+<table class="io">
+<tr><th>Gesture</th><th>On</th><th>Effect</th></tr>
+<tr><td>Click</td><td>a reference row with an arrow</td>
+    <td>Opens the target&rsquo;s properties underneath the row, where it stands. Those properties
+        have followable references of their own, so a chain can be traced as many levels deep as
+        there are clicks without losing the row you started from. A reference leading back to where
+        you began simply opens again one level down: nothing loops, because a row builds its
+        children only when it is opened.</td></tr>
+<tr><td>Double-click</td><td>a reference row with an arrow</td>
+    <td>Jumps to the resource&rsquo;s <em>own</em> row, wherever the current <em>Group by</em> put
+        it &mdash; ancestors opened, the row selected and scrolled into view. There is no
+        disambiguation delay, so a double click also delivers a single click first and the row you
+        left is opened in passing; both steps are on the trail, so right-clicking retraces
+        them.</td></tr>
+<tr><td>Double-click</td><td>a reference row with no arrow</td>
+    <td>Reports that nothing loaded describes the resource, and gives its full URI. A single click
+        stays silent, so selecting such a row merely to scope the diagram never nags.</td></tr>
+<tr><td>Click</td><td>the disclosure arrow itself</td>
+    <td>Expands or collapses, and nothing more. The arrow is how a followed row is closed again.</td></tr>
+<tr><td>Right-click</td><td>anywhere in the tree</td>
+    <td>Steps back one hop, closing what that hop opened and restoring what was highlighted before
+        it.</td></tr>
+<tr><td>Double right-click</td><td>anywhere in the tree</td>
+    <td>Unwinds the whole trace and returns to where it started.</td></tr>
+</table>
+
+<p><strong>References across profile files.</strong> A CGMES export normally declares no
+<code>xml:base</code>, so every file resolves <code>#_abc</code> against its own location: the same
+Terminal is <code>&hellip;/EQ.xml#_abc</code> in the equipment file and
+<code>&hellip;/SSH.xml#_abc</code> in the steady-state hypothesis file. Matching on the URI alone
+would therefore never carry a reference from one profile to the next. So a reference is resolved by
+URI first, and any graph that does <em>not</em> have that URI is then tried on the local name
+&mdash; the <code>_abc</code> part &mdash; which is what makes EQ&nbsp;/&nbsp;SSH&nbsp;/&nbsp;TP
+tracing work. Only graphs lacking the exact URI are matched this way, so a file that does have the
+resource is never second-guessed, and the status line names the graphs a reference resolved into
+and says when a local name stood in for a URI. The case to be aware of is two unrelated datasets
+loaded at once: they share their mRIDs, so their resources would be treated as one.</p>
+
+<p>A double click has two things it can report instead of jumping:</p>
+
+<table class="io">
+<tr><th>Message</th><th>What it means</th></tr>
+<tr><td>&hellip; has no row of its own in the tree</td>
+    <td>The resource is in the models, but the tree does not list it &mdash; the filters exclude it or
+        it is past the subject cap. There is nowhere to jump to, so it
+        is opened under the reference row instead.</td></tr>
+<tr><td>&hellip; is referenced, but nothing loaded describes it</td>
+    <td>No loaded file states anything about the resource, under its own URI or under its local
+        name. Either the reference is dangling, or the file that describes it has not been loaded;
+        the full URI is given so it can be searched for.</td></tr>
+</table>
+
+<p>In the two nested groupings a resource&rsquo;s own row can sit deep inside a structure that has
+to be built a level at a time, so the search for it is bounded. Where the bound is reached the
+message says the row could not be located in this grouping; <em>Subject (flat)</em> always finds
+it.</p>
+
+<h4>Outputs</h4>
+<ul>
+  <li>The unified graph browser. Named graphs remain at the top level; subjects sort alphabetically
+      by their displayed form and expand to their
+      predicates; a predicate with a single value is shown on one line, a repeated predicate
+      becomes a node with one child per value.</li>
+  <li>URIs are shortened using the namespace prefixes declared in the source file. Where no prefix
+      applies and the namespace is long enough to crowd the name off the row &mdash; a
+      <code>file:///C:/&hellip;</code> namespace is mostly folder path &mdash; it is stood in for
+      by <code>loc:</code>, so the row reads <code>loc:_1234-5678</code> instead of the whole
+      path. A graph with a second such namespace gets <code>loc2:</code>, a third
+      <code>loc3:</code>, so two resources never end up sharing a label; the prefixes are assigned
+      per graph, in order of first appearance. A short namespace with no prefix &mdash;
+      <code>urn:uuid:</code>, for instance &mdash; is left as the document wrote it, because
+      hiding nine characters behind <code>loc:</code> would only make it anonymous. Only the
+      displayed form changes: <em>Copy value</em> yields the full URI, and the filters match it.
+      Literals are shown quoted, with their language tag or datatype where they have one.</li>
+  <li><em>Copy value</em> puts the full URI or literal of every highlighted row on the clipboard,
+      one per line, ready to paste into a SPARQL query or into a filter field.</li>
+<li>Graph or table content, depending on the active right-hand view. The status bar reports the
+      active selection/query scope, node and relationship counts, or table row and column counts.</li>
+  <li>When PowsyBl is prepared, an IIDM browser and manually generated interactive SVG grid
+      diagrams. PowsyBl layout notices for a few unplaced visual cells do not change the imported
+      IIDM network or power-flow calculation.</li>
+</ul>
+
+<h4>Notes</h4>
+<ul>
+  <li>The browser toolbar provides icon buttons for <em>Expand selected</em>, <em>Collapse all</em>
+      and <em>Copy value</em>; pause over an icon to see its tooltip. Expand selected opens every
+      highlighted branch and everything below it, stopping
+      after 1000 nodes across all of them so that a large subtree cannot lock up the view; expand
+      the remaining branches individually. <em>Collapse all</em> closes everything. It deliberately
+      stops at reference rows: opening one loads the target&rsquo;s properties, whose own references
+      would be opened in turn, and a single press would chase them across the whole graph until the
+      budget ran out. Following a reference stays a deliberate click.</li>
+  <li>Each graph initially displays the first 5,000 matching subjects to keep browsing responsive.
+      The <code>&infin;</code> button switches the browser between this limit and all matching
+      subjects. Table and SPARQL operations always work from the complete in-memory selected
+      graph scope.</li>
+  <li>For related RDF/XML files, choose or enter a common Base URI before loading. This is
+      particularly important for CGMES profile files containing relative identifiers, because it
+      lets references and SPARQL joins resolve across profiles consistently.</li>
+  <li>A file that cannot be parsed does not abort the load: the remaining files are loaded, and the
+      reason for each failure is written to the Output window.</li>
+  <li>The diagram is capped at 400 nodes. Past that a node-link view is an unreadable tangle well
+      before it is slow, so the cap is about legibility: narrow the filters, or select a subject to
+      see just its neighbourhood. The line under the diagram says when it has been truncated.</li>
+  <li>The layout is deterministic - the same filter and selection always produce the same
+      arrangement - and it is computed fresh on each redraw, so a node you dragged returns to its
+      computed place the next time the scope changes.</li>
+  <li>The class grouping reads <code>rdf:type</code> from the triples the filters admitted. A
+      predicate filter that excludes <code>rdf:type</code> therefore leaves every subject in the
+      <em>(no rdf:type)</em> folder; narrow a class view with the subject or object filter
+      instead.</li>
+  <li>In the two nested groupings, a resource with more than eight nested children has them
+      grouped into class folders, because forty children in one flat list is not browsable. Fewer
+      than that, or a grouping that would produce a single folder, and the children are listed
+      directly.</li>
+  <li>References form a graph, not a tree. A resource reached from two parents appears under each
+      of them, which is what a reference view should show, and a cycle is broken where it closes,
+      so nothing is ever nested under itself.</li>
+  <li>A resource's own properties are listed directly when it has nothing nested under it, and
+      behind a <em>properties</em> folder when it has, so the structure the grouping exists to show
+      stays legible.</li>
+</ul>
+
+<p class="src">Source: <code>RDFVisualisationController</code></p>
+</div>
+</details>
+
+<h3>Dataset Operations</h3>
+
+<details class="fn" id="tab-instance-data-comparison">
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; Comparison</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Compares two CGMES instance datasets object by object and property by property, so that a
+regression in a model export, or the effect of a change in a source system, can be identified
+precisely. It understands the CGMES profile split, so the volatile parts of a model &mdash;
+topology, state variables, diagram layout &mdash; can be excluded, and it has a dedicated mode for
+comparing power flow solutions (State Variables), where matching by ConnectivityNode rather than
+Terminal is often the only way to align two models. Where a full comparison would be too large to
+read, it can report instance counts per class instead.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>File A</td><td>file, required</td>
+    <td>First CGMES instance data file. Accepts XML profile files or ZIP archives containing
+        several profile XMLs.</td></tr>
+<tr><td>File B</td><td>file, required</td>
+    <td>Second CGMES instance data file, compared against File A.</td></tr>
+<tr><td>Profile version</td><td>choice</td>
+    <td>CGMES version of the instance data; determines which CIM namespaces are expected in the
+        files.</td></tr>
+<tr><td>Base namespace</td><td>text</td>
+    <td>The base XML namespace for the instance data. Detected automatically when files are
+        loaded.</td></tr>
+<tr><td>Datatype map</td><td>choice / file</td>
+    <td>Datatype mapping used to validate property values during comparison. Select a built-in map
+        or browse for a custom one.</td></tr>
+<tr><td>Ignore non-persistent (TP, SV, DL)</td><td>checkboxes</td>
+    <td>Exclude non-persistent classes: <em>TP</em> topology classes, <em>SV</em> state variables
+        (voltages, flows), <em>DL</em> diagram layout.</td></tr>
+<tr><td>SV options</td><td>checkboxes</td>
+    <td><em>Compare only SV profile</em> restricts the comparison to State Variables data;
+        <em>Rely on ConnectivityNodes</em> uses ConnectivityNodes rather than Terminals for topology
+        matching; <em>Compare only count</em> counts instances per class instead of a full
+        comparison.</td></tr>
+<tr><td>Output options</td><td>checkboxes</td>
+    <td><em>Solution overview</em> gives summary statistics across all profiles; <em>Show
+        details</em> lists per-object differences; <em>Compare Diff</em> shows only the differences;
+        <em>Compare single files</em> compares individual profile files rather than the assembled
+        model.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>A modal <em>Comparison Instance data</em> result window listing per-object differences when
+      <em>Show details</em> is selected.</li>
+  <li>Class-count and solution-overview results written to the Output window.</li>
+  <li>The information message <em>&ldquo;The two models are identical.&rdquo;</em> when no
+      difference is found.</li>
+</ul>
+
+<p class="src">Source: <code>InstanceDataComparisonController.actionBtnRunIDcompare()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-generate-instance-data">
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; Generate</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Creates CGMES instance data from a spreadsheet, in two stages. First it generates an Excel
+template whose worksheets and columns are derived from the RDFS profile, optionally pre-populated
+from an existing dataset. Someone then fills that template in &mdash; in a tool they already know,
+with no RDF syntax involved. Second, CimPal converts the filled template into valid CIMXML instance
+data. This is how small, purpose-built test models and examples get produced without hand-writing
+RDF/XML.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Use method</td><td>choice</td>
+    <td>Selects the template generation strategy. <em>Advanced template</em> is the current
+        recommended method and supports the full CIM property set.</td></tr>
+<tr><td>Load RDFS</td><td>files, required for the template</td>
+    <td>RDFS profile files (<code>.xml</code>, <code>.rdf</code>) defining the CIM class and
+        property structure. Load one or more profiles to drive template generation.</td></tr>
+<tr><td>Load instances</td><td>files, optional</td>
+    <td>CGMES instance data files (XML or ZIP). When loaded, the template is pre-populated with
+        sample values from the instance data.</td></tr>
+<tr><td>Hide empty sheets</td><td>checkbox</td>
+    <td>Worksheet tabs with no instance data are hidden in the generated template, keeping the file
+        compact.</td></tr>
+<tr><td>xls template</td><td>file, required for generation</td>
+    <td>The filled-in Excel template (<code>.xlsx</code>) to convert into CIMXML instance data. It
+        must follow the structure produced by the template section above.</td></tr>
+<tr><td>Sorting options</td><td>checkbox + choice</td>
+    <td>Controls output element order: <em>Sort alphabetically</em> sorts subjects by URI, and the
+        secondary strategy sorts by local name or by prefix.</td></tr>
+<tr><td>Strip prefixes</td><td>checkbox</td>
+    <td>Removes namespace prefix declarations not used in the generated XML.</td></tr>
+<tr><td>Export extensions</td><td>checkbox</td>
+    <td>Includes any extension attributes or classes identified in the template in the generated
+        CIMXML output.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>An Excel template (<code>.xlsx</code>) saved where you choose, with one worksheet per class
+      of the loaded profiles.</li>
+  <li>CIMXML instance data files generated from the filled template, written to the selected
+      location.</li>
+  <li>Progress and any template structure problems in the Output window.</li>
+</ul>
+
+<p class="src">Source: <code>GenerateInstanceDataController.actionCreateXlsTemplate()</code>,
+<code>actionBtnRunGenerateInstance()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-task-wizard">
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; Task Wizard</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>A guided, multi-step runner for model manipulation tasks. Each task is a self-contained
+transformation of instance data, and the wizard walks you through choosing one, supplying its
+inputs, and running it. Two families of task matter most in practice: <em>scaling</em> &mdash;
+multiplying a base model into a large synthetic system to test performance and assembly &mdash; and
+<em>negative testing</em> &mdash; deliberately breaking a valid model (deleting required properties,
+making datatypes non-conformant) to prove that a constraint set actually detects the defect. The
+identifier tasks resolve the recurring mismatch between an object's <code>rdf:ID</code> and its
+mRID.</p>
+
+<h4>Inputs</h4>
+<p>Inputs are per task, collected on the wizard pages that follow the task selection; typically a
+base instance data model (XML or ZIP), a configuration spreadsheet for the multiplication tasks,
+and an output location. The twelve available tasks are:</p>
+<ul>
+  <li><strong>Regenerate rdf:ID and mRID</strong> &mdash; issues fresh identifiers throughout the
+      model.</li>
+  <li><strong>Replaces mRID with rdf:ID</strong> &mdash; aligns the mRID property with the
+      serialised resource identifier.</li>
+  <li><strong>Delete Required Properties</strong> &mdash; removes mandatory properties, to test
+      that constraints flag them.</li>
+  <li><strong>Make Non-Conform Datatypes</strong> &mdash; writes values of the wrong datatype, to
+      test datatype constraints.</li>
+  <li><strong>Rename</strong> &mdash; bulk-renames objects in the model.</li>
+  <li><strong>Multiply base model N times</strong> &mdash; replicates the model to build a larger
+      synthetic dataset.</li>
+  <li><strong>Multiply and connect</strong> &mdash; replicates and electrically interconnects the
+      copies, producing one coherent larger network.</li>
+  <li><strong>Multiply IGM from Config xls</strong> &mdash; builds individual grid models according
+      to a configuration spreadsheet.</li>
+  <li><strong>Multiply CGM from Config xls</strong> &mdash; builds common grid models according to a
+      configuration spreadsheet.</li>
+  <li><strong>Change Model Header Description</strong> &mdash; rewrites the model header
+      description fields.</li>
+  <li><strong>Modify MAS of SV Header</strong> &mdash; sets the Modelling Authority Set in the State
+      Variables header.</li>
+  <li><strong>Generate Instance Data Model</strong> &mdash; produces an instance data model from
+      the wizard inputs.</li>
+</ul>
+
+<h4>Outputs</h4>
+<ul>
+  <li>The transformed or generated instance data files, written to the location the task asks
+      for.</li>
+  <li>Per-task progress and result messages in the Output window.</li>
+</ul>
+
+<p class="src">Source: <code>TaskWizardController.forwardWizardPane()</code>; tasks registered in
+<code>WizardContext</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-sparql-query">
+<summary><span class="kind">Tool</span> SPARQL Query</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>The escape hatch for questions no report anticipates. Select any set of models, load them as one
+combined RDF dataset when the query runs, and execute a SPARQL SELECT query &mdash; to count objects
+matching a condition, find the instances behind a validation failure, or extract a tabular slice
+of a model for a colleague. Queries can be saved and reloaded, so a useful investigation becomes a
+reusable check. File selection, loading, completion and errors are reported in the shared status
+bar at the bottom of CimPal; the tab intentionally does not duplicate those messages.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Select model files&hellip;</td><td>files, required</td>
+    <td>One or more RDF/XML / CIM XML files, Turtle, N-Triples, N-Quads, TriG, JSON-LD, RDF/JSON,
+        TriX or ZIP archives containing those RDF files. The files are loaded as a combined RDF
+        dataset.</td></tr>
+<tr><td>Base URI</td><td>choice and text</td>
+    <td>Select a preset or enter a common base URI before loading related RDF/XML files. This is
+        shared in purpose with the Visualisation Base URI: a consistent base lets relative CGMES
+        identifiers join across profile files.</td></tr>
+<tr><td>SPARQL query</td><td>text, required</td>
+    <td>A SPARQL SELECT query to execute against the selected model files. Use
+        <em>Load query</em> to import an existing <code>.sparql</code> or <code>.rq</code> file,
+        or type and edit the query directly in the text area.</td></tr>
+<tr><td>Save / Save as</td><td>buttons</td>
+    <td>Write the current query text back to its file, or to a new <code>.sparql</code> or
+        <code>.rq</code> file.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>A results window presenting the SELECT bindings as a table, with an <em>Export</em> button to
+      write them to Excel. The export has a light-blue filtered header, practical column widths and
+      a frozen first row.</li>
+  <li>Query parse errors and execution failures in the shared status bar and a diagnostic dialog.</li>
+  <li>The shared status bar shows the selected-file count, loading/query state and result count.
+      A completed model selection or successful query is indicated by a full green progress bar.</li>
+</ul>
+
+<p class="src">Source: <code>SparqlQueryTabController.actionRunQuery()</code>;
+<code>SparqlResultsWindowController.actionExport()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-ai-assistant">
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; AI Assistant</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>The AI Assistant is an optional, local-first helper for CIM, CGMES, RDF, SHACL and SPARQL work.
+It connects only to the Ollama address configured at the top of the tab; CimPal does not send the
+selected model, validation data or question to a cloud model. The assistant produces proposals for
+review &mdash; it never changes a model or runs a repair automatically.</p>
+
+<h4>Before you begin</h4>
+<ol>
+  <li>Install and start <a href="https://ollama.com/">Ollama</a> on the same computer.</li>
+  <li>Pull a model, for example <code>ollama pull qwen3:1.7b</code>, then use <em>Check connection</em>.
+      The model list is populated from the local Ollama server.</li>
+  <li>Choose a response length. <em>Fast</em>, <em>Normal</em> and <em>Complete</em> are named
+      profiles whose token limits can be changed in <em>File &#9656; Preferences &#9656; AI Assistant</em>.</li>
+</ol>
+
+<h4>Tasks and actions</h4>
+<table class="io">
+<tr><th>Control</th><th>Meaning</th></tr>
+<tr><td>Ask CimPal</td><td>Answers a general CIM/CGMES/RDF/SHACL/SPARQL question.</td></tr>
+<tr><td>Draft SHACL</td><td>Creates a proposed Turtle SHACL shapes graph. Use <em>Verify draft locally</em> to parse it, and <em>Test SHACL on selected model</em> to run it in memory against the selected SPARQL-model files.</td></tr>
+<tr><td>Draft SPARQL</td><td>Creates one read-only <code>SELECT</code> query. <em>Run &amp; revise SELECT</em> executes the query locally and asks the model to revise it using the local execution result. <em>Use in SPARQL tab</em> transfers the reviewed query to the normal SPARQL workflow.</td></tr>
+<tr><td>Draft SPARQL repair</td><td>Creates a narrow, review-only SPARQL Update proposal. <em>Preview repair locally</em> reports its effect without changing files; save it as <code>.ru</code> or transfer it to the SPARQL tab for explicit review, confirmation and output-file selection.</td></tr>
+<tr><td>Explain validation report</td><td>After <em>Choose validation report...</em>, explains a selected local SHACL report. The <em>Validation problem</em> list can narrow the explanation to one reported finding.</td></tr>
+<tr><td>Use selected model summary</td><td>Adds a compact, local summary of the files selected in the SPARQL tab, including observed namespaces, types and predicates. It improves grounding but may increase response time.</td></tr>
+</table>
+
+<h4>Validation reports</h4>
+<p>In the SHACL Validation tab, select <em>Also save each validation report as Turtle (.ttl)</em>
+before running any workflow. Each report can then be selected in the AI Assistant and used to focus
+an explanation or repair proposal on an individual violation.</p>
+
+<h4>Knowledge sources and privacy</h4>
+<p>Configure knowledge sources in <em>File &#9656; Preferences &#9656; AI Assistant</em>. Add one local
+folder, public URL, or public GitHub repository URL (optionally followed by <code>#branch</code>) per
+line. Local folders are searched on the computer. GitHub sources are shallow-cloned into CimPal's
+local cache and public URLs are cached as public reference material. Enable remote sources and use
+<em>Refresh remote sources now</em> when wanted; <em>Refresh at application start</em> checks them
+when CimPal opens. Neither private model data nor the user's request is sent to those sources.</p>
+
+<div class="note" style="margin-top:16px"><strong>Review is required.</strong> Generated SHACL,
+SPARQL and repair text can be wrong for a particular profile or model. Verify and test drafts first;
+read-only SELECT queries are the only assistant-generated operations that can be executed as part
+of the assisted revision flow. Updates require the normal SPARQL confirmation and save workflow.</div>
+
+<p class="src">Source: <code>AiAssistantTabController</code>, <code>OllamaClient</code>,
+<code>AiDatasetInspector</code>, <code>AiKnowledgeSearch</code></p>
+</div>
+</details>
+
+<details class="fn" id="tab-validation-by-mapping">
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; SHACL Validation</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Validates datasets against a SHACL constraint set. The <em>Validation workflow</em> choice
+selects one of three routes, and the rest of the form enables only the fields that route reads.</p>
+<ul>
+  <li><strong>Validate by mapping file</strong> &mdash; production-scale validation driven by a
+      mapping file. Instead of choosing constraints and models by hand, a CSV declares which
+      constraint files apply to which inputs; CimPal then executes the whole matrix and produces
+      the reports, summaries and ZIP deliverables in one run.</li>
+  <li><strong>Validate by timestamped mapping</strong> &mdash; as above, but additionally discovers
+      timestamped input files and organises the reports by timestamp, and can compare each run's
+      totals against the previous run's &mdash; which is what turns validation from a one-off check
+      into a trend you can watch across releases.</li>
+  <li><strong>Validate by manual selection</strong> &mdash; batch validation without a mapping
+      file. Point it at constraint files you pick yourself and at the models root folder, and it
+      validates every model archive it finds against those constraints, reporting conformance for
+      each. This is the regression test for a constraint set: run it over a corpus of known-good
+      and known-bad models and confirm that the good ones pass and the bad ones fail for the
+      expected reason. It is equally the acceptance check for a batch of received datasets.</li>
+</ul>
+
+<p class="note">The manual workflow was previously a separate <em>SHACL tester</em> tab. Its
+&ldquo;Parent folder for test models&rdquo; field is now the tab's own <em>Models / input root
+folder</em>, shared with the two mapping workflows.</p>
+
+<p><strong>All three workflows load their models through the datatype map and base URI.</strong>
+The map is what gives the literals their datatypes as the RDF/XML is parsed, and a constraint on a
+numeric range or a boolean value can only fire against a typed literal &mdash; parsed untyped,
+every value is a plain string and such a constraint passes a model it should reject. The manual
+workflow therefore reads the same two fields as the mapping ones, and they stay enabled for
+it.</p>
+
+<p><strong>ZIP model archives are read directly from their entries into memory.</strong> CimPal
+does not extract input XML files into temporary local folders. After a timestamp or model has been
+validated, its data graph can be released while the resolved shapes remain available for the next
+validation. The ZIP files created in the output folder by mapping validation are intentional
+deliverables, not extracted input data.</p>
+
+<div class="note" style="margin-top:16px">
+  <strong>Remote constraints and inputs, and what is remembered</strong> &mdash; a mapping CSV may
+  name an <code>https://</code> URL where it would name a local file, and GitHub <em>blob</em>,
+  <em>raw</em> and <em>tree</em> links are accepted as written; the same applies to the
+  <code>owl:imports</code> a constraint file pulls in. Downloaded files are kept in a cache folder,
+  but nothing is reused without being checked: each run starts by discarding what it holds in
+  memory, and every cached file is revalidated against the server before it is used again. An
+  unchanged file costs one request and no download; a file edited upstream is downloaded again. So
+  editing a constraint on GitHub and re-running picks up the edit &mdash; there is no need to
+  restart CimPal or press <em>Reset</em> first.
+  <br><br>
+  One delay is outside CimPal's control: <code>raw.githubusercontent.com</code> serves its own
+  cached copy of a file for a few minutes after a commit, so a re-run inside that window can still
+  be given the previous content by GitHub. If you suspect a stale file for any other reason,
+  <a href="#clear-remote-cache">File &#9656; Clear cached remote data&hellip;</a> empties the cache
+  folders outright.
+  <br><br>
+  What the tab does remember between sessions is the <em>paths</em> you picked &mdash; mapping CSV,
+  models root, constraints root, output folder, previous comparison CSV and a custom datatype map
+  file &mdash; never validation data or results. Every run re-reads its inputs from disk or from
+  the web.
+</div>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Validation workflow</td><td>choice, required</td>
+    <td>Which of the three routes above to run. Changing it enables and disables the rest of the
+        form accordingly.</td></tr>
+<tr><td>SHACL Constraint files (.ttl)</td><td>files</td>
+    <td>SHACL constraint files (<code>.ttl</code>) used to validate the models. Several files can
+        be selected and are combined into one shapes graph. <strong>Manual selection only</strong>
+        &mdash; the mapping workflows resolve their constraint files from the mapping CSV, and this
+        field is disabled for them.</td></tr>
+<tr><td>Mapping CSV file</td><td>file</td>
+    <td>CSV mapping file containing the XML input definitions and the SHACL constraint files. Only
+        <code>.csv</code> files are accepted. Required for both mapping workflows; disabled for
+        manual selection.</td></tr>
+<tr><td>Models / input root folder</td><td>folder, required</td>
+    <td>For normal mapping, the models root folder. For timestamped mapping, the root folder
+        containing timestamped XML or ZIP files. For manual selection, the parent folder that is
+        searched recursively (up to three levels) for <code>.zip</code> model archives.</td></tr>
+<tr><td>Constraints root folder</td><td>folder</td>
+    <td>Root folder where the SHACL constraint files live. The constraint paths in the mapping file
+        are resolved relative to this folder. Required for both mapping workflows; disabled for
+        manual selection.</td></tr>
+<tr><td>Output folder</td><td>folder</td>
+    <td>Folder where validation reports, timestamped summaries and generated ZIP files are
+        written. Required for both mapping workflows; disabled for manual selection.</td></tr>
+<tr><td>Also save each validation report as Turtle (.ttl)</td><td>checkbox</td>
+    <td>Writes the standard SHACL <code>ValidationReport</code> graph as a Turtle file for every
+        validation result. It is available for all three workflows and allows a particular report
+        and finding to be selected in the AI Assistant. Manual validation continues to produce its
+        normal Excel reports.</td></tr>
+<tr><td>Datatype map</td><td>choice, required</td>
+    <td>The CGMES and NC version combination whose datatype map is loaded for validation:
+        <em>CGMES 3.0 / NC 2.5</em> uses the CIM17 / CGMES 3 / NC 2.5 map, <em>CGMES 3.0 / NC
+        2.4</em> the CIM17 / CGMES 3 / NC 2.4 map, <em>CGMES 2.4 / NC 2.2</em> the CIM16 / CGMES 2.4
+        / NC 2.2 map. <em>Other</em> reveals a field and <em>Browse</em> button for a
+        <code>.properties</code> map of your own, in the same format as the bundled ones; the run
+        refuses to start if <em>Other</em> is selected with no file chosen.
+        <strong>Used by all three workflows</strong>, manual selection included.</td></tr>
+<tr><td>Base URI</td><td>choice + text, required</td>
+    <td>Base URI used when loading RDF/XML files; relative URIs in the models resolve against it.
+        Choose the namespace the dataset is based on from the dropdown and the field is filled and
+        locked; choose <em>Other</em> and the field becomes editable for anything not in the list.
+        The presets are listed below. <strong>Used by all three workflows.</strong></td></tr>
+<tr><td>Previous comparison CSV</td><td>file, optional</td>
+    <td>CSV holding the previous run's totals, used to build the comparison workbook.
+        <strong>Shown only for the timestamped workflow</strong>, the only one that produces a
+        comparison; the row is hidden entirely for the other two. Expected header
+        <code>region,dataset,total</code> where total = warnings + infos + violations &mdash; the
+        same shape the comparison workbook emits, so each run's output can feed the next. Left
+        empty, the comparison is produced with an empty <em>previous</em> column.</td></tr>
+<tr><td>SHACL validation engine</td><td>choice</td>
+    <td><em>Apache Jena</em> is CimPal's production engine and the default. The three Python
+        choices are experimental comparison engines: pySHACL (RDFLib), pySHACL + Oxigraph, and
+        the SHACL Rust Python binding. They receive the same resolved shapes graph and
+        datatype-enhanced data graph as Jena, so the mapping logic does not change. The Python
+        engines may reject shape constructs accepted by Jena or run more slowly. This control is
+        used by the mapping workflows; manual selection uses Jena.</td></tr>
+<tr><td>Parallel validation workers</td><td>choice</td>
+    <td>Number of independent model validations run concurrently. <em>Auto (memory-aware)</em>
+        chooses a total work budget from available CPU cores and Java heap size. It first divides
+        that budget between concurrent timestamp validations, then gives unused workers to
+        independent SHACL target shapes for a single graph. Each target-shape worker retains the
+        complete resolved shapes graph, so imports, property-shape references, deactivated
+        constraints, prefixes and messages remain correct; CimPal merges the findings into the
+        usual report. This fallback also applies when there is only one timestamp or one data
+        graph to validate. It is used by all three workflows. Increase explicit values gradually:
+        each worker holds validation state, and Python engines also start a Python process.</td></tr>
+<tr><td>Sample validation: stop after 10 results per shape</td><td>checkbox</td>
+    <td>Retains at most ten findings for each source shape, across violations, warnings and
+        information results. In the mapping workflows, Jena stops that target shape and marks the
+        affected report as <em>Partial</em>. Python engines complete validation before applying
+        the same report cap. Manual selection caps exported findings while retaining its complete
+        pass/fail rule check.</td></tr>
+<tr><td>Write validation diagnostic log</td><td>checkbox</td>
+    <td>Writes detailed input-loading, shape-loading, validation and report-writing timings for
+        the selected workflow to <code>cimpal_validation_debug.log</code> in CimPal's per-user
+        application-data folder (normally <code>C:\Users\&lt;user&gt;\AppData\Local\CimPal</code>).
+        Use it to investigate a slow run or unexpected result. It serializes worker log writes,
+        so leave it off for ordinary performance runs.</td></tr>
+</table>
+
+<h4>Base URI presets</h4>
+<p>Selecting any preset but <em>Other</em> fills the field and makes it read-only, so a mistyped
+base URI cannot silently produce a model whose subjects resolve nowhere.</p>
+
+<table class="io">
+<tr><th>Selection</th><th>Base URI</th></tr>
+<tr><td>CIM 16</td><td><code>http://iec.ch/TC57/2013/CIM-schema-cim16</code></td></tr>
+<tr><td>CIM 17</td><td><code>http://iec.ch/TC57/CIM100</code> &mdash; the default</td></tr>
+<tr><td>Stable CIM</td><td><code>https://cim.ucaiug.io/ns</code></td></tr>
+<tr><td>ENTSO-E extensions prior 2021</td><td><code>http://entsoe.eu/CIM/SchemaExtension/3/1</code></td></tr>
+<tr><td>EU extensions prior 2026</td><td><code>http://iec.ch/TC57/CIM100-European</code></td></tr>
+<tr><td>EU extensions 2026 on</td><td><code>https://cim.ucaiug.io/ns/eu</code></td></tr>
+<tr><td>EU NC extensions</td><td><code>https://cim4.eu/ns/nc</code></td></tr>
+<tr><td>DCAT</td><td><code>http://www.w3.org/ns/dcat</code></td></tr>
+<tr><td>DCTERMS</td><td><code>http://purl.org/dc/terms</code></td></tr>
+<tr><td>Other</td><td>Editable. Switching to <em>Other</em> keeps whatever the field already held,
+    since the URI wanted is usually a variant of one of the presets.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>Mapping workflows: validation report files per input, written into the output folder, plus
+      ZIP deliverables assembled from the reports. When Turtle export is selected, each validation
+      also has a separate <code>*.ttl</code> SHACL report.</li>
+  <li>Timestamped workflow: additionally timestamp-based summaries and a comparison workbook
+      against the previous run's totals.</li>
+  <li>Manual selection: per-model conformance results and validation messages streamed to the
+      Output window as the run proceeds, with normal Excel reports and optional Turtle SHACL
+      reports beside each validated model. Nothing happens, and the progress bar resets, if no
+      model archives are found under the models root folder.</li>
+  <li>Progress on the shared progress bar in the status line, and messages in the Output
+      window.</li>
+</ul>
+
+<p class="src">Source: <code>ValidationByMappingController.actionRunValidationByMapping()</code>,
+<code>runManualValidation()</code></p>
+</div>
+</details>
+
+<!-- ================================================================ TOOLS -->
+
+<h2>Tools menu</h2>
+
+<p>Single-purpose batch operations. Each one prompts for its inputs with a file or folder chooser,
+does its work, and reports to the Output window.</p>
+
+<p>The menu is grouped into five submenus by the kind of artefact each tool works on, so a tool can
+be found by asking &ldquo;what am I holding?&rdquo; rather than by scanning one long list:</p>
+
+<ul>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;RDFS Profiles</strong> &mdash; Export RDFS descriptions;
+      Export RDF tripples to xls; Generate information from RDFS &mdash; needed for serialisation;
+      Generate properties info from RDFS (xls, ttl, json); Create datatypes map.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;SHACL Constraints</strong> &mdash; Export SHACL constraints
+      information to Excel; Export All SHACL constraints information to Excel; Validate SHACL
+      shapes; Restore ttl from constraint csv.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;Reference Data</strong> &mdash; Convert Reference Data;
+      Convert Reference data to Common data.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;Instance Data &amp; Models</strong> &mdash; Model
+      transformation; Populate missing attributes; Generate Manifest; PSSE-PowerFactory
+      compare.</li>
+  <li><strong>Tools&nbsp;&#9656;&nbsp;Quality Reports</strong> &mdash; Generate QAR based on xls;
+      Create xlsx template from QAR; QoCDC 3.2.1 xml to Excel.</li>
+</ul>
+
+<p>Two entries stay at the top level of the menu, below the submenus, because they are not batch
+tools at all: <em>Validate by mapping file</em> and <em>Run SPARQL Query</em> only bring their tab
+to the front. The cards below are in menu order, submenu by submenu.</p>
+
+<h3>Tools &#9656; RDFS Profiles</h3>
+
+<details class="fn" id="tool-export-rdfs-descriptions">
+<summary><span class="kind">Tool</span> Export RDFS descriptions</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Extracts the human-readable documentation held in an RDFS profile &mdash; the class and property
+descriptions written by the modellers &mdash; into a reviewable form. This is how the narrative part
+of a profile gets proof-read, translated or published separately from the machine-readable
+definition.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDFS profile file</td><td>single file (<code>*.rdf</code>), required</td>
+    <td>The profile whose descriptions are to be exported.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>An exported description file at the location you choose, plus progress in the Output
+    window.</li></ul>
+<p class="src">Source: <code>MainController.actionRDFSexportDescriptionMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-export-triples">
+<summary><span class="kind">Tool</span> Export RDF tripples to xls</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Flattens an RDF model into a spreadsheet, one row per triple. This is the lowest-level view of a
+model and the pragmatic answer to &ldquo;what is actually in this file?&rdquo; &mdash; useful for
+sorting, filtering and pivoting model content with spreadsheet tools when no more specific export
+fits.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDF file</td><td>single file (<code>*.rdf</code>, <code>*.xml</code>), required</td>
+    <td>The model to flatten.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>An Excel workbook of subject / predicate / object rows at the location you choose.</li></ul>
+<p class="src">Source: <code>MainController.actionRDFSexportTripplesMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-gen-info-from-rdfs">
+<summary><span class="kind">Tool</span> Generate information from RDFS &mdash; needed for serialisation</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Pre-computes the profile knowledge that CimPal's writers need in order to serialise instance data
+correctly: which properties are attributes and which are references, what their order is, which
+namespace each belongs to. Without this derived information a writer cannot produce
+CGMES-conformant CIMXML, so this step is run once per profile release and its output reused.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDFS profile files</td><td>files (<code>*.rdf</code>), required</td>
+    <td>The profiles to derive serialisation information from. Several can be selected and are
+        processed together.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The generated serialisation information files, saved where you choose, plus progress in the
+    Output window.</li></ul>
+<p class="src">Source: <code>MainController.actionGenInfoFromRDFS()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-properties-info-from-rdfs">
+<summary><span class="kind">Tool</span> Generate properties info from RDFS (xls, ttl, json)</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Produces the full inventory of properties defined by a set of profiles, in three formats at
+once, so it can serve three audiences: a spreadsheet for review and mapping work, Turtle for RDF
+tooling, and JSON for scripts and web front-ends. It is the reference list used when building
+instance data templates or mapping a profile onto another data model.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>RDFS profile files</td><td>files (<code>*.rdf</code>), required</td>
+    <td>The profiles to inventory. Several can be selected.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The properties inventory as Excel, Turtle and JSON at the location you choose.</li></ul>
+<p class="src">Source: <code>MainController.actionRDFSInstanceDataInfoMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-datatypes-map">
+<summary><span class="kind">Tool</span> Create datatypes map</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Builds a datatype map from an RDF model: the lookup table from property URI to expected
+datatype. Several parts of CimPal &mdash; instance data comparison, validation by mapping &mdash;
+need such a map to type-check values, and this is where one is produced when no suitable map
+exists. It is emitted in three shapes at once so it can be consumed by tooling
+(<code>.properties</code>), by RDF processors (RDF/XML) and by people (Excel).</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Source model</td><td>file, required</td>
+    <td>The RDF model from which the datatype mapping is derived.</td></tr>
+<tr><td>Map save location</td><td>save dialog (<code>*.properties</code>)</td>
+    <td>Where the properties-format map is written.</td></tr>
+<tr><td>RDF save location</td><td>save dialog (<code>*.rdf</code>)</td>
+    <td>Where the datatype model is written as RDF/XML.</td></tr>
+<tr><td>Excel save location</td><td>save dialog (<code>*.xlsx</code>)</td>
+    <td>Where the spreadsheet view of the map is written.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>A <code>.properties</code> datatype map.</li>
+  <li>An RDF/XML datatype model.</li>
+  <li>An <code>.xlsx</code> workbook of the same mapping.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionMenuDatatypeMap()</code></p>
+</div>
+</details>
+
+<h3>Tools &#9656; SHACL Constraints</h3>
+
+<details class="fn" id="tool-export-shacl-info">
+<summary><span class="kind">Tool</span> Export SHACL constraints information to Excel</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Turns a SHACL constraint set into constraint documentation. A shapes graph is precise but not
+readable by the people who have to review, approve and comply with it; this export produces the
+spreadsheet of constraints &mdash; what is checked, on what, with what severity and message &mdash;
+that accompanies a constraint release and supports its review.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>SHACL files</td><td>files (<code>*.ttl</code>), required</td>
+    <td>The constraint files to document. Several can be selected.</td></tr>
+<tr><td>Single file or one per input</td><td>prompt</td>
+    <td>Whether all selected constraint files are documented into one workbook, or each into its
+        own.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>One Excel workbook of constraint information, or one per input file, according to your
+    choice.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuExportSHACLInfo()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-export-all-shacl-info">
+<summary><span class="kind">Tool</span> Export All SHACL constraints information to Excel</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>The exhaustive variant of the export above, for the two cases where the summary is not enough.
+<em>Complete SHACL Predicate Export</em> writes out every predicate present in the shapes, leaving
+nothing out &mdash; the form to use when reverse-engineering or auditing a constraint set. <em>EA
+Import Format</em> shapes the same content for import into Enterprise Architect, so constraints can
+be carried back into the UML modelling environment where the profile originates.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>SHACL files</td><td>files (<code>*.ttl</code>), required</td>
+    <td>The constraint files to export.</td></tr>
+<tr><td>Single file or one per input</td><td>prompt</td>
+    <td>Whether to produce one combined workbook or one per input file.</td></tr>
+<tr><td>Export format</td><td>choice, required</td>
+    <td><em>Complete SHACL Predicate Export</em> or <em>EA Import Format</em>.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>Excel workbook(s) in the chosen format at the selected location.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuExportAllSHACLInfo()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-validate-shacl-shapes">
+<summary><span class="kind">Tool</span> Validate SHACL shapes</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Validates a SHACL shapes graph against the SHACL specification's own shapes &mdash;
+&ldquo;SHACL-on-SHACL&rdquo;. A shapes file that is itself malformed will silently fail to catch the
+errors it was written to catch, which is the worst possible failure mode for a constraint set. Run
+this on any hand-edited or newly-generated constraint file before publishing it.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Shapes files</td><td>files (<code>*.rdf</code>, <code>*.ttl</code>), required</td>
+    <td>The shapes graphs to check. Several can be selected; each is reported
+        separately.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>A conformance verdict per file in the Output window, followed by the full SHACL validation
+      report for any file that does not conform.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionSHACLSHACL()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-restore-ttl">
+<summary><span class="kind">Tool</span> Restore ttl from constraint csv</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Rebuilds SHACL Turtle constraint files from the CSV form of those constraints. Constraints are
+often reviewed and edited as CSV &mdash; it diffs well and non-RDF users can work with it &mdash; but
+only Turtle is executable. This tool closes that loop, turning the reviewed CSV back into a working
+shapes file, so CSV can be used as the editing format without losing the ability to validate.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Constraint CSV files</td><td>files (<code>*.csv</code>), required</td>
+    <td>The CSV constraint definitions to restore. Several can be selected.</td></tr>
+<tr><td>Output folder</td><td>folder, required</td>
+    <td>Where the restored Turtle files are written.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>One restored <code>.ttl</code> constraint file per input CSV, in the chosen output
+      folder.</li>
+  <li>A progress dialog during the run, and a summary in the Output window.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionRestoreTtlFromConstraintCsv()</code></p>
+</div>
+</details>
+
+<h3>Tools &#9656; Reference Data</h3>
+
+<details class="fn" id="tool-convert-reference-data">
+<summary><span class="kind">Tool</span> Convert Reference Data</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Converts reference data instance files &mdash; the shared codelists and boundary definitions that
+exchanged models point at &mdash; using a datatype map to resolve value types correctly. Reference
+data has a long life and passes through several standard versions, so converting it faithfully,
+with datatypes preserved, is a recurring maintenance job.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Instance data files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The reference data to convert.</td></tr>
+<tr><td>Datatype map</td><td>file (<code>*.properties</code>), required</td>
+    <td>The map used to resolve property datatypes during conversion.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The converted reference data files, plus conversion messages in the Output window.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuConvertRefData()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-ref-to-common-data">
+<summary><span class="kind">Tool</span> Convert Reference data to Common data</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Derives the common data set from a reference data file: the subset of reference content that is
+shared by all participants and must be identical in every exchange. Producing it mechanically from
+the reference data, rather than curating it by hand, is what guarantees that every party starts
+from the same common basis.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Reference data file</td><td>file (<code>*.rdf</code>), required</td>
+    <td>The reference data to derive common data from.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The generated common data file, plus messages in the Output window.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuConvertRefToComData()</code></p>
+</div>
+</details>
+
+<h3>Tools &#9656; Instance Data &amp; Models</h3>
+
+<details class="fn" id="tool-model-transformation">
+<summary><span class="kind">Tool</span> Model transformation</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Applies a SPARQL-defined transformation to a set of models. Because the transformation is data
+&mdash; a SPARQL file you supply, not code inside CimPal &mdash; arbitrary migrations can be
+expressed and version-controlled outside the application: moving content between profile versions,
+renaming properties across a corpus, or injecting derived triples. This is the general-purpose
+answer for bulk model change.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Original models</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The models to transform.</td></tr>
+<tr><td>Transformation definition</td><td>file (<code>*.ttl</code>, <code>*.trig</code>), required</td>
+    <td>The SPARQL-based transformation rules to apply.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The transformed models, plus transformation progress and messages in the Output
+    window.</li></ul>
+<p class="src">Source: <code>MainController.actionModelTransformationMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-populate-attributes">
+<summary><span class="kind">Tool</span> Populate missing attributes</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Fills gaps in existing models from a spreadsheet of attribute values. When a profile gains newly
+mandatory attributes, or an export omitted values that downstream consumers require, this injects
+them into the model rather than requiring a fresh export from the source system &mdash; the
+practical way to bring a corpus of already-published models up to a new requirement.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Model files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The models to populate.</td></tr>
+<tr><td>Attributes template</td><td>single file (<code>*.xlsx</code>), required</td>
+    <td>Workbook containing a <code>ClassAttributes</code> worksheet mapping classes to the
+        attribute values to inject.</td></tr>
+<tr><td>Output folder</td><td>folder, required</td>
+    <td>Where the populated models are written.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>The populated models, written as RDF/XML in CimPal's custom plain pretty format into the
+      output folder. The XML base defaults to <code>https://cim.ucaiug.io/ns</code> unless the
+      model declares its own <code>cim</code> prefix, which then takes precedence.</li>
+  <li>Injection counts and any unmatched entries in the Output window.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionPopulateMissingAttributes()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-generate-manifest">
+<summary><span class="kind">Tool</span> Generate Manifest</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Produces a manifest describing a set of model files: what is in the delivery, and where it can be
+retrieved from. A manifest is what allows a consumer to discover and resolve the parts of a
+distributed dataset without being told about each file individually, and it is normally required to
+accompany a published model set.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Model files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The files the manifest should describe. All are loaded to read their headers.</td></tr>
+<tr><td>Access URL</td><td>text</td>
+    <td>The base location from which the described files can be retrieved.</td></tr>
+<tr><td>Output file</td><td>save dialog (<code>manifest.ttl</code>)</td>
+    <td>Where to write the manifest.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>A <code>manifest.ttl</code> file at the chosen location.</li>
+  <li>A confirmation dialog reporting the manifest path and the number of files described.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionGenerateManifest()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-psse-pf">
+<summary><span class="kind">Tool</span> PSSE-PowerFactory compare</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Compares power flow results produced by PSS&reg;E with those produced by PowerFactory. When the
+same CIM model is imported into two different power system analysis tools, the two solutions should
+agree; where they do not, the discrepancy usually points at an ambiguity or defect in the model or
+in one tool's import. This comparison is how such cases are located.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Result files</td><td>files, required</td>
+    <td>The PSS&reg;E and PowerFactory result files to compare, requested by the comparison
+        routine.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>The comparison result, reported to the Output window and to the generated result
+    file.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuPSSEPF()</code></p>
+</div>
+</details>
+
+<h3>Tools &#9656; Quality Reports</h3>
+
+<details class="fn" id="tool-generate-qar">
+<summary><span class="kind">Tool</span> Generate QAR based on xls</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Builds Quality Assessment Report instance files from a spreadsheet of findings. Quality
+assessment results are collected and discussed in Excel, but must be exchanged as CIM instance
+data; this tool performs that promotion, generating one correctly-named QAR file per region so the
+result can be published straight into the exchange process.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>QAR spreadsheet</td><td>file (<code>*.xlsx</code>), required</td>
+    <td>The workbook of findings, including the identifiers to be used. Each worksheet is
+        imported.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul>
+  <li>One QAR XML file per region, named
+      <code>GLOBAL_&lt;timestamp&gt;_&lt;process&gt;_&lt;region&gt;_IGM_&lt;version&gt;.xml</code>,
+      written into an <code>Output</code> subfolder next to the input workbook.</li>
+</ul>
+<p class="src">Source: <code>MainController.actionQARMenu()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-qar-template">
+<summary><span class="kind">Tool</span> Create xlsx template from QAR</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>The reverse direction of the previous tool: reads existing QAR instance files and produces the
+spreadsheet template that matches them. Use it to obtain a correctly-structured workbook to fill in
+for the next reporting round, or to bring already-published QAR content back into Excel for
+analysis.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>QAR model files</td><td>files (<code>*.xml</code>, <code>*.zip</code>), required</td>
+    <td>The QAR instance files to derive the template from.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>An <code>.xlsx</code> template reflecting the structure and content of the supplied QAR
+    files.</li></ul>
+<p class="src">Source: <code>MainController.actionCreateQARTemplate()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-qocdc">
+<summary><span class="kind">Tool</span> QoCDC 3.2.1 xml to Excel</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>Converts the QoCDC from its XML form into a spreadsheet.
+The XML is the authoritative machine-readable definition, but the rules have to be read, reviewed
+and cross-referenced against implemented constraints by people &mdash; which is a spreadsheet job.
+Each rule's name, severity, level, description and message are extracted.</p>
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Input</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>QoCDC XML file</td><td>file (<code>*.xml</code>), required</td>
+    <td>The rule catalogue. UML restriction rules are read from the CGM-BP extensions
+        namespace.</td></tr>
+</table>
+<h4>Outputs</h4>
+<ul><li>An Excel workbook with one row per rule, carrying its name, severity, level, description and
+    message.</li></ul>
+<p class="src">Source: <code>MainController.actionMenuQoCDCxls()</code></p>
+</div>
+</details>
+
+<h3>Tools &mdash; top level of the menu</h3>
+
+<details class="fn" id="tool-validate-by-mapping">
+<summary><span class="kind">Tool</span> Validate by mapping file</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>A shortcut. This menu item performs no work of its own &mdash; it simply brings the
+<a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> tab to the front, where the whole
+workflow lives. See that tab for inputs and outputs.</p>
+<h4>Inputs</h4>
+<p>None.</p>
+<h4>Outputs</h4>
+<ul><li>The <em>Dataset SHACL Validation</em> tab is selected in the main window.</li></ul>
+<p class="src">Source: <code>MainController.actionValidateByMapping()</code></p>
+</div>
+</details>
+
+<details class="fn" id="tool-run-sparql">
+<summary><span class="kind">Tool</span> Run SPARQL Query</summary>
+<div class="fn-body">
+<h4>Business logic</h4>
+<p>A shortcut. This menu item performs no work of its own &mdash; it brings the
+<a href="#tab-sparql-query">Dataset Operations &#9656; SPARQL Query</a> tab to the front, where models are loaded and queries
+are written and run. See that tab for inputs and outputs.</p>
+<h4>Inputs</h4>
+<p>None.</p>
+<h4>Outputs</h4>
+<ul><li>The <em>SPARQL Query</em> tab is selected in the main window.</li></ul>
+<p class="src">Source: <code>MainController.actionRunSPARQLQuery()</code></p>
+</div>
+</details>
+
+<!-- ========================================================== PREFERENCES -->
+
+<h2 id="preferences">Settings</h2>
+
+<details class="fn" id="pref-card" open>
+<summary><span class="kind">Settings</span> File &#9656; Preferences&hellip;</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Holds the settings that would otherwise have to be retyped in every tab. The <strong>CIM
+related</strong> tab defines the namespaces of the standard CimPal is working against &mdash; get
+these right once and every generated artefact carries consistent, correct namespace declarations;
+get them wrong and the output is subtly invalid in a way that is tedious to trace. The
+<strong>Application</strong> tab controls appearance and the folders CimPal reopens in. Settings
+are stored per user and persist between sessions.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Setting</th><th>Tab</th><th>Meaning</th></tr>
+<tr><td>CIM namespace</td><td>CIM related</td>
+    <td>The base CIM namespace URI used for classes and properties.</td></tr>
+<tr><td>CIMS namespace</td><td>CIM related</td>
+    <td>The CIM syntax (<code>cims</code>) namespace URI used by the augmented RDFS
+        vocabulary.</td></tr>
+<tr><td>RDF namespace</td><td>CIM related</td>
+    <td>The RDF namespace URI.</td></tr>
+<tr><td>IO prefix / URI</td><td>CIM related</td>
+    <td>Prefix and URI of the namespace declaring <code>IdentifiedObject</code>, used when
+        generating mRID-related constraints.</td></tr>
+<tr><td>EU prefix / URI</td><td>CIM related</td>
+    <td>Prefix and URI of the European extension namespace.</td></tr>
+<tr><td>Other prefix / URI</td><td>CIM related</td>
+    <td>Prefix and URI of a further custom extension namespace.</td></tr>
+<tr><td>Clear remembered locations</td><td>Application &#9656; Remembered locations</td>
+    <td>Forgets every remembered field value and dialog folder, after asking for confirmation. The
+        label above the button reports how many are currently remembered. Nothing on disk is
+        touched: path fields simply start empty again and dialogs open in your home folder until
+        you pick a location.</td></tr>
+<tr><td>Theme</td><td>Application &#9656; Themes</td>
+    <td>One of ten themes, grouped light, dark and accessibility: Minimalist White, Nordic Light,
+        Solarized Light, Sepia (Warm Paper), Sleek Dark Mode, Material Dark, Dracula, Solarized
+        Dark, High-contrast Cyberpunk, High Contrast Black. <strong>Dracula</strong> is the theme a
+        fresh installation starts with; an installation that has already had a theme chosen keeps
+        that choice. The selection is applied immediately as a preview &mdash; press <em>OK</em> to
+        keep it, <em>Cancel</em> to revert.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li><strong>OK</strong> &mdash; saves the values and closes the dialog. They persist for this
+      user between sessions and are picked up as the defaults by the tabs that offer <em>Apply
+      default namespace</em> and <em>Apply default base URI</em>.</li>
+  <li><strong>Default</strong> &mdash; restores the shipped default values, and forgets the
+      remembered locations as well.</li>
+  <li><strong>Cancel</strong> &mdash; discards the changes, including reverting a previewed
+      theme.</li>
+</ul>
+
+<div class="note" style="margin-top:16px">
+  <strong>Remembered locations</strong> &mdash; CimPal remembers each path field and each file or
+  folder dialog separately, so a field comes back filled in the next time you start the application
+  and every dialog opens where that same dialog was last used. A field's <em>Reset</em> button also
+  forgets its remembered path. If a remembered folder has since been deleted, the dialog opens in
+  the nearest folder that still exists instead of reporting an error, and a field whose file no
+  longer exists simply starts empty. A few fields show a list of several selected files rather than
+  one path; those cannot be restored into the field, but their dialogs still remember their
+  folder.
+</div>
+
+<div class="note" style="margin-top:16px">
+  <strong>Note</strong> &mdash; a theme change applies to windows that are open at the time and to
+  windows opened afterwards. If this help window is open when you change the theme, close and
+  reopen it from the Help menu to repaint the page in the new palette.
+</div>
+
+<p class="src">Source: <code>MainController.actionMenuPreferences()</code>,
+<code>PreferencesController</code>, <code>ThemeManager</code>, <code>PathMemory</code></p>
+</div>
+</details>
+
+<details class="fn" id="clear-remote-cache">
+<summary><span class="kind">Settings</span> File &#9656; Clear cached remote data&hellip;</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Empties the two folders in which CimPal keeps files it downloaded from the web: remote SHACL
+constraint files, including everything they pull in through <code>owl:imports</code>, and remote XML
+inputs named by a mapping CSV. This is not part of normal use. A validation run already discards
+whatever it is holding in memory before it starts, and every cached file is revalidated against the
+server before it is reused, so an upstream edit is picked up on the next run by itself. The menu
+item exists for the two cases revalidation cannot cover: a cached file that is corrupt or truncated,
+and a server that serves changed content under an unchanged validator. Emptying the cache costs
+nothing but the time to download the files again.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Confirmation dialog</td><td>action</td>
+    <td>Reports how many files are currently cached and lists the exact folders that will be
+        emptied, before anything is deleted. <em>Cancel</em> leaves everything in place.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li>The cache folders are emptied and the number of deleted files is reported. If a file could not
+      be deleted &mdash; typically because another program is holding it open &mdash; the message
+      names it, and the rest are still removed.</li>
+  <li>Nothing outside those two folders is touched: local constraint files, models, reports,
+      preferences and remembered locations are all unaffected. The next run downloads what it
+      needs.</li>
+</ul>
+
+<div class="note" style="margin-top:16px">
+  <strong>Where the files are</strong> &mdash; both folders sit in CimPal's own per-user data
+  directory, <code>%LOCALAPPDATA%\CimPal</code> on Windows and <code>~/.cimpal</code> elsewhere:
+  <code>shapes-cache</code> holds downloaded constraint files, <code>remote-xml-cache</code>
+  downloaded XML inputs. The confirmation dialog shows the full paths for the machine you are on.
+  Each cached file is stored next to a small <code>.meta</code> file recording the
+  <code>ETag</code> the server gave it; that is what lets the next run ask &ldquo;has this
+  changed?&rdquo; instead of downloading it again.
+</div>
+
+<p class="src">Source: <code>MainController.actionMenuClearRemoteCache()</code>,
+<code>ValidationTools.clearRemoteDiskCaches()</code>, <code>ValidationTools.clearRemoteCaches()</code></p>
+</div>
+</details>
+
+<p class="footer">
+CimPal &mdash; Version 2026.9.05.1. Copyright &copy; 2020, gridDigIt Kft. Licensed under the
+EUPL-1.2-or-later. Each documentation card names the controller method it describes, so this page
+can be re-checked against the code.
+</p>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var cards = Array.prototype.slice.call(document.querySelectorAll("details.fn"));
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav a"));
+  var groups = Array.prototype.slice.call(
+    document.querySelectorAll("nav .group, nav .subgroup"));
+  var empty = document.getElementById("navEmpty");
+
+  // ---- Expand all / Collapse all -----------------------------------------
+
+  document.getElementById("expandAll").addEventListener("click", function () {
+    cards.forEach(function (c) { c.open = true; });
+  });
+  document.getElementById("collapseAll").addEventListener("click", function () {
+    cards.forEach(function (c) { c.open = false; });
+  });
+
+  // ---- Sidebar filter -----------------------------------------------------
+  // Matches on the sidebar link text and on the card's own text, so a search for
+  // "datatype" finds cards whose title does not contain the word.
+
+  var filter = document.getElementById("filter");
+
+  function textOf(el) { return (el.textContent || "").toLowerCase(); }
+
+  function applyFilter() {
+    var q = filter.value.trim().toLowerCase();
+    var anyVisible = false;
+
+    if (!q) {
+      links.forEach(function (a) { a.classList.remove("hidden"); });
+      groups.forEach(function (g) { g.classList.remove("hidden"); });
+      cards.forEach(function (c) { c.classList.remove("hidden"); });
+      empty.classList.remove("show");
+      return;
+    }
+
+    links.forEach(function (a) {
+      var target = document.querySelector(a.getAttribute("href"));
+      var haystack = textOf(a) + " " + (target ? textOf(target) : "");
+      var hit = haystack.indexOf(q) !== -1;
+      a.classList.toggle("hidden", !hit);
+      if (hit) { anyVisible = true; }
+    });
+
+    // A heading is only useful while at least one of its links survives. A submenu
+    // heading owns the links up to the next heading of either level; a top-level
+    // group heading owns everything up to the next top-level group, submenus
+    // included, so it stays visible whenever any of its submenus does.
+    groups.forEach(function (g) {
+      var isSub = g.classList.contains("subgroup");
+      var visible = false;
+      var node = g.nextElementSibling;
+      while (node && !node.classList.contains("group")) {
+        if (isSub && node.classList.contains("subgroup")) { break; }
+        if (node.tagName === "A" && !node.classList.contains("hidden")) { visible = true; }
+        node = node.nextElementSibling;
+      }
+      g.classList.toggle("hidden", !visible);
+    });
+
+    cards.forEach(function (c) {
+      c.classList.toggle("hidden", textOf(c).indexOf(q) === -1);
+    });
+
+    empty.classList.toggle("show", !anyVisible);
+  }
+
+  filter.addEventListener("input", applyFilter);
+
+  // ---- Scroll spy ---------------------------------------------------------
+
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+
+  var targets = Object.keys(byId)
+    .map(function (id) { return document.getElementById(id); })
+    .filter(function (el) { return el !== null; });
+
+  function highlight(id) {
+    links.forEach(function (a) { a.classList.remove("active"); });
+    if (byId[id]) { byId[id].classList.add("active"); }
+  }
+
+  if (window.IntersectionObserver) {
+    var observer = new IntersectionObserver(function (entries) {
+      // Topmost intersecting section wins, so the highlight follows the reading position.
+      var best = null;
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) { return; }
+        if (!best || e.boundingClientRect.top < best.boundingClientRect.top) { best = e; }
+      });
+      if (best) { highlight(best.target.id); }
+    }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+
+    targets.forEach(function (el) { observer.observe(el); });
+  }
+
+  // Clicking a sidebar link opens the card it points at, otherwise the anchor
+  // lands on a collapsed summary and the content stays hidden.
+  links.forEach(function (a) {
+    a.addEventListener("click", function () {
+      var target = document.querySelector(a.getAttribute("href"));
+      if (target && target.tagName === "DETAILS") { target.open = true; }
+      highlight(a.getAttribute("href").slice(1));
+    });
+  });
+}());
+</script>
+
+</body>
+</html>

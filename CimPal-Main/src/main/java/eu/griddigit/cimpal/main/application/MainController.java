@@ -8,20 +8,21 @@ package eu.griddigit.cimpal.main.application;
 import eu.griddigit.cimpal.core.generators.ManifestGenerator;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.utils.AttributeInjector;
-import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.*;
 import eu.griddigit.cimpal.main.application.controllers.sparql.SparqlQueryTabController;
+import eu.griddigit.cimpal.main.application.controllers.ai.AiAssistantTabController;
 import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
+import eu.griddigit.cimpal.main.workspace.WorkspaceArtifactRegistry;
+import eu.griddigit.cimpal.main.workspace.WorkspaceRdfStore;
+import eu.griddigit.cimpal.main.workspace.WorkspaceTdbStore;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 
 import java.io.InputStream;
 
-//import guru.nidi.graphviz.engine.Graphviz;
-//import guru.nidi.graphviz.engine.Format;
 
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -32,10 +33,10 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.text.Font;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.util.Callback;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.*;
@@ -45,7 +46,6 @@ import org.apache.jena.vocabulary.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import eu.griddigit.cimpal.main.util.ExcelTools;
 
-import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.*;
@@ -56,6 +56,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
+import java.util.stream.Collectors;
 
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.ModelManipulationFactory.LoadRDFAbout;
@@ -88,41 +89,210 @@ import java.io.FileOutputStream;
 
 public class MainController implements Initializable {
 
+    /** Shows registered sources and in-memory RDF artifacts without exposing a mutable global model. */
+    @FXML
+    private void actionShowWorkspace() {
+        VBox artifactList = new VBox(4);
+        ScrollPane inventory = new ScrollPane(artifactList);
+        inventory.setFitToWidth(true);
+        inventory.setPrefViewportWidth(900);
+        inventory.setPrefViewportHeight(560);
+        Set<String> selectedKeys = new LinkedHashSet<>();
+        Runnable refreshArtifacts = () -> {
+            WorkspaceArtifactRegistry.synchronizeLegacyInventory();
+            artifactList.getChildren().clear();
+            List<WorkspaceArtifactRegistry.Artifact> artifacts = WorkspaceArtifactRegistry.snapshot().stream()
+                    .filter(artifact -> WorkspaceRdfStore.isLoaded(artifact.key()) || WorkspaceTdbStore.isStored(artifact.key())).toList();
+            if (artifacts.isEmpty()) {
+                artifactList.getChildren().add(new Label("No graphs are loaded in memory or stored locally. Load model files or use Restore."));
+                return;
+            }
+            for (WorkspaceArtifactRegistry.Artifact artifact : artifacts) {
+                boolean loaded = WorkspaceRdfStore.isLoaded(artifact.key());
+                boolean stored = WorkspaceTdbStore.isStored(artifact.key());
+                String availability = loaded && stored ? artifact.triples() + " triples in memory + stored" : loaded
+                        ? artifact.triples() + " triples in memory" : "stored locally (not loaded)";
+                CheckBox item = new CheckBox(artifact.type() + "  |  " + artifact.name() + "  |  " + availability);
+                item.setSelected(selectedKeys.contains(artifact.key()));
+                item.setUserData(artifact.key());
+                item.setTooltip(new Tooltip("Owner: " + artifact.owner() + "\nState: " + artifact.state()
+                        + "\nSources: " + (artifact.sources().isEmpty() ? "not recorded" : String.join("\n", artifact.sources()))));
+                item.selectedProperty().addListener((ignored, wasSelected, isSelected) -> {
+                    if (isSelected) selectedKeys.add(artifact.key()); else selectedKeys.remove(artifact.key());
+                });
+                artifactList.getChildren().add(item);
+            }
+        };
+        Button refresh = new Button("↻");
+        refresh.setTooltip(new Tooltip("Refresh workspace inventory"));
+        refresh.setOnAction(event -> refreshArtifacts.run());
+        Button selectAll = new Button("✓");
+        selectAll.setTooltip(new Tooltip("Check all loaded workspace graphs"));
+        selectAll.setOnAction(event -> {
+            artifactList.getChildren().stream().filter(CheckBox.class::isInstance).map(CheckBox.class::cast)
+                    .forEach(check -> check.setSelected(true));
+        });
+        Button clearSelection = new Button("□");
+        clearSelection.setTooltip(new Tooltip("Uncheck all workspace graphs"));
+        clearSelection.setOnAction(event -> {
+            artifactList.getChildren().stream().filter(CheckBox.class::isInstance).map(CheckBox.class::cast)
+                    .forEach(check -> check.setSelected(false));
+        });
+        Button release = new Button("−");
+        release.setTooltip(new Tooltip("Release checked artifacts from memory; source files remain untouched"));
+        release.setOnAction(event -> {
+            List<String> loadedSelection = selectedKeys.stream().filter(WorkspaceRdfStore::isLoaded).toList();
+            if (loadedSelection.isEmpty()) {
+                new Alert(Alert.AlertType.INFORMATION, "Check one or more artifacts that are currently in memory.", ButtonType.OK).showAndWait();
+                return;
+            }
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            loadedSelection.forEach(WorkspaceRdfStore::release);
+            selectedKeys.removeAll(loadedSelection);
+            refreshArtifacts.run();
+            completeProgressBar();
+        });
+        Button clearMemory = new Button("×");
+        clearMemory.setTooltip(new Tooltip("Release all workspace graphs from memory; source files remain untouched"));
+        clearMemory.setOnAction(event -> {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Release all CimPal workspace graphs from memory? Source files on disk will not be deleted.", ButtonType.OK, ButtonType.CANCEL);
+            confirm.setTitle("Clear workspace memory");
+            confirm.setHeaderText("This only clears the in-memory workspace cache");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+                setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+                WorkspaceRdfStore.clearMemoryArtifacts();
+                selectedKeys.clear();
+                refreshArtifacts.run();
+                completeProgressBar();
+            }
+        });
+        Button store = new Button("Store");
+        store.setTooltip(new Tooltip("Persist checked in-memory graphs for a later application session"));
+        store.setOnAction(event -> {
+            List<String> loadedSelection = selectedKeys.stream().filter(WorkspaceRdfStore::isLoaded).toList();
+            if (loadedSelection.isEmpty()) {
+                new Alert(Alert.AlertType.INFORMATION, "Check one or more artifacts that are currently in memory before storing them.", ButtonType.OK).showAndWait();
+                return;
+            }
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                int count = WorkspaceTdbStore.persist(loadedSelection);
+                new Alert(Alert.AlertType.INFORMATION, count + " artifact(s) stored in:\n" + WorkspaceTdbStore.storePath(), ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not store workspace artifacts:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button restore = new Button("Restore");
+        restore.setTooltip(new Tooltip("Restore all persisted workspace graphs into memory"));
+        restore.setOnAction(event -> {
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                List<String> restored = WorkspaceTdbStore.restoreAll();
+                refreshArtifacts.run();
+                new Alert(Alert.AlertType.INFORMATION, restored.isEmpty()
+                        ? "No persisted workspace graphs were found in:\n" + WorkspaceTdbStore.storePath()
+                        : restored.size() + " artifact(s) restored from:\n" + WorkspaceTdbStore.storePath(), ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not restore workspace artifacts:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button forgetStored = new Button("Forget");
+        forgetStored.setTooltip(new Tooltip("Delete persisted copies of checked graphs; leaves memory and source files unchanged"));
+        forgetStored.setOnAction(event -> {
+            if (selectedKeys.isEmpty()) {
+                new Alert(Alert.AlertType.INFORMATION, "Check one or more restored artifacts to remove their stored copies.", ButtonType.OK).showAndWait();
+                return;
+            }
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Delete the persisted copies of the checked artifacts? Their in-memory graphs and source files will remain.", ButtonType.OK, ButtonType.CANCEL);
+            confirm.setTitle("Forget stored workspace artifacts");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                int removed = WorkspaceTdbStore.remove(selectedKeys);
+                refreshArtifacts.run();
+                new Alert(Alert.AlertType.INFORMATION, removed + " stored artifact(s) removed.", ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not remove stored workspace artifacts:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button clearStore = new Button("Clear store");
+        clearStore.setTooltip(new Tooltip("Delete all persisted TDB2 workspace graphs; leaves memory and source files unchanged"));
+        clearStore.setOnAction(event -> {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Delete all persisted workspace graphs from the local TDB2 store? In-memory graphs and source files will remain.", ButtonType.OK, ButtonType.CANCEL);
+            confirm.setTitle("Clear persistent workspace store");
+            if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+            setProgressBarValue(ProgressIndicator.INDETERMINATE_PROGRESS);
+            try {
+                int removed = WorkspaceTdbStore.clear();
+                selectedKeys.clear();
+                refreshArtifacts.run();
+                new Alert(Alert.AlertType.INFORMATION, removed + " stored artifact(s) removed.", ButtonType.OK).showAndWait();
+            } catch (Exception exception) {
+                new Alert(Alert.AlertType.ERROR, "Could not clear the persistent workspace store:\n" + exception.getMessage(), ButtonType.OK).showAndWait();
+            } finally {
+                completeProgressBar();
+            }
+        });
+        Button help = new Button("?");
+        help.setTooltip(new Tooltip("− and × affect only memory. Store and Restore manage saved workspace graphs. Forget removes checked persisted copies; Clear store removes all persisted graphs. Source files are never deleted."));
+        javafx.scene.layout.HBox controls = new javafx.scene.layout.HBox(8, refresh, selectAll, clearSelection, release, clearMemory, store, restore, forgetStored, clearStore, help);
+        VBox content = new VBox(8, controls, inventory);
+        Stage dialog = new Stage();
+        dialog.setTitle("Workspace artifacts");
+        dialog.setScene(new Scene(content));
+        dialog.setMinWidth(850);
+        dialog.setMinHeight(620);
+        if (foutputWindow != null && foutputWindow.getScene() != null) dialog.initOwner(foutputWindow.getScene().getWindow());
+        refreshArtifacts.run();
+        dialog.show();
+    }
+
     public GUIhelper getGuiHelper() {
         return guiHelper;
     }
 
     private final GUIhelper guiHelper;
-    private eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController cimPalWizardController;
 
-    public TabPane tabPaneConstraintsDetails;
+    /** Outer row of the two-level tab structure: the three categories of work. */
+    @FXML
+    private TabPane tabPaneWorkspace;
     public Tab tabCreateCompleteSM1;
     public Tab tabInstanceDataComparison;
     public Tab tabExcelToSHACL;
     public Tab tabRDFConvert;
-    public Tab tabOutputWindow;
+    @FXML private Tab tabRdfsUnion;
     public Tab tabSPARQLQuery;
+    private SparqlQueryTabController sparqlQueryTabController;
+    @FXML
+    private Tab tabAiAssistant;
+    @FXML
+    private Tab tabRDFVisualisation;
     public Font x3;
     @FXML
     public TreeView treeViewInstanceData;
-    public TextField fPrefixGenerateTab1;
-    public TextField fshapesBaseURIDefineTab1;
-    public TextField fURIGenerateTab1;
-    public TextField fowlImportsDefineTab1;
     @FXML
     private TextArea foutputWindow;
     @FXML
     private ProgressBar progressBar;
-
     @FXML
-    private TabPane tabPaneDown;
+    private Label lblStatus;
+
     @FXML
     private SplitPane mainSplitPane;
     @FXML
     private TitledPane outputSourceContainer;
-    public static Preferences prefs;
     @FXML
-    private CheckBox cbShowUnionModelOnly;
+    private TitledPane workAreaContainer;
+    public static Preferences prefs;
 
     private double outputSourceDividerPosition = 0.8146067415730337;
 
@@ -131,17 +301,7 @@ public class MainController implements Initializable {
     @FXML
     private Tab tabGenerateInstanceData;
     @FXML
-    private Tab tabSHACLTester;
-    @FXML
-    private Tab tabSHACLOrganizer;
-    @FXML
     private Tab tabRDFStoSHACL;
-    @FXML
-    private Tab tabConstraintsSourceCode;
-    @FXML
-    private ToggleButton btnShowSourceCodeDefineTab;
-    @FXML
-    private TextArea fsourceDefineTab;
 
     @FXML
     private Tab tabValidationByMapping;
@@ -156,11 +316,7 @@ public class MainController implements Initializable {
     public static File xlsFileExcelShacl;
     public static File TtlChangesExcelToTtl;
     public static File XlsChangesExcelToTtl;
-    public static RDFCompareResult rdfCompareResult;
-    public static List<String> rdfsCompareFiles;
 
-    private ArrayList<Object> models;
-    private ArrayList<Object> modelsNames;
     public static ArrayList<Model> RDFSmodels;
     public static List<RdfsModelDefinition> RDFSmodelsNames;
     public static ArrayList<Object> shapeModelsNames;
@@ -169,14 +325,9 @@ public class MainController implements Initializable {
     public static ArrayList<Object> shapeModels;
     private static Map<String, RDFDatatype> dataTypeMapFromShapes;
     private static int shaclNodataMap;
-    private static String defaultShapesURI;
     public static String rdfFormatInput;
 
-    public static TreeView treeViewConstraintsStatic;
     public static TreeView treeViewIDStatic;
-    private static Map<TreeItem, String> treeMapConstraints;
-    private static Map<TreeItem, String> treeMapID;
-    private static Map<String, TreeItem> treeMapConstraintsInverse;
     public static Integer shapesOnAbstractOption;
 
     public static TextArea foutputWindowVar;
@@ -210,12 +361,17 @@ public class MainController implements Initializable {
     public static Map<String, Model> InstanceModelMap;
     public static boolean treeID;
     //for the
-    private double initialX;
-    private double initialY;
 
 
     public MainController() {
         guiHelper = new GUIhelper();
+    }
+
+    /** Updates the application-wide status area at the bottom of the window. */
+    public void setStatusMessage(String message) {
+        if (lblStatus != null) {
+            lblStatus.setText(message == null ? "" : message);
+        }
     }
 
     @Override
@@ -231,9 +387,6 @@ public class MainController implements Initializable {
         treeID = false;
         treeViewIDStatic = treeViewInstanceData;
         foutputWindowVar = foutputWindow;
-        //initialization of the Browse and Modify table - SHACL Shapes Browse
-        Callback<TableColumn, TableCell> cellFactory = p -> new ComboBoxCell();
-
         try {
             if (!Preferences.userRoot().nodeExists("CimPal")) {
                 prefs = Preferences.userRoot().node("CimPal");
@@ -246,38 +399,7 @@ public class MainController implements Initializable {
             GUIhelper.showUserFriendlyError("Preferences error", "Preferences could not be loaded. Please review details and send them to support.", e);
         }
 
-        cimPalWizardController = new eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController(prefs);
-
-        Platform.runLater(() -> {
-            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
-                outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
-                mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, oldValue, newValue) -> {
-                    if (outputSourceContainer == null || outputSourceContainer.isExpanded()) {
-                        outputSourceDividerPosition = newValue.doubleValue();
-                    }
-                });
-            }
-
-            if (outputSourceContainer != null) {
-                outputSourceContainer.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
-                    if (!isExpanded) {
-                        if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
-                            outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
-                        }
-                    } else {
-                        Platform.runLater(() -> {
-                            if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty()) {
-                                mainSplitPane.setDividerPosition(0, outputSourceDividerPosition);
-                            }
-                        });
-                    }
-                });
-            }
-        });
-
-
-        //TODO: see how to have this default on the screen
-        defaultShapesURI = "/Constraints";
+        Platform.runLater(this::initializeCollapsiblePanes);
 
 
         try {
@@ -313,34 +435,25 @@ public class MainController implements Initializable {
             ExcelToSHACLController controller = loader.getController();
             controller.setMainController(this);
         } catch (IOException e) {
-            GUIhelper.showUserFriendlyError("Excel to SHACL tab error", "The Excel to SHACL tab could not be loaded.", e);
+            GUIhelper.showUserFriendlyError("SHACL Constraints Operations tab error", "The SHACL Constraints Operations tab could not be loaded.", e);
         }
 
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFConvertTab.fxml"));
             tabRDFConvert.setContent(loader.load());
-            RDFConvertController controller = loader.getController();
+            RDFSimpleConvertController controller = loader.getController();
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("RDF Convert tab error", "The RDF Convert tab could not be loaded.", e);
         }
 
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SHACLOrganizerTab.fxml"));
-            tabSHACLOrganizer.setContent(loader.load());
-            SHACLOrganizerController controller = loader.getController();
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFSUnionTab.fxml"));
+            tabRdfsUnion.setContent(loader.load());
+            RDFSUnionController controller = loader.getController();
             controller.setMainController(this);
         } catch (IOException e) {
-            GUIhelper.showUserFriendlyError("SHACL Organizer tab error", "The SHACL Organizer tab could not be loaded.", e);
-        }
-
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/SHACLTesterTab.fxml"));
-            tabSHACLTester.setContent(loader.load());
-            SHACLTesterController controller = loader.getController();
-            controller.setMainController(this);
-        } catch (IOException e) {
-            GUIhelper.showUserFriendlyError("SHACL Tester tab error", "The SHACL Tester tab could not be loaded.", e);
+            GUIhelper.showUserFriendlyError("RDFS Union tab error", "The RDFS Union tab could not be loaded.", e);
         }
 
         try {
@@ -366,12 +479,133 @@ public class MainController implements Initializable {
             tabSPARQLQuery.setContent(loader.load());
             SparqlQueryTabController controller = loader.getController();
             controller.setMainController(this);
+            sparqlQueryTabController = controller;
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("SPARQL Query tab error", "The SPARQL Query tab could not be loaded.", e);
         }
 
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/AiAssistantTab.fxml"));
+            tabAiAssistant.setContent(loader.load());
+            AiAssistantTabController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("AI Assistant tab error", "The AI Assistant tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RDFVisualisationTab.fxml"));
+            tabRDFVisualisation.setContent(loader.load());
+            RDFVisualisationController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("RDF Visualisation tab error", "The RDF Visualisation tab could not be loaded.", e);
+        }
+
         initializeValidationByMappingTab();
 
+    }
+
+    /**
+     * Makes both halves of the main SplitPane behave as an accordion: collapsing the
+     * <em>Operations</em> pane hands the whole height to <em>Output</em>, and vice versa.
+     * <p>
+     * The divider has to be driven explicitly, because a SplitPane leaves it where the user last
+     * put it and a collapsed pane would otherwise just leave an empty gap. Both panes carry
+     * {@code minHeight="0"} in the FXML - needed so that either one can be squeezed right down -
+     * which also means the SplitPane is free to squeeze a collapsed pane past its title bar and
+     * leave the user no way to expand it again. So while a pane is collapsed its minimum height is
+     * pinned to that title bar, and released when it expands. The last position while both panes
+     * were open is remembered, so re-expanding restores the layout rather than a default.
+     */
+    private void initializeCollapsiblePanes() {
+        if (mainSplitPane == null || mainSplitPane.getDividers().isEmpty()) {
+            return;
+        }
+
+        outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+        mainSplitPane.getDividers().getFirst().positionProperty().addListener((obs, oldValue, newValue) -> {
+            if (bothPanesExpanded()) {
+                outputSourceDividerPosition = newValue.doubleValue();
+            }
+        });
+
+        addCollapseListener(workAreaContainer, 0.0);
+        addCollapseListener(outputSourceContainer, 1.0);
+    }
+
+    /**
+     * @param collapsedDividerPosition the end of the divider's travel that belongs to this pane:
+     *                                 0 for the upper pane, 1 for the lower one.
+     */
+    private void addCollapseListener(TitledPane pane, double collapsedDividerPosition) {
+        if (pane == null) {
+            return;
+        }
+        pane.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
+            if (mainSplitPane == null || mainSplitPane.getDividers().isEmpty()) {
+                return;
+            }
+            if (isExpanded) {
+                pane.setMinHeight(0);
+                // Deferred: the pane's content is still being laid out at this point, so a
+                // position set now would be recomputed and lost.
+                Platform.runLater(() -> {
+                    if (mainSplitPane != null && !mainSplitPane.getDividers().isEmpty() && bothPanesExpanded()) {
+                        mainSplitPane.setDividerPosition(0, outputSourceDividerPosition);
+                    }
+                });
+            } else {
+                outputSourceDividerPosition = mainSplitPane.getDividerPositions()[0];
+                Platform.runLater(() -> {
+                    if (mainSplitPane == null || mainSplitPane.getDividers().isEmpty()) {
+                        return;
+                    }
+                    // Collapsed, a TitledPane's preferred height is exactly its title bar.
+                    pane.setMinHeight(pane.prefHeight(pane.getWidth()));
+                    mainSplitPane.setDividerPosition(0, collapsedDividerPosition);
+                });
+            }
+        });
+    }
+
+    private boolean bothPanesExpanded() {
+        return (workAreaContainer == null || workAreaContainer.isExpanded())
+                && (outputSourceContainer == null || outputSourceContainer.isExpanded());
+    }
+
+    /**
+     * Brings a function workspace to the front from the single Operations toolbar.
+     */
+    private void selectFunctionTab(Tab functionTab) {
+        if (functionTab == null) {
+            return;
+        }
+        if (tabPaneWorkspace != null) {
+            tabPaneWorkspace.getSelectionModel().select(functionTab);
+        }
+    }
+
+    @FXML private void actionShowVisualisation(ActionEvent event) { selectFunctionTab(tabRDFVisualisation); }
+    @FXML private void actionShowConvert(ActionEvent event) { selectFunctionTab(tabRDFConvert); }
+    @FXML private void actionShowSparql(ActionEvent event) { selectFunctionTab(tabSPARQLQuery); }
+    @FXML private void actionShowAiAssistant(ActionEvent event) { selectFunctionTab(tabAiAssistant); }
+    @FXML private void actionShowRdfsToShacl(ActionEvent event) { selectFunctionTab(tabRDFStoSHACL); }
+    @FXML private void actionShowConstraints(ActionEvent event) { selectFunctionTab(tabExcelToSHACL); }
+    @FXML private void actionShowRdfComparison(ActionEvent event) { selectFunctionTab(tabCreateCompleteSM1); }
+    @FXML private void actionShowRdfsUnion(ActionEvent event) { selectFunctionTab(tabRdfsUnion); }
+    @FXML private void actionShowDatasetComparison(ActionEvent event) { selectFunctionTab(tabInstanceDataComparison); }
+    @FXML private void actionShowGenerate(ActionEvent event) { selectFunctionTab(tabGenerateInstanceData); }
+    @FXML private void actionShowTaskWizard(ActionEvent event) { selectFunctionTab(tabTaskWizard); }
+    @FXML private void actionShowValidation(ActionEvent event) { selectFunctionTab(tabValidationByMapping); }
+
+    /** Opens a generated query or review-only repair script in CimPal's SPARQL editor. */
+    public void openGeneratedSparql(String query) {
+        if (sparqlQueryTabController == null) {
+            throw new IllegalStateException("The SPARQL Query tab is not available.");
+        }
+        sparqlQueryTabController.setGeneratedQuery(query);
+        selectFunctionTab(tabSPARQLQuery);
     }
 
     private void initializeValidationByMappingTab() {
@@ -387,10 +621,16 @@ public class MainController implements Initializable {
 
             tabValidationByMapping.setContent(root);
 
+            //the manual-selection workflow streams per-model results to the Output pane
+            ValidationByMappingController controller = loader.getController();
+            if (controller != null) {
+                controller.setMainController(this);
+            }
+
         } catch (Exception e) {
             GUIhelper.showUserFriendlyError(
-                    "Validation by Mapping tab error",
-                    "The Validation by Mapping tab could not be loaded.",
+                    "Dataset SHACL Validation tab error",
+                    "The Dataset SHACL Validation tab could not be loaded.",
                     e
             );
         }
@@ -402,49 +642,38 @@ public class MainController implements Initializable {
      * Sets the progress bar value (0.0 to 1.0, or use ProgressIndicator.INDETERMINATE_PROGRESS)
      */
     public void setProgressBarValue(double progress) {
-        Platform.runLater(() -> progressBar.setProgress(progress));
+        Platform.runLater(() -> {
+            progressBar.setStyle("");
+            progressBar.setProgress(progress);
+        });
     }
 
-    /**
-     * Sets the progress bar to indeterminate state (animated)
-     */
-    public void setProgressBarIndeterminate() {
-        Platform.runLater(() -> progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS));
+    /** Marks a completed operation distinctly from an idle/empty progress bar. */
+    public void completeProgressBar() {
+        Platform.runLater(() -> {
+            progressBar.setStyle("-fx-accent: #45c46b;");
+            progressBar.setProgress(1);
+        });
     }
 
     /**
      * Sets the progress bar to 0 (empty)
      */
     public void resetProgressBar() {
-        Platform.runLater(() -> progressBar.setProgress(0));
+        Platform.runLater(() -> {
+            progressBar.setStyle("");
+            progressBar.setProgress(0);
+        });
     }
 
-    /**
-     * Sets the progress bar to 1 (full)
-     */
-    public void completeProgressBar() {
-        Platform.runLater(() -> progressBar.setProgress(1));
-    }
 
-    /**
-     * Gets the current progress bar value
-     */
-    public double getProgressBarValue() {
-        return progressBar.getProgress();
-    }
 
-    /**
-     * Gets the ProgressBar control (advanced use)
-     */
-    public ProgressBar getProgressBar() {
-        return progressBar;
-    }
 
     // ============ End Progress Bar Control Methods ============
 
     @FXML
     // action on menu PSSE-PowerFactory compare
-    private void actionMenuPSSEPF() throws FileNotFoundException {
+    private void actionMenuPSSEPF() {
         comparePssePF.comparePssePFresults();
     }
 
@@ -453,11 +682,12 @@ public class MainController implements Initializable {
     private void actionMenuQoCDCxls() throws FileNotFoundException {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select QoCDC xml", "*.xml"));
-        filechooser.setInitialDirectory(new File(prefs.get("LastWorkingFolder", "")));
+        PathMemory.prepare(filechooser, "dialog.qocdcXml");
         File file = filechooser.showOpenDialog(null);
 
         if (file != null) {// the file is selected
             prefs.put("LastWorkingFolder", file.getParent());
+            PathMemory.remember("dialog.qocdcXml", file);
 
             Model model = ModelFactory.createDefaultModel();
             InputStream inputStream = new FileInputStream(file.toString());
@@ -545,7 +775,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Export RDFS description
-    private void actionRDFSexportTripplesMenu() throws FileNotFoundException {
+    private void actionRDFSexportTripplesMenu() {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF files", List.of("*.rdf", "*.xml"), "");
@@ -568,7 +798,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Export SHACL constraints information to Excel
-    private void actionMenuExportSHACLInfo() throws FileNotFoundException {
+    private void actionMenuExportSHACLInfo() {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open SHACL files
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
@@ -586,7 +816,9 @@ public class MainController implements Initializable {
                 ButtonType btnMultiple = new ButtonType("Export in multiple files");
                 alert1.getButtonTypes().setAll(btnOneFile, btnMultiple);
                 Optional<ButtonType> result1 = alert1.showAndWait();
-                if (result1.get() == btnOneFile) {
+                //dismissing the dialog leaves the choice empty; treat that as "multiple files"
+                //rather than dereferencing an absent Optional
+                if (result1.isPresent() && result1.get() == btnOneFile) {
                     singleFile = true;
                 }
             } else if (file.size() == 1) {
@@ -603,7 +835,7 @@ public class MainController implements Initializable {
 
     @FXML
     //action menu item Tools -> Export SHACL constraints information to Excel
-    private void actionMenuExportAllSHACLInfo() throws FileNotFoundException {
+    private void actionMenuExportAllSHACLInfo() {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open SHACL files
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL files", List.of("*.ttl"), "");
@@ -621,7 +853,9 @@ public class MainController implements Initializable {
                 ButtonType btnMultiple = new ButtonType("Export in multiple files");
                 alert1.getButtonTypes().setAll(btnOneFile, btnMultiple);
                 Optional<ButtonType> result1 = alert1.showAndWait();
-                if (result1.get() == btnOneFile) {
+                //dismissing the dialog leaves the choice empty; treat that as "multiple files"
+                //rather than dereferencing an absent Optional
+                if (result1.isPresent() && result1.get() == btnOneFile) {
                     singleFile = true;
                 }
             } else if (file.size() == 1) {
@@ -728,11 +962,9 @@ public class MainController implements Initializable {
     }
 
     @FXML
-    //Action for button "Clear" related to the output window
+    //Action for the Clear icon button above the output window
     private void actionBtnClear() {
-        if (tabPaneDown.getSelectionModel().getSelectedItem().getText().equals("Output window")) { //clears Output window
-            foutputWindow.clear();
-        }
+        foutputWindow.clear();
     }
 
     @FXML
@@ -759,12 +991,12 @@ public class MainController implements Initializable {
 
     @FXML
     public void actionValidateByMapping() {
-        if (tabPaneConstraintsDetails == null || tabValidationByMapping == null) {
+        if (tabValidationByMapping == null) {
             System.err.println("[ERROR] Validation by Mapping tab is not initialized.");
             return;
         }
 
-        tabPaneConstraintsDetails.getSelectionModel().select(tabValidationByMapping);
+        selectFunctionTab(tabValidationByMapping);
     }
 
     @FXML
@@ -800,111 +1032,6 @@ public class MainController implements Initializable {
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
-        }
-    }
-
-    @FXML
-    // action on menu Generation of instance data based on xls template
-    private void actionMenuInstanceDataGenxls() throws IOException {
-
-        System.out.print("Conversion in progress.\n");
-        progressBar.setProgress(0);
-        shaclNodataMap = 1; // as this mapping should not be used for this task
-        //select file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Input template instance data XLS", List.of("*.xlsx"), "");
-
-        if (file != null) {// the file is selected
-            MainController.inputXLS = file;
-            //select file
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF profile file", List.of("*.rdf", "*.ttl"), "");
-
-            if (file != null) {// the file is selected
-                MainController.rdfProfileFileList = file;
-
-                //String xmlBase = "http://entsoe.eu/ns/nc";
-                String xmlBase = "http://iec.ch/TC57/CIM100";
-                //String xmlBase = "";
-
-                //set properties for the export
-                String formatGeneratedModel = "61970-552 CIM XML (.xml)"; //fcbGenDataFormat.getSelectionModel().getSelectedItem().toString();
-                Map<String, Object> saveProperties = new HashMap<>();
-                if (formatGeneratedModel.equals("61970-552 CIM XML (.xml)")) {
-                    saveProperties.put("filename", "test");
-                    saveProperties.put("showXmlDeclaration", "true");
-                    saveProperties.put("showDoctypeDeclaration", "false");
-                    saveProperties.put("tab", "2");
-                    saveProperties.put("relativeURIs", "same-document");
-                    saveProperties.put("showXmlEncoding", "true");
-                    saveProperties.put("xmlBase", xmlBase);
-                    saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-                    saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-                    saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-                    saveProperties.put("useFileDialog", true);
-                    saveProperties.put("fileFolder", "C:");
-                    saveProperties.put("dozip", false);
-                    saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
-                    saveProperties.put("showXmlBaseDeclaration", "true");
-                    saveProperties.put("sortRDF", "true");
-                    saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-
-                    saveProperties.put("putHeaderOnTop", true);
-                    saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
-                    saveProperties.put("extensionName", "RDF XML");
-                    saveProperties.put("fileExtension", "*.xml");
-                    saveProperties.put("fileDialogTitle", "Save RDF XML for");
-                    //RDFFormat rdfFormat=RDFFormat.RDFXML;
-                    //RDFFormat rdfFormat=RDFFormat.RDFXML_PLAIN;
-                    //RDFFormat rdfFormat = RDFFormat.RDFXML_ABBREV;
-                    //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY;
-                    //RDFFormat rdfFormat = CustomRDFFormat.RDFXML_CUSTOM_PLAIN;
-
-                } else if (formatGeneratedModel.equals("Custom RDF XML Plain (.xml)")) {
-                    saveProperties.put("filename", "test");
-                    saveProperties.put("showXmlDeclaration", "true");
-                    saveProperties.put("showDoctypeDeclaration", "false");
-                    saveProperties.put("tab", "2");
-                    saveProperties.put("relativeURIs", "same-document");
-                    saveProperties.put("showXmlEncoding", "true");
-                    saveProperties.put("xmlBase", xmlBase);
-                    saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-                    saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-                    saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-                    saveProperties.put("useFileDialog", true);
-                    saveProperties.put("fileFolder", "C:");
-                    saveProperties.put("dozip", false);
-                    saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
-                    saveProperties.put("showXmlBaseDeclaration", "false");
-
-                    saveProperties.put("putHeaderOnTop", true);
-                    saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
-                    saveProperties.put("extensionName", "RDF XML");
-                    saveProperties.put("fileExtension", "*.xml");
-                    saveProperties.put("fileDialogTitle", "Save RDF XML for");
-                }
-
-                boolean profileModelUnionFlag = false;
-                boolean instanceModelUnionFlag = false;
-                boolean shaclModelUnionFlag = false;
-                String eqbdID = null;
-                String tpbdID = null;
-                boolean persistentEQflag = false;
-
-                Map<String, Boolean> inputData = new HashMap<>();
-                inputData.put("rdfs", true);
-                inputData.put("baseModel", false);
-                inputData.put("shacl", false);
-
-                progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-
-                ModelManipulationFactory.generateDataFromXls(xmlBase, saveProperties, guiHelper);
-
-                progressBar.setProgress(1);
-                System.out.print("Conversion finished.\n");
-            } else {
-                System.out.print("Conversion terminated.\n");
-            }
-        } else {
-            System.out.print("Conversion terminated.\n");
         }
     }
 
@@ -959,8 +1086,14 @@ public class MainController implements Initializable {
         try {
             Stage guiPrefStage = new Stage();
             //Scene for the menu Preferences
-            FXMLLoader fxmlLoader = new FXMLLoader();
-            Parent rootPreferences = fxmlLoader.load(getClass().getResource("/fxml/preferencesGui.fxml"));
+
+            //A missing FXML would otherwise surface as an opaque NullPointerException from
+            //inside FXMLLoader; name the resource instead.
+            URL fxmlUrl = getClass().getResource("/fxml/preferencesGui.fxml");
+            if (fxmlUrl == null) {
+                throw new IOException("FXML not found: /fxml/preferencesGui.fxml");
+            }
+            Parent rootPreferences = FXMLLoader.load(fxmlUrl);
             Scene preferences = new Scene(rootPreferences);
             guiPrefStage.setScene(preferences);
             guiPrefStage.setTitle("Preferences");
@@ -974,13 +1107,71 @@ public class MainController implements Initializable {
     }
 
     @FXML
+    // action on menu Clear cached remote data
+    private void actionMenuClearRemoteCache() {
+        // The in-memory caches are dropped at the start of every validation run, and the disk
+        // caches revalidate against the origin, so this is the escape hatch for the remaining
+        // case: a cached file that is corrupt, or an origin that serves changed content under an
+        // unchanged ETag. Nothing outside the two cache directories is touched.
+        int files = ValidationTools.remoteDiskCacheFileCount();
+
+        String directories = ValidationTools.remoteDiskCacheDirectories().stream()
+                .map(Path::toString)
+                .collect(Collectors.joining("\n"));
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Clear cached remote data");
+        confirm.setHeaderText(files == 0
+                ? "Nothing is cached on disk. Clear the in-memory cache anyway?"
+                : "Delete " + files + " cached file" + (files == 1 ? "" : "s") + "?");
+        confirm.setContentText("Downloaded constraint files and model inputs will be fetched "
+                + "again on the next run. Only these folders are emptied:\n\n" + directories);
+
+        confirm.showAndWait()
+                .filter(button -> button == ButtonType.OK)
+                .ifPresent(button -> {
+                    ValidationTools.RemoteCacheClearResult result = ValidationTools.clearRemoteDiskCaches();
+
+                    if (result.failures().isEmpty()) {
+                        GUIhelper.showInfo("Cached remote data cleared",
+                                "Deleted " + result.filesDeleted() + " cached file"
+                                        + (result.filesDeleted() == 1 ? "" : "s")
+                                        + " and dropped " + result.memoryEntries()
+                                        + " in-memory entr" + (result.memoryEntries() == 1 ? "y" : "ies") + ".");
+                    } else {
+                        GUIhelper.showWarning("Cached remote data partly cleared",
+                                "Deleted " + result.filesDeleted() + " file(s). These could not be deleted, "
+                                        + "most likely because another program has them open:\n\n"
+                                        + String.join("\n", result.failures()));
+                    }
+                });
+    }
+
+    @FXML
+    // action on menu Help - Help Contents
+    private void actionMenuHelpContents() {
+        try {
+            HelpWindow.show();
+        } catch (RuntimeException e) {
+            // WebView construction fails hard where the native javafx-web library is unavailable.
+            GUIhelper.showUserFriendlyError("Help window error", "The help window could not be opened.", e);
+        }
+    }
+
+    @FXML
     // action on menu About
     private void actionMenuAbout() {
         try {
             Stage guiAboutStage = new Stage();
             //Scene for the menu Preferences
-            FXMLLoader fxmlLoader = new FXMLLoader();
-            Parent rootAbout = fxmlLoader.load(getClass().getResource("/fxml/aboutGui.fxml"));
+
+            //A missing FXML would otherwise surface as an opaque NullPointerException from
+            //inside FXMLLoader; name the resource instead.
+            URL fxmlUrl = getClass().getResource("/fxml/aboutGui.fxml");
+            if (fxmlUrl == null) {
+                throw new IOException("FXML not found: /fxml/aboutGui.fxml");
+            }
+            Parent rootAbout = FXMLLoader.load(fxmlUrl);
             Scene about = new Scene(rootAbout);
             guiAboutStage.setScene(about);
             guiAboutStage.setTitle("About");
@@ -1000,11 +1191,9 @@ public class MainController implements Initializable {
         List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Instance files", List.of("*.xml", "*.zip"), "");
 
         if (fileL != null) {// the file is selected
-//            fPathIDfile1.setText(fileL.toString());
             MainController.IDModel1 = fileL;
-        } else {
-//            fPathIDfile1.clear();
         }
+
 
         List<File> fileL1 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "ap file", List.of("*.properties"), "");
 
@@ -1021,7 +1210,7 @@ public class MainController implements Initializable {
 
     @FXML
     // action on menu Generate QAR
-    private void actionQARMenu() throws IOException, XMLStreamException {
+    private void actionQARMenu() throws IOException {
         //select the xlsx file
         List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Excel file with IDs", List.of("*.xlsx"), "Select input data: ");
 
@@ -1047,10 +1236,7 @@ public class MainController implements Initializable {
                         String timestamp = fileNameParts[0];
                         String process = fileNameParts[1];
                         String tso = fileNameParts[2];
-                        String profile = fileNameParts[3];
                         String version = fileNameParts[4];
-                        String fileProfile = ((LinkedList<?>) inputXLSdata.get(row)).get(1).toString();
-                        String mas = ((LinkedList<?>) inputXLSdata.get(row)).get(2).toString();
                         String fileID_0 = ((LinkedList<?>) inputXLSdata.get(row)).get(3).toString();
                         String fileID_1 = ((LinkedList<?>) inputXLSdata.get(row + 1)).get(3).toString();
                         String fileID_2 = ((LinkedList<?>) inputXLSdata.get(row + 2)).get(3).toString();
@@ -1650,17 +1836,6 @@ public class MainController implements Initializable {
 //    }
 
 
-    @FXML
-    // action on button "Show/Hide source code" in the SHACL Shapes Browser
-    private void actionBtnShowSourceCodeShacl(ActionEvent actionEvent) {
-        if (btnShowSourceCodeDefineTab.isSelected()) {
-            btnShowSourceCodeDefineTab.setText("Hide");
-        } else {
-            btnShowSourceCodeDefineTab.setText("Show");
-            fsourceDefineTab.clear();
-        }
-    }
-
     //set expand in the Instance data tree view
     public static void treeInstanceDataExpand(TaggedTreeItem<String> expandedItem) {
 
@@ -1810,11 +1985,6 @@ public class MainController implements Initializable {
         return currentItem;
     }
 
-    @FXML
-    // //action for tab pane down - the tab pane with the source code
-    private void actionTabConstraintsSourceCode() {
-        btnShowSourceCodeDefineTab.setDisable(!tabConstraintsSourceCode.isSelected());
-    }
 
 
     public static Map getDataTypeMapFromShapes() {
@@ -1908,9 +2078,7 @@ public class MainController implements Initializable {
 
     @FXML
     public void actionRunSPARQLQuery(ActionEvent actionEvent) {
-        if (tabPaneConstraintsDetails != null && tabSPARQLQuery != null) {
-            tabPaneConstraintsDetails.getSelectionModel().select(tabSPARQLQuery);
-        }
+        selectFunctionTab(tabSPARQLQuery);
     }
 
     @FXML
@@ -2041,4 +2209,3 @@ public class MainController implements Initializable {
 
 
 }
-

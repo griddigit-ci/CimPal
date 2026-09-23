@@ -15,13 +15,10 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.util.Duration;
-import javafx.util.Pair;
-import org.apache.jena.rdf.model.Model;
 
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
 
 import static eu.griddigit.cimpal.main.application.MainController.foutputWindowVar;
@@ -29,20 +26,6 @@ import static eu.griddigit.cimpal.main.application.MainController.foutputWindowV
 public class GUIhelper implements IOutputHandler {
 
     private static final String GENERIC_ERROR_MESSAGE = "An unexpected error occurred. You can review and copy the technical details for support.";
-
-    public static final String HELP_ICON_STYLE =
-            "-fx-background-color: #e0e0e0;" +
-            "-fx-background-radius: 20;" +
-            "-fx-border-color: #808080;" +
-            "-fx-border-radius: 20;" +
-            "-fx-text-fill: #333333;" +
-            "-fx-font-weight: bold;" +
-            "-fx-alignment: center;" +
-            "-fx-min-width: 18px;" +
-            "-fx-min-height: 18px;" +
-            "-fx-pref-width: 18px;" +
-            "-fx-pref-height: 18px;" +
-            "-fx-cursor: hand;";
 
     public static void installHelpTooltip(Label helpIcon, String text) {
         if (helpIcon == null) {
@@ -104,6 +87,48 @@ public class GUIhelper implements IOutputHandler {
 
     public static void showUserFriendlyError(String title, Throwable throwable) {
         showUserFriendlyError(title, GENERIC_ERROR_MESSAGE, throwable);
+    }
+
+    /*
+     * The three plain dialogs below plus showUserFriendlyError are the whole reporting surface:
+     * info for "it finished", warning for "you need to supply something first", error for
+     * "it failed with no exception to show", and showUserFriendlyError for anything carrying a
+     * Throwable - only that one offers the expandable technical details and Copy button, because
+     * only that one has something worth copying. Controllers used to each keep their own private
+     * copies of these, which is why the same situation looked different from tab to tab.
+     *
+     * All four marshal onto the FX thread themselves, so a background worker can call them
+     * directly without wrapping them in Platform.runLater.
+     */
+
+    /** An operation completed. */
+    public static void showInfo(String title, String message) {
+        showAlert(Alert.AlertType.INFORMATION, title, message);
+    }
+
+    /** The user has to supply or correct something before the operation can run. */
+    public static void showWarning(String title, String message) {
+        showAlert(Alert.AlertType.WARNING, title, message);
+    }
+
+    /** An operation failed and there is no Throwable to offer; otherwise use showUserFriendlyError. */
+    public static void showError(String title, String message) {
+        showAlert(Alert.AlertType.ERROR, title, message);
+    }
+
+    private static void showAlert(Alert.AlertType type, String title, String message) {
+        Runnable showDialog = () -> {
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
+            alert.setHeaderText(title);
+            alert.setContentText(message == null ? "" : message);
+            alert.showAndWait();
+        };
+        if (Platform.isFxApplicationThread()) {
+            showDialog.run();
+        } else {
+            Platform.runLater(showDialog);
+        }
     }
 
     private static Alert createErrorAlert(String title, String userMessage, Throwable throwable) {
@@ -244,21 +269,6 @@ public class GUIhelper implements IOutputHandler {
 //        return dialog;
 //    }
 
-
-    public static Pair<Integer, Model> getShapeModel(String shapeModelName) {
-        Model shapeModel = null;
-        int index = 0;
-        for (int i = 0; i < MainController.shapeModelsNames.size(); i++) {
-            if (((ArrayList) MainController.shapeModelsNames.get(i)).get(0).equals(shapeModelName)) {
-                shapeModel = (Model) MainController.shapeModels.get(i);
-                index = i;
-                break;
-            }
-        }
-
-        Pair<Integer, Model> result = new Pair(index, shapeModel);
-        return result;
-    }
 
     //Append text to output window
     public void appendOutput(String valueOf, Boolean nextLine) {

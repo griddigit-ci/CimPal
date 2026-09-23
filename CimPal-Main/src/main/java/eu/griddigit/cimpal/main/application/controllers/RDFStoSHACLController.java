@@ -5,6 +5,7 @@ import eu.griddigit.cimpal.core.models.RDFtoSHACLOptions;
 import eu.griddigit.cimpal.core.models.RdfsModelDefinition;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.application.PreferencesController;
+import eu.griddigit.cimpal.main.core.ShaclTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -15,6 +16,7 @@ import javafx.scene.input.MouseEvent;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 
@@ -572,6 +574,7 @@ public class RDFStoSHACLController implements Initializable {
                 }
             } else {
                 rdfsToShaclGuiMapBool.put("shaclflagCount", false);
+                rdfsToShaclGuiMapBool.put("shaclflagCountDefaultURI", true);
             }
 
             if (fselectDatatypeMapDefineConstraints.getSelectionModel().getSelectedItem().equals("All profiles in one map")) {
@@ -597,13 +600,13 @@ public class RDFStoSHACLController implements Initializable {
             List<File> baseModelFiles3 = null;
 
             if (cbRDFSSHACLoptionBaseprofiles.isSelected()) {
-                baseModelFiles1 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 1st Base profiles");
+                baseModelFiles1 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 1st Base profiles", "dialog.rdfsToShacl.baseProfiles1");
             }
             if (cbRDFSSHACLoptionBaseprofiles2nd.isSelected()) {
-                baseModelFiles2 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd Base profiles");
+                baseModelFiles2 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 2nd Base profiles", "dialog.rdfsToShacl.baseProfiles2");
             }
             if (cbRDFSSHACLoptionBaseprofiles3rd.isSelected()) {
-                baseModelFiles3 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd Base profiles");
+                baseModelFiles3 = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file", List.of("*.rdf"), "Select 3rd Base profiles", "dialog.rdfsToShacl.baseProfiles3");
             }
 
 
@@ -611,8 +614,11 @@ public class RDFStoSHACLController implements Initializable {
             RDFtoSHACLOptions.RdfsFormatShapes rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.RDFS_AUGMENTED_2020;
             if (rdfFormatcbInput.equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
                 rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.RDFS_AUGMENTED_2019;
-            } else if (rdfFormatcbInput.equals("CIMTool-merged-owl")) {
-                rdfsFormatShapes = RDFtoSHACLOptions.RdfsFormatShapes.CIMTOOL_MERGED_OWL;
+            } else if (rdfFormatcbInput.equals("Merged OWL CIMTool (NOT READY)")) {
+                //the conversion from merged OWL is not implemented, without this the selection was silently
+                //falling back to the v2020 augmented RDFS conversion
+                showFormatNotSupportedAlert();
+                return;
             }
 
             setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -656,10 +662,13 @@ public class RDFStoSHACLController implements Initializable {
             rdftoSHACL.convert();
             if (cbRDFSSHACLvalidate.isSelected()) {
                 rdftoSHACL.validateShapeModels();
+                printSHACLSHACLreports(rdftoSHACL.getValidationReports(), "");
+                //the datatype constraints are in a separate shapes model when the option to split datatypes is selected
+                printSHACLSHACLreports(rdftoSHACL.getValidationReportsDT(), "datatype-");
             }
 
             // save the generated shapes
-            Path outputFolderPath = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select output folder").toPath();
+            Path outputFolderPath = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select output folder", "dialog.rdfsToShacl.outputFolder").toPath();
             rdftoSHACL.saveShapeModel(outputFolderPath);
 
             // save datatype map if requested
@@ -689,6 +698,30 @@ public class RDFStoSHACLController implements Initializable {
             alert.setHeaderText(null);
             alert.setTitle("Error - no profile selected");
             alert.showAndWait();
+        }
+    }
+
+    private void showFormatNotSupportedAlert() {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setContentText("Generation of SHACL shapes from merged OWL exported by CIMTool is not implemented. Please select one of the augmented RDFS formats.");
+        alert.setHeaderText(null);
+        alert.setTitle("Error - RDFS format not supported");
+        alert.showAndWait();
+    }
+
+    //prints the outcome of the SHACL-SHACL validation of the generated shapes. The reports are in the same order as
+    //the profiles, the prefix is used to name the shapes file the report belongs to
+    private void printSHACLSHACLreports(List<ValidationReport> validationReports, String namePrefix) {
+        for (int r = 0; r < validationReports.size(); r++) {
+            ValidationReport report = validationReports.get(r);
+            String shapesName = namePrefix + (r < RDFSmodelsNames.size() ? RDFSmodelsNames.get(r).getModelName() : String.valueOf(r));
+            if (report.conforms()) {
+                System.out.printf("Generated SHACL shapes: %s conform to SHACL-SHACL validation.\n", shapesName);
+            } else {
+                System.out.printf("Validation failed. Generated SHACL shapes: %s do not conform to the SHACL-SHACL shapes.\n", shapesName);
+                System.out.println("Validation problems:");
+                ShaclTools.printSHACLreport(report);
+            }
         }
     }
 
@@ -1374,13 +1407,13 @@ public class RDFStoSHACLController implements Initializable {
         List<File> file = null;
         if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2019) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2019";
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2019) by CimSyntaxGen files", List.of("*.rdf"), "", "tab.rdfsToShacl.rdfsProfiles");
         } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("RDFS (augmented, v2020) by CimSyntaxGen")) {
             rdfFormatInput = "CimSyntaxGen-RDFS-Augmented-2020";
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "");
-        } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool")) {
-            rdfFormatInput = "CIMTool-merged-owl";
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Merged OWL CIMTool files", List.of("*.owl"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS (augmented, v2020) by CimSyntaxGen files", List.of("*.rdf"), "", "tab.rdfsToShacl.rdfsProfiles");
+        } else if (fcbRDFSformatShapes.getSelectionModel().getSelectedItem().equals("Merged OWL CIMTool (NOT READY)")) {
+            showFormatNotSupportedAlert();
+            return;
         }
         this.selectedFile = file;
 

@@ -3,7 +3,9 @@ package eu.griddigit.cimpal.main.application.controllers;
 import eu.griddigit.cimpal.core.converters.RDFConverter;
 import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -48,6 +50,8 @@ public class RDFConvertController implements Initializable {
     @FXML
     private ChoiceBox<String> ftargetFormatChoiceBox;
     @FXML
+    private ChoiceBox<String> fcbBaseUri;
+    @FXML
     private TextField frdfConvertXmlBase;
     @FXML
     private CheckBox fcbShowXMLDeclaration;
@@ -81,8 +85,6 @@ public class RDFConvertController implements Initializable {
     private ChoiceBox fcbRDFsortOptions;
     @FXML
     private CheckBox fcbRDFconvertFixPackage;
-    @FXML
-    private Button fbtnRunRDFConvert;
     @FXML
     private Label helpSource;
     @FXML
@@ -150,10 +152,25 @@ public class RDFConvertController implements Initializable {
                 "Sorting by prefix"
         );
 
+        // "Other" with the field left empty: this tab writes the value out as xml:base, and an
+        // empty field means omit it - the tab's existing default, which has to stay reachable.
+        BaseUriPresets.bind(fcbBaseUri, frdfConvertXmlBase, BaseUriPresets.OTHER);
+
         ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBRDFconvertTarget());
 
         rdfConvertModelUnionDetailedFiles = new LinkedList<>();
         rdfConvertFileList = new LinkedList<>();
+
+        //restore the paths this tab was last used with. The source field also shows a joined
+        //list when "Union model" is on; PathMemory only stores text that is an existing path,
+        //so that case simply leaves the field empty.
+        PathMemory.bind(fsourcePathTextField, "tab.rdfConvert.source", file -> rdfConvertFile = file);
+        PathMemory.bind(fMainRdfPathTextField, "tab.rdfConvert.mainRdf",
+                file -> rdfConvertModelUnionDetailedFiles.add(file));
+        PathMemory.bind(fDeviationRdfPathTextField, "tab.rdfConvert.deviationRdf",
+                file -> rdfConvertModelUnionDetailedFiles.add(file));
+        PathMemory.bind(fExtendedRdfPathTextField, "tab.rdfConvert.extendedRdf",
+                file -> rdfConvertModelUnionDetailedFiles.add(file));
     }
 
     private void initializeHelpTooltips() {
@@ -164,7 +181,12 @@ public class RDFConvertController implements Initializable {
         GUIhelper.installHelpTooltip(helpExtendedRdf, "Additional RDF file with extension data to include in processing.");
         GUIhelper.installHelpTooltip(helpSourceType, "Check if the source follows CGMES/IEC 61970-552 instance data serialisation rules. This affects how the parser interprets the RDF structure.");
         GUIhelper.installHelpTooltip(helpTargetFormat, "The output serialisation format (e.g. RDF/XML, Turtle, N-Triples). Some output options (XML declaration, tab size, etc.) are only available for certain formats.");
-        GUIhelper.installHelpTooltip(helpXmlBase, "The XML base URI embedded in the serialised output. Relative URIs in the output will be resolved against this base. Used when writing RDF/XML.");
+        GUIhelper.installHelpTooltip(helpXmlBase,
+                "The base URI embedded in the serialised output as xml:base. Relative URIs in the output are "
+                        + "resolved against it. Used when writing RDF/XML.\n\n"
+                        + "Pick a standard CIM namespace from the dropdown and the field is filled and locked; "
+                        + "pick Other to type any base URI, or leave the field empty to omit xml:base from the "
+                        + "output altogether.");
         GUIhelper.installHelpTooltip(helpSortingOptions, "Controls how output triples/subjects are ordered in the serialised file. Sorting alphabetically produces deterministic, diff-friendly output.");
     }
 
@@ -192,7 +214,7 @@ public class RDFConvertController implements Initializable {
         List<File> file;
         List<File> fileL;
         if (fcbRDFconvertModelUnion.isSelected()) {
-            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.sourceUnion");
 
             if (!fileL.isEmpty()) {// the file is selected
                 fsourcePathTextField.setText(fileL.toString());
@@ -201,7 +223,7 @@ public class RDFConvertController implements Initializable {
                 fsourcePathTextField.clear();
             }
         } else {
-            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+            file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "RDF file to convert", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.source");
 
             if (!file.isEmpty()) {// the file is selected
                 //MainController.prefs.put("LastWorkingFolder", file.getParent());
@@ -215,7 +237,7 @@ public class RDFConvertController implements Initializable {
 
     @FXML
     private void actionBrowseMainRDF() {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Main RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Main RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.mainRdf");
 
         if (file.getFirst() != null) {// the file is selected
             fMainRdfPathTextField.setText(file.getFirst().toString());
@@ -227,7 +249,7 @@ public class RDFConvertController implements Initializable {
 
     @FXML
     private void actionBrowseDeviationRDF() {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Deviation RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Deviation RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.deviationRdf");
 
         if (file.getFirst() != null) {// the file is selected
             fDeviationRdfPathTextField.setText(file.getFirst().toString());
@@ -239,7 +261,7 @@ public class RDFConvertController implements Initializable {
 
     @FXML
     private void actionBrowseExtendedRDF() {
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Extended RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(true, "Extended RDF file", List.of("*.rdf", "*.xml", "*.ttl", "*.jsonld"), "", "tab.rdfConvert.extendedRdf");
 
         if (file.getFirst() != null) {// the file is selected
             fExtendedRdfPathTextField.setText(file.getFirst().toString());
@@ -261,7 +283,9 @@ public class RDFConvertController implements Initializable {
         String targetFormatString = ftargetFormatChoiceBox.getSelectionModel().getSelectedItem();
         RDFConvertOptions.RDFFormats targetFormat = RDFConvertOptions.RDFFormats.RDFXML;
         //xmlBase
-        String xmlBase = null;
+        // An empty base URI means that xml:base is omitted. The options object deliberately
+        // distinguishes this valid value from an absent setting.
+        String xmlBase = "";
 
         if (!frdfConvertXmlBase.getText().isBlank()) {
             xmlBase = frdfConvertXmlBase.getText();
@@ -302,7 +326,7 @@ public class RDFConvertController implements Initializable {
         }
         String relativeURIs = "";
         if (targetFormatString.equals("RDF XML (.rdf or .xml)")) {
-            relativeURIs = fcbRelativeURIs.getSelectionModel().getSelectedItem().toString();
+            relativeURIs = fcbRelativeURIs.getSelectionModel().getSelectedItem();
         }
 
         if (sourceFormatString.equals("RDF Turtle (.ttl)")) {
@@ -327,10 +351,7 @@ public class RDFConvertController implements Initializable {
             rdfSortOptions = "true";
         }
 
-        boolean stripPrefixes = false;
-        if (fcbStripPrefixes.isSelected()) {
-            stripPrefixes = true;
-        }
+        boolean stripPrefixes = fcbStripPrefixes.isSelected();
 
         boolean modelUnionFlag = fcbRDFconvertModelUnion.isSelected();
 
@@ -397,31 +418,21 @@ public class RDFConvertController implements Initializable {
         rdfConverter.convert();
 
         // select the output file
-        String filename = "";
-        if (!modelUnionFlag && rdfConvertFile != null) {
-            filename = rdfConvertFile.getName().split("\\.", 2)[0];
-        } else {
-            filename = "MultipleModels";
-        }
-        OutputStream out = null;
-        switch (targetFormatString) {
-            case "RDF XML (.rdf or .xml)" -> {
-                out = fileSaveDialog("Save RDF XML for: " + filename, "RDF XML", "*.rdf");
-            }
-            case "RDF Turtle (.ttl)" -> {
-                out = fileSaveDialog("Save RDF Turtle for: " + filename, "RDF Turtle", "*.ttl");
-            }
-            case "JSON-LD (.jsonld)" -> {
-                out = fileSaveDialog("Save JSON-LD for: " + filename, "JSON-LD", "*.jsonld");
-            }
-        }
+        String filename = !modelUnionFlag && rdfConvertFile != null
+                ? rdfConvertFile.getName().split("\\.", 2)[0]
+                : "MultipleModels";
+        OutputStream out = switch (targetFormatString) {
+            case "RDF XML (.rdf or .xml)" -> fileSaveDialog("Save RDF XML for: " + filename, "RDF XML", "*.rdf");
+            case "RDF Turtle (.ttl)" -> fileSaveDialog("Save RDF Turtle for: " + filename, "RDF Turtle", "*.ttl");
+            case "JSON-LD (.jsonld)" -> fileSaveDialog("Save JSON-LD for: " + filename, "JSON-LD", "*.jsonld");
+            default -> null;
+        };
         // write the converted model to the output file
         rdfConverter.writeConvertedModel(out);
 
         // write the inheritance list if required
         if (options.isInheritanceList()) {
             OutputStream outInheritance = fileSaveDialog("Save inheritance for: " + filename + "Inheritance", "RDF Turtle", "*.ttl");
-            ;
 
             rdfConverter.writeInheritanceModel(outInheritance);
         }
@@ -450,6 +461,7 @@ public class RDFConvertController implements Initializable {
         fsourcePathTextField.clear();
         fsourceFormatChoiceBox.getSelectionModel().clearSelection();
         ftargetFormatChoiceBox.getSelectionModel().clearSelection();
+        fcbBaseUri.getSelectionModel().select(BaseUriPresets.OTHER);
         frdfConvertXmlBase.clear();
         fcbRDFconvertModelUnion.setSelected(false);
         fcbRDFConvertInheritanceOnly.setSelected(false);
@@ -518,7 +530,7 @@ public class RDFConvertController implements Initializable {
 
         resetProgressBar();
         if (!ftargetFormatChoiceBox.getSelectionModel().isSelected(-1)) {
-            if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().toString().equals("RDF XML (.rdf or .xml)")) {
+            if (ftargetFormatChoiceBox.getSelectionModel().getSelectedItem().equals("RDF XML (.rdf or .xml)")) {
                 fcbShowXMLDeclaration.setDisable(false);
                 fcbShowDoctypeDeclaration.setDisable(false);
                 fRDFconvertTab.setDisable(false);

@@ -1,0 +1,58 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: Minimalist White (default)
+ * Near-stock Modena, flattened: no gradients, hairline borders, blue accent.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #fbfbfb;
+    -fx-background:                   #ffffff;
+    -fx-control-inner-background:     #ffffff;
+    -fx-control-inner-background-alt: #f6f6f6;
+    -fx-accent:                       #1f5c99;
+    -fx-focus-color:                  #1f5c99;
+    -fx-faint-focus-color:            #1f5c9922;
+    -fx-selection-bar:                #1f5c99;
+    -fx-selection-bar-non-focused:    #dcdcdc;
+    -fx-default-button:               #dceaf7;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #ffffff;
+    -fx-dark-text-color:              #1a1a1a;
+    -fx-text-base-color:              #1a1a1a;
+    -fx-text-background-color:        #1a1a1a;
+    -fx-text-inner-color:             #1a1a1a;
+    -fx-mid-text-color:               #5d5d5d;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #1a1a1a;
+    -cimpal-text-muted:      #5d5d5d;
+    -cimpal-text-disabled:   #6b6b6b;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #f2f2f2;
+    -cimpal-surface-2:       #e9e9e9;
+    -cimpal-border:          #c4c4c4;
+    -cimpal-badge-bg:        #e6e6e6;
+    -cimpal-badge-border:    #1f5c99;
+    -cimpal-badge-text:      #1a1a1a;
+    -cimpal-warning:         #b3261e;
+}
+
+/* --- flatten Modena's gradients --- */
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 2;
+}
+
+.menu-bar {
+    -fx-border-color: transparent transparent -cimpal-border transparent;
+}
+
+.titled-pane > .title,
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 2 2 0 0;
+}

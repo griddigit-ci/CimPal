@@ -1,0 +1,495 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * base.css - structure and control rules shared by every theme. Always applied
+ * underneath the active theme-*.css.
+ *
+ * Contains NO colour literals. Every colour is a looked-up variable that the active
+ * theme defines in its .root block:
+ *
+ *   -cimpal-text            primary body text        (>= 4.5:1 on every surface)
+ *   -cimpal-text-muted      secondary + prompt text  (>= 3:1)
+ *   -cimpal-text-disabled   disabled controls        (>= 3:1)
+ *   -cimpal-text-on-accent  text on accent/selection backgrounds
+ *   -cimpal-surface         menu bar, tab + column headers, titled-pane titles
+ *   -cimpal-surface-2       raised/alternate surface, disabled input background
+ *   -cimpal-border          hairlines, dividers, scrollbar thumbs
+ *   -cimpal-badge-bg/-border/-text   the round "?" help badge
+ *   -cimpal-warning         inline warning text
+ *
+ * The point of pinning these explicitly is that Modena otherwise derives text colour
+ * with ladder()/derive() off -fx-base, which guesses wrong wherever a theme restyles a
+ * control's background, and dims disabled controls with -fx-opacity, which is what makes
+ * grey text unreadable on dark backgrounds.
+ */
+
+/* ===================== text colour ===================== */
+
+.label,
+.check-box,
+.radio-button,
+.toggle-button,
+.button,
+.menu-button,
+.choice-box,
+.combo-box-base,
+.tab-label,
+.text-field,
+.text-area,
+.list-cell,
+.tree-cell,
+.table-cell,
+.menu-item .label,
+.titled-pane {
+    -fx-text-fill: -cimpal-text;
+}
+
+/* TitledPane titles and CheckBox/RadioButton glyph labels render as Text nodes. */
+.titled-pane > .title > .text,
+.check-box > .text,
+.radio-button > .text {
+    -fx-fill: -cimpal-text;
+}
+
+/* Spots Modena hardcodes to a fixed grey. */
+.table-view .placeholder .label,
+.tree-table-view .placeholder .label,
+.list-view .placeholder .label {
+    -fx-text-fill: -cimpal-text-muted;
+}
+
+/* The invisible-prompt fix: Modena uses derive(-fx-control-inner-background, -30%),
+   which on a dark theme is darker than the field the prompt sits in. */
+.text-input {
+    -fx-prompt-text-fill: -cimpal-text-muted;
+}
+
+/* Selected rows must not end up dark-on-dark. */
+.list-cell:filled:selected,
+.tree-cell:filled:selected,
+.table-row-cell:filled:selected,
+.table-row-cell:filled:selected .table-cell,
+.list-cell:filled:selected .label,
+.tree-cell:filled:selected .label {
+    -fx-text-fill: -cimpal-text-on-accent;
+}
+
+/* Comparison-result cells use a wrapping Text graphic, whose foreground is
+   controlled by -fx-fill rather than the TableCell's -fx-text-fill. */
+.table-cell .cimpal-table-cell-text {
+    -fx-fill: -cimpal-text;
+}
+
+.table-row-cell:filled:selected .table-cell .cimpal-table-cell-text {
+    -fx-fill: -cimpal-text-on-accent;
+}
+
+/* ===================== disabled state ===================== */
+/*
+ * Modena dims disabled controls with -fx-opacity: 0.4. Compositing light text at 40%
+ * over a dark background lands around 2.2:1 contrast - unreadable. Dim with colour
+ * instead, so disabled still reads as disabled but stays legible.
+ */
+
+.button:disabled,
+.toggle-button:disabled,
+.check-box:disabled,
+.radio-button:disabled,
+.choice-box:disabled,
+.combo-box-base:disabled,
+.menu-button:disabled,
+.label:disabled,
+.hyperlink:disabled,
+.text-input:disabled,
+.text-field:disabled,
+.text-area:disabled,
+.tree-view:disabled,
+.list-view:disabled,
+.table-view:disabled,
+.tree-table-view:disabled,
+.titled-pane:disabled,
+.tab:disabled,
+.slider:disabled,
+.progress-bar:disabled,
+.scroll-pane:disabled {
+    -fx-opacity: 1.0;
+}
+
+.button:disabled,
+.toggle-button:disabled,
+.check-box:disabled,
+.radio-button:disabled,
+.choice-box:disabled,
+.combo-box-base:disabled,
+.menu-button:disabled,
+.label:disabled,
+.hyperlink:disabled,
+.tab:disabled .tab-label {
+    -fx-text-fill: -cimpal-text-disabled;
+}
+
+.check-box:disabled > .text,
+.radio-button:disabled > .text,
+.titled-pane:disabled > .title > .text {
+    -fx-fill: -cimpal-text-disabled;
+}
+
+/* Disabled inputs recess instead of fading out. */
+.text-input:disabled,
+.text-field:disabled,
+.text-area:disabled {
+    -fx-text-fill: -cimpal-text-disabled;
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.text-area:disabled .content {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.choice-box:disabled,
+.combo-box-base:disabled,
+.button:disabled,
+.toggle-button:disabled,
+.menu-button:disabled {
+    -fx-background-color: -cimpal-border, -cimpal-surface-2;
+}
+
+.tree-view:disabled,
+.list-view:disabled,
+.table-view:disabled,
+.tree-table-view:disabled {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+.check-box:disabled > .box,
+.radio-button:disabled > .radio {
+    -fx-background-color: -cimpal-border, -cimpal-surface-2;
+}
+
+/* ===================== containers ===================== */
+/*
+ * Every tab is wrapped in a ScrollPane. Modena paints the viewport with a light
+ * background, which would leave a pale rectangle behind themed content.
+ */
+
+.scroll-pane,
+.scroll-pane > .viewport,
+.split-pane,
+.tab-pane > .tab-content-area {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane > .corner {
+    -fx-background-color: -cimpal-surface;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-background-color: -cimpal-border;
+    -fx-padding: 0 1 0 1;
+}
+
+.separator .line {
+    -fx-border-color: -cimpal-border;
+}
+
+/* ===================== surfaces ===================== */
+
+.menu-bar {
+    -fx-background-color: -cimpal-surface;
+}
+
+.titled-pane > .title {
+    -fx-background-color: -cimpal-surface;
+    -fx-border-color: -cimpal-border;
+}
+
+.titled-pane > .content {
+    -fx-background-color: -fx-background;
+    -fx-border-color: -cimpal-border;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: -cimpal-surface;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: transparent transparent -fx-accent transparent;
+    -fx-border-width: 0 0 2 0;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: -cimpal-surface;
+}
+
+/*
+ * Outer row of the two-level tab structure (the three categories of work). The two header
+ * bands sit directly on top of one another, so the category row is given a heavier, larger
+ * label and a thicker selection underline; without that difference the two rows read as one
+ * block of nine tabs and the grouping is lost. Colour-free - both rows keep the theme's own
+ * surface and accent from the rules above.
+ */
+.category-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-padding: 5 18 5 18;
+}
+
+.category-tabs > .tab-header-area > .headers-region > .tab > .tab-container > .tab-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 1.1em;
+}
+
+.category-tabs > .tab-header-area > .headers-region > .tab:selected {
+    -fx-border-width: 0 0 3 0;
+}
+
+/*
+ * Container TitledPane whose whole job is to be collapsible: its content is a TabPane that
+ * should sit flush against the title, with none of Modena's content padding.
+ */
+.pane-flush > .content {
+    -fx-padding: 0;
+}
+
+.table-view .column-header-background,
+.tree-table-view .column-header-background {
+    -fx-background-color: -cimpal-surface;
+}
+
+.table-view .column-header,
+.tree-table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent -cimpal-border transparent transparent;
+}
+
+.table-view .column-header .label,
+.tree-table-view .column-header .label {
+    -fx-text-fill: -cimpal-text;
+}
+
+.text-area,
+.text-area .content {
+    -fx-background-color: -fx-control-inner-background;
+}
+
+.context-menu,
+.combo-box-popup > .list-view {
+    -fx-background-color: -cimpal-surface;
+    -fx-border-color: -cimpal-border;
+}
+
+/* ===================== scrollbars ===================== */
+
+.scroll-bar {
+    -fx-background-color: -cimpal-surface;
+}
+
+.scroll-bar > .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-color: -cimpal-border;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar > .thumb:hover {
+    -fx-background-color: -fx-accent;
+}
+
+.scroll-bar > .increment-button,
+.scroll-bar > .decrement-button {
+    -fx-background-color: transparent;
+}
+
+/* ===================== progress ===================== */
+
+.progress-bar > .bar {
+    -fx-background-color: -fx-accent;
+}
+
+.progress-bar > .track {
+    -fx-background-color: -cimpal-surface-2;
+}
+
+/* ===================== CimPal widgets ===================== */
+
+/* The round "?" help badge used next to most input rows. */
+.help-badge {
+    -fx-background-color: -cimpal-badge-bg;
+    -fx-background-radius: 20;
+    -fx-border-color: -cimpal-badge-border;
+    -fx-border-radius: 20;
+    -fx-text-fill: -cimpal-badge-text;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-min-width: 18px;
+    -fx-min-height: 18px;
+    -fx-pref-width: 18px;
+    -fx-pref-height: 18px;
+    -fx-cursor: hand;
+}
+
+.help-badge:hover {
+    -fx-background-color: -cimpal-badge-border;
+    -fx-text-fill: -cimpal-text-on-accent;
+}
+
+/* Inline hints that must read as a warning regardless of theme. */
+.warning-text {
+    -fx-text-fill: -cimpal-warning;
+}
+
+/* ===================== layout scaffolding ===================== */
+
+/*
+ * Structure-only classes shared by every tab, so the 8/16 px grid is declared
+ * once here instead of as per-node Insets in eleven FXML files. Colour-free
+ * except for the .action-bar rule, which uses the theme's own -cimpal-border
+ * and therefore needs no per-theme override.
+ */
+
+.tab-root {
+    -fx-padding: 16;
+}
+
+.form-grid {
+    -fx-hgap: 8;
+    -fx-vgap: 8;
+}
+
+.section-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 1.05em;
+}
+
+/* The Operations toolbar owns navigation; keep its TabPane solely as the content switcher. */
+.workspace-tabs > .tab-header-area {
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    -fx-opacity: 0;
+    -fx-padding: 0;
+}
+
+.workspace-tabs > .tab-content-area {
+    -fx-padding: 0;
+}
+
+/* Caption line under a section title: an explanation the control itself cannot carry,
+   set apart from the surrounding labels. Uses the theme variable every theme defines,
+   so it needs no per-theme override. */
+.caption-text {
+    -fx-text-fill: -cimpal-text-muted;
+    -fx-font-size: 0.92em;
+}
+
+/* A tree row that is an action rather than data: the "show more subjects" row. Uses the accent
+   every theme already defines for its help badge, so it needs no per-theme override. */
+.tree-action-row {
+    -fx-text-fill: -cimpal-badge-border;
+    -fx-underline: true;
+    -fx-cursor: hand;
+}
+
+.section-box {
+    -fx-spacing: 8;
+    -fx-padding: 12 0 0 0;
+}
+
+/* The top border replaces the Separator nodes the tabs used to draw by hand:
+   one theme-aware rule, no layout node, nothing to mis-size. */
+.action-bar {
+    -fx-padding: 16 0 0 0;
+    -fx-border-color: -cimpal-border transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.primary-action {
+    -fx-font-weight: bold;
+}
+
+/*
+ * Icon-only button (the Clear control above the output area). Sized to the glyph
+ * rather than to a text label, so it reads as a toolbar affordance; the glyph is an
+ * SVGPath and takes its colour from the theme's own text and warning variables,
+ * needing no per-theme override.
+ */
+.icon-button {
+    -fx-padding: 4 7 4 7;
+    -fx-min-width: 30px;
+    -fx-min-height: 28px;
+}
+
+.icon-button .icon-glyph {
+    -fx-fill: -cimpal-text-muted;
+}
+
+.icon-button:hover .icon-glyph {
+    -fx-fill: -cimpal-warning;
+}
+
+.icon-button:disabled .icon-glyph {
+    -fx-fill: -cimpal-text-disabled;
+}
+
+.option-flow {
+    -fx-hgap: 16;
+    -fx-vgap: 8;
+}
+
+/*
+ * Row label for a grid cell whose field is an .option-flow. Such a pane is taller than a single
+ * control - it reflows when narrow, and some entries carry a text field or dropdown - so a
+ * centred label drifts away from the first line of options. Pairing this class with
+ * GridPane.valignment="TOP" pins the label to the top of the row; the padding then makes up the
+ * space a CheckBox reserves above its own text, so label and first option read as one line.
+ */
+.option-label {
+    -fx-padding: 3 0 0 0;
+}
+
+/* ===================== RDF graph diagram ===================== */
+
+/*
+ * The node-link view in RDF Operations > Visualisation. Every colour comes from the theme's own
+ * variables, so the diagram follows the light/dark choice without a per-theme override; only the
+ * geometry is fixed here.
+ */
+
+.rdf-graph-view {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: -cimpal-border;
+}
+
+.rdf-graph-node {
+    -fx-fill: -fx-accent;
+    -fx-stroke: -fx-control-inner-background;
+    -fx-stroke-width: 1.5;
+    -fx-cursor: hand;
+}
+
+.rdf-graph-node:hover {
+    -fx-fill: -cimpal-warning;
+}
+
+.rdf-graph-node-text {
+    -fx-fill: -cimpal-text;
+    -fx-font-size: 11px;
+}
+
+.rdf-graph-edge {
+    -fx-stroke: -cimpal-text-muted;
+    -fx-stroke-width: 1;
+    -fx-opacity: 0.7;
+}
+
+.rdf-graph-arrow {
+    -fx-fill: -cimpal-text-muted;
+    -fx-opacity: 0.85;
+}
+
+.rdf-graph-edge-text {
+    -fx-fill: -cimpal-text-muted;
+    -fx-font-size: 9.5px;
+}

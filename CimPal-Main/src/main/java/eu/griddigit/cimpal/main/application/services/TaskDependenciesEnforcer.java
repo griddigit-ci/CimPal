@@ -12,22 +12,32 @@ import java.util.List;
 import java.util.Map;
 
 public class TaskDependenciesEnforcer {
-    private ObjectMapper objectMapper;
-    private Map<String, List<String>> taskOrderConstraints;
+
+    private static final String RULES_RESOURCE = "/taskOrderRules/taskAllowed.json";
+
+    private final ObjectMapper objectMapper;
+    private final Map<String, List<String>> taskOrderConstraints;
+
+    /**
+     * Loads the task-ordering rules from the application bundle.
+     * <p>
+     * A missing or unreadable rules file is fatal rather than swallowed: the previous
+     * implementation logged the failure and continued with a null constraint map, so the
+     * first call to {@link #checkIfAddingTaskIsAllowed(String)} failed with a
+     * {@link NullPointerException} far from the real cause. The stream is also closed,
+     * which it previously was not.
+     */
     public TaskDependenciesEnforcer() throws IOException, URISyntaxException {
         this.objectMapper = new ObjectMapper();
-        URL uri = getClass().getResource("/taskOrderRules/taskAllowed.json");
 
-        if (uri != null) {
-            try {
-                InputStream file = uri.openStream();
-                taskOrderConstraints = objectMapper.readValue(file,
-                        new TypeReference<Map<String, List<String>>>(){});
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else {
-            System.err.println("Resource not found: /taskOrderRules/taskAllowed.json");
+        URL rules = getClass().getResource(RULES_RESOURCE);
+        if (rules == null) {
+            throw new IOException("Missing bundled resource: " + RULES_RESOURCE);
+        }
+
+        try (InputStream in = rules.openStream()) {
+            this.taskOrderConstraints = objectMapper.readValue(
+                    in, new TypeReference<Map<String, List<String>>>() {});
         }
     }
 
@@ -35,7 +45,8 @@ public class TaskDependenciesEnforcer {
         String name = "";
         WizardContext wizardContext = WizardContext.getInstance();
         var selectedTasks = wizardContext.getSelectedTasks();
-        var currentTaskConstraints = this.taskOrderConstraints.get(taskName);
+        // A task with no recorded constraints is unconstrained, not an error.
+        var currentTaskConstraints = this.taskOrderConstraints.getOrDefault(taskName, List.of());
 
         for (var task : selectedTasks) {
             if (currentTaskConstraints.contains(task.getName())){

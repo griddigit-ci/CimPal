@@ -3,8 +3,13 @@ package eu.griddigit.cimpal.main.application.datagenerator.resources;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SupportedRDFSProfiles {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SupportedRDFSProfiles.class);
+
 
     // Hashmap to hold the mapping between Supported RDFS Profiles and file location
     private HashMap<String, RDFSProfile> supportedRDFSProfiles;
@@ -109,7 +114,7 @@ public class SupportedRDFSProfiles {
             }};
         }
         catch (NullPointerException e){
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 

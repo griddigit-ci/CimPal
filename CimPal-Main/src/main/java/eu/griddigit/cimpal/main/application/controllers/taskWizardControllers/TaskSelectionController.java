@@ -7,6 +7,7 @@ import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -16,7 +17,6 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
-import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 
 import java.io.File;
@@ -26,8 +26,13 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TaskSelectionController implements Initializable, IController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TaskSelectionController.class);
+
 
     public TableColumn removeColumn;
     @FXML
@@ -41,9 +46,6 @@ public class TaskSelectionController implements Initializable, IController {
 
     @FXML
     public TextArea fieldTextProfileIDG;
-
-    @FXML
-    private AnchorPane taskSelectionAnchorPane;
 
     @FXML
     private ListView<String> tasksForSelection;
@@ -68,10 +70,8 @@ public class TaskSelectionController implements Initializable, IController {
     public void initialize(URL url, ResourceBundle resourceBundle) {
         try {
             taskSelectionController = new TaskDependenciesEnforcer();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
+        } catch (IOException | URISyntaxException e) {
+            LOG.error("Unhandled exception", e);
         }
         try {
             supportedRDFSProfiles = new SupportedRDFSProfiles();
@@ -141,7 +141,7 @@ public class TaskSelectionController implements Initializable, IController {
             }
         });
 
-        fcbProfileVersionIDG.getItems().addAll(supportedRDFSProfiles.getSupportedRDFSProfileNames());
+        fcbProfileVersionIDG.getItems().addAll(List.of(supportedRDFSProfiles.getSupportedRDFSProfileNames()));
 
         //Adding action to the choice box
         fcbProfileVersionIDG.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> actionCBInstanceDataProfileformat());
@@ -154,19 +154,12 @@ public class TaskSelectionController implements Initializable, IController {
         Platform.runLater(() -> context.setCurrentController(this));
     }
 
-    public void loadBaseInputData() throws IOException {
-        context.getDataGeneratorModel().loadRDFSProfileModel();
-        if (context.getSelectedTasks().getFirst().getTask().getClass() != GenerateInstanceDataModel.class) {
-            context.getDataGeneratorModel().loadInstanceModel();
-        }
-    }
-
     @FXML
     public void browseBaseInstance(ActionEvent actionEvent) {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Select Base Instance Model Files", "*.zip", "*.xml", "*.ttl"));
-        filechooser.setInitialDirectory(new File(context.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.baseInstanceModels");
 
         selectedBaseInstanceModelFilePaths = filechooser.showOpenMultipleDialog(null);
 
@@ -179,6 +172,7 @@ public class TaskSelectionController implements Initializable, IController {
             }
             context.getDataGeneratorModel().setBaseInstanceModelPath(filePaths);
             context.setLastOpenedDir(selectedBaseInstanceModelFilePaths.getFirst().getParentFile());
+            PathMemory.remember("dialog.wizard.baseInstanceModels", selectedBaseInstanceModelFilePaths.getFirst().getParentFile());
         } else {
             baseInstanceModelFilesPaths.clear();
         }
@@ -190,7 +184,7 @@ public class TaskSelectionController implements Initializable, IController {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("RDF profile file", "*.rdf", "*.ttl"));
-        filechooser.setInitialDirectory(new File(context.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.profileRdfs");
         selectedProfileIDG = filechooser.showOpenMultipleDialog(null);
 
         if (selectedProfileIDG != null) {// the file is selected
@@ -201,6 +195,7 @@ public class TaskSelectionController implements Initializable, IController {
             }
             context.getDataGeneratorModel().getRdfsProfileVersion().setPathToRDFSFiles(filePaths);
             context.setLastOpenedDir(selectedProfileIDG.getFirst().getParentFile());
+            PathMemory.remember("dialog.wizard.profileRdfs", selectedProfileIDG.getFirst().getParentFile());
         } else {
             fieldTextProfileIDG.clear();
         }
@@ -208,7 +203,8 @@ public class TaskSelectionController implements Initializable, IController {
 
     //Action for choice box "Profile version" related to Instance data comparison
     private void actionCBInstanceDataProfileformat() {
-        return;
+        // Nothing to do: the profile version is read straight from the choice box when the task
+        // runs. Kept because the FXML binds it.
     }
 
     public boolean validateInputs() {

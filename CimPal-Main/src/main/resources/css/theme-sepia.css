@@ -1,0 +1,71 @@
+/*
+ * Licensed under the EUPL-1.2-or-later.
+ * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
+ *
+ * Theme: Sepia (Warm Paper)
+ * Low-blue-light warm paper tones with a muted brown accent - easy on the eyes for
+ * long sessions in a bright room.
+ */
+
+.root {
+    /* --- Modena derivation roots --- */
+    -fx-base:                         #f1e7d5;
+    -fx-background:                   #f8f1e3;
+    -fx-control-inner-background:     #fdf8ee;
+    -fx-control-inner-background-alt: #f3ebda;
+    -fx-accent:                       #8a5a2b;
+    -fx-focus-color:                  #a9713a;
+    -fx-faint-focus-color:            #a9713a22;
+    -fx-selection-bar:                #8a5a2b;
+    -fx-selection-bar-non-focused:    #e6dac2;
+    -fx-default-button:               #e9dcc4;
+
+    /* --- text: pinned, never left to ladder() --- */
+    -fx-light-text-color:             #fdf8ee;
+    -fx-dark-text-color:              #3b2f21;
+    -fx-text-base-color:              #3b2f21;
+    -fx-text-background-color:        #3b2f21;
+    -fx-text-inner-color:             #3b2f21;
+    -fx-mid-text-color:               #6a5540;
+
+    /* --- CimPal tokens consumed by base.css --- */
+    -cimpal-text:            #3b2f21;
+    -cimpal-text-muted:      #6a5540;
+    -cimpal-text-disabled:   #7a6650;
+    -cimpal-text-on-accent:  #ffffff;
+    -cimpal-surface:         #ece0ca;
+    -cimpal-surface-2:       #e2d4ba;
+    -cimpal-border:          #c9b795;
+    -cimpal-badge-bg:        #ece0ca;
+    -cimpal-badge-border:    #8a5a2b;
+    -cimpal-badge-text:      #3b2f21;
+    -cimpal-warning:         #9c2b20;
+}
+
+.button, .toggle-button, .choice-box, .combo-box-base, .menu-button {
+    -fx-background-color: -cimpal-border, -fx-base;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 4;
+}
+
+.button:hover, .toggle-button:hover, .menu-button:hover {
+    -fx-background-color: -fx-focus-color, derive(-fx-base, -3%);
+}
+
+.menu-bar {
+    -fx-border-color: transparent transparent -cimpal-border transparent;
+}
+
+.titled-pane > .title,
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 4 4 0 0;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-radius: 6;
+}
+
+.progress-bar > .bar,
+.progress-bar > .track {
+    -fx-background-radius: 4;
+}

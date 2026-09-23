@@ -1,6 +1,7 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
-import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.CimPalWizardController;
+import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.stage.FileChooser;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -11,8 +12,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ExportFactory {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExportFactory.class);
+
 
 
     public static void exportQoCDC(List ruleName, List ruleSeverity, List ruleDescription, List ruleMessage, List ruleLevel, String sheetname, String initialFileName, String title) {
@@ -81,11 +87,18 @@ public class ExportFactory {
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("QoCDC321", "*.xlsx"));
         filechooser.setInitialFileName(initialFileName);
-        filechooser.setInitialDirectory(new File(CimPalWizardController.prefs.get("LastWorkingFolder","")));
+        PathMemory.prepare(filechooser, "dialog.qocdcXlsxExport");
         filechooser.setTitle(title);
         File saveFile = filechooser.showSaveDialog(null);
         if (saveFile != null) {
-            CimPalWizardController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            // Same dead-static problem as the wizard's task input page: CimPalWizardController
+            // was bound to no FXML and never constructed, so its prefs field was null and saving
+            // a QoCDC export threw. That class is now deleted; MainController.prefs is the live
+            // handle on the same node.
+            if (MainController.prefs != null) {
+                MainController.prefs.put("LastWorkingFolder", saveFile.getParent());
+            }
+            PathMemory.remember("dialog.qocdcXlsxExport", saveFile);
             try {
                 FileOutputStream outputStream = new FileOutputStream(saveFile);
                 workbook.write(outputStream);
@@ -93,9 +106,9 @@ public class ExportFactory {
                 outputStream.flush();
                 outputStream.close();
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             } catch (IOException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
         }
     }

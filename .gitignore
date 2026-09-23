@@ -16,4 +16,6 @@ target/
 **/target/
 /CimPal-CLI/dependency-reduced-pom.xml
 /CLAUDE.md
-
+/.ai/
+/.claude/
+/.engine-test-venv/

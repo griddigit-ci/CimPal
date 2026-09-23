@@ -6,12 +6,15 @@
 package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.ThemeManager;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.application.Preloader;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
@@ -42,7 +45,30 @@ public class MainGUI extends Application {
 
             // Show the scene containing the root layout.
             primaryStage.setScene(mainApp);
+
+            // Open as the largest 16:9 window that fits inside 95% of the screen work area
+            // (visual bounds exclude the taskbar), centred. On 16:10 / 4:3 / rotated screens
+            // the height clamp keeps the aspect ratio instead of overflowing.
+            Rectangle2D visual = Screen.getPrimary().getVisualBounds();
+            double width = visual.getWidth() * 0.95;
+            double height = width * 9.0 / 16.0;
+            if (height > visual.getHeight() * 0.95) {
+                height = visual.getHeight() * 0.95;
+                width = height * 16.0 / 9.0;
+            }
+            primaryStage.setWidth(width);
+            primaryStage.setHeight(height);
+            primaryStage.setX(visual.getMinX() + (visual.getWidth() - width) / 2);
+            primaryStage.setY(visual.getMinY() + (visual.getHeight() - height) / 2);
+
+            // 1280x720 floor, clamped so it can never exceed the window itself on small screens.
+            primaryStage.setMinWidth(Math.min(1280, width));
+            primaryStage.setMinHeight(Math.min(720, height));
             primaryStage.setMaximized(false);
+
+            // Applies the saved theme and keeps every future window (dialogs, alerts,
+            // tooltips) in sync with it.
+            ThemeManager.get().install();
 
             /*// Get current screen of the stage
             ObservableList<Screen> screens = Screen.getScreensForRectangle(new Rectangle2D(primaryStage.getX(), primaryStage.getY(), primaryStage.getWidth(), primaryStage.getHeight()));
@@ -81,6 +107,23 @@ public class MainGUI extends Application {
 
     public static void main(String[] args) {
         //Application.launch(args);
+        // PowSyBl can be embedded without an optional PlatformConfig provider.  Its resulting
+        // INFO startup message is not an application problem, and was obscuring useful output.
+        // Set this before any SLF4J logger is created (not when Grid is first opened).
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl", "warn");
+        // CGMES conversion logs a full UUID-to-IIDM map as one warning when node containers are
+        // merged. On real datasets that is megabytes of routine diagnostics and can overwhelm
+        // the JavaFX Output control; the conversion itself remains valid.
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl.cgmes.conversion.NodeContainerMapping", "error");
+        // Embedded CimPal deliberately has no on-disk PowSyBl platform configuration.  PowSyBl
+        // then loads its bundled base-voltages.yml successfully, so this message is a repeated
+        // implementation detail, not a missing configuration or diagram error.
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl.commons.config.BaseVoltagesConfig", "error");
+        // The SLD grid-layout algorithm may report a few bus nodes which cannot be assigned to
+        // one of its visual cells for a partially described CGMES voltage level.  It still emits
+        // the SVG and does not change the imported IIDM network or any power-flow result. Keep
+        // actual drawing/conversion warnings visible while avoiding this noisy per-render notice.
+        System.setProperty("org.slf4j.simpleLogger.log.com.powsybl.sld.model.graphs.VoltageLevelGraph", "error");
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) ->
                 GUIhelper.showUserFriendlyError("Unexpected application error", throwable)
         );

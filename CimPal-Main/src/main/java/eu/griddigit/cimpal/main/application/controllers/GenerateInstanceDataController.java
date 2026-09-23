@@ -3,6 +3,7 @@ package eu.griddigit.cimpal.main.application.controllers;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.core.ModelManipulationFactory;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -125,6 +126,10 @@ public class GenerateInstanceDataController implements Initializable {
             ls_geni_instances.setPrefWidth(Math.min(maxWidth + 40, 400));
         });
 
+        //the two lists above are multi-file selections with no path field to restore, so only
+        //their dialogs remember a folder; the template path is a single file and is restored
+        PathMemory.bind(fsXlsTemplatePath, "tab.generateInstanceData.xlsTemplate",
+                file -> inputXLS = List.of(file));
     }
 
     private void initializeHelpTooltips() {
@@ -159,7 +164,7 @@ public class GenerateInstanceDataController implements Initializable {
     private void actionBrowseXlsTemplate() {
         resetProgressBar();
         //select xls file
-        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Xls template", List.of("*.xlsx"), "Browse for xls template");
+        List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Xls template", List.of("*.xlsx"), "Browse for xls template", "tab.generateInstanceData.xlsTemplate");
 
         if (file != null) {// the file is selected
 
@@ -322,7 +327,7 @@ public class GenerateInstanceDataController implements Initializable {
     @FXML
     private void actionLoadRDFSGen() {
         try {
-            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS files", List.of("*.rdf"), "Select RDF file(s) for template.");
+            List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDFS files", List.of("*.rdf"), "Select RDF file(s) for template.", "tab.generateInstanceData.rdfsFiles");
             ls_geni_rdfs.getItems().clear();
             genRDFSFiles = file;
             if (file != null) {// the file is selected
@@ -344,7 +349,8 @@ public class GenerateInstanceDataController implements Initializable {
                     false,
                     "Instance files",
                     List.of("*.xml"),
-                    "Select instance file(s) for template."
+                    "Select instance file(s) for template.",
+                    "tab.generateInstanceData.instanceFiles"
             );
 
             ls_geni_instances.getItems().clear();

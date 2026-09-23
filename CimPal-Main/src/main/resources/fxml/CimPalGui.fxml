@@ -8,124 +8,160 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
+<?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.MainController">
-   <MenuBar prefHeight="13.0" prefWidth="1280.0" VBox.vgrow="NEVER">
+<VBox minHeight="0.0" minWidth="0.0" prefHeight="861.0" prefWidth="1284.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="eu.griddigit.cimpal.main.application.MainController">
+   <MenuBar VBox.vgrow="NEVER">
       <Menu mnemonicParsing="false" text="File">
-         <SeparatorMenuItem mnemonicParsing="false" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuPreferences" text="Preferences…" />
+         <MenuItem mnemonicParsing="false" onAction="#actionShowWorkspace" text="Workspace artifacts…" />
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuClearRemoteCache" text="Clear cached remote data…" />
          <SeparatorMenuItem mnemonicParsing="false" />
          <MenuItem mnemonicParsing="false" onAction="#menuQuit" text="Quit" />
       </Menu>
       <Menu mnemonicParsing="false" text="Tools">
-         <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportDescriptionMenu" text="Export RDFS descriptions" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuExportSHACLInfo" text="Export SHACL constraints information to Excel" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuExportAllSHACLInfo" text="Export All SHACL constraints information to Excel" />
-         <MenuItem mnemonicParsing="false" onAction="#actionGenInfoFromRDFS" text="Generate information from RDFS - needed for serialisation" />
-         <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
-         <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
-         <MenuItem mnemonicParsing="false" onAction="#actionCreateQARTemplate" text="Create xlsx template from QAR" />
-         <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
-         <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
-         <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text=" Model transformation" />
+         <Menu mnemonicParsing="false" text="RDFS Profiles">
+            <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportDescriptionMenu" text="Export RDFS descriptions" />
+            <MenuItem mnemonicParsing="false" onAction="#actionRDFSexportTripplesMenu" text="Export RDF tripples to xls" />
+            <SeparatorMenuItem mnemonicParsing="false" />
+            <MenuItem mnemonicParsing="false" onAction="#actionGenInfoFromRDFS" text="Generate information from RDFS - needed for serialisation" />
+            <MenuItem mnemonicParsing="false" onAction="#actionRDFSInstanceDataInfoMenu" text="Generate properties info from RDFS (xls, ttl, json)" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuDatatypeMap" text="Create datatypes map" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="SHACL Constraints">
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuExportSHACLInfo" text="Export SHACL constraints information to Excel" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuExportAllSHACLInfo" text="Export All SHACL constraints information to Excel" />
+            <SeparatorMenuItem mnemonicParsing="false" />
+            <MenuItem mnemonicParsing="false" onAction="#actionSHACLSHACL" text="Validate SHACL shapes" />
+            <MenuItem mnemonicParsing="false" onAction="#actionRestoreTtlFromConstraintCsv" text="Restore ttl from constraint csv" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="Reference Data">
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefData" text="Convert Reference Data" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuConvertRefToComData" text="Convert Reference data to Common data" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="Instance Data &amp; Models">
+            <MenuItem mnemonicParsing="false" onAction="#actionModelTransformationMenu" text="Model transformation" />
+            <MenuItem mnemonicParsing="false" onAction="#actionPopulateMissingAttributes" text="Populate missing attributes" />
+            <MenuItem mnemonicParsing="false" onAction="#actionGenerateManifest" text="Generate Manifest" />
+            <SeparatorMenuItem mnemonicParsing="false" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuPSSEPF" text="PSSE-PowerFactory compare" />
+         </Menu>
+         <Menu mnemonicParsing="false" text="Quality Reports">
+            <MenuItem mnemonicParsing="false" onAction="#actionQARMenu" text="Generate QAR based on xls" />
+            <MenuItem mnemonicParsing="false" onAction="#actionCreateQARTemplate" text="Create xlsx template from QAR" />
+            <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
+         </Menu>
+         <SeparatorMenuItem mnemonicParsing="false" />
+         <!-- Not tools: these two only switch to a tab, so they stay reachable at the top level. -->
          <MenuItem mnemonicParsing="false" onAction="#actionValidateByMapping" text="Validate by mapping file" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuPSSEPF" text="PSSE-PowerFactory compare" />
-         <MenuItem mnemonicParsing="false" onAction="#actionMenuQoCDCxls" text="QoCDC 3.2.1 xml to Excel" />
-         <MenuItem mnemonicParsing="false" onAction="#actionGenerateManifest" text="Generate Manifest" />
          <MenuItem mnemonicParsing="false" onAction="#actionRunSPARQLQuery" text="Run SPARQL Query" />
-         <MenuItem mnemonicParsing="false" onAction="#actionRestoreTtlFromConstraintCsv" text="Restore ttl from constraint csv" />
-         <MenuItem mnemonicParsing="false" onAction="#actionPopulateMissingAttributes" text="Populate missing attributes" />
-
       </Menu>
       <Menu mnemonicParsing="false" text="Help">
+         <MenuItem mnemonicParsing="false" onAction="#actionMenuHelpContents" text="Help Contents">
+            <accelerator>
+               <KeyCodeCombination alt="UP" code="F1" control="UP" meta="UP" shift="UP" shortcut="UP" />
+            </accelerator>
+         </MenuItem>
+         <SeparatorMenuItem mnemonicParsing="false" />
          <MenuItem mnemonicParsing="false" onAction="#actionMenuAbout" text="About" />
       </Menu>
    </MenuBar>
-   <AnchorPane minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
-      <SplitPane fx:id="mainSplitPane" dividerPositions="0.8146067415730337" layoutX="222.0" layoutY="349.0" orientation="VERTICAL" prefHeight="713.6" prefWidth="1016.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="579.0" prefWidth="1278.0">
-            <HBox alignment="TOP_RIGHT" layoutX="106.0" layoutY="108.0" prefHeight="569.0" prefWidth="1278.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-               <TabPane fx:id="tabPaneConstraintsDetails" prefHeight="595.0" prefWidth="1278.0" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
-                  <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
-                  <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
-                  <Tab fx:id="tabExcelToSHACL" text="Excel to SHACL"/>
-                  <Tab fx:id="tabRDFConvert" text="RDF Convert"/>
-                  <Tab fx:id="tabInstanceDataComparison" text="Instance Data Comparison"/>
-                  <Tab fx:id="tabSHACLOrganizer" text="SHACL Organizer"/>
-                  <Tab fx:id="tabSHACLTester" text="SHACL tester"/>
-                  <Tab fx:id="tabGenerateInstanceData" text="Generate Instance data"/>
-                  <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
+   <SplitPane fx:id="mainSplitPane" dividerPositions="0.8146067415730337" minHeight="0.0" minWidth="0.0" orientation="VERTICAL" VBox.vgrow="ALWAYS">
+      <!--
+        One Operations toolbar keeps transversal tools (Visualise, Convert and SPARQL) visible
+        while category menus retain the context needed for distinct RDF and Dataset comparisons.
+        Both halves of the SplitPane are TitledPanes: collapsing either one gives the whole height
+        to the other, which is what lets the Output pane be read full-window without a resize drag.
+        maxHeight is unbounded on both for that to work - a SplitPane never grows an item past its
+        maximum height, and a TitledPane's default maximum is its content's preferred height, so
+        without this the pane left expanded would keep its old height and leave the freed space
+        blank. See MainController.initializeCollapsiblePanes() for the matching divider handling.
+      -->
+      <TitledPane fx:id="workAreaContainer" animated="false" maxHeight="1.7976931348623157E308"
+                  minHeight="0.0" minWidth="0.0" styleClass="pane-flush" text="Operations">
+         <VBox minHeight="0.0" minWidth="0.0" spacing="8.0">
+            <padding><Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/></padding>
+            <FlowPane hgap="8.0" vgap="8.0">
+               <Button mnemonicParsing="false" onAction="#actionShowVisualisation" styleClass="primary-action" text="Visualise"/>
+               <Button mnemonicParsing="false" onAction="#actionShowConvert" text="Convert"/>
+               <Button mnemonicParsing="false" onAction="#actionShowSparql" text="SPARQL"/>
+               <Button mnemonicParsing="false" onAction="#actionShowAiAssistant" styleClass="primary-action" text="AI Assistant"/>
+               <Separator orientation="VERTICAL"/>
+               <MenuButton mnemonicParsing="false" text="SHACL">
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfsToShacl" text="RDFS to SHACL"/><MenuItem mnemonicParsing="false" onAction="#actionShowConstraints" text="Constraints Operations"/></items>
+               </MenuButton>
+               <MenuButton mnemonicParsing="false" text="RDF">
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowRdfsUnion" text="RDFS Union"/></items>
+               </MenuButton>
+               <MenuButton mnemonicParsing="false" text="Dataset">
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowDatasetComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowGenerate" text="Generate"/><MenuItem mnemonicParsing="false" onAction="#actionShowTaskWizard" text="Task Wizard"/><MenuItem mnemonicParsing="false" onAction="#actionShowValidation" text="SHACL Validation"/></items>
+               </MenuButton>
+            </FlowPane>
+            <TabPane fx:id="tabPaneWorkspace" minHeight="0.0" minWidth="0.0" styleClass="workspace-tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+               <tabs>
+                  <Tab fx:id="tabRDFVisualisation" text="Visualisation"/>
+                  <Tab fx:id="tabRDFConvert" text="Convert"/>
+                  <Tab fx:id="tabRdfsUnion" text="RDFS Union"/>
                   <Tab fx:id="tabSPARQLQuery" text="SPARQL Query"/>
-                  <Tab fx:id="tabValidationByMapping" text="Validation by Mapping"/>
-               </TabPane>
+                  <Tab fx:id="tabAiAssistant" text="AI Assistant"/>
+                  <Tab fx:id="tabRDFStoSHACL" text="RDFS to SHACL"/>
+                  <Tab fx:id="tabExcelToSHACL" text="Constraints Operations"/>
+                  <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
+                  <Tab fx:id="tabInstanceDataComparison" text="Dataset Comparison"/>
+                  <Tab fx:id="tabGenerateInstanceData" text="Generate"/>
+                  <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
+                  <Tab fx:id="tabValidationByMapping" text="SHACL Validation"/>
+               </tabs>
+            </TabPane>
+         </VBox>
+      </TitledPane>
+      <TitledPane fx:id="outputSourceContainer" animated="false" maxHeight="1.7976931348623157E308"
+                  minHeight="0.0" minWidth="0.0" text="Output">
+         <!--
+           The Clear button sits in a strip above the text area rather than in a left-hand
+           column, so the output area spans the full width of the pane. The pane held a
+           second "Source code" tab and a Show/Hide toggle for it; nothing ever wrote to
+           that text area, so both were removed rather than left as dead controls.
+         -->
+         <VBox minHeight="0.0" minWidth="0.0" spacing="6.0">
+            <padding>
+               <Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/>
+            </padding>
+            <HBox alignment="CENTER_LEFT" spacing="8.0" VBox.vgrow="NEVER">
+               <Button mnemonicParsing="false" onAction="#actionBtnClear"
+                       styleClass="icon-button">
+                  <graphic>
+                     <!-- Trash-can silhouette: lid handle, lid, body. Drawn rather than
+                          loaded from a font or image so it inherits the theme's text
+                          colour and renders identically on every platform. -->
+                     <SVGPath styleClass="icon-glyph"
+                              content="M6 1.5 H10 V3.5 H6 Z M2 4 H14 V6 H2 Z M3.6 6.8 H12.4 L11.7 15.2 H4.3 Z"/>
+                  </graphic>
+                  <tooltip>
+                     <Tooltip text="Clear Output Window"/>
+                  </tooltip>
+               </Button>
+               <Region HBox.hgrow="ALWAYS"/>
             </HBox>
-         </AnchorPane>
-         <TitledPane fx:id="outputSourceContainer" animated="false" text="Output &amp; Source Code">
-            <BorderPane minHeight="0.0" minWidth="0.0">
-               <left>
-                  <VBox alignment="TOP_CENTER" spacing="10.0">
-                     <padding>
-                        <Insets bottom="3.0" left="3.0" right="3.0" top="3.0"/>
-                     </padding>
-                     <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#actionBtnClear"
-                             text="Clear" wrapText="true"/>
-                     <ToggleButton fx:id="btnShowSourceCodeDefineTab" maxWidth="1.7976931348623157E308"
-                                   mnemonicParsing="false" onAction="#actionBtnShowSourceCodeShacl" text="Show"
-                                   wrapText="true">
-                        <tooltip>
-                           <Tooltip text="Show or hide the source code of the constraints."/>
-                        </tooltip>
-                     </ToggleButton>
-                  </VBox>
-               </left>
-               <center>
-                  <TabPane fx:id="tabPaneDown" minHeight="0.0" minWidth="0.0" side="BOTTOM"
-                           tabClosingPolicy="UNAVAILABLE" BorderPane.alignment="CENTER">
-                     <Tab fx:id="tabOutputWindow" closable="false" text="Output window">
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                           <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true"
-                                       AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
-                                       AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                              <TextArea fx:id="foutputWindow" wrapText="true"/>
-                           </ScrollPane>
-                        </AnchorPane>
-                     </Tab>
-                     <Tab fx:id="tabConstraintsSourceCode" closable="false"
-                          onSelectionChanged="#actionTabConstraintsSourceCode" text="Source code">
-                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                           <ScrollPane fitToHeight="true" fitToWidth="true" pannable="true"
-                                       AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0"
-                                       AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                              <TextArea fx:id="fsourceDefineTab" editable="false" wrapText="true"/>
-                           </ScrollPane>
-                        </AnchorPane>
-                     </Tab>
-                  </TabPane>
-               </center>
-            </BorderPane>
-         </TitledPane>
-      </SplitPane>
-   </AnchorPane>
-   <HBox id="HBox" alignment="CENTER_LEFT" prefHeight="20.0" prefWidth="1280.0" spacing="5.0" VBox.vgrow="NEVER">
+            <TextArea fx:id="foutputWindow" minHeight="0.0" minWidth="0.0" wrapText="true"
+                      VBox.vgrow="ALWAYS"/>
+         </VBox>
+      </TitledPane>
+   </SplitPane>
+   <HBox id="HBox" alignment="CENTER_LEFT" spacing="8.0" VBox.vgrow="NEVER">
       <padding>
-         <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
+         <Insets bottom="8.0" left="8.0" right="8.0" top="8.0" />
       </padding>
-      <Label maxHeight="1.7976931348623157E308" text="Status:" HBox.hgrow="ALWAYS">
+      <Label maxHeight="1.7976931348623157E308" text="Status:" HBox.hgrow="NEVER">
          <font>
             <Font size="11.0" fx:id="x3" />
          </font>
       </Label>
-      <Pane HBox.hgrow="ALWAYS">
-         <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0">
-            <padding>
-               <Insets left="10.0" />
-            </padding>
-         </ProgressBar>
-      </Pane>
-      <Label font="$x3" text="Version: 2025.12.18.1" HBox.hgrow="NEVER" />
+      <Label fx:id="lblStatus" maxWidth="1.7976931348623157E308" text="Ready" HBox.hgrow="ALWAYS" />
+      <ProgressBar fx:id="progressBar" prefWidth="300.0" progress="0.0" HBox.hgrow="NEVER" />
+      <Region HBox.hgrow="ALWAYS" />
+      <Label font="$x3" text="Version: 2026.9.10.1" HBox.hgrow="NEVER" />
    </HBox>
 </VBox>

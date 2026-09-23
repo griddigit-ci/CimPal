@@ -5,30 +5,34 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.main.gui.GUIhelper;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.awt.*;
 import java.io.*;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Date;
 import java.util.ResourceBundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AboutController implements Initializable {
-    @FXML
-    private Button btnOK;
+
+    private static final Logger LOG = LoggerFactory.getLogger(AboutController.class);
+
     @FXML
     private ImageView fImage;
     @FXML
-    private AnchorPane faPane;
+    private VBox faPane;
     @FXML
     private Hyperlink fsupportemail;
     @FXML
@@ -50,39 +54,38 @@ public class AboutController implements Initializable {
 //Creating a hyper link
         Hyperlink link = new Hyperlink();
 
-        link.setLayoutX(fImage.getLayoutX());
-        link.setLayoutY(fImage.getLayoutY());
+        // setGraphic re-parents fImage out of faPane, so the link takes its place at the top.
         link.setGraphic(fImage);
         link.setOnAction(ev -> {
                     try {
-                        Desktop.getDesktop().browse(new URL("https://griddigit.eu").toURI());
-                    } catch (IOException | URISyntaxException e) {
-                        e.printStackTrace();
+                        Desktop.getDesktop().browse(URI.create("https://griddigit.eu"));
+                    } catch (IOException e) {
+                        LOG.error("Unhandled exception", e);
                     }
         });
 
-        faPane.getChildren().add(link);
+        faPane.getChildren().addFirst(link);
         fsupportemail.setOnAction(ev -> {
             try {
-                Desktop.getDesktop().browse(new URL("mailto:cimpal@griddigit.eu").toURI());
-            } catch (IOException | URISyntaxException e) {
-                e.printStackTrace();
+                Desktop.getDesktop().browse(URI.create("mailto:cimpal@griddigit.eu"));
+            } catch (IOException e) {
+                LOG.error("Unhandled exception", e);
             }
         });
 
         fwebsite.setOnAction(ev -> {
             try {
-                Desktop.getDesktop().browse(new URL("https://cimpal.app").toURI());
-            } catch (IOException | URISyntaxException e) {
-                e.printStackTrace();
+                Desktop.getDesktop().browse(URI.create("https://cimpal.app"));
+            } catch (IOException e) {
+                LOG.error("Unhandled exception", e);
             }
         });
 
         fgitHub.setOnAction(ev -> {
             try {
-                Desktop.getDesktop().browse(new URL("https://github.com/griddigit/CimPal").toURI());
-            } catch (IOException | URISyntaxException e) {
-                e.printStackTrace();
+                Desktop.getDesktop().browse(URI.create("https://github.com/griddigit/CimPal"));
+            } catch (IOException e) {
+                LOG.error("Unhandled exception", e);
             }
         });
 
@@ -102,9 +105,9 @@ public class AboutController implements Initializable {
     //action button License
     private void actionBtnLicense(ActionEvent actionEvent) {
         try {
-            Desktop.getDesktop().browse(new URL("https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12").toURI());
-        } catch (IOException | URISyntaxException e) {
-            e.printStackTrace();
+            Desktop.getDesktop().browse(URI.create("https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12"));
+        } catch (IOException e) {
+            LOG.error("Unhandled exception", e);
         }
     }
 
@@ -117,11 +120,19 @@ public class AboutController implements Initializable {
 
 
         File file = null;
-        String resource = "/license/license.txt" ;
+        String resource = "/license/license.txt";
         URL res = getClass().getResource(resource);
+        if (res == null) {
+            GUIhelper.showError("License unavailable",
+                    "The bundled licence text could not be found in the application resources.");
+            return;
+        }
         if (res.toString().startsWith("jar:")) {
             try {
                 InputStream input = getClass().getResourceAsStream(resource);
+                if (input == null) {
+                    throw new IOException("License resource disappeared: " + resource);
+                }
                 file = File.createTempFile(new Date().getTime()+"", ".txt");
                 OutputStream out = new FileOutputStream(file);
                 int read;
@@ -136,7 +147,7 @@ public class AboutController implements Initializable {
                 file.deleteOnExit();
 
             } catch (IOException ex) {
-                ex.printStackTrace();
+                LOG.error("Unhandled exception", ex);
             }
         } else {
 
@@ -147,7 +158,7 @@ public class AboutController implements Initializable {
         try {
             Desktop.getDesktop().edit(file);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
 
 

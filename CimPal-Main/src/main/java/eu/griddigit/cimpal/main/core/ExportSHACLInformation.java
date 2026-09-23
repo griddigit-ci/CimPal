@@ -6,6 +6,7 @@
 
 package eu.griddigit.cimpal.main.core;
 
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.stage.FileChooser;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.*;
@@ -27,9 +28,14 @@ import java.util.*;
 
 import static eu.griddigit.cimpal.main.util.ExcelTools.exportMapToExcel;
 import static eu.griddigit.cimpal.main.util.ExcelTools.saveExcelFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ExportSHACLInformation {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExportSHACLInformation.class);
+
 
     public static void shaclInformationExport(boolean singleFile, List<File> file) {
         XSSFWorkbook workbook = new XSSFWorkbook();
@@ -39,7 +45,7 @@ public class ExportSHACLInformation {
             try {
                 RDFDataMgr.read(model, new FileInputStream(f), Lang.TURTLE);
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
             fileName = FilenameUtils.getBaseName(f.getAbsolutePath());
             if (!singleFile) {
@@ -86,6 +92,8 @@ public class ExportSHACLInformation {
             //iterate on all PropertyShape
             for (StmtIterator i = model.listStatements(null, RDF.type, SH.PropertyShape); i.hasNext(); ) {
                 Statement stmtPS = i.next();
+                // skip deactivated shapes and helper shapes (sh:not / sh:qualifiedValueShape guards) that have no sh:name
+                if (!model.listStatements(stmtPS.getSubject(), SH.name, (RDFNode) null).hasNext()) continue;
                 propertyShapeID.add(model.getNsURIPrefix(stmtPS.getSubject().getNameSpace()) + ":" + stmtPS.getSubject().getLocalName());
                 String name = model.listStatements(stmtPS.getSubject(), SH.name, (RDFNode) null).next().getObject().toString();
                 propertyShapeName.add(name);
@@ -185,7 +193,7 @@ public class ExportSHACLInformation {
                 Lang lang = org.apache.jena.riot.RDFLanguages.filenameToLang(f.getName());
                 RDFDataMgr.read(model, new FileInputStream(f), (lang != null ? lang : Lang.TURTLE));
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
             }
 
             String fileName = FilenameUtils.getBaseName(f.getAbsolutePath());
@@ -275,7 +283,7 @@ public class ExportSHACLInformation {
                 Lang lang = org.apache.jena.riot.RDFLanguages.filenameToLang(f.getName());
                 RDFDataMgr.read(model, new FileInputStream(f), (lang != null ? lang : Lang.TURTLE));
             } catch (Exception e) {
-                e.printStackTrace();
+                LOG.error("Unhandled exception", e);
                 continue;
             }
 
@@ -1003,12 +1011,23 @@ public class ExportSHACLInformation {
         return String.join(System.lineSeparator() + System.lineSeparator(), parts);
     }
 
+    /** Characters a spreadsheet treats as the start of a formula when it opens a CSV file. */
+    private static final String FORMULA_TRIGGERS = "=+-@\t\r";
+
     private static String csvEscape(String value) {
         if (value == null) {
             return "";
         }
 
         String s = value;
+
+        // Neutralise formula injection before quoting. RFC-4180 quoting does not prevent
+        // evaluation: Excel and LibreOffice evaluate a cell whose content begins with
+        // =, +, -, @, TAB or CR, and these values are RDF literals from third-party models.
+        // A single leading apostrophe forces literal interpretation and is not displayed.
+        if (!s.isEmpty() && FORMULA_TRIGGERS.indexOf(s.charAt(0)) >= 0) {
+            s = "'" + s;
+        }
 
         boolean mustQuote =
                 s.contains(",")
@@ -1066,7 +1085,7 @@ public class ExportSHACLInformation {
             System.out.println("Saved EA import CSV: " + outFile.getAbsolutePath());
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Unhandled exception", e);
         }
     }
 
@@ -1078,8 +1097,11 @@ public class ExportSHACLInformation {
         fileChooser.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("CSV files (*.csv)", "*.csv")
         );
+        PathMemory.prepare(fileChooser, "dialog.shaclEaImportCsv");
 
-        return fileChooser.showSaveDialog(null);
+        File chosen = fileChooser.showSaveDialog(null);
+        PathMemory.remember("dialog.shaclEaImportCsv", chosen);
+        return chosen;
     }
 
     // Build a wide predicate table for given subjects; `sh:name` goes first if present.

@@ -14,7 +14,6 @@ import eu.griddigit.cimpal.core.kgcl.KgclConverter;
 import eu.griddigit.cimpal.core.kgcl.KgclRdfWriter;
 import eu.griddigit.cimpal.core.models.KgclOptions;
 import eu.griddigit.cimpal.core.models.RDFCompareResult;
-import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.ExcelExportTableView;
 import eu.griddigit.cimpal.main.gui.RDFcomparisonResultModel;
 import eu.griddigit.cimpal.main.gui.TextAreaEditTableCell;
@@ -76,7 +75,7 @@ public class rdfDiffResultController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        tableViewResults.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY);
+        tableViewResults.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         tableViewResults.setPlaceholder(new Label("No comparison details available"));
 
         //add callback - the table is not editable, but it is necessary in order to get the wrap text and text area
@@ -260,10 +259,5 @@ public class rdfDiffResultController implements Initializable {
     @FXML
     private void actionBtnCancel(ActionEvent actionEvent) {
         guiRdfDiffResultsStage.close();
-    }
-
-    // kept for compatibility (not used) - prefer using the instance initData(stage,result,files)
-    public static void initData(Stage stage) {
-        // no-op to avoid breaking existing callers; prefer loader.getController().initData(...)
     }
 }

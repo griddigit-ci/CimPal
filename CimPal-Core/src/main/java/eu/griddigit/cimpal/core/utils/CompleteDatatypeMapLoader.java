@@ -6,6 +6,8 @@ import org.apache.jena.sys.JenaSystem;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -14,42 +16,54 @@ public final class CompleteDatatypeMapLoader {
     private CompleteDatatypeMapLoader() {}
 
     /**
-     * Loads CompleteDatatypeMap_CIM16.properties where values look like:
-     * Datatype[http://www.w3.org/2001/XMLSchema#boolean -> class java.lang.Boolean]
+     * Loads a datatype map such as {@code CompleteDatatypeMap_CIM16.properties}, whose values look
+     * like {@code Datatype[http://www.w3.org/2001/XMLSchema#boolean -> class java.lang.Boolean]}.
      *
-     * Returns map: predicateURI -> RDFDatatype
+     * @return predicate URI to {@link RDFDatatype}
      */
     public static Map<String, RDFDatatype> loadFromResource(String resourcePath) throws IOException {
         try (InputStream in = CompleteDatatypeMapLoader.class.getResourceAsStream(resourcePath)) {
             if (in == null) {
                 throw new IOException("Datatype map resource not found: " + resourcePath);
             }
-            JenaSystem.init();
+            return load(in);
+        }
+    }
 
-            Properties props = new Properties();
-            props.load(in);
+    /**
+     * As {@link #loadFromResource(String)}, but reading a map the user supplied from disk rather
+     * than one of the bundled ones. Same file format; a key whose datatype URI is unknown to Jena
+     * is skipped, so a map written for a different profile family degrades to a partial mapping
+     * rather than failing the run.
+     */
+    public static Map<String, RDFDatatype> loadFromFile(Path file) throws IOException {
+        try (InputStream in = Files.newInputStream(file)) {
+            return load(in);
+        }
+    }
 
-            Map<String, RDFDatatype> out = new HashMap<>();
-            TypeMapper.reset();
-            TypeMapper tm = TypeMapper.getInstance();
+    private static Map<String, RDFDatatype> load(InputStream in) throws IOException {
+        JenaSystem.init();
 
-            for (String key : props.stringPropertyNames()) {
-                String raw = props.getProperty(key);
-                String dtUri = extractDatatypeUri(raw);
-                if (dtUri == null || dtUri.isBlank()) continue;
+        Properties props = new Properties();
+        props.load(in);
 
-                RDFDatatype dt = tm.getTypeByName(dtUri);
-                if (dt == null) {
-                    // If unknown datatype URI, skip (or log).
-                    // System.err.println("[WARN] Unknown datatype URI: " + dtUri + " for key " + key);
-                    continue;
-                }
-                out.put(key, dt);
+        Map<String, RDFDatatype> out = new HashMap<>();
+        TypeMapper tm = TypeMapper.getInstance();
+
+        for (String key : props.stringPropertyNames()) {
+            String raw = props.getProperty(key);
+            String dtUri = extractDatatypeUri(raw);
+            if (dtUri == null || dtUri.isBlank()) continue;
+
+            RDFDatatype dt = tm.getSafeTypeByName(dtUri);
+            if (dt == null) {
+                continue;
             }
-
-            return out;
+            out.put(key, dt);
         }
 
+        return out;
     }
 
     private static String extractDatatypeUri(String raw) {

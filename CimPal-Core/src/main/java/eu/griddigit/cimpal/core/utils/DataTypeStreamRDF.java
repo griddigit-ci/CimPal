@@ -11,8 +11,6 @@ import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
-import org.apache.jena.rdf.model.Literal;
-import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.riot.system.StreamRDF;
 import org.apache.jena.sparql.core.Quad;
 import org.apache.jena.sparql.graph.GraphFactory;
@@ -53,9 +51,9 @@ public class DataTypeStreamRDF implements StreamRDF {
     }
 
     public void triple(Triple triple) {
-        //if the triple is found it is put to the defaut graph
-        Triple dataTypeTriple = dataTypeTriple(triple);
-        addToGraphs(Quad.defaultGraphNodeGenerated, dataTypeTriple);
+        // RDF/XML produces triples in the default graph. Avoid a HashMap lookup for every
+        // parsed triple; this is the hot path for large EQ models.
+        graph.add(dataTypeTriple(triple));
     }
 
     private Triple dataTypeTriple(Triple triple) {
@@ -77,15 +75,7 @@ public class DataTypeStreamRDF implements StreamRDF {
 
             String literalValue = triple.getObject().getLiteralLexicalForm();
 
-            Literal typedLiteral = ResourceFactory.createTypedLiteral(
-                    literalValue,
-                    datatype
-            );
-
-            Node objectNode = NodeFactory.createLiteralDT(
-                    typedLiteral.getLexicalForm(),
-                    typedLiteral.getDatatype()
-            );
+            Node objectNode = NodeFactory.createLiteralDT(literalValue, datatype);
 
             triple = Triple.create(
                     triple.getSubject(),

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="CimPal-CustomWriter" />
+        <module name="CimPal-Main" />
+        <module name="CimPal-Core" />
+        <module name="CimPal-CLI" />
+      </profile>
+    </annotationProcessing>
+  </component>
+</project>

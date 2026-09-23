@@ -35,6 +35,10 @@ public class TextAreaEditTableCell<S> extends TextAreaTableCell<S, String> {
 
     private Text createText() {
         Text text = new Text();
+        // Text nodes use -fx-fill rather than the table cell's -fx-text-fill.
+        // Give the shared stylesheet a precise hook so wrapped table values
+        // remain readable in every application theme.
+        text.getStyleClass().add("cimpal-table-cell-text");
         text.wrappingWidthProperty().bind(widthProperty());
         text.textProperty().bind(itemProperty());
         return text;

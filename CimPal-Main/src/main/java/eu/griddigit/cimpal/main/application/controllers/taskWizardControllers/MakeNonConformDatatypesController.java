@@ -1,6 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.tasks.MakeNonConformDatatypes;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;
@@ -36,7 +37,7 @@ public class MakeNonConformDatatypesController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("SHACL constraints", "*.rdf", "*.ttl", "*.xml"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.makeNonConformDatatypes.shaclFiles");
 
         List<File> selectedFilesPaths = null;
         selectedFilesPaths = filechooser.showOpenMultipleDialog(null);
@@ -48,6 +49,7 @@ public class MakeNonConformDatatypesController implements Initializable {
             MakeNonConformDatatypes task = (MakeNonConformDatatypes) wizardContext.getSelectedTasks().stream().filter(x -> x.getTask().getClass() == MakeNonConformDatatypes.class).findFirst().get().getTask();
             task.setShaclFilesPath(selectedFilesPaths.stream().map(x -> x.getPath()).toArray(String[]::new));
             wizardContext.setLastOpenedDir(selectedFilesPaths.get(0).getParentFile());
+            PathMemory.remember("dialog.wizard.makeNonConformDatatypes.shaclFiles", selectedFilesPaths.get(0).getParentFile());
         }
         else{
             loadedShaclFiles.clear();

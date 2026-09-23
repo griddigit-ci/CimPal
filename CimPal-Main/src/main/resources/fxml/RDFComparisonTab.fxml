@@ -5,27 +5,30 @@
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFComparisonController"
-            prefHeight="400.0" prefWidth="600.0">
-    <VBox spacing="12.0"
-          AnchorPane.topAnchor="0.0"
-          AnchorPane.rightAnchor="0.0"
-          AnchorPane.bottomAnchor="0.0"
-          AnchorPane.leftAnchor="0.0"
-          style="-fx-padding: 10;">
-        <GridPane hgap="10.0" vgap="10.0">
+<?import javafx.scene.control.ScrollPane?>
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFComparisonController"
+      minHeight="0.0" minWidth="0.0">
+  <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
+    <VBox spacing="16.0"
+          minHeight="0.0"
+          minWidth="0.0"
+          styleClass="tab-root">
+        <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
                     <columnConstraints>
-                        <ColumnConstraints minWidth="140.0" prefWidth="170.0" hgrow="NEVER" />
-                            <ColumnConstraints hgrow="ALWAYS" />
-                        <ColumnConstraints minWidth="95.0" prefWidth="95.0" hgrow="NEVER" />
+                        <!-- 0: labels. Fixed so every field in the tab starts on the same x. -->
+                        <ColumnConstraints halignment="LEFT" minWidth="180.0" prefWidth="180.0" hgrow="NEVER" />
+                        <!-- 1: the field. The only column that absorbs slack. minWidth 0 lets the tab shrink. -->
+                        <ColumnConstraints hgrow="ALWAYS" minWidth="0.0" />
+                        <!-- 2: Browse. Fixed so it never inflates into a banner. -->
+                        <ColumnConstraints halignment="RIGHT" minWidth="95.0" prefWidth="95.0" hgrow="NEVER" />
                     </columnConstraints>
                     <rowConstraints>
                         <RowConstraints vgrow="NEVER" />
@@ -33,12 +36,13 @@
                         <RowConstraints vgrow="NEVER" />
                     </rowConstraints>
 
-                    <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                    <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="0">
                         <Label text="RDF file A (Model A):" wrapText="true"/>
-                        <Label fx:id="helpRdfFileA" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpRdfFileA" text="?" styleClass="help-badge"/>
                     </HBox>
                     <TextField fx:id="fPathRdffile1"
                                editable="false"
+                               maxWidth="1.7976931348623157E308"
                                GridPane.rowIndex="0"
                                GridPane.columnIndex="1"
                                GridPane.hgrow="ALWAYS" />
@@ -49,12 +53,13 @@
                             GridPane.rowIndex="0"
                             GridPane.columnIndex="2" />
 
-                    <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                    <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="0">
                         <Label text="RDF file B (Model B):" wrapText="true"/>
-                        <Label fx:id="helpRdfFileB" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpRdfFileB" text="?" styleClass="help-badge"/>
                     </HBox>
                     <TextField fx:id="fPathRdffile2"
                                editable="false"
+                               maxWidth="1.7976931348623157E308"
                                GridPane.rowIndex="1"
                                GridPane.columnIndex="1"
                                GridPane.hgrow="ALWAYS" />
@@ -65,48 +70,53 @@
                             GridPane.rowIndex="1"
                             GridPane.columnIndex="2" />
 
-                    <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0">
+                    <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0">
                         <Label text="RDF scope and format:" wrapText="true"/>
-                        <Label fx:id="helpScopeFormat" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpScopeFormat" text="?" styleClass="help-badge"/>
                     </HBox>
-                    <HBox spacing="10.0"
+                    <HBox spacing="8.0"
+                          alignment="CENTER_LEFT"
                           GridPane.rowIndex="2"
                           GridPane.columnIndex="1"
-                          GridPane.columnSpan="2"
-                          HBox.hgrow="ALWAYS">
+                          GridPane.columnSpan="2">
                         <ChoiceBox fx:id="fcbRDFSformat"
-                                   prefWidth="220.0"
-                                   HBox.hgrow="ALWAYS" />
+                                   prefWidth="220.0" />
                         <CheckBox fx:id="fcbRDFcompareCimVersion"
                                   mnemonicParsing="false"
                                   text="Assume same CIM namespace"
                                   wrapText="true" />
-                        <Label fx:id="helpSameCimNS" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                        <Label fx:id="helpSameCimNS" text="?" styleClass="help-badge"/>
+                        <!-- A ChoiceBox has a natural width; the spacer absorbs the slack instead. -->
+                        <Region HBox.hgrow="ALWAYS" />
                     </HBox>
                 </GridPane>
 
-                <HBox spacing="10.0" alignment="CENTER_LEFT">
+                <HBox spacing="8.0" alignment="CENTER_LEFT">
                     <CheckBox fx:id="fcbRDFcompareProfileNS"
                               mnemonicParsing="false"
                               text="Assume same Profile/Ontology namespace for prefix:"
                               wrapText="true" />
-                    <Label fx:id="helpProfileNS" text="?" style="-fx-background-color: #e0e0e0; -fx-background-radius: 20; -fx-border-color: #808080; -fx-border-radius: 20; -fx-text-fill: #333333; -fx-font-weight: bold; -fx-alignment: center; -fx-min-width: 18px; -fx-min-height: 18px; -fx-pref-width: 18px; -fx-pref-height: 18px; -fx-cursor: hand;"/>
+                    <Label fx:id="helpProfileNS" text="?" styleClass="help-badge"/>
                     <TextField fx:id="fPrefixRDFCompare"
                                HBox.hgrow="ALWAYS" />
                 </HBox>
 
-                <HBox spacing="10.0" alignment="CENTER_RIGHT">
+                <Region VBox.vgrow="ALWAYS" />
+
+                <HBox spacing="8.0" alignment="CENTER_RIGHT" styleClass="action-bar" VBox.vgrow="NEVER">
                     <Button fx:id="btnResetRDFComp"
                             mnemonicParsing="false"
                             onAction="#actionBtnResetRDFComp"
                             text="Reset"
-                            minWidth="90.0" />
+                            minWidth="95.0" />
                     <Button fx:id="btnRunRDFcompare"
                             disable="true"
                             mnemonicParsing="false"
                             onAction="#actionBtnRunRDFcompare"
                             text="Run"
-                            minWidth="90.0" />
+                            styleClass="primary-action"
+                            minWidth="110.0" />
                 </HBox>
     </VBox>
-</AnchorPane>
+  </ScrollPane>
+</VBox>

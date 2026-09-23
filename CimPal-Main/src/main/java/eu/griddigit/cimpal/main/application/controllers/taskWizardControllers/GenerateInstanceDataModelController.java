@@ -1,6 +1,7 @@
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 import eu.griddigit.cimpal.main.application.tasks.DeleteRequiredProperties;
 import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
+import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;
@@ -52,7 +53,7 @@ public class GenerateInstanceDataModelController implements Initializable {
         //select file
         FileChooser filechooser = new FileChooser();
         filechooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Input template instance data XLS", "*.xlsx"));
-        filechooser.setInitialDirectory(new File(wizardContext.getLastOpenedDir().toString()));
+        PathMemory.prepare(filechooser, "dialog.wizard.generateInstanceData.template");
 
         File selectedFilePath = null;
         selectedFilePath = filechooser.showOpenDialog(null);
@@ -63,6 +64,7 @@ public class GenerateInstanceDataModelController implements Initializable {
                 GenerateInstanceDataModel task = (GenerateInstanceDataModel) wizardContext.getSelectedTasks().stream().filter(x -> x.getTask().getClass() == DeleteRequiredProperties.class).findFirst().get().getTask();
                 task.setTemplateDataFilePath(selectedFilePath.getPath());
                 wizardContext.setLastOpenedDir(selectedFilePath.getParentFile());
+                PathMemory.remember("dialog.wizard.generateInstanceData.template", selectedFilePath.getParentFile());
         }
         else{
             loadedInputFile.clear();
