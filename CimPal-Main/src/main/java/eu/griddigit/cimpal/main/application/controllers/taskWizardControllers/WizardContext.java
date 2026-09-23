@@ -5,8 +5,8 @@ import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.application.tasks.*;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
-import eu.griddigit.cimpal.main.application.datagenerator.ModelManipulationFactory;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
+import eu.griddigit.cimpal.main.core.ModelManipulationFactory;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.TableView;
@@ -34,6 +34,9 @@ import org.slf4j.LoggerFactory;
 
 public class WizardContext {
 
+    private static final String STEREOTYPE_PROPERTY = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype";
+    private static final String UML_ENUMERATION = "http://iec.ch/TC57/NonStandard/UML#enumeration";
+
     private static final Logger LOG = LoggerFactory.getLogger(WizardContext.class);
 
     // Static helper objects for singleton pattern implementation
@@ -53,6 +56,12 @@ public class WizardContext {
     private static TextArea executionTextArea;
     private IController currentController;
     private ArrayList<Object> inputXLSdataCGM;
+
+    // Serialisation rules per "<base namespace>|<profile keyword>". They are the same for every
+    // file of a profile and for every task in a run, and working them out means parsing a bundled
+    // Turtle file, so it is done once. clearContext() drops them with the rest of the run.
+    private final Map<String, Set<Resource>> aboutRulesCache = new HashMap<>();
+    private final Map<String, Set<Resource>> enumRulesCache = new HashMap<>();
 
     private WizardContext() {
         currentWizardPane = 0;
@@ -223,165 +232,45 @@ public class WizardContext {
         PathMemory.remember("wizard.lastDir", lastOpenedDir);
     }
 
-    // Save instance model based
-    public void saveInstanceModel(Map<String, Object> saveProperties, String taskName, boolean saveWorkingDir) throws IOException {
-        File pathToSaveInstanceModel;
-        if (null != taskName) {
-            String folderName = taskName.replaceAll("[^a-zA-Z0-9]", " ");
-            File taskFolderPath;
-            if (selectedTasks.getLast().getName().equals(taskName)) {
-                taskFolderPath = new File(this.outputDirectory.toString() + "\\" + folderName);
-            }
-            else if (saveWorkingDir) {
-                taskFolderPath = new File(this.workingDirectory.toString() + "\\" + folderName);
-            }
-            else
-                return;
-            var success = taskFolderPath.mkdir();
-            pathToSaveInstanceModel = taskFolderPath;
+    /**
+     * Where a task writes its result, or null when it writes nothing.
+     * <p>
+     * The last task in the chain produces the run's result, so it goes to the output directory -
+     * and only there, even when "save result" is ticked for it, because the run's result is not an
+     * interim copy of anything. Any earlier task writes into its own folder under the working
+     * directory, and only when that tick asks for one.
+     * <p>
+     * The last task used to write into an output/&lt;task name&gt; subfolder while the chain wrote
+     * the same models again into the output root, so a finished run left two copies of its result
+     * in two places - and the second copy was written with a different set of rdf:about rules.
+     */
+    private File resolveSaveDirectory(String taskName, boolean saveToWorkingDir) throws IOException {
+        File directory;
+        if (isLastSelectedTask(taskName)) {
+            directory = outputDirectory;
+        } else if (saveToWorkingDir) {
+            directory = new File(workingDirectory, taskName.replaceAll("[^a-zA-Z0-9]", " "));
+        } else {
+            return null;
         }
-        else {
-            pathToSaveInstanceModel = outputDirectory;
+
+        // mkdir() used to be called without looking at what it returned, so an output folder that
+        // could not be created surfaced as a FileNotFoundException on the first model instead.
+        if (!directory.isDirectory() && !directory.mkdirs()) {
+            throw new IOException("Could not create the folder to save into: " + directory);
         }
+        return directory;
+    }
 
-        for (Map.Entry<String, BaseInstanceModel> entry : dataGeneratorModel.getBaseInstanceModel().entrySet()) {
-            //register custom format
-            CustomRDFFormat.RegisterCustomFormatWriters();
-
-            String filename = entry.getKey();
-            String showXmlDeclaration = saveProperties.get("showXmlDeclaration").toString();
-            String showDoctypeDeclaration = saveProperties.get("showDoctypeDeclaration").toString();
-            String tab = saveProperties.get("tab").toString();
-            String relativeURIs = saveProperties.get("relativeURIs").toString();
-            String showXmlEncoding = saveProperties.get("showXmlEncoding").toString();
-            String showXmlBaseDeclaration = saveProperties.get("showXmlBaseDeclaration").toString();
-            String instanceData = saveProperties.get("instanceData").toString();
-            String sortRDFprefix = saveProperties.get("sortRDFprefix").toString();
-            String xmlBase = this.dataGeneratorModel.getRdfsProfileVersion().getBaseNamespace();
-            RDFFormat rdfFormat = (RDFFormat) saveProperties.get("rdfFormat");
-            boolean useAboutRules = (boolean) saveProperties.get("useAboutRules");   //switch to trigger file chooser and adding the property
-            boolean useEnumRules = (boolean) saveProperties.get("useEnumRules");   //switch to trigger special treatment when Enum is referenced
-
-            //boolean dozip = (boolean) saveProperties.get("dozip");
-            boolean dozip = getSaveInZip();
-
-            //Set<Resource> rdfAboutList = null;
-            //Set<Resource> rdfEnumList = null;
-            Set<Resource> rdfAboutList = ModelManipulationFactory.LoadRDFAbout(xmlBase);
-            Set<Resource> rdfEnumList = ModelManipulationFactory.LoadRDFEnum(xmlBase);
-            boolean putHeaderOnTop = (boolean) saveProperties.get("putHeaderOnTop");
-            String headerClassResource=saveProperties.get("headerClassResource").toString();
-
-            //save file
-            OutputStream outXML = new FileOutputStream(pathToSaveInstanceModel.toString() + "\\" + filename);
-            ZipOutputStream outzip = null;
-            String sortRDF = "false";
-
-            if (outXML != null) {
-                try {
-                    if (rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY || rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN) {
-                        Map<String, Object> properties = new HashMap<>();
-                        properties.put("showXmlDeclaration", showXmlDeclaration);
-                        properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
-                        properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
-                        properties.put("sortRDF",sortRDF);
-                        properties.put("showXmlBaseDeclaration", showXmlBaseDeclaration);
-                        properties.put("instanceData", instanceData);
-                        properties.put("sortRDFprefix",sortRDFprefix);
-                        //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
-                        //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
-                        //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
-                        if (putHeaderOnTop) {
-                            properties.put("prettyTypes", new Resource[]{ResourceFactory.createResource(headerClassResource)});
-                        }
-                        properties.put("xmlbase", xmlBase);
-                        properties.put("tab", tab);
-                        properties.put("relativeURIs", relativeURIs);
-
-                        if (useAboutRules) {
-                            properties.put("aboutRules", rdfAboutList);
-                        }
-
-                        if (useEnumRules) {
-                            properties.put("enumRules", rdfEnumList);
-                        }
-
-
-                        // Put a properties object into the Context.
-                        Context cxt = new Context();
-                        cxt.set(SysRIOT.sysRdfWriterProperties, properties);
-
-
-                        org.apache.jena.riot.RDFWriter.create()
-                                .base(xmlBase)
-                                .format(rdfFormat)
-                                .context(cxt)
-                                .source(entry.getValue().getBaseInstanceModel())
-                                .output(outXML);
-
-                    } else {
-                        entry.getValue().getBaseInstanceModel().write(outXML, rdfFormat.getLang().getLabel().toUpperCase(), xmlBase);
-                    }
-                } finally {
-                    outXML.flush();
-                    outXML.close();
-
-
-                }
-                if (dozip) {
-                    String sourceFile = pathToSaveInstanceModel + "\\" + filename;
-                    FileOutputStream fos = new FileOutputStream(pathToSaveInstanceModel + "\\" + filename.replace(".xml", ".zip"));
-                    ZipOutputStream zipOut = new ZipOutputStream(fos);
-                    File fileToZip = new File(sourceFile);
-                    FileInputStream fis = new FileInputStream(fileToZip);
-                    ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-                    zipOut.putNextEntry(zipEntry);
-                    byte[] bytes = new byte[1024];
-                    int length;
-                    while ((length = fis.read(bytes)) >= 0) {
-                        zipOut.write(bytes, 0, length);
-                    }
-                    zipOut.close();
-                    fis.close();
-                    fos.close();
-                    //delete the xml
-                    File xmlTodelete = new File(pathToSaveInstanceModel + "\\" + filename);
-                    xmlTodelete.delete();
-                }
-            }
-        }
+    private boolean isLastSelectedTask(String taskName) {
+        return !selectedTasks.isEmpty() && selectedTasks.getLast().getName().equals(taskName);
     }
 
     // Save instance model based
     public void saveModel(Map<String, Object> saveProperties, Model model ,  String fileName,String taskName, boolean saveToWorkingDir) throws IOException {
-        File pathToSaveModel;
-        if (null != taskName) {
-            String folderName = taskName.replaceAll("[^a-zA-Z0-9]", " ");
-            File taskFolderPath;
-            if (selectedTasks.getLast().getName().equals(taskName)) {
-                taskFolderPath = new File(this.outputDirectory.toString() + File.separator + folderName);
-            }
-            else if (saveToWorkingDir) {
-                taskFolderPath = new File(this.workingDirectory.toString() + File.separator + folderName);
-            }
-            else
-                return;
-            var success = taskFolderPath.mkdir();
-
-            pathToSaveModel = taskFolderPath;
-        }
-        else {
-            pathToSaveModel = outputDirectory;
-        }
-
-        if (!pathToSaveModel.exists()) { // See if the folders exist, if not create them
-            boolean created = pathToSaveModel.mkdirs();
-            if (created) {
-                System.out.println("Folders created successfully at: " + pathToSaveModel.getAbsolutePath());
-            } else {
-                System.out.println("Failed to create folders.");
-            }
-
+        File pathToSaveModel = resolveSaveDirectory(taskName, saveToWorkingDir);
+        if (pathToSaveModel == null) {
+            return;
         }
 
 
@@ -489,64 +378,13 @@ public class WizardContext {
     public void saveModel(SelectedTask selectedTask, boolean saveToWorkingDir) throws IOException {
 
         Map<String,BaseInstanceModel> instanceModel = dataGeneratorModel.getBaseInstanceModel();
-        Map<String, Model> profileModelMap = dataGeneratorModel.getProfileModelMap();
         var saveProperties = dataGeneratorModel.getSaveProperties();
         String taskName = selectedTask.getName();
         TaskStateUpdater taskUpdater = new TaskStateUpdater();
-        //this is related to the save of the data
 
-        Set<Resource> rdfAboutList = new HashSet<>();
-        Set<Resource> rdfEnumList = new HashSet<>();
-        for (Map.Entry<String, BaseInstanceModel> entry : instanceModel.entrySet()) {
-            if ((boolean) saveProperties.get("useAboutRules")) {
-                if (profileModelMap.get(entry.getValue().getProfile()).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").hasNext()) {
-                    rdfAboutList = profileModelMap.get(entry.getValue().getProfile()).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"), "Description").toSet();
-                }
-                rdfAboutList.add(ResourceFactory.createResource(saveProperties.get("headerClassResource").toString()));
-            }
-
-            if ((boolean) saveProperties.get("useEnumRules")) {
-                for (ResIterator ii = profileModelMap.get(entry.getValue().getProfile()).listSubjectsWithProperty(ResourceFactory.createProperty("http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#stereotype"),
-                        ResourceFactory.createProperty("http://iec.ch/TC57/NonStandard/UML#enumeration")); ii.hasNext(); ) {
-                    Resource resItem = ii.next();
-                    for (ResIterator j = profileModelMap.get(entry.getValue().getProfile()).listSubjectsWithProperty(RDF.type, resItem); j.hasNext(); ) {
-                        Resource resItemProp = j.next();
-                        rdfEnumList.add(resItemProp);
-                    }
-                }
-            }
-
-            saveProperties.replace("filename", entry.getKey());
-        }
-
-        if (saveProperties.containsKey("rdfAboutList")) {
-            saveProperties.replace("rdfAboutList", rdfAboutList);
-        } else {
-            saveProperties.put("rdfAboutList", rdfAboutList);
-        }
-        if (saveProperties.containsKey("rdfEnumList")) {
-            saveProperties.replace("rdfEnumList", rdfEnumList);
-        } else {
-            saveProperties.put("rdfEnumList", rdfEnumList);
-        }
-
-        File pathToSaveInstanceModel;
-        if (null != taskName) {
-            String folderName = taskName.replaceAll("[^a-zA-Z0-9]", " ");
-            File taskFolderPath;
-            if (selectedTasks.getLast().getName().equals(taskName)) {
-                taskFolderPath = new File(this.outputDirectory.toString() + "\\" + folderName);
-            }
-            else if (saveToWorkingDir) {
-                taskFolderPath = new File(this.workingDirectory.toString() + "\\" + folderName);
-            }
-            else
-                return;
-            var success = taskFolderPath.mkdir();
-            pathToSaveInstanceModel = taskFolderPath;
-        }
-        else {
-            pathToSaveInstanceModel = outputDirectory;
+        File pathToSaveInstanceModel = resolveSaveDirectory(taskName, saveToWorkingDir);
+        if (pathToSaveInstanceModel == null) {
+            return;
         }
 
         int iCount = 0;
@@ -572,6 +410,19 @@ public class WizardContext {
             boolean dozip = getSaveInZip();
             boolean putHeaderOnTop = (boolean) saveProperties.get("putHeaderOnTop");
             String headerClassResource=saveProperties.get("headerClassResource").toString();
+
+            // The rdf:about and enum rules belong to the profile of the file being written, so they
+            // are worked out per file. They used to be accumulated into one pair of sets before the
+            // loop, and the rdf:about set was overwritten on each round rather than added to, so
+            // every file was written with whichever profile the map happened to yield last.
+            String profileKeyword = entry.getValue().getProfile();
+            Set<Resource> rdfAboutList = new HashSet<>();
+            if (useAboutRules) {
+                rdfAboutList.addAll(aboutRulesFor(xmlBase, profileKeyword));
+                // The model header is written with rdf:about whatever the profile says.
+                rdfAboutList.add(ResourceFactory.createResource(headerClassResource));
+            }
+            Set<Resource> rdfEnumList = useEnumRules ? enumRulesFor(xmlBase, profileKeyword) : Set.of();
 
             //save file
             OutputStream outXML = new FileOutputStream(pathToSaveInstanceModel.toString() + "\\" + filename);
@@ -722,7 +573,54 @@ public class WizardContext {
         }
     }
 
+    /**
+     * The classes the given profile writes with rdf:about.
+     * <p>
+     * Read from the bundled serialisation rules by profile keyword. For a base namespace those
+     * rules do not cover - a custom "Other CIM version" profile - it falls back to the classes the
+     * profile RDFS marks with the Description stereotype, which is where this used to be derived
+     * from and which matches the serialisation rules exactly for every bundled profile.
+     */
+    private Set<Resource> aboutRulesFor(String xmlBase, String profileKeyword) {
+        return aboutRulesCache.computeIfAbsent(xmlBase + "|" + profileKeyword, key -> {
+            try {
+                return ModelManipulationFactory.LoadRDFAbout(xmlBase, profileKeyword);
+            } catch (FileNotFoundException e) {
+                Model profile = dataGeneratorModel.getProfileModelMap().get(profileKeyword);
+                return profile == null
+                        ? Set.of()
+                        : profile.listSubjectsWithProperty(ResourceFactory.createProperty(STEREOTYPE_PROPERTY), "Description").toSet();
+            }
+        });
+    }
+
+    /**
+     * The enumeration values the given profile writes as a full URI rather than a relative one.
+     * Same source, and same fallback, as {@link #aboutRulesFor}.
+     */
+    private Set<Resource> enumRulesFor(String xmlBase, String profileKeyword) {
+        return enumRulesCache.computeIfAbsent(xmlBase + "|" + profileKeyword, key -> {
+            try {
+                return ModelManipulationFactory.LoadRDFEnum(xmlBase, profileKeyword);
+            } catch (FileNotFoundException e) {
+                Model profile = dataGeneratorModel.getProfileModelMap().get(profileKeyword);
+                if (profile == null) {
+                    return Set.of();
+                }
+                Set<Resource> values = new HashSet<>();
+                for (ResIterator classes = profile.listSubjectsWithProperty(
+                        ResourceFactory.createProperty(STEREOTYPE_PROPERTY),
+                        ResourceFactory.createProperty(UML_ENUMERATION)); classes.hasNext(); ) {
+                    values.addAll(profile.listSubjectsWithProperty(RDF.type, classes.next()).toSet());
+                }
+                return values;
+            }
+        });
+    }
+
     public void clearContext() {
+        aboutRulesCache.clear();
+        enumRulesCache.clear();
         selectedTasks = FXCollections.observableArrayList();
         this.initialiseTaskInputElements();
         this.initialiseWizardPanes();

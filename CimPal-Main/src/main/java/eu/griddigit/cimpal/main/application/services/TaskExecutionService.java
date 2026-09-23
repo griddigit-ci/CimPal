@@ -85,7 +85,9 @@ public class TaskExecutionService {
                     }
                 }
 
-                saveFinalResult(wizardContext);
+                // The last task writes the run's result into the output directory as part of its
+                // own save, so there is nothing left to write here.
+                report(wizardContext, "All tasks finished. The result is in the output directory.");
                 return null;
             }
         };
@@ -107,24 +109,6 @@ public class TaskExecutionService {
         taskThread.setDaemon(true);
         taskThread.start();
         return taskThread;
-    }
-
-    /**
-     * Writes the combined result of the whole chain into the output directory.
-     * <p>
-     * This write used to sit unguarded at the end of {@code call()}. Anything it threw - a missing
-     * serialisation file for a custom base namespace, an unwritable output folder - was captured
-     * by the Task and never surfaced, so the table showed the last task at "Completed / 100%"
-     * while nothing had been written.
-     */
-    private void saveFinalResult(WizardContext wizardContext) {
-        try {
-            wizardContext.saveInstanceModel(wizardContext.getDataGeneratorModel().getSaveProperties(), null, false);
-        } catch (Exception e) {
-            LOG.error("Writing the combined result to the output directory failed", e);
-            report(wizardContext, "All tasks finished, but writing the result to the output directory failed:");
-            report(wizardContext, describe(e));
-        }
     }
 
     private void skipRemaining(WizardContext wizardContext, List<SelectedTask> selectedTasks, int fromIndex) {

@@ -28,6 +28,8 @@ public class ChangeModelHeaderDescription implements ITask {
         this.status = "Queued";
         this.info = "0%";
         this.taskUpdater = new TaskStateUpdater();
+        // Matches the "save result" checkbox on this task's page, which starts out ticked.
+        this.saveResult = true;
     }
 
     @Override

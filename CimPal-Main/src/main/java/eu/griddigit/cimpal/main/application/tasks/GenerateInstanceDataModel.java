@@ -377,4 +377,30 @@ public class GenerateInstanceDataModel implements ITask {
     public boolean getSaveResult() {
         return this.saveResult;
     }
+
+    // Not offered in the wizard: the wiring this task needs was never finished.
+    //
+    //  - GenerateInstanceDataModelController.actionBrowseDataTemplate() looks the task up by
+    //    DeleteRequiredProperties.class, so browsing for a template throws instead of ever
+    //    setting templateDataFilePath.
+    //  - The format choice box offers "RDF Turtle (.ttl)", for which getSavePreferences()
+    //    returns an empty map, and its listener is registered after selectFirst(), so leaving
+    //    the default selection never reaches the task either.
+    //  - new BaseInstanceModel(sheetname) expects a CGMES five-part file name, so an ordinary
+    //    sheet name goes out of bounds.
+    //  - The saveProperties built in execute() are discarded: saveModel() reads its own from
+    //    DataGeneratorModel.
+    //
+    // Delete these two overrides to put the task back in the list once the above are fixed.
+    @Override
+    public boolean isAvailable() {
+        return false;
+    }
+
+    @Override
+    public String getUnavailableReason() {
+        return "Generating an instance data model from an Excel template is not finished: the "
+                + "selected template never reaches the task, and the generated models cannot be "
+                + "named or written.";
+    }
 }
