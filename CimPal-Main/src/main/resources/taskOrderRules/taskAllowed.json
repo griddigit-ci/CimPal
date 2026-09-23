@@ -1,4 +1,7 @@
 {
+  "CGMES 2.4 → 3.0: Convert IGM (multi-file selection)": [],
+  "CGMES 2.4 → 3.0: Convert Boundary dataset": [],
+  "Add Switching Devices": [],
   "Change Model Header Description": [],
   "Delete Required Properties": [],
   "Make Non-Conform Datatypes": [],

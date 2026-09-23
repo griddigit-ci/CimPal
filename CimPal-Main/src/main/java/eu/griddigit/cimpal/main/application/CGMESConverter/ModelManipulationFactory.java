@@ -100,7 +100,7 @@ public class ModelManipulationFactory {
         //saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
         saveProperties.put("useAboutRules", true);
         saveProperties.put("useEnumRules", true);
-        saveProperties.put("useFileDialog", true);
+        saveProperties.put("useFileDialog", false);
         saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
         saveProperties.put("instanceData", "true");
@@ -1134,7 +1134,7 @@ public class ModelManipulationFactory {
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         saveProperties.put("useAboutRules", true);
         saveProperties.put("useEnumRules", true);
-        saveProperties.put("useFileDialog", true);
+        saveProperties.put("useFileDialog", false);
         saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
         saveProperties.put("instanceData", "true");
@@ -1214,7 +1214,7 @@ public class ModelManipulationFactory {
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         saveProperties.put("useAboutRules", true);
         saveProperties.put("useEnumRules", true);
-        saveProperties.put("useFileDialog", true);
+        saveProperties.put("useFileDialog", false);
         saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
         saveProperties.put("instanceData", "true");
@@ -1330,7 +1330,7 @@ public class ModelManipulationFactory {
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         saveProperties.put("useAboutRules", true);
         saveProperties.put("useEnumRules", true);
-        saveProperties.put("useFileDialog", true);
+        saveProperties.put("useFileDialog", false);
         saveProperties.put("fileFolder", outputDirectory);
         saveProperties.put("dozip", false);
         saveProperties.put("instanceData", "true");
@@ -2146,7 +2146,7 @@ public class ModelManipulationFactory {
         saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
         saveProperties.put("useAboutRules", true);
         saveProperties.put("useEnumRules", true);
-        saveProperties.put("useFileDialog", true);
+        saveProperties.put("useFileDialog", false);
         saveProperties.put("fileFolder", wizardContext.getOutputDirectory());
         saveProperties.put("dozip", false);
         saveProperties.put("instanceData", "true");

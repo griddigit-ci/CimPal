@@ -4,7 +4,6 @@ import eu.griddigit.cimpal.main.application.services.TaskDependenciesEnforcer;
 import eu.griddigit.cimpal.main.application.tasks.*;
 import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
@@ -225,7 +224,7 @@ public class TaskSelectionController implements Initializable, IController {
                                         || taskClass == CgmesAddSwitchingDevices.class
                         );
 
-        if (fieldTextProfileIDG.getText().isEmpty()) {
+        if (fieldTextProfileIDG.getText().isEmpty() && !onlyNoNeedBaseInstanceTasks) {
             message = message + "RDF Profile files not selected! \n";
         }
 
