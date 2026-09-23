@@ -389,6 +389,11 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <a class="sub" href="#tab-task-wizard">Task Wizard</a>
   <a class="sub" href="#tab-validation-by-mapping">SHACL Validation</a>
 
+  <div class="group">Automation &amp; integration</div>
+  <a href="#automation-cli">Headless CLI</a>
+  <a href="#automation-http-mcp">HTTP and MCP APIs</a>
+  <a href="#automation-java-builders">Java builder API</a>
+
   <div class="group">Tools menu</div>
   <div class="subgroup">RDFS Profiles</div>
   <a class="sub" href="#tool-export-rdfs-descriptions">Export RDFS descriptions</a>
@@ -2269,6 +2274,162 @@ are written and run. See that tab for inputs and outputs.</p>
 </div>
 </details>
 
+<!-- ========================================================== AUTOMATION & INTEGRATION -->
+
+<h2 id="automation">Automation &amp; integration</h2>
+
+<details class="fn" id="automation-cli">
+<summary><span class="kind">Integration</span> Headless CLI</summary>
+<div class="fn-body">
+<h4>Purpose and availability</h4>
+<p>The headless CimPal CLI is for repeatable scripts and CI pipelines. It is a separate
+<code>CimPal-CLI.jar</code> distribution: the desktop application neither installs nor starts it.
+Use a CLI release compatible with your CimPal Core version. The historical CLI command set covers
+<code>validate</code>, <code>sparql</code>, <code>convert</code>, <code>compare</code>,
+<code>compare-instances</code>, <code>rdfs2shacl</code>, <code>excel2shacl</code>,
+<code>organize</code>, <code>gen-instances</code>, <code>manifest</code>, <code>run</code>,
+<code>serve</code> and <code>mcp</code>. Confirm the commands in your JAR:</p>
+<pre><code>java -jar CimPal-CLI.jar --help
+java -jar CimPal-CLI.jar validate --help</code></pre>
+<h4>JSON configuration</h4>
+<p>Every command accepts <code>--config file.json</code>. Keep the file alongside mappings and
+shapes so a run is reproducible. Relative paths resolve from the configuration file; command-line
+flags override JSON values. Keys beginning with <code>_comment</code> or <code>_note_</code> are
+ignored, allowing configurations to document themselves.</p>
+<pre><code>{
+  "workflow": "mapping",
+  "mappingCsv": "mapping.csv",
+  "modelsDir": "models",
+  "constraintsRoot": "constraints",
+  "outputDir": "out",
+  "datatypeMap": "CGMES30NC25",
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "workers": 0,
+  "format": "json"
+}</code></pre>
+<pre><code>java -jar CimPal-CLI.jar validate --config nightly.json --dry-run
+java -jar CimPal-CLI.jar validate --config nightly.json --max-results 10
+java -jar CimPal-CLI.jar validate --config nightly.json --format json &gt; summary.json</code></pre>
+<p><code>workers: 0</code> selects an automatic worker count. Progress goes to stderr and JSON
+results to stdout, so CI can capture a machine-readable summary separately.</p>
+<h4>Common examples</h4>
+<pre><code>java -jar CimPal-CLI.jar sparql ^
+  --models "C:\Data\EQ.xml,C:\Data\TP.xml" ^
+  --query "SELECT ?type (COUNT(*) AS ?n) { ?s a ?type } GROUP BY ?type" ^
+  --format json &gt; class-counts.json
+
+java -jar CimPal-CLI.jar convert ^
+  --input "C:\Data\Equipment.rdf" --output "C:\Data\Equipment.ttl" --sort
+
+java -jar CimPal-CLI.jar convert ^
+  --input-files "C:\Data\EQ.xml,C:\Data\TP.xml,C:\Data\SV.xml" ^
+  --output "C:\Data\combined.ttl"</code></pre>
+<h4>Exit codes</h4>
+<table class="io"><tr><th>Code</th><th>Meaning</th></tr>
+<tr><td>0</td><td>Completed successfully; validation found no violations.</td></tr>
+<tr><td>1</td><td>Completed successfully, but validation found violations or warnings.</td></tr>
+<tr><td>2</td><td>Invalid input or command configuration.</td></tr>
+<tr><td>3</td><td>Unexpected internal failure; retain stderr and the configuration for diagnosis.</td></tr></table>
+<p class="src">Historical source: separate CimPal CLI implementation and templates.</p>
+</div></details>
+
+<details class="fn" id="automation-http-mcp">
+<summary><span class="kind">Integration</span> Local HTTP and MCP APIs</summary>
+<div class="fn-body">
+<h4>HTTP daemon</h4>
+<p><code>serve</code> keeps Jena and the validation runtime warm for repeated local automation.
+It binds to <code>localhost:7474</code> by default. Retain localhost unless the service is protected
+appropriately; every supplied file path is read or written on the local machine.</p>
+<pre><code>java -jar CimPal-CLI.jar serve
+curl http://localhost:7474/health
+
+curl -s -X POST http://localhost:7474/sparql ^
+  -H "Content-Type: application/json" ^
+  -d "{\"models\":[\"C:/Data/EQ.xml\",\"C:/Data/TP.xml\"],\
+       \"query\":\"SELECT ?s ?type { ?s a ?type } LIMIT 10\",\
+       \"xmlBase\":\"http://iec.ch/TC57/CIM100\"}"</code></pre>
+<p>Available command endpoints are <code>POST /validate</code>, <code>/sparql</code>,
+<code>/convert</code>, <code>/compare</code>, <code>/compare-instances</code>,
+<code>/rdfs2shacl</code>, <code>/organize</code>, <code>/excel2shacl</code>,
+<code>/gen-instances</code> and <code>/manifest</code>. The JSON body uses the matching CLI
+configuration keys. <code>GET /health</code> and <code>GET /commands</code> are read-only;
+<code>POST /shutdown</code> stops the daemon. HTTP 200 means the command ran, 400 is invalid input,
+and 500 is an internal failure. The daemon processes one request at a time.</p>
+<h4>MCP tools</h4>
+<p><code>mcp</code> exposes the same operations as typed tools over standard input/output for an
+MCP-capable desktop agent. It is not an HTTP service. Configure its JVM heap for large CGMES models:</p>
+<pre><code>{
+  "mcpServers": {
+    "cimpal": {
+      "command": "java",
+      "args": ["-Xmx8g", "-jar", "C:/Tools/CimPal-CLI.jar", "mcp"]
+    }
+  }
+}</code></pre>
+<p>The tools are <code>validate</code>, <code>sparql</code>, <code>compare</code>,
+<code>compare_instances</code>, <code>convert</code>, <code>rdfs_to_shacl</code>,
+<code>organize</code>, <code>excel_to_shacl</code>, <code>gen_instances</code> and
+<code>manifest</code>. Each accepts the same JSON fields as the CLI configuration. Use absolute
+paths and start the service only for trusted local automation.</p>
+<p class="src">Historical source: CLI <code>serve</code> and <code>mcp</code> commands.</p>
+</div></details>
+
+<details class="fn" id="automation-java-builders">
+<summary><span class="kind">Integration</span> Java builder API for SHACL validation</summary>
+<div class="fn-body">
+<h4>Single dataset validation</h4>
+<p>Applications embedding <code>CimPal-Core</code> can use immutable option builders directly.
+This is current Core functionality: build options, create a validator and call <code>validate()</code>.
+The CGMES presets supply the datatype map and XML base used by the GUI.</p>
+<pre><code>import eu.griddigit.cimpal.core.models.SHACLValidationReport;
+import eu.griddigit.cimpal.core.presets.SHACLValidationOptionsPresets;
+import eu.griddigit.cimpal.core.utils.SHACLValidator;
+import java.nio.file.Path;
+
+SHACLValidationReport report = new SHACLValidator(
+    SHACLValidationOptionsPresets.cgmes30()
+        .dataFiles(Path.of("C:/Data/EQ.xml"), Path.of("C:/Data/TP.xml"))
+        .shapeFiles(Path.of("C:/Data/constraints/Equipment.ttl"))
+        .maxResultsPerConstraint(20)
+        .workers(4)
+        .build()
+).validate();
+
+if (!report.conforms()) {
+    System.out.println(report.getResults().size());
+    report.getReportModel().write(System.out, "TURTLE");
+}</code></pre>
+<p>Use <code>cgmes24()</code> for CGMES 2.4.15. Builders also accept in-memory
+<code>dataModel(...)</code> and <code>shapesModel(...)</code>, a custom datatype map or map file,
+and <code>constraintsRoot(...)</code> for relative <code>owl:imports</code>. A non-conformant
+report is a normal result; catch <code>IOException</code> for unreadable inputs or failed imports.</p>
+<h4>Mapping batch validation</h4>
+<pre><code>import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.presets.MappingValidationOptionsPresets;
+import eu.griddigit.cimpal.core.utils.MappingValidator;
+import java.nio.file.Path;
+
+MappingValidationSummary summary = new MappingValidator(
+    MappingValidationOptionsPresets.cgmes30()
+        .mappingCsv(Path.of("C:/Run/mapping.csv"))
+        .modelsInput(Path.of("C:/Run/models"))
+        .constraintsRoot(Path.of("C:/Run/constraints"))
+        .outputDir(Path.of("C:/Run/reports"))
+        .threads(4)
+        .exportTurtleReports(true)
+        .build()
+).validate();
+
+if (summary.hasViolations()) throw new IllegalStateException("Validation failed");</code></pre>
+<p>Add <code>.timestamped(true)</code> for timestamp-grouped runs and
+<code>.previousComparisonCsv(...)</code> to compare against an earlier report. Choose worker counts
+with available heap in mind: each worker can hold a substantial RDF graph. Call
+<code>ValidationTools.clearRemoteCaches()</code> only when deliberately refreshing remote shape
+imports; imports are cached for the Java process.</p>
+<p class="src">Source: <code>SHACLValidationOptions</code>, <code>SHACLValidator</code>,
+<code>MappingValidationOptions</code> and <code>MappingValidator</code>.</p>
+</div></details>
+
 <!-- ========================================================== PREFERENCES -->
 
 <h2 id="preferences">Settings</h2>
@@ -2314,6 +2475,11 @@ are stored per user and persist between sessions.</p>
         fresh installation starts with; an installation that has already had a theme chosen keeps
         that choice. The selection is applied immediately as a preview &mdash; press <em>OK</em> to
         keep it, <em>Cancel</em> to revert.</td></tr>
+<tr><td>RDF loading and conversion performance</td><td>Application &#9656; RDF loading and conversion</td>
+    <td><em>Balanced</em>, the default, uses up to four workers for independent Visualise
+        parsing and multi-file Convert jobs. <em>High performance</em> uses all available
+        processors except one. Choose it for large batches on a machine with sufficient memory;
+        it can make the desktop less responsive while several large RDF models are held in memory.</td></tr>
 </table>
 
 <h4>Outputs</h4>
