@@ -5,16 +5,19 @@ import eu.griddigit.cimpal.core.models.RDFConvertOptions;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.RdfLoadingPerformance;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.application.Platform;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.RDFWriterRegistry;
 
 import java.io.*;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.*;
 
 import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
 
@@ -100,21 +103,50 @@ public class RDFSimpleConvertController implements Initializable {
             File folder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom("Select output folder", "tab.rdfConvert.output");
             if (folder == null) return;
             Set<String> usedNames = new HashSet<>();
-            for (File source : sourceFiles) convert(source, target, new FileOutputStream(uniqueOutput(folder, baseName(source.getName()) + target.extension(), usedNames)));
+            List<ConversionJob> jobs = new ArrayList<>();
+            for (File source : sourceFiles) jobs.add(new ConversionJob(source, uniqueOutput(folder, baseName(source.getName()) + target.extension(), usedNames)));
+            convertBatch(jobs, target, settings());
+            return;
         }
         if (mainController != null) mainController.setProgressBarValue(1);
     }
 
     private void convert(File source, TargetFormat target, OutputStream output) throws IOException {
-        String base = frdfConvertXmlBase.getText().isBlank() ? "" : frdfConvertXmlBase.getText();
-        RDFConvertOptions.Builder builder = RDFConvertOptions.builder().sourceFile(source).sourceFormat(RDFConvertOptions.RDFFormats.RDFXML).targetFormat(RDFConvertOptions.RDFFormats.RDFXML).xmlBase(base)
-                .showXmlDeclaration(Boolean.toString(fcbShowXMLDeclaration.isSelected())).showDoctypeDeclaration(Boolean.toString(fcbShowDoctypeDeclaration.isSelected())).tabCharacter(fRDFconvertTab.getText())
-                .relativeURIs(fcbRelativeURIs.getValue() == null ? "" : fcbRelativeURIs.getValue()).sortRDF(Boolean.toString(fcbSortRDF.isSelected()))
-                .rdfSortOptions(Boolean.toString("Sorting by prefix".equals(fcbRDFsortOptions.getValue()))).stripPrefixes(fcbStripPrefixes.isSelected()).convertInstanceData(Boolean.toString(fcbRDFconvertInstanceData.isSelected()))
-                .jsonLdContext(jsonLdContextTextField.getText()).jsonLdUseNativeTypes(jsonLdNativeTypesCheckBox.isSelected()).jsonLdUseRdfType(jsonLdRdfTypeCheckBox.isSelected())
-                .jsonLdCompactArrays(jsonLdCompactArraysCheckBox.isSelected()).jsonLdOrdered(jsonLdOrderedCheckBox.isSelected());
+        convert(source, target, output, settings());
+    }
+
+    private void convert(File source, TargetFormat target, OutputStream output, ConversionSettings settings) throws IOException {
+        RDFConvertOptions.Builder builder = RDFConvertOptions.builder().sourceFile(source).sourceFormat(RDFConvertOptions.RDFFormats.RDFXML).targetFormat(RDFConvertOptions.RDFFormats.RDFXML).xmlBase(settings.base())
+                .showXmlDeclaration(Boolean.toString(settings.showXmlDeclaration())).showDoctypeDeclaration(Boolean.toString(settings.showDoctypeDeclaration())).tabCharacter(settings.tab())
+                .relativeURIs(settings.relativeUris()).sortRDF(Boolean.toString(settings.sort())).rdfSortOptions(Boolean.toString(settings.sortByPrefix()))
+                .stripPrefixes(settings.stripPrefixes()).convertInstanceData(Boolean.toString(settings.instanceData()))
+                .jsonLdContext(settings.jsonLdContext()).jsonLdUseNativeTypes(settings.jsonLdNativeTypes()).jsonLdUseRdfType(settings.jsonLdRdfType())
+                .jsonLdCompactArrays(settings.jsonLdCompactArrays()).jsonLdOrdered(settings.jsonLdOrdered());
         if (target.jenaFormat() != null) builder.jenaTargetFormat(target.jenaFormat()).rdfXmlFormat(RDFFormat.RDFXML_PLAIN); else builder.rdfXmlFormat(target.cimXmlFormat());
         RDFConverter converter = new RDFConverter(builder.build()); converter.convert(); converter.writeConvertedModel(output);
+    }
+
+    private ConversionSettings settings() {
+        return new ConversionSettings(frdfConvertXmlBase.getText().isBlank() ? "" : frdfConvertXmlBase.getText(), fcbShowXMLDeclaration.isSelected(), fcbShowDoctypeDeclaration.isSelected(), fRDFconvertTab.getText(), fcbRelativeURIs.getValue() == null ? "" : fcbRelativeURIs.getValue(), fcbSortRDF.isSelected(), "Sorting by prefix".equals(fcbRDFsortOptions.getValue()), fcbStripPrefixes.isSelected(), fcbRDFconvertInstanceData.isSelected(), jsonLdContextTextField.getText(), jsonLdNativeTypesCheckBox.isSelected(), jsonLdRdfTypeCheckBox.isSelected(), jsonLdCompactArraysCheckBox.isSelected(), jsonLdOrderedCheckBox.isSelected());
+    }
+
+    private void convertBatch(List<ConversionJob> jobs, TargetFormat target, ConversionSettings settings) {
+        int workers = RdfLoadingPerformance.workerCount(jobs.size());
+        Thread batchThread = new Thread(() -> {
+            ExecutorService executor = Executors.newFixedThreadPool(workers);
+            try {
+                List<Future<?>> futures = new ArrayList<>();
+                for (ConversionJob job : jobs) futures.add(executor.submit(() -> { try (OutputStream output = new FileOutputStream(job.output())) { convert(job.source(), target, output, settings); } return null; }));
+                for (Future<?> future : futures) future.get();
+                Platform.runLater(() -> { if (mainController != null) mainController.setProgressBarValue(1); });
+            } catch (Exception e) {
+                Platform.runLater(() -> GUIhelper.showUserFriendlyError("Batch conversion failed", "One or more RDF files could not be converted. Review the technical details.", e));
+            } finally {
+                executor.shutdown();
+            }
+        }, "rdf-convert-batch");
+        batchThread.setDaemon(true);
+        batchThread.start();
     }
 
     private File uniqueOutput(File folder, String requestedName, Set<String> usedNames) {
@@ -135,4 +167,6 @@ public class RDFSimpleConvertController implements Initializable {
         if (cimXml) { fcbRelativeURIs.setValue("same-document"); fcbRDFsortOptions.setValue("Sorting by local name"); }
     }
     private record TargetFormat(String label, String extension, RDFFormat jenaFormat, RDFFormat cimXmlFormat) { }
+    private record ConversionJob(File source, File output) { }
+    private record ConversionSettings(String base, boolean showXmlDeclaration, boolean showDoctypeDeclaration, String tab, String relativeUris, boolean sort, boolean sortByPrefix, boolean stripPrefixes, boolean instanceData, String jsonLdContext, boolean jsonLdNativeTypes, boolean jsonLdRdfType, boolean jsonLdCompactArrays, boolean jsonLdOrdered) { }
 }

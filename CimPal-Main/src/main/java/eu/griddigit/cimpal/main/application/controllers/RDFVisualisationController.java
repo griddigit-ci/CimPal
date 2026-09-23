@@ -13,6 +13,7 @@ import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.RdfGraphView;
 import eu.griddigit.cimpal.main.gui.PowsyblBridge;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
+import eu.griddigit.cimpal.main.gui.RdfLoadingPerformance;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.collections.FXCollections;
@@ -93,6 +94,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -543,23 +549,31 @@ public class RDFVisualisationController implements Initializable {
 
         Thread loader = new Thread(() -> {
             List<GraphEntry> loaded = new ArrayList<>();
-            List<String> problems = new ArrayList<>();
-
-            for (File file : selection) {
-                try {
-                    if (hasExtension(file.getName(), "zip")) {
-                        loaded.addAll(readArchive(file, problems));
-                    } else {
-                        GraphEntry entry = readPlainFile(file);
-                        if (entry == null) {
-                            problems.add(file.getName() + ": unrecognised RDF syntax for this extension");
-                        } else {
-                            loaded.add(entry);
-                        }
-                    }
-                } catch (Exception e) {
-                    problems.add(file.getName() + ": " + describe(e));
+            Collection<String> problems = new ConcurrentLinkedQueue<>();
+            int workers = RdfLoadingPerformance.workerCount(selection.size());
+            ExecutorService executor = Executors.newFixedThreadPool(workers, runnable -> {
+                Thread thread = new Thread(runnable, "rdf-visualisation-parser");
+                thread.setDaemon(true);
+                return thread;
+            });
+            try {
+                // A task owns its Model while parsing. Results are collected in selection order,
+                // avoiding concurrent writes to a Jena Model and keeping the browser stable.
+                List<Callable<List<GraphEntry>>> jobs = new ArrayList<>();
+                for (File file : selection) {
+                    jobs.addAll(visualisationJobs(file, problems));
                 }
+                List<Future<List<GraphEntry>>> futures = new ArrayList<>();
+                for (Callable<List<GraphEntry>> job : jobs) futures.add(executor.submit(job));
+                for (Future<List<GraphEntry>> future : futures) {
+                    try {
+                        loaded.addAll(future.get());
+                    } catch (Exception e) {
+                        problems.add("Input could not be read: " + describe(e));
+                    }
+                }
+            } finally {
+                executor.shutdown();
             }
 
             Platform.runLater(() -> {
@@ -597,6 +611,37 @@ public class RDFVisualisationController implements Initializable {
         loader.start();
     }
 
+    private List<Callable<List<GraphEntry>>> visualisationJobs(File file, Collection<String> problems) {
+        if (!hasExtension(file.getName(), "zip")) return List.of(() -> readVisualisationFile(file, problems));
+        List<Callable<List<GraphEntry>>> jobs = new ArrayList<>();
+        try (ZipFile zip = new ZipFile(file)) {
+            int seen = 0;
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory()) continue;
+                if (++seen > MAX_ZIP_ENTRIES) { problems.add(file.getName() + ": archive exceeds the entry limit (" + MAX_ZIP_ENTRIES + "); remaining entries skipped"); break; }
+                if (langFor(entry.getName()) == null) continue;
+                String entryName = entry.getName();
+                jobs.add(() -> readArchiveEntry(file, entryName, problems));
+            }
+            if (jobs.isEmpty()) problems.add(file.getName() + ": the archive contains no recognised RDF entries");
+        } catch (IOException e) { problems.add(file.getName() + ": " + describe(e)); }
+        return jobs;
+    }
+
+    private List<GraphEntry> readVisualisationFile(File file, Collection<String> problems) {
+        try {
+            if (hasExtension(file.getName(), "zip")) return readArchive(file, problems);
+            GraphEntry entry = readPlainFile(file);
+            if (entry == null) problems.add(file.getName() + ": unrecognised RDF syntax for this extension");
+            return entry == null ? List.of() : List.of(entry);
+        } catch (Exception e) {
+            problems.add(file.getName() + ": " + describe(e));
+            return List.of();
+        }
+    }
+
     private GraphEntry readPlainFile(File file) throws IOException {
         Lang lang = langFor(file.getName());
         if (lang == null) {
@@ -611,12 +656,27 @@ public class RDFVisualisationController implements Initializable {
         return new GraphEntry(file.getName(), model, documentBase(model, parseBase), file.toPath());
     }
 
+    private List<GraphEntry> readArchiveEntry(File archive, String entryName, Collection<String> problems) {
+        String graphName = archive.getName() + " ! " + entryName;
+        Lang lang = langFor(entryName);
+        String base = archive.toURI() + "!/" + entryName;
+        String parseBase = lang == Lang.RDFXML ? selectedBaseUri() : base;
+        try (ZipFile zip = new ZipFile(archive); InputStream in = zip.getInputStream(zip.getEntry(entryName))) {
+            Model model = ModelFactory.createDefaultModel();
+            RDFDataMgr.read(model, in, parseBase, lang);
+            return List.of(new GraphEntry(graphName, model, documentBase(model, parseBase), archive.toPath()));
+        } catch (Exception e) {
+            problems.add(graphName + ": " + describe(e));
+            return List.of();
+        }
+    }
+
     /**
      * Reads every RDF entry of an archive as its own named graph. Entries are parsed from the
      * archive stream and never written to disk, so no path traversal is possible here; the entry
      * count is still bounded because the archive is third-party input.
      */
-    private List<GraphEntry> readArchive(File file, List<String> problems) throws IOException {
+    private List<GraphEntry> readArchive(File file, Collection<String> problems) throws IOException {
         List<GraphEntry> loaded = new ArrayList<>();
 
         try (ZipFile zip = new ZipFile(file)) {

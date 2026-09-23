@@ -20,6 +20,7 @@ import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ChoiceBox;
 import javafx.concurrent.Task;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
@@ -81,6 +82,10 @@ public class PreferencesController implements Initializable {
     private TextField fAiValidationMaxResults;
     @FXML
     private TextField fAiValidationMaxProperties;
+    @FXML
+    private ChoiceBox<String> cbRdfLoadingPerformance;
+    @FXML
+    private Label helpRdfLoadingPerformance;
 
     /** The theme that was active when the dialog opened, restored if the user cancels. */
     private ThemeManager.Theme themeOnOpen;
@@ -102,6 +107,11 @@ public class PreferencesController implements Initializable {
                         + "Choose Fast, Normal, or Complete beside the model in the AI Assistant tab. "
                         + "Higher values allow longer SPARQL/SHACL drafts but take longer on a CPU-only model. "
                         + "Allowed range: 16 to 8,192.");
+        cbRdfLoadingPerformance.getItems().setAll("Balanced", "High performance");
+        GUIhelper.installHelpTooltip(helpRdfLoadingPerformance,
+                "Balanced uses up to four concurrent RDF parsing or batch-conversion workers. "
+                        + "High performance uses all available processors except one. It can load batches faster, "
+                        + "but uses more CPU and memory while large RDF models are being parsed.");
 
         themeOnOpen = ThemeManager.get().getCurrent();
 
@@ -128,6 +138,7 @@ public class PreferencesController implements Initializable {
         MainController.prefs.put("uriEU", furiEU.getText());
         MainController.prefs.put("prefixOther", fprefixOther.getText());
         MainController.prefs.put("uriOther", furiOther.getText());
+        MainController.prefs.put("rdf.loading.performance", cbRdfLoadingPerformance.getValue());
         try {
             MainController.prefs.putInt("ai.fastResponseTokens", parseTokenLimit(fAiFastTokens, "Fast"));
             MainController.prefs.putInt("ai.normalResponseTokens", parseTokenLimit(fAiNormalTokens, "Normal"));
@@ -251,6 +262,7 @@ public class PreferencesController implements Initializable {
         MainController.prefs.putBoolean("ai.knowledge.refreshOnStartup", true);
         MainController.prefs.putInt("ai.validation.maxResults", 10);
         MainController.prefs.putInt("ai.validation.maxProperties", 20);
+        MainController.prefs.put("rdf.loading.performance", "Balanced");
 
     }
 
@@ -287,6 +299,7 @@ public class PreferencesController implements Initializable {
         lblAiKnowledgeStatus.setText("");
         fAiValidationMaxResults.setText(String.valueOf(MainController.prefs.getInt("ai.validation.maxResults", 10)));
         fAiValidationMaxProperties.setText(String.valueOf(MainController.prefs.getInt("ai.validation.maxProperties", 20)));
+        cbRdfLoadingPerformance.setValue(MainController.prefs.get("rdf.loading.performance", "Balanced"));
 
         showRememberedLocationCount();
     }

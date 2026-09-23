@@ -9,6 +9,7 @@ import eu.griddigit.cimpal.main.util.ModelFactory;
 import eu.griddigit.cimpal.main.workspace.WorkspaceArtifactRegistry;
 import eu.griddigit.cimpal.main.workspace.WorkspaceRdfStore;
 import javafx.event.ActionEvent;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
@@ -323,76 +324,30 @@ public class SparqlQueryTabController implements Initializable {
             return;
         }
 
+        if (selectedModelFiles.isEmpty() && selectedWorkspaceArtifactKeys.isEmpty()) { setStatus("Select model files or choose an in-memory workspace model first."); return; }
+        if (!selectedWorkspaceArtifactKeys.isEmpty() && selectedWorkspaceArtifactKeys.stream().anyMatch(key -> !WorkspaceRdfStore.isLoaded(key))) { selectedWorkspaceArtifactKeys.clear(); setStatus("A selected workspace model was released or is stale. Choose it again from the ◫ workspace picker."); return; }
+        List<File> files = new ArrayList<>(selectedModelFiles); List<String> workspaceKeys = new ArrayList<>(selectedWorkspaceArtifactKeys); String base = selectedBaseUri();
+        setProgressBar(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS); setStatus(workspaceKeys.isEmpty() ? "Loading RDF models..." : "Using in-memory workspace model(s)...");
+        Task<Model> loadTask = new Task<>() { @Override protected Model call() throws Exception { return workspaceKeys.isEmpty() ? eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(files, base) : WorkspaceRdfStore.copyAll(workspaceKeys); } };
+        loadTask.setOnSucceeded(event -> continueWithLoadedModel(queryText, loadTask.getValue(), files));
+        loadTask.setOnFailed(event -> { resetProgressBar(); setStatus("SPARQL model loading failed."); GUIhelper.showUserFriendlyError("SPARQL model loading failed", "The selected RDF models could not be loaded. Review the technical details.", loadTask.getException()); });
+        Thread thread = new Thread(loadTask, "sparql-model-load"); thread.setDaemon(true); thread.start();
+    }
+
+    private void continueWithLoadedModel(String queryText, Model combinedModel, List<File> files) {
         try {
-            if (selectedModelFiles.isEmpty() && selectedWorkspaceArtifactKeys.isEmpty()) {
-                setStatus("Select model files or choose an in-memory workspace model first.");
-                return;
-            }
-            if (!selectedWorkspaceArtifactKeys.isEmpty()
-                    && selectedWorkspaceArtifactKeys.stream().anyMatch(key -> !WorkspaceRdfStore.isLoaded(key))) {
-                selectedWorkspaceArtifactKeys.clear();
-                setStatus("A selected workspace model was released or is stale. Choose it again from the ◫ workspace picker.");
-                return;
-            }
-
-            setProgressBar(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
-            setStatus(selectedWorkspaceArtifactKeys.isEmpty() ? "Loading RDF models..." : "Using in-memory workspace model(s)...");
-            Model combinedModel;
-            if (selectedWorkspaceArtifactKeys.isEmpty()) {
-                // Preserve the established file-loading path; caching must never make a query unavailable.
-                combinedModel = eu.griddigit.cimpal.core.utils.ModelFactory.loadCombinedModelForSparql(selectedModelFiles, selectedBaseUri());
-                if (combinedModel != null && !combinedModel.isEmpty()) {
-                    try {
-                        WorkspaceRdfStore.publishModel("sparql-selected-input", WorkspaceArtifactRegistry.Type.INSTANCE_DATA,
-                                "SPARQL / AI selected input", "SPARQL Query", "loaded in shared memory", combinedModel,
-                                selectedModelFiles.stream().map(File::getAbsolutePath).toList());
-                    } catch (RuntimeException ignored) {
-                        // The query still runs when the optional workspace cache cannot be updated.
-                    }
-                }
-            } else {
-                combinedModel = WorkspaceRdfStore.copyAll(selectedWorkspaceArtifactKeys);
-            }
-            if (combinedModel == null || combinedModel.isEmpty()) {
-                throw new IllegalStateException("Failed to load RDF models from the selected files.");
-            }
-
-            if (isUpdate(queryText)) {
-                runUpdate(queryText, combinedModel);
-                completeProgressBar();
-                return;
-            }
-
+            if (combinedModel == null || combinedModel.isEmpty()) throw new IllegalStateException("Failed to load RDF models from the selected files.");
+            if (!files.isEmpty()) try { WorkspaceRdfStore.publishModel("sparql-selected-input", WorkspaceArtifactRegistry.Type.INSTANCE_DATA, "SPARQL / AI selected input", "SPARQL Query", "loaded in shared memory", combinedModel, files.stream().map(File::getAbsolutePath).toList()); } catch (RuntimeException ignored) { }
+            if (isUpdate(queryText)) { runUpdate(queryText, combinedModel); completeProgressBar(); return; }
             org.apache.jena.query.Query parsedQuery = QueryFactory.create(queryText);
             if (parsedQuery.isSelectType() && parsedQuery.getLimit() < 0 && combinedModel.size() > 100_000) {
-                Alert warning = new Alert(Alert.AlertType.CONFIRMATION,
-                        "This SELECT has no LIMIT and will run against " + combinedModel.size() + " triples. It may return a very large result set.\n\nRun it anyway?",
-                        ButtonType.OK, ButtonType.CANCEL);
-                warning.setTitle("Large SPARQL result risk");
-                warning.setHeaderText("Consider adding LIMIT before running");
-                if (warning.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
-                    resetProgressBar();
-                    setStatus("SPARQL query cancelled before execution.");
-                    return;
-                }
+                Alert warning = new Alert(Alert.AlertType.CONFIRMATION, "This SELECT has no LIMIT and will run against " + combinedModel.size() + " triples. It may return a very large result set.\n\nRun it anyway?", ButtonType.OK, ButtonType.CANCEL);
+                warning.setTitle("Large SPARQL result risk"); warning.setHeaderText("Consider adding LIMIT before running");
+                if (warning.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) { resetProgressBar(); setStatus("SPARQL query cancelled before execution."); return; }
             }
-            setStatus("Running SPARQL query...");
-            SparqlTools.QueryResults results = SparqlTools.executeSparqlQuery(queryText, combinedModel);
-
-            setStatus("SPARQL query completed: " + results.rows.size() + " result(s).");
-            completeProgressBar();
-
-            // Open results window
-            showResultsWindow(results);
-        } catch (Exception e) {
-            resetProgressBar();
-            setStatus("SPARQL query failed.");
-            GUIhelper.showUserFriendlyError(
-                    "SPARQL query failed",
-                    "The SPARQL query could not be run. Review the details and send them to support if needed.",
-                    e
-            );
-        }
+            setStatus("Running SPARQL query..."); SparqlTools.QueryResults results = SparqlTools.executeSparqlQuery(queryText, combinedModel);
+            setStatus("SPARQL query completed: " + results.rows.size() + " result(s)."); completeProgressBar(); showResultsWindow(results);
+        } catch (Exception e) { resetProgressBar(); setStatus("SPARQL query failed."); GUIhelper.showUserFriendlyError("SPARQL query failed", "The SPARQL query could not be run. Review the details and send them to support if needed.", e); }
     }
 
     private void showResultsWindow(SparqlTools.QueryResults results) {
