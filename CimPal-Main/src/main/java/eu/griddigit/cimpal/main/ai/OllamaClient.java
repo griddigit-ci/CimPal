@@ -136,7 +136,9 @@ public final class OllamaClient {
         }
         URI endpointUri = URI.create(normalized);
         String host = endpointUri.getHost();
-        if (host == null || !(host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.equals("::1"))) {
+        if (!("http".equalsIgnoreCase(endpointUri.getScheme()) || "https".equalsIgnoreCase(endpointUri.getScheme()))
+                || endpointUri.getUserInfo() != null || host == null
+                || !(host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.equals("::1"))) {
             throw new IllegalArgumentException("The initial AI release accepts local Ollama addresses only.");
         }
         return URI.create(normalized + path);
