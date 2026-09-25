@@ -49,8 +49,11 @@ mvn -B -pl CimPal-CLI -am package -DskipTests    # → CimPal-CLI/target/CimPal-
 mvn -B -pl CimPal-Main -am package -DskipTests   # → CimPal-Main/target/CimPal.jar + CimPal.exe
 mvn -pl CimPal-Main exec:java                    # launch the GUI (after `mvn install -DskipTests`, so sibling modules resolve)
 mvn -Psecurity-scan verify                       # OWASP dependency check (slow; fails on CVSS ≥ 7)
+mvn -B test -DexcludedGroups=gui                 # skip display-dependent JavaFX tests (@Tag("gui")) on headless machines
 java -jar CimPal-CLI/target/CimPal-CLI.jar <subcommand> --help
 ```
+
+CI (`.github/workflows/ci.yml`) runs `mvn -B verify` on Windows and Ubuntu (under Xvfb) for every push and PR to `devel` and `master`. Keep both green, because Ubuntu catches case mismatches that Windows hides.
 
 Core tests run on the classpath (`useModulePath=false`) so they can reach package-private members — don't add test-only `opens` to `module-info.java`.
 

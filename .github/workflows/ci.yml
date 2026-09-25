@@ -1,0 +1,92 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+name: CI
+
+on:
+  push:
+    branches: [devel, master]
+  pull_request:
+    branches: [devel, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Ubuntu runs under Xvfb so the JavaFX test (tagged "gui") gets a display instead of being skipped.
+      - name: Build and test (Windows)
+        if: runner.os == 'Windows'
+        run: mvn -B verify
+
+      - name: Build and test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a mvn -B verify
+
+      - name: Test summary
+        if: always()
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then py=python; else py=python3; fi
+          "$py" - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import glob, os, xml.etree.ElementTree as ET
+          rows, failed = {}, []
+          for path in sorted(glob.glob("**/target/surefire-reports/TEST-*.xml", recursive=True)):
+              suite = ET.parse(path).getroot()
+              module = path.replace(os.sep, "/").split("/")[0]
+              r = rows.setdefault(module, [0, 0, 0, 0])
+              for i, key in enumerate(("tests", "failures", "errors", "skipped")):
+                  r[i] += int(suite.get(key, 0))
+              for case in suite.iter("testcase"):
+                  if case.find("failure") is not None or case.find("error") is not None:
+                      failed.append(f"{case.get('classname')}.{case.get('name')}")
+          print(f"### Tests ({os.environ.get('RUNNER_OS', '')})\n")
+          if not rows:
+              print("No surefire reports found.")
+          else:
+              print("| Module | Tests | Failures | Errors | Skipped |\n| --- | ---: | ---: | ---: | ---: |")
+              total = [0, 0, 0, 0]
+              for module, r in rows.items():
+                  total = [a + b for a, b in zip(total, r)]
+                  print(f"| {module} | " + " | ".join(map(str, r)) + " |")
+              print("| **Total** | " + " | ".join(f"**{n}**" for n in total) + " |")
+          if failed:
+              print("\n**Failing tests:**\n")
+              for name in failed:
+                  print(f"- `{name}`")
+          EOF
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-reports-${{ matrix.os }}
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: warn
