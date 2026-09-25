@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `rdfs2shacl` — RDFS to SHACL Generation Command
 
 Generates SHACL shape files from RDFS CIM profile definitions exported by cimsyntaxgen or cimcontextor. Takes `.rdf` profile files as input and produces `.ttl` shape files.

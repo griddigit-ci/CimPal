@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `gen-instances` — Instance Data Generation Command
 
 Generates CIM/RDF instance data (RDF/XML) from a CimPal Excel template. The Excel template defines the class instances, their properties, and their relationships using the CimPal "Advanced template" format. The output is a CGMES-compatible RDF/XML file.

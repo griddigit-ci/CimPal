@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `run` — Pipeline Command
 
 Executes a declarative JSON pipeline of CimPal commands. Steps run sequentially, each using the full option set of the named subcommand. The pipeline stops on error by default but continues through validation violations.

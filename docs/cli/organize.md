@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `organize` — SHACL Organizer Command
 
 Reorganizes SHACL constraint files according to an Excel mapping template. Splits constraints from one or more input `.ttl` files into multiple output files, each with a defined structure, namespace, and canonical ordering.

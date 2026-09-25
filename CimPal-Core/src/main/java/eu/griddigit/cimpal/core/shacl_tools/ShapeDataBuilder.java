@@ -1,6 +1,9 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
+/*
  * Adapted for Core (no JavaFX) from eu.griddigit.cimpal.main.core.ShaclTools.
  */
 package eu.griddigit.cimpal.core.shacl_tools;

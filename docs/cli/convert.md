@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `convert` — RDF Format Conversion Command
 
 Converts RDF model files between RDF/XML, Turtle, and JSON-LD formats. Also supports merging multiple files into one (model union) and various RDF/XML sub-format options for CGMES-specific serialisation.

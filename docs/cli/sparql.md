@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `sparql` — SPARQL Query Command
 
 Executes a SPARQL SELECT query against one or more RDF model files. Outputs results as a text table, JSON, CSV, or an Excel file.
