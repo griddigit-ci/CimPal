@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.main.core;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import eu.griddigit.cimpal.main.interfaces.IOutputHandler;
+import eu.griddigit.cimpal.core.generators.InstanceDataBuilder;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
@@ -712,6 +713,23 @@ public class ModelManipulationFactory {
     }
 
     public static void generateDataFromXlsV2(String xmlBase, File xmlfile, Map<String, Object> saveProperties,
+                                             Boolean stripPrefixes, Boolean exportExtensions) throws Exception {
+        InstanceDataBuilder.BuildResult result =
+                InstanceDataBuilder.buildFromXls(xmlBase, xmlfile, stripPrefixes, exportExtensions);
+
+        // Preserve the caller's useFileDialog setting (true = show save dialog, false = direct write)
+        result.saveProperties().put("useFileDialog",
+                saveProperties.containsKey("useFileDialog") ? saveProperties.get("useFileDialog") : true);
+        result.saveProperties().put("fileFolder", MainController.prefs.get("LastWorkingFolder", ""));
+
+        InstanceDataFactory.saveInstanceData(result.model(), result.saveProperties());
+
+        // Disable dialog for subsequent files in the same batch (mirrors original behaviour)
+        saveProperties.put("useFileDialog", false);
+    }
+
+    @SuppressWarnings("unused")
+    private static void generateDataFromXlsV2_LEGACY(String xmlBase, File xmlfile, Map<String, Object> saveProperties,
                                              Boolean stripPrefixes, Boolean exportExtensions) throws Exception {
         ArrayList<Object> headerXlsData = null;
         String headerClassName = "";

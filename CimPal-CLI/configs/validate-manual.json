@@ -1,0 +1,32 @@
+{
+  "_comment": "Template: Manual SHACL tester. You pick the constraint files; the CLI scans a folder for model archives and validates each one.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar validate --config this-file.json",
+  "_when_to_use": "Use this for shape development and testing. It is faster than the mapping workflow because there is no CSV to maintain. Good for checking one or two shapes against a set of test models.",
+
+  "workflow": "manual",
+  "_note_workflow": "The manual workflow does not use a mapping CSV. You specify the SHACL files directly with shaclConstraintFiles. The CLI scans modelsDir for .zip archives (up to 3 levels deep) and validates each one against all the specified shapes.",
+
+  "shaclConstraintFiles": [
+    "REPLACE_WITH_PATH/shapes1.ttl",
+    "REPLACE_WITH_PATH/shapes2.ttl"
+  ],
+  "_note_shaclConstraintFiles": "One or more SHACL .ttl files. All files are loaded and merged into one combined shapes graph before validation starts. Useful when shapes are spread across multiple files (e.g. one file per profile). Accepts absolute or relative paths — relative paths are resolved from the folder containing this config file.",
+
+  "modelsDir": "REPLACE_WITH_PATH/models",
+  "_note_modelsDir": "Folder containing .zip model archives to validate. The CLI walks this folder up to 3 levels deep looking for .zip files. Each .zip is treated as one model set and validated independently. The Excel report is written beside each .zip.",
+
+  "datatypeMap": "CGMES30NC25",
+  "_note_datatypeMap": "Same as the mapping workflow — must match the CGMES version of your test models. CGMES30NC25 is correct for CIM17/CGMES 3.0. Without the right map, numeric and boolean shape constraints cannot fire.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for parsing the model files. For CIM17/CGMES 3.0 this is http://iec.ch/TC57/CIM100. For CIM16/CGMES 2.4 use http://iec.ch/TC57/2013/CIM-schema-cim16.",
+
+  "workers": 0,
+  "_note_workers": "Number of parallel model validations. 0 = auto. For a small number of test models (< 10) set to 1 for simpler output. For larger test sets, auto or 2-4 is fine.",
+
+  "maxResultsPerConstraint": 10,
+  "_note_maxResultsPerConstraint": "Set to 10 for development — you just need to know the shape fires and see a sample of the failing nodes. Set to 0 for an exhaustive run (e.g. before promoting a shape to the mapping workflow).",
+
+  "exportTurtle": true,
+  "_note_exportTurtle": "true is recommended for development. The .ttl report gives you the exact focus node URIs and property paths that fired, which is more useful than the Excel summary when debugging a shape."
+}

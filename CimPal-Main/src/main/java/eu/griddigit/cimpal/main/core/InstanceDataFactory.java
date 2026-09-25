@@ -6,6 +6,7 @@
 package eu.griddigit.cimpal.main.core;
 
 import eu.griddigit.cimpal.core.utils.ShapeFactory;
+import eu.griddigit.cimpal.core.generators.InstanceDataWriter;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
 import eu.griddigit.cimpal.main.util.ModelFactory;
@@ -159,118 +160,32 @@ public class InstanceDataFactory {
 
     //save instance data
     public static void saveInstanceData(Model instanceDataModel, Map<String,Object> saveProperties) throws IOException {
-        //register custom format
-        CustomRDFFormat.RegisterCustomFormatWriters();
+        String filename = saveProperties.get("filename").toString();
+        filename = filename.replace(".XML", ".xml");
+        boolean useFileDialog = (boolean) saveProperties.get("useFileDialog");
+        String fileFolder = saveProperties.get("fileFolder").toString();
+        boolean dozip = (boolean) saveProperties.get("dozip");
+        String extensionName = saveProperties.get("extensionName").toString();
+        String fileExtension = saveProperties.get("fileExtension").toString();
+        String fileDialogTitle = saveProperties.get("fileDialogTitle").toString();
 
-        String filename=saveProperties.get("filename").toString();
-        filename=filename.replace(".XML", ".xml"); //TODO make this more intelligent and bring it to GUI
-        String showXmlDeclaration=saveProperties.get("showXmlDeclaration").toString();
-        String showDoctypeDeclaration=saveProperties.get("showDoctypeDeclaration").toString();
-        String tab=saveProperties.get("tab").toString();
-        String relativeURIs=saveProperties.get("relativeURIs").toString();
-        String showXmlEncoding=saveProperties.get("showXmlEncoding").toString();
-        String xmlBase=saveProperties.get("xmlBase").toString();
-        RDFFormat rdfFormat=(RDFFormat) saveProperties.get("rdfFormat");
-        boolean useAboutRules = (boolean) saveProperties.get("useAboutRules");   //switch to trigger file chooser and adding the property
-        boolean useEnumRules = (boolean) saveProperties.get("useEnumRules");   //switch to trigger special treatment when Enum is referenced
-        boolean useFileDialog=(boolean) saveProperties.get("useFileDialog");
-        String instanceData = saveProperties.get("instanceData").toString();
-        String sortRDF = saveProperties.get("sortRDF").toString();
-        String sortRDFprefix = saveProperties.get("sortRDFprefix").toString();
-        String fileFolder=saveProperties.get("fileFolder").toString();
-        boolean dozip=(boolean) saveProperties.get("dozip");
-        String showXmlBaseDeclaration = saveProperties.get("showXmlBaseDeclaration").toString();
-
-        //Set<Resource> rdfAboutList = null;
-        //Set<Resource> rdfEnumList = null;
-        Set<Resource> rdfAboutList = (Set<Resource>) saveProperties.get("rdfAboutList");
-        Set<Resource> rdfEnumList = (Set<Resource>) saveProperties.get("rdfEnumList");
-        boolean putHeaderOnTop = (boolean) saveProperties.get("putHeaderOnTop");
-        String headerClassResource=saveProperties.get("headerClassResource").toString();
-        String extensionName=saveProperties.get("extensionName").toString();
-        String fileExtension=saveProperties.get("fileExtension").toString();
-        String fileDialogTitle=saveProperties.get("fileDialogTitle").toString();
-        Resource[] prettyTypes = null;
-
-        Object prettyTypesObj = saveProperties.get("prettyTypes");
-        if (prettyTypesObj instanceof Resource[] resources && resources.length > 0) {
-            prettyTypes = resources;
-        } else if (prettyTypesObj instanceof Collection<?> collection && !collection.isEmpty()) {
-            prettyTypes = collection.stream()
-                    .filter(Resource.class::isInstance)
-                    .map(Resource.class::cast)
-                    .toArray(Resource[]::new);
-        }
-
-        if ((prettyTypes == null || prettyTypes.length == 0) && headerClassResource != null && !headerClassResource.isBlank()) {
-            prettyTypes = new Resource[]{ResourceFactory.createResource(headerClassResource)};
-        }
-
-        if (putHeaderOnTop && (prettyTypes == null || prettyTypes.length == 0)) {
-            prettyTypes = buildPrettyTypesFallback(instanceDataModel, headerClassResource);
-        }
-
-        //save file
-        OutputStream outXML=null;
-        ZipOutputStream outzip=null;
-
-        if(useFileDialog) {
+        // Resolve the output stream — file dialog (GUI) or direct path (headless / CLI)
+        OutputStream outXML = null;
+        if (useFileDialog) {
             outXML = fileSaveDialog(fileDialogTitle, filename, extensionName, fileExtension);
-        }else{
-            outXML = new FileOutputStream(fileFolder+"\\"+filename);
-
+        } else {
+            outXML = new FileOutputStream(fileFolder + "\\" + filename);
         }
-        if (outXML!=null) {
+
+        if (outXML != null) {
             try {
-                if (rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY || rdfFormat == CustomRDFFormat.RDFXML_CUSTOM_PLAIN) {
-                    Map<String, Object> properties = new HashMap<>();
-                    properties.put("showXmlDeclaration", showXmlDeclaration);
-                    properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
-                    properties.put("showXmlEncoding", showXmlEncoding); // works only with the custom format
-                    //properties.put("blockRules", "daml:collection,parseTypeLiteralPropertyElt,"
-                    //        +"parseTypeResourcePropertyElt,parseTypeCollectionPropertyElt"
-                    //        +"sectionReification,sectionListExpand,idAttr,propertyAttr"); //???? not sure
-                    if (putHeaderOnTop && prettyTypes != null && prettyTypes.length > 0) {
-                        properties.put("prettyTypes", prettyTypes);
-                    }
-                    properties.put("xmlbase", xmlBase);
-                    properties.put("tab", tab);
-                    properties.put("relativeURIs", relativeURIs);
-                    properties.put("instanceData", instanceData);
-                    properties.put("sortRDF",sortRDF);
-                    properties.put("sortRDFprefix",sortRDFprefix);
-                    properties.put("showXmlBaseDeclaration", showXmlBaseDeclaration);
-
-                    if (useAboutRules) {
-                        properties.put("aboutRules", rdfAboutList);
-                    }
-
-                    if (useEnumRules) {
-                        properties.put("enumRules", rdfEnumList);
-                    }
-
-
-                    // Put a properties object into the Context.
-                    Context cxt = new Context();
-                    cxt.set(SysRIOT.sysRdfWriterProperties, properties);
-
-
-                    org.apache.jena.riot.RDFWriter.create()
-                            .base(xmlBase)
-                            .format(rdfFormat)
-                            .context(cxt)
-                            .source(instanceDataModel)
-                            .output(outXML);
-
-                } else {
-                    instanceDataModel.write(outXML, rdfFormat.getLang().getLabel().toUpperCase(), xmlBase);
-                }
+                // Delegate all RDF serialisation to Core (no JavaFX dependency there)
+                InstanceDataWriter.write(instanceDataModel, saveProperties, outXML);
             } finally {
                 outXML.flush();
                 outXML.close();
-
-
             }
+
             if (dozip) {
                 String sourceFile = fileFolder + "\\" + filename;
                 FileOutputStream fos = new FileOutputStream(fileFolder + "\\" + filename.replace(".xml", ".zip"));
@@ -278,7 +193,6 @@ public class InstanceDataFactory {
                 File fileToZip = new File(sourceFile);
                 FileInputStream fis = new FileInputStream(fileToZip);
                 ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-                //zipEntry.setMethod(ZipEntry.STORED); // no compression, deflated - with
                 zipOut.putNextEntry(zipEntry);
                 byte[] bytes = new byte[1024];
                 int length;
@@ -288,13 +202,11 @@ public class InstanceDataFactory {
                 zipOut.close();
                 fis.close();
                 fos.close();
-                //delete the xml
+                // delete the xml after zipping
                 File xmlTodelete = new File(fileFolder + "\\" + filename);
                 xmlTodelete.delete();
             }
         }
-
-
     }
 
     //File save dialog

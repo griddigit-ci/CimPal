@@ -1,0 +1,53 @@
+{
+  "_comment": "Pipeline: Shape development loop — generate test instances, then validate with hand-picked shapes.",
+  "_how_to_use": "Fill in REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar run pipeline-shape-dev.json",
+
+  "name": "Shape development loop",
+  "description": "Generate synthetic instance data from an Excel template, then validate against SHACL shapes.",
+
+  "stopOnError": true,
+  "stopOnViolations": false,
+
+  "steps": [
+    {
+      "id": "gen-conform",
+      "name": "Generate conforming instance data",
+      "command": "gen-instances",
+      "_note": "Generates a small RDF/XML file from the conform template. This file should PASS the shapes.",
+      "templateXlsx": "REPLACE_WITH_PATH/fixture-conform.xlsx",
+      "_note_templateXlsx": "Excel template for a conforming instance. See gen-instances docs for the required format.",
+      "output": "REPLACE_WITH_PATH/fixtures/conform.xml",
+      "xmlBase": "http://iec.ch/TC57/CIM100",
+      "stopOnError": true
+    },
+    {
+      "id": "gen-nonconform",
+      "name": "Generate non-conforming instance data",
+      "command": "gen-instances",
+      "_note": "Generates a small RDF/XML file from the non-conform template. This file should FAIL the shapes.",
+      "templateXlsx": "REPLACE_WITH_PATH/fixture-nonconform.xlsx",
+      "output": "REPLACE_WITH_PATH/fixtures/nonconform.xml",
+      "xmlBase": "http://iec.ch/TC57/CIM100",
+      "stopOnError": true
+    },
+    {
+      "id": "validate",
+      "name": "Validate fixtures against shapes",
+      "command": "validate",
+      "_note": "Validates all .xml files in fixtures/ against the SHACL shapes. Conform should pass (0 violations); non-conform should fail (>0 violations). Check the Excel reports to verify both are working as expected.",
+      "workflow": "manual",
+      "shaclConstraintFiles": [
+        "REPLACE_WITH_PATH/shapes/MyShape.ttl"
+      ],
+      "_note_shaclConstraintFiles": "The SHACL .ttl file(s) you are developing. Multiple files are unioned.",
+      "modelsDir": "REPLACE_WITH_PATH/fixtures",
+      "datatypeMap": "CGMES30NC25",
+      "xmlBase": "http://iec.ch/TC57/CIM100",
+      "workers": 1,
+      "maxResultsPerConstraint": 10,
+      "exportTurtle": true,
+      "stopOnError": true,
+      "stopOnViolations": false
+    }
+  ]
+}

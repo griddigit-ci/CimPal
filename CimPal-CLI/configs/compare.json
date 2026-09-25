@@ -1,0 +1,36 @@
+{
+  "_comment": "Template: Compare two RDF model files and report differences.",
+  "_how_to_use": "Copy to your working directory. Fill in the paths. Run: java -jar CimPal-CLI.jar compare --config this-file.json",
+  "_when_to_use": "Use to diff two versions of a CIM RDFS profile or two SHACL shape graphs. Reports added, removed, or changed classes, attributes, associations, and property values.",
+
+  "fileA": "REPLACE_WITH_PATH/profile-v1.rdf",
+  "_note_fileA": "First (reference) RDF file. Extension used for auto-detection: .ttl → SHACL comparison, .rdf/.xml → RDFS comparison.",
+
+  "fileB": "REPLACE_WITH_PATH/profile-v2.rdf",
+  "_note_fileB": "Second RDF file to compare against the first.",
+
+  "compareType": "auto",
+  "_note_compareType": "Comparison algorithm: 'rdfs' (RDFS CIM profile), 'rdfs-cimtool' (CIMTool-generated profiles), 'shacl' (SHACL shape graphs), or 'auto' (detect from file-A extension, default).",
+
+  "normalizeCimVersion": false,
+  "_note_normalizeCimVersion": "Rename the 'cim' prefix namespace in fileB to match fileA before comparing. Useful when comparing profiles that use different CIM versions (e.g. CIM16 vs CIM17) but are otherwise structurally equivalent.",
+
+  "normalizeProfileNs": false,
+  "_note_normalizeProfileNs": "Rename the profile namespace in fileB to match fileA. Requires 'nsPrefix' to identify which namespace to normalise.",
+
+  "nsPrefix": "",
+  "_note_nsPrefix": "The namespace prefix to normalise when 'normalizeProfileNs' is true (e.g. 'eq', 'tp', 'ssh').",
+
+  "output": "REPLACE_WITH_PATH/comparison-result.xlsx",
+  "_note_output": "Where to write the result. Use .xlsx for an Excel workbook, any other extension for CSV. If omitted, prints to stdout using the 'format' field.",
+
+  "format": "text",
+  "_note_format": "Stdout format when 'output' is not set. 'text' (table, default), 'json', or 'csv'. Ignored when 'output' is set.",
+
+  "_exit_codes": {
+    "0": "Files are identical — no differences found.",
+    "1": "Differences were found (see output).",
+    "2": "Bad or missing input; command was not executed.",
+    "3": "Internal error during comparison."
+  }
+}
