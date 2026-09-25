@@ -1,7 +1,13 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
 
 import eu.griddigit.cimpal.main.application.services.TaskDependenciesEnforcer;
 import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
+import eu.griddigit.cimpal.main.application.tasks.ITask;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
@@ -88,15 +94,39 @@ public class TaskSelectionController implements Initializable, IController {
 
         tableForSelectedTasks.setItems(context.getSelectedTasks());
         tasksForSelection.setItems(availableTasks);
+        tasksForSelection.setCellFactory(list -> new TaskNameCell());
 
         // Bind clicking as a selection and add it to the Table of Selected Tasks
         tasksForSelection.getSelectionModel().selectedItemProperty().addListener(new ChangeListener<String>() {
             @Override
             public void changed(ObservableValue<? extends String> observable, String oldValue, String newValue) {
+                // Clearing the selection - which the unavailable branch below does - fires this
+                // listener with a null name, and null is not a task to add.
+                if (newValue == null) {
+                    return;
+                }
+
+                ITask task = context.getTaskElements().get(newValue);
+
+                // Unavailable tasks are greyed out in the list, but keyboard navigation still
+                // reaches them, so refuse them here too rather than letting a run start and fail
+                // part way through, after earlier tasks have already written files.
+                if (task == null || !task.isAvailable()) {
+                    Alert a = new Alert(Alert.AlertType.INFORMATION);
+                    a.setTitle("Task not available");
+                    a.setHeaderText(newValue);
+                    a.setContentText(task == null
+                            ? "This task is not registered."
+                            : task.getUnavailableReason());
+                    a.show();
+                    Platform.runLater(() -> tasksForSelection.getSelectionModel().clearSelection());
+                    return;
+                }
+
                 var allowed = taskSelectionController.checkIfAddingTaskIsAllowed(newValue);
                 if (allowed.isEmpty()) {
                     var nextTaskIndex = context.getSelectedTasks().size() + 1;
-                    var selectedTask = new SelectedTask(context.getTaskElements().get(newValue), nextTaskIndex);
+                    var selectedTask = new SelectedTask(task, nextTaskIndex);
                     context.addSelectedTasks(selectedTask);
                 } else {
                     Alert a = new Alert(Alert.AlertType.INFORMATION);
@@ -213,8 +243,12 @@ public class TaskSelectionController implements Initializable, IController {
             message = message + "RDF Profile files not selected! \n";
         }
 
+        // Generate Instance Data Model is the one task that makes its own models rather than
+        // reading them, so it is the one case where base instance files are not needed. It is
+        // currently not selectable - see GenerateInstanceDataModel.isAvailable() - which is why
+        // the message no longer offers it as an alternative; the check is kept for when it is.
         if (baseInstanceModelFilesPaths.getText().isEmpty() && (!context.getSelectedTasks().isEmpty() && context.getSelectedTasks().getFirst().getTask().getClass() != GenerateInstanceDataModel.class) ) {
-            message = message + "Select Generate Instance DataModel Task first, or choose Instance Model files! \n";
+            message = message + "Base Instance Model files not selected! \n";
         }
 
         if (context.getSelectedTasks().isEmpty()) {
@@ -231,5 +265,32 @@ public class TaskSelectionController implements Initializable, IController {
         }
 
         return validInputs;
+    }
+
+    /**
+     * Renders one task name, greying out the tasks that are registered but not offered.
+     * <p>
+     * An unfinished task stays in the list rather than disappearing from it, so it is clear the
+     * feature exists and is coming; the tooltip carries the reason it cannot be picked yet.
+     */
+    private final class TaskNameCell extends ListCell<String> {
+        @Override
+        protected void updateItem(String taskName, boolean empty) {
+            super.updateItem(taskName, empty);
+
+            if (empty || taskName == null) {
+                setText(null);
+                setTooltip(null);
+                setDisable(false);
+                return;
+            }
+
+            ITask task = context.getTaskElements().get(taskName);
+            boolean available = task == null || task.isAvailable();
+
+            setText(available ? taskName : taskName + "  (not available)");
+            setDisable(!available);
+            setTooltip(available ? null : new Tooltip(task.getUnavailableReason()));
+        }
     }
 }

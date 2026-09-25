@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 Manifest Service
 
 This CLI wrapper invokes `ManifestGenerator` (from `CimPal-Core`) to create a `manifest.ttl` file from a folder of model RDF/XML files. It is built as a self-contained (shaded) executable jar: `CimPal-CLI.jar`.

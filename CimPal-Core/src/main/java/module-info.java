@@ -1,7 +1,13 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 module CimPal.Core {
     exports eu.griddigit.cimpal.core.interfaces;
     exports eu.griddigit.cimpal.core.comparators;
     exports eu.griddigit.cimpal.core.models;
+    exports eu.griddigit.cimpal.core.presets;
     exports eu.griddigit.cimpal.core.utils;
     exports eu.griddigit.cimpal.core.converters;
     exports eu.griddigit.cimpal.core.shacl_tools;
@@ -11,6 +17,7 @@ module CimPal.Core {
 
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
+    requires titanium.json.ld;
     requires CimPal.CustomWriter;
     requires org.apache.jena.shacl;
     requires org.apache.commons.io;

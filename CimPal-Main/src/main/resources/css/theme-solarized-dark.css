@@ -1,13 +1,8 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- *
- * Theme: Solarized Dark
- * Solarized base03/base02 surfaces with the cyan/blue accents. Canonical Solarized body
- * text (base0 #839496) is only ~3:1 on base03, so the foreground is lifted to base1/base2
- * to clear WCAG AA. The hues stay Solarized; the lightness does not.
+ * SPDX-License-Identifier: EUPL-1.2+
  */
-
 .root {
     /* --- Modena derivation roots --- */
     -fx-base:                         #073642;   /* base02 */

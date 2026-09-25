@@ -1,8 +1,7 @@
-
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2023, gridDigIt Kft. All rights reserved.
- * @author Chavdar Ivanov
+ * SPDX-License-Identifier: EUPL-1.2+
  */
 package eu.griddigit.cimpal.writer.formats;
 
@@ -30,7 +29,7 @@ public class CustomBasicPretty extends CustomBasic {
         boolean isDescription = typeStatement == null;
 
         if (isDescription) {
-            if (this.sortRDF.equals("true")) {
+            if ("true".equals(this.sortRDF)) {
                 writeDescriptionHeader(subject, writer);
                 //get list of all triples of the rdf:type and these need to be sorted by object
                 Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject, this.sortRDFprefix);
@@ -49,7 +48,7 @@ public class CustomBasicPretty extends CustomBasic {
             }
         } else {
 
-            if (this.sortRDF.equals("true")) {
+            if ("true".equals(this.sortRDF)) {
                 writePrettyDescriptionHeader(subject, typeStatement, writer);
                 //get list of all triples of the rdf:type and these need to be sorted by object
                 Set<Map.Entry<String, Property>> entries = sortRDFprepare(model, subject, this.sortRDFprefix);
@@ -81,7 +80,7 @@ public class CustomBasicPretty extends CustomBasic {
 
         Map<String, Property> listPredicateMap = new TreeMap<>();
         for (Statement stmt : listStatements) {
-            if (sortRDFprefix.equals("true")) {
+            if ("true".equals(sortRDFprefix)) {
                 listPredicateMap.put(model.getNsURIPrefix(stmt.getPredicate().getNameSpace()) + ":" + stmt.getPredicate().getLocalName(), stmt.getPredicate());
             } else {
                 listPredicateMap.put(stmt.getPredicate().getLocalName(), stmt.getPredicate());

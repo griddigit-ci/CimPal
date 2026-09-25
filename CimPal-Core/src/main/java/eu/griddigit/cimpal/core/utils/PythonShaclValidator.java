@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
@@ -30,7 +35,7 @@ final class PythonShaclValidator {
 
     private PythonShaclValidator() { }
 
-    record Outcome(List<SHACLValidationResult> results, boolean conforms) { }
+    record Outcome(List<SHACLValidationResult> results, boolean conforms, Model report) { }
 
     static Outcome validate(ValidationEngine engine, Model shapesModel, Model dataModel)
             throws IOException, InterruptedException {
@@ -90,7 +95,7 @@ final class PythonShaclValidator {
             throw new IOException("Python " + engine.displayName() + " exited with code " + exit
                     + ": " + stderr);
         }
-        return new Outcome(ShaclTools.extractSHACLValidationResults(report, shapesModel), conforms);
+        return new Outcome(ShaclTools.extractSHACLValidationResults(report, shapesModel), conforms, report);
     }
 
     private static List<String> pythonCommand(ValidationEngine engine) throws IOException, InterruptedException {

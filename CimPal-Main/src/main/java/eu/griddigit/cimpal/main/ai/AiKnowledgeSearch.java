@@ -1,4 +1,8 @@
-/* Licensed under the EUPL-1.2-or-later. Copyright (c) 2026, gridDigIt Kft. */
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.main.ai;
 
 import java.io.IOException;
@@ -12,6 +16,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.net.URI;
+import java.net.InetAddress;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -20,6 +25,7 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.io.InputStream;
 
 /** Small, dependency-free local knowledge retrieval for a user-selected folder. */
 public final class AiKnowledgeSearch {
@@ -29,6 +35,10 @@ public final class AiKnowledgeSearch {
     private static final int MAX_CHARS_PER_MATCH = 3_000;
     private static final int MAX_REMOTE_SOURCES = 3;
     private static final Duration REMOTE_CACHE_TTL = Duration.ofHours(24);
+    private static final int MAX_REMOTE_BYTES = 2_000_000;
+    private static final Pattern GITHUB_SEGMENT = Pattern.compile("[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?");
+    private static final HttpClient REMOTE_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
 
     private AiKnowledgeSearch() { }
 
@@ -58,7 +68,7 @@ public final class AiKnowledgeSearch {
                 }
                 continue;
             }
-            if (raw.startsWith("http://") || raw.startsWith("https://")) {
+            if (raw.startsWith("https://")) {
                 if (includeRemote && remoteSources++ < MAX_REMOTE_SOURCES) appendRemoteSource(result, raw, request);
             } else {
                 Path path = Path.of(raw);
@@ -81,7 +91,7 @@ public final class AiKnowledgeSearch {
                 else unavailable++;
                 continue;
             }
-            if (!(raw.startsWith("http://") || raw.startsWith("https://")) || remoteSources++ >= MAX_REMOTE_SOURCES) continue;
+            if (!raw.startsWith("https://") || remoteSources++ >= MAX_REMOTE_SOURCES) continue;
             try {
                 Path cachedFile = remoteCacheFile(raw);
                 if (!force && readFreshCache(cachedFile) != null) {
@@ -125,8 +135,7 @@ public final class AiKnowledgeSearch {
     /** No request content is sent: the configured URL alone is fetched as public reference material. */
     private static void appendRemoteSource(StringBuilder result, String source, String userRequest) {
         try {
-            URI uri = URI.create(source);
-            if (!"https".equalsIgnoreCase(uri.getScheme()) && !"http".equalsIgnoreCase(uri.getScheme())) return;
+            validatePublicHttpsUri(source);
             Path cachedFile = remoteCacheFile(source);
             String body = readFreshCache(cachedFile);
             boolean cached = body != null;
@@ -145,13 +154,21 @@ public final class AiKnowledgeSearch {
 
     private static String downloadRemoteSource(String source, Path cachedFile) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(source)).GET().timeout(Duration.ofSeconds(5))
+            URI uri = validatePublicHttpsUri(source);
+            HttpRequest request = HttpRequest.newBuilder(uri).GET().timeout(Duration.ofSeconds(5))
                     .header("User-Agent", "CimPal-AI-Knowledge/1.0").build();
-            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<InputStream> response = REMOTE_HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() < 200 || response.statusCode() >= 300) return null;
+            if (response.headers().firstValueAsLong("Content-Length").orElse(0) > MAX_REMOTE_BYTES) return null;
+            byte[] bytes;
+            try (InputStream stream = response.body()) {
+                bytes = stream.readNBytes(MAX_REMOTE_BYTES + 1);
+            }
+            if (bytes.length > MAX_REMOTE_BYTES) return null;
+            String body = new String(bytes, StandardCharsets.UTF_8);
             Files.createDirectories(cachedFile.getParent());
-            Files.writeString(cachedFile, response.body(), StandardCharsets.UTF_8);
-            return response.body();
+            Files.writeString(cachedFile, body, StandardCharsets.UTF_8);
+            return body;
         } catch (Exception ignored) {
             return null;
         }
@@ -176,10 +193,8 @@ public final class AiKnowledgeSearch {
     /** GitHub repository lines may include a branch after '#', for example https://github.com/owner/repo#main. */
     private static boolean isGitHubRepository(String source) {
         try {
-            URI uri = URI.create(source);
-            if (!"github.com".equalsIgnoreCase(uri.getHost())) return false;
-            String[] segments = uri.getPath().replaceFirst("^/", "").replaceFirst("\\.git$", "").split("/");
-            return segments.length == 2 && !segments[0].isBlank() && !segments[1].isBlank();
+            validatedGitHubRepositoryUri(source);
+            return true;
         } catch (RuntimeException ignored) {
             return false;
         }
@@ -188,7 +203,7 @@ public final class AiKnowledgeSearch {
     /** Keeps a shallow local checkout; command arguments are fixed and source values are never passed through a shell. */
     private static Path updateGitRepository(String source) {
         try {
-            URI uri = URI.create(source);
+            URI uri = validatedGitHubRepositoryUri(source);
             String branch = uri.getFragment();
             String repositoryUrl = new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), uri.getQuery(), null).toString();
             Path destination = Path.of(System.getProperty("user.home"), ".cimpal", "ai-knowledge-repositories", sha256(repositoryUrl));
@@ -211,7 +226,7 @@ public final class AiKnowledgeSearch {
     /** Opens an existing checkout without network traffic, cloning only if the source has never been cached. */
     private static Path ensureGitRepository(String source) {
         try {
-            URI uri = URI.create(source);
+            URI uri = validatedGitHubRepositoryUri(source);
             String branch = uri.getFragment();
             String repositoryUrl = new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), uri.getQuery(), null).toString();
             Path destination = Path.of(System.getProperty("user.home"), ".cimpal", "ai-knowledge-repositories", sha256(repositoryUrl));
@@ -262,6 +277,43 @@ public final class AiKnowledgeSearch {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is not available", e);
         }
+    }
+
+    /** Rejects URLs that could turn the opt-in public-reference feature into a local-network client. */
+    static URI validatePublicHttpsUri(String source) {
+        URI uri = URI.create(source);
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getHost().isBlank()
+                || uri.getUserInfo() != null || (uri.getPort() != -1 && uri.getPort() != 443)) {
+            throw new IllegalArgumentException("Knowledge sources must be credential-free HTTPS URLs on port 443.");
+        }
+        try {
+            for (InetAddress address : InetAddress.getAllByName(uri.getHost())) {
+                if (!isPublicAddress(address)) throw new IllegalArgumentException("Knowledge sources must not resolve to a private or local address.");
+            }
+        } catch (java.net.UnknownHostException exception) {
+            throw new IllegalArgumentException("Knowledge source host could not be resolved.", exception);
+        }
+        return uri;
+    }
+
+    private static boolean isPublicAddress(InetAddress address) {
+        byte[] bytes = address.getAddress();
+        boolean ipv6UniqueLocal = bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
+        return !address.isAnyLocalAddress() && !address.isLoopbackAddress() && !address.isLinkLocalAddress()
+                && !address.isSiteLocalAddress() && !address.isMulticastAddress() && !ipv6UniqueLocal;
+    }
+
+    private static URI validatedGitHubRepositoryUri(String source) {
+        URI uri = validatePublicHttpsUri(source);
+        if (!"github.com".equalsIgnoreCase(uri.getHost()) || uri.getQuery() != null) {
+            throw new IllegalArgumentException("Only canonical public GitHub repository URLs are supported.");
+        }
+        String[] segments = uri.getPath().replaceFirst("^/", "").replaceFirst("\\.git$", "").split("/");
+        if (segments.length != 2 || !GITHUB_SEGMENT.matcher(segments[0]).matches() || !GITHUB_SEGMENT.matcher(segments[1]).matches()
+                || (uri.getFragment() != null && !GITHUB_SEGMENT.matcher(uri.getFragment()).matches())) {
+            throw new IllegalArgumentException("GitHub sources must use owner/repository and an optional simple branch name.");
+        }
+        return uri;
     }
 
     private static Match score(Path path, Set<String> terms) {

@@ -1,12 +1,8 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- *
- * Theme: Nordic Light
- * Nord "Snow Storm" surfaces with "Frost" accents - soft and cool-toned. Body text is
- * Nord "Polar Night" darkened enough to clear WCAG AA on every surface.
+ * SPDX-License-Identifier: EUPL-1.2+
  */
-
 .root {
     /* --- Modena derivation roots --- */
     -fx-base:                         #eceff4;

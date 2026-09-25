@@ -1,6 +1,7 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2026, gridDigIt Kft. All rights reserved.
+ * SPDX-License-Identifier: EUPL-1.2+
  */
 package eu.griddigit.cimpal.main.ai;
 
@@ -136,7 +137,9 @@ public final class OllamaClient {
         }
         URI endpointUri = URI.create(normalized);
         String host = endpointUri.getHost();
-        if (host == null || !(host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.equals("::1"))) {
+        if (!("http".equalsIgnoreCase(endpointUri.getScheme()) || "https".equalsIgnoreCase(endpointUri.getScheme()))
+                || endpointUri.getUserInfo() != null || host == null
+                || !(host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.equals("::1"))) {
             throw new IllegalArgumentException("The initial AI release accepts local Ollama addresses only.");
         }
         return URI.create(normalized + path);

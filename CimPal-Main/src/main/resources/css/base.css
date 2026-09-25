@@ -1,29 +1,8 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- *
- * base.css - structure and control rules shared by every theme. Always applied
- * underneath the active theme-*.css.
- *
- * Contains NO colour literals. Every colour is a looked-up variable that the active
- * theme defines in its .root block:
- *
- *   -cimpal-text            primary body text        (>= 4.5:1 on every surface)
- *   -cimpal-text-muted      secondary + prompt text  (>= 3:1)
- *   -cimpal-text-disabled   disabled controls        (>= 3:1)
- *   -cimpal-text-on-accent  text on accent/selection backgrounds
- *   -cimpal-surface         menu bar, tab + column headers, titled-pane titles
- *   -cimpal-surface-2       raised/alternate surface, disabled input background
- *   -cimpal-border          hairlines, dividers, scrollbar thumbs
- *   -cimpal-badge-bg/-border/-text   the round "?" help badge
- *   -cimpal-warning         inline warning text
- *
- * The point of pinning these explicitly is that Modena otherwise derives text colour
- * with ladder()/derive() off -fx-base, which guesses wrong wherever a theme restyles a
- * control's background, and dims disabled controls with -fx-opacity, which is what makes
- * grey text unreadable on dark backgrounds.
+ * SPDX-License-Identifier: EUPL-1.2+
  */
-
 /* ===================== text colour ===================== */
 
 .label,
@@ -73,6 +52,16 @@
 .list-cell:filled:selected .label,
 .tree-cell:filled:selected .label {
     -fx-text-fill: -cimpal-text-on-accent;
+}
+
+/* Comparison-result cells use a wrapping Text graphic, whose foreground is
+   controlled by -fx-fill rather than the TableCell's -fx-text-fill. */
+.table-cell .cimpal-table-cell-text {
+    -fx-fill: -cimpal-text;
+}
+
+.table-row-cell:filled:selected .table-cell .cimpal-table-cell-text {
+    -fx-fill: -cimpal-text-on-accent;
 }
 
 /* ===================== disabled state ===================== */
