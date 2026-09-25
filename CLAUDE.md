@@ -8,6 +8,16 @@ Guidance for Claude Code when working in this repository.
 - `docs/cli/index.md` — CLI command status and per-command docs.
 - Do not redo a full codebase discovery; start from those two and the source file relevant to the task.
 
+## Current work
+
+- Work is planned in Claude Desktop and handed over as work packages in `docs/plans/`. **Start with `docs/plans/README.md`**: order, status, open decisions and the standard footer.
+- A session usually begins with `Execute docs/plans/<ID>.md` in plan mode. Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
+- Shared tooling in `.claude/`:
+  - Path-scoped rules: `rules/security.md` for security-sensitive code, `rules/testing.md` for `src/test`.
+  - Skills: `/add-regression-test`, `/security-check-change`.
+  - Agents: `security-reviewer` (read-only), `test-writer`.
+  - A Stop hook runs the tests of modules with changed Java files at the end of each turn.
+
 ## What CimPal is
 
 Java 25 / Maven multi-module toolset by gridDigIt for CIM/CGMES semantic work: SHACL validation, RDFS→SHACL generation, RDF conversion, SPARQL, profile/instance comparison, Excel-driven shape authoring, CGMES instance generation and manifests. Licensed EUPL-1.2-or-later.
@@ -70,6 +80,7 @@ Core tests run on the classpath (`useModulePath=false`) so they can reach packag
 - Never call Jena `TypeMapper.reset()`, and prefer `getSafeTypeByName()`. A reset once emptied the datatype map, typed every literal as `xsd:string`, and silently broke SHACL rules that use typed literals.
 - A failed remote `owl:imports` fetch must surface as an error, never as a silent pass (a false-clean validation is the worst outcome here).
 - `validate --samples` depends on the `*__report.ttl` files written by `--export-turtle`.
+- If Claude Desktop has the CimPal MCP server running (`CimPal-CLI/configs/claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`. `mvn package`/`verify` then fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop (or stop the `CimPal-CLI.jar mcp` processes) first.
 
 ## Testing
 
@@ -78,7 +89,7 @@ Coverage is sparse: a handful of Core tests, a few in Main, none in CLI. Before 
 ## Git and releases
 
 - Day-to-day work happens on `devel` (or feature branches off it, PR'd into `devel`). `master` is the release branch.
-- Don't commit, push, or open PRs unless asked.
+- Don't commit, push, or open PRs unless asked. `.claude/settings.json` makes `git push` ask for approval every time, and denies `gh release`, the release script, and tag or force pushes.
 - **Never run `scripts/New-ReleaseTag.ps1`** or push version tags unless explicitly asked. A pushed `YYYY.MM.DD.N` tag triggers `.github/workflows/release.yml`, which publishes a GitHub release.
 - Versions live in all five `pom.xml` files plus `<cimpal.version>`; only the release script changes them.
 
