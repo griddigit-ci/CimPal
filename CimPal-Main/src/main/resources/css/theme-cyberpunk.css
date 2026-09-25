@@ -1,12 +1,8 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- *
- * Theme: High-contrast Cyberpunk
- * Near-black violet base, cyan primary accent, magenta secondary. Square corners,
- * heavy borders, glow on focus.
+ * SPDX-License-Identifier: EUPL-1.2+
  */
-
 .root {
     /* --- Modena derivation roots --- */
     -fx-base:                         #17082e;

@@ -1,4 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 <sm:ValidateResult xmlns:sm="http://entsoe.eu/opde/ServiceModel/1/0">
     <sm:part name="identifier" type="opde:ShortMetaData">
         <opdm:OPDMObject xmlns:opdm="http://entsoe.eu/opdm/ObjectModel/1/0">

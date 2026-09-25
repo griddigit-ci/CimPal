@@ -1,4 +1,8 @@
-/* Licensed under the EUPL-1.2-or-later. Copyright (c) 2026, gridDigIt Kft. */
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.main.workspace;
 
 import eu.griddigit.cimpal.core.utils.ModelFactory;
