@@ -22,7 +22,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 
 | Phase | ID | Work package | Depends on | Size | Status |
 | --- | --- | --- | --- | --- | --- |
-| 0 | [A1](A1.md) | Claude Code workspace setup | — | S | Done (branch `feature/a1-claude-workspace`, not merged) |
+| 0 | [A1](A1.md) | Claude Code workspace setup | — | S | In review ([PR #39](https://github.com/griddigit-ci/CimPal/pull/39)) |
 | 0 | [CI-1](CI-1.md) | PR build and test | — | S | Not started |
 | 1 | [TEST-1](TEST-1.md) | Test harness | CI-1 | M | Not started |
 | 1 | [SEC-1](SEC-1.md) | Harden serve | TEST-1 | M | Not started |
