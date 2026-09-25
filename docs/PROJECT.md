@@ -167,6 +167,29 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 
 ---
 
+## Development workflow — plans and Claude Code workspace
+
+Added 2026-09-25 by work package A1. Work is planned in Claude Desktop and handed to Claude Code as
+work packages in `docs/plans/` (see `docs/plans/README.md` for order, status and open decisions).
+The shared Claude Code setup is committed under `.claude/`:
+- **`settings.json`:**
+  - Allows `mvn` and routine git.
+  - `git push` asks for approval every time.
+  - Denies `gh release`, `New-ReleaseTag.ps1`, tag and force pushes, and reading token, env,
+    credential and certificate files.
+  - Its Stop hook, `.claude/hooks/test-changed-modules.sh`, runs `mvn -pl <module> -am test` for
+    the modules with changed Java files at the end of each turn. It skips when nothing changed
+    since the last green run.
+- **Rules:** `rules/security.md`, path-scoped to the security-sensitive classes, and
+  `rules/testing.md` for `src/test`.
+- **Skills:** `/add-regression-test`, `/security-check-change`, `/end-session`, `/wp-footer`.
+- **Agents:** `security-reviewer` (read-only) and `test-writer`.
+
+**Next steps:** CI-1 (PR build and test), then TEST-1 (test harness), following the phase order in
+`docs/plans/README.md`.
+
+---
+
 ## Implementation status — all commands done
 
 ### Commands implemented (Phases 2–9)
@@ -318,6 +341,8 @@ CimPal/
 **`validate --samples` requires `--export-turtle`.** Per-shape detail is extracted by parsing the `*__report.ttl` files after validation. These are auto-enabled when `--samples > 0` in JSON mode, but they remain on disk as a side effect. This is by design (the AI Assistant also uses them) but should be documented clearly.
 
 **`serve` serialises all requests.** The single-threaded executor prevents concurrent validation runs. For team use (multiple users sharing one server) this is a bottleneck. Addressed in the REST API plan below.
+
+**`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output.
 
 **`MainController` static state bag.** Several GUI tabs still share state through static fields. Do not add new static fields. The pattern of delegating from Main to Core (introduced in Phase 5) is the correct long-term direction.
 
