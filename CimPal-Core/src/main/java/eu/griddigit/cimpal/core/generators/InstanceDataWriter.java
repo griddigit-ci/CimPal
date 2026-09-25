@@ -3,10 +3,6 @@
  * Licensed under the EUPL-1.2-or-later.
  * SPDX-License-Identifier: EUPL-1.2+
  */
-/**
- * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- */
 package eu.griddigit.cimpal.core.generators;
 
 import eu.griddigit.cimpal.writer.formats.CustomRDFFormat;
