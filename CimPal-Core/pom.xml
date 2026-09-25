@@ -33,6 +33,22 @@
                     <release>${jdk.version}</release>
                     <fork>true</fork>
                 </configuration>
+                <executions>
+                    <!-- Test sources compile patched into the CimPal.Core module. The test-support
+                         StubHttpServer needs jdk.httpserver, which production code must not read,
+                         so the read edge is added for test compilation only. -->
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <compilerArgs>
+                                <arg>--add-modules</arg>
+                                <arg>jdk.httpserver</arg>
+                                <arg>--add-reads</arg>
+                                <arg>CimPal.Core=jdk.httpserver</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -55,6 +71,26 @@
                     -->
                     <useModulePath>false</useModulePath>
                 </configuration>
+            </plugin>
+            <!-- Publish the shared test helpers (eu.griddigit.cimpal.core.testsupport) as a test-jar
+                 so the CLI and Main test suites can use them. Only that package is included. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <executions>
+                    <execution>
+                        <id>test-support-jar</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>eu/griddigit/cimpal/core/testsupport/**</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -149,6 +185,19 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.13.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.27.7</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- JSON snapshots in the test-support package (same Jackson 3 line as Main and CLI). -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>3.2.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
