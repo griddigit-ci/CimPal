@@ -185,8 +185,14 @@ The shared Claude Code setup is committed under `.claude/`:
 - **Skills:** `/add-regression-test`, `/security-check-change`, `/end-session`, `/wp-footer`.
 - **Agents:** `security-reviewer` (read-only) and `test-writer`.
 
-**Next steps:** CI-1 (PR build and test), then TEST-1 (test harness), following the phase order in
-`docs/plans/README.md`.
+**CI** (added by CI-1): `.github/workflows/ci.yml` runs `mvn -B verify` on windows-latest and
+ubuntu-latest (under Xvfb) for every push and PR to `devel` and `master`. It publishes a per-module
+test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest` is tagged `gui`
+(exclude with `-DexcludedGroups=gui`). The release workflow is unchanged.
+
+**Next steps:** TEST-1 (test harness), then SEC-1 and SEC-2, following the phase order in
+`docs/plans/README.md`. Enabling branch protection with the two CI checks as required is a
+maintainer action.
 
 ---
 
