@@ -353,6 +353,19 @@
     -fx-font-size: 1.05em;
 }
 
+/* The Operations toolbar owns navigation; keep its TabPane solely as the content switcher. */
+.workspace-tabs > .tab-header-area {
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    -fx-opacity: 0;
+    -fx-padding: 0;
+}
+
+.workspace-tabs > .tab-content-area {
+    -fx-padding: 0;
+}
+
 /* Caption line under a section title: an explanation the control itself cannot carry,
    set apart from the surrounding labels. Uses the theme variable every theme defines,
    so it needs no per-theme override. */

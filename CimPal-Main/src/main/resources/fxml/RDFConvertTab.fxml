@@ -43,7 +43,9 @@
                 <Label fx:id="helpOperationsOptions" text="?" styleClass="help-badge"/>
             </HBox>
             <!-- FlowPane so the seven options reflow instead of overflowing the tab. -->
-            <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0"
+            <!-- The tab is normally wide enough for this row.  FlowPane's 400 px default
+                 preferred wrap width otherwise reserves several invisible lines here. -->
+            <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0" prefWrapLength="1800.0"
                       GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2"
                       GridPane.valignment="TOP">
                 <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" text="Union model" wrapText="true" />
@@ -113,7 +115,9 @@
             -->
             <Label text="Options:" styleClass="option-label"
                    GridPane.rowIndex="8" GridPane.columnIndex="0" GridPane.valignment="TOP" />
-            <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0"
+            <!-- Keep preferred height aligned with the wide, one-line layout; actual layout
+                 still wraps when the window becomes narrower. -->
+            <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0" prefWrapLength="1800.0"
                       GridPane.rowIndex="8" GridPane.columnIndex="1" GridPane.columnSpan="2"
                       GridPane.valignment="TOP">
                 <CheckBox fx:id="fcbShowXMLDeclaration" disable="true" mnemonicParsing="false" selected="true" text="Show Xml declaration" />
@@ -166,8 +170,6 @@
                 <CheckBox fx:id="fcbStripPrefixes" disable="true" mnemonicParsing="false" selected="true" text="Strip declaration of unused prefixes" />
             </FlowPane>
         </GridPane>
-
-        <Region VBox.vgrow="ALWAYS" />
 
         <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
             <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrtResetRDFConvert" text="Reset" />

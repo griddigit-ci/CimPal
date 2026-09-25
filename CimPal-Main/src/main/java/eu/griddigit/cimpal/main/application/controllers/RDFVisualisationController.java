@@ -5,11 +5,16 @@
 package eu.griddigit.cimpal.main.application.controllers;
 
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.ai.AiDatasetInspector;
+import eu.griddigit.cimpal.main.workspace.WorkspaceArtifactRegistry;
+import eu.griddigit.cimpal.main.workspace.WorkspaceRdfStore;
+import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.RdfGraphView;
+import eu.griddigit.cimpal.main.gui.PowsyblBridge;
+import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import javafx.application.Platform;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
+import javafx.concurrent.Task;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
@@ -19,23 +24,38 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Alert;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.web.WebView;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.query.Dataset;
+import org.apache.jena.query.DatasetFactory;
+import org.apache.jena.query.Query;
+import org.apache.jena.query.QueryExecution;
+import org.apache.jena.query.QueryExecutionFactory;
+import org.apache.jena.query.QueryFactory;
+import org.apache.jena.query.QuerySolution;
+import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.AnonId;
 import org.apache.jena.rdf.model.Literal;
 import org.apache.jena.rdf.model.Model;
@@ -54,6 +74,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.net.URL;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -74,23 +96,25 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
+import javafx.scene.Scene;
 
 /**
  * Controller for the <em>RDF Operations &#9656; Visualisation</em> tab.
  * <p>
  * Loads RDF in any syntax Jena has a parser for and presents it as a browsable
  * subject &rarr; predicate &rarr; object tree. Each loaded file (each entry, for ZIP archives)
- * becomes a named graph that can be included in or excluded from the tree independently, so one
- * profile file of a CGMES dataset can be inspected without unloading the rest.
+ * becomes a named graph at the top of the unified browser, so one profile file of a CGMES
+ * dataset can be inspected, merged, or removed without leaving the tree view.
  * <p>
  * Read-only throughout: nothing here writes to the loaded models or to disk.
  */
 public class RDFVisualisationController implements Initializable {
 
     /**
-     * Subjects collected per graph before the tree is truncated. A CGMES EQ file holds tens of
-     * thousands of subjects; past a few thousand tree rows the view stops being browsable, and
-     * the filters are the intended way to narrow it. The status line reports the truncation.
+     * Browser subject cap. The table can still query all matching data, and the browser header
+     * offers an explicit all-subjects toggle for occasions where that is needed.
      */
     private static final int MAX_SUBJECTS_PER_GRAPH = 5_000;
 
@@ -143,6 +167,9 @@ public class RDFVisualisationController implements Initializable {
     /** Name of the graph produced by Merge. Merging again replaces it. */
     private static final String MERGED_GRAPH_NAME = "Merged Graph";
 
+    /** Common RDF/XML base used by the dedicated SPARQL Query tab. */
+    private static final String SPARQL_COMPATIBLE_XML_BASE = "http://iec.ch/TC57/2013/CIM-schema-cim16";
+
     private MainController mainController;
 
     @FXML
@@ -154,23 +181,29 @@ public class RDFVisualisationController implements Initializable {
     @FXML
     private TextField tfFullTextSearch;
     @FXML
+    private TextArea taSparqlFilter;
+    @FXML
+    private ChoiceBox<String> cbBaseUri;
+    @FXML
+    private TextField tfBaseUri;
+    @FXML
     private Button btnApplyFilters;
+    @FXML
+    private Label lblGraphScope;
     @FXML
     private Button btnRemoveGraph;
     @FXML
     private Button btnClearAll;
-    @FXML
-    private ListView<GraphEntry> lvGraphs;
+    @FXML private Button btnPreparePowsybl;
+    @FXML private Button btnReleasePowsybl;
     @FXML
     private TreeView<NodeValue> tvGraph;
-    @FXML
-    private Label lblStatus;
     @FXML
     private Label helpLoad;
     @FXML
     private Label helpFilters;
     @FXML
-    private Label helpGraphs;
+    private Label helpSparqlFilter;
     @FXML
     private Label helpTree;
     @FXML
@@ -180,15 +213,13 @@ public class RDFVisualisationController implements Initializable {
     @FXML
     private Button btnMergeGraphs;
     @FXML
-    private Button btnToggleGraphsPane;
-    @FXML
     private Button btnToggleTreePane;
     @FXML
     private ComboBox<Grouping> cbGrouping;
     @FXML
-    private SplitPane visualisationSplitPane;
+    private ComboBox<BrowserMode> cbBrowserMode;
     @FXML
-    private VBox graphsPane;
+    private SplitPane visualisationSplitPane;
     @FXML
     private VBox treePane;
     @FXML
@@ -198,23 +229,56 @@ public class RDFVisualisationController implements Initializable {
     @FXML
     private CheckBox cbIncludeLiterals;
     @FXML
-    private Label lblGraphViewInfo;
+    private ComboBox<RdfGraphView.LayoutMode> cbGraphLayout;
+    @FXML
+    private TableView<Map<String, String>> tvGraphData;
+    @FXML
+    private Button btnToggleGraphContent;
+    @FXML
+    private CheckBox cbAutoRefresh;
+    @FXML
+    private Button btnExportTable;
+    @FXML
+    private Button btnToggleAllSubjects;
+    @FXML
+    private Button btnToggleGraphMetadata;
+    @FXML
+    private StackPane gridViewHost;
+    @FXML
+    private ComboBox<PowsyblBridge.Diagram> cbGridDiagram;
+    @FXML
+    private Button btnGenerateGrid;
+    @FXML
+    private Button btnPowerFlow;
 
-    /** Loaded graphs in load order; the ListView is a view onto this list. */
+    private boolean tableViewVisible;
+    private boolean gridViewVisible;
+    private final PowsyblBridge powsybl = new PowsyblBridge();
+    /** Created after Application.start(): WebView construction is illegal in Application.init(). */
+    private WebView gridView;
+    private double gridZoom = 1.0;
+    private BrowserMode browserMode = BrowserMode.RDF;
+    private List<PowsyblBridge.Profile> preparedProfiles = List.of();
+    private PowsyblBridge.IidmElement iidmRoot;
+
+    private SparqlTools.QueryResults tableResults = new SparqlTools.QueryResults(List.of(), List.of());
+    private String graphViewSummary = "";
+    private String tableViewSummary = "";
+    private boolean graphMetadataVisible;
+    /** Named graphs used by the most recent Apply; empty means every loaded graph. */
+    private Set<String> activeGraphNames = Set.of();
+
+    /** Loaded graphs in load order; their names form the top level of the graph browser. */
     private final ObservableList<GraphEntry> graphEntries = FXCollections.observableArrayList();
 
-    /**
-     * Set while a bulk tick change is in progress, so Select all / Select none rebuild the tree
-     * once at the end instead of once per row.
-     */
-    private boolean suppressRebuild;
-
-    /** Whether each of the two left-hand panes is currently part of the split. */
-    private boolean graphsPaneVisible = true;
+    /** Whether the unified graph browser is currently part of the split. */
     private boolean treePaneVisible = true;
 
     /** Appended to the status line: what the last load could not read. Empty when all was well. */
     private String lastLoadNote = "";
+
+    /** Most recent status, retained until the parent controller is attached after FXML loading. */
+    private String statusMessage = "";
 
     /**
      * The last filter result. The diagram is drawn from this rather than from the models, so what
@@ -253,13 +317,12 @@ public class RDFVisualisationController implements Initializable {
      * raised by that much again each time the show-more row is clicked; <em>Reset</em> puts it back.
      */
     private int subjectLimit = MAX_SUBJECTS_PER_GRAPH;
+    private boolean allSubjectsVisible;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeHelpTooltips();
-
-        lvGraphs.setItems(graphEntries);
-        lvGraphs.setCellFactory(view -> new GraphEntryCell());
+        BaseUriPresets.bind(cbBaseUri, tfBaseUri, "CIM 16");
 
         tvGraph.setRoot(new TreeItem<>(NodeValue.info("")));
         tvGraph.setShowRoot(false);
@@ -270,25 +333,40 @@ public class RDFVisualisationController implements Initializable {
         // anywhere in the pane retraces - there is no need to find the row you came from.
         tvGraph.setOnMouseClicked(this::handleTreeSecondaryClick);
 
-        // Both lists are multi-selection: the diagram is drawn for the union of what is
-        // highlighted, so several graphs or several resources can be compared at once.
-        lvGraphs.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        // The browser supports multi-selection, so several graphs or resources can be compared.
         tvGraph.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
         cbGrouping.getItems().setAll(Grouping.values());
         cbGrouping.setValue(Grouping.FLAT);
+        cbBrowserMode.getItems().setAll(BrowserMode.values());
+        cbBrowserMode.setValue(BrowserMode.RDF);
         // Grouping reshapes rows that are already scanned and filtered, so it rebuilds the tree
         // without touching the models.
-        cbGrouping.valueProperty().addListener((obs, oldValue, newValue) -> buildTreeItems());
+        cbGrouping.valueProperty().addListener((obs, oldValue, newValue) -> {
+            if (browserMode == BrowserMode.POWSYBL && iidmRoot != null) showIidmTree(); else buildTreeItems();
+        });
+        cbGraphLayout.getItems().setAll(RdfGraphView.LayoutMode.values());
+        cbGraphLayout.setValue(RdfGraphView.LayoutMode.FORCE_DIRECTED);
+        graphView.setLayoutMode(RdfGraphView.LayoutMode.FORCE_DIRECTED);
+        cbGridDiagram.getItems().setAll(PowsyblBridge.Diagram.values());
+        cbGridDiagram.setValue(PowsyblBridge.Diagram.NETWORK_AREA);
+        cbAutoRefresh.setSelected(true);
+        Platform.runLater(this::createGridView);
 
         graphEntries.addListener((ListChangeListener<GraphEntry>) change ->
                 updateControlsEnabled());
 
-        // Highlighting in either the list or the tree narrows the diagram to that scope.
-        lvGraphs.getSelectionModel().getSelectedItems()
-                .addListener((ListChangeListener<GraphEntry>) change -> redrawGraphView());
+        // Highlighting a named graph or a resource in the browser narrows the diagram to that scope.
         tvGraph.getSelectionModel().getSelectedItems()
-                .addListener((ListChangeListener<TreeItem<NodeValue>>) change -> redrawGraphView());
+                .addListener((ListChangeListener<TreeItem<NodeValue>>) change -> {
+                    updateSelectedScopeLabel();
+                    if (cbAutoRefresh.isSelected()) {
+                    if (gridViewVisible) {
+                        setStatus("Grid selection changed. Press ▶ to generate the selected PowsyBl diagram.");
+                    } else if (tableViewVisible) refreshTable(); else redrawGraphView();
+                    }
+                });
+        tvGraphData.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         graphView.setOnNodeClicked(id -> setStatus("Selected in graph view: " + id));
 
         updateControlsEnabled();
@@ -315,22 +393,18 @@ public class RDFVisualisationController implements Initializable {
                         + "fields narrows the result: all non-empty fields must match.\n\n"
                         + "Filters are applied when you press Enter in a field or press Apply - not on every "
                         + "keystroke, because a large dataset has to be rescanned each time.");
-        GUIhelper.installHelpTooltip(helpGraphs,
-                "One entry per loaded file, or per entry inside a loaded ZIP archive, with its triple count.\n\n"
-                        + "The tick box and the row highlight do two different things. Ticking includes a graph "
-                        + "in the tree; unticking leaves it out without unloading it. Tick all and Untick all "
-                        + "act on every row. When more than one graph is ticked the tree gets a named-graph "
-                        + "level above the subjects; with a single graph the subjects are shown directly.\n\n"
-                        + "Highlighting a row - clicking its name, with Ctrl or Shift for several - narrows the "
-                        + "graph view to those graphs, and tells Remove selected which graphs to unload. "
-                        + "Ticking a row does not highlight it, and highlighting one does not tick it.");
+        GUIhelper.installHelpTooltip(helpSparqlFilter,
+                "Optional SPARQL SELECT query. When it projects a ?s variable, subjects returned by it "
+                        + "are kept in the tree and graph view. Any other SELECT query remains available in "
+                        + "Table view, while the tree keeps its current text-filter result. Apply runs it after the text filters, over the "
+                        + "ticked graphs. The filtered graphs are available both as the default union graph and "
+                        + "as named graphs, so GRAPH ?g { ... } is supported. Load query imports a .rq or .sparql file.");
         GUIhelper.installHelpTooltip(helpPanes,
-                "Named graphs and Graph tree can each be folded away to give the graph view the whole "
-                        + "width. The buttons say what pressing them will do and turn into Show Named graphs "
-                        + "and Show Graph tree once the pane is away, so bringing one back is never a hunt; "
-                        + "the chevron in a pane's own header folds that pane in place.\n\n"
-                        + "The panes are removed from the split rather than hidden, so the diagram actually "
-                        + "gains the space.");
+                "The graph browser can be folded away to give the graph view the whole width. The button "
+                        + "says what pressing it will do and turns into Show graph browser once the pane is away; "
+                        + "the chevron in the pane header folds it in place.\n\n"
+                        + "The browser is removed from the split rather than merely hidden, so the diagram "
+                        + "actually gains the space.");
         GUIhelper.installHelpTooltip(helpGraphView,
                 "The relationships between the resources currently shown, drawn as a node-link diagram: "
                         + "one node per resource, one arrow per triple whose object is another resource.\n\n"
@@ -344,7 +418,9 @@ public class RDFVisualisationController implements Initializable {
                         + "Scroll to zoom, drag the background to pan, drag a node to rearrange it, and use "
                         + "Fit to bring everything back into view.");
         GUIhelper.installHelpTooltip(helpTree,
-                "The filtered triples, each resource expanding to its predicates and objects. A predicate "
+                "The graph browser starts with one named-graph row per loaded file (or archive entry); "
+                        + "select one or more of these top-level rows to draw, merge, or remove those graphs. "
+                        + "Each graph expands to its filtered triples, with every resource expanding to its predicates and objects. A predicate "
                         + "with one value is shown on a single line; a repeated predicate becomes a node with one "
                         + "child per value.\n\n"
                         + "Group by reshapes the rows already scanned, so it never rescans the models:\n"
@@ -380,6 +456,9 @@ public class RDFVisualisationController implements Initializable {
 
     public void setMainController(MainController mainController) {
         this.mainController = mainController;
+        if (!statusMessage.isBlank()) {
+            mainController.setStatusMessage(statusMessage);
+        }
     }
 
     private void setProgressBar(double progress) {
@@ -395,6 +474,42 @@ public class RDFVisualisationController implements Initializable {
     }
 
     // ==================== loading ====================
+
+    /** Opens the shared selected-model schema summary without adding another workspace tab. */
+    @FXML
+    private void actionShowModelInsights(ActionEvent event) {
+        TextArea content = new TextArea("Loading selected-model schema insights...");
+        content.setEditable(false);
+        content.setWrapText(false);
+        content.setPrefColumnCount(92);
+        content.setPrefRowCount(30);
+        Stage dialog = new Stage();
+        dialog.setTitle("Model insights");
+        dialog.setScene(new Scene(new VBox(content)));
+        dialog.setMinWidth(760);
+        dialog.setMinHeight(560);
+        dialog.initOwner(tfBaseUri.getScene().getWindow());
+        dialog.show();
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        setStatus("Inspecting the selected model's schema locally...");
+        Task<String> task = new Task<>() {
+            @Override protected String call() throws Exception { return AiDatasetInspector.inspectSelectedModels(); }
+        };
+        task.setOnSucceeded(ignored -> {
+            content.setText(task.getValue());
+            resetProgressBar();
+            setStatus("Model insights are ready. No data was changed or sent to the AI.");
+        });
+        task.setOnFailed(ignored -> {
+            content.setText("Model insights are unavailable:\n" + describe(task.getException())
+                    + "\n\nSelect instance-model files in the SPARQL Query tab, then try again.");
+            resetProgressBar();
+            setStatus("Model insights are unavailable.");
+        });
+        Thread thread = new Thread(task, "cimpal-model-insights");
+        thread.setDaemon(true);
+        thread.start();
+    }
 
     @FXML
     private void actionLoadFiles(ActionEvent event) {
@@ -452,6 +567,15 @@ public class RDFVisualisationController implements Initializable {
                     graphEntries.clear();
                 }
                 graphEntries.addAll(loaded);
+                for (GraphEntry entry : loaded) {
+                    try {
+                        WorkspaceRdfStore.publishModel("visualisation-" + entry.name, WorkspaceArtifactRegistry.Type.VISUALISATION_GRAPH,
+                                entry.name, "RDF Visualisation", "loaded for browsing", entry.model,
+                                entry.source == null ? List.of() : List.of(entry.source.toAbsolutePath().toString()));
+                    } catch (RuntimeException ignored) {
+                        // Visualisation remains usable even when the optional shared cache is unavailable.
+                    }
+                }
                 setLoadingControlsDisabled(false);
                 resetProgressBar();
 
@@ -479,11 +603,12 @@ public class RDFVisualisationController implements Initializable {
             return null;
         }
         String base = file.toURI().toString();
+        String parseBase = lang == Lang.RDFXML ? selectedBaseUri() : base;
         Model model = ModelFactory.createDefaultModel();
         try (InputStream in = new FileInputStream(file)) {
-            RDFDataMgr.read(model, in, base, lang);
+            RDFDataMgr.read(model, in, parseBase, lang);
         }
-        return new GraphEntry(file.getName(), model, documentBase(model, base));
+        return new GraphEntry(file.getName(), model, documentBase(model, parseBase), file.toPath());
     }
 
     /**
@@ -515,10 +640,11 @@ public class RDFVisualisationController implements Initializable {
 
                 String graphName = file.getName() + " ! " + entry.getName();
                 String base = file.toURI() + "!/" + entry.getName();
+                String parseBase = lang == Lang.RDFXML ? selectedBaseUri() : base;
                 try (InputStream in = zip.getInputStream(entry)) {
                     Model model = ModelFactory.createDefaultModel();
-                    RDFDataMgr.read(model, in, base, lang);
-                    loaded.add(new GraphEntry(graphName, model, documentBase(model, base)));
+                    RDFDataMgr.read(model, in, parseBase, lang);
+                    loaded.add(new GraphEntry(graphName, model, documentBase(model, parseBase), file.toPath()));
                 } catch (Exception e) {
                     problems.add(graphName + ": " + describe(e));
                 }
@@ -558,47 +684,32 @@ public class RDFVisualisationController implements Initializable {
         return declared != null && !declared.isBlank() ? declared : fallback;
     }
 
+    private String selectedBaseUri() {
+        String value = tfBaseUri == null ? "" : tfBaseUri.getText();
+        return value == null || value.isBlank() ? SPARQL_COMPATIBLE_XML_BASE : value.trim();
+    }
+
     private static String describe(Throwable t) {
-        String message = t.getMessage();
-        return message == null || message.isBlank() ? t.getClass().getSimpleName() : message;
+        Throwable root = t;
+        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        String message = root.getMessage();
+        return message == null || message.isBlank() ? root.getClass().getSimpleName() : message;
     }
 
-    // ==================== graph ticking and highlighting ====================
+    // ==================== named-graph actions ====================
 
-    @FXML
-    private void actionTickAllGraphs(ActionEvent event) {
-        setAllGraphsTicked(true);
-    }
-
-    @FXML
-    private void actionUntickAllGraphs(ActionEvent event) {
-        setAllGraphsTicked(false);
-    }
-
-    private void setAllGraphsTicked(boolean ticked) {
-        suppressRebuild = true;
-        try {
-            graphEntries.forEach(entry -> entry.selectedProperty().set(ticked));
-        } finally {
-            suppressRebuild = false;
-        }
-        // The tick boxes are not bound to the entries, so the visible rows need redrawing.
-        lvGraphs.refresh();
-        rebuildTree();
-    }
-
-    /** Unloads every highlighted graph. Ticking plays no part: it decides inclusion, not scope. */
+    /** Unloads every selected named-graph row from the unified browser. */
     @FXML
     private void actionRemoveSelectedGraph(ActionEvent event) {
         // Copied first: the selection list is a live view and shrinks as the entries go.
-        List<GraphEntry> highlighted = new ArrayList<>(lvGraphs.getSelectionModel().getSelectedItems());
+        List<GraphEntry> highlighted = selectedGraphEntries();
         if (highlighted.isEmpty()) {
-            GUIhelper.showWarning("No graph highlighted",
-                    "Click a graph's name in the Named graphs list first - Ctrl or Shift for several - "
+            GUIhelper.showWarning("No graph selected",
+                    "Select one or more named graphs at the top of the graph browser first - Ctrl or Shift for several - "
                             + "then press Remove selected.");
             return;
         }
-        lvGraphs.getSelectionModel().clearSelection();
+        tvGraph.getSelectionModel().clearSelection();
         graphEntries.removeAll(highlighted);
         setStatus(highlighted.size() == 1
                 ? "Removed graph: " + highlighted.getFirst().name()
@@ -607,20 +718,23 @@ public class RDFVisualisationController implements Initializable {
     }
 
     /**
-     * Merges the ticked graphs into one called {@value #MERGED_GRAPH_NAME}, leaving the originals
-     * loaded. The sources are unticked, because a merged graph shown alongside its own sources
-     * would present every triple twice.
+     * Merges selected named graphs into one called {@value #MERGED_GRAPH_NAME}. The source
+     * entries remain loaded and browsable; only a previous merged result is replaced.
      */
     @FXML
     private void actionMergeGraphs(ActionEvent event) {
-        List<GraphEntry> ticked = graphEntries.stream()
-                .filter(GraphEntry::isSelected)
+        List<GraphEntry> explicitlySelected = selectedGraphEntries();
+        List<GraphEntry> mergeScope = explicitlySelected.isEmpty() && !activeGraphNames.isEmpty()
+                ? graphEntries.stream().filter(entry -> activeGraphNames.contains(entry.name())).toList()
+                : explicitlySelected;
+        List<GraphEntry> ticked = mergeScope.stream()
                 .filter(entry -> !MERGED_GRAPH_NAME.equals(entry.name()))
                 .toList();
 
         if (ticked.size() < 2) {
             GUIhelper.showWarning("Nothing to merge",
-                    "Tick at least two graphs in the Named graphs list, then press Merge.");
+                    "Select at least two named graphs in the graph browser, then press Merge. "
+                            + "The graph scope used by the last Apply can also be merged.");
             return;
         }
 
@@ -631,25 +745,17 @@ public class RDFVisualisationController implements Initializable {
             merged.setNsPrefixes(entry.model().getNsPrefixMap());
         }
 
-        suppressRebuild = true;
-        try {
-            graphEntries.removeIf(entry -> MERGED_GRAPH_NAME.equals(entry.name()));
-            ticked.forEach(entry -> entry.selectedProperty().set(false));
-            graphEntries.add(new GraphEntry(MERGED_GRAPH_NAME, merged, ticked.getFirst().base()));
-        } finally {
-            suppressRebuild = false;
-        }
+        graphEntries.removeIf(entry -> MERGED_GRAPH_NAME.equals(entry.name()));
+        graphEntries.add(new GraphEntry(MERGED_GRAPH_NAME, merged, ticked.getFirst().base(), null));
+        // The previous Apply may have scoped the browser to just the source graphs. Clear that
+        // scope so the newly created named graph is immediately visible alongside its sources.
+        tvGraph.getSelectionModel().clearSelection();
+        activeGraphNames = Set.of();
+        updateSelectedScopeLabel();
 
-        lvGraphs.refresh();
         setStatus("Merged " + ticked.size() + " graphs into \"" + MERGED_GRAPH_NAME + "\" ("
-                + merged.size() + " triples). The source graphs are kept but unticked.");
+                + merged.size() + " triples). Source graphs remain available in the browser.");
         rebuildTree();
-    }
-
-    @FXML
-    private void actionToggleGraphsPane(ActionEvent event) {
-        graphsPaneVisible = !graphsPaneVisible;
-        applyPaneVisibility();
     }
 
     @FXML
@@ -664,10 +770,7 @@ public class RDFVisualisationController implements Initializable {
      * hiding alone would leave the diagram no wider than before.
      */
     private void applyPaneVisibility() {
-        List<javafx.scene.Node> panes = new ArrayList<>(3);
-        if (graphsPaneVisible) {
-            panes.add(graphsPane);
-        }
+        List<javafx.scene.Node> panes = new ArrayList<>(2);
         if (treePaneVisible) {
             panes.add(treePane);
         }
@@ -675,16 +778,13 @@ public class RDFVisualisationController implements Initializable {
         visualisationSplitPane.getItems().setAll(panes);
 
         // The label states the action, so it flips once the pane is away.
-        btnToggleGraphsPane.setText(graphsPaneVisible ? "Hide Named graphs" : "Show Named graphs");
-        btnToggleTreePane.setText(treePaneVisible ? "Hide Graph tree" : "Show Graph tree");
+        btnToggleTreePane.setText(treePaneVisible ? "Hide graph browser" : "Show graph browser");
 
         // setAll drops the divider positions, so restore a sensible split for the new item count.
         // Deferred, because a position set before the SplitPane has been laid out is discarded.
         Platform.runLater(() -> {
-            if (panes.size() == 3) {
-                visualisationSplitPane.setDividerPositions(0.22, 0.5);
-            } else if (panes.size() == 2) {
-                visualisationSplitPane.setDividerPositions(0.3);
+            if (panes.size() == 2) {
+                visualisationSplitPane.setDividerPositions(1.0 / 3.0);
             }
             graphView.fitToView();
         });
@@ -696,43 +796,639 @@ public class RDFVisualisationController implements Initializable {
     }
 
     @FXML
+    private void actionRefreshGraph(ActionEvent event) {
+        redrawGraphView();
+    }
+
+    @FXML
+    private void actionRefreshTable(ActionEvent event) {
+        refreshTable();
+    }
+
+    @FXML
+    private void actionAutoRefreshChanged(ActionEvent event) {
+        if (!cbAutoRefresh.isSelected()) {
+            graphView.clear();
+            tvGraphData.getColumns().clear();
+            tvGraphData.getItems().clear();
+            if (!gridViewVisible) {
+                showGridHtml("<html><body><p>Automatic updates are paused.</p></body></html>");
+            }
+            graphViewSummary = "Automatic graph updates are paused.";
+            tableViewSummary = "Automatic table updates are paused.";
+            updateViewStatus();
+        } else if (gridViewVisible) {
+            setStatus("Grid view is ready. Select one or more source graphs, then press ▶ to generate.");
+        } else if (tableViewVisible) {
+            refreshTable();
+        } else {
+            redrawGraphView();
+        }
+    }
+
+    @FXML
+    private void actionChangeGraphLayout(ActionEvent event) {
+        graphView.setLayoutMode(cbGraphLayout.getValue());
+        redrawGraphView();
+    }
+
+    @FXML
+    private void actionToggleAllSubjects(ActionEvent event) {
+        allSubjectsVisible = !allSubjectsVisible;
+        subjectLimit = allSubjectsVisible ? Integer.MAX_VALUE : MAX_SUBJECTS_PER_GRAPH;
+        btnToggleAllSubjects.setText(allSubjectsVisible ? "5k" : "∞");
+        btnToggleAllSubjects.setTooltip(new Tooltip(allSubjectsVisible
+                ? "Limit the browser to 5,000 subjects per graph"
+                : "Show all matching subjects in the browser"));
+        rebuildTree();
+    }
+
+    @FXML
+    private void actionToggleGraphMetadata(ActionEvent event) {
+        graphMetadataVisible = !graphMetadataVisible;
+        btnToggleGraphMetadata.setText(graphMetadataVisible ? "G✓" : "G");
+        refreshTable();
+    }
+
+    /** Switches the graph content in-place instead of consuming vertical space with nested tabs. */
+    @FXML
+    private void actionToggleGraphContent(ActionEvent event) {
+        // Graph -> Table -> Grid -> Graph.  Grid is intentionally a third peer view, not a
+        // filtered variant of the RDF graph: PowSyBl always imports the full loaded CGMES set.
+        if (!tableViewVisible && !gridViewVisible) tableViewVisible = true;
+        else if (tableViewVisible && browserMode == BrowserMode.POWSYBL) { tableViewVisible = false; gridViewVisible = true; }
+        else if (tableViewVisible) tableViewVisible = false;
+        else gridViewVisible = false;
+        tvGraphData.setVisible(tableViewVisible);
+        tvGraphData.setManaged(tableViewVisible);
+        btnExportTable.setVisible(tableViewVisible);
+        btnExportTable.setManaged(tableViewVisible);
+        graphView.setVisible(!tableViewVisible && !gridViewVisible);
+        graphView.setManaged(!tableViewVisible && !gridViewVisible);
+        gridViewHost.setVisible(gridViewVisible);
+        gridViewHost.setManaged(gridViewVisible);
+        cbGridDiagram.setVisible(gridViewVisible);
+        cbGridDiagram.setManaged(gridViewVisible);
+        btnPowerFlow.setVisible(gridViewVisible);
+        btnPowerFlow.setManaged(gridViewVisible);
+        btnGenerateGrid.setVisible(gridViewVisible);
+        btnGenerateGrid.setManaged(gridViewVisible);
+        btnToggleGraphContent.setText(tableViewVisible ? "Grid view" : gridViewVisible ? "Graph view" : "Table view");
+        if (gridViewVisible) {
+            showGridHtml("<html><body><p>Select one or more source graphs, then press &#9654; to generate a PowsyBl diagram.</p></body></html>");
+            setStatus("Grid view is ready. Press ▶ to generate the selected PowsyBl diagram.");
+        } else if (cbAutoRefresh.isSelected()) {
+            if (tableViewVisible) {
+                refreshTable();
+            } else {
+                redrawGraphView();
+            }
+        } else {
+            graphView.clear();
+            tvGraphData.getColumns().clear();
+            tvGraphData.getItems().clear();
+            showGridHtml("<html><body><p>Automatic updates are paused.</p></body></html>");
+            graphViewSummary = "Automatic graph updates are paused.";
+            tableViewSummary = "Automatic table updates are paused.";
+            updateViewStatus();
+        }
+        if (!tableViewVisible && !gridViewVisible && cbAutoRefresh.isSelected()) {
+            Platform.runLater(graphView::fitToView);
+        }
+    }
+
+    @FXML
+    private void actionGridDiagramChanged(ActionEvent event) {
+        if (gridViewVisible) setStatus("Diagram type changed. Press ▶ to generate it for the selected graph(s).");
+    }
+
+    @FXML
+    private void actionGenerateGrid(ActionEvent event) {
+        if (!powsybl.available()) { setStatus("PowSyBl is not available in this CimPal distribution."); return; }
+        List<PowsyblBridge.Profile> profiles = selectedGridProfiles();
+        if (!powsybl.isPreparedFor(profiles)) { setStatus("Prepare the selected CGMES study before generating a diagram."); return; }
+        renderGridView(profiles, selectedEquipmentId(), cbGridDiagram.getValue());
+    }
+
+    @FXML
+    private void actionPreparePowsybl(ActionEvent event) {
+        List<GraphEntry> entries = selectedGridEntries();
+        String issue = cgmesStudyIssue(entries);
+        if (issue != null) { setStatus("CGMES study is not ready: " + issue); return; }
+        List<PowsyblBridge.Profile> profiles = entries.stream()
+                .map(entry -> new PowsyblBridge.Profile(entry.name(), entry.source())).toList();
+        setStatus("Preparing consistent CGMES study for PowsyBl...");
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread task = new Thread(() -> {
+            try {
+                powsybl.importCgmes(profiles);
+                Platform.runLater(() -> { preparedProfiles = profiles; resetProgressBar(); setStatus("PowsyBl network prepared for " + profiles.size() + " profile(s). Switch the left browser to PowsyBl to explore it."); });
+            } catch (Exception e) { Platform.runLater(() -> { resetProgressBar(); setStatus("PowsyBl preparation failed: " + describe(e)); }); }
+        }, "powsybl-prepare-network");
+        task.setDaemon(true); task.start();
+    }
+
+    @FXML
+    private void actionReleasePowsybl(ActionEvent event) {
+        try { powsybl.release(); preparedProfiles = List.of(); if (browserMode == BrowserMode.POWSYBL) showRdfBrowser(); setStatus("Released the prepared PowsyBl network and its temporary data."); }
+        catch (Exception e) { setStatus("Could not release PowsyBl data: " + describe(e)); }
+    }
+
+    @FXML
+    private void actionShowPowerFlowSettings(ActionEvent event) {
+        if (!powsybl.available()) {
+            setStatus("PowSyBl is not available in this CimPal distribution.");
+            return;
+        }
+        List<PowsyblBridge.Profile> profiles = selectedGridProfiles();
+        if (profiles.isEmpty()) { setStatus("Select at least one graph before running power flow."); return; }
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread runner = new Thread(() -> {
+            try {
+                if (!powsybl.isPreparedFor(profiles)) throw new IllegalStateException("Prepare the selected CGMES study first.");
+                Platform.runLater(() -> {
+                    try {
+                        Object parameters = powsybl.configurePowerFlow();
+                        if (parameters == null) { resetProgressBar(); setStatus("Power flow cancelled."); return; }
+                        Thread flow = new Thread(() -> {
+                            try {
+                                String result = powsybl.runPowerFlow(parameters);
+                                Platform.runLater(() -> {
+                                    resetProgressBar(); setStatus("PowsyBl power flow completed.");
+                                    new Alert(Alert.AlertType.INFORMATION, "Power flow completed.\n" + result).showAndWait();
+                                });
+                            } catch (Exception e) {
+                                Platform.runLater(() -> { resetProgressBar(); setStatus("Power flow failed: " + describe(e)); });
+                            }
+                        }, "powsybl-power-flow-run");
+                        flow.setDaemon(true); flow.start();
+                    } catch (Exception e) { resetProgressBar(); setStatus("Power-flow settings failed: " + describe(e)); }
+                });
+            } catch (Exception e) { Platform.runLater(() -> { resetProgressBar(); setStatus("Unable to import CGMES for power flow: " + describe(e)); }); }
+        }, "powsybl-load-flow");
+        runner.setDaemon(true); runner.start();
+    }
+
+    private void renderGridView(List<PowsyblBridge.Profile> profiles, String equipmentId,
+                                PowsyblBridge.Diagram diagram) {
+        if (profiles.isEmpty()) { setStatus("Select at least one graph before generating a PowsyBl diagram."); return; }
+        setStatus("Building the PowsyBl " + diagram
+                + " from the complete CGMES network (the first CGMES import can take a while)...");
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread renderer = new Thread(() -> {
+            try {
+                if (!powsybl.isPreparedFor(profiles)) throw new IllegalStateException("Prepare the selected CGMES study first.");
+                String svg = powsybl.draw(diagram, equipmentId);
+                Platform.runLater(() -> {
+                    gridZoom = 1.0;
+                    showGridHtml(interactiveGridHtml(svg));
+                    resetProgressBar(); setStatus("Showing " + diagram + " for " + profiles.size() + " selected graph(s).");
+                });
+            } catch (Exception e) { Platform.runLater(() -> { resetProgressBar(); setStatus("Unable to render PowsyBl diagram: " + describe(e)); }); }
+        }, "powsybl-diagram");
+        renderer.setDaemon(true); renderer.start();
+    }
+
+    /**
+     * Top-level graph selection scopes PowsyBl input. With no graph selected, all source profiles
+     * are used. A selected merged graph already contains its sources, so it is used by itself.
+     */
+    private List<GraphEntry> selectedGridEntries() {
+        List<GraphEntry> selected = selectedGraphEntries();
+        List<GraphEntry> source;
+        if (selected.stream().anyMatch(entry -> MERGED_GRAPH_NAME.equals(entry.name()))) {
+            source = selected.stream().filter(entry -> MERGED_GRAPH_NAME.equals(entry.name())).toList();
+        } else if (!selected.isEmpty()) {
+            source = selected;
+        } else {
+            source = graphEntries.stream().filter(entry -> !MERGED_GRAPH_NAME.equals(entry.name())).toList();
+        }
+        return source;
+    }
+
+    private List<PowsyblBridge.Profile> selectedGridProfiles() {
+        if (browserMode == BrowserMode.POWSYBL && !preparedProfiles.isEmpty()) return preparedProfiles;
+        return selectedGridEntries().stream()
+                .filter(entry -> entry.source() != null)
+                .map(entry -> new PowsyblBridge.Profile(entry.name(), entry.source())).toList();
+    }
+
+    /** Lightweight header validation before allocating RDF4J/IIDM memory. */
+    private static String cgmesStudyIssue(List<GraphEntry> entries) {
+        if (entries.isEmpty()) return "no source profiles are selected";
+        if (entries.stream().anyMatch(entry -> entry.source() == null)) return "Merged Graph is derived; select its original source profiles";
+        Set<String> kinds = new HashSet<>();
+        for (GraphEntry entry : entries) {
+            StmtIterator statements = entry.model().listStatements();
+            try {
+                while (statements.hasNext()) {
+                    Statement statement = statements.nextStatement();
+                    if (!statement.getPredicate().getURI().endsWith("Model.profile")) continue;
+                    String value = statement.getObject().isLiteral() ? statement.getString() : statement.getObject().toString();
+                    String lower = value.toLowerCase(Locale.ROOT);
+                    if (lower.contains("equipment")) kinds.add("EQ");
+                    if (lower.contains("topology")) kinds.add("TP");
+                    if (lower.contains("steadystate")) kinds.add("SSH");
+                }
+            } finally { statements.close(); }
+        }
+        List<String> missing = new ArrayList<>();
+        for (String required : List.of("EQ", "TP", "SSH")) if (!kinds.contains(required)) missing.add(required);
+        return missing.isEmpty() ? null : "missing required profile(s): " + String.join(", ", missing);
+    }
+
+    /** A resource selection supplies an optional diagram focus; graph rows determine network input. */
+    private String selectedEquipmentId() {
+        for (TreeItem<NodeValue> item : tvGraph.getSelectionModel().getSelectedItems()) {
+            if (item != null && item.getValue() != null && item.getValue().kind() == NodeKind.SUBJECT) return item.getValue().raw();
+        }
+        return null;
+    }
+
+    @FXML
+    private void actionBrowserModeChanged(ActionEvent event) {
+        BrowserMode selected = cbBrowserMode.getValue();
+        if (selected == BrowserMode.POWSYBL && preparedProfiles.isEmpty()) {
+            cbBrowserMode.setValue(BrowserMode.RDF);
+            setStatus("Prepare a consistent PowsyBl network before opening its browser.");
+            return;
+        }
+        browserMode = selected;
+        if (browserMode == BrowserMode.POWSYBL) showPowsyblBrowser(); else showRdfBrowser();
+        if (browserMode == BrowserMode.RDF && gridViewVisible) actionToggleGraphContent(new ActionEvent());
+    }
+
+    private void showRdfBrowser() {
+        browserMode = BrowserMode.RDF;
+        cbGrouping.setDisable(false);
+        buildTreeItems();
+    }
+
+    private void showPowsyblBrowser() {
+        cbGrouping.setDisable(false);
+        setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
+        Thread treeTask = new Thread(() -> {
+            try {
+                PowsyblBridge.IidmElement root = powsybl.iidmTree();
+                Platform.runLater(() -> { iidmRoot = root; showIidmTree(); resetProgressBar(); setStatus("Browsing the prepared IIDM network."); });
+            } catch (Exception e) { Platform.runLater(() -> { cbBrowserMode.setValue(BrowserMode.RDF); showRdfBrowser(); resetProgressBar(); setStatus("Could not build PowsyBl browser: " + describe(e)); }); }
+        }, "powsybl-iidm-browser");
+        treeTask.setDaemon(true); treeTask.start();
+    }
+
+    private static TreeItem<NodeValue> iidmItem(PowsyblBridge.IidmElement element) {
+        TreeItem<NodeValue> item = new TreeItem<>(NodeValue.subject(element.label(), element.id()));
+        for (PowsyblBridge.IidmElement child : element.children()) item.getChildren().add(iidmItem(child));
+        return item;
+    }
+
+    private void showIidmTree() {
+        if (cbGrouping.getValue() != Grouping.CLASS) {
+            tvGraph.setRoot(iidmItem(iidmRoot)); tvGraph.setShowRoot(true); return;
+        }
+        TreeItem<NodeValue> root = new TreeItem<>(NodeValue.info("IIDM network by type"));
+        Map<String, List<PowsyblBridge.IidmElement>> byType = new java.util.TreeMap<>();
+        collectIidmByType(iidmRoot, byType);
+        for (Map.Entry<String, List<PowsyblBridge.IidmElement>> entry : byType.entrySet()) {
+            List<String> ids = entry.getValue().stream().map(PowsyblBridge.IidmElement::id).filter(id -> !id.isBlank()).toList();
+            TreeItem<NodeValue> folder = new TreeItem<>(NodeValue.classNode(entry.getKey() + " (" + ids.size() + ")", entry.getKey(), ids));
+            for (PowsyblBridge.IidmElement element : entry.getValue()) folder.getChildren().add(iidmItem(element));
+            root.getChildren().add(folder);
+        }
+        tvGraph.setRoot(root); tvGraph.setShowRoot(false);
+    }
+
+    private static void collectIidmByType(PowsyblBridge.IidmElement element,
+                                          Map<String, List<PowsyblBridge.IidmElement>> byType) {
+        if (!element.id().isBlank()) byType.computeIfAbsent(element.type(), ignored -> new ArrayList<>()).add(element);
+        for (PowsyblBridge.IidmElement child : element.children()) collectIidmByType(child, byType);
+    }
+
+    /** Must run on the FX thread; called through Platform.runLater from FXML initialization. */
+    private void createGridView() {
+        if (gridView != null) return;
+        gridView = new WebView();
+        gridView.setMinSize(0, 0);
+        // WebEngine exposes window.status as a regular JavaFX event.  It gives the local SVG
+        // interaction layer a supported callback channel without the deprecated JSObject API.
+        gridView.getEngine().setOnStatusChanged(event -> handleGridStatus(event.getData()));
+        gridView.getEngine().getLoadWorker().stateProperty().addListener((obs, oldState, state) -> {
+            if (state == javafx.concurrent.Worker.State.SUCCEEDED) {
+                applyGridZoom();
+            }
+        });
+        gridViewHost.getChildren().setAll(gridView);
+    }
+
+    /** A Grid render can finish before deferred WebView creation; retain it rather than losing it. */
+    private void showGridHtml(String html) {
+        if (gridView == null) {
+            Platform.runLater(() -> showGridHtml(html));
+            return;
+        }
+        gridView.getEngine().loadContent(html);
+    }
+
+    /**
+     * PowsyBl produces a static SVG.  Wrap it in a small, local interaction layer rather than
+     * relying on WebView's document zoom, which is inconsistent across JavaFX/WebKit releases.
+     * Wheel zoom is centred on the pointer; drag pans the drawing; the JavaFX toolbar calls the
+     * exposed setZoom/fit functions below.
+     */
+    private static String interactiveGridHtml(String svg) {
+        return """
+                <!doctype html>
+                <html><head><meta charset='utf-8'>
+                <style>
+                  html,body,#stage { margin:0; width:100%%; height:100%%; overflow:hidden; background:white; }
+                  #stage { position:relative; }
+                  /* PowsyBl may emit width='100%%' and height='100%%'. Give those percentages
+                     a real parent size before the SVG is placed in a transformed layer. */
+                  #canvas { position:absolute; left:0; top:0; width:100%%; height:100%%; transform-origin:0 0; cursor:grab; user-select:none; }
+                  #canvas svg { display:block; min-width:100%%; min-height:100%%; }
+                </style></head><body>
+                <div id='stage'><div id='canvas'>%s</div></div>
+                <script>
+                (() => {
+                  const stage = document.getElementById('stage');
+                  const canvas = document.getElementById('canvas');
+                  const svg = canvas.querySelector('svg');
+                  let scale = 1, x = 0, y = 0, drag = null;
+                  const clamp = value => Math.max(0.08, Math.min(12, value));
+                  const apply = () => canvas.style.transform = `translate(${x}px,${y}px) scale(${scale})`;
+                  const zoomAt = (target, px, py) => {
+                    target = clamp(target);
+                    const bounds = stage.getBoundingClientRect();
+                    const pointX = px - bounds.left, pointY = py - bounds.top;
+                    x = pointX - (pointX - x) * target / scale;
+                    y = pointY - (pointY - y) * target / scale;
+                    scale = target; apply(); return scale;
+                  };
+                  const fit = () => {
+                    if (!svg) { scale = 1; x = y = 0; apply(); return scale; }
+                    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+                    const width = (viewBox && viewBox.width) || svg.width.baseVal.value || svg.getBBox().width || 1;
+                    const height = (viewBox && viewBox.height) || svg.height.baseVal.value || svg.getBBox().height || 1;
+                    scale = clamp(Math.min(stage.clientWidth / width, stage.clientHeight / height));
+                    x = (stage.clientWidth - width * scale) / 2;
+                    y = (stage.clientHeight - height * scale) / 2;
+                    apply(); return scale;
+                  };
+                  window.cimpalSetZoom = target => zoomAt(target, stage.getBoundingClientRect().left + stage.clientWidth / 2,
+                                                           stage.getBoundingClientRect().top + stage.clientHeight / 2);
+                  window.cimpalFit = fit;
+                  stage.addEventListener('wheel', event => {
+                    event.preventDefault();
+                    zoomAt(scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15), event.clientX, event.clientY);
+                  }, {passive:false});
+                  stage.addEventListener('pointerdown', event => {
+                    drag = {pointerId:event.pointerId, x:event.clientX, y:event.clientY, originX:x, originY:y};
+                    stage.setPointerCapture(event.pointerId); canvas.style.cursor = 'grabbing';
+                  });
+                  stage.addEventListener('pointermove', event => {
+                    if (!drag || drag.pointerId !== event.pointerId) return;
+                    x = drag.originX + event.clientX - drag.x; y = drag.originY + event.clientY - drag.y; apply();
+                  });
+                  const stopDrag = event => {
+                    if (!drag || drag.pointerId !== event.pointerId) return;
+                    drag = null; canvas.style.cursor = 'grab';
+                  };
+                  stage.addEventListener('pointerup', stopDrag); stage.addEventListener('pointercancel', stopDrag);
+                  stage.addEventListener('contextmenu', event => {
+                    const target = event.target.closest('[data-iidm-id],[id]');
+                    const id = target && (target.dataset.iidmId || target.id);
+                    if (!id || id === 'stage' || id === 'canvas') return;
+                    event.preventDefault();
+                    window.status = 'cimpal-menu|' + encodeURIComponent(String(id)) + '|'
+                        + event.screenX + '|' + event.screenY;
+                  });
+                  // Start in the SVG's own native viewport. This is important for percentage-sized
+                  // PowsyBl SVGs; Fit remains available from the toolbar after it has rendered.
+                  apply();
+                })();
+                </script></body></html>
+                """.formatted(svg);
+    }
+
+    @FXML
     private void actionZoomIn(ActionEvent event) {
+        if (gridViewVisible) { setGridZoom(gridZoom * 1.2); return; }
         graphView.zoom(1.2);
     }
 
     @FXML
     private void actionZoomOut(ActionEvent event) {
+        if (gridViewVisible) { setGridZoom(gridZoom / 1.2); return; }
         graphView.zoom(1 / 1.2);
     }
 
     @FXML
     private void actionFitGraphView(ActionEvent event) {
+        if (gridViewVisible) { fitGridView(); return; }
         graphView.fitToView();
+    }
+
+    private void setGridZoom(double zoom) {
+        gridZoom = Math.max(0.1, Math.min(8.0, zoom));
+        applyGridZoom();
+        setStatus("Grid diagram zoom: " + Math.round(gridZoom * 100) + "% (mouse wheel zooms; drag to pan).");
+    }
+
+    private void applyGridZoom() {
+        if (gridView == null) return;
+        try { gridView.getEngine().executeScript("window.cimpalSetZoom && window.cimpalSetZoom(" + gridZoom + ")"); }
+        catch (Exception ignored) { }
+    }
+
+    /** Receives local SVG context-menu requests through WebEngine's supported status callback. */
+    private void handleGridStatus(String status) {
+        if (status == null || !status.startsWith("cimpal-menu|")) return;
+        String[] parts = status.split("\\|", 4);
+        if (parts.length != 4) return;
+        try {
+            String id = java.net.URLDecoder.decode(parts[1], StandardCharsets.UTF_8);
+            showGridElementMenu(id, Double.parseDouble(parts[2]), Double.parseDouble(parts[3]));
+        } catch (IllegalArgumentException ignored) {
+            // A malformed status message must not affect diagram interaction.
+        }
+    }
+
+    private void showGridElementMenu(String graphicId, double screenX, double screenY) {
+        String iidmId = resolveIidmId(graphicId);
+        ContextMenu menu = new ContextMenu();
+        MenuItem identity = new MenuItem(iidmId == null
+                ? "Diagram element: " + graphicId
+                : "IIDM element: " + iidmId);
+        identity.setDisable(true);
+        menu.getItems().add(identity);
+        if (iidmId == null) {
+            MenuItem unavailable = new MenuItem("No IIDM identity is attached to this SVG primitive");
+            unavailable.setDisable(true);
+            menu.getItems().add(unavailable);
+        } else {
+            MenuItem properties = new MenuItem("Show IIDM properties in table");
+            properties.setOnAction(event -> showIidmPropertiesFromDiagram(iidmId));
+            MenuItem reveal = new MenuItem("Reveal in PowsyBl browser");
+            reveal.setOnAction(event -> revealIidmElement(iidmId));
+            menu.getItems().addAll(properties, reveal);
+        }
+        menu.show(gridView, screenX, screenY);
+    }
+
+    /** SVG writers sometimes decorate an IIDM id; accept an exact id first, then a unique suffix match. */
+    private String resolveIidmId(String graphicId) {
+        if (graphicId == null || graphicId.isBlank() || iidmRoot == null) return null;
+        List<String> ids = new ArrayList<>();
+        collectIidmIds(iidmRoot, ids);
+        if (ids.contains(graphicId)) return graphicId;
+        List<String> matches = ids.stream().filter(id -> graphicId.endsWith(id)).toList();
+        return matches.size() == 1 ? matches.getFirst() : null;
+    }
+
+    private static void collectIidmIds(PowsyblBridge.IidmElement element, List<String> target) {
+        if (!element.id().isBlank()) target.add(element.id());
+        for (PowsyblBridge.IidmElement child : element.children()) collectIidmIds(child, target);
+    }
+
+    private void revealIidmElement(String id) {
+        if (iidmRoot == null) { setStatus("The PowsyBl browser is still being prepared."); return; }
+        if (browserMode != BrowserMode.POWSYBL) {
+            browserMode = BrowserMode.POWSYBL;
+            cbBrowserMode.setValue(BrowserMode.POWSYBL);
+        }
+        showIidmTree();
+        TreeItem<NodeValue> target = findIidmTreeItem(tvGraph.getRoot(), id);
+        if (target == null) { setStatus("The diagram element '" + id + "' is not present in the IIDM browser."); return; }
+        revealAndSelect(target);
+        setStatus("Revealed IIDM element: " + id);
+    }
+
+    private static TreeItem<NodeValue> findIidmTreeItem(TreeItem<NodeValue> item, String id) {
+        if (item == null) return null;
+        if (item.getValue() != null && id.equals(item.getValue().raw())) return item;
+        for (TreeItem<NodeValue> child : item.getChildren()) {
+            TreeItem<NodeValue> match = findIidmTreeItem(child, id);
+            if (match != null) return match;
+        }
+        return null;
+    }
+
+    private void showIidmPropertiesFromDiagram(String id) {
+        revealIidmElement(id);
+        tableViewVisible = true;
+        gridViewVisible = false;
+        tvGraphData.setVisible(true); tvGraphData.setManaged(true);
+        btnExportTable.setVisible(true); btnExportTable.setManaged(true);
+        graphView.setVisible(false); graphView.setManaged(false);
+        gridViewHost.setVisible(false); gridViewHost.setManaged(false);
+        cbGridDiagram.setVisible(false); cbGridDiagram.setManaged(false);
+        btnPowerFlow.setVisible(false); btnPowerFlow.setManaged(false);
+        btnGenerateGrid.setVisible(false); btnGenerateGrid.setManaged(false);
+        btnToggleGraphContent.setText("Grid view");
+        refreshIidmTable();
+    }
+
+
+    private void fitGridView() {
+        if (gridView == null) return;
+        try { gridView.getEngine().executeScript("window.cimpalFit && window.cimpalFit()"); }
+        catch (Exception ignored) { }
+        gridZoom = 1.0;
+        setStatus("Grid diagram fitted to the available view (mouse wheel zooms; drag to pan).");
+    }
+
+    /** Resolves selected top-level named-graph rows to their backing entries. */
+    private List<GraphEntry> selectedGraphEntries() {
+        Set<String> names = new LinkedHashSet<>();
+        for (TreeItem<NodeValue> item : tvGraph.getSelectionModel().getSelectedItems()) {
+            if (item != null && item.getValue() != null && item.getValue().kind() == NodeKind.GRAPH) {
+                names.add(item.getValue().raw());
+            }
+        }
+        return graphEntries.stream().filter(entry -> names.contains(entry.name())).toList();
+    }
+
+    /** Shows the scope that the next Apply will use; no selected named graph means all graphs. */
+    private void updateSelectedScopeLabel() {
+        if (lblGraphScope == null) return;
+        int count = selectedGraphEntries().size();
+        if (count > 0) {
+            lblGraphScope.setText("Scope: " + count + " selected graph(s)");
+        } else if (!activeGraphNames.isEmpty()) {
+            lblGraphScope.setText("Applied scope: " + activeGraphNames.size() + " selected graph(s)");
+        } else {
+            lblGraphScope.setText("Scope: all loaded graphs");
+        }
     }
 
     /**
      * Redraws the diagram for the current filter result and the highlighted rows.
      * <p>
-     * Highlighted graphs - rows of the list, or named-graph rows of the tree - set which graphs
+     * Highlighted named-graph rows set which graphs
      * are in scope; with none highlighted every filtered graph is. Any other highlighted tree row
      * is a focus resource, and the diagram is narrowed to those resources and their immediate
      * neighbours; a class folder contributes all of its instances.
      */
+    private void refreshIidmTable() {
+        TreeItem<NodeValue> selected = tvGraph.getSelectionModel().getSelectedItem();
+        if (selected == null || selected.getValue() == null || selected.getValue().raw().isBlank()) {
+            tvGraphData.getColumns().clear(); tvGraphData.getItems().clear();
+            setStatus("Select an IIDM element in the PowsyBl Browser to inspect its properties.");
+            return;
+        }
+        List<String> ids = selected.getValue().kind() == NodeKind.CLASS
+                ? selected.getValue().members() : List.of(selected.getValue().raw());
+        Thread task = new Thread(() -> {
+            try {
+                List<Map<String, String>> rows = new ArrayList<>();
+                Set<String> columns = new LinkedHashSet<>(); columns.add("Identifier");
+                for (String id : ids) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (PowsyblBridge.Property property : powsybl.iidmProperties(id)) row.put(property.name(), property.value());
+                    columns.addAll(row.keySet()); rows.add(row);
+                }
+                Platform.runLater(() -> displayTableResults(new SparqlTools.QueryResults(new ArrayList<>(columns), rows)));
+            } catch (Exception e) { Platform.runLater(() -> setStatus("Could not read IIDM properties: " + describe(e))); }
+        }, "powsybl-iidm-properties");
+        task.setDaemon(true); task.start();
+    }
+
+    private void redrawIidmGraph() {
+        TreeItem<NodeValue> root = tvGraph.getRoot();
+        if (root == null) { graphView.clear(); return; }
+        List<RdfGraphView.Edge> edges = new ArrayList<>();
+        iidmEdges(root, "iidm-network", "IIDM network", edges);
+        graphView.show(edges, MAX_GRAPH_NODES);
+        Platform.runLater(graphView::fitToView);
+        graphViewSummary = "IIDM containment graph: " + edges.size() + " relationship(s).";
+        updateViewStatus();
+    }
+
+    private static void iidmEdges(TreeItem<NodeValue> parent, String parentId, String parentLabel,
+                                  List<RdfGraphView.Edge> edges) {
+        for (TreeItem<NodeValue> child : parent.getChildren()) {
+            NodeValue value = child.getValue();
+            if (value == null) continue;
+            String id = value.raw().isBlank() ? parentId + "/" + value.label() : value.raw();
+            edges.add(new RdfGraphView.Edge(parentId, parentLabel, id, value.label(), "contains"));
+            iidmEdges(child, id, value.label(), edges);
+        }
+    }
+
     private void redrawGraphView() {
+        if (browserMode == BrowserMode.POWSYBL) { redrawIidmGraph(); return; }
+        if (!cbAutoRefresh.isSelected()) {
+            graphView.clear();
+            return;
+        }
         if (lastRows.isEmpty()) {
             graphView.clear();
-            lblGraphViewInfo.setText("Load RDF to draw the relationships.");
+            setStatus("Load RDF to draw the relationships.");
             return;
         }
 
         Set<String> selectedGraphs = new LinkedHashSet<>();
         Set<String> focusNodes = new LinkedHashSet<>();
-
-        for (GraphEntry entry : lvGraphs.getSelectionModel().getSelectedItems()) {
-            if (entry != null) {
-                selectedGraphs.add(entry.name());
-            }
-        }
 
         for (TreeItem<NodeValue> item : tvGraph.getSelectionModel().getSelectedItems()) {
             // A removed row can still be reported by the selection model for a moment.
@@ -781,7 +1477,8 @@ public class RDFVisualisationController implements Initializable {
                         .append(" nodes - narrow the filters or select a subject to see less at once.");
             }
         }
-        lblGraphViewInfo.setText(info.toString());
+        graphViewSummary = info.toString();
+        updateViewStatus();
     }
 
     /**
@@ -823,15 +1520,171 @@ public class RDFVisualisationController implements Initializable {
         return edges;
     }
 
+    /** Rebuilds the table from the current graph-browser selection or the optional SELECT query. */
+    private void refreshTable() {
+        if (tvGraphData == null) return;
+        if (browserMode == BrowserMode.POWSYBL) { refreshIidmTable(); return; }
+        try {
+            String query = taSparqlFilter.getText() == null ? "" : taSparqlFilter.getText().trim();
+            if (!query.isBlank()) {
+                List<GraphEntry> scope = activeGraphNames.isEmpty() ? List.copyOf(graphEntries)
+                        : graphEntries.stream().filter(entry -> activeGraphNames.contains(entry.name())).toList();
+                tableResults = executeVisualisationTableQuery(query, scope);
+            } else {
+                tableResults = treeRowsAsTable();
+            }
+            displayTableResults(tableResults);
+        } catch (Exception ex) {
+            tableResults = new SparqlTools.QueryResults(List.of(), List.of());
+            tvGraphData.getColumns().clear();
+            tvGraphData.getItems().clear();
+            setStatus("Table query failed: " + describe(ex));
+        }
+    }
+
+    /** Executes the table query over the same union and named-graph dataset used by Apply. */
+    private static SparqlTools.QueryResults executeVisualisationTableQuery(String queryText, List<GraphEntry> entries) {
+        Query query = QueryFactory.create(queryText);
+        if (!query.isSelectType()) throw new IllegalArgumentException("The visualisation query must be a SELECT query");
+        // Match the dedicated SPARQL tab exactly for ordinary queries: it executes against one
+        // combined default model. Named-graph support below is reserved for queries that ask for it.
+        if (!queryText.toUpperCase(Locale.ROOT).contains("GRAPH")) {
+            Model combined = ModelFactory.createDefaultModel();
+            entries.forEach(entry -> combined.add(entry.model()));
+            try {
+                return SparqlTools.executeSparqlQuery(queryText, combined);
+            } catch (Exception ex) {
+                throw new IllegalArgumentException(describe(ex), ex);
+            }
+        }
+        Dataset dataset = DatasetFactory.createTxnMem();
+        Model union = ModelFactory.createDefaultModel();
+        for (int i = 0; i < entries.size(); i++) {
+            dataset.addNamedModel("urn:cimpal:visualisation:graph:" + i, entries.get(i).model());
+            union.add(entries.get(i).model());
+        }
+        dataset.setDefaultModel(union);
+        List<String> columns = query.getResultVars();
+        List<Map<String, String>> rows = new ArrayList<>();
+        try (QueryExecution execution = QueryExecutionFactory.create(query, dataset)) {
+            ResultSet result = execution.execSelect();
+            while (result.hasNext()) {
+                QuerySolution solution = result.nextSolution();
+                Map<String, String> row = new LinkedHashMap<>();
+                for (String column : columns) {
+                    RDFNode value = solution.get(column);
+                    row.put(column, value == null ? "" : value.toString());
+                }
+                rows.add(row);
+            }
+        }
+        return new SparqlTools.QueryResults(columns, rows);
+    }
+
+    /** Turns the selected tree scope into one row per subject, with predicates as columns. */
+    private SparqlTools.QueryResults treeRowsAsTable() {
+        Set<String> graphNames = new LinkedHashSet<>();
+        Set<String> subjects = new LinkedHashSet<>();
+        for (TreeItem<NodeValue> item : tvGraph.getSelectionModel().getSelectedItems()) {
+            if (item == null || item.getValue() == null) continue;
+            NodeValue value = item.getValue();
+            if (value.kind() == NodeKind.GRAPH) graphNames.add(value.raw());
+            if (value.kind() == NodeKind.SUBJECT || value.kind() == NodeKind.REFERENCE) subjects.add(value.raw());
+            if (value.kind() == NodeKind.CLASS) subjects.addAll(value.members());
+        }
+        Map<String, Map<String, String>> rowsBySubject = new LinkedHashMap<>();
+        Set<String> predicates = new LinkedHashSet<>();
+        Filter filter = new Filter(text(tfSubjectFilter), text(tfPredicateFilter), text(tfObjectFilter), text(tfFullTextSearch));
+        for (GraphEntry graph : graphEntries) {
+            if (!graphNames.isEmpty() && !graphNames.contains(graph.name())) continue;
+            StmtIterator statements = graph.model().listStatements();
+            try {
+                while (statements.hasNext()) {
+                    Statement statement = statements.nextStatement();
+                    Term subject = term(statement.getSubject(), graph.labels());
+                    Term predicateTerm = term(statement.getPredicate(), graph.labels());
+                    Term object = term(statement.getObject(), graph.labels());
+                    if (!filter.accepts(subject, predicateTerm, object)
+                            || (!subjects.isEmpty() && !subjects.contains(subject.raw()))) continue;
+                String rowKey = graphMetadataVisible
+                        ? graph.name() + "\u0000" + subject.raw()
+                        : subject.raw();
+                Map<String, String> row = rowsBySubject.computeIfAbsent(rowKey, ignored -> {
+                            Map<String, String> values = new LinkedHashMap<>();
+                            values.put("Subject", subject.label());
+                            if (graphMetadataVisible) values.put("Graph", graph.name());
+                            return values;
+                        });
+                    String predicate = predicateTerm.label();
+                    predicates.add(predicate);
+                    row.merge(predicate, object.label(),
+                            (first, next) -> first.equals(next) ? first : first + " | " + next);
+                }
+            } finally {
+                statements.close();
+            }
+        }
+        List<String> columns = new ArrayList<>();
+        columns.add("Subject");
+        if (graphMetadataVisible) columns.add("Graph");
+        columns.addAll(predicates);
+        return new SparqlTools.QueryResults(columns, new ArrayList<>(rowsBySubject.values()));
+    }
+
+    private void displayTableResults(SparqlTools.QueryResults results) {
+        tvGraphData.getColumns().clear();
+        tvGraphData.getItems().clear();
+        if (!cbAutoRefresh.isSelected()) {
+            tableViewSummary = "Automatic table updates are paused.";
+            updateViewStatus();
+            return;
+        }
+        for (String name : results.columns) {
+            TableColumn<Map<String, String>, String> column = new TableColumn<>(name);
+            column.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
+                    data.getValue().getOrDefault(name, "")));
+            column.setMinWidth(120);
+            tvGraphData.getColumns().add(column);
+        }
+        tvGraphData.getItems().setAll(results.rows);
+        boolean query = taSparqlFilter.getText() != null && !taSparqlFilter.getText().isBlank();
+        int selectedGraphCount = activeGraphNames.size();
+        String scope = selectedGraphCount == 0 ? "all loaded graphs" : selectedGraphCount + " selected graph(s)";
+        tableViewSummary = (query ? "SPARQL query in " + scope : "Tree selection") + ": " + results.rows.size() + " row(s), "
+                + results.columns.size() + " column(s).";
+        updateViewStatus();
+    }
+
+    @FXML
+    private void actionExportTable(ActionEvent event) {
+        if (tableResults.columns.isEmpty()) {
+            GUIhelper.showWarning("Nothing to export", "Populate the table with a tree selection or a SELECT query first.");
+            return;
+        }
+        try {
+            File output = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom(
+                    "Excel file", List.of("*.xlsx"), "Save graph table", "graph-results.xlsx");
+            if (output == null) return;
+            if (!output.getName().toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
+                output = new File(output.getAbsolutePath() + ".xlsx");
+            }
+            SparqlTools.exportResultsToExcel(tableResults, output);
+            setStatus("Exported " + tableResults.rows.size() + " table row(s) to " + output.getName() + ".");
+        } catch (Exception ex) {
+            GUIhelper.showUserFriendlyError("Export failed", "Could not export the graph table to Excel.", ex);
+        }
+    }
+
     @FXML
     private void actionClearAll(ActionEvent event) {
         graphEntries.clear();
         clearFilterFields();
         subjectLimit = MAX_SUBJECTS_PER_GRAPH;
+        allSubjectsVisible = false;
+        btnToggleAllSubjects.setText("∞");
         lastRows = List.of();
         buildTreeItems();
         graphView.clear();
-        lblGraphViewInfo.setText("Load RDF to draw the relationships.");
         lastLoadNote = "";
         resetProgressBar();
         setStatus("No data loaded. Use Load RDF files... to begin.");
@@ -855,6 +1708,24 @@ public class RDFVisualisationController implements Initializable {
         tfPredicateFilter.clear();
         tfObjectFilter.clear();
         tfFullTextSearch.clear();
+        taSparqlFilter.clear();
+    }
+
+    @FXML
+    private void actionLoadSparqlQuery(ActionEvent event) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Open SPARQL query");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("SPARQL query files", "*.rq", "*.sparql"),
+                new FileChooser.ExtensionFilter("All files", "*.*"));
+        File queryFile = chooser.showOpenDialog(taSparqlFilter.getScene().getWindow());
+        if (queryFile == null) return;
+        try {
+            taSparqlFilter.setText(Files.readString(queryFile.toPath(), StandardCharsets.UTF_8));
+            setStatus("Loaded SPARQL filter from " + queryFile.getName() + ". Press Apply to execute it.");
+        } catch (IOException ex) {
+            GUIhelper.showUserFriendlyError("Query loading failed", "The SPARQL query file could not be opened.", ex);
+        }
     }
 
     /**
@@ -863,25 +1734,30 @@ public class RDFVisualisationController implements Initializable {
      * lazily, as the user expands nodes.
      */
     private void rebuildTree() {
-        if (suppressRebuild) {
-            return;
-        }
-        List<GraphEntry> selected = graphEntries.stream().filter(GraphEntry::isSelected).toList();
+        List<GraphEntry> selectedByUser = selectedGraphEntries();
+        List<GraphEntry> queryScope = selectedByUser.isEmpty() ? List.copyOf(graphEntries) : selectedByUser;
+        // Always keep every loaded graph at the browser's top level. The scope limits the query,
+        // not whether source graphs disappear after Apply.
+        List<GraphEntry> selected = List.copyOf(graphEntries);
+        activeGraphNames = selectedByUser.stream().map(GraphEntry::name)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        lblGraphScope.setText(activeGraphNames.isEmpty() ? "Scope: all loaded graphs"
+                : "Scope: " + activeGraphNames.size() + " selected graph(s)");
         if (selected.isEmpty()) {
             lastRows = List.of();
             buildTreeItems();
             graphView.clear();
-            lblGraphViewInfo.setText("No graph is ticked.");
             setStatus(graphEntries.isEmpty()
                     ? "No data loaded. Use Load RDF files... to begin."
-                    : "No graph is ticked. Tick at least one graph in the list to see its triples.");
+                    : "No graphs are available.");
             return;
         }
 
         Filter filter = new Filter(
                 text(tfSubjectFilter), text(tfPredicateFilter), text(tfObjectFilter), text(tfFullTextSearch));
+        String sparqlQuery = taSparqlFilter.getText() == null ? "" : taSparqlFilter.getText().trim();
 
-        setStatus("Filtering...");
+        setStatus("Filtering " + (activeGraphNames.isEmpty() ? "all loaded graphs" : activeGraphNames.size() + " selected graph(s)") + "...");
         setProgressBar(ProgressIndicator.INDETERMINATE_PROGRESS);
         btnApplyFilters.setDisable(true);
 
@@ -892,24 +1768,42 @@ public class RDFVisualisationController implements Initializable {
         // thread that already shows a progress indicator instead of on a click.
         List<GraphEntry> loaded = new ArrayList<>(graphEntries);
         Thread scanner = new Thread(() -> {
-            loaded.forEach(GraphEntry::warmLocalNames);
-            List<GraphRows> rows = new ArrayList<>(selected.size());
-            for (GraphEntry entry : selected) {
-                rows.add(scan(entry, filter, limit));
-            }
+            try {
+                loaded.forEach(GraphEntry::warmLocalNames);
+                Set<String> sparqlSubjects = sparqlQuery.isBlank() ? null
+                        : executeSparqlSubjectFilter(sparqlQuery, queryScope, filter);
+                // Evaluate the result table from the captured in-memory scope here, alongside
+                // filtering, rather than later from whichever tree rows happen to be visible.
+                SparqlTools.QueryResults queryResults = sparqlQuery.isBlank() ? null
+                        : executeVisualisationTableQuery(sparqlQuery, queryScope);
+                List<GraphRows> rows = new ArrayList<>(selected.size());
+                for (GraphEntry entry : selected) {
+                    Set<String> entrySubjects = activeGraphNames.isEmpty() || activeGraphNames.contains(entry.name())
+                            ? sparqlSubjects : null;
+                    rows.add(scan(entry, filter, entrySubjects, limit));
+                }
 
-            Platform.runLater(() -> {
-                showRows(rows);
-                btnApplyFilters.setDisable(false);
-                resetProgressBar();
-            });
+                Platform.runLater(() -> {
+                    showRows(rows, queryResults);
+                    btnApplyFilters.setDisable(false);
+                    resetProgressBar();
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    btnApplyFilters.setDisable(false);
+                    resetProgressBar();
+                    setStatus("SPARQL filter failed: " + describe(ex));
+                    GUIhelper.showUserFriendlyError("SPARQL filter failed",
+                            "Use a SELECT query that returns a ?s subject variable.", ex);
+                });
+            }
         }, "rdf-visualisation-filter");
         scanner.setDaemon(true);
         scanner.start();
     }
 
     /** One pass over a graph, grouping the matching triples by subject in subject-label order. */
-    private static GraphRows scan(GraphEntry entry, Filter filter, int subjectLimit) {
+    private static GraphRows scan(GraphEntry entry, Filter filter, Set<String> sparqlSubjects, int subjectLimit) {
         Model model = entry.model();
         // The graph's own Labels, kept for its lifetime rather than made fresh per scan, so a
         // namespace it had to invent a prefix for keeps that prefix everywhere: in the rows, in
@@ -918,6 +1812,7 @@ public class RDFVisualisationController implements Initializable {
         Map<String, SubjectRows> bySubject = new LinkedHashMap<>();
         int total = 0;
         int matched = 0;
+        Set<String> matchingSubjects = new HashSet<>();
         boolean truncated = false;
 
         StmtIterator it = model.listStatements();
@@ -933,7 +1828,11 @@ public class RDFVisualisationController implements Initializable {
                 if (!filter.accepts(subject, predicate, object)) {
                     continue;
                 }
+                if (sparqlSubjects != null && !sparqlSubjects.contains(subject.raw())) {
+                    continue;
+                }
                 matched++;
+                matchingSubjects.add(subject.raw());
 
                 SubjectRows rowsForSubject = bySubject.get(subject.raw());
                 if (rowsForSubject == null) {
@@ -956,14 +1855,73 @@ public class RDFVisualisationController implements Initializable {
                 Comparator.comparing((TripleRow t) -> t.predicate().label(), String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(t -> t.object().label(), String.CASE_INSENSITIVE_ORDER)));
 
-        return new GraphRows(entry.name(), subjects, matched, total, truncated);
+        return new GraphRows(entry.name(), subjects, matchingSubjects.size(), matched, total, truncated);
     }
 
-    private void showRows(List<GraphRows> rows) {
+    /** Runs a SELECT ?s query over the textual-filter result, as both union and named graphs. */
+    private static Set<String> executeSparqlSubjectFilter(String queryText, List<GraphEntry> entries, Filter filter) {
+        Query query = QueryFactory.create(queryText);
+        if (!query.isSelectType()) {
+            throw new IllegalArgumentException("The visualisation query must be a SELECT query");
+        }
+        // A query with no ?s is still useful in Table view (for example SELECT ?class ?count).
+        // It cannot say which tree subjects to retain, so leave the tree governed by its other
+        // filters while the table shows the query's result columns and rows.
+        if (!query.getResultVars().contains("s")) {
+            return null;
+        }
+        Dataset dataset = DatasetFactory.createTxnMem();
+        Model union = ModelFactory.createDefaultModel();
+        int graphNumber = 0;
+        for (GraphEntry entry : entries) {
+            Model filtered = ModelFactory.createDefaultModel();
+            StmtIterator statements = entry.model().listStatements();
+            try {
+                while (statements.hasNext()) {
+                    Statement statement = statements.nextStatement();
+                    if (filter.accepts(term(statement.getSubject(), entry.labels()),
+                            term(statement.getPredicate(), entry.labels()), term(statement.getObject(), entry.labels()))) {
+                        filtered.add(statement);
+                    }
+                }
+            } finally {
+                statements.close();
+            }
+            dataset.addNamedModel("urn:cimpal:visualisation:graph:" + graphNumber++, filtered);
+            union.add(filtered);
+        }
+        dataset.setDefaultModel(union);
+
+        Set<String> subjects = new HashSet<>();
+        try (QueryExecution execution = QueryExecutionFactory.create(query, dataset)) {
+            ResultSet results = execution.execSelect();
+            while (results.hasNext()) {
+                QuerySolution solution = results.nextSolution();
+                RDFNode subject = solution.get("s");
+                if (subject != null && (subject.isURIResource() || subject.isAnon())) {
+                    subjects.add(rawResourceId(subject));
+                }
+            }
+        }
+        return subjects;
+    }
+
+    private static String rawResourceId(RDFNode node) {
+        return node.isURIResource() ? node.asResource().getURI()
+                : "_:" + node.asResource().getId().getLabelString();
+    }
+
+    private void showRows(List<GraphRows> rows, SparqlTools.QueryResults queryResults) {
         lastRows = rows;
         buildTreeItems();
         setStatus(statusText(rows));
         redrawGraphView();
+        if (queryResults != null) {
+            tableResults = queryResults;
+            displayTableResults(queryResults);
+        } else {
+            refreshTable();
+        }
     }
 
     /**
@@ -996,13 +1954,12 @@ public class RDFVisualisationController implements Initializable {
         }
 
         // The named-graph level only earns its extra click when there is more than one graph.
-        if (lastRows.size() == 1) {
-            root.getChildren().setAll(groupedItems(lastRows.getFirst()));
-        } else {
+        {
             List<TreeItem<NodeValue>> graphItems = new ArrayList<>(lastRows.size());
             for (GraphRows graph : lastRows) {
-                String label = graph.name() + "  (" + graph.subjects().size() + " subject"
-                        + (graph.subjects().size() == 1 ? "" : "s") + ", "
+                String label = graph.name() + "  (" + graph.subjectCount() + " subject"
+                        + (graph.subjectCount() == 1 ? "" : "s")
+                        + (graph.truncated() ? ", showing first " + graph.subjects().size() : "") + ", "
                         + graph.matched() + " of " + graph.total() + " triples)";
                 graphItems.add(new LazyItem(NodeValue.graph(label, graph.name()),
                         () -> groupedItems(graph)));
@@ -1744,11 +2701,13 @@ public class RDFVisualisationController implements Initializable {
         btnClearAll.setDisable(empty);
         // Merging needs at least two graphs to merge.
         btnMergeGraphs.setDisable(graphEntries.size() < 2);
+        btnPreparePowsybl.setDisable(empty);
+        btnReleasePowsybl.setDisable(empty);
     }
 
     private void setLoadingControlsDisabled(boolean disabled) {
         btnApplyFilters.setDisable(disabled);
-        lvGraphs.setDisable(disabled);
+        tvGraph.setDisable(disabled);
     }
 
     private String statusText(List<GraphRows> rows) {
@@ -1770,8 +2729,20 @@ public class RDFVisualisationController implements Initializable {
     }
 
     private void setStatus(String message) {
-        if (lblStatus != null) {
-            lblStatus.setText(message);
+        statusMessage = message == null ? "" : message;
+        if (mainController != null) {
+            mainController.setStatusMessage(statusMessage);
+        }
+    }
+
+    /** Combines the two view summaries in the application-wide bottom status bar. */
+    private void updateViewStatus() {
+        if (graphViewSummary.isBlank()) {
+            setStatus(tableViewSummary);
+        } else if (tableViewSummary.isBlank()) {
+            setStatus(graphViewSummary);
+        } else {
+            setStatus(graphViewSummary + "  |  " + tableViewSummary);
         }
     }
 
@@ -1809,6 +2780,13 @@ public class RDFVisualisationController implements Initializable {
         }
     }
 
+    private enum BrowserMode {
+        RDF("RDF Browser"), POWSYBL("PowsyBl Browser");
+        private final String label;
+        BrowserMode(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
+
     /** An RDF term as shown ({@code label}) and as matched and copied ({@code raw}). */
     private record Term(String label, String raw, boolean resource) {
         boolean contains(String needle) {
@@ -1842,7 +2820,7 @@ public class RDFVisualisationController implements Initializable {
     private record SubjectRows(Term subject, List<TripleRow> triples) {
     }
 
-    private record GraphRows(String name, List<SubjectRows> subjects, int matched, int total,
+    private record GraphRows(String name, List<SubjectRows> subjects, int subjectCount, int matched, int total,
                              boolean truncated) {
     }
 
@@ -2127,17 +3105,19 @@ public class RDFVisualisationController implements Initializable {
         private final String name;
         private final Model model;
         private final String base;
+        /** Original XML/RDF file or ZIP used for direct PowSyBl import; null for derived merges. */
+        private final java.nio.file.Path source;
         private final long tripleCount;
-        private final BooleanProperty selected = new SimpleBooleanProperty(true);
         /** Shortening for this graph, shared by every scan and every later lookup. */
         private final Labels labels;
         /** Local name to the subject URI that carries it. Built on demand; see the accessor. */
         private Map<String, String> localNames;
 
-        GraphEntry(String name, Model model, String base) {
+        GraphEntry(String name, Model model, String base, java.nio.file.Path source) {
             this.name = name;
             this.model = model;
             this.base = base;
+            this.source = source;
             this.tripleCount = model.size();
             this.labels = new Labels(model, base);
         }
@@ -2198,17 +3178,12 @@ public class RDFVisualisationController implements Initializable {
             return base;
         }
 
+        java.nio.file.Path source() { return source; }
+
         long tripleCount() {
             return tripleCount;
         }
 
-        BooleanProperty selectedProperty() {
-            return selected;
-        }
-
-        boolean isSelected() {
-            return selected.get();
-        }
     }
 
     /**
@@ -2298,39 +3273,4 @@ public class RDFVisualisationController implements Initializable {
         }
     }
 
-    /** Graph list row: a tick box controlling inclusion in the tree, plus the triple count. */
-    private final class GraphEntryCell extends ListCell<GraphEntry> {
-        private final CheckBox checkBox = new CheckBox();
-        private GraphEntry bound;
-
-        private GraphEntryCell() {
-            checkBox.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
-                if (bound != null && bound.isSelected() != isSelected) {
-                    bound.selectedProperty().set(isSelected);
-                    // Ticking says nothing about which row is highlighted: moving the
-                    // highlight here would silently change what the graph view draws.
-                    rebuildTree();
-                }
-            });
-            checkBox.setTooltip(new Tooltip("Include this graph in the tree and the graph view"));
-        }
-
-        @Override
-        protected void updateItem(GraphEntry entry, boolean empty) {
-            super.updateItem(entry, empty);
-            bound = null;
-            if (empty || entry == null) {
-                setText(null);
-                setGraphic(null);
-                return;
-            }
-            checkBox.setSelected(entry.isSelected());
-            bound = entry;
-            // The name is the cell's own text, not the checkbox's: a checkbox carrying the whole
-            // label spans the row and consumes the click, so the row could never be selected and
-            // "Remove selected" always found an empty selection.
-            setText(entry.name() + "  (" + entry.tripleCount() + ")");
-            setGraphic(checkBox);
-        }
-    }
 }

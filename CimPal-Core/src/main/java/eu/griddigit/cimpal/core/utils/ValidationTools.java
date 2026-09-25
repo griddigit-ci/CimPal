@@ -2,13 +2,22 @@ package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.compose.MultiUnion;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFParser;
+import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.shacl.ShaclValidator;
+import org.apache.jena.shacl.Shapes;
 import org.apache.jena.shacl.ValidationReport;
+import org.apache.jena.shacl.engine.ValidationContext;
+import org.apache.jena.shacl.parser.Shape;
+import org.apache.jena.shacl.validation.VLib;
+import org.apache.jena.shacl.validation.ValidationProc;
+import org.apache.jena.shacl.validation.event.ConstraintEvaluatedEvent;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -17,6 +26,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDateTime;
@@ -50,11 +60,23 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HexFormat;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
 
 public class ValidationTools {
+    private static volatile boolean exportTurtleValidationReports;
+
+    public static void setExportTurtleValidationReports(boolean enabled) { exportTurtleValidationReports = enabled; }
 
 
-    private static final boolean DEBUG = true;
+    /**
+     * Detailed row-level logging opens and appends to a shared file for every event. Keeping it
+     * off in ordinary runs avoids serialising validation workers on that file I/O lock. Enable
+     * it for a diagnostic run with {@code -Dcimpal.validation.debug=true}.
+     */
+    private static volatile boolean DEBUG = Boolean.getBoolean("cimpal.validation.debug");
     private static final boolean DEBUG_TO_CONSOLE = false;
 
     // Diagnostic log lives under the per-user application data directory. A fixed path in a
@@ -114,6 +136,33 @@ public class ValidationTools {
             DateTimeFormatter.ofPattern("LLLL yyyy", Locale.ENGLISH);
 
     private ValidationTools() { }
+
+    /** Enables or disables detailed validation diagnostics for the current application session. */
+    public static void setValidationDebugEnabled(boolean enabled) {
+        DEBUG = enabled;
+    }
+
+    /** Starts a fresh diagnostic log for workflows that do not use mapping validation. */
+    public static void startValidationDebugRun(String workflow) {
+        if (!DEBUG) return;
+        try {
+            Files.deleteIfExists(DEBUG_LOG_PATH);
+        } catch (IOException e) {
+            System.err.println("[DBG_LOG_ERROR] Could not delete old debug log: " + e.getMessage());
+        }
+        dbg("START " + workflow);
+        printMemory("start " + workflow);
+    }
+
+    /** Adds a workflow-level event to the optional validation diagnostic log. */
+    public static void logValidationDebug(String message) {
+        dbg(message);
+    }
+
+    /** Location of the optional validation diagnostic log. */
+    public static Path getValidationDebugLogPath() {
+        return DEBUG_LOG_PATH;
+    }
 
     /**
      * Forgets what has already been fetched from a remote host, so the next fetch of each URL
@@ -241,7 +290,54 @@ public class ValidationTools {
                                                           String xmlBase,
                                                           Path previousComparisonCsv)    // NEW  nullable
             throws IOException {
+        return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot,
+                outputBaseDir, threadCount, dataTypeMap, xmlBase, previousComparisonCsv, 0, ValidationEngine.APACHE_JENA);
+    }
 
+    /**
+     * Runs timestamped validation, optionally stopping a target-shape evaluation after the first
+     * results beyond the configured per-source-shape limit. A value of zero means no limit.
+     * <p>
+     * The sampled path uses Jena's validation listener to interrupt an affected target shape.
+     * Constraints that produce no findings, or only a few findings, still run completely.
+     */
+    public static ValidationTimestampedRunSummary validateByTimestampedMapping(Path mappingCsvPath,
+                                                          Path inputPath,
+                                                          Path constraintsRoot,
+                                                          Path outputBaseDir,
+                                                          int threadCount,
+                                                          Map<String, RDFDatatype> dataTypeMap,
+                                                          String xmlBase,
+                                                          Path previousComparisonCsv,
+                                                          int maxResultsPerConstraint)
+            throws IOException {
+        return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, previousComparisonCsv, maxResultsPerConstraint,
+                ValidationEngine.APACHE_JENA);
+    }
+
+    /**
+     * Timestamped mapping validation using the selected engine. The mapping resolution,
+     * datatype mapping, import resolution, report generation and Excel writers are shared by
+     * every engine; only the final validation of each selected graph pair changes.
+     */
+    public static ValidationTimestampedRunSummary validateByTimestampedMapping(Path mappingCsvPath,
+                                                          Path inputPath,
+                                                          Path constraintsRoot,
+                                                          Path outputBaseDir,
+                                                          int threadCount,
+                                                          Map<String, RDFDatatype> dataTypeMap,
+                                                          String xmlBase,
+                                                          Path previousComparisonCsv,
+                                                          int maxResultsPerConstraint,
+                                                          ValidationEngine validationEngine)
+            throws IOException {
+
+        if (maxResultsPerConstraint < 0) {
+            throw new IllegalArgumentException("maxResultsPerConstraint must be zero or greater");
+        }
+
+        validationEngine = validationEngine == null ? ValidationEngine.APACHE_JENA : validationEngine;
         long allStart = System.currentTimeMillis();
 
         if (DEBUG) {
@@ -252,7 +348,9 @@ public class ValidationTools {
             }
         }
 
-        dbg("START validateByTimestampedMapping");
+        dbg("START validateByTimestampedMapping engine=" + validationEngine
+                + " workers=" + threadCount
+                + " resultLimit=" + maxResultsPerConstraint);
         printMemory("start validateByTimestampedMapping");
 
         //a run re-reads every input: nothing carries over from the previous one
@@ -262,9 +360,8 @@ public class ValidationTools {
 
         List<MappingRow> mappingRows = readMappingCsv(mappingCsvPath);
 
-        int threads = (threadCount > 0)
-                ? threadCount
-                : Math.min(Math.max(1, Runtime.getRuntime().availableProcessors() - 1), 6);
+        TimestampExecutionPlan executionPlan = TimestampExecutionPlan.create(threadCount, validationEngine);
+        int threads = executionPlan.rowWorkers();
 
         consoleInput("validateByTimestampedMapping");
         consoleInput("mappingCsvPath=" + mappingCsvPath.toAbsolutePath());
@@ -272,9 +369,13 @@ public class ValidationTools {
         consoleInput("constraintsRoot=" + constraintsRoot.toAbsolutePath());
         consoleInput("outputBaseDir=" + outputBaseDir.toAbsolutePath());
         consoleInput("mapping rows=" + mappingRows.size());
-        consoleInput("threads=" + threads);
+        consoleInput("timestamp parallelism=" + executionPlan.timestampWorkers()
+                + " row workers per timestamp=" + threads);
+        consoleInput("max results per constraint="
+                + (maxResultsPerConstraint == 0 ? "unlimited" : maxResultsPerConstraint));
+        consoleInput("validation engine=" + validationEngine.displayName());
 
-        Map<String, Model> shapesCache = new ConcurrentHashMap<>();
+        Map<String, CachedShapes> shapesCache = new ConcurrentHashMap<>();
         List<Path> createdReports = new ArrayList<>();
         int totalConforming = 0;
         int totalViolations = 0;
@@ -299,7 +400,14 @@ public class ValidationTools {
 
                 printMemory("before input group " + inputGroup.name);
 
+                logInfo("START input metadata discovery group=" + inputGroup.name
+                        + " localRoots=" + inputGroup.roots.size()
+                        + " zipXmlEntries=" + inputGroup.zipEntriesByVirtualPath.size());
+                long metadataDiscoveryStart = System.currentTimeMillis();
                 List<XmlFileMetadata> metadata = discoverXmlMetadataForInputGroup(inputGroup);
+                logInfo("DONE input metadata discovery group=" + inputGroup.name
+                        + " xmlFiles=" + metadata.size()
+                        + " elapsedMs=" + (System.currentTimeMillis() - metadataDiscoveryStart));
 
                 if (metadata.isEmpty()) {
                     logWarn("No XML metadata discovered for input group=" + inputGroup.name);
@@ -318,6 +426,29 @@ public class ValidationTools {
 
                 try (ValidationExcelWriter summaryWriter = ValidationExcelWriter.createTimestampedSummaryWriter()) {
 
+                    // Resolve and record input checks on this (writer-owning) thread.  The
+                    // resulting graph validations are independent and can safely share only the
+                    // concurrent shape/static-model caches.
+                    Map<TimestampGroup, ResolvedRowsAndInputChecks> plannedTimestamps = new LinkedHashMap<>();
+                    for (TimestampGroup timestampGroup : tsoIndex.byTimestamp.values()) {
+                        ResolvedRowsAndInputChecks resolved = buildResolvedRowsForTimestampKeepingPairings(
+                                mappingRows, tsoIndex, timestampGroup, constraintsRoot);
+                        appendMappingRowInputChecks(summaryWriter, resolved.inputChecks);
+                        appendMappingRowInputChecks(allCountriesSummaryWriter, resolved.inputChecks);
+                        if (resolved.resolvedRows.isEmpty()) {
+                            logWarn("No resolved validation rows for inputGroup=" + inputGroup.name
+                                    + " timestamp=" + timestampGroup.timestamp);
+                        } else {
+                            plannedTimestamps.put(timestampGroup, resolved);
+                        }
+                    }
+
+                    Map<TimestampGroup, List<ValidationTaskResult>> timestampResults =
+                            executeTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
+                                    shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
+                                    dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
+                                    threadCount <= 0, inputGroup.name);
+
                     for (TimestampGroup timestampGroup : tsoIndex.byTimestamp.values()) {
                         long timestampStart = System.currentTimeMillis();
 
@@ -327,54 +458,11 @@ public class ValidationTools {
                         printMemory("before timestamp run "
                                 + inputGroup.name + " " + timestampGroup.timestamp);
 
-                        ResolvedRowsAndInputChecks resolved =
-                                buildResolvedRowsForTimestampKeepingPairings(
-                                        mappingRows,
-                                        tsoIndex,
-                                        timestampGroup,
-                                        constraintsRoot
-                                );
+                        ResolvedRowsAndInputChecks resolved = plannedTimestamps.get(timestampGroup);
+                        if (resolved == null) continue;
 
                         List<ResolvedMappingRow> resolvedRows = resolved.resolvedRows;
-
-                        appendMappingRowInputChecks(
-                                summaryWriter,
-                                resolved.inputChecks
-                        );
-
-                        appendMappingRowInputChecks(
-                                allCountriesSummaryWriter,
-                                resolved.inputChecks
-                        );
-
-                        if (resolvedRows.isEmpty()) {
-                            logWarn("No resolved validation rows for inputGroup="
-                                    + inputGroup.name + " timestamp=" + timestampGroup.timestamp);
-
-                            continue;
-                        }
-
-                        Map<Path, Model> timestampXmlModelCache = new ConcurrentHashMap<>();
-
-                        List<ValidationTaskResult> results;
-
-                        try {
-                            results = executeResolvedRows(
-                                    resolvedRows,
-                                    constraintsRoot,
-                                    shapesCache,
-                                    staticXmlModelCache,
-                                    timestampXmlModelCache,
-                                    threads,
-                                    dataTypeMap,
-                                    xmlBase
-                            );
-                        } finally {
-                            timestampXmlModelCache.clear();
-
-                            printMemory("after clearing timestampXmlModelCache "
-                                    + inputGroup.name + " " + timestampGroup.timestamp);
-                        }
+                        List<ValidationTaskResult> results = timestampResults.get(timestampGroup);
 
                         for (ValidationTaskResult r : results) {
                             if (r.error != null) totalErrors++;
@@ -391,10 +479,19 @@ public class ValidationTools {
 
                         try (ValidationExcelWriter timestampWriter = new ValidationExcelWriter()) {
                             timestampWriter.setReportContext(analysisName, inputGroup.name, timestampGroup.timestamp); // NEW
-                            appendTaskResultsToWriter(timestampWriter, results);
+                            long reportRowsStart = System.currentTimeMillis();
+                            appendTaskResultsToWriter(timestampWriter, results, maxResultsPerConstraint);
+                            if (exportTurtleValidationReports) {
+                                for (ValidationTaskResult result : results) saveValidationReportTurtle(groupOutputDir, result);
+                            }
+                            dbg("DONE append timestamp report rows inputGroup=" + inputGroup.name
+                                    + " timestamp=" + timestampGroup.timestamp, reportRowsStart);
 
+                            long reportSaveStart = System.currentTimeMillis();
                             timestampReport = saveTimestampReport(
                                     timestampWriter, groupOutputDir, inputGroup.name, timestampGroup.timestamp);
+                            dbg("DONE save timestamp report inputGroup=" + inputGroup.name
+                                    + " timestamp=" + timestampGroup.timestamp, reportSaveStart);
                             createdReports.add(timestampReport);
                             consoleReport("Timestamp report created: " + timestampReport.toAbsolutePath());
                         }
@@ -407,7 +504,8 @@ public class ValidationTools {
                                 inputGroup.name,
                                 timestampGroup.timestamp,
                                 timestampReport,
-                                results
+                                results,
+                                maxResultsPerConstraint
                         );
 
                         appendTimestampSummary(
@@ -415,7 +513,8 @@ public class ValidationTools {
                                 inputGroup.name,
                                 timestampGroup.timestamp,
                                 timestampReport,
-                                results
+                                results,
+                                maxResultsPerConstraint
                         );
 
                         if (WRITE_SUMMARY_CHECKPOINT_EACH_TIMESTAMP) {
@@ -439,7 +538,9 @@ public class ValidationTools {
                                 + inputGroup.name + " " + timestampGroup.timestamp);
                     }
 
+                    long groupSummarySaveStart = System.currentTimeMillis();
                     Path summaryReport = summaryWriter.saveTo(groupOutputDir);
+                    dbg("DONE save input-group summary inputGroup=" + inputGroup.name, groupSummarySaveStart);
                     createdReports.add(summaryReport);
 
                     consoleReport("Timestamped summary report created: " + summaryReport.toAbsolutePath());
@@ -454,18 +555,20 @@ public class ValidationTools {
                 dbg("DONE input group=" + inputGroup.name, inputGroupStart);
             }
 
+            long allCountriesSummarySaveStart = System.currentTimeMillis();
             Path allCountriesSummaryReport = allCountriesSummaryWriter.saveTo(outputBaseDir);
+            dbg("DONE save all-countries summary", allCountriesSummarySaveStart);
             createdReports.add(allCountriesSummaryReport);
             consoleReport("All-countries timestamped summary report created: "
                     + allCountriesSummaryReport.toAbsolutePath());
 
             // NEW: comparison workbook (region sheets + delta charts)
+            long comparisonSaveStart = System.currentTimeMillis();
             Path comparisonReport = comparisonWriter.saveTo(outputBaseDir);
+            dbg("DONE save comparison report", comparisonSaveStart);
             createdReports.add(comparisonReport);
             consoleReport("Comparison report created: " + comparisonReport.toAbsolutePath());
         }
-
-        deleteDirectoryRecursively(outputBaseDir.resolve("_unzipped"));
 
         dbg("DONE validateByTimestampedMapping", allStart);
         printMemory("end validateByTimestampedMapping");
@@ -537,6 +640,38 @@ public class ValidationTools {
                                          Map<String, RDFDatatype> dataTypeMap,
                                          String xmlBase
     ) throws IOException {
+        return validateByMapping(mappingCsvPath, modelsBaseDir, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, 0, ValidationEngine.APACHE_JENA);
+    }
+
+    /** Mapping validation using the same resolved graph pairs with the selected SHACL engine. */
+    public static ValidationRunSummary validateByMapping(Path mappingCsvPath,
+                                         Path modelsBaseDir,
+                                         Path constraintsRoot,
+                                         Path outputBaseDir,
+                                         int threadCount,
+                                         Map<String, RDFDatatype> dataTypeMap,
+                                         String xmlBase,
+                                         ValidationEngine validationEngine
+    ) throws IOException {
+        return validateByMapping(mappingCsvPath, modelsBaseDir, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, 0, validationEngine);
+    }
+
+    /** Mapping validation with optional per-source-shape result sampling. */
+    public static ValidationRunSummary validateByMapping(Path mappingCsvPath,
+                                         Path modelsBaseDir,
+                                         Path constraintsRoot,
+                                         Path outputBaseDir,
+                                         int threadCount,
+                                         Map<String, RDFDatatype> dataTypeMap,
+                                         String xmlBase,
+                                         int maxResultsPerConstraint,
+                                         ValidationEngine validationEngine
+    ) throws IOException {
+
+        validationEngine = validationEngine == null ? ValidationEngine.APACHE_JENA : validationEngine;
+        final ValidationEngine selectedValidationEngine = validationEngine;
 
         long allStart = System.currentTimeMillis();
 
@@ -548,7 +683,9 @@ public class ValidationTools {
             }
         }
 
-        dbg("START validateByMapping");
+        dbg("START validateByMapping engine=" + selectedValidationEngine
+                + " workers=" + threadCount
+                + " resultLimit=" + maxResultsPerConstraint);
         printMemory("start validateByMapping");
 
         //a run re-reads every input: nothing carries over from the previous one
@@ -576,12 +713,12 @@ public class ValidationTools {
 
         Map<String, Model> shapesCache = new ConcurrentHashMap<>();
 
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
         List<Callable<ValidationTaskResult>> tasks = new ArrayList<>();
 
         dbg("START create validation tasks");
 
         int rowIdx = 0;
+        List<Map.Entry<Integer, MappingRow>> runnableRows = new ArrayList<>();
         for (MappingRow row : rows) {
             rowIdx++;
             final int idx = rowIdx;
@@ -593,10 +730,21 @@ public class ValidationTools {
             }
 
             dbgRow(idx, "ADD task ttl=" + row.ttl + " xmlRaw=" + shortValue(row.xmlInputsRaw, 300));
+            runnableRows.add(Map.entry(idx, row));
+        }
 
+        int activeRows = Math.min(threads, runnableRows.size());
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, activeRows));
+        for (int taskNumber = 0; taskNumber < runnableRows.size(); taskNumber++) {
+            Map.Entry<Integer, MappingRow> runnableRow = runnableRows.get(taskNumber);
+            MappingRow row = runnableRow.getValue();
+            int idx = runnableRow.getKey();
+            int targetShapeWorkers = activeRows == 0 ? 1 : workersForRow(threads, activeRows, taskNumber);
             tasks.add(() -> {
                 try {
-                    return validateOneRow(idx, row, modelsBaseDir, constraintsRoot, shapesCache, dataTypeMap, xmlBase);
+                    return validateOneRow(idx, row, modelsBaseDir, constraintsRoot, shapesCache,
+                            dataTypeMap, xmlBase, maxResultsPerConstraint, selectedValidationEngine,
+                            targetShapeWorkers);
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName() + "][row " + idx + "]");
                     logError("Unhandled exception", t);
@@ -760,7 +908,9 @@ public class ValidationTools {
 */
                     writer.appendValidation(
                             sheet, r.datasetName, r.xmlFiles, r.missingXmlFiles, r.constraintFile,
-                            r.results, r.conforms, r.displayName);
+                            r.results, r.conforms, r.displayName,
+                            r.partialValidation, maxResultsPerConstraint);
+                    if (exportTurtleValidationReports) saveValidationReportTurtle(outputBaseDir, r);
                     dbgRow(r.rowIdx, "DONE writer.appendValidation dataset=" + r.datasetName,
                             appendStart);
                 }
@@ -809,9 +959,15 @@ public class ValidationTools {
         final String missingXmlFiles;
 
         String displayName = "";   // mapping column C, used for chart x-axis
+        boolean partialValidation;
 
         ValidationTaskResult withDisplayName(String dn) {
             this.displayName = (dn == null) ? "" : dn;
+            return this;
+        }
+
+        ValidationTaskResult withPartialValidation(boolean partialValidation) {
+            this.partialValidation = partialValidation;
             return this;
         }
 
@@ -844,7 +1000,10 @@ public class ValidationTools {
                                                        Path constraintsRoot,
                                                        Map<String, Model> shapesCache,
                                                        Map<String, RDFDatatype> dataTypeMap,
-                                                       String xmlBase) {
+                                                       String xmlBase,
+                                                       int maxResultsPerConstraint,
+                                                       ValidationEngine validationEngine,
+                                                       int targetShapeWorkers) {
 
         long rowStart = System.currentTimeMillis();
 
@@ -968,9 +1127,13 @@ public class ValidationTools {
             dbgRow(rowIdx, "START SHACL validation");
             long validationStart = System.currentTimeMillis();
 
-            ValidationReport report = ShaclValidator.get().validate(shapesModel.getGraph(), dataModel.getGraph());
+            LimitedValidationOutcome validationOutcome = validateWithSelectedEngine(
+                    validationEngine, Shapes.parse(shapesModel.getGraph()), dataModel.getGraph(), shapesModel,
+                    maxResultsPerConstraint, rowIdx, targetShapeWorkers);
+            List<SHACLValidationResult> results = validationOutcome.results();
+            boolean conforms = validationOutcome.conforms();
 
-            dbgRow(rowIdx, "DONE SHACL validation conforms=" + report.conforms(),
+            dbgRow(rowIdx, "DONE SHACL validation conforms=" + conforms,
                     validationStart);
 
             printMemory("[row " + rowIdx + "] after SHACL validation");
@@ -978,23 +1141,20 @@ public class ValidationTools {
             dbgRow(rowIdx, "START extractSHACLValidationResults");
             long extractStart = System.currentTimeMillis();
 
-            List<eu.griddigit.cimpal.core.models.SHACLValidationResult> results =
-                    ShaclTools.extractSHACLValidationResults(report, shapesModel);
-
             dbgRow(rowIdx, "DONE extractSHACLValidationResults resultCount="
                             + (results == null ? "null" : results.size()),
                     extractStart);
 
             dbgRow(rowIdx, "DONE row dataset=" + datasetName
-                            + " conforms=" + report.conforms()
+                            + " conforms=" + conforms
                             + " resultCount=" + (results == null ? "null" : results.size()),
                     rowStart);
 
             return new ValidationTaskResult(
                     rowIdx, caseFolder, datasetName, ttlName,
                     xmlFilesText, missingXmlFilesText, constraintFileText,
-                    results, report.conforms(), null
-            ).withDisplayName(row.notes);
+                    results, conforms, null
+            ).withDisplayName(row.notes).withPartialValidation(validationOutcome.partial());
         } catch (Exception ex) {
             dbgRow(rowIdx, "ERROR row dataset=" + datasetName, rowStart);
             logError("Unhandled exception", ex);
@@ -1121,10 +1281,12 @@ public class ValidationTools {
     private static Model loadSingleRdfXmlWithDatatypeMap(Path xmlFile,
                                                          Map<String, RDFDatatype> dataTypeMap,
                                                          String xmlBase,
-                                                         int rowIdx) {
+                                                         int rowIdx,
+                                                         Map<Path, ZipXmlEntry> zipEntriesByVirtualPath) {
         Path p = xmlFile.toAbsolutePath().normalize();
+        ZipXmlEntry zipEntry = zipEntriesByVirtualPath.get(p);
 
-        if (!Files.isRegularFile(p)) {
+        if (zipEntry == null && !Files.isRegularFile(p)) {
             throw new IllegalArgumentException("XML file is not a regular file: " + p);
         }
 
@@ -1137,7 +1299,7 @@ public class ValidationTools {
 
         long start = System.currentTimeMillis();
 
-        try (InputStream in = Files.newInputStream(p)) {
+        try (InputStream in = zipEntry == null ? Files.newInputStream(p) : zipEntry.openStream()) {
             Model single = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoadXMLmapping(
                     in,
                     dataTypeMap,
@@ -1155,15 +1317,16 @@ public class ValidationTools {
         }
     }
 
-    private static Model loadRdfXmlFromFilesWithCache(Collection<Path> xmlFiles,
+    static Graph loadRdfXmlGraphFromFilesWithCache(Collection<Path> xmlFiles,
                                                       Map<Path, Model> staticXmlModelCache,
                                                       Map<Path, Model> timestampXmlModelCache,
+                                                      Map<Path, ZipXmlEntry> zipEntriesByVirtualPath,
                                                       Map<String, RDFDatatype> dataTypeMap,
                                                       String xmlBase,
                                                       int rowIdx) {
         long startAll = System.currentTimeMillis();
 
-        Model merged = ModelFactory.createDefaultModel();
+        MultiUnion union = new MultiUnion();
 
         int fileIndex = 0;
 
@@ -1195,7 +1358,8 @@ public class ValidationTools {
 
             Model single = selectedCache.computeIfAbsent(
                     key,
-                    p -> loadSingleRdfXmlWithDatatypeMap(p, dataTypeMap, xmlBase, rowIdx)
+                    p -> loadSingleRdfXmlWithDatatypeMap(
+                            p, dataTypeMap, xmlBase, rowIdx, zipEntriesByVirtualPath)
             );
 
             dbgRow(rowIdx, "DONE get XML model from cache"
@@ -1205,24 +1369,16 @@ public class ValidationTools {
                     + " singleTriples=" + single.size()
                     + " path=" + key.getFileName(), cacheStart);
 
-            long mergeStart = System.currentTimeMillis();
-
-            synchronized (single) {
-                merged.add(single);
-                merged.setNsPrefixes(single.getNsPrefixMap());
-            }
-
-            dbgRow(rowIdx, "DONE merge cached XML"
-                    + " fileIndex=" + fileIndex
-                    + " mergedTriples=" + merged.size()
-                    + " path=" + key.getFileName(), mergeStart);
+            // Cached models are fully loaded before publication and remain read-only.
+            // The union borrows their graphs: do not mutate or close it, since closing
+            // a MultiUnion also closes its shared component graphs.
+            union.addGraph(single.getGraph());
         }
 
-        dbgRow(rowIdx, "DONE loadRdfXmlFromFilesWithCache"
-                + " xmlFiles=" + xmlFiles.size()
-                + " mergedTriples=" + merged.size(), startAll);
+        dbgRow(rowIdx, "DONE loadRdfXmlGraphFromFilesWithCache"
+                + " xmlFiles=" + xmlFiles.size(), startAll);
 
-        return merged;
+        return union;
     }
 
     /**
@@ -1508,6 +1664,30 @@ public class ValidationTools {
         }
 
         return constraintsRoot.resolve(ttl).normalize();
+    }
+
+    /**
+     * Resolves the semicolon-separated SHACL roots from one mapping cell. A one-file cell keeps
+     * its former behaviour; multiple roots define one shape combination for that mapping row.
+     */
+    private static List<Path> resolveTtlPaths(Path constraintsRoot, String ttlNames) {
+        LinkedHashSet<Path> paths = new LinkedHashSet<>();
+        for (String token : safe(ttlNames).split(";")) {
+            String ttl = token.trim();
+            if (!ttl.isBlank()) {
+                paths.add(resolveTtlPath(constraintsRoot, ttl).toAbsolutePath().normalize());
+            }
+        }
+        return new ArrayList<>(paths);
+    }
+
+    private static String formatTtlPaths(Collection<Path> ttlPaths) {
+        if (ttlPaths == null || ttlPaths.isEmpty()) {
+            return "";
+        }
+        return ttlPaths.stream()
+                .map(path -> trimReportPath(path.toString()))
+                .collect(Collectors.joining("; "));
     }
 
     // ---------------- CSV parsing ----------------
@@ -2282,6 +2462,28 @@ public class ValidationTools {
         return sb.toString();
     }
 
+    /** Run-scoped cache entry retaining the RDF model for result extraction. */
+    record CachedShapes(Model model, Shapes shapes) {}
+
+    static CachedShapes loadParsedShapesWithImports(ShapeSource root,
+                                                    Path constraintsRoot,
+                                                    Map<String, CachedShapes> cache) throws IOException {
+        try {
+            // Publish only after both import loading and parsing succeed. Concurrent
+            // rows sharing a root wait for one load; failures remain retryable.
+            return cache.computeIfAbsent(root.key(), key -> {
+                try {
+                    Model model = loadShapesWithImports(root, constraintsRoot, new HashMap<>()).model();
+                    return new CachedShapes(model, Shapes.parse(model.getGraph()));
+                } catch (IOException ex) {
+                    throw new UncheckedIOException(ex);
+                }
+            });
+        } catch (UncheckedIOException ex) {
+            throw ex.getCause();
+        }
+    }
+
     static LoadShapesResult loadShapesWithImports(ShapeSource root,
                                                   Path constraintsRoot,
                                                   Map<String, Model> cache) throws IOException {
@@ -2437,6 +2639,26 @@ public class ValidationTools {
                 return new LocalShapeSource(p);
             } catch (Exception ex) {
                 dbg("resolveImport invalid fileUri=" + forLog(importUri) + " error=" + forLog(ex.getMessage()));
+                return null;
+            }
+        }
+
+        // Some CGMES constraint packages use C://path/to/file.ttl instead of a file: URI.
+        // Treat that explicitly as an absolute Windows path rather than resolving it relative
+        // to the current TTL directory.
+        if (u.matches("(?i)^[a-z]:/+.*")) {
+            try {
+                String windowsPath = u.replaceFirst("(?i)^([a-z]):/+", "$1:/");
+                Path p = Paths.get(windowsPath).toAbsolutePath().normalize();
+                if (Files.isRegularFile(p)) {
+                    dbg("resolveImport windowsPath=" + forLog(importUri) + " resolved=" + p);
+                    return new LocalShapeSource(p);
+                }
+                dbg("resolveImport windowsPath missing=" + forLog(importUri) + " resolved=" + p);
+                return null;
+            } catch (Exception ex) {
+                dbg("resolveImport invalid windowsPath=" + forLog(importUri)
+                        + " error=" + forLog(ex.getMessage()));
                 return null;
             }
         }
@@ -2849,10 +3071,156 @@ public class ValidationTools {
     private static class InputGroup {
         final String name;
         final List<Path> roots;
+        final Map<Path, ZipXmlEntry> zipEntriesByVirtualPath;
 
-        InputGroup(String name, List<Path> roots) {
+        InputGroup(String name, List<Path> roots, List<ZipXmlEntry> zipEntries) {
             this.name = name;
             this.roots = roots;
+            this.zipEntriesByVirtualPath = zipEntries.stream()
+                    .collect(Collectors.toMap(
+                            entry -> entry.virtualPath,
+                            entry -> entry,
+                            (left, right) -> left,
+                            LinkedHashMap::new
+                    ));
+        }
+    }
+
+    /**
+     * Keeps Auto's worker budget bounded. When a timestamp has fewer mapping rows than the
+     * budget, spare workers validate independent SHACL target shapes for those rows.
+     * Explicit worker selections remain a fixed row-worker budget for backwards compatibility.
+     */
+    private record TimestampExecutionPlan(int timestampWorkers, int rowWorkers) {
+        static TimestampExecutionPlan create(int requestedWorkers, ValidationEngine engine) {
+            if (requestedWorkers > 0) {
+                return new TimestampExecutionPlan(1, requestedWorkers);
+            }
+            int cores = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+            long heapGiB = Math.max(1, Runtime.getRuntime().maxMemory() / (1024L * 1024L * 1024L));
+            int heapWorkers = Math.max(1, (int) (heapGiB / 6));
+            int engineCap = engine == ValidationEngine.APACHE_JENA ? 8 : 4;
+            int budget = Math.clamp(Math.min(cores, Math.min(heapWorkers, engineCap)), 1, engineCap);
+            // The total budget remains bounded: a batch with N active timestamps gives each a
+            // share of these workers.  Do not impose a second timestamp cap here; spare capacity
+            // should be usable by further independent timestamps when memory and CPU allow it.
+            return new TimestampExecutionPlan(budget, budget);
+        }
+    }
+
+    /**
+     * Produces one parsed Jena Shapes object for the exact set of roots selected by a mapping
+     * row. Each root still contributes its full owl:imports closure; RDF set semantics remove
+     * overlapping imported triples. The canonical cache key makes the combination reusable for
+     * every timestamp without conflating it with another shape set.
+     */
+    static CachedShapes loadParsedShapesWithImports(Collection<Path> roots,
+                                                    Path constraintsRoot,
+                                                    Map<String, CachedShapes> cache) throws IOException {
+        List<Path> canonicalRoots = roots.stream()
+                .map(path -> path.toAbsolutePath().normalize())
+                .distinct()
+                .sorted(Comparator.comparing(Path::toString))
+                .toList();
+
+        if (canonicalRoots.isEmpty()) {
+            throw new IOException("No SHACL constraint files were resolved");
+        }
+
+        String cacheKey = "SHAPES_COMBINATION:"
+                + canonicalRoots.stream().map(Path::toString).collect(Collectors.joining("|"));
+
+        try {
+            return cache.computeIfAbsent(cacheKey, ignored -> {
+                try {
+                    Model combination = ModelFactory.createDefaultModel();
+                    Map<String, Model> rootsInCombination = new HashMap<>();
+
+                    for (Path root : canonicalRoots) {
+                        Model rootModel = loadShapesWithImports(
+                                new LocalShapeSource(root), constraintsRoot, rootsInCombination).model();
+                        combination.add(rootModel);
+                        combination.setNsPrefixes(rootModel.getNsPrefixMap());
+                    }
+
+                    Shapes parsed = Shapes.parse(combination.getGraph());
+                    long deactivated = parsed.getShapeMap().values().stream()
+                            .filter(Shape::deactivated)
+                            .count();
+                    dbg("SHAPES combination loaded"
+                            + " roots=" + canonicalRoots.size()
+                            + " triples=" + combination.size()
+                            + " parsedShapes=" + parsed.numShapes()
+                            + " deactivatedShapes=" + deactivated
+                            + " key=" + cacheKey);
+                    return new CachedShapes(combination, parsed);
+                } catch (IOException ex) {
+                    throw new UncheckedIOException(ex);
+                }
+            });
+        } catch (UncheckedIOException ex) {
+            throw ex.getCause();
+        }
+    }
+
+    /**
+     * An XML entry in an input archive. Its virtual path is only an identity used by the
+     * existing timestamp/mapping resolver; no corresponding file is ever written to disk.
+     */
+    static class ZipXmlEntry {
+        final Path archivePath;
+        final String entryName;
+        final Path virtualPath;
+
+        ZipXmlEntry(Path archivePath, String entryName, Path virtualPath) {
+            this.archivePath = archivePath;
+            this.entryName = entryName;
+            this.virtualPath = virtualPath;
+        }
+
+        InputStream openStream() throws IOException {
+            java.util.zip.ZipFile archive = new java.util.zip.ZipFile(archivePath.toFile());
+            java.util.zip.ZipEntry entry = archive.getEntry(entryName);
+            if (entry == null) {
+                archive.close();
+                throw new FileNotFoundException("ZIP entry not found: " + archivePath + "!" + entryName);
+            }
+
+            InputStream entryStream = archive.getInputStream(entry);
+            return new java.io.FilterInputStream(entryStream) {
+                private long bytesRead;
+
+                @Override
+                public int read() throws IOException {
+                    int value = super.read();
+                    if (value >= 0) checkLimit(1);
+                    return value;
+                }
+
+                @Override
+                public int read(byte[] bytes, int offset, int length) throws IOException {
+                    int count = super.read(bytes, offset, length);
+                    if (count > 0) checkLimit(count);
+                    return count;
+                }
+
+                private void checkLimit(long count) throws IOException {
+                    bytesRead += count;
+                    if (bytesRead > MAX_ZIP_XML_BYTES) {
+                        throw new IOException("ZIP entry exceeds the XML size limit: "
+                                + archivePath.getFileName() + "!" + entryName);
+                    }
+                }
+
+                @Override
+                public void close() throws IOException {
+                    try {
+                        super.close();
+                    } finally {
+                        archive.close();
+                    }
+                }
+            };
         }
     }
 
@@ -2861,13 +3229,7 @@ public class ValidationTools {
                 && inputPath.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")) {
 
             String zipBaseName = removeExtension(inputPath.getFileName().toString());
-            Path targetDir = outputBaseDir
-                    .resolve("_unzipped")
-                    .resolve(sanitizePathPart(zipBaseName));
-
-            unzipXmlFiles(inputPath, targetDir);
-
-            return List.of(new InputGroup(zipBaseName, List.of(targetDir)));
+            return List.of(new InputGroup(zipBaseName, List.of(), scanZipXmlEntries(inputPath)));
         }
 
         if (!Files.isDirectory(inputPath)) {
@@ -2913,10 +3275,7 @@ public class ValidationTools {
                                                       Path outputBaseDir) throws IOException {
         List<Path> roots = new ArrayList<>();
         roots.add(groupRoot);
-
-        Path unzipBase = outputBaseDir
-                .resolve("_unzipped")
-                .resolve(sanitizePathPart(groupName));
+        List<ZipXmlEntry> zipEntries = new ArrayList<>();
 
         Path normalizedOutput = outputBaseDir.toAbsolutePath().normalize();
 
@@ -2929,19 +3288,17 @@ public class ValidationTools {
                     .toList();
 
             for (Path zip : zipFiles) {
-                String zipBaseName = removeExtension(zip.getFileName().toString());
-                Path targetDir = unzipBase.resolve(sanitizePathPart(zipBaseName));
-
-                unzipXmlFiles(zip, targetDir);
-                roots.add(targetDir);
+                List<ZipXmlEntry> entries = scanZipXmlEntries(zip);
+                zipEntries.addAll(entries);
 
                 logInfo("Prepared zip input group=" + groupName
                         + " zip=" + zip.toAbsolutePath()
-                        + " extractedTo=" + targetDir.toAbsolutePath());
+                        + " xmlEntries=" + entries.size()
+                        + " storage=in-memory-on-demand");
             }
         }
 
-        return new InputGroup(groupName, roots);
+        return new InputGroup(groupName, roots, zipEntries);
     }
 
     private static List<XmlFileMetadata> discoverXmlMetadataForInputGroup(InputGroup inputGroup) throws IOException {
@@ -2983,6 +3340,22 @@ public class ValidationTools {
                     ));
                 }
             }
+        }
+
+        for (ZipXmlEntry zipEntry : inputGroup.zipEntriesByVirtualPath.values()) {
+            Path xml = zipEntry.virtualPath;
+            String fileName = xml.getFileName().toString();
+            String profile = detectProfile(fileName, xml);
+            String headerTimestamp = readTimestampFromXmlHeader(xml, inputGroup.zipEntriesByVirtualPath);
+            String filenameTimestamp = readTimestampFromFileName(fileName);
+
+            drafts.add(new XmlDiscoveryDraft(
+                    xml,
+                    fileName,
+                    profile,
+                    headerTimestamp,
+                    filenameTimestamp
+            ));
         }
 
         Map<String, String> filenameToMetadataTimestamp = buildFilenameToMetadataTimestampMap(inputGroup.name, drafts);
@@ -3300,8 +3673,7 @@ public class ValidationTools {
 
             String ttlName = row.ttl.trim();
 
-            String constraintFileText =
-                    trimReportPath(resolveTtlPath(constraintsRoot, ttlName).toString());
+            String constraintFileText = formatTtlPaths(resolveTtlPaths(constraintsRoot, ttlName));
 
             String requestedInput = cleanRequestedInputForReport(row.xmlInputsRaw);
 
@@ -3323,16 +3695,13 @@ public class ValidationTools {
                 if (resolution.onlyCountrySpecificMissing) {
                     status = "Missing - country-specific input";
                     message = "The mapping row requests input for another country or region. This skip can be expected if the row is intentionally country-specific.";
-                } else if (willRunValidation) {
-                    status = "Partial input - validation executed";
-                    message = "Some requested inputs were missing, but at least one XML file was resolved and the validation was executed with the available files.";
                 } else {
                     status = "Missing input - skipped";
-                    message = "One or more required inputs from the mapping row were not resolved, and no partial validation was executed.";
+                    message = "One or more required inputs from the mapping row were not resolved, so validation was skipped to avoid validating an incomplete data graph.";
                 }
             } else if (resolution.xmlFiles.size() > resolution.expectedFileCount) {
-                status = "Too many files";
-                message = "More XML files were resolved than requested mapping tokens. Check duplicate files or broad token matching.";
+                status = "Too many files - skipped";
+                message = "More XML files were resolved than requested mapping tokens. Validation was skipped to avoid loading an unintended data graph.";
             } else {
                 status = "OK";
                 message = "All requested inputs were resolved.";
@@ -3368,7 +3737,7 @@ public class ValidationTools {
             }
 
             if (!resolution.missingInputs.isEmpty()) {
-                logWarn("PRECHECK_PARTIAL_RUN validation row"
+                logWarn("PRECHECK_SKIP validation row"
                         + " row=" + rowIdx
                         + " inputGroup=" + tsoIndex.tso
                         + " timestamp=" + timestampGroup.timestamp
@@ -3471,23 +3840,12 @@ public class ValidationTools {
     }
 
     private static boolean shouldRunValidationWithResolvedInputs(InputResolution resolution) {
-        if (resolution == null) {
-            return false;
-        }
-
-        if (resolution.xmlFiles == null || resolution.xmlFiles.isEmpty()) {
-            return false;
-        }
-
-        if (resolution.missingInputs == null || resolution.missingInputs.isEmpty()) {
-            return true;
-        }
-
-        if (resolution.onlyCountrySpecificMissing) {
-            return false;
-        }
-
-        return resolution.expectedFileCount > 1;
+        return resolution != null
+                && resolution.xmlFiles != null
+                && !resolution.xmlFiles.isEmpty()
+                && resolution.missingInputs != null
+                && resolution.missingInputs.isEmpty()
+                && resolution.xmlFiles.size() == resolution.expectedFileCount;
     }
 
 
@@ -3665,7 +4023,6 @@ public class ValidationTools {
 
         List<Path> out = candidates.stream()
                 .filter(Objects::nonNull)
-                .filter(Files::isRegularFile)
                 .filter(p -> matcher.matches(p.getFileName()))
                 .sorted(Comparator.comparing(Path::toString))
                 .toList();
@@ -3830,23 +4187,167 @@ public class ValidationTools {
 
 
     private static String readTimestampFromXmlHeader(Path xmlPath) {
-        try (BufferedReader br = Files.newBufferedReader(xmlPath, StandardCharsets.UTF_8)) {
-            StringBuilder head = new StringBuilder();
-            String line;
-            int lineCount = 0;
+        return readTimestampFromXmlHeader(xmlPath, Map.of());
+    }
 
-            while ((line = br.readLine()) != null && lineCount < 500) {
-                head.append(line).append('\n');
-                lineCount++;
-            }
+    private static String readTimestampFromXmlHeader(Path xmlPath,
+                                                     Map<Path, ZipXmlEntry> zipEntriesByVirtualPath) {
+        ZipXmlEntry zipEntry = zipEntriesByVirtualPath.get(xmlPath.toAbsolutePath().normalize());
 
-            return readTimestampFromHeaderText(head.toString());
+        try (InputStream input = zipEntry == null
+                ? Files.newInputStream(xmlPath)
+                : zipEntry.openStream()) {
+            return readTimestampFromRdfXmlHeader(input);
 
         } catch (Exception ex) {
             dbg("Could not read timestamp from XML header: " + xmlPath
                     + " error=" + ex.getMessage());
             return "";
         }
+    }
+
+    /**
+     * Reads the RDF/XML header structurally, without loading an XML document or relying on line
+     * breaks.  A CGMES export may be a single very long line; StAX still emits an event for every
+     * element and permits us to stop as soon as its header closes.
+     * <p>
+     * Both common forms are supported: {@code <md:FullModel>} / {@code <dcat:Dataset>} elements
+     * and {@code <rdf:Description>} whose child {@code rdf:type} identifies either class.
+     * Within FullModel, scenarioTime has priority over startDate. Dataset startDate is used for
+     * Dataset headers.
+     */
+    static String readTimestampFromRdfXmlHeader(InputStream input) throws XMLStreamException {
+        XMLInputFactory factory = XMLInputFactory.newFactory();
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        factory.setProperty("javax.xml.stream.isSupportingExternalEntities", false);
+
+        Deque<RdfXmlHeaderElement> elements = new ArrayDeque<>();
+        XMLStreamReader reader = factory.createXMLStreamReader(input, StandardCharsets.UTF_8.name());
+        try {
+            while (reader.hasNext()) {
+                int event = reader.next();
+
+                if (event == XMLStreamConstants.START_ELEMENT) {
+                    RdfXmlHeaderElement parent = elements.peek();
+                    RdfXmlHeaderElement element = new RdfXmlHeaderElement(
+                            parent,
+                            classifyDirectHeaderElement(reader.getNamespaceURI(), reader.getLocalName())
+                    );
+                    elements.push(element);
+
+                    if (isRdfTypeElement(reader)) {
+                        HeaderKind type = classifyHeaderTypeUri(
+                                reader.getAttributeValue(RDF.getURI(), "resource"));
+                        if (type != HeaderKind.NONE && parent != null) {
+                            parent.kind = type;
+                        }
+                    }
+
+                    if (isScenarioTimeName(reader.getLocalName())
+                            || isStartDateName(reader.getLocalName())) {
+                        RdfXmlHeaderElement header = findHeaderElement(parent);
+                        if (header != null) {
+                            element.captureHeader = header;
+                            element.captureScenarioTime = isScenarioTimeName(reader.getLocalName());
+                        }
+                    }
+                } else if (event == XMLStreamConstants.CHARACTERS
+                        || event == XMLStreamConstants.CDATA) {
+                    RdfXmlHeaderElement current = elements.peek();
+                    if (current != null && current.captureHeader != null) {
+                        current.text.append(reader.getText());
+                    }
+                } else if (event == XMLStreamConstants.END_ELEMENT) {
+                    RdfXmlHeaderElement current = elements.pop();
+                    if (current.captureHeader != null) {
+                        String timestamp = normalizeTimestamp(current.text.toString());
+                        if (!timestamp.isBlank()) {
+                            if (current.captureScenarioTime) {
+                                current.captureHeader.scenarioTime = timestamp;
+                            } else {
+                                current.captureHeader.startDate = timestamp;
+                            }
+                        }
+                    }
+
+                    if (current.kind == HeaderKind.FULL_MODEL) {
+                        if (!current.scenarioTime.isBlank()) {
+                            return current.scenarioTime;
+                        }
+                        if (!current.startDate.isBlank()) {
+                            return current.startDate;
+                        }
+                    }
+                    if (current.kind == HeaderKind.DATASET && !current.startDate.isBlank()) {
+                        return current.startDate;
+                    }
+                }
+            }
+        } finally {
+            reader.close();
+        }
+        return "";
+    }
+
+    private enum HeaderKind { NONE, FULL_MODEL, DATASET }
+
+    private static final class RdfXmlHeaderElement {
+        final RdfXmlHeaderElement parent;
+        final StringBuilder text = new StringBuilder();
+        HeaderKind kind;
+        RdfXmlHeaderElement captureHeader;
+        boolean captureScenarioTime;
+        String scenarioTime = "";
+        String startDate = "";
+
+        RdfXmlHeaderElement(RdfXmlHeaderElement parent, HeaderKind kind) {
+            this.parent = parent;
+            this.kind = kind;
+        }
+    }
+
+    private static RdfXmlHeaderElement findHeaderElement(RdfXmlHeaderElement start) {
+        for (RdfXmlHeaderElement current = start; current != null; current = current.parent) {
+            if (current.kind != HeaderKind.NONE) {
+                return current;
+            }
+        }
+        return null;
+    }
+
+    private static HeaderKind classifyDirectHeaderElement(String namespace, String localName) {
+        if ("FullModel".equals(localName)) {
+            return HeaderKind.FULL_MODEL;
+        }
+        if ("Dataset".equals(localName) && "http://www.w3.org/ns/dcat#".equals(namespace)) {
+            return HeaderKind.DATASET;
+        }
+        return HeaderKind.NONE;
+    }
+
+    private static HeaderKind classifyHeaderTypeUri(String uri) {
+        if (uri == null || uri.isBlank()) {
+            return HeaderKind.NONE;
+        }
+        if (uri.endsWith("#FullModel") || uri.endsWith("/FullModel")) {
+            return HeaderKind.FULL_MODEL;
+        }
+        if ("http://www.w3.org/ns/dcat#Dataset".equals(uri)) {
+            return HeaderKind.DATASET;
+        }
+        return HeaderKind.NONE;
+    }
+
+    private static boolean isRdfTypeElement(XMLStreamReader reader) {
+        return "type".equals(reader.getLocalName()) && RDF.getURI().equals(reader.getNamespaceURI());
+    }
+
+    private static boolean isScenarioTimeName(String localName) {
+        return safe(localName).toLowerCase(Locale.ROOT).endsWith("scenariotime");
+    }
+
+    private static boolean isStartDateName(String localName) {
+        return safe(localName).toLowerCase(Locale.ROOT).endsWith("startdate");
     }
 
     private static String readTimestampFromHeaderText(String text) {
@@ -4124,28 +4625,6 @@ public class ValidationTools {
         return "";
     }
 
-    private static Path prepareTimestampedInput(Path inputPath, Path outputBaseDir) throws IOException {
-        if (Files.isDirectory(inputPath)) {
-            return inputPath;
-        }
-
-        if (Files.isRegularFile(inputPath)
-                && inputPath.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")) {
-
-            String zipBaseName = removeExtension(inputPath.getFileName().toString());
-
-            Path tempDir = outputBaseDir.resolve("_timestamped_input_unzipped_"
-                    + sanitizePathPart(zipBaseName)
-                    + "_"
-                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")));
-
-            unzipXmlFiles(inputPath, tempDir);
-            return tempDir;
-        }
-
-        throw new IOException("Input must be a directory or zip file: " + inputPath);
-    }
-
     private static String removeExtension(String fileName) {
         String s = safe(fileName).trim();
         int dot = s.lastIndexOf('.');
@@ -4155,65 +4634,60 @@ public class ValidationTools {
         return s;
     }
 
-    /** Maximum cumulative size written to disk when extracting one archive. */
-    private static final long MAX_EXTRACTED_BYTES = 2L * 1024 * 1024 * 1024; // 2 GiB
-    /** Maximum number of entries extracted from one archive. */
-    private static final int MAX_EXTRACTED_ENTRIES = 10_000;
+    /** Maximum uncompressed XML bytes accepted from one input archive. */
+    private static final long MAX_ZIP_XML_BYTES = 2L * 1024 * 1024 * 1024; // 2 GiB
+    /** Maximum XML entries accepted from one input archive. */
+    private static final int MAX_ZIP_XML_ENTRIES = 10_000;
 
-    private static void unzipXmlFiles(Path zipPath, Path targetDir) throws IOException {
-        Files.createDirectories(targetDir);
+    /**
+     * Lists XML entries without extracting them. The entry stream is opened only when metadata
+     * or RDF parsing needs it, and is closed immediately after that operation.
+     */
+    static List<ZipXmlEntry> scanZipXmlEntries(Path zipPath) throws IOException {
+        List<ZipXmlEntry> entries = new ArrayList<>();
+        long declaredBytes = 0;
+        Path normalizedZip = zipPath.toAbsolutePath().normalize();
+        String archiveIdentity = Integer.toUnsignedString(normalizedZip.toString().hashCode(), 36);
+        Path virtualRoot = normalizedZip.getParent()
+                .resolve(".cimpal-zip-inputs")
+                .resolve(archiveIdentity);
 
-        int extracted = 0;
-        // Archives arrive from third parties: bound what an entry-count or expansion-ratio
-        // bomb can write, rather than filling the operator's disk.
-        long extractedBytes = 0;
-
-        try (java.util.zip.ZipInputStream zis =
-                     new java.util.zip.ZipInputStream(Files.newInputStream(zipPath))) {
-
-            java.util.zip.ZipEntry entry;
-
-            while ((entry = zis.getNextEntry()) != null) {
+        try (java.util.zip.ZipFile archive = new java.util.zip.ZipFile(normalizedZip.toFile())) {
+            Enumeration<? extends java.util.zip.ZipEntry> zipEntries = archive.entries();
+            while (zipEntries.hasMoreElements()) {
+                java.util.zip.ZipEntry entry = zipEntries.nextElement();
                 if (entry.isDirectory()) {
                     continue;
                 }
 
                 String entryName = entry.getName().replace("\\", "/");
-
                 if (!entryName.toLowerCase(Locale.ROOT).endsWith(".xml")) {
                     continue;
                 }
 
-                Path out = targetDir.resolve(entryName).normalize();
-
-                if (!out.startsWith(targetDir.normalize())) {
-                    throw new IOException("Unsafe zip entry path: " + entryName);
+                Path virtualPath = virtualRoot.resolve(entryName).normalize();
+                if (!virtualPath.startsWith(virtualRoot)) {
+                    throw new IOException("Unsafe ZIP entry path: " + entryName);
                 }
 
-                Path parent = out.getParent();
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-
-                if (extracted + 1 > MAX_EXTRACTED_ENTRIES) {
+                if (entries.size() + 1 > MAX_ZIP_XML_ENTRIES) {
                     throw new IOException("Archive exceeds the entry limit ("
-                            + MAX_EXTRACTED_ENTRIES + "): " + zipPath.getFileName());
+                            + MAX_ZIP_XML_ENTRIES + "): " + normalizedZip.getFileName());
                 }
 
-                long written = Files.copy(zis, out, StandardCopyOption.REPLACE_EXISTING);
-                extractedBytes += written;
-                if (extractedBytes > MAX_EXTRACTED_BYTES) {
-                    Files.deleteIfExists(out);
-                    throw new IOException("Archive exceeds the extracted size limit ("
-                            + MAX_EXTRACTED_BYTES + " bytes): " + zipPath.getFileName());
+                if (entry.getSize() >= 0) {
+                    declaredBytes += entry.getSize();
+                    if (declaredBytes > MAX_ZIP_XML_BYTES) {
+                        throw new IOException("Archive exceeds the XML size limit ("
+                                + MAX_ZIP_XML_BYTES + " bytes): " + normalizedZip.getFileName());
+                    }
                 }
-                extracted++;
+
+                entries.add(new ZipXmlEntry(normalizedZip, entryName, virtualPath));
             }
         }
 
-        logInfo("Extracted XML files from zip=" + zipPath.toAbsolutePath()
-                + " targetDir=" + targetDir.toAbsolutePath()
-                + " count=" + extracted);
+        return entries;
     }
 
     private static class XmlFileMetadata {
@@ -4510,17 +4984,25 @@ public class ValidationTools {
 
     private static List<ValidationTaskResult> executeResolvedRows(List<ResolvedMappingRow> resolvedRows,
                                                                   Path constraintsRoot,
-                                                                  Map<String, Model> shapesCache,
+                                                                  Map<String, CachedShapes> shapesCache,
                                                                   Map<Path, Model> staticXmlModelCache,
                                                                   Map<Path, Model> timestampXmlModelCache,
+                                                                  Map<Path, ZipXmlEntry> zipEntriesByVirtualPath,
                                                                   int threads,
                                                                   Map<String, RDFDatatype> dataTypeMap,
-                                                                  String xmlBase) throws IOException {
+                                                                  String xmlBase,
+                                                                  int maxResultsPerConstraint,
+                                                                  ValidationEngine validationEngine,
+                                                                  boolean useSpareWorkersForTargetShapes) throws IOException {
 
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        int activeRows = Math.min(threads, resolvedRows.size());
+        ExecutorService pool = Executors.newFixedThreadPool(activeRows);
         List<Callable<ValidationTaskResult>> tasks = new ArrayList<>();
 
-        for (ResolvedMappingRow row : resolvedRows) {
+        for (int rowNumber = 0; rowNumber < resolvedRows.size(); rowNumber++) {
+            ResolvedMappingRow row = resolvedRows.get(rowNumber);
+            int targetShapeWorkers = useSpareWorkersForTargetShapes
+                    ? workersForRow(threads, activeRows, rowNumber) : 1;
             tasks.add(() -> {
                 try {
                     return validateOneResolvedRow(
@@ -4529,8 +5011,12 @@ public class ValidationTools {
                             shapesCache,
                             staticXmlModelCache,
                             timestampXmlModelCache,
+                            zipEntriesByVirtualPath,
                             dataTypeMap,
-                            xmlBase
+                            xmlBase,
+                            maxResultsPerConstraint,
+                            validationEngine,
+                            targetShapeWorkers
                     );
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName()
@@ -4599,6 +5085,78 @@ public class ValidationTools {
         return results;
     }
 
+    /**
+     * Runs timestamp graphs in small bounded batches.  The plan's row-worker budget is split
+     * between only the timestamps that are active in a batch, so two concurrent timestamps do
+     * not each create a full worker pool.
+     */
+    private static Map<TimestampGroup, List<ValidationTaskResult>> executeTimestampBatches(
+            Map<TimestampGroup, ResolvedRowsAndInputChecks> plannedTimestamps,
+            TimestampExecutionPlan plan,
+            Path constraintsRoot,
+            Map<String, CachedShapes> shapesCache,
+            Map<Path, Model> staticXmlModelCache,
+            Map<Path, ZipXmlEntry> zipEntriesByVirtualPath,
+            Map<String, RDFDatatype> dataTypeMap,
+            String xmlBase,
+            int maxResultsPerConstraint,
+            ValidationEngine validationEngine,
+            boolean useSpareWorkersForTargetShapes,
+            String inputGroupName) throws IOException {
+        Map<TimestampGroup, List<ValidationTaskResult>> results = new LinkedHashMap<>();
+        List<Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks>> entries =
+                new ArrayList<>(plannedTimestamps.entrySet());
+        for (int first = 0; first < entries.size(); first += plan.timestampWorkers()) {
+            List<Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks>> batch = entries.subList(first,
+                    Math.min(entries.size(), first + plan.timestampWorkers()));
+            ExecutorService pool = Executors.newFixedThreadPool(batch.size());
+            try {
+                List<Future<List<ValidationTaskResult>>> futures = new ArrayList<>();
+                for (int timestampNumber = 0; timestampNumber < batch.size(); timestampNumber++) {
+                    Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks> entry = batch.get(timestampNumber);
+                    int rowBudget = workersForRow(plan.rowWorkers(), batch.size(), timestampNumber);
+                    futures.add(pool.submit(() -> {
+                        TimestampGroup group = entry.getKey();
+                        Map<Path, Model> timestampXmlModelCache = new ConcurrentHashMap<>();
+                        try {
+                            logInfo("START timestamp validation batch inputGroup=" + inputGroupName
+                                    + " timestamp=" + group.timestamp + " rowWorkers=" + rowBudget);
+                            return executeResolvedRows(entry.getValue().resolvedRows, constraintsRoot, shapesCache,
+                                    staticXmlModelCache, timestampXmlModelCache, zipEntriesByVirtualPath, rowBudget,
+                                    dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
+                                    useSpareWorkersForTargetShapes);
+                        } finally {
+                            timestampXmlModelCache.clear();
+                            printMemory("after clearing timestampXmlModelCache " + inputGroupName
+                                    + " " + group.timestamp);
+                        }
+                    }));
+                }
+                for (int i = 0; i < futures.size(); i++) {
+                    try {
+                        results.put(batch.get(i).getKey(), futures.get(i).get(FUTURE_TIMEOUT_MINUTES,
+                                TimeUnit.MINUTES));
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Timestamp batch validation interrupted", ex);
+                    } catch (ExecutionException | TimeoutException ex) {
+                        futures.get(i).cancel(true);
+                        throw new IOException("Timestamp batch validation failed", ex);
+                    }
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+        }
+        return results;
+    }
+
+    private static int workersForRow(int totalWorkers, int activeRows, int rowNumber) {
+        int baseWorkers = totalWorkers / activeRows;
+        int extraWorkers = totalWorkers % activeRows;
+        return baseWorkers + (rowNumber < extraWorkers ? 1 : 0);
+    }
+
     private static void consoleInput(String message) {
         System.out.println("[INPUT] " + message);
     }
@@ -4636,11 +5194,15 @@ public class ValidationTools {
 
     private static ValidationTaskResult validateOneResolvedRow(ResolvedMappingRow row,
                                                                Path constraintsRoot,
-                                                               Map<String, Model> shapesCache,
+                                                               Map<String, CachedShapes> shapesCache,
                                                                Map<Path, Model> staticXmlModelCache,
                                                                Map<Path, Model> timestampXmlModelCache,
+                                                               Map<Path, ZipXmlEntry> zipEntriesByVirtualPath,
                                                                Map<String, RDFDatatype> dataTypeMap,
-                                                               String xmlBase) {
+                                                               String xmlBase,
+                                                               int maxResultsPerConstraint,
+                                                               ValidationEngine validationEngine,
+                                                               int targetShapeWorkers) {
 
         long rowStart = System.currentTimeMillis();
 
@@ -4648,7 +5210,7 @@ public class ValidationTools {
                 + " tso=" + row.tso
                 + " timestamp=" + row.timestamp
                 + " ttl=" + row.ttlName
-                + " xmlFiles=" + row.xmlFiles.size());
+                + " xmlFiles=" + (row.xmlFiles == null ? 0 : row.xmlFiles.size()));
 
         try {
             if (row.xmlFiles == null || row.xmlFiles.isEmpty()) {
@@ -4666,9 +5228,10 @@ public class ValidationTools {
                 );
             }
 
-            Path ttlPath = resolveTtlPath(constraintsRoot, row.ttlName);
+            List<Path> ttlPaths = resolveTtlPaths(constraintsRoot, row.ttlName);
+            Optional<Path> missingTtl = ttlPaths.stream().filter(path -> !Files.exists(path)).findFirst();
 
-            if (!Files.exists(ttlPath)) {
+            if (ttlPaths.isEmpty() || missingTtl.isPresent()) {
                 return new ValidationTaskResult(
                         row.rowIdx,
                         row.caseFolder,
@@ -4679,39 +5242,58 @@ public class ValidationTools {
                         row.constraintFileText,
                         null,
                         false,
-                        new FileNotFoundException("TTL not found: " + ttlPath)
+                        new FileNotFoundException("TTL not found: "
+                                + missingTtl.map(Path::toString).orElse(row.ttlName))
                 );
             }
 
-            LoadShapesResult shapesResult = loadShapesWithImports(
-                    new LocalShapeSource(ttlPath), constraintsRoot, shapesCache);
-            Model shapesModel = shapesResult.model();
+            long shapesStart = System.currentTimeMillis();
+            CachedShapes cachedShapes = loadParsedShapesWithImports(ttlPaths, constraintsRoot, shapesCache);
+            Model shapesModel = cachedShapes.model();
+            dbgRow(row.rowIdx, "DONE load timestamped shapes"
+                    + " triples=" + shapesModel.size(), shapesStart);
 
-            Model dataModel = loadRdfXmlFromFilesWithCache(
+            long dataStart = System.currentTimeMillis();
+            Graph dataGraph = loadRdfXmlGraphFromFilesWithCache(
                     row.xmlFiles,
                     staticXmlModelCache,
                     timestampXmlModelCache,
+                    zipEntriesByVirtualPath,
                     dataTypeMap,
                     xmlBase,
                     row.rowIdx
             );
-            ValidationReport report = ShaclValidator.get().validate(shapesModel.getGraph(), dataModel.getGraph());
+            dbgRow(row.rowIdx, "DONE load timestamped data graph", dataStart);
 
-            List<SHACLValidationResult> results =
-                    ShaclTools.extractSHACLValidationResults(report, shapesModel);
+            long validationStart = System.currentTimeMillis();
+            LimitedValidationOutcome limitedOutcome = validateWithSelectedEngine(
+                    validationEngine, cachedShapes.shapes(), dataGraph, shapesModel,
+                    maxResultsPerConstraint, row.rowIdx, targetShapeWorkers);
+            dbgRow(row.rowIdx, "DONE timestamped SHACL validation"
+                    + " conforms=" + limitedOutcome.conforms()
+                    + (limitedOutcome.partial() ? " partial=true" : ""), validationStart);
+
+            long extractionStart = System.currentTimeMillis();
+            List<SHACLValidationResult> results = limitedOutcome.results();
+            dbgRow(row.rowIdx, "DONE timestamped result extraction"
+                    + " resultCount=" + (results == null ? "null" : results.size())
+                    + (limitedOutcome.partial()
+                    ? " limitPerConstraint=" + maxResultsPerConstraint + " partial=true" : ""), extractionStart);
+            dbgTopResultShapes(row.rowIdx, results);
 
             dbgRow(row.rowIdx, "DONE timestamped resolved row"
                             + " tso=" + row.tso
                             + " timestamp=" + row.timestamp
-                            + " conforms=" + report.conforms()
+                            + " conforms=" + limitedOutcome.conforms()
                             + " resultCount=" + (results == null ? "null" : results.size()),
                     rowStart);
 
             return new ValidationTaskResult(
                     row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
                     row.xmlFilesText, "", row.constraintFileText,
-                    results, report.conforms(), null
-            ).withDisplayName(row.sourceRow.notes);
+                    results, limitedOutcome.conforms(), null
+            ).withDisplayName(row.sourceRow.notes)
+                    .withPartialValidation(limitedOutcome.partial());
 
         } catch (Exception ex) {
             dbgRow(row.rowIdx, "ERROR timestamped resolved row"
@@ -4737,7 +5319,8 @@ public class ValidationTools {
     }
 
     private static void appendTaskResultsToWriter(ValidationExcelWriter writer,
-                                                  List<ValidationTaskResult> taskResults) {
+                                                  List<ValidationTaskResult> taskResults,
+                                                  int maxResultsPerConstraint) {
         for (ValidationTaskResult r : taskResults) {
             if (r.error != null) {
                 writer.appendError(
@@ -4746,9 +5329,279 @@ public class ValidationTools {
             } else {
                 writer.appendValidation(
                         r.caseFolder, r.datasetName, r.xmlFiles, "", r.constraintFile,
-                        r.results, r.conforms, r.displayName);
+                        r.results, r.conforms, r.displayName,
+                        r.partialValidation, maxResultsPerConstraint);
+                // Timestamped callers save their Turtle reports beside the timestamp workbook.
             }
         }
+    }
+
+    private static void saveValidationReportTurtle(Path folder, ValidationTaskResult r) throws IOException {
+        if (r.error != null) return;
+        Model model = ModelFactory.createDefaultModel();
+        String sh = "http://www.w3.org/ns/shacl#";
+        org.apache.jena.rdf.model.Resource report = model.createResource();
+        report.addProperty(org.apache.jena.vocabulary.RDF.type, model.createResource(sh + "ValidationReport"));
+        report.addLiteral(model.createProperty(sh + "conforms"), r.conforms);
+        if (r.results != null) for (SHACLValidationResult finding : r.results) {
+            org.apache.jena.rdf.model.Resource result = model.createResource();
+            result.addProperty(org.apache.jena.vocabulary.RDF.type, model.createResource(sh + "ValidationResult"));
+            report.addProperty(model.createProperty(sh + "result"), result);
+            addReportValue(result, model, sh + "focusNode", finding.getFocusNode());
+            addReportValue(result, model, sh + "resultPath", finding.getPath());
+            addReportValue(result, model, sh + "resultMessage", finding.getMessage());
+            addReportValue(result, model, sh + "sourceShape", finding.getSourceShape());
+            addReportValue(result, model, sh + "sourceConstraintComponent", finding.getConstraintComponent());
+            addReportValue(result, model, sh + "value", finding.getValue());
+        }
+        Files.createDirectories(folder);
+        String name = (r.datasetName + "__" + r.constraintFile).replaceAll("[^A-Za-z0-9._-]+", "_");
+        try (OutputStream out = Files.newOutputStream(folder.resolve(name + "__report.ttl"))) { RDFDataMgr.write(out, model, RDFFormat.TURTLE_PRETTY); }
+    }
+
+    private static void addReportValue(org.apache.jena.rdf.model.Resource result, Model model, String property, String value) {
+        if (value != null && !value.isBlank()) result.addLiteral(model.createProperty(property), value);
+    }
+
+    private record LimitedValidationOutcome(List<SHACLValidationResult> results,
+                                            boolean conforms,
+                                            boolean partial) {}
+
+    private static LimitedValidationOutcome validateWithSelectedEngine(ValidationEngine engine,
+                                                                        Shapes shapes,
+                                                                        Graph dataGraph,
+                                                                        Model shapesModel,
+                                                                        int maxResultsPerConstraint,
+                                                                        int rowIdx,
+                                                                        int targetShapeWorkers)
+            throws IOException, InterruptedException {
+        if (engine == ValidationEngine.APACHE_JENA) {
+            return maxResultsPerConstraint == 0
+                    ? validateCompletely(shapes, dataGraph, shapesModel, rowIdx, targetShapeWorkers)
+                    : validateWithResultLimit(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx,
+                            targetShapeWorkers);
+        }
+
+        PythonShaclValidator.Outcome outcome = PythonShaclValidator.validate(
+                engine, shapesModel, ModelFactory.createModelForGraph(dataGraph));
+        List<SHACLValidationResult> allResults = outcome.results();
+        // Python engines have no public equivalent of Jena's per-source-shape interruption
+        // callback. They run the complete graph and the shared reporting layer samples the
+        // returned findings, preserving the report's Partial marker without suppressing checks.
+        if (maxResultsPerConstraint == 0) {
+            return new LimitedValidationOutcome(allResults, outcome.conforms(), false);
+        }
+        List<SHACLValidationResult> limited = limitResultsPerConstraint(allResults, maxResultsPerConstraint);
+        boolean partial = limited.size() < allResults.size();
+        return new LimitedValidationOutcome(limited, !partial && outcome.conforms(), partial);
+    }
+    private static LimitedValidationOutcome validateCompletely(Shapes shapes,
+                                                                Graph dataGraph,
+                                                                Model shapesModel,
+                                                                int rowIdx,
+                                                                int targetShapeWorkers) {
+        return validateTargetShapes(shapes, dataGraph, shapesModel, 0, rowIdx, targetShapeWorkers);
+    }
+
+    /**
+     * Performs a sampled validation directly through Jena's public validation primitives.
+     * Each target shape has its own context and listener. Once the listener observes more than
+     * {@code maxResultsPerConstraint} failed constraint evaluations for one source shape it
+     * interrupts that target-shape evaluation, retaining the results already emitted by Jena.
+     * All severities are counted.
+     * <p>
+     * An interrupted target shape is intentionally reported as partial: a non-conformance finding
+     * is valid, but no conclusion can be drawn about checks that have not run yet.
+     */
+    private static LimitedValidationOutcome validateWithResultLimit(Shapes shapes,
+                                                                      Graph dataGraph,
+                                                                      Model shapesModel,
+                                                                      int maxResultsPerConstraint,
+                                                                      int rowIdx,
+                                                                      int targetShapeWorkers) {
+        return validateTargetShapes(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx,
+                targetShapeWorkers);
+    }
+
+    /** Validates independent Jena target shapes concurrently without exceeding a row's budget. */
+    private static LimitedValidationOutcome validateTargetShapes(Shapes shapes, Graph dataGraph, Model shapesModel,
+                                                                   int maxResultsPerConstraint, int rowIdx,
+                                                                   int targetShapeWorkers) {
+        List<Shape> targetShapes = new ArrayList<>(shapes.getTargetShapes());
+        if (targetShapes.isEmpty()) return new LimitedValidationOutcome(List.of(), true, false);
+        int workerCount = Math.min(Math.max(1, targetShapeWorkers), targetShapes.size());
+        if (workerCount == 1) {
+            return mergeTargetShapeOutcomes(targetShapes.stream().map(shape -> validateTargetShape(
+                    shapes, dataGraph, shapesModel, shape, maxResultsPerConstraint, rowIdx)).toList(),
+                    maxResultsPerConstraint);
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<TargetShapeOutcome>> futures = new ArrayList<>();
+            for (Shape targetShape : targetShapes) futures.add(pool.submit(() -> validateTargetShape(
+                    shapes, dataGraph, shapesModel, targetShape, maxResultsPerConstraint, rowIdx)));
+            List<TargetShapeOutcome> outcomes = new ArrayList<>();
+            for (Future<TargetShapeOutcome> future : futures) {
+                try {
+                    outcomes.add(future.get(FUTURE_TIMEOUT_MINUTES, TimeUnit.MINUTES));
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Target-shape validation interrupted", ex);
+                } catch (ExecutionException | TimeoutException ex) {
+                    future.cancel(true);
+                    throw new IOException("Target-shape validation failed", ex);
+                }
+            }
+            return mergeTargetShapeOutcomes(outcomes, maxResultsPerConstraint);
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static TargetShapeOutcome validateTargetShape(Shapes shapes, Graph dataGraph, Model shapesModel,
+                                                            Shape targetShape, int maxResultsPerConstraint,
+                                                            int rowIdx) {
+        long started = System.currentTimeMillis();
+        int focusNodeCount = 0;
+        boolean partial = false;
+        ValidationContext context = maxResultsPerConstraint == 0
+                ? ValidationContext.create(shapes, dataGraph)
+                : ValidationContext.create(shapes, dataGraph, new ResultLimitListener(maxResultsPerConstraint));
+        try {
+            for (org.apache.jena.graph.Node focusNode : VLib.focusNodes(dataGraph, targetShape)) {
+                focusNodeCount++;
+                ValidationProc.execValidateShape(context, dataGraph, targetShape, focusNode);
+            }
+        } catch (ResultLimitReached ex) {
+            partial = true;
+        }
+        ValidationReport report = context.generateReport();
+        List<SHACLValidationResult> results = ShaclTools.extractSHACLValidationResults(report, shapesModel);
+        dbgRow(rowIdx, "DONE target shape=" + targetShape.getShapeNode() + " focusNodes=" + focusNodeCount
+                + " resultCount=" + results.size() + (partial ? " partial=true" : ""), started);
+        return new TargetShapeOutcome(results, report, report.conforms(), partial);
+    }
+
+    private static LimitedValidationOutcome mergeTargetShapeOutcomes(List<TargetShapeOutcome> outcomes,
+                                                                       int maxResultsPerConstraint) {
+        List<SHACLValidationResult> combined = new ArrayList<>();
+        boolean partial = false;
+        boolean conforms = true;
+        for (TargetShapeOutcome outcome : outcomes) {
+            combined.addAll(outcome.results());
+            partial |= outcome.partial();
+            conforms &= outcome.conforms();
+        }
+        List<SHACLValidationResult> distinct = new ArrayList<>(new LinkedHashSet<>(combined));
+        List<SHACLValidationResult> results = maxResultsPerConstraint == 0 ? distinct
+                : limitResultsPerConstraint(distinct, maxResultsPerConstraint);
+        return new LimitedValidationOutcome(results, !partial && conforms, partial);
+    }
+
+    /**
+     * Validates a graph by independent target shapes, for workflows that do not have mapping
+     * rows to parallelise (for example manual rule testing).
+     */
+    public static ValidationReport validateJenaTargetShapes(Shapes shapes, Graph dataGraph, int workers) {
+        List<Shape> targetShapes = new ArrayList<>(shapes.getTargetShapes());
+        if (targetShapes.isEmpty()) return ValidationReport.reportConformsTrue();
+        int workerCount = Math.min(Math.max(1, workers), targetShapes.size());
+        ExecutorService pool = Executors.newFixedThreadPool(workerCount);
+        try {
+            List<Future<TargetShapeOutcome>> futures = new ArrayList<>();
+            Model shapesModel = ModelFactory.createModelForGraph(shapes.getGraph());
+            for (Shape targetShape : targetShapes) futures.add(pool.submit(() -> validateTargetShape(
+                    shapes, dataGraph, shapesModel, targetShape, 0, -1)));
+            ValidationReport.Builder merged = ValidationReport.create();
+            for (Future<TargetShapeOutcome> future : futures) {
+                try {
+                    for (var entry : future.get(FUTURE_TIMEOUT_MINUTES, TimeUnit.MINUTES).report().getEntries()) {
+                        merged.addReportEntry(entry);
+                    }
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Target-shape validation interrupted", ex);
+                } catch (ExecutionException | TimeoutException ex) {
+                    future.cancel(true);
+                    throw new IllegalStateException("Target-shape validation failed", ex);
+                }
+            }
+            return merged.build();
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private record TargetShapeOutcome(List<SHACLValidationResult> results, ValidationReport report,
+                                      boolean conforms, boolean partial) {}
+
+    /** Keeps the first {@code maxResultsPerConstraint} report rows for each SHACL source shape. */
+    private static List<SHACLValidationResult> limitResultsPerConstraint(
+            List<SHACLValidationResult> results, int maxResultsPerConstraint) {
+        Map<String, Integer> retainedBySourceShape = new HashMap<>();
+        List<SHACLValidationResult> limited = new ArrayList<>(results.size());
+        for (SHACLValidationResult result : results) {
+            String sourceShape = safe(result.getSourceShape());
+            int retained = retainedBySourceShape.getOrDefault(sourceShape, 0);
+            if (retained < maxResultsPerConstraint) {
+                limited.add(result);
+                retainedBySourceShape.put(sourceShape, retained + 1);
+            }
+        }
+        return limited;
+    }
+
+    private static final class ResultLimitListener implements org.apache.jena.shacl.validation.ValidationListener {
+        private final int limit;
+        private final Map<org.apache.jena.graph.Node, Integer> failuresByShape = new HashMap<>();
+
+        private ResultLimitListener(int limit) {
+            this.limit = limit;
+        }
+
+        @Override
+        public void onValidationEvent(org.apache.jena.shacl.validation.event.ValidationEvent event) {
+            if (!(event instanceof ConstraintEvaluatedEvent evaluated) || evaluated.isValid()) {
+                return;
+            }
+
+            org.apache.jena.graph.Node shape = evaluated.getShape().getShapeNode();
+            int failures = failuresByShape.merge(shape, 1, Integer::sum);
+            if (failures > limit) {
+                throw new ResultLimitReached();
+            }
+        }
+    }
+
+    private static final class ResultLimitReached extends RuntimeException {
+        private ResultLimitReached() {
+            super(null, null, false, false);
+        }
+    }
+
+    /**
+     * Makes high-volume SHACL output actionable during a diagnostic run.  Result count is often
+     * the first signal of a broad SPARQL constraint or an unintended cartesian join; logging the
+     * leading source shapes lets us profile only those constraints next.
+     */
+    private static void dbgTopResultShapes(int rowIdx, List<SHACLValidationResult> results) {
+        if (!DEBUG || results == null || results.isEmpty()) {
+            return;
+        }
+
+        results.stream()
+                .collect(Collectors.groupingBy(
+                        result -> safe(result.getSourceShape()),
+                        Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .limit(20)
+                .forEach(entry -> dbgRow(rowIdx, "RESULT_SOURCE"
+                        + " count=" + entry.getValue()
+                        + " shape=" + forLog(entry.getKey())));
     }
 
     private static LinkedHashSet<String> detectProfilesFromMappingInput(String xmlInputsRaw) {
@@ -4806,7 +5659,8 @@ public class ValidationTools {
                                                String country,
                                                String timestamp,
                                                Path timestampReport,
-                                               List<ValidationTaskResult> results) {
+                                               List<ValidationTaskResult> results,
+                                               int maxResultsPerConstraint) {
         int validationCount = 0;
         int conformCount = 0;
         int nonConformCount = 0;
@@ -4815,6 +5669,7 @@ public class ValidationTools {
         int violationCount = 0;
         int warningCount = 0;
         int infoCount = 0;
+        int partialValidationCount = 0;
 
         for (ValidationTaskResult r : results) {
             validationCount++;
@@ -4822,6 +5677,10 @@ public class ValidationTools {
             if (r.error != null) {
                 errorCount++;
                 continue;
+            }
+
+            if (r.partialValidation) {
+                partialValidationCount++;
             }
 
             if (r.conforms) {
@@ -4868,7 +5727,9 @@ public class ValidationTools {
                 totalResults,
                 violationCount,
                 warningCount,
-                infoCount
+                infoCount,
+                partialValidationCount,
+                maxResultsPerConstraint
         );
     }
 
@@ -5025,16 +5886,6 @@ public class ValidationTools {
         return false;
     }
 
-    private static void deleteDirectoryRecursively(Path dir) {
-        if (!Files.exists(dir)) return;
-        try (java.util.stream.Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder())
-                    .forEach(p -> { try { Files.delete(p); } catch (IOException ignore) {} });
-        } catch (IOException ex) {
-            logWarn("Could not delete temporary directory: " + dir + " error=" + ex.getMessage());
-        }
-    }
-
     private static void feedComparison(ValidationExcelWriter.ComparisonExcelWriter comparisonWriter,
                                        String region,
                                        String timestamp,
@@ -5055,6 +5906,87 @@ public class ValidationTools {
             }
             String label = safe(r.displayName).isBlank() ? r.datasetName : r.displayName;
             comparisonWriter.addTimestampDataset(region, timestamp, label, w, i, v);
+        }
+    }
+
+    /**
+     * Re-creates the comparison XLSX from the per-timestamp reports already written to
+     * {@code outputBaseDir} by a previous full run, without re-running validation.
+     *
+     * <p>Reads the most recent {@code timestamped_validation_summary__*.xlsx} found in
+     * {@code outputBaseDir} to discover which per-timestamp reports exist and which country
+     * each one belongs to, then feeds their statistics into a fresh
+     * {@link ValidationExcelWriter.ComparisonExcelWriter} together with whatever historical
+     * data {@code previousComparisonXlsx} carries, and saves the result to {@code outputBaseDir}.
+     *
+     * @param outputBaseDir       folder that holds the per-region subdirectories and the summary
+     * @param previousComparisonXlsx  previous {@code validation_comparison__*.xlsx}, or null
+     * @return path of the newly written {@code validation_comparison__*.xlsx}
+     */
+    public static Path regenerateComparisonXlsx(Path outputBaseDir,
+                                                Path previousComparisonXlsx) throws IOException {
+        // 1. Find the most recent all-countries summary file.
+        Path summaryXlsx;
+        try (Stream<Path> ls = Files.list(outputBaseDir)) {
+            summaryXlsx = ls
+                    .filter(p -> p.getFileName().toString()
+                            .startsWith("timestamped_validation_summary__")
+                            && p.getFileName().toString().endsWith(".xlsx"))
+                    .max(Comparator.comparing(p -> p.getFileName().toString()))
+                    .orElseThrow(() -> new IOException(
+                            "No timestamped_validation_summary__*.xlsx found in " + outputBaseDir));
+        }
+
+        // 2. Read TimestampOverview.
+        List<ValidationExcelWriter.TimestampOverviewRow> overview =
+                ValidationExcelWriter.readTimestampOverview(summaryXlsx);
+
+        if (overview.isEmpty()) {
+            throw new IOException("TimestampOverview sheet is empty in " + summaryXlsx);
+        }
+
+        // 3. Derive a human-readable month label from the first timestamp encountered.
+        String monthLabel = overview.stream()
+                .map(r -> monthYearFromInstant(r.timestamp()))
+                .filter(l -> l != null)
+                .findFirst()
+                .orElse("Current");
+
+        // 4. Feed statistics into the comparison writer.
+        try (ValidationExcelWriter.ComparisonExcelWriter compWriter =
+                     new ValidationExcelWriter.ComparisonExcelWriter(
+                             previousComparisonXlsx, "Previous", "Current")) {
+            compWriter.setCurrentLabel(monthLabel);
+
+            for (ValidationExcelWriter.TimestampOverviewRow row : overview) {
+                String country    = row.country();
+                String timestamp  = row.timestamp();
+                String reportFile = row.reportFileName();
+
+                if (reportFile.isBlank()) {
+                    continue;
+                }
+
+                Path reportPath = outputBaseDir
+                        .resolve(sanitizePathPart(country))
+                        .resolve(reportFile);
+
+                if (!Files.isRegularFile(reportPath)) {
+                    logWarn("regenerateComparison: report not found: " + reportPath);
+                    continue;
+                }
+
+                List<ValidationExcelWriter.StatisticsRow> stats =
+                        ValidationExcelWriter.readStatisticsSheet(reportPath);
+
+                for (ValidationExcelWriter.StatisticsRow stat : stats) {
+                    compWriter.addTimestampDataset(
+                            country, timestamp, stat.label(),
+                            stat.warnings(), stat.infos(), stat.violations());
+                }
+            }
+
+            return compWriter.saveTo(outputBaseDir);
         }
     }
 

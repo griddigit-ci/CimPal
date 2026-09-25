@@ -11,6 +11,7 @@ import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -88,6 +89,7 @@ public class SparqlTools {
 
             Sheet sheet = workbook.createSheet("SPARQL Results");
             createHeaderRow(sheet, columns);
+            sheet.createFreezePane(0, 1);
             fillDataRows(sheet, resultSet, columns, model);
             autoSizeColumns(sheet, columns.size());
 
@@ -132,7 +134,10 @@ public class SparqlTools {
         CellStyle headerStyle = sheet.getWorkbook().createCellStyle();
         org.apache.poi.ss.usermodel.Font font = sheet.getWorkbook().createFont();
         font.setBold(true);
+        font.setColor(IndexedColors.BLACK.getIndex());
         headerStyle.setFont(font);
+        headerStyle.setFillForegroundColor(IndexedColors.PALE_BLUE.getIndex());
+        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
         for (int i = 0; i < columns.size(); i++) {
             Cell cell = headerRow.createCell(i);
@@ -290,6 +295,7 @@ public class SparqlTools {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("SPARQL Results");
             createHeaderRow(sheet, results.columns);
+            sheet.createFreezePane(0, 1);
 
             int rowIndex = 1;
             for (Map<String, String> row : results.rows) {
@@ -302,6 +308,10 @@ public class SparqlTools {
             }
 
             autoSizeColumns(sheet, results.columns.size());
+            if (!results.columns.isEmpty()) {
+                sheet.setAutoFilter(new CellRangeAddress(0, Math.max(0, rowIndex - 1), 0,
+                        results.columns.size() - 1));
+            }
 
             try (FileOutputStream fileOutput = new FileOutputStream(outputFile)) {
                 workbook.write(fileOutput);

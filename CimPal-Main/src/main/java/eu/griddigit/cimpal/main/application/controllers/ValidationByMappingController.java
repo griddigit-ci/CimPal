@@ -4,6 +4,7 @@ import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
+import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
@@ -114,6 +115,9 @@ public class ValidationByMappingController {
     private Button btnBrowseOutputFolder;
 
     @FXML
+    private Button btnRegenerateComparison;
+
+    @FXML
     private Button btnRunValidationByMapping;
 
     @FXML
@@ -140,6 +144,42 @@ public class ValidationByMappingController {
     @FXML
     private Label helpPreviousComparisonCsv;
 
+    @FXML
+    private HBox rowValidationEngineLabel;
+
+    @FXML
+    private ChoiceBox<ValidationEngine> cbValidationEngine;
+
+    @FXML
+    private Label helpValidationEngine;
+
+    @FXML
+    private HBox rowValidationWorkersLabel;
+
+    @FXML
+    private ChoiceBox<String> cbValidationWorkers;
+
+    @FXML
+    private Label helpValidationWorkers;
+
+    @FXML
+    private HBox rowLimitValidationResults;
+
+    @FXML
+    private CheckBox cbLimitValidationResults;
+
+    @FXML
+    private Label helpLimitValidationResults;
+
+    @FXML
+    private HBox rowValidationDebug;
+
+    @FXML
+    private CheckBox cbValidationDebug;
+
+    @FXML
+    private Label helpValidationDebug;
+
     // ---- manual-selection workflow controls, formerly the SHACL tester tab ----
     @FXML
     private HBox rowShaclConstraintFilesLabel;
@@ -154,16 +194,10 @@ public class ValidationByMappingController {
     private Label helpShaclConstraintFiles;
 
     @FXML
-    private HBox rowExportModelReports;
-
-    @FXML
-    private CheckBox cbExportReports;
+    private CheckBox cbExportReportsTurtle;
 
     @FXML
     private Label helpExportReports;
-
-    @FXML
-    private TreeView<String> treeViewShaclFiles;
 
     private File mappingCsvFile;
     private File modelsInputFolder;
@@ -199,6 +233,19 @@ public class ValidationByMappingController {
         );
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
 
+        cbValidationEngine.getItems().setAll(ValidationEngine.values());
+        cbValidationEngine.getSelectionModel().select(ValidationEngine.APACHE_JENA);
+        if (cbValidationDebug != null) {
+            cbValidationDebug.setSelected(false);
+        }
+
+        int maximumWorkers = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+        cbValidationWorkers.getItems().add("Auto (memory-aware)");
+        for (int workerCount = 1; workerCount <= maximumWorkers; workerCount++) {
+            cbValidationWorkers.getItems().add(Integer.toString(workerCount));
+        }
+        cbValidationWorkers.getSelectionModel().selectFirst();
+
         cbDatatypeMap.getItems().setAll(
                 DATATYPE_MAP_CGMES30_NC25,
                 DATATYPE_MAP_CGMES30_NC24,
@@ -221,6 +268,7 @@ public class ValidationByMappingController {
 
         initializeHelpTooltips();
         restoreRememberedPaths();
+        restoreRememberedSettings();
     }
 
     /**
@@ -237,9 +285,6 @@ public class ValidationByMappingController {
         PathMemory.bind(tfModelsInputFolder, "tab.validationByMapping.modelsInput",
                 folder -> {
                     modelsInputFolder = folder;
-                    //the manual workflow shows the discovered models, so rebuild the tree
-                    //whenever the folder is restored, exactly as the Browse handler does
-                    GUIhelper.buildFileTree(folder, treeViewShaclFiles);
                 });
         PathMemory.bind(tfConstraintsRootFolder, "tab.validationByMapping.constraintsRoot",
                 folder -> constraintsRootFolder = folder);
@@ -249,6 +294,49 @@ public class ValidationByMappingController {
                 file -> previousComparisonCsvFile = file);
         PathMemory.bind(tfDatatypeMapFile, "tab.validationByMapping.datatypeMap",
                 file -> datatypeMapFile = file);
+    }
+
+    /**
+     * Restores ChoiceBox selections and the custom base-URI field. Runs after path restore so
+     * the workflow controls reflect the saved state immediately. Listeners are added here (not
+     * in initialize) so that the initial programmatic selections do not trigger premature saves.
+     */
+    private void restoreRememberedSettings() {
+        // Validation workflow
+        String savedWorkflow = PathMemory.recallValue("tab.validationByMapping.workflow", null);
+        if (savedWorkflow != null && cbValidationWorkflow.getItems().contains(savedWorkflow)) {
+            cbValidationWorkflow.getSelectionModel().select(savedWorkflow);
+        }
+        cbValidationWorkflow.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldVal, newVal) -> PathMemory.rememberValue(
+                        "tab.validationByMapping.workflow", newVal));
+
+        // Datatype map
+        String savedDatatypeMap = PathMemory.recallValue("tab.validationByMapping.datatypeMapChoice", null);
+        if (savedDatatypeMap != null && cbDatatypeMap.getItems().contains(savedDatatypeMap)) {
+            cbDatatypeMap.getSelectionModel().select(savedDatatypeMap);
+        }
+        cbDatatypeMap.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldVal, newVal) -> PathMemory.rememberValue(
+                        "tab.validationByMapping.datatypeMapChoice", newVal));
+
+        // Base URI preset choice
+        String savedBaseUri = PathMemory.recallValue("tab.validationByMapping.baseUriChoice", null);
+        if (savedBaseUri != null && cbBaseUri.getItems().contains(savedBaseUri)) {
+            cbBaseUri.getSelectionModel().select(savedBaseUri);
+        }
+        cbBaseUri.getSelectionModel().selectedItemProperty().addListener(
+                (obs, oldVal, newVal) -> PathMemory.rememberValue(
+                        "tab.validationByMapping.baseUriChoice", newVal));
+
+        // Custom base URI text (only meaningful when "Other" is selected)
+        String savedBaseUriText = PathMemory.recallValue("tab.validationByMapping.baseUriText", null);
+        if (savedBaseUriText != null && !savedBaseUriText.isBlank()) {
+            tfXmlBaseUri.setText(savedBaseUriText);
+        }
+        tfXmlBaseUri.textProperty().addListener((obs, oldVal, newVal) ->
+                PathMemory.rememberValue("tab.validationByMapping.baseUriText",
+                        newVal == null ? "" : newVal));
     }
 
     /** Reveals the file field and Browse button only for the "Other" datatype map. */
@@ -273,10 +361,12 @@ public class ValidationByMappingController {
         boolean timestamped = isTimestampedWorkflow();
         boolean manual = isManualWorkflow();
 
-        // Previous-run comparison CSV: timestamped workflow only, and hidden rather than
-        // disabled - it is the last row, so hiding it costs no layout gap.
+        // Previous-run comparison CSV and Regenerate button: timestamped workflow only.
         setShown(timestamped, rowPreviousComparisonCsvLabel, tfPreviousComparisonCsv,
-                btnBrowsePreviousComparisonCsv);
+                btnBrowsePreviousComparisonCsv, btnRegenerateComparison);
+        setShown(!manual, rowValidationEngineLabel, cbValidationEngine);
+        setShown(true, rowValidationWorkersLabel, cbValidationWorkers,
+                rowLimitValidationResults, rowValidationDebug);
 
         // Manual constraint file selection: manual workflow only.
         setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
@@ -287,9 +377,6 @@ public class ValidationByMappingController {
                 tfConstraintsRootFolder, btnBrowseConstraintsRootFolder,
                 tfOutputFolder, btnBrowseOutputFolder);
 
-        // The export option and the discovered-model tree only mean anything for the manual
-        // workflow, so they are hidden outright rather than shown disabled.
-        setShown(manual, rowExportModelReports, treeViewShaclFiles);
     }
 
     private static void setDisabled(boolean disabled, Node... nodes) {
@@ -341,8 +428,9 @@ public class ValidationByMappingController {
 
         GUIhelper.installHelpTooltip(
                 helpExportReports,
-                "When checked, saves a SHACL validation report file alongside each validated model in the models root folder.\n\n" +
-                        "Only used by the \"Validate by manual selection\" workflow."
+                "Saves the standard SHACL ValidationReport graph as a Turtle (.ttl) file for each validation result. " +
+                        "Turtle reports can be selected later in the AI Assistant for targeted explanations and repair proposals.\n\n" +
+                        "Applies to all validation workflows."
         );
 
         GUIhelper.installHelpTooltip(
@@ -379,11 +467,55 @@ public class ValidationByMappingController {
 
         GUIhelper.installHelpTooltip(
                 helpPreviousComparisonCsv,
-                "Optional CSV holding the previous run's totals, used to build the comparison workbook.\n\n" +
+                "Optional XLSX holding the previous run's totals, used to build the comparison workbook.\n\n" +
                         "Shown only for the timestamped workflow, the only one that produces a comparison.\n\n" +
-                        "Expected header: region,dataset,total  (total = warnings + infos + violations).\n\n" +
-                        "This is the same shape the comparison workbook emits, so each run's output can feed the next.\n\n" +
-                        "If left empty, the comparison is produced with an empty \"previous\" column."
+                        "Supply the validation_comparison__*.xlsx file produced by a previous run.\n\n" +
+                        "All date-time named sheets from that file are carried over into the new comparison workbook, " +
+                        "and the most recent one is used as the comparison baseline (\"Previous\" column in the charts).\n\n" +
+                        "If left empty, no historical data is included and the % distribution chart is produced without a delta chart."
+        );
+
+        GUIhelper.installHelpTooltip(
+                helpValidationEngine,
+                "Apache Jena is the default and production engine. It runs inside CimPal and is " +
+                        "validated against the supplied Coreso/QoCDC shape sets.\n\n" +
+                        "The three Python choices are experimental comparison engines. CimPal gives " +
+                        "them the same fully resolved shapes graph and datatype-enhanced data graph " +
+                        "through memory pipes, so they do not change the mapping combinations or write " +
+                        "ZIP/XML model data to disk.\n\n" +
+                        "pySHACL (RDFLib) uses RDFLib SPARQL. pySHACL + Oxigraph uses Oxigraph for " +
+                        "SPARQL acceleration. SHACL (Rust Python binding) uses the PyPI Rust binding. " +
+                        "Some supplied SPARQL constraints or shape-graph structures are not compatible " +
+                        "with these engines, and their results and timing must be compared to Jena.\n\n" +
+                        "Install Python options with: py -3 -m pip install \"pyshacl[oxigraph]\" shacl\n\n" +
+                        "In the mapping workflows, the 10-result sampling option interrupts Jena early. " +
+                        "Python engines complete their validation before CimPal applies the same report limit.");
+        GUIhelper.installHelpTooltip(
+                helpValidationWorkers,
+                "Number of independent model validations CimPal runs concurrently. Each worker " +
+                        "uses a separate combined data graph and can use a CPU core.\n\n" +
+                        "Auto sizes Jena workers from the Java heap: roughly one worker per 6 GB, " +
+                        "up to 8 timestamped or 12 normal mapping workers. Python engines default " +
+                        "to half those limits because every worker is a Python process with another " +
+                        "in-memory graph. Select a number explicitly to override Auto.\n\n" +
+                        "Increase gradually while observing memory use; selecting every available " +
+                        "core may exhaust memory before it improves throughput.");
+        GUIhelper.installHelpTooltip(
+                helpLimitValidationResults,
+                "When selected, CimPal retains at most 10 findings for each source shape, counting "
+                        + "violations, warnings and information results alike. The mapping workflows stop "
+                        + "Jena after that limit and mark affected validations as Partial, because checks "
+                        + "after the limit were not run. The manual-selection workflow applies the same "
+                        + "cap to its exported findings while retaining its complete pass/fail rule check.\n\n"
+                        + "Use this for quick investigation; clear it to run the complete validation."
+        );
+        GUIhelper.installHelpTooltip(
+                helpValidationDebug,
+                "Writes a detailed diagnostic log for the selected validation workflow. The log includes " +
+                        "the selected options, input loading, shape loading, validation and report-writing timings. " +
+                        "It is saved as cimpal_validation_debug.log in CimPal's per-user application-data folder.\n\n" +
+                        "Logging serializes worker events to one file, so leave it off for normal performance runs " +
+                        "and turn it on when investigating a slow run or an unexpected result."
         );
     }
 
@@ -434,8 +566,6 @@ public class ValidationByMappingController {
         modelsInputFolder = selected;
         tfModelsInputFolder.setText(modelsInputFolder.getAbsolutePath());
 
-        //the manual workflow lists what was found under this folder
-        GUIhelper.buildFileTree(modelsInputFolder, treeViewShaclFiles);
     }
 
     /**
@@ -532,9 +662,9 @@ public class ValidationByMappingController {
     private void actionBrowsePreviousComparisonCsv() {
         List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
                 true,
-                "Previous comparison CSV",
-                List.of("*.csv"),
-                "Previous comparison CSV",
+                "Previous comparison XLSX",
+                List.of("*.xlsx"),
+                "Previous comparison XLSX",
                 "tab.validationByMapping.previousComparisonCsv"
         );
 
@@ -544,10 +674,10 @@ public class ValidationByMappingController {
 
         File selectedFile = selected.getFirst();
 
-        if (!selectedFile.getName().toLowerCase().endsWith(".csv")) {
+        if (!selectedFile.getName().toLowerCase().endsWith(".xlsx")) {
             GUIhelper.showWarning(
                     "Invalid comparison file",
-                    "Please select a CSV file (header: region,dataset,total)."
+                    "Please select an XLSX file produced by a previous validation run."
             );
             return;
         }
@@ -556,6 +686,50 @@ public class ValidationByMappingController {
         if (tfPreviousComparisonCsv != null) {
             tfPreviousComparisonCsv.setText(previousComparisonCsvFile.getAbsolutePath());
         }
+    }
+
+    @FXML
+    private void actionRegenerateComparison() {
+        if (outputFolder == null) {
+            GUIhelper.showWarning("Missing output folder",
+                    "Please select the output folder that contains the previous run's reports.");
+            return;
+        }
+
+        Path previousComparisonPath = getPreviousComparisonCsvPath();
+
+        btnRegenerateComparison.setDisable(true);
+        btnRunValidationByMapping.setDisable(true);
+        setProgress(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        File selectedOutputFolder = outputFolder;
+
+        new Thread(() -> {
+            try {
+                Path result = ValidationTools.regenerateComparisonXlsx(
+                        selectedOutputFolder.toPath(),
+                        previousComparisonPath
+                );
+
+                Platform.runLater(() -> {
+                    setProgress(1);
+                    btnRegenerateComparison.setDisable(false);
+                    btnRunValidationByMapping.setDisable(false);
+                    GUIhelper.showInfo("Comparison regenerated",
+                            "Comparison workbook written to:\n" + result);
+                });
+
+            } catch (IOException ex) {
+                LOG.error("Regenerate comparison failed", ex);
+
+                Platform.runLater(() -> {
+                    resetProgress();
+                    btnRegenerateComparison.setDisable(false);
+                    btnRunValidationByMapping.setDisable(false);
+                    GUIhelper.showError("Regeneration failed", ex.getMessage());
+                });
+            }
+        }, "regenerate-comparison-runner").start();
     }
 
     @FXML
@@ -577,14 +751,6 @@ public class ValidationByMappingController {
             tfShaclConstraintFiles.clear();
         }
 
-        if (treeViewShaclFiles != null) {
-            treeViewShaclFiles.setRoot(null);
-        }
-
-        if (cbExportReports != null) {
-            cbExportReports.setSelected(true);
-        }
-
         if (tfPreviousComparisonCsv != null) {
             tfPreviousComparisonCsv.clear();
         }
@@ -594,6 +760,9 @@ public class ValidationByMappingController {
         }
 
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
+
+        cbValidationEngine.getItems().setAll(ValidationEngine.values());
+        cbValidationEngine.getSelectionModel().select(ValidationEngine.APACHE_JENA);
         cbDatatypeMap.getSelectionModel().select(DATATYPE_MAP_CGMES30_NC25);
         cbBaseUri.getSelectionModel().select(BaseUriPresets.DEFAULT_SELECTION);
 
@@ -609,6 +778,9 @@ public class ValidationByMappingController {
             return;
         }
 
+        ValidationTools.setValidationDebugEnabled(
+                cbValidationDebug != null && cbValidationDebug.isSelected());
+
         if (isManualWorkflow()) {
             runManualValidation();
             return;
@@ -618,10 +790,15 @@ public class ValidationByMappingController {
         DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
         String xmlBase = getBaseUri();
 
-        int threadCount = getThreadCount(runTimestampedWorkflow);
+        ValidationEngine validationEngine = cbValidationEngine == null
+                ? ValidationEngine.APACHE_JENA : cbValidationEngine.getValue();
+        int threadCount = getThreadCount(runTimestampedWorkflow, validationEngine);
 
-        // Only meaningful for the timestamped workflow; null when none selected.
+        // Only the timestamped workflow uses a previous comparison workbook.
         Path previousComparisonCsv = runTimestampedWorkflow ? getPreviousComparisonCsvPath() : null;
+        int maxResultsPerConstraint = cbLimitValidationResults != null
+                && cbLimitValidationResults.isSelected() ? 10 : 0;
+        ValidationTools.setExportTurtleValidationReports(cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected());
 
         btnRunValidationByMapping.setDisable(true);
         setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -645,7 +822,9 @@ public class ValidationByMappingController {
                             threadCount,
                             dataTypeMap,
                             xmlBase,
-                            previousComparisonCsv
+                            previousComparisonCsv,
+                            maxResultsPerConstraint,
+                            validationEngine
                     );
                     List<Path> reports = tsResult.reports();
 
@@ -662,7 +841,9 @@ public class ValidationByMappingController {
                             selectedOutputFolder.toPath(),
                             threadCount,
                             dataTypeMap,
-                            xmlBase
+                            xmlBase,
+                            maxResultsPerConstraint,
+                            validationEngine
                     );
                     Path report = result.reportPath();
 
@@ -718,9 +899,15 @@ public class ValidationByMappingController {
     private void runManualValidation() {
         File selectedModelsFolder = modelsInputFolder;
         List<File> selectedConstraintFiles = shaclConstraintFiles;
-        boolean exportReports = cbExportReports != null && cbExportReports.isSelected();
+        // Manual validation has historically created its Excel reports by default; retain
+        // that behaviour while exposing Turtle as the single optional report format.
+        boolean exportReports = true;
+        boolean exportTurtleReports = cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected();
         DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
         String xmlBase = getBaseUri();
+        int workerCount = getThreadCount(false, ValidationEngine.APACHE_JENA);
+        int maxResultsPerConstraint = cbLimitValidationResults != null
+                && cbLimitValidationResults.isSelected() ? 10 : 0;
 
         List<File> archives = new ArrayList<>();
         try {
@@ -771,8 +958,11 @@ public class ValidationByMappingController {
                 // Same datatype mapping the mapping-driven workflows use, so a numeric or boolean
                 // constraint is evaluated against typed literals here too.
                 tester.setDatatypeMapping(datatypeMapSource.load(), xmlBase);
+                tester.setValidationOptions(workerCount, maxResultsPerConstraint);
+                ValidationTools.startValidationDebugRun("manual SHACL validation workers=" + workerCount
+                        + " resultLimit=" + maxResultsPerConstraint);
 
-                tester.runTests(selectedConstraintFiles, selectedModelsFolder, archives, exportReports);
+                tester.runTestsInternal(selectedConstraintFiles, selectedModelsFolder, archives, exportReports, exportTurtleReports);
 
                 Platform.runLater(() -> {
                     setProgress(1);
@@ -944,14 +1134,30 @@ public class ValidationByMappingController {
         return null;
     }
 
-    private int getThreadCount(boolean timestampedWorkflow) {
-        int availableProcessors = Runtime.getRuntime().availableProcessors();
+    private int getThreadCount(boolean timestampedWorkflow, ValidationEngine engine) {
+        String selection = cbValidationWorkers == null ? "Auto (memory-aware)" : cbValidationWorkers.getValue();
+        if (selection != null && !selection.startsWith("Auto")) {
+            try {
+                return Math.clamp(Integer.parseInt(selection), 1,
+                        Math.max(1, Runtime.getRuntime().availableProcessors() - 1));
+            } catch (NumberFormatException ignored) {
+                // Fall through to the resource-aware default.
+            }
+        }
 
-        // One core is left for the UI, then capped: the timestamped workflow holds more models
-        // in memory per thread, so it gets the tighter cap.
-        return timestampedWorkflow
-                ? Math.clamp(availableProcessors - 1, 1, 2)
-                : Math.clamp(availableProcessors - 1, 1, 4);
+        // The core timestamped workflow needs to distinguish Auto from a user-selected worker
+        // count so it can divide its bounded budget between row and target-shape validation.
+        if (timestampedWorkflow) {
+            return 0;
+        }
+
+        int availableWorkers = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+        long heapGiB = Math.max(1, Runtime.getRuntime().maxMemory() / (1024L * 1024L * 1024L));
+        int memoryWorkers = Math.max(1, (int) (heapGiB / 6));
+        int engineCap = engine == ValidationEngine.APACHE_JENA
+                ? (timestampedWorkflow ? 8 : 12)
+                : (timestampedWorkflow ? 4 : 6);
+        return Math.clamp(Math.min(availableWorkers, Math.min(memoryWorkers, engineCap)), 1, engineCap);
     }
 
 }

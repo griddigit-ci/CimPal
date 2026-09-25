@@ -9,6 +9,7 @@ module CimPal.Main {
     exports eu.griddigit.cimpal.main.interfaces;
     exports eu.griddigit.cimpal.main.application.controllers.taskWizardControllers;
     opens eu.griddigit.cimpal.main.application.controllers;
+    opens eu.griddigit.cimpal.main.application.controllers.ai to javafx.fxml;
     exports eu.griddigit.cimpal.main.application.PssePFcompare;
     exports eu.griddigit.cimpal.main.application.tasks;
     opens eu.griddigit.cimpal.main.application.tasks;
@@ -30,8 +31,10 @@ module CimPal.Main {
     // that dependency is gone and the real one is declared here.
     requires java.desktop;
     requires java.xml;
+    requires java.net.http;
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
+    requires org.apache.jena.tdb2;
     requires org.slf4j;
     // A real binding, not slf4j-nop: discarding all library output also discards the
     // security-relevant warnings emitted by the RDF parsers and the HTTP client.
@@ -53,6 +56,13 @@ module CimPal.Main {
     requires org.apache.jena.shacl;
     requires CimPal.Core;
     requires CimPal.CustomWriter;
+    // PowsyBl's ServiceLoader discovers its compressed-network importer at runtime.  The
+    // importer references ZstdInputStream, so a named CimPal module must resolve zstd-jni even
+    // though application code does not import it directly.
+    requires com.github.luben.zstd_jni;
+    // CGMES import obtains this RDF4J implementation through ServiceLoader. It is an automatic
+    // module, so named CimPal launches must explicitly bring it into the module graph.
+    requires com.powsybl.triplestore.impl.rdf4j;
 
     //requires smartgraph;
 }

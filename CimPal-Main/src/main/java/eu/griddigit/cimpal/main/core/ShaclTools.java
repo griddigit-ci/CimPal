@@ -4991,12 +4991,19 @@ public class ShaclTools {
 
     //List of SHACL type properties
     public static void splitShaclPerXlsInput(ArrayList<Object> inputXLSdata) throws IOException {
-
+        // GUI picks the output folder; the actual reorganisation logic lives in Core.
+        File folder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom();
+        if (folder == null) return; // user cancelled the folder dialog
+        List<Model> models = shapeModels.stream().map(o -> (Model) o).toList();
+        eu.griddigit.cimpal.core.shacl_tools.ShaclOrganizer.splitShaclPerXlsInput(
+                inputXLSdata, models, folder.toPath());
+        // ---------- old body below — DEAD CODE, kept for reference, will be removed -----
+        if (false) {
         Map<String, Model> splitShaclMap = new HashMap<>();
         Map<String, PropertyHolder> constraintPropertiesMap = new HashMap<>();
         Map<String, String> baseMap = new HashMap<>();
         Model shaclModel;
-        File folder = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom();
+        File folderLegacy = eu.griddigit.cimpal.main.util.ModelFactory.folderChooserCustom();
         //the map where we store the things before we process with the save
         //the string can ve the path and the file name that can be used by the save
         int constraintCount = 0;
@@ -5211,6 +5218,7 @@ public class ShaclTools {
                 }
             }
         }
+        } // end if(false) — dead legacy body
     }
 
     //List of SHACL type properties

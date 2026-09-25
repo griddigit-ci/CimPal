@@ -37,7 +37,7 @@ public final class RdfGraphView extends Pane {
     }
 
     /** Layout iterations. Enough to untangle a few hundred nodes without a visible pause. */
-    private static final int ITERATIONS = 260;
+    private static final int ITERATIONS = 420;
 
     /**
      * Strength of the pull towards the centre. Small on purpose: enough to stop disconnected
@@ -47,7 +47,7 @@ public final class RdfGraphView extends Pane {
     private static final double GRAVITY = 0.012;
 
     /** Above this many nodes the per-node labels overlap into noise, so they are left off. */
-    private static final int MAX_LABELLED_NODES = 120;
+    private static final int MAX_LABELLED_NODES = 50;
 
     private static final double NODE_RADIUS = 6.0;
     private static final double MIN_SCALE = 0.05;
@@ -66,6 +66,20 @@ public final class RdfGraphView extends Pane {
 
     /** Told the id of whichever node was last clicked, so the tab can report or reveal it. */
     private Consumer<String> onNodeClicked = id -> { };
+    private LayoutMode layoutMode = LayoutMode.FORCE_DIRECTED;
+
+    /** Layouts offered by the visualisation toolbar. */
+    public enum LayoutMode {
+        FORCE_DIRECTED("Force-directed"),
+        RADIAL("Radial"),
+        GRID("Grid");
+
+        private final String label;
+
+        LayoutMode(String label) { this.label = label; }
+
+        @Override public String toString() { return label; }
+    }
 
     public RdfGraphView() {
         getStyleClass().add("rdf-graph-view");
@@ -108,6 +122,10 @@ public final class RdfGraphView extends Pane {
 
     public void setOnNodeClicked(Consumer<String> listener) {
         this.onNodeClicked = listener == null ? id -> { } : listener;
+    }
+
+    public void setLayoutMode(LayoutMode layoutMode) {
+        this.layoutMode = layoutMode == null ? LayoutMode.FORCE_DIRECTED : layoutMode;
     }
 
     /**
@@ -179,19 +197,30 @@ public final class RdfGraphView extends Pane {
     private void layout(List<int[]> links) {
         int n = nodes.size();
         double area = Math.max(400.0 * n, 250_000.0);
-        double side = Math.sqrt(area);
+        double aspect = getWidth() > 0 && getHeight() > 0 ? getWidth() / getHeight() : 16.0 / 9.0;
+        double width = Math.sqrt(area * aspect);
+        double height = area / width;
         double k = Math.sqrt(area / n);
+
+        if (layoutMode == LayoutMode.RADIAL) {
+            radialLayout(width, height);
+            return;
+        }
+        if (layoutMode == LayoutMode.GRID) {
+            gridLayout(width, height);
+            return;
+        }
 
         // A ring start beats a random one: it is deterministic, so the same filter always yields
         // the same picture, and no two nodes begin on top of each other.
         for (int i = 0; i < n; i++) {
             double angle = 2 * Math.PI * i / n;
-            double radius = side / 2 * (0.35 + 0.65 * ((i % 7) / 7.0));
-            nodes.get(i).x = side / 2 + radius * Math.cos(angle);
-            nodes.get(i).y = side / 2 + radius * Math.sin(angle);
+            double radius = 0.42 + 0.45 * ((i % 7) / 7.0);
+            nodes.get(i).x = width / 2 + width * radius * Math.cos(angle) / 2;
+            nodes.get(i).y = height / 2 + height * radius * Math.sin(angle) / 2;
         }
 
-        double temperature = side / 8;
+        double temperature = Math.min(width, height) / 7;
         double cooling = temperature / (ITERATIONS + 1);
 
         for (int iteration = 0; iteration < ITERATIONS; iteration++) {
@@ -238,8 +267,8 @@ public final class RdfGraphView extends Pane {
             // apart indefinitely and the finished drawing has to be scaled to near-invisibility
             // to fit. A weak pull keeps them in one frame without distorting local structure.
             for (LayoutNode node : nodes) {
-                node.dx += (side / 2 - node.x) * GRAVITY;
-                node.dy += (side / 2 - node.y) * GRAVITY;
+                node.dx += (width / 2 - node.x) * GRAVITY;
+                node.dy += (height / 2 - node.y) * GRAVITY;
             }
 
             for (LayoutNode node : nodes) {
@@ -250,10 +279,63 @@ public final class RdfGraphView extends Pane {
                     node.y += node.dy / step * limited;
                 }
                 // Standard FR also confines nodes to the frame it computed the forces for.
-                node.x = Math.clamp(node.x, 0, side);
-                node.y = Math.clamp(node.y, 0, side);
+                node.x = Math.clamp(node.x, NODE_RADIUS * 2, width - NODE_RADIUS * 2);
+                node.y = Math.clamp(node.y, NODE_RADIUS * 2, height - NODE_RADIUS * 2);
             }
             temperature -= cooling;
+        }
+        separateOverlaps(width, height);
+    }
+
+    /** Places isolated or very dense data in readable, deterministic alternatives to the force layout. */
+    private void radialLayout(double width, double height) {
+        double maximumRadius = Math.min(width, height) * 0.42;
+        double spacing = NODE_RADIUS * 4.0;
+        int next = 0;
+        for (double radius = Math.max(spacing, maximumRadius / 4);
+             next < nodes.size(); radius += spacing) {
+            // The outermost ring may need to carry the remaining nodes; its spacing is still
+            // better than stacking all of them at one radius.
+            int capacity = Math.max(6, (int) Math.floor(2 * Math.PI * radius / spacing));
+            int count = Math.min(capacity, nodes.size() - next);
+            for (int i = 0; i < count; i++) {
+                double angle = 2 * Math.PI * i / count - Math.PI / 2;
+                LayoutNode node = nodes.get(next++);
+                node.x = width / 2 + radius * Math.cos(angle);
+                node.y = height / 2 + radius * Math.sin(angle);
+            }
+        }
+    }
+
+    private void gridLayout(double width, double height) {
+        int columns = (int) Math.ceil(Math.sqrt(nodes.size() * width / height));
+        int rows = (int) Math.ceil((double) nodes.size() / columns);
+        for (int i = 0; i < nodes.size(); i++) {
+            LayoutNode node = nodes.get(i);
+            node.x = width * ((i % columns) + 0.5) / columns;
+            node.y = height * ((i / columns) + 0.5) / rows;
+        }
+    }
+
+    /** Final collision pass: force layouts can settle with two high-degree nodes touching. */
+    private void separateOverlaps(double width, double height) {
+        double minimum = NODE_RADIUS * 3.5;
+        for (int pass = 0; pass < 12; pass++) {
+            for (int i = 0; i < nodes.size(); i++) {
+                for (int j = i + 1; j < nodes.size(); j++) {
+                    LayoutNode a = nodes.get(i), b = nodes.get(j);
+                    double dx = b.x - a.x, dy = b.y - a.y;
+                    double distance = Math.hypot(dx, dy);
+                    if (distance >= minimum) continue;
+                    if (distance < 0.01) { dx = 1; dy = 0; distance = 1; }
+                    double move = (minimum - distance) / 2;
+                    double ux = dx / distance, uy = dy / distance;
+                    a.x = Math.clamp(a.x - ux * move, NODE_RADIUS, width - NODE_RADIUS);
+                    a.y = Math.clamp(a.y - uy * move, NODE_RADIUS, height - NODE_RADIUS);
+                    b.x = Math.clamp(b.x + ux * move, NODE_RADIUS, width - NODE_RADIUS);
+                    b.y = Math.clamp(b.y + uy * move, NODE_RADIUS, height - NODE_RADIUS);
+                }
+            }
         }
     }
 
