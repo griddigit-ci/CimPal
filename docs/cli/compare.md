@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `compare` — RDF File Comparison Command
 
 Compares two RDF files (RDFS profiles or SHACL shape files) and reports what changed between them. Useful for auditing profile version changes, reviewing shape edits, and generating change documentation.

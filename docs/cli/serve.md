@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `serve` — HTTP Daemon Command
 
 Starts a local HTTP server that exposes every CimPal operation as a REST endpoint. The server accepts JSON request bodies (same format as command config files) and returns JSON responses.

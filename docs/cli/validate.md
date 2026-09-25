@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `validate` — SHACL Validation Command
 
 Validates CGMES/CIM model files against SHACL constraint files. Produces an Excel report and, optionally, Turtle validation report files.

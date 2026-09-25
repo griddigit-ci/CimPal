@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
+/*
  * Licensed under the EUPL-1.2-or-later.
  * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
  * Adapted for Core (no JavaFX) from eu.griddigit.cimpal.main.core.ComparisonInstanceData.

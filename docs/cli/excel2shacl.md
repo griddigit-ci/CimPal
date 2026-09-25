@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `excel2shacl` — Excel to SHACL Generation Command
 
 Generates SHACL constraint shapes from an Excel spreadsheet and an RDFS profile. Used for spreadsheet-driven constraint authoring — define constraints in Excel rows, generate `.ttl` shape files automatically.

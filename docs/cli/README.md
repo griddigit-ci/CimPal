@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # CimPal CLI — Overview
 
 The CimPal CLI is a headless entry point into CimPal's core logic. It lets you run validation, execute SPARQL queries, and generate manifests from the command line, in scripts, and in CI pipelines — without opening the GUI.

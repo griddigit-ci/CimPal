@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `compare-instances` — Instance Data Comparison Command
 
 Compares two sets of CGMES instance-data model files and reports differences. Useful for auditing what changed between two model submissions, or verifying that a conversion or transformation preserved all data.

@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # CI Pipeline — Command Collection
 
 This file collects the exact CLI commands for a complete validation CI run. It is organized as a sequence of steps from data preparation through report generation.

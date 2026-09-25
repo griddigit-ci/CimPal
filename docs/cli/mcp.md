@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # `mcp` — Model Context Protocol Server
 
 Starts a Model Context Protocol (MCP) server that exposes all CimPal operations as typed tools a Claude agent can call directly — without shell invocations or subprocess management.
