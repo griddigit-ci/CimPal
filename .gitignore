@@ -13,7 +13,10 @@ target/
 out/
 /CimPal-Main/dependency-reduced-pom.xml
 /CimPal-CLI/dependency-reduced-pom.xml
-/CLAUDE.md
 /.ai/
-/.claude/
+/.claude/*
+!/.claude/settings.json
+!/.claude/commands/
+!/.claude/skills/
+!/.claude/agents/
 /.engine-test-venv/
