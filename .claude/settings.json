@@ -10,18 +10,62 @@
       "Bash(git show*)",
       "Bash(git branch*)",
       "Bash(git fetch*)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
       "PowerShell(mvn *)",
+      "PowerShell(java -jar CimPal-CLI/target/CimPal-CLI.jar *)",
       "PowerShell(git status*)",
       "PowerShell(git diff*)",
-      "PowerShell(git log*)"
+      "PowerShell(git log*)",
+      "PowerShell(git show*)",
+      "PowerShell(git branch*)",
+      "PowerShell(git fetch*)",
+      "PowerShell(git checkout *)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)"
+    ],
+    "ask": [
+      "Bash(git push*)",
+      "PowerShell(git push*)"
     ],
     "deny": [
+      "Bash(gh release *)",
       "Bash(*New-ReleaseTag.ps1*)",
-      "PowerShell(*New-ReleaseTag.ps1*)",
       "Bash(git push --tags*)",
+      "Bash(git push * --tags*)",
       "Bash(git push --force*)",
+      "Bash(git push * --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * -f*)",
+      "PowerShell(gh release *)",
+      "PowerShell(*New-ReleaseTag.ps1*)",
       "PowerShell(git push --tags*)",
-      "PowerShell(git push --force*)"
+      "PowerShell(git push * --tags*)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push * --force*)",
+      "PowerShell(git push -f*)",
+      "PowerShell(git push * -f*)",
+      "Read(**/*.token)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*credential*)",
+      "Read(**/*.pem)",
+      "Read(**/*.pfx)",
+      "Read(**/*.p12)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/test-changed-modules.sh\"",
+            "timeout": 900
+          }
+        ]
+      }
     ]
   }
 }
