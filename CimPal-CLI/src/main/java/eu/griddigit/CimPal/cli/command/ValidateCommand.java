@@ -2,12 +2,12 @@ package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
+import eu.griddigit.cimpal.core.models.MappingValidationOptions;
+import eu.griddigit.cimpal.core.models.MappingValidationSummary;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
+import eu.griddigit.cimpal.core.utils.MappingValidator;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
-import eu.griddigit.cimpal.core.utils.ValidationTools;
-import eu.griddigit.cimpal.core.utils.ValidationTools.ValidationRunSummary;
-import eu.griddigit.cimpal.core.utils.ValidationTools.ValidationTimestampedRunSummary;
 import org.apache.jena.datatypes.RDFDatatype;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -169,13 +169,10 @@ public class ValidateCommand implements Callable<Integer> {
             // 5. Load datatype map
             Map<String, RDFDatatype> dataTypeMap = loadDatatypeMap();
 
-            // 6. Configure turtle export on the shared ValidationTools flag
-            ValidationTools.setExportTurtleValidationReports(Boolean.TRUE.equals(exportTurtle));
-
-            // 7. Resolve validation engine
+            // 6. Resolve validation engine
             ValidationEngine validationEngine = resolveEngine();
 
-            // 8. Execute workflow
+            // 7. Execute workflow
             return executeWorkflow(dataTypeMap, validationEngine);
 
         } catch (Exception ex) {
@@ -457,22 +454,22 @@ public class ValidateCommand implements Callable<Integer> {
 
         // Per-shape detail requires TTL reports to be written so we can read them back.
         boolean needShapeDetail = jsonOutput && samples > 0;
-        boolean autoTurtle = needShapeDetail && !Boolean.TRUE.equals(exportTurtle);
-        if (autoTurtle) ValidationTools.setExportTurtleValidationReports(true);
+        boolean exportTurtleForRun = Boolean.TRUE.equals(exportTurtle) || needShapeDetail;
 
-        ValidationRunSummary summary = ValidationTools.validateByMapping(
-                mappingCsv.toPath(),
-                modelsDir.toPath(),
-                constraintsRoot.toPath(),
-                outputDir.toPath(),
-                workers,
-                dataTypeMap,
-                xmlBase,
-                maxResults,
-                validationEngine
-        );
+        MappingValidationOptions options = MappingValidationOptions.builder()
+                .mappingCsv(mappingCsv.toPath())
+                .modelsInput(modelsDir.toPath())
+                .constraintsRoot(constraintsRoot.toPath())
+                .outputDir(outputDir.toPath())
+                .datatypeMap(dataTypeMap)
+                .xmlBase(xmlBase)
+                .engine(validationEngine)
+                .maxResultsPerConstraint(maxResults)
+                .threads(workers)
+                .exportTurtleReports(exportTurtleForRun)
+                .build();
 
-        if (autoTurtle) ValidationTools.setExportTurtleValidationReports(false);
+        MappingValidationSummary summary = new MappingValidator(options).validate();
 
         List<ShapeGroup> shapeGroups = List.of();
         if (needShapeDetail && outputDir != null && outputDir.exists()) {
@@ -497,18 +494,23 @@ public class ValidateCommand implements Callable<Integer> {
                                        PrintStream origOut) throws Exception {
         Path prevPath = (previousComparison != null) ? previousComparison.toPath() : null;
 
-        ValidationTimestampedRunSummary summary = ValidationTools.validateByTimestampedMapping(
-                mappingCsv.toPath(),
-                modelsDir.toPath(),
-                constraintsRoot.toPath(),
-                outputDir.toPath(),
-                workers,
-                dataTypeMap,
-                xmlBase,
-                prevPath,
-                maxResults,
-                validationEngine
-        );
+        MappingValidationOptions.Builder optionsBuilder = MappingValidationOptions.builder()
+                .mappingCsv(mappingCsv.toPath())
+                .modelsInput(modelsDir.toPath())
+                .constraintsRoot(constraintsRoot.toPath())
+                .outputDir(outputDir.toPath())
+                .timestamped(true)
+                .datatypeMap(dataTypeMap)
+                .xmlBase(xmlBase)
+                .engine(validationEngine)
+                .maxResultsPerConstraint(maxResults)
+                .threads(workers)
+                .exportTurtleReports(Boolean.TRUE.equals(exportTurtle));
+        if (prevPath != null) {
+            optionsBuilder.previousComparisonCsv(prevPath);
+        }
+
+        MappingValidationSummary summary = new MappingValidator(optionsBuilder.build()).validate();
 
         if (jsonOutput) {
             System.setOut(origOut);
@@ -577,14 +579,14 @@ public class ValidateCommand implements Callable<Integer> {
     // Text output
     // -------------------------------------------------------------------------
 
-    private void printTextSummary(ValidationRunSummary summary) {
+    private void printTextSummary(MappingValidationSummary summary) {
         System.out.println();
         System.out.println("=== Validation Summary ===");
         System.out.println("  Conforming : " + summary.conforming());
         System.out.println("  Violations : " + summary.violations());
         System.out.println("  Errors     : " + summary.errors());
         System.out.println("  Total rows : " + summary.totalRows());
-        System.out.println("  Report     : " + summary.reportPath().toAbsolutePath());
+        System.out.println("  Report     : " + summary.reports().get(0).toAbsolutePath());
         if (summary.hasViolations()) {
             System.out.println("  Result     : VIOLATIONS FOUND");
         } else {
@@ -592,7 +594,7 @@ public class ValidateCommand implements Callable<Integer> {
         }
     }
 
-    private void printTextSummaryTimestamped(ValidationTimestampedRunSummary summary) {
+    private void printTextSummaryTimestamped(MappingValidationSummary summary) {
         System.out.println();
         System.out.println("=== Timestamped Validation Summary ===");
         System.out.println("  Conforming : " + summary.conforming());
@@ -614,7 +616,7 @@ public class ValidateCommand implements Callable<Integer> {
     // JSON output (mapping workflow)
     // -------------------------------------------------------------------------
 
-    private String buildMappingJson(ValidationRunSummary summary, List<ShapeGroup> shapeGroups) {
+    private String buildMappingJson(MappingValidationSummary summary, List<ShapeGroup> shapeGroups) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         sb.append("  \"schema\": \"cimpal-validate-summary/1\",\n");
@@ -639,12 +641,12 @@ public class ValidateCommand implements Callable<Integer> {
         if (!shapeGroups.isEmpty()) {
             sb.append("  \"shapes\": ").append(buildShapeGroupsJson(shapeGroups)).append(",\n");
         }
-        sb.append("  \"report\": ").append(jsonStr(summary.reportPath().toAbsolutePath().toString())).append("\n");
+        sb.append("  \"report\": ").append(jsonStr(summary.reports().get(0).toAbsolutePath().toString())).append("\n");
         sb.append("}");
         return sb.toString();
     }
 
-    private String buildTimestampedJson(ValidationTimestampedRunSummary summary) {
+    private String buildTimestampedJson(MappingValidationSummary summary) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         sb.append("  \"schema\": \"cimpal-validate-summary/1\",\n");
