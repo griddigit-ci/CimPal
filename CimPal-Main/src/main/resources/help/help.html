@@ -1,8 +1,10 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 <!DOCTYPE html>
 <!--
- Licensed under the EUPL-1.2-or-later.
- Copyright (c) 2020, gridDigIt Kft. All rights reserved.
-
  CimPal user documentation. This page is displayed inside a JavaFX WebView by
  eu.griddigit.cimpal.main.gui.HelpWindow, and is also usable stand-alone in any browser.
 
@@ -382,11 +384,17 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <a class="sub" href="#tab-excel-to-shacl">Constraints Operations</a>
   <div class="subgroup">RDF</div>
   <a class="sub" href="#tab-rdf-comparison">Comparison</a>
+  <a class="sub" href="#tab-rdfs-union">RDFS Union</a>
   <div class="subgroup">Dataset</div>
   <a class="sub" href="#tab-instance-data-comparison">Comparison</a>
   <a class="sub" href="#tab-generate-instance-data">Generate</a>
   <a class="sub" href="#tab-task-wizard">Task Wizard</a>
   <a class="sub" href="#tab-validation-by-mapping">SHACL Validation</a>
+
+  <div class="group">Automation &amp; integration</div>
+  <a href="#automation-cli">Headless CLI</a>
+  <a href="#automation-http-mcp">HTTP and MCP APIs</a>
+  <a href="#automation-java-builders">Java builder API</a>
 
   <div class="group">Tools menu</div>
   <div class="subgroup">RDFS Profiles</div>
@@ -853,53 +861,93 @@ change so that a version bump does not appear as a wholesale rewrite.</p>
 </div>
 </details>
 
+<details class="fn" id="tab-rdfs-union">
+<summary><span class="kind">Tab</span> RDF Operations &#9656; RDFS Union</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>RDFS Union is the profile-composition workspace. It keeps merging and profile-specific
+transformations separate from the general-purpose <a href="#tab-rdf-convert">Convert</a> tab.
+Choose <strong>Simple union</strong> to merge any selected RDFS datasets as they are, or
+<strong>Detailed RDFS union</strong> to create a cleaned combined profile from a main RDFS dataset
+and, where required, one deviation and one extended dataset. The source syntax of every selected
+file is inferred automatically.</p>
+
+<h4>Inputs and transformations</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Union type</td><td>radio buttons, required</td>
+    <td><em>Simple union</em> merges one or more selected RDFS datasets. <em>Detailed RDFS union</em>
+        applies profile-cleanup rules and creates a combined result profile.</td></tr>
+<tr><td>Select RDFS datasets</td><td>multiple files, Simple union</td>
+    <td>The datasets to merge. <em>Keep ontology headers</em> retains ontology header resources
+        from all selected datasets; otherwise the normal union processing determines the result.</td></tr>
+<tr><td>Main RDFS dataset</td><td>single file, required for Detailed union</td>
+    <td>The primary profile dataset. It provides the main reference for detailed processing.</td></tr>
+<tr><td>Deviation / Extended RDFS dataset</td><td>single file each, optional for Detailed union</td>
+    <td>Optional profile datasets merged with the main dataset. The current workflow accepts one
+        file in each role.</td></tr>
+<tr><td>Result profile package</td><td>text, optional</td>
+    <td>The package resource to assign to the detailed-union result. Enter either a complete URI
+        or a prefix-qualified identifier such as <code>gb:Package_EQProfile</code>; CimPal resolves
+        declared prefixes from the loaded datasets.</td></tr>
+<tr><td>Result ontology / Configure ontology</td><td>text + dialog, optional</td>
+    <td>Sets the result ontology URI, also accepting a complete URI or <code>prefix:name</code>.
+        <em>Configure ontology&hellip;</em> reads all ontology-header properties from the loaded main,
+        deviation and extended datasets. Select the properties and values to retain, or add a value
+        for the combined ontology.</td></tr>
+<tr><td>Deletion stereotype</td><td>text, optional</td>
+    <td>Detailed union removes resources marked with this stereotype. Leave it blank for automatic
+        detection of a stereotype containing <code>notDefined</code>.</td></tr>
+<tr><td>RDFS transformations</td><td>checkboxes</td>
+    <td><em>Process inheritance properties only</em> restricts processing to the class hierarchy.
+        <em>Generate inheritance list</em> also writes that hierarchy as Turtle; <em>Concrete
+        classes only</em> narrows that list. <em>Add OWL</em> adds OWL class and property declarations.</td></tr>
+</table>
+
+<h4>Output</h4>
+<p>Select RDF/XML, Turtle or JSON-LD, then choose the output location. The RDF/XML options include
+the normal Jena RDF/XML styles and CimPal&rsquo;s <strong>RDFS CIMXML / IEC 61970-501</strong> writer.
+For RDF/XML output, Base URI, declaration, relative-URI, sorting and unused-prefix controls are
+available. An inheritance-list file is requested separately when that transformation is selected.</p>
+
+<p class="src">Source: <code>RDFSUnionController</code></p>
+</div>
+</details>
+
 <details class="fn" id="tab-rdf-convert">
 <summary><span class="kind">Tab</span> RDF Operations &#9656; Convert</summary>
 <div class="fn-body">
 
 <h4>Business logic</h4>
-<p>The general-purpose serialisation and model-surgery workbench. It reads RDF in any supported
-syntax and writes it out in another, but the reason to use it is usually one of the processing
-options: merging a set of files into a single union model, correcting RDFS package assignments,
-extracting or listing the class inheritance tree, or adding OWL declarations. Its sorting and
-prefix-stripping options produce deterministic output, which is what makes generated artefacts
-reviewable in a version control diff.</p>
+<p>The general-purpose RDF serialisation workspace. It converts RDF graphs without applying
+profile-union or RDFS-cleanup rules; use <a href="#tab-rdfs-union">RDFS Union</a> for those
+operations. Convert accepts one file or a batch of files, infers each source syntax automatically,
+and writes each graph using either CimPal&rsquo;s CIMXML writers or an Apache Jena graph writer.</p>
 
-<p><strong>Also the converter for datasets and instance data.</strong> This tab sits under
-<em>RDF Operations</em> because conversion is a syntax-level operation that does not care what the
-graph means, and it is deliberately the only place in the application that converts. It is
-therefore the tab to use for CGMES instance data as well as for profile definitions: tick
-<em>Source type</em> and it applies the CGMES&nbsp;/&nbsp;IEC&nbsp;61970-552 instance data
-serialisation rules on output. There is no separate converter under <em>Dataset
-Operations</em>.</p>
+<p>Use the <strong>Source type: Instance data</strong> option only when producing CimPal&rsquo;s
+IEC&nbsp;61970-552 / CGMES CIMXML. It enables the custom writer&rsquo;s CIM instance identifier and
+ordering rules. It does not change generic Jena serialisations.</p>
 
 <h4>Inputs</h4>
 <table class="io">
 <tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
-<tr><td>Source</td><td>file or folder, required</td>
-    <td>Input RDF file, or a folder of RDF files processed together.</td></tr>
-<tr><td>Format</td><td>choice</td><td>The syntax of the source.</td></tr>
-<tr><td>Operations options</td><td>checkboxes</td>
-    <td>Processing operations to apply: <em>Union model</em> merges all input files into a single
-        model; <em>Union model detailed</em> adds provenance information; <em>Fix RDFS Package
-        Assignment</em> corrects package assignments in RDFS files; <em>Process only inheritance
-        related properties</em> limits processing to class hierarchy properties; <em>Generate
-        inheritance list in Turtle</em> outputs the inheritance tree; <em>Inherited members - only
-        concrete classes</em> limits that list to non-abstract classes; <em>Add OWL</em> adds OWL
-        ontology declarations.</td></tr>
-<tr><td>Main RDF file</td><td>file</td>
-    <td>Primary RDF file for operations needing a reference model, such as deviation
-        comparison.</td></tr>
-<tr><td>Deviation RDF file</td><td>file</td>
-    <td>Secondary RDF file representing deviations from the main model.</td></tr>
-<tr><td>Extended RDF file</td><td>file</td>
-    <td>Additional RDF file with extension data to include in processing.</td></tr>
+<tr><td>Source</td><td>one or more files, required</td>
+    <td>Select RDF/XML, Turtle, N-Triples, N3, TriG, TriX, JSON-LD or another supported RDF file.
+        No source-format choice is required: Jena detects the syntax for every selected file.</td></tr>
 <tr><td>Source type</td><td>checkbox</td>
-    <td>Tick when the source follows CGMES&nbsp;/&nbsp;IEC&nbsp;61970-552 instance data
-        serialisation rules; this changes how the parser interprets the RDF structure.</td></tr>
+    <td>Enable only for the CimPal IEC 61970-552 / CGMES CIMXML target. It changes the custom
+        writer&rsquo;s identifier and ordering behaviour; generic Jena writers do not use it.</td></tr>
 <tr><td>Target format</td><td>choice, required</td>
-    <td>The output serialisation (RDF/XML, Turtle, JSON-LD, N-Triples&nbsp;&hellip;). Some output
-        options are only available for certain formats.</td></tr>
+    <td>Choose a concise format family: CimPal CIMXML 61970-552, CimPal RDFS CIMXML 61970-501, or
+        a Jena syntax family such as JSON-LD, RDF/XML, Turtle, N-Triples, N-Quads, TriG, TriX or
+        RDF/JSON.</td></tr>
+<tr><td>Jena writer options</td><td>choice, when a Jena target is selected</td>
+    <td>Select the writer style available for that syntax, for example pretty, plain, flat, blocks,
+        long, canonical or encoding variants. This avoids a long mixed list in Target format.</td></tr>
+<tr><td>JSON-LD options</td><td>expandable options, for JSON-LD</td>
+    <td>Set an optional context URI and select native JSON types, <code>rdf:type</code>, compact
+        arrays and ordered output. These settings are passed to Jena&rsquo;s JSON-LD writer.</td></tr>
 <tr><td>Base URI</td><td>choice + text</td>
     <td>The base URI embedded in the serialised output as <code>xml:base</code>; relative URIs in
         the output are resolved against it. Used when writing RDF/XML.
@@ -910,24 +958,25 @@ Operations</em>.</p>
         <br>This tab defaults to <em>Other</em> with the field empty, because here an empty field
         means <em>omit <code>xml:base</code> from the output altogether</em>, which is often what
         you want.</td></tr>
-<tr><td>Show Xml declaration, Show Doctype declaration, Tab, Relative URIs, RDF format</td>
+<tr><td>Show XML declaration, Show DOCTYPE declaration, Tab, Relative URIs</td>
     <td>checkbox / text / choice</td>
     <td>RDF/XML writer details, enabled only for the formats that support them.</td></tr>
 <tr><td>Sorting options</td><td>checkbox + choice</td>
-    <td>Controls how output triples and subjects are ordered. Sorting alphabetically produces
+    <td>Available for CimPal&rsquo;s custom CIMXML writers. Sorting alphabetically produces
         deterministic, diff-friendly output. <em>Strip declaration of unused prefixes</em> removes
-        namespace declarations the output does not use.</td></tr>
+        namespace declarations the output does not use. Other Jena writers retain their own
+        serialisation order.</td></tr>
 </table>
 
 <h4>Outputs</h4>
 <ul>
-  <li>The converted model, saved through a save dialog offering <code>.rdf</code>,
-      <code>.ttl</code> or <code>.jsonld</code> as appropriate to the target format.</li>
-  <li>A separate inheritance list Turtle file when the inheritance list option is used.</li>
+  <li>For one source file, a Save dialog using an extension suited to the target writer.</li>
+  <li>For multiple source files, an output-folder chooser. CimPal writes one converted file per
+      source and adds a numeric suffix where two source files would produce the same name.</li>
   <li>Progress and any parse or write problems in the Output window.</li>
 </ul>
 
-<p class="src">Source: <code>RDFConvertController.actionBtnRunRDFConvert()</code></p>
+<p class="src">Source: <code>RDFSimpleConvertController</code></p>
 </div>
 </details>
 
@@ -2227,6 +2276,162 @@ are written and run. See that tab for inputs and outputs.</p>
 </div>
 </details>
 
+<!-- ========================================================== AUTOMATION & INTEGRATION -->
+
+<h2 id="automation">Automation &amp; integration</h2>
+
+<details class="fn" id="automation-cli">
+<summary><span class="kind">Integration</span> Headless CLI</summary>
+<div class="fn-body">
+<h4>Purpose and availability</h4>
+<p>The headless CimPal CLI is for repeatable scripts and CI pipelines. It is a separate
+<code>CimPal-CLI.jar</code> distribution: the desktop application neither installs nor starts it.
+Use a CLI release compatible with your CimPal Core version. The historical CLI command set covers
+<code>validate</code>, <code>sparql</code>, <code>convert</code>, <code>compare</code>,
+<code>compare-instances</code>, <code>rdfs2shacl</code>, <code>excel2shacl</code>,
+<code>organize</code>, <code>gen-instances</code>, <code>manifest</code>, <code>run</code>,
+<code>serve</code> and <code>mcp</code>. Confirm the commands in your JAR:</p>
+<pre><code>java -jar CimPal-CLI.jar --help
+java -jar CimPal-CLI.jar validate --help</code></pre>
+<h4>JSON configuration</h4>
+<p>Every command accepts <code>--config file.json</code>. Keep the file alongside mappings and
+shapes so a run is reproducible. Relative paths resolve from the configuration file; command-line
+flags override JSON values. Keys beginning with <code>_comment</code> or <code>_note_</code> are
+ignored, allowing configurations to document themselves.</p>
+<pre><code>{
+  "workflow": "mapping",
+  "mappingCsv": "mapping.csv",
+  "modelsDir": "models",
+  "constraintsRoot": "constraints",
+  "outputDir": "out",
+  "datatypeMap": "CGMES30NC25",
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "workers": 0,
+  "format": "json"
+}</code></pre>
+<pre><code>java -jar CimPal-CLI.jar validate --config nightly.json --dry-run
+java -jar CimPal-CLI.jar validate --config nightly.json --max-results 10
+java -jar CimPal-CLI.jar validate --config nightly.json --format json &gt; summary.json</code></pre>
+<p><code>workers: 0</code> selects an automatic worker count. Progress goes to stderr and JSON
+results to stdout, so CI can capture a machine-readable summary separately.</p>
+<h4>Common examples</h4>
+<pre><code>java -jar CimPal-CLI.jar sparql ^
+  --models "C:\Data\EQ.xml,C:\Data\TP.xml" ^
+  --query "SELECT ?type (COUNT(*) AS ?n) { ?s a ?type } GROUP BY ?type" ^
+  --format json &gt; class-counts.json
+
+java -jar CimPal-CLI.jar convert ^
+  --input "C:\Data\Equipment.rdf" --output "C:\Data\Equipment.ttl" --sort
+
+java -jar CimPal-CLI.jar convert ^
+  --input-files "C:\Data\EQ.xml,C:\Data\TP.xml,C:\Data\SV.xml" ^
+  --output "C:\Data\combined.ttl"</code></pre>
+<h4>Exit codes</h4>
+<table class="io"><tr><th>Code</th><th>Meaning</th></tr>
+<tr><td>0</td><td>Completed successfully; validation found no violations.</td></tr>
+<tr><td>1</td><td>Completed successfully, but validation found violations or warnings.</td></tr>
+<tr><td>2</td><td>Invalid input or command configuration.</td></tr>
+<tr><td>3</td><td>Unexpected internal failure; retain stderr and the configuration for diagnosis.</td></tr></table>
+<p class="src">Historical source: separate CimPal CLI implementation and templates.</p>
+</div></details>
+
+<details class="fn" id="automation-http-mcp">
+<summary><span class="kind">Integration</span> Local HTTP and MCP APIs</summary>
+<div class="fn-body">
+<h4>HTTP daemon</h4>
+<p><code>serve</code> keeps Jena and the validation runtime warm for repeated local automation.
+It binds to <code>localhost:7474</code> by default. Retain localhost unless the service is protected
+appropriately; every supplied file path is read or written on the local machine.</p>
+<pre><code>java -jar CimPal-CLI.jar serve
+curl http://localhost:7474/health
+
+curl -s -X POST http://localhost:7474/sparql ^
+  -H "Content-Type: application/json" ^
+  -d "{\"models\":[\"C:/Data/EQ.xml\",\"C:/Data/TP.xml\"],\
+       \"query\":\"SELECT ?s ?type { ?s a ?type } LIMIT 10\",\
+       \"xmlBase\":\"http://iec.ch/TC57/CIM100\"}"</code></pre>
+<p>Available command endpoints are <code>POST /validate</code>, <code>/sparql</code>,
+<code>/convert</code>, <code>/compare</code>, <code>/compare-instances</code>,
+<code>/rdfs2shacl</code>, <code>/organize</code>, <code>/excel2shacl</code>,
+<code>/gen-instances</code> and <code>/manifest</code>. The JSON body uses the matching CLI
+configuration keys. <code>GET /health</code> and <code>GET /commands</code> are read-only;
+<code>POST /shutdown</code> stops the daemon. HTTP 200 means the command ran, 400 is invalid input,
+and 500 is an internal failure. The daemon processes one request at a time.</p>
+<h4>MCP tools</h4>
+<p><code>mcp</code> exposes the same operations as typed tools over standard input/output for an
+MCP-capable desktop agent. It is not an HTTP service. Configure its JVM heap for large CGMES models:</p>
+<pre><code>{
+  "mcpServers": {
+    "cimpal": {
+      "command": "java",
+      "args": ["-Xmx8g", "-jar", "C:/Tools/CimPal-CLI.jar", "mcp"]
+    }
+  }
+}</code></pre>
+<p>The tools are <code>validate</code>, <code>sparql</code>, <code>compare</code>,
+<code>compare_instances</code>, <code>convert</code>, <code>rdfs_to_shacl</code>,
+<code>organize</code>, <code>excel_to_shacl</code>, <code>gen_instances</code> and
+<code>manifest</code>. Each accepts the same JSON fields as the CLI configuration. Use absolute
+paths and start the service only for trusted local automation.</p>
+<p class="src">Historical source: CLI <code>serve</code> and <code>mcp</code> commands.</p>
+</div></details>
+
+<details class="fn" id="automation-java-builders">
+<summary><span class="kind">Integration</span> Java builder API for SHACL validation</summary>
+<div class="fn-body">
+<h4>Single dataset validation</h4>
+<p>Applications embedding <code>CimPal-Core</code> can use immutable option builders directly.
+This is current Core functionality: build options, create a validator and call <code>validate()</code>.
+The CGMES presets supply the datatype map and XML base used by the GUI.</p>
+<pre><code>import eu.griddigit.cimpal.core.models.SHACLValidationReport;
+import eu.griddigit.cimpal.core.presets.SHACLValidationOptionsPresets;
+import eu.griddigit.cimpal.core.utils.SHACLValidator;
+import java.nio.file.Path;
+
+SHACLValidationReport report = new SHACLValidator(
+    SHACLValidationOptionsPresets.cgmes30()
+        .dataFiles(Path.of("C:/Data/EQ.xml"), Path.of("C:/Data/TP.xml"))
+        .shapeFiles(Path.of("C:/Data/constraints/Equipment.ttl"))
+        .maxResultsPerConstraint(20)
+        .workers(4)
+        .build()
+).validate();
+
+if (!report.conforms()) {
+    System.out.println(report.getResults().size());
+    report.getReportModel().write(System.out, "TURTLE");
+}</code></pre>
+<p>Use <code>cgmes24()</code> for CGMES 2.4.15. Builders also accept in-memory
+<code>dataModel(...)</code> and <code>shapesModel(...)</code>, a custom datatype map or map file,
+and <code>constraintsRoot(...)</code> for relative <code>owl:imports</code>. A non-conformant
+report is a normal result; catch <code>IOException</code> for unreadable inputs or failed imports.</p>
+<h4>Mapping batch validation</h4>
+<pre><code>import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.presets.MappingValidationOptionsPresets;
+import eu.griddigit.cimpal.core.utils.MappingValidator;
+import java.nio.file.Path;
+
+MappingValidationSummary summary = new MappingValidator(
+    MappingValidationOptionsPresets.cgmes30()
+        .mappingCsv(Path.of("C:/Run/mapping.csv"))
+        .modelsInput(Path.of("C:/Run/models"))
+        .constraintsRoot(Path.of("C:/Run/constraints"))
+        .outputDir(Path.of("C:/Run/reports"))
+        .threads(4)
+        .exportTurtleReports(true)
+        .build()
+).validate();
+
+if (summary.hasViolations()) throw new IllegalStateException("Validation failed");</code></pre>
+<p>Add <code>.timestamped(true)</code> for timestamp-grouped runs and
+<code>.previousComparisonCsv(...)</code> to compare against an earlier report. Choose worker counts
+with available heap in mind: each worker can hold a substantial RDF graph. Call
+<code>ValidationTools.clearRemoteCaches()</code> only when deliberately refreshing remote shape
+imports; imports are cached for the Java process.</p>
+<p class="src">Source: <code>SHACLValidationOptions</code>, <code>SHACLValidator</code>,
+<code>MappingValidationOptions</code> and <code>MappingValidator</code>.</p>
+</div></details>
+
 <!-- ========================================================== PREFERENCES -->
 
 <h2 id="preferences">Settings</h2>
@@ -2272,6 +2477,11 @@ are stored per user and persist between sessions.</p>
         fresh installation starts with; an installation that has already had a theme chosen keeps
         that choice. The selection is applied immediately as a preview &mdash; press <em>OK</em> to
         keep it, <em>Cancel</em> to revert.</td></tr>
+<tr><td>RDF loading and conversion performance</td><td>Application &#9656; RDF loading and conversion</td>
+    <td><em>Balanced</em>, the default, uses up to four workers for independent Visualise
+        parsing and multi-file Convert jobs. <em>High performance</em> uses all available
+        processors except one. Choose it for large batches on a machine with sufficient memory;
+        it can make the desktop less responsive while several large RDF models are held in memory.</td></tr>
 </table>
 
 <h4>Outputs</h4>
@@ -2355,7 +2565,7 @@ nothing but the time to download the files again.</p>
 </details>
 
 <p class="footer">
-CimPal &mdash; Version 2026.9.05.1. Copyright &copy; 2020, gridDigIt Kft. Licensed under the
+CimPal &mdash; Version 2026.9.05.1. Copyright &copy; 2020-2026, gridDigIt Kft. Licensed under the
 EUPL-1.2-or-later. Each documentation card names the controller method it describes, so this page
 can be re-checked against the code.
 </p>

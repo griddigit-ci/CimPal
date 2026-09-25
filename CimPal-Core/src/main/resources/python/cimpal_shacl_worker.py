@@ -1,3 +1,6 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
 """CimPal's in-memory bridge for optional Python SHACL engines.
 
 Input and output are Turtle on standard streams.  The model streams are never written to

@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFConvertController"
+      fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFSimpleConvertController"
       minHeight="0.0" minWidth="0.0">
   <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
     <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" styleClass="tab-root">
@@ -29,96 +33,59 @@
             <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseRDFConvert" text="Browse"
                     GridPane.rowIndex="0" GridPane.columnIndex="2" />
 
-            <!-- The source format used to share the Source row, which pushed the path field narrow. -->
-            <Label text="Format:" GridPane.rowIndex="1" GridPane.columnIndex="0" />
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="2">
-                <ChoiceBox fx:id="fsourceFormatChoiceBox" prefWidth="250.0" />
-                <!-- A ChoiceBox has a natural width; the spacer absorbs the slack instead. -->
-                <Region HBox.hgrow="ALWAYS" />
-            </HBox>
-
-            <HBox spacing="8.0" styleClass="option-label"
-                  GridPane.rowIndex="2" GridPane.columnIndex="0" GridPane.valignment="TOP">
-                <Label text="Operations options:" wrapText="true" />
-                <Label fx:id="helpOperationsOptions" text="?" styleClass="help-badge"/>
-            </HBox>
-            <!-- FlowPane so the seven options reflow instead of overflowing the tab. -->
-            <!-- The tab is normally wide enough for this row.  FlowPane's 400 px default
-                 preferred wrap width otherwise reserves several invisible lines here. -->
-            <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0" prefWrapLength="1800.0"
-                      GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2"
-                      GridPane.valignment="TOP">
-                <CheckBox fx:id="fcbRDFconvertModelUnion" mnemonicParsing="false" text="Union model" wrapText="true" />
-                <CheckBox fx:id="fcbRDFconvertModelUnionDetailed" mnemonicParsing="false" text="Union model detailed" wrapText="true" />
-                <CheckBox fx:id="fcbRDFconvertFixPackage" mnemonicParsing="false" text="Fix RDFS Package Assignment" wrapText="true" />
-                <CheckBox fx:id="fcbRDFConvertInheritanceOnly" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceOnly" text="Process only inheritance related properties" wrapText="true" />
-                <CheckBox fx:id="fcbRDFConverInheritanceList" disable="true" mnemonicParsing="false" onAction="#actionRDFConvertInheritanceList" text="Generate inheritance list in Turtle" wrapText="true" />
-                <CheckBox fx:id="fcbRDFConverInheritanceListConcrete" disable="true" mnemonicParsing="false" text="Inherited members - only concrete classes" wrapText="true" />
-                <CheckBox fx:id="fcbRDFConveraddowl" mnemonicParsing="false" text="Add OWL" wrapText="true" />
-            </FlowPane>
-
-            <!--
-              These three rows stay single HBoxes because the controller binds their
-              disableProperty as a unit. They span the grid and repeat its column widths
-              internally, so their labels and Browse buttons still line up with the rows above.
-            -->
-            <HBox fx:id="mainRdfBox" alignment="CENTER_LEFT" spacing="8.0"
-                  GridPane.rowIndex="3" GridPane.columnIndex="0" GridPane.columnSpan="3">
-                <HBox alignment="CENTER_LEFT" spacing="8.0" minWidth="180.0" prefWidth="180.0">
-                    <Label text="Main RDF file:" wrapText="true"/>
-                    <Label fx:id="helpMainRdf" text="?" styleClass="help-badge"/>
-                </HBox>
-                <TextField fx:id="fMainRdfPathTextField" editable="false" HBox.hgrow="ALWAYS"/>
-                <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseMainRDF" text="Browse"/>
-            </HBox>
-
-            <HBox fx:id="deviationRdfBox" alignment="CENTER_LEFT" spacing="8.0"
-                  GridPane.rowIndex="4" GridPane.columnIndex="0" GridPane.columnSpan="3">
-                <HBox alignment="CENTER_LEFT" spacing="8.0" minWidth="180.0" prefWidth="180.0">
-                    <Label text="Deviation RDF file:" wrapText="true"/>
-                    <Label fx:id="helpDeviationRdf" text="?" styleClass="help-badge"/>
-                </HBox>
-                <TextField fx:id="fDeviationRdfPathTextField" editable="false" HBox.hgrow="ALWAYS"/>
-                <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseDeviationRDF" text="Browse"/>
-            </HBox>
-
-            <HBox fx:id="extRdfBox" alignment="CENTER_LEFT" spacing="8.0"
-                  GridPane.rowIndex="5" GridPane.columnIndex="0" GridPane.columnSpan="3">
-                <HBox alignment="CENTER_LEFT" spacing="8.0" minWidth="180.0" prefWidth="180.0">
-                    <Label text="Extended RDF file:" wrapText="true"/>
-                    <Label fx:id="helpExtendedRdf" text="?" styleClass="help-badge"/>
-                </HBox>
-                <TextField fx:id="fExtendedRdfPathTextField" editable="false" HBox.hgrow="ALWAYS"/>
-                <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseExtendedRDF" text="Browse"/>
-            </HBox>
-
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="6" GridPane.columnIndex="0">
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
                 <Label text="Source type:" wrapText="true"/>
                 <Label fx:id="helpSourceType" text="?" styleClass="help-badge"/>
             </HBox>
             <CheckBox fx:id="fcbRDFconvertInstanceData" mnemonicParsing="false"
                       text="Instance data (serialisation according to IEC 61970-552 and CGMES)"
-                      GridPane.rowIndex="6" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
+                      GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
 
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="7" GridPane.columnIndex="0">
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
                 <Label text="Target format:" wrapText="true" />
                 <Label fx:id="helpTargetFormat" text="?" styleClass="help-badge"/>
             </HBox>
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="7" GridPane.columnIndex="1" GridPane.columnSpan="2">
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2">
                 <ChoiceBox fx:id="ftargetFormatChoiceBox" prefWidth="250.0" />
                 <Region HBox.hgrow="ALWAYS" />
             </HBox>
+
+            <TitledPane fx:id="jenaOptionsPane" collapsible="true" expanded="true" managed="false" text="Jena writer options" visible="false"
+                        GridPane.rowIndex="3" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <content>
+                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+                        <Label text="Writer style:" />
+                        <ChoiceBox fx:id="targetVariantChoiceBox" prefWidth="240.0" />
+                    </HBox>
+                </content>
+            </TitledPane>
+
+            <TitledPane fx:id="jsonLdOptionsPane" collapsible="true" expanded="true" managed="false" text="JSON-LD options" visible="false"
+                        GridPane.rowIndex="4" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <content>
+                    <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0">
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <Label text="Context URI:" />
+                            <TextField fx:id="jsonLdContextTextField" prefWidth="360.0" promptText="Optional remote or local JSON-LD context URI" />
+                        </HBox>
+                        <CheckBox fx:id="jsonLdNativeTypesCheckBox" mnemonicParsing="false" text="Use native JSON types" />
+                        <CheckBox fx:id="jsonLdRdfTypeCheckBox" mnemonicParsing="false" text="Use rdf:type" />
+                        <CheckBox fx:id="jsonLdCompactArraysCheckBox" mnemonicParsing="false" selected="true" text="Compact arrays" />
+                        <CheckBox fx:id="jsonLdOrderedCheckBox" mnemonicParsing="false" text="Order output" />
+                    </FlowPane>
+                </content>
+            </TitledPane>
 
             <!--
               "Options:" used to label an empty box while the serialisation options sat in
               unlabelled rows below it. It now labels the options it was always meant to.
             -->
             <Label text="Options:" styleClass="option-label"
-                   GridPane.rowIndex="8" GridPane.columnIndex="0" GridPane.valignment="TOP" />
+                   GridPane.rowIndex="5" GridPane.columnIndex="0" GridPane.valignment="TOP" />
             <!-- Keep preferred height aligned with the wide, one-line layout; actual layout
                  still wraps when the window becomes narrower. -->
             <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0" prefWrapLength="1800.0"
-                      GridPane.rowIndex="8" GridPane.columnIndex="1" GridPane.columnSpan="2"
+                      GridPane.rowIndex="5" GridPane.columnIndex="1" GridPane.columnSpan="2"
                       GridPane.valignment="TOP">
                 <CheckBox fx:id="fcbShowXMLDeclaration" disable="true" mnemonicParsing="false" selected="true" text="Show Xml declaration" />
                 <CheckBox fx:id="fcbShowDoctypeDeclaration" disable="true" mnemonicParsing="false" text="Show Doctype declaration" />
@@ -130,10 +97,6 @@
                     <Label text="Relative URIs: " />
                     <ChoiceBox fx:id="fcbRelativeURIs" disable="true" prefWidth="200.0" />
                 </HBox>
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <Label text="RDF format: " />
-                    <ChoiceBox fx:id="fcbRDFformat" disable="true" prefWidth="200.0" />
-                </HBox>
             </FlowPane>
 
             <!--
@@ -142,12 +105,12 @@
               as xml:base, and an empty field means "omit it" - which is this tab's existing
               default and must stay reachable.
             -->
-            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="9" GridPane.columnIndex="0">
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="6" GridPane.columnIndex="0">
                 <Label text="Base URI:" wrapText="true" />
                 <Label fx:id="helpXmlBase" text="?" styleClass="help-badge"/>
             </HBox>
             <HBox alignment="CENTER_LEFT" spacing="8.0"
-                  GridPane.rowIndex="9" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                  GridPane.rowIndex="6" GridPane.columnIndex="1" GridPane.columnSpan="2">
                 <ChoiceBox fx:id="fcbBaseUri" prefWidth="260.0" />
                 <TextField fx:id="frdfConvertXmlBase" minWidth="0.0"
                            promptText="Leave empty to omit xml:base from the output"
@@ -155,12 +118,12 @@
             </HBox>
 
             <HBox spacing="8.0" styleClass="option-label"
-                  GridPane.rowIndex="10" GridPane.columnIndex="0" GridPane.valignment="TOP">
+                  GridPane.rowIndex="7" GridPane.columnIndex="0" GridPane.valignment="TOP">
                 <Label text="Sorting options:" />
                 <Label fx:id="helpSortingOptions" text="?" styleClass="help-badge"/>
             </HBox>
             <FlowPane styleClass="option-flow" hgap="16.0" vgap="8.0"
-                      GridPane.rowIndex="10" GridPane.columnIndex="1" GridPane.columnSpan="2"
+                      GridPane.rowIndex="7" GridPane.columnIndex="1" GridPane.columnSpan="2"
                       GridPane.valignment="TOP">
                 <CheckBox fx:id="fcbSortRDF" disable="true" mnemonicParsing="false" selected="true" text="Sort alphabetically" />
                 <HBox alignment="CENTER_LEFT" spacing="8.0">

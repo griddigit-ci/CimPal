@@ -1,9 +1,16 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.core.models;
 
 import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.graph.Node;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 public class RDFConvertOptions {
     public enum RDFFormats {
@@ -15,6 +22,13 @@ public class RDFConvertOptions {
     private final List<File> modelUnionDetailedFiles;
     private final RDFFormats sourceFormat;
     private final RDFFormats targetFormat;
+    /** Optional direct Jena graph writer. When present it takes precedence over targetFormat. */
+    private final RDFFormat jenaTargetFormat;
+    private final String jsonLdContext;
+    private final boolean jsonLdUseNativeTypes;
+    private final boolean jsonLdUseRdfType;
+    private final boolean jsonLdCompactArrays;
+    private final boolean jsonLdOrdered;
     private final String xmlBase;
     private final RDFFormat rdfXmlFormat;
     private final String showXmlDeclaration;
@@ -33,6 +47,10 @@ public class RDFConvertOptions {
     private final String convertInstanceData;
     private final boolean modelUnionFixPackage;
     private final boolean keepOntologyHeaders;
+    private final String detailedUnionPackageUri;
+    private final String detailedUnionOntologyUri;
+    private final String detailedUnionDeletionStereotype;
+    private final Map<String, List<Node>> detailedUnionOntologyMetadata;
 
     // private constructor takes the Builder
     private RDFConvertOptions(Builder b) {
@@ -41,6 +59,12 @@ public class RDFConvertOptions {
         this.modelUnionDetailedFiles = b.modelUnionDetailedFiles;
         this.sourceFormat = b.sourceFormat;
         this.targetFormat = b.targetFormat;
+        this.jenaTargetFormat = b.jenaTargetFormat;
+        this.jsonLdContext = b.jsonLdContext;
+        this.jsonLdUseNativeTypes = b.jsonLdUseNativeTypes;
+        this.jsonLdUseRdfType = b.jsonLdUseRdfType;
+        this.jsonLdCompactArrays = b.jsonLdCompactArrays;
+        this.jsonLdOrdered = b.jsonLdOrdered;
         this.xmlBase = b.xmlBase;
         this.rdfXmlFormat = b.rdfXmlFormat;
         this.showXmlDeclaration = b.showXmlDeclaration;
@@ -59,6 +83,10 @@ public class RDFConvertOptions {
         this.convertInstanceData = b.convertInstanceData;
         this.modelUnionFixPackage = b.modelUnionFixPackage;
         this.keepOntologyHeaders = b.keepOntologyHeaders;
+        this.detailedUnionPackageUri = b.detailedUnionPackageUri;
+        this.detailedUnionOntologyUri = b.detailedUnionOntologyUri;
+        this.detailedUnionDeletionStereotype = b.detailedUnionDeletionStereotype;
+        this.detailedUnionOntologyMetadata = Map.copyOf(b.detailedUnionOntologyMetadata);
     }
 
     // static entry-point for the builder
@@ -85,6 +113,12 @@ public class RDFConvertOptions {
     public RDFFormats getTargetFormat() {
         return targetFormat;
     }
+    public RDFFormat getJenaTargetFormat() { return jenaTargetFormat; }
+    public String getJsonLdContext() { return jsonLdContext; }
+    public boolean isJsonLdUseNativeTypes() { return jsonLdUseNativeTypes; }
+    public boolean isJsonLdUseRdfType() { return jsonLdUseRdfType; }
+    public boolean isJsonLdCompactArrays() { return jsonLdCompactArrays; }
+    public boolean isJsonLdOrdered() { return jsonLdOrdered; }
 
     public String getXmlBase() {
         return xmlBase;
@@ -158,6 +192,22 @@ public class RDFConvertOptions {
         return keepOntologyHeaders;
     }
 
+    /** Exact URI (or a prefix-qualified identifier) for the Detailed Union package. */
+    public String getDetailedUnionPackageUri() {
+        return detailedUnionPackageUri;
+    }
+
+    /** Exact URI (or a prefix-qualified identifier) for the Detailed Union ontology. */
+    public String getDetailedUnionOntologyUri() {
+        return detailedUnionOntologyUri;
+    }
+
+    /** Explicit Detailed Union deletion stereotype; blank requests automatic detection. */
+    public String getDetailedUnionDeletionStereotype() {
+        return detailedUnionDeletionStereotype;
+    }
+    public Map<String, List<Node>> getDetailedUnionOntologyMetadata() { return detailedUnionOntologyMetadata; }
+
 
     // ============ the Builder ============
 
@@ -168,6 +218,12 @@ public class RDFConvertOptions {
         private List<File> modelUnionDetailedFiles = null;
         private RDFFormats sourceFormat = null;
         private RDFFormats targetFormat = null;
+        private RDFFormat jenaTargetFormat = null;
+        private String jsonLdContext = "";
+        private boolean jsonLdUseNativeTypes = false;
+        private boolean jsonLdUseRdfType = false;
+        private boolean jsonLdCompactArrays = true;
+        private boolean jsonLdOrdered = false;
         private String xmlBase = null;
         private RDFFormat rdfXmlFormat = null;
         private String showXmlDeclaration = null;
@@ -186,6 +242,10 @@ public class RDFConvertOptions {
          private String convertInstanceData = null;
          private boolean modelUnionFixPackage = false;
          private boolean keepOntologyHeaders = true;
+         private String detailedUnionPackageUri = "";
+         private String detailedUnionOntologyUri = "";
+         private String detailedUnionDeletionStereotype = "";
+         private Map<String, List<Node>> detailedUnionOntologyMetadata = Map.of();
 
         public Builder sourceFile(File sourceFile) {
             this.sourceFile = sourceFile;
@@ -300,6 +360,35 @@ public class RDFConvertOptions {
 
         public Builder keepOntologyHeaders(boolean keep) {
             this.keepOntologyHeaders = keep;
+            return this;
+        }
+
+        public Builder jenaTargetFormat(RDFFormat jenaTargetFormat) {
+            this.jenaTargetFormat = jenaTargetFormat;
+            return this;
+        }
+        public Builder jsonLdContext(String context) { this.jsonLdContext = context == null ? "" : context; return this; }
+        public Builder jsonLdUseNativeTypes(boolean value) { this.jsonLdUseNativeTypes = value; return this; }
+        public Builder jsonLdUseRdfType(boolean value) { this.jsonLdUseRdfType = value; return this; }
+        public Builder jsonLdCompactArrays(boolean value) { this.jsonLdCompactArrays = value; return this; }
+        public Builder jsonLdOrdered(boolean value) { this.jsonLdOrdered = value; return this; }
+
+        public Builder detailedUnionPackageUri(String uri) {
+            this.detailedUnionPackageUri = uri == null ? "" : uri;
+            return this;
+        }
+
+        public Builder detailedUnionOntologyUri(String uri) {
+            this.detailedUnionOntologyUri = uri == null ? "" : uri;
+            return this;
+        }
+
+        public Builder detailedUnionDeletionStereotype(String stereotype) {
+            this.detailedUnionDeletionStereotype = stereotype == null ? "" : stereotype;
+            return this;
+        }
+        public Builder detailedUnionOntologyMetadata(Map<String, List<Node>> metadata) {
+            this.detailedUnionOntologyMetadata = metadata == null ? Map.of() : metadata;
             return this;
         }
 

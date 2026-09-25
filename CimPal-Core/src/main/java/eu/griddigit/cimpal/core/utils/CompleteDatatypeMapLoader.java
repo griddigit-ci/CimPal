@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.core.utils;
 
 import org.apache.jena.datatypes.RDFDatatype;
@@ -40,6 +45,22 @@ public final class CompleteDatatypeMapLoader {
         try (InputStream in = Files.newInputStream(file)) {
             return load(in);
         }
+    }
+
+    /**
+     * The map a set of validation options selects: an explicit map, else a map file, else a
+     * bundled preset. With none of them set the result is empty.
+     */
+    static Map<String, RDFDatatype> resolve(DatatypeMapPreset preset,
+                                            Path file,
+                                            Map<String, RDFDatatype> map) throws IOException {
+        if (map != null) {
+            return map;
+        }
+        if (file != null) {
+            return loadFromFile(file);
+        }
+        return preset == null ? Map.of() : preset.load();
     }
 
     private static Map<String, RDFDatatype> load(InputStream in) throws IOException {

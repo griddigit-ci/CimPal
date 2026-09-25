@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.main.application.datagenerator;
 
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
@@ -16,15 +21,26 @@ import java.util.concurrent.TimeUnit;
 
 public class ModelManipulationFactory {
 
-    public static String cnNewUUIDconnect;
-    public static String cnNewUUIDconnectTemp;
+    //Regenerate rdf:ID and mrid, if there. This is working for an IGM - i.e. one MAS
 
-
-        //Regenerate rdf:ID and mrid, if there. This is working for an IGM - i.e. one MAS
-    public static Map<String,Model> regenerateRDFIDmodule(Map<String, Model> instanceModel, List<String> skipList, String cnIDwhenMultiply)  {
+    /**
+     * Gives every resource a new rdf:ID, except for the classes named in {@code skipList}, whose
+     * ids are kept so copies of a model stay inside the same containers.
+     * <p>
+     * The models are rewritten in place and handed back, so a caller that needs the originals has
+     * to pass clones.
+     *
+     * @param idMap filled with the old local name to new local name mapping. A caller that has to
+     *              find a particular resource again in the rewritten model - Multiply and connect
+     *              has to find the connectivity node it chains onto - reads it from here. This
+     *              replaced a pair of static fields that reported the id of the last resource
+     *              matched: the same resource appears in more than one profile, and each sighting
+     *              generated a fresh UUID while only the first was kept, so the id reported was
+     *              usually one that had been thrown away.
+     */
+    public static Map<String,Model> regenerateRDFIDmodule(Map<String, Model> instanceModel, List<String> skipList, Map<String,String> idMap)  {
 
         Map<String, Model> modifiedInstanceDataMap= new HashMap<>();
-        Map<String,String> idMap = new HashMap<>(); //old id, new id
 
         //Map<String,Model> instanceModel= loadDataMap.get("baseInstanceModelMap");
 
@@ -48,14 +64,7 @@ public class ModelManipulationFactory {
                         if (skipList.contains(entry.getValue().getRequiredProperty(rdfid,RDF.type).getObject().asResource().getLocalName())) {
                             idMap.putIfAbsent(rdfid.getLocalName(), rdfid.getLocalName());
                         }else{
-                            UUID newUUID = UUID.randomUUID();
-                            idMap.putIfAbsent(rdfid.getLocalName(), "_" + newUUID);
-                            if (!cnIDwhenMultiply.isEmpty()) {
-                                if (rdfid.getLocalName().equals(cnIDwhenMultiply) || rdfid.getLocalName().equals("_"+cnNewUUIDconnectTemp)) {
-                                    cnNewUUIDconnect = String.valueOf(newUUID);
-                                    cnNewUUIDconnectTemp= String.valueOf(newUUID);
-                                }
-                            }
+                            idMap.putIfAbsent(rdfid.getLocalName(), "_" + UUID.randomUUID());
                         }
                     }
                 }

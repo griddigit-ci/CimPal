@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.main.application.tasks;
 
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
@@ -29,6 +34,8 @@ public class DeleteRequiredProperties implements ITask {
         this.status = "Queued";
         this.info = "0%";
         this.taskUpdater = new TaskStateUpdater();
+        // Matches the "save result" checkbox on this task's page, which starts out ticked.
+        this.saveResult = true;
         this.shaclManipulationsService = new ShaclManipulationsService();
     }
 

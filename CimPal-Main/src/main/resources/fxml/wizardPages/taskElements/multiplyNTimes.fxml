@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -17,9 +21,16 @@
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
         </padding>
 
-        <Label text="Multiply N times:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-        <TextField fx:id="timesToMultiply" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+        <Label text="Number of models in the result:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+        <TextField fx:id="timesToMultiply" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="0">
+            <tooltip>
+                <Tooltip text="How many models the result holds in total, counting the base model. 3 gives the base model and 2 copies."/>
+            </tooltip>
+        </TextField>
         <CheckBox fx:id="saveResult" mnemonicParsing="false" selected="true"
                   text="Save Result to Working Dir" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+
+        <Label text="The base model is kept as it is and counts as one. Every copy gets newly generated rdf:IDs and mRIDs, and a file name timestamped one second apart."
+               wrapText="true" GridPane.columnIndex="0" GridPane.columnSpan="3" GridPane.rowIndex="1"/>
     </GridPane>
 </TitledPane>

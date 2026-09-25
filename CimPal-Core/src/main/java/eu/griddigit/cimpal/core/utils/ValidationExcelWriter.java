@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
@@ -544,8 +549,19 @@ public class ValidationExcelWriter implements Closeable {
         }
     }
 
+    /** Writes the workbook into {@code outputBaseDir} under a name stamped with the current time. */
     public Path saveTo(Path outputBaseDir) throws IOException {
-        Files.createDirectories(outputBaseDir);
+        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String prefix = timestampedSummaryMode ? "timestamped_validation_summary__" : "validation_report__";
+        return saveAs(outputBaseDir.resolve(prefix + ts + ".xlsx"));
+    }
+
+    /** Writes the workbook to exactly {@code out}, creating its folder if needed. */
+    public Path saveAs(Path out) throws IOException {
+        Path parent = out.toAbsolutePath().getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
 
         if (timestampedSummaryMode) {
             writeTimestampConstraintStatisticsRows();
@@ -553,9 +569,6 @@ public class ValidationExcelWriter implements Closeable {
             autosize(timestampOverviewSheet, TIMESTAMP_OVERVIEW_HEADER.length);
             autosize(timestampConstraintSheet, TIMESTAMP_CONSTRAINT_HEADER.length);
             autosize(inputCompletenessSheet, INPUT_COMPLETENESS_HEADER.length);
-
-            String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            Path out = outputBaseDir.resolve("timestamped_validation_summary__" + ts + ".xlsx");
 
             try (OutputStream os = Files.newOutputStream(out)) {
                 wb.write(os);
@@ -575,8 +588,6 @@ public class ValidationExcelWriter implements Closeable {
                 autosize(chartsSheet, 9);
             }
         }
-        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        Path out = outputBaseDir.resolve("validation_report__" + ts + ".xlsx");
 
         try (OutputStream os = Files.newOutputStream(out)) {
             streamingWorkbook.write(os);

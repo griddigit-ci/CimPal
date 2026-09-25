@@ -1,10 +1,15 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # Application Security Self-Attestation Report
 
 > **PROVENANCE — AI-GENERATED ASSESSMENT AND REMEDIATION.**
 >
 > The secure code review described in this document, and the code changes recorded in §4,
-> were produced by **Claude (Anthropic), model Opus 5**, operating as an AI coding assistant
-> inside JetBrains IntelliJ IDEA, at the direction of the CimPal maintainer.
+> include a follow-up review produced by **Codex (OpenAI), GPT-5**, operating as an AI coding
+> assistant at the direction of the CimPal maintainer.
 >
 > This is a **self-attestation**: it records work performed and verified by an automated
 > reviewer. It is **not** an independent audit, not a penetration test, and carries no
@@ -44,8 +49,9 @@ Accordingly, the review scoped the trust boundary as follows:
   process environment, internal network reachability from the workstation, and the integrity
   of reports the application produces for downstream consumers.
 
-The review produced **12 findings and 1 hardening item**: 1 High/Critical, 1 High,
-2 Medium-High, 3 Medium, and 5 Low. **All 13 are remediated and verified.**
+The original review produced **12 findings and 1 hardening item**. The present-state follow-up
+review identified one further High finding in the subsequently added AI knowledge-source
+feature. **All 13 findings and the hardening item are remediated and verified.**
 
 The most significant finding was a chain of three defects in the remote-shapes subsystem
 (`ValidationTools`) that composed into a single high-impact attack: a third-party SHACL
@@ -68,14 +74,14 @@ positive assurance.
 |---|---|
 | Application name | CimPal |
 | Component / repository | `github.com/griddigit/CimPal` |
-| Version reviewed | 2026.9.05.1 |
-| Git revision (base commit) | `b1585473eed70cceea3b0930e82232eed3f7e6a9` (`b158547`) |
+| Version reviewed | 2026.9.10.1 |
+| Git revision (base commit) | `a0c38d3eb09d6a81723e4965ccaca62a76491fc0` (`a0c38d3`) |
 | Branch | `devel` |
 | Review start date | 2026-09-06 |
-| Review completion date | 2026-09-06 |
-| Remediation completion date | 2026-09-06 |
-| Reviewer | Claude (Anthropic), model Opus 5 — AI coding assistant |
-| Review harness | Claude Code, JetBrains IntelliJ IDEA 2026.2 |
+| Review completion date | 2026-09-24 |
+| Remediation completion date | 2026-09-24 |
+| Reviewer | Codex (OpenAI), GPT-5 — AI coding assistant; prior review by Claude (Anthropic), Opus 5 |
+| Review harness | Codex desktop, JetBrains IntelliJ IDEA Maven distribution |
 | Approver / accountable owner | *outstanding — see §6* |
 | Target platform(s) | Windows (primary, packaged via launch4j as `CimPal.exe`); Linux and macOS supported |
 | Runtime / toolchain | Java 25, JavaFX 25.0.3, Apache Maven, Apache Jena 6.2.0 |
@@ -90,8 +96,9 @@ positive assurance.
 | `CimPal-CustomWriter` | Custom Jena RDF/XML serialisers | Yes |
 | `CimPal-CLI` | Command-line manifest service | Yes |
 
-All four Maven modules were included. 31 files were modified across all four modules plus
-the aggregator POM; one new test class was added.
+All four Maven modules were included. The follow-up specifically reviewed the AI knowledge
+source and local Ollama additions in `CimPal-Main`, plus the existing application-wide trust
+boundaries documented below.
 
 ### 2.2 Explicitly Out of Scope
 
@@ -544,6 +551,35 @@ scanning or SBOM generation existed in the build.
 
 ---
 
+#### Finding 13 — SSRF and resource exhaustion in AI knowledge-source retrieval
+
+| | |
+|---|---|
+| **Severity** | **High** |
+| **CWE** | CWE-918 (SSRF), CWE-400 (Uncontrolled Resource Consumption), CWE-601 (Open Redirect) |
+| **OWASP** | A10, A05 |
+| **Location** | `CimPal-Main/.../ai/AiKnowledgeSearch`, `OllamaClient` |
+| **Status** | **Remediated & Verified** |
+
+**Discovered condition.** The subsequently added optional AI knowledge feature accepted
+operator-configured `http` and `https` sources and fetched them directly. It had no scheme
+or port policy, no rejection of user-info or private/loopback destinations, followed the
+HTTP client's default redirect behaviour, and buffered an entire response before caching it.
+An attacker able to influence a configured source could use the desktop application as a
+network client against local or private services, or cause excessive memory consumption.
+
+**Remediation applied.** All public-reference retrieval now passes a mandatory URI gate:
+credential-free HTTPS only, port 443 only, and all resolved addresses must be public (no
+loopback, link-local, site-local, multicast, wildcard, or IPv6 ULA addresses). The dedicated
+client has `Redirect.NEVER`, connects within five seconds, and reads at most 2 MB before
+caching. GitHub repository sources are restricted to canonical credential-free HTTPS
+`github.com/owner/repository` URLs with a constrained optional branch name. The local Ollama
+client additionally rejects non-HTTP(S) endpoints and embedded credentials.
+
+**Regression tests.** `AiKnowledgeSearchSecurityTest` verifies acceptance of a public HTTPS
+address and rejection of HTTP, embedded credentials, loopback, RFC1918, and IPv6 loopback
+destinations.
+
 ### 4.5 Hardening Items
 
 #### H1 — Script source assembled by string concatenation
@@ -569,10 +605,10 @@ be reinterpreted as script regardless of the value.
 
 | Check | Method | Result |
 |---|---|---|
-| Compilation | Full clean rebuild of all four modules, Java 25 | **Pass** — zero errors; only pre-existing deprecation warnings unrelated to these changes (`RandomStringUtils.randomAlphabetic`, `TableView.CONSTRAINED_RESIZE_POLICY`, `SourceStringReader.generateImage`, `new URL(String)`) |
-| Static inspection | IntelliJ IDEA inspections at error severity over all modified files | **Pass** — zero problems |
-| Unit tests | `ShapeSourceTest` (19) + `ComparisonCsvWriterTest` (9), JUnit 5.13.1 | **Pass** — 28/28 |
-| Pattern absence | Source re-scan for each vulnerable construct | **Pass** — `Runtime.getRuntime().exec` absent; substring host test absent; unguarded `HttpClient.newBuilder`/`URI.create(url)` at fetch sites absent; hardcoded `C:\` paths absent; live `printStackTrace()` absent |
+| Compilation | Maven reactor build of all four modules, Java 25 | **Pass** — all four reactor modules compiled successfully |
+| Static inspection | Targeted source review and source re-scan | **Pass** — the AI public-fetch path has a mandatory URI gate, redirects disabled, and a bounded streaming response body |
+| Unit tests | Existing `CimPal-Core` suite plus `AiKnowledgeSearchSecurityTest`, JUnit 5.13.1 | **Pass** — 65 Core tests and 4 new AI-security tests, zero failures/errors |
+| Pattern absence | Source re-scan for security-relevant request construction | **Pass** — no unvalidated public-reference fetch remains; local Ollama rejects non-HTTP(S) endpoints and embedded credentials |
 | Behavioural regression | Existing local-import, diamond, cycle and triple-count tests in `ShapeSourceTest` | **Pass** — unchanged |
 
 **Test-infrastructure defect found and fixed during verification.** The project's only test
@@ -604,8 +640,8 @@ runner remains outstanding** and is item 1 of §5.3.
 
 ### 5.1 Statement of Position
 
-All 12 findings and 1 hardening item identified by this review — including both High and
-Critical-severity findings — have been remediated, and each remediation has been verified by
+All 13 findings and 1 hardening item identified across the original and follow-up reviews —
+including High and Critical-severity findings — have been remediated, and each remediation has been verified by
 the means recorded in §4.6. As at the remediation completion date in §2, no known
 unmitigated defect of High or Critical severity remained in the reviewed revision.
 
@@ -649,6 +685,12 @@ The following residual risk is acknowledged and is **not** eliminated by this re
 8. **The remote-fetch allowlist is a policy decision requiring maintenance.**
    `ALLOWED_REMOTE_HOSTS` currently permits the GitHub content hosts. Any future addition
    widens the SSRF surface and should be treated as a security-relevant change (§5.3 item 5).
+9. **Public knowledge-source DNS resolution is a time-of-check control.** The AI feature
+   rejects non-public answers during validation and does not follow redirects, but the JDK HTTP
+   client performs its own subsequent resolution. A malicious DNS operator could theoretically
+   rebind a previously public name. Configured knowledge sources should therefore remain
+   operator-controlled, trusted public domains; a future feature that permits untrusted source
+   lists should use a connection layer that pins validated addresses.
 
 ### 5.3 Ongoing Security Programme
 
@@ -694,7 +736,7 @@ countersigned certificate, until a named human has reviewed §4 and signed.
 
 | Role | Name | Signature | Date |
 |---|---|---|---|
-| Reviewer (automated) | Claude (Anthropic), model Opus 5 | *AI-generated — not a human signature* | 2026-09-06 |
+| Reviewer (automated) | Codex (OpenAI), GPT-5; prior review by Claude (Anthropic), Opus 5 | *AI-generated — not a human signature* | 2026-09-24 |
 | Engineering owner | `________________` | `________________` | `__________` |
 | Accountable approver | `________________` | `________________` | `__________` |
 
@@ -702,11 +744,11 @@ countersigned certificate, until a named human has reviewed §4 and signed.
 
 | Field | Value |
 |---|---|
-| Document version | 1.0 |
-| Prepared | 2026-09-06 |
-| Prepared by | Claude (Anthropic), model Opus 5, via Claude Code in IntelliJ IDEA |
-| Base revision | `b1585473eed70cceea3b0930e82232eed3f7e6a9` (branch `devel`) |
-| Application version | CimPal 2026.9.05.1 |
-| Supersedes | Draft 0.1 (2026-09-06) |
-| Next review due | 2027-09-06, or upon material architectural change |
+| Document version | 1.1 |
+| Prepared | 2026-09-24 |
+| Prepared by | Codex (OpenAI), GPT-5, with prior attestation content by Claude (Anthropic), Opus 5 |
+| Base revision | `a0c38d3eb09d6a81723e4965ccaca62a76491fc0` (branch `devel`) |
+| Application version | CimPal 2026.9.10.1 |
+| Supersedes | Version 1.0 (2026-09-06) |
+| Next review due | 2027-09-24, or upon material architectural change |
 | Classification | `________________` |

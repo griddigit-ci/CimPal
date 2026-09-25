@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.main.application.tasks;
 
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
@@ -7,8 +12,8 @@ import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstance
 import org.apache.jena.rdf.model.Model;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class RegenerateRDFIDAndMRID implements ITask {
@@ -43,7 +48,7 @@ public class RegenerateRDFIDAndMRID implements ITask {
         }
         var modifiedBaseInstanceModel = new HashMap<String, BaseInstanceModel>();
         // Change the RDFIDs
-        Map<String, Model> modifiedInstanceDataMap = ModelManipulationFactory.regenerateRDFIDmodule(modelsMapForChangeIds, new ArrayList(), String.valueOf(1));
+        Map<String, Model> modifiedInstanceDataMap = ModelManipulationFactory.regenerateRDFIDmodule(modelsMapForChangeIds, List.of(), new HashMap<>());
 
         // Update Instance model entries with mutated entries
         for (Map.Entry<String, Model> entry : modifiedInstanceDataMap.entrySet()) {

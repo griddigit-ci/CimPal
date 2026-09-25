@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
@@ -332,6 +337,24 @@ public class ValidationTools {
                                                           int maxResultsPerConstraint,
                                                           ValidationEngine validationEngine)
             throws IOException {
+        return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, previousComparisonCsv, maxResultsPerConstraint,
+                validationEngine, exportTurtleValidationReports);
+    }
+
+    /** As above, with the Turtle report export given per run rather than by the global switch. */
+    static ValidationTimestampedRunSummary validateByTimestampedMapping(Path mappingCsvPath,
+                                                          Path inputPath,
+                                                          Path constraintsRoot,
+                                                          Path outputBaseDir,
+                                                          int threadCount,
+                                                          Map<String, RDFDatatype> dataTypeMap,
+                                                          String xmlBase,
+                                                          Path previousComparisonCsv,
+                                                          int maxResultsPerConstraint,
+                                                          ValidationEngine validationEngine,
+                                                          boolean exportTurtleReports)
+            throws IOException {
 
         if (maxResultsPerConstraint < 0) {
             throw new IllegalArgumentException("maxResultsPerConstraint must be zero or greater");
@@ -481,7 +504,7 @@ public class ValidationTools {
                             timestampWriter.setReportContext(analysisName, inputGroup.name, timestampGroup.timestamp); // NEW
                             long reportRowsStart = System.currentTimeMillis();
                             appendTaskResultsToWriter(timestampWriter, results, maxResultsPerConstraint);
-                            if (exportTurtleValidationReports) {
+                            if (exportTurtleReports) {
                                 for (ValidationTaskResult result : results) saveValidationReportTurtle(groupOutputDir, result);
                             }
                             dbg("DONE append timestamp report rows inputGroup=" + inputGroup.name
@@ -668,6 +691,23 @@ public class ValidationTools {
                                          String xmlBase,
                                          int maxResultsPerConstraint,
                                          ValidationEngine validationEngine
+    ) throws IOException {
+        return validateByMapping(mappingCsvPath, modelsBaseDir, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
+                exportTurtleValidationReports);
+    }
+
+    /** As above, with the Turtle report export given per run rather than by the global switch. */
+    static ValidationRunSummary validateByMapping(Path mappingCsvPath,
+                                         Path modelsBaseDir,
+                                         Path constraintsRoot,
+                                         Path outputBaseDir,
+                                         int threadCount,
+                                         Map<String, RDFDatatype> dataTypeMap,
+                                         String xmlBase,
+                                         int maxResultsPerConstraint,
+                                         ValidationEngine validationEngine,
+                                         boolean exportTurtleReports
     ) throws IOException {
 
         validationEngine = validationEngine == null ? ValidationEngine.APACHE_JENA : validationEngine;
@@ -910,7 +950,7 @@ public class ValidationTools {
                             sheet, r.datasetName, r.xmlFiles, r.missingXmlFiles, r.constraintFile,
                             r.results, r.conforms, r.displayName,
                             r.partialValidation, maxResultsPerConstraint);
-                    if (exportTurtleValidationReports) saveValidationReportTurtle(outputBaseDir, r);
+                    if (exportTurtleReports) saveValidationReportTurtle(outputBaseDir, r);
                     dbgRow(r.rowIdx, "DONE writer.appendValidation dataset=" + r.datasetName,
                             appendStart);
                 }
@@ -1129,7 +1169,7 @@ public class ValidationTools {
 
             LimitedValidationOutcome validationOutcome = validateWithSelectedEngine(
                     validationEngine, Shapes.parse(shapesModel.getGraph()), dataModel.getGraph(), shapesModel,
-                    maxResultsPerConstraint, rowIdx, targetShapeWorkers);
+                    maxResultsPerConstraint, rowIdx, targetShapeWorkers, false);
             List<SHACLValidationResult> results = validationOutcome.results();
             boolean conforms = validationOutcome.conforms();
 
@@ -1587,7 +1627,7 @@ public class ValidationTools {
         return ValidationExcelWriter.CaseFolder.UNKNOWN;
     }
 
-    private static String formatPaths(Collection<Path> paths) {
+    static String formatPaths(Collection<Path> paths) {
         if (paths == null || paths.isEmpty()) return "";
         return paths.stream()
                 .filter(Objects::nonNull)
@@ -1614,7 +1654,7 @@ public class ValidationTools {
         return normalizedPath;
     }
 
-    private static String makeDatasetName(Collection<Path> xmlFiles) {
+    static String makeDatasetName(Collection<Path> xmlFiles) {
         if (xmlFiles == null || xmlFiles.isEmpty()) {
             return "UNKNOWN";
         }
@@ -5268,7 +5308,7 @@ public class ValidationTools {
             long validationStart = System.currentTimeMillis();
             LimitedValidationOutcome limitedOutcome = validateWithSelectedEngine(
                     validationEngine, cachedShapes.shapes(), dataGraph, shapesModel,
-                    maxResultsPerConstraint, row.rowIdx, targetShapeWorkers);
+                    maxResultsPerConstraint, row.rowIdx, targetShapeWorkers, false);
             dbgRow(row.rowIdx, "DONE timestamped SHACL validation"
                     + " conforms=" + limitedOutcome.conforms()
                     + (limitedOutcome.partial() ? " partial=true" : ""), validationStart);
@@ -5363,44 +5403,54 @@ public class ValidationTools {
         if (value != null && !value.isBlank()) result.addLiteral(model.createProperty(property), value);
     }
 
-    private record LimitedValidationOutcome(List<SHACLValidationResult> results,
-                                            boolean conforms,
-                                            boolean partial) {}
+    /** {@code reportModel} is the engine's sh:ValidationReport graph, or null when not retained. */
+    record LimitedValidationOutcome(List<SHACLValidationResult> results,
+                                    boolean conforms,
+                                    boolean partial,
+                                    Model reportModel) {}
 
-    private static LimitedValidationOutcome validateWithSelectedEngine(ValidationEngine engine,
-                                                                        Shapes shapes,
-                                                                        Graph dataGraph,
-                                                                        Model shapesModel,
-                                                                        int maxResultsPerConstraint,
-                                                                        int rowIdx,
-                                                                        int targetShapeWorkers)
+    /**
+     * @param retainReport also return the engine's report graph. Mapping runs leave it off: they
+     *                     only need the extracted results, and merging the per-target-shape
+     *                     reports would build a second copy of every result.
+     */
+    static LimitedValidationOutcome validateWithSelectedEngine(ValidationEngine engine,
+                                                               Shapes shapes,
+                                                               Graph dataGraph,
+                                                               Model shapesModel,
+                                                               int maxResultsPerConstraint,
+                                                               int rowIdx,
+                                                               int targetShapeWorkers,
+                                                               boolean retainReport)
             throws IOException, InterruptedException {
         if (engine == ValidationEngine.APACHE_JENA) {
             return maxResultsPerConstraint == 0
-                    ? validateCompletely(shapes, dataGraph, shapesModel, rowIdx, targetShapeWorkers)
+                    ? validateCompletely(shapes, dataGraph, shapesModel, rowIdx, targetShapeWorkers, retainReport)
                     : validateWithResultLimit(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx,
-                            targetShapeWorkers);
+                            targetShapeWorkers, retainReport);
         }
 
         PythonShaclValidator.Outcome outcome = PythonShaclValidator.validate(
                 engine, shapesModel, ModelFactory.createModelForGraph(dataGraph));
         List<SHACLValidationResult> allResults = outcome.results();
+        Model reportModel = retainReport ? outcome.report() : null;
         // Python engines have no public equivalent of Jena's per-source-shape interruption
         // callback. They run the complete graph and the shared reporting layer samples the
         // returned findings, preserving the report's Partial marker without suppressing checks.
         if (maxResultsPerConstraint == 0) {
-            return new LimitedValidationOutcome(allResults, outcome.conforms(), false);
+            return new LimitedValidationOutcome(allResults, outcome.conforms(), false, reportModel);
         }
         List<SHACLValidationResult> limited = limitResultsPerConstraint(allResults, maxResultsPerConstraint);
         boolean partial = limited.size() < allResults.size();
-        return new LimitedValidationOutcome(limited, !partial && outcome.conforms(), partial);
+        return new LimitedValidationOutcome(limited, !partial && outcome.conforms(), partial, reportModel);
     }
     private static LimitedValidationOutcome validateCompletely(Shapes shapes,
                                                                 Graph dataGraph,
                                                                 Model shapesModel,
                                                                 int rowIdx,
-                                                                int targetShapeWorkers) {
-        return validateTargetShapes(shapes, dataGraph, shapesModel, 0, rowIdx, targetShapeWorkers);
+                                                                int targetShapeWorkers,
+                                                                boolean retainReport) {
+        return validateTargetShapes(shapes, dataGraph, shapesModel, 0, rowIdx, targetShapeWorkers, retainReport);
     }
 
     /**
@@ -5418,22 +5468,27 @@ public class ValidationTools {
                                                                       Model shapesModel,
                                                                       int maxResultsPerConstraint,
                                                                       int rowIdx,
-                                                                      int targetShapeWorkers) {
+                                                                      int targetShapeWorkers,
+                                                                      boolean retainReport) {
         return validateTargetShapes(shapes, dataGraph, shapesModel, maxResultsPerConstraint, rowIdx,
-                targetShapeWorkers);
+                targetShapeWorkers, retainReport);
     }
 
     /** Validates independent Jena target shapes concurrently without exceeding a row's budget. */
     private static LimitedValidationOutcome validateTargetShapes(Shapes shapes, Graph dataGraph, Model shapesModel,
                                                                    int maxResultsPerConstraint, int rowIdx,
-                                                                   int targetShapeWorkers) {
+                                                                   int targetShapeWorkers, boolean retainReport) {
         List<Shape> targetShapes = new ArrayList<>(shapes.getTargetShapes());
-        if (targetShapes.isEmpty()) return new LimitedValidationOutcome(List.of(), true, false);
+        if (targetShapes.isEmpty()) {
+            // Not reportConformsTrue(): that report's model is a shared singleton.
+            return new LimitedValidationOutcome(List.of(), true, false,
+                    retainReport ? ValidationReport.create().build().getModel() : null);
+        }
         int workerCount = Math.min(Math.max(1, targetShapeWorkers), targetShapes.size());
         if (workerCount == 1) {
             return mergeTargetShapeOutcomes(targetShapes.stream().map(shape -> validateTargetShape(
                     shapes, dataGraph, shapesModel, shape, maxResultsPerConstraint, rowIdx)).toList(),
-                    maxResultsPerConstraint);
+                    maxResultsPerConstraint, retainReport);
         }
         ExecutorService pool = Executors.newFixedThreadPool(workerCount);
         try {
@@ -5452,7 +5507,7 @@ public class ValidationTools {
                     throw new IOException("Target-shape validation failed", ex);
                 }
             }
-            return mergeTargetShapeOutcomes(outcomes, maxResultsPerConstraint);
+            return mergeTargetShapeOutcomes(outcomes, maxResultsPerConstraint, retainReport);
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         } finally {
@@ -5485,19 +5540,25 @@ public class ValidationTools {
     }
 
     private static LimitedValidationOutcome mergeTargetShapeOutcomes(List<TargetShapeOutcome> outcomes,
-                                                                       int maxResultsPerConstraint) {
+                                                                       int maxResultsPerConstraint,
+                                                                       boolean retainReport) {
         List<SHACLValidationResult> combined = new ArrayList<>();
         boolean partial = false;
         boolean conforms = true;
+        ValidationReport.Builder report = retainReport ? ValidationReport.create() : null;
         for (TargetShapeOutcome outcome : outcomes) {
             combined.addAll(outcome.results());
             partial |= outcome.partial();
             conforms &= outcome.conforms();
+            if (report != null) {
+                outcome.report().getEntries().forEach(report::addReportEntry);
+            }
         }
         List<SHACLValidationResult> distinct = new ArrayList<>(new LinkedHashSet<>(combined));
         List<SHACLValidationResult> results = maxResultsPerConstraint == 0 ? distinct
                 : limitResultsPerConstraint(distinct, maxResultsPerConstraint);
-        return new LimitedValidationOutcome(results, !partial && conforms, partial);
+        return new LimitedValidationOutcome(results, !partial && conforms, partial,
+                report == null ? null : report.build().getModel());
     }
 
     /**

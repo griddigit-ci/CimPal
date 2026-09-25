@@ -1,7 +1,7 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- * @author Chavdar Ivanov
+ * SPDX-License-Identifier: EUPL-1.2+
  */
 package eu.griddigit.cimpal.main.gui;
 
@@ -35,6 +35,10 @@ public class TextAreaEditTableCell<S> extends TextAreaTableCell<S, String> {
 
     private Text createText() {
         Text text = new Text();
+        // Text nodes use -fx-fill rather than the table cell's -fx-text-fill.
+        // Give the shared stylesheet a precise hook so wrapped table values
+        // remain readable in every application theme.
+        text.getStyleClass().add("cimpal-table-cell-text");
         text.wrappingWidthProperty().bind(widthProperty());
         text.textProperty().bind(itemProperty());
         return text;

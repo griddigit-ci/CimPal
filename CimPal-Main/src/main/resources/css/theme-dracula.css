@@ -1,13 +1,8 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- *
- * Theme: Dracula
- * The canonical Dracula palette - #282a36 background, #f8f8f2 foreground, purple and
- * pink accents. Accent tones are darkened from the reference palette so white text on
- * a selection bar still clears WCAG AA.
+ * SPDX-License-Identifier: EUPL-1.2+
  */
-
 .root {
     /* --- Modena derivation roots --- */
     -fx-base:                         #282a36;
