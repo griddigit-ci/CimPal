@@ -3635,7 +3635,7 @@ public class ValidationTools {
             String profile = safe(meta.profile).toUpperCase(Locale.ROOT);
 
             if (BOUNDARY_PROFILES.contains(profile) || STATIC_PROFILES.contains(profile)) {
-                index.staticFiles(profile).add(meta.path);
+                index.addStaticFile(profile, meta.path, meta.timestamp);
 
                 logInfo("INDEX_STATIC"
                         + " inputGroup=" + inputGroupName
@@ -3908,7 +3908,18 @@ public class ValidationTools {
 
         for (String profile : requestedProfiles) {
             if (BOUNDARY_PROFILES.contains(profile) || STATIC_PROFILES.contains(profile)) {
-                out.addAll(filterFilesByToken(tsoIndex.staticFiles(profile), token));
+                List<Path> matches = filterFilesByToken(tsoIndex.staticFiles(profile), token);
+                List<Path> selected = selectStaticFilesForTimestamp(
+                        matches, tsoIndex.staticFileTimestamps, timestampGroup.timestamp);
+                if (selected.size() < matches.size()) {
+                    logInfo("STATIC_SELECTED_BY_DATE"
+                            + " inputGroup=" + tsoIndex.tso
+                            + " timestamp=" + timestampGroup.timestamp
+                            + " profile=" + profile
+                            + " candidates=" + matches.size()
+                            + " selected=" + formatPaths(selected));
+                }
+                out.addAll(selected);
                 continue;
             }
 
@@ -3923,6 +3934,54 @@ public class ValidationTools {
         }
 
         return new ArrayList<>(out);
+    }
+
+    /**
+     * Narrows several static/boundary files that match the same mapping token down to the one
+     * valid for {@code timestamp}: the file whose header timestamp is the latest at or before it.
+     * This works whether a day's header starts at 00:00Z or at local midnight (e.g. 22:00Z).
+     * <p>
+     * A single candidate is returned as is, without a date check. When the choice is ambiguous
+     * (a candidate without a parseable timestamp, no candidate at or before the timestamp, or a
+     * tie on the latest one) every remaining candidate is returned, so the row still fails the
+     * "Too many files" check instead of silently validating against a guessed file.
+     */
+    static List<Path> selectStaticFilesForTimestamp(List<Path> candidates,
+                                                    Map<Path, String> fileTimestamps,
+                                                    String timestamp) {
+        if (candidates == null || candidates.size() <= 1) {
+            return candidates == null ? List.of() : candidates;
+        }
+
+        Instant target;
+        try {
+            target = Instant.parse(safe(timestamp));
+        } catch (DateTimeParseException ex) {
+            return candidates;
+        }
+
+        Map<Path, Instant> candidateInstants = new LinkedHashMap<>();
+        for (Path candidate : candidates) {
+            try {
+                candidateInstants.put(candidate, Instant.parse(safe(fileTimestamps.get(candidate))));
+            } catch (DateTimeParseException ex) {
+                return candidates;
+            }
+        }
+
+        Instant latest = candidateInstants.values().stream()
+                .filter(instant -> !instant.isAfter(target))
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+
+        if (latest == null) {
+            return candidates;
+        }
+
+        return candidateInstants.entrySet().stream()
+                .filter(entry -> entry.getValue().equals(latest))
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     private static String cleanRequestedInputForReport(String xmlInputsRaw) {
@@ -4919,6 +4978,8 @@ public class ValidationTools {
         final String tso;
         final Map<String, TimestampGroup> byTimestamp = new TreeMap<>();
         final Map<String, List<Path>> staticFilesByProfile = new LinkedHashMap<>();
+        // header timestamp of each static/boundary file, used to pick one per timestamp
+        final Map<Path, String> staticFileTimestamps = new HashMap<>();
 
         TsoFileIndex(String tso) {
             this.tso = tso;
@@ -4934,6 +4995,11 @@ public class ValidationTools {
 
         List<Path> staticFiles(String profile) {
             return staticFilesByProfile.computeIfAbsent(profile, k -> new ArrayList<>());
+        }
+
+        void addStaticFile(String profile, Path path, String timestamp) {
+            staticFiles(profile).add(path);
+            staticFileTimestamps.put(path, safe(timestamp));
         }
     }
 
@@ -4961,7 +5027,7 @@ public class ValidationTools {
             TsoFileIndex index = out.computeIfAbsent(tso, TsoFileIndex::new);
 
             if (BOUNDARY_PROFILES.contains(profile) || STATIC_PROFILES.contains(profile)) {
-                index.staticFiles(profile).add(meta.path);
+                index.addStaticFile(profile, meta.path, meta.timestamp);
                 continue;
             }
 
