@@ -185,6 +185,88 @@ class TimestampedValidationGraphTest {
     }
 
     @Test
+    void staticFileSelectionPicksLatestHeaderAtOrBeforeTheTimestamp() {
+        Path day1 = tempDir.resolve("RA_day1.xml");
+        Path day2 = tempDir.resolve("RA_day2.xml");
+        // day starts at local midnight, i.e. 22:30Z of the previous UTC date after normalisation
+        Map<Path, String> headers = Map.of(day1, "2026-08-31T22:30:00Z", day2, "2026-09-01T22:30:00Z");
+        List<Path> both = List.of(day1, day2);
+
+        assertEquals(List.of(day1), ValidationTools.selectStaticFilesForTimestamp(both, headers, "2026-08-31T22:30:00Z"));
+        assertEquals(List.of(day1), ValidationTools.selectStaticFilesForTimestamp(both, headers, "2026-09-01T21:30:00Z"));
+        assertEquals(List.of(day2), ValidationTools.selectStaticFilesForTimestamp(both, headers, "2026-09-01T22:30:00Z"));
+        assertEquals(List.of(day2), ValidationTools.selectStaticFilesForTimestamp(both, headers, "2026-09-02T10:30:00Z"));
+    }
+
+    @Test
+    void staticFileSelectionKeepsAllCandidatesWhenTheChoiceIsAmbiguous() {
+        Path a = tempDir.resolve("RA_a.xml");
+        Path b = tempDir.resolve("RA_b.xml");
+        List<Path> both = List.of(a, b);
+
+        // same header timestamp
+        assertEquals(both, ValidationTools.selectStaticFilesForTimestamp(both,
+                Map.of(a, "2026-09-01T00:30:00Z", b, "2026-09-01T00:30:00Z"), "2026-09-01T10:30:00Z"));
+        // every candidate is later than the timestamp
+        assertEquals(both, ValidationTools.selectStaticFilesForTimestamp(both,
+                Map.of(a, "2026-09-02T00:30:00Z", b, "2026-09-03T00:30:00Z"), "2026-09-01T10:30:00Z"));
+        // one candidate has no header timestamp
+        assertEquals(both, ValidationTools.selectStaticFilesForTimestamp(both,
+                Map.of(a, "2026-09-01T00:30:00Z", b, ""), "2026-09-01T10:30:00Z"));
+        // a single candidate is used without a date check
+        assertEquals(List.of(a), ValidationTools.selectStaticFilesForTimestamp(List.of(a),
+                Map.of(a, "2026-12-01T00:30:00Z"), "2026-09-01T10:30:00Z"));
+    }
+
+    @Test
+    void timestampedRunUsesTheStaticFileOfEachDay() throws Exception {
+        Path region = tempDir.resolve("input").resolve("RegionA");
+        writeCgmesXml(region.resolve("M_EQ_20260901T1030Z.xml"), "Model.scenarioTime", "2026-09-01T10:30:00Z");
+        writeCgmesXml(region.resolve("M_EQ_20260902T1030Z.xml"), "Model.scenarioTime", "2026-09-02T10:30:00Z");
+        writeCgmesXml(region.resolve("M_RA_first.xml"), "Model.startDate", "2026-08-31T22:00:00Z");
+        writeCgmesXml(region.resolve("M_RA_second.xml"), "Model.startDate", "2026-09-01T22:00:00Z");
+
+        var summary = runTimestamped();
+
+        // one row per timestamp; before date selection both were "Too many files - skipped"
+        assertEquals(2, summary.totalRows());
+    }
+
+    @Test
+    void timestampedRunStillSkipsRowsWhenStaticFilesShareTheDate() throws Exception {
+        Path region = tempDir.resolve("input").resolve("RegionA");
+        writeCgmesXml(region.resolve("M_EQ_20260901T1030Z.xml"), "Model.scenarioTime", "2026-09-01T10:30:00Z");
+        writeCgmesXml(region.resolve("M_RA_first.xml"), "Model.startDate", "2026-08-31T22:00:00Z");
+        writeCgmesXml(region.resolve("M_RA_second.xml"), "Model.startDate", "2026-08-31T22:00:00Z");
+
+        assertEquals(0, runTimestamped().totalRows());
+    }
+
+    private ValidationTools.ValidationTimestampedRunSummary runTimestamped() throws Exception {
+        Path constraints = Files.createDirectories(tempDir.resolve("constraints"));
+        Files.writeString(constraints.resolve("shapes.ttl"), """
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                <urn:test:shape> a sh:NodeShape; sh:targetClass <urn:test:Nothing> .
+                """);
+        Path mapping = tempDir.resolve("mapping.csv");
+        Files.writeString(mapping, "xml_inputs,ttl\n\"*_EQ_*.xml;*_RA_*.xml\",shapes.ttl\n");
+        return ValidationTools.validateByTimestampedMapping(mapping, tempDir.resolve("input"), constraints,
+                tempDir.resolve("out"), 1, null, "urn:test:", null);
+    }
+
+    private static void writeCgmesXml(Path file, String headerField, String timestamp) throws Exception {
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                         xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#">
+                  <md:FullModel rdf:about="urn:uuid:%s">
+                    <md:%s>%s</md:%s>
+                  </md:FullModel>
+                </rdf:RDF>
+                """.formatted(file.getFileName(), headerField, timestamp, headerField));
+    }
+
+    @Test
     void failedShapeLoadIsNotCachedAndCanBeRetried() throws Exception {
         Path root = tempDir.resolve("missing.ttl");
         var source = new ValidationTools.LocalShapeSource(root);
