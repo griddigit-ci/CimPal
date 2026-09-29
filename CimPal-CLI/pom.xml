@@ -28,6 +28,17 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.3</version>
+                <configuration>
+                    <!-- Same as CimPal-Core: run tests on the classpath so the unnamed test
+                         dependencies (test-support jar, AssertJ, schema validator) need no
+                         module-path wiring. -->
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.6.1</version>
                 <configuration>
@@ -107,6 +118,32 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>2.0.18</version>
+        </dependency>
+        <!-- Shared test helpers from CimPal-Core (eu.griddigit.cimpal.core.testsupport). -->
+        <dependency>
+            <groupId>eu.griddigit.CimPal</groupId>
+            <artifactId>CimPal-Core</artifactId>
+            <version>${cimpal.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.27.7</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.13.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>3.0.7</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

@@ -5,6 +5,8 @@
  */
 package eu.griddigit.cimpal.main.workspace;
 
+import eu.griddigit.cimpal.core.testsupport.Snapshots;
+import eu.griddigit.cimpal.core.testsupport.TestModels;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,20 @@ class WorkspaceRdfStoreTest {
         Model model = ModelFactory.createDefaultModel();
         model.createResource("urn:test:" + subject).addProperty(model.createProperty("urn:test:property"), subject);
         return model;
+    }
+
+    @Test
+    void workingCopyOfACgmesModelIsIsomorphicToThePublishedModel() {
+        String key = "workspace-test-cgmes-copy";
+        Model eq = TestModels.eq()
+                .resource("Substation", "_sub1").literal("IdentifiedObject.name", "North")
+                .resource("VoltageLevel", "_vl1").reference("VoltageLevel.Substation", "_sub1")
+                .toModel();
+        WorkspaceRdfStore.publishModel(key, WorkspaceArtifactRegistry.Type.INSTANCE_DATA,
+                "EQ", "test", "loaded", eq, List.of("eq.xml"));
+
+        Snapshots.assertIsomorphic(eq, WorkspaceRdfStore.copy(key));
+        WorkspaceRdfStore.release(key);
     }
 
     @Test

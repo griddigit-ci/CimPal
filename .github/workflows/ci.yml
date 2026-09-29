@@ -81,6 +81,38 @@ jobs:
                   print(f"- `{name}`")
           EOF
 
+      - name: Coverage summary
+        if: always()
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then py=python; else py=python3; fi
+          "$py" - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import csv, glob, os
+          print(f"\n### Coverage ({os.environ.get('RUNNER_OS', '')})\n")
+          paths = sorted(glob.glob("*/target/site/jacoco/jacoco.csv"))
+          if not paths:
+              print("No JaCoCo reports found.")
+          else:
+              print("| Module | Line | Branch |\n| --- | ---: | ---: |")
+              for path in paths:
+                  module = path.replace(os.sep, "/").split("/")[0]
+                  lc = lm = bc = bm = 0
+                  with open(path, newline="") as f:
+                      for row in csv.DictReader(f):
+                          lc += int(row["LINE_COVERED"]); lm += int(row["LINE_MISSED"])
+                          bc += int(row["BRANCH_COVERED"]); bm += int(row["BRANCH_MISSED"])
+                  pct = lambda c, m: f"{100 * c / (c + m):.2f}% ({c}/{c + m})" if c + m else "n/a"
+                  print(f"| {module} | {pct(lc, lm)} | {pct(bc, bm)} |")
+          EOF
+
+      - name: Upload coverage report
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: CimPal-Coverage/target/site/jacoco-aggregate/
+          if-no-files-found: warn
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

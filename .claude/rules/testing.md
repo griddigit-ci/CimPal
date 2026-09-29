@@ -19,9 +19,18 @@ paths:
 - **Fixtures** live under `src/test/resources/fixtures/<feature>/`, where `<feature>` is a short
   kebab-case name, e.g. `fixtures/mapping-validation/`. Keep them minimal and synthetic. Real
   customer or ENTSO-E conformity data only with an explicit decision in `docs/plans/`.
-- **Snapshots (golden-master outputs)** change only when the run has `-Dsnapshot.update=true`. A
-  normal test run never rewrites expected output. When you update a snapshot, say so in the commit
-  message and explain why the output changed.
+- **Shared helpers** live in `eu.griddigit.cimpal.core.testsupport`: `TestModels`, `Fixtures`,
+  `Snapshots`, `Normalizer` and `StubHttpServer`. CLI and Main use them through the Core `test-jar`.
+  Use these rather than writing new ones. `MappingValidatorTest` is the reference example.
+- **Snapshots (golden-master outputs)** live under `src/test/resources/snapshots/<feature>/` and are
+  checked with `Snapshots.forFeature("<feature>")`. They change only when the run has
+  `-Dsnapshot.update=true`; a normal test run never rewrites expected output. Normalise volatile
+  values first (`Normalizer.timestamps()`, `paths(tempDir)`, `blankNodeLabels()`,
+  `Snapshots.normalizeLiterals(...)` for RDF). Generate twice and diff to prove the output is stable.
+  When you update a snapshot, say so in the commit message and explain why the output changed.
+- **Coverage ratchet:** `verify` fails if a module's coverage drops more than 0.5 pp below its
+  `coverage-baseline.properties`. When your tests raise coverage, run
+  `scripts/Update-CoverageBaseline.ps1` and commit the updated files.
 - **Core tests run on the classpath** (`useModulePath=false` in `CimPal-Core/pom.xml`), so they can
   reach package-private members. Don't add test-only `opens` to `module-info.java`.
 - **Determinism:** no reliance on wall-clock time, locale, map iteration order or thread timing. Pass

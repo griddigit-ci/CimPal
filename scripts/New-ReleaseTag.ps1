@@ -37,7 +37,8 @@ $pomFiles = @(
     (Join-Path $repoRoot "CimPal-Core\pom.xml"),
     (Join-Path $repoRoot "CimPal-Main\pom.xml"),
     (Join-Path $repoRoot "CimPal-CustomWriter\pom.xml"),
-    (Join-Path $repoRoot "CimPal-CLI\pom.xml")
+    (Join-Path $repoRoot "CimPal-CLI\pom.xml"),
+    (Join-Path $repoRoot "CimPal-Coverage\pom.xml")
 )
 
 # GUI files with a hardcoded "Version: ..." string that isn't wired to the pom

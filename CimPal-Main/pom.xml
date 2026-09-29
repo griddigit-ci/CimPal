@@ -511,6 +511,20 @@
             <version>5.13.1</version>
             <scope>test</scope>
         </dependency>
+        <!-- Shared test helpers from CimPal-Core (eu.griddigit.cimpal.core.testsupport). -->
+        <dependency>
+            <groupId>eu.griddigit.CimPal</groupId>
+            <artifactId>CimPal-Core</artifactId>
+            <version>${cimpal.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.27.7</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

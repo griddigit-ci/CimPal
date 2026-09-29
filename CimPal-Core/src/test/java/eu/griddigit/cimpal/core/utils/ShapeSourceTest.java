@@ -5,6 +5,8 @@
  */
 package eu.griddigit.cimpal.core.utils;
 
+import eu.griddigit.cimpal.core.testsupport.StubHttpServer;
+import eu.griddigit.cimpal.core.testsupport.TestModels;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Resource;
@@ -290,6 +292,25 @@ class ShapeSourceTest {
         assertEquals(1, result.unresolvableImports(),
                 "a policy-refused import must be reported as unresolvable, not silently dropped");
         assertEquals(1, result.loadedFiles(), "only the local root may be loaded");
+    }
+
+    @Test
+    void importPointingAtLocalStub_isRefusedAndNeverRequested() throws Exception {
+        // Same probe as above, but against a live local server that would answer: the stub's
+        // request log proves the refusal happens before any connection, not merely that a
+        // connection failed.
+        try (StubHttpServer stub = StubHttpServer.start()) {
+            stub.serve("/shapes.ttl", TestModels.THING_SHAPES, "text/turtle");
+            Path root = tempDir.resolve("root.ttl");
+            writeOntologyWithImport(root, "urn:root", stub.uri("/shapes.ttl").toString());
+
+            var result = ValidationTools.loadShapesWithImports(
+                    new ValidationTools.LocalShapeSource(root), tempDir, new HashMap<>());
+
+            assertEquals(1, result.unresolvableImports());
+            assertEquals(1, result.loadedFiles());
+            assertEquals(0, stub.requests().size(), "the egress gate must refuse before connecting");
+        }
     }
 
     @Test
