@@ -7,12 +7,18 @@ public class RDFSProfile {
     private String[] pathToRDFSFiles;
     private InputStream[] rdfsInputStreams;
     private String baseNamespace;
+    private final ProfileFamily family;
 
     public RDFSProfile(String name, String[] pathToRDFSFiles,InputStream[] rdfsInputStreams, String baseNamespace) {
+        this(name, pathToRDFSFiles, rdfsInputStreams, baseNamespace, ProfileFamily.CGMES);
+    }
+
+    public RDFSProfile(String name, String[] pathToRDFSFiles, InputStream[] rdfsInputStreams, String baseNamespace, ProfileFamily family) {
         this.name = name;
         this.pathToRDFSFiles = pathToRDFSFiles;
         this.baseNamespace = baseNamespace;
         this.rdfsInputStreams = rdfsInputStreams;
+        this.family = family;
     }
 
     public String getBaseNamespace() {
@@ -28,6 +34,14 @@ public class RDFSProfile {
     }
 
     public InputStream[] getRdfsInputStreams(){return rdfsInputStreams;}
+
+    public ProfileFamily getFamily() {
+        return family;
+    }
+
+    public boolean isNcp() {
+        return family == ProfileFamily.NCP;
+    }
 
     public void setPathToRDFSFiles(String[] pathToRDFSFiles) {
         this.pathToRDFSFiles = pathToRDFSFiles;

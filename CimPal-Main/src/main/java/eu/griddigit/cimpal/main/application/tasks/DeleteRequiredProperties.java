@@ -127,4 +127,9 @@ public class DeleteRequiredProperties implements ITask {
     public void setSaveResult(boolean saveResult) {
         this.saveResult = saveResult;
     }
+
+    @Override
+    public boolean supportsNcp() {
+        return true;
+    }
 }

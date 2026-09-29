@@ -428,4 +428,9 @@ public class MultiplyAndConnect implements ITask {
     public boolean getSaveResult() {
         return this.saveResult;
     }
+
+    @Override
+    public String getNcpUnsupportedReason() {
+        return "Joins the copies of a CGMES grid model with new lines, terminals and connectivity nodes in its EQ and SSH.";
+    }
 }

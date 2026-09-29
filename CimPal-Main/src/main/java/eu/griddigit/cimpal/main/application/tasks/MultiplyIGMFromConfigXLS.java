@@ -359,5 +359,10 @@ public class MultiplyIGMFromConfigXLS implements ITask {
     public boolean getSaveResult() {
         return this.saveResult;
     }
+
+    @Override
+    public String getNcpUnsupportedReason() {
+        return "Builds CGMES IGMs - EQ, SSH, TP and SV files under md:FullModel headers - from the configuration file.";
+    }
 }
 

@@ -7,10 +7,18 @@ import org.topbraid.shacl.vocabulary.SH;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class ConstraintsFactory {
+
+    // Property shapes already reported as skipped. The same shape is examined once for every
+    // property of every class it targets - the Network Code Profiles' sh:alternativePath
+    // cardinality shapes came up 362 times over one set of SHACL files - so it is reported once per
+    // load of the constraints instead.
+    private static final Set<String> reportedShapes = new HashSet<>();
 
     //Check if property has a constraint - shacl shape
     public static Map<String,Map> hasConstraintCheck(Model shaclModel, String classFullURI, Property property) {
@@ -88,13 +96,35 @@ public class ConstraintsFactory {
                     inversePathValue.add(model.getRequiredProperty(stmt.getObject().asResource(), SH.inversePath).getObject());
                     result.put("inversePath", inversePathValue);
                 }else{
-                    GuiHelper.appendTextToOutputWindow(WizardContext.getExecutionTextArea(),"[Error] Please check: Not supported complex sh:path, which is not sh:inversePath found on the PropertyShape: "+model.getNsURIPrefix(stmt.getObject().asResource().getNameSpace())+":"+stmt.getObject().asResource().getLocalName(),true);
+                    reportSkippedShape(model, stmt.getSubject());
                 }
             }else{
-                GuiHelper.appendTextToOutputWindow(WizardContext.getExecutionTextArea(),"[Error] Please check:Not supported complex sh:path found on the PropertyShape: "+model.getNsURIPrefix(stmt.getObject().asResource().getNameSpace())+":"+stmt.getObject().asResource().getLocalName(),true);
+                reportSkippedShape(model, stmt.getSubject());
             }
         }
         return result;
+    }
+
+    // A property shape whose sh:path is neither a direct path, a sequence nor a plain inverse path -
+    // an sh:alternativePath, say - is left out, and the user told so once.
+    private static void reportSkippedShape(Model model, Resource shape) {
+        String name = shapeName(model, shape);
+        if (reportedShapes.add(name)) {
+            GuiHelper.appendTextToOutputWindow(WizardContext.getExecutionTextArea(), "[Warning] Not supported complex sh:path "
+                    + "(only direct, sequence and inverse paths are) on the PropertyShape " + name + " - the shape is not used.", true);
+        }
+    }
+
+    // Names the property shape a message is about. This used to name the path instead, which in
+    // the unsupported cases is a blank node: it has no namespace, so the message itself threw - on
+    // the sh:alternativePath cardinality shapes of the Network Code Profiles, for one - and the task
+    // failed where it was meant to report the shape and carry on without it.
+    private static String shapeName(Model model, Resource shape) {
+        if (shape.isURIResource()) {
+            return model.shortForm(shape.getURI());
+        }
+        Statement name = model.getProperty(shape, SH.name);
+        return name != null ? name.getObject().toString() : "(unnamed shape)";
     }
 
     //checks if the blank node is a list
@@ -389,6 +419,7 @@ public class ConstraintsFactory {
 
     public static Map<Property,Map> getConstraints(Model shaclModel, ArrayList<Object> profileData) {
 
+        reportedShapes.clear();
         Map<Property,Map> shaclConstraints = new HashMap<>();
         Property property = null;
         Map<String, Map> propertyConstraints = null;

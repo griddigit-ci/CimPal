@@ -42,14 +42,19 @@ public class RegenerateRDFIDAndMRID implements ITask {
             modelsMapForChangeIds.put(entry.getKey(), entry.getValue().getBaseInstanceModel());
         }
         var modifiedBaseInstanceModel = new HashMap<String, BaseInstanceModel>();
-        // Change the RDFIDs
-        Map<String, Model> modifiedInstanceDataMap = ModelManipulationFactory.regenerateRDFIDmodule(modelsMapForChangeIds, List.of(), new HashMap<>());
+        // Change the RDFIDs - except of the objects these files only refer to, which belong to a
+        // dataset that is not being regenerated with them.
+        Map<String, String> idMap = wizardContext.referencedIdsToKeep(instanceModel);
+        Map<String, Model> modifiedInstanceDataMap = ModelManipulationFactory.regenerateRDFIDmodule(modelsMapForChangeIds, List.of(), idMap);
 
-        // Update Instance model entries with mutated entries
+        // Update Instance model entries with mutated entries. The loaded file's metadata is carried
+        // over rather than re-derived from the name, which would lose an NCP dataset's profile, and
+        // the objects it wrote with rdf:about are followed to their new ids so they are written that
+        // way again.
         for (Map.Entry<String, Model> entry : modifiedInstanceDataMap.entrySet()) {
-            var newBaseInstanceModel = new BaseInstanceModel(entry.getKey());
-            newBaseInstanceModel.setBaseInstanceModel(modifiedInstanceDataMap.get(entry.getKey()));
-            modifiedBaseInstanceModel.put(entry.getKey(), newBaseInstanceModel);
+            BaseInstanceModel regenerated = new BaseInstanceModel(instanceModel.get(entry.getKey()), entry.getKey(), entry.getValue());
+            ModelManipulationFactory.remapWrittenForm(regenerated, idMap);
+            modifiedBaseInstanceModel.put(entry.getKey(), regenerated);
         }
         wizardContext.getDataGeneratorModel().setBaseInstanceModel(modifiedBaseInstanceModel);
 
@@ -92,6 +97,11 @@ public class RegenerateRDFIDAndMRID implements ITask {
     @Override
     public boolean getSaveResult() {
         return this.saveResult;
+    }
+
+    @Override
+    public boolean supportsNcp() {
+        return true;
     }
 }
 

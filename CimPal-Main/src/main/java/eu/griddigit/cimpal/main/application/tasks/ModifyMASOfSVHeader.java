@@ -109,5 +109,10 @@ public class ModifyMASOfSVHeader implements ITask {
     public boolean getSaveResult() {
         return this.saveResult;
     }
+
+    @Override
+    public String getNcpUnsupportedReason() {
+        return "Network Code Profile datasets have no SV profile, and their header names a publisher (dcterms:publisher) rather than a modelling authority set.";
+    }
 }
 

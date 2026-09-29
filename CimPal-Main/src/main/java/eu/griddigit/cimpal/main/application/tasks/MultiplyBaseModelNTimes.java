@@ -52,9 +52,16 @@ public class MultiplyBaseModelNTimes implements ITask {
         // clone: handing it the base models directly gave all the copies - and the base model
         // itself - one shared model carrying the last round's IDs.
         var originalModels = new HashMap<String, Model>();
+        var originalFiles = new HashMap<String, BaseInstanceModel>();
         for (Map.Entry<String, BaseInstanceModel> entry : instanceModel.entrySet()) {
             originalModels.put(entry.getKey(), entry.getValue().getBaseInstanceModel());
+            originalFiles.put(entry.getKey(), entry.getValue());
         }
+
+        // Objects the files only refer to keep their id in every copy: they belong to a dataset that
+        // is not being copied - for NCP, the grid model - so every copy still has to point at them.
+        // Worked out once, from the originals, since the copies land in the same map as they go.
+        Map<String, String> referencedIds = wizardContext.referencedIdsToKeep(originalFiles);
 
         // One timestamp per round, taken from a single instant and stepped a second at a time.
         // The file name pattern is only accurate to the second, so reading the clock inside the
@@ -80,14 +87,24 @@ public class MultiplyBaseModelNTimes implements ITask {
             }
 
             // Change the RDFIDs of this round's copy
-            Map<String, Model> modifiedInstanceDataMap = ModelManipulationFactory.regenerateRDFIDmodule(modelsMapForMultiply, List.of(), new HashMap<>());
+            Map<String, String> idMap = new HashMap<>(referencedIds);
+            Map<String, Model> modifiedInstanceDataMap = ModelManipulationFactory.regenerateRDFIDmodule(modelsMapForMultiply, List.of(), idMap);
 
             // Create new Base instance Model entries for the multiplied entries
             for (Map.Entry<String, Model> entry : modifiedInstanceDataMap.entrySet()) {
-                var nameArray = entry.getKey().split("_", 5);
-                var newBaseInstanceModel = new BaseInstanceModel(timestamp, nameArray[1], nameArray[2], nameArray[3], nameArray[4]);
-                newBaseInstanceModel.setBaseInstanceModel(entry.getValue());
-                instanceModel.put(newBaseInstanceModel.getFileName(), newBaseInstanceModel);
+                BaseInstanceModel original = originalFiles.get(entry.getKey());
+                BaseInstanceModel copy = original.hasCgmesFileName()
+                        // A CGMES name carries a timestamp of its own; the copy gets this round's.
+                        ? new BaseInstanceModel(timestamp, original.getProcess(), original.getTso(), original.getProfile(), original.getVersion())
+                        // Any other name - NCP datasets are named freely - gets the timestamp appended.
+                        : new BaseInstanceModel(original, withSuffix(entry.getKey(), timestamp), null);
+                // The profile stays the original's, which for NCP was read from the content, and the
+                // copy is written in the form the original was, under its own ids.
+                copy.setProfile(original.getProfile());
+                copy.setWrittenForm(original.getAboutSubjects(), original.getIdSubjects());
+                ModelManipulationFactory.remapWrittenForm(copy, idMap);
+                copy.setBaseInstanceModel(entry.getValue());
+                instanceModel.put(copy.getFileName(), copy);
             }
 
             int progress = 10 + (int) ((double) (i + 1) / copiesToMake * 80);
@@ -144,5 +161,16 @@ public class MultiplyBaseModelNTimes implements ITask {
     @Override
     public boolean getSaveResult() {
         return this.saveResult;
+    }
+
+    @Override
+    public boolean supportsNcp() {
+        return true;
+    }
+
+    // Belgovia_CO.xml -> Belgovia_CO_20260928T120000Z.xml
+    private static String withSuffix(String fileName, String suffix) {
+        int dot = fileName.lastIndexOf('.');
+        return dot < 0 ? fileName + "_" + suffix : fileName.substring(0, dot) + "_" + suffix + fileName.substring(dot);
     }
 }

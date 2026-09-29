@@ -5,6 +5,7 @@ import eu.griddigit.cimpal.main.application.tasks.GenerateInstanceDataModel;
 import eu.griddigit.cimpal.main.application.tasks.ITask;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.main.application.datagenerator.DataGeneratorModel;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.RDFSProfile;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.SupportedRDFSProfiles;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.application.Platform;
@@ -25,6 +26,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,13 +108,12 @@ public class TaskSelectionController implements Initializable, IController {
                 // Unavailable tasks are greyed out in the list, but keyboard navigation still
                 // reaches them, so refuse them here too rather than letting a run start and fail
                 // part way through, after earlier tasks have already written files.
-                if (task == null || !task.isAvailable()) {
+                String refusal = task == null ? "This task is not registered." : whyNotSelectable(task);
+                if (refusal != null) {
                     Alert a = new Alert(Alert.AlertType.INFORMATION);
                     a.setTitle("Task not available");
                     a.setHeaderText(newValue);
-                    a.setContentText(task == null
-                            ? "This task is not registered."
-                            : task.getUnavailableReason());
+                    a.setContentText(refusal);
                     a.show();
                     Platform.runLater(() -> tasksForSelection.getSelectionModel().clearSelection());
                     return;
@@ -155,11 +156,14 @@ public class TaskSelectionController implements Initializable, IController {
                 rdfsProfileBaseNamespaceTextField.setDisable(true);
             }
             context.getDataGeneratorModel().setRdfsProfileVersion(supportedRDFSProfiles.getRDFSProfileFromName(selectedRDFSProfileVersion));
+            // Which tasks can be picked depends on the family of the profile version.
+            tasksForSelection.refresh();
         });
 
-        // Set change listener for Base namespace for the Other usage
+        // Set change listener for Base namespace for the Other usage. It compared against "Other",
+        // which is not the entry's name, so a namespace typed here was never applied.
         rdfsProfileBaseNamespaceTextField.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (context.getDataGeneratorModel().getRdfsProfileVersion() != null && context.getDataGeneratorModel().getRdfsProfileVersion().getName().equals("Other")) {
+            if (context.getDataGeneratorModel().getRdfsProfileVersion() != null && context.getDataGeneratorModel().getRdfsProfileVersion().getName().equals(SupportedRDFSProfiles.OTHER_CIM_VERSION)) {
                 context.getDataGeneratorModel().getRdfsProfileVersion().setBaseNamespace(newValue);
             }
         });
@@ -250,6 +254,21 @@ public class TaskSelectionController implements Initializable, IController {
             message = message + "Please select at least one task to execute! \n";
         }
 
+        // Tasks can be picked before the profile version, so one picked for CGMES may be left over
+        // after switching to NCP. It is named here rather than dropped from the list silently.
+        if (isNcpSelected()) {
+            String cgmesOnly = context.getSelectedTasks().stream()
+                    .map(SelectedTask::getTask)
+                    .filter(task -> !task.supportsNcp())
+                    .map(ITask::getName)
+                    .distinct()
+                    .collect(Collectors.joining(", "));
+            if (!cgmesOnly.isEmpty()) {
+                message = message + "These tasks work on CGMES grid models only - remove them, or pick a CGMES "
+                        + "profile version: " + cgmesOnly + " \n";
+            }
+        }
+
         if (!message.isEmpty()) {
             validInputs = false;
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -260,6 +279,25 @@ public class TaskSelectionController implements Initializable, IController {
         }
 
         return validInputs;
+    }
+
+    private boolean isNcpSelected() {
+        RDFSProfile profile = context.getDataGeneratorModel().getRdfsProfileVersion();
+        return profile != null && profile.isNcp();
+    }
+
+    /**
+     * Why the task cannot be added under the current profile version, or null when it can: it is
+     * not finished, or it works on CGMES models only and a Network Code Profile version is picked.
+     */
+    private String whyNotSelectable(ITask task) {
+        if (!task.isAvailable()) {
+            return task.getUnavailableReason();
+        }
+        if (isNcpSelected() && !task.supportsNcp()) {
+            return task.getNcpUnsupportedReason();
+        }
+        return null;
     }
 
     /**
@@ -281,11 +319,15 @@ public class TaskSelectionController implements Initializable, IController {
             }
 
             ITask task = context.getTaskElements().get(taskName);
-            boolean available = task == null || task.isAvailable();
+            String refusal = task == null ? null : whyNotSelectable(task);
 
-            setText(available ? taskName : taskName + "  (not available)");
-            setDisable(!available);
-            setTooltip(available ? null : new Tooltip(task.getUnavailableReason()));
+            if (refusal == null) {
+                setText(taskName);
+            } else {
+                setText(taskName + (task.isAvailable() ? "  (CGMES only)" : "  (not available)"));
+            }
+            setDisable(refusal != null);
+            setTooltip(refusal == null ? null : new Tooltip(refusal));
         }
     }
 }

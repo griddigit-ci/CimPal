@@ -12,9 +12,11 @@ import javafx.collections.ObservableList;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.ResIterator;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
+import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.SysRIOT;
 import org.apache.jena.sparql.util.Context;
@@ -453,6 +455,15 @@ public class WizardContext {
                     properties.put("showXmlBaseDeclaration", showXmlBaseDeclaration);
                     if (useAboutRules) {
                         properties.put("aboutRules", rdfAboutList);
+                        // Objects are written in the form the file was read in, whatever the rules
+                        // say about their class; the rules decide only for objects a task added. The
+                        // rules alone rewrote references as definitions - the abstract cim:Equipment
+                        // of a CGMES SSH, grid equipment a Network Code dataset refers to in the
+                        // CGMES namespace - and the one Terminal an SSH defines as a reference.
+                        Set<Resource> aboutSubjects = entry.getValue().getAboutSubjects();
+                        Set<Resource> idSubjects = entry.getValue().getIdSubjects();
+                        properties.put("aboutResources", aboutSubjects == null ? Set.of() : aboutSubjects);
+                        properties.put("idResources", idSubjects == null ? Set.of() : idSubjects);
                     }
 
                     if (useEnumRules) {
@@ -571,6 +582,52 @@ public class WizardContext {
         } catch (IOException e) {
             LOG.error("Unhandled exception", e);
         }
+    }
+
+    /**
+     * Identity entries - in the form {@code regenerateRDFIDmodule} takes them - for the objects the
+     * given files only refer to, so that regenerating ids leaves those alone.
+     * <p>
+     * A file writes an object with rdf:about when another dataset describes it: an SSH its EQ's
+     * breakers, a Network Code dataset the grid model's generating units and lines. Such an object
+     * can only take a new id together with the file that describes it; given one on its own, the
+     * reference points at an id nothing defines any more. Regenerating an NCP set is the usual
+     * case, since it goes without the grid model it refers to, but a CGMES SSH regenerated without
+     * its EQ was broken the same way.
+     * <p>
+     * Which objects a file refers to is read off the form it was written in. The serialisation
+     * rules by class are only the fallback, for files that were not RDF/XML: real data does not
+     * keep to them - a Network Code dataset refers to the grid's lines in the CGMES namespace,
+     * which no NCP rule names.
+     */
+    public Map<String, String> referencedIdsToKeep(Map<String, BaseInstanceModel> files) {
+        String xmlBase = dataGeneratorModel.getRdfsProfileVersion().getBaseNamespace();
+        Set<String> described = new HashSet<>();
+        Set<String> referenced = new HashSet<>();
+        for (BaseInstanceModel file : files.values()) {
+            Set<Resource> aboutSubjects = file.getAboutSubjects();
+            Set<Resource> aboutClasses = aboutSubjects == null ? aboutRulesFor(xmlBase, file.getProfile()) : Set.of();
+            for (Statement type : file.getBaseInstanceModel().listStatements(null, RDF.type, (RDFNode) null).toList()) {
+                Resource subject = type.getSubject();
+                if (!subject.isURIResource()) {
+                    continue;
+                }
+                boolean reference = aboutSubjects != null
+                        // rdf:about with a URN is how an object identified by URN is defined - an
+                        // NCP dataset header, for one - so only the other forms refer.
+                        ? aboutSubjects.contains(subject) && !subject.getURI().startsWith("urn:uuid:")
+                        : aboutClasses.contains(type.getObject());
+                String id = eu.griddigit.cimpal.main.application.datagenerator.ModelManipulationFactory.idKey(subject);
+                (reference ? referenced : described).add(id);
+            }
+        }
+        referenced.removeAll(described);
+
+        Map<String, String> keep = new HashMap<>();
+        for (String id : referenced) {
+            keep.put(id, id);
+        }
+        return keep;
     }
 
     /**

@@ -2,6 +2,7 @@ package eu.griddigit.cimpal.main.application.tasks;
 
 import eu.griddigit.cimpal.main.application.services.TaskStateUpdater;
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.GuiHelper;
 import eu.griddigit.cimpal.main.application.datagenerator.InstanceDataFactory;
 import eu.griddigit.cimpal.main.application.datagenerator.ModelManipulationFactory;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
@@ -51,7 +52,15 @@ public class MakeNonConformDatatypes implements ITask {
 
             if (!entry.getKey().contains("unionModel") && !entry.getKey().contains("modelUnionWithoutHeader")){
                 Model model = entry.getValue().getBaseInstanceModel();
-                ArrayList<Object> profileData = profileDataMap.get(entry.getKey());
+                // Keyed by profile keyword, as every profile lookup is. It used to be looked up by
+                // file name, which is never a key, so the task failed on its first file.
+                ArrayList<Object> profileData = profileDataMap.get(entry.getValue().getProfile());
+                if (profileData == null) {
+                    GuiHelper.appendTextToOutputWindow(WizardContext.getExecutionTextArea(), "Model part " + entry.getKey()
+                            + " left as it is: its profile (" + entry.getValue().getProfile()
+                            + ") is not among the selected RDFS files.", true);
+                    continue;
+                }
 
                 //get info if it is association or attribure, enum
                 Map<String,String> propertyMap = new HashMap<>(); //class&property URI, attribute, association
@@ -210,5 +219,10 @@ public class MakeNonConformDatatypes implements ITask {
     @Override
     public boolean getSaveResult() {
         return this.saveResult;
+    }
+
+    @Override
+    public boolean supportsNcp() {
+        return true;
     }
 }

@@ -663,6 +663,10 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
             return result;
         } else if (propName.equalsIgnoreCase("aboutRules")) {
             return setAboutRules((Set<Resource>) propValue);
+        } else if (propName.equalsIgnoreCase("aboutResources")) {
+            return setAboutResources((Set<Resource>) propValue);
+        } else if (propName.equalsIgnoreCase("idResources")) {
+            return setIdResources((Set<Resource>) propValue);
         } else if (propName.equalsIgnoreCase("enumRules")) {
             return setEnumRules((Set<Resource>) propValue);
         } else {
@@ -774,6 +778,16 @@ public abstract class CustomBaseXMLWriter implements RDFXMLWriterI {
 
     Set<Resource> setAboutRules(Set<Resource> aboutRules) {
         logger.warn("aboutRules is not a property on the Basic RDF/XML writer.");
+        return null;
+    }
+
+    Set<Resource> setAboutResources(Set<Resource> aboutResources) {
+        logger.warn("aboutResources is not a property on the Basic RDF/XML writer.");
+        return null;
+    }
+
+    Set<Resource> setIdResources(Set<Resource> idResources) {
+        logger.warn("idResources is not a property on the Basic RDF/XML writer.");
         return null;
     }
 

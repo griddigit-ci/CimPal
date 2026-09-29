@@ -26,6 +26,12 @@ public class CustomBasic extends CustomBaseXMLWriter {
     protected Set<Resource> performedPleasingObjects = new HashSet<>();
     protected Set<Resource> aboutRules = new HashSet<>();
     protected boolean useAboutRules = false;
+    // Individual resources written with rdf:about, and with rdf:ID, whatever aboutRules says about
+    // their class. They let a writer keep the form a file was read in: the same class can be a
+    // reference in one place and a definition in another - a CGMES SSH has both kinds of Terminal -
+    // which a rule by class cannot say. aboutRules still decides for resources in neither set.
+    protected Set<Resource> aboutResources = new HashSet<>();
+    protected Set<Resource> idResources = new HashSet<>();
     //protected boolean instanceData = false;
     //protected  boolean sortRDF;
 
@@ -51,6 +57,20 @@ public class CustomBasic extends CustomBaseXMLWriter {
             useAboutRules = false;
         }
 
+        return result;
+    }
+
+    @Override
+    Set<Resource> setAboutResources(Set<Resource> aboutResources) {
+        Set<Resource> result = this.aboutResources;
+        this.aboutResources = aboutResources == null ? new HashSet<>() : aboutResources;
+        return result;
+    }
+
+    @Override
+    Set<Resource> setIdResources(Set<Resource> idResources) {
+        Set<Resource> result = this.idResources;
+        this.idResources = idResources == null ? new HashSet<>() : idResources;
         return result;
     }
 
@@ -306,7 +326,8 @@ public class CustomBasic extends CustomBaseXMLWriter {
             String placeholder;
             String url;
             if (type != null) {
-                isAbout = aboutRules.contains(type.getObject());
+                isAbout = aboutResources.contains(r)
+                        || (aboutRules.contains(type.getObject()) && !idResources.contains(r));
                 placeholder = isAbout ? "about" : "ID";
                 url = relativize(r.getURI());
             } else {
