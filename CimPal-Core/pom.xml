@@ -88,6 +88,13 @@
                             <includes>
                                 <include>eu/griddigit/cimpal/core/testsupport/**</include>
                             </includes>
+                            <!-- Without this the jar's derived module name would be CimPal.Core, the
+                                 same as the production module, and module-path compilers ignore it. -->
+                            <archive>
+                                <manifestEntries>
+                                    <Automatic-Module-Name>CimPal.Core.testsupport</Automatic-Module-Name>
+                                </manifestEntries>
+                            </archive>
                         </configuration>
                     </execution>
                 </executions>
