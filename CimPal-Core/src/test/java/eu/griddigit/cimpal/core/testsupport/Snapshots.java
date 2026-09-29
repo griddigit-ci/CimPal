@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.core.testsupport;
 
+import org.apache.jena.rdf.model.Literal;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
@@ -105,6 +106,29 @@ public final class Snapshots {
         if (!expected.isIsomorphicWith(actual)) {
             throw new AssertionError("Graphs are not isomorphic\n" + graphDiff(expected, actual));
         }
+    }
+
+    /**
+     * Returns a copy of {@code model} in which the lexical form of every literal object has passed
+     * through the normalizers (datatype and language tag kept). Use it before
+     * {@link #assertIsomorphic(String, Model)} when a report carries volatile values as literals.
+     */
+    public static Model normalizeLiterals(Model model, Normalizer... normalizers) {
+        Normalizer normalizer = Normalizer.chain(normalizers);
+        Model copy = ModelFactory.createDefaultModel().setNsPrefixes(model.getNsPrefixMap());
+        for (Statement statement : model.listStatements().toList()) {
+            if (statement.getObject().isLiteral()) {
+                Literal literal = statement.getLiteral();
+                String lexical = normalizer.apply(literal.getLexicalForm());
+                Literal normalized = literal.getLanguage().isEmpty()
+                        ? copy.createTypedLiteral(lexical, literal.getDatatype())
+                        : copy.createLiteral(lexical, literal.getLanguage());
+                copy.add(statement.getSubject(), statement.getPredicate(), normalized);
+            } else {
+                copy.add(statement);
+            }
+        }
+        return copy;
     }
 
     // ---- Excel ----

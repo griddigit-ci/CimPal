@@ -72,6 +72,16 @@ public interface Normalizer {
         return value -> pattern.matcher(value).replaceAll("<PATH>");
     }
 
+    /**
+     * Jena blank-node labels (32 lowercase hex digits) become {@code <BNODE>}. Reports write the
+     * label of an anonymous shape as a plain string (e.g. {@code sh:sourceShape}), which changes on
+     * every run and so can't be matched by graph isomorphism.
+     */
+    static Normalizer blankNodeLabels() {
+        Pattern label = Pattern.compile("\\b[0-9a-f]{32}\\b");
+        return value -> label.matcher(value).replaceAll("<BNODE>");
+    }
+
     static Normalizer regex(String regex, String replacement) {
         Pattern pattern = Pattern.compile(regex);
         return value -> pattern.matcher(value).replaceAll(replacement);

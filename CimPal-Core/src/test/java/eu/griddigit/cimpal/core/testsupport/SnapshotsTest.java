@@ -6,9 +6,12 @@
 package eu.griddigit.cimpal.core.testsupport;
 
 import org.apache.jena.rdf.model.Model;
+import org.apache.jena.riot.Lang;
+import org.apache.jena.riot.RDFParser;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,9 +27,21 @@ class SnapshotsTest {
     @TempDir
     Path tempDir;
 
+    /** The run's own -Dsnapshot.update value, restored after each test so other classes still see it. */
+    private String runUpdateMode;
+
+    @BeforeEach
+    void startInNormalMode() {
+        runUpdateMode = System.clearProperty(Snapshots.UPDATE_PROPERTY);
+    }
+
     @AfterEach
-    void leaveUpdateModeOff() {
-        System.clearProperty(Snapshots.UPDATE_PROPERTY);
+    void restoreRunUpdateMode() {
+        if (runUpdateMode == null) {
+            System.clearProperty(Snapshots.UPDATE_PROPERTY);
+        } else {
+            System.setProperty(Snapshots.UPDATE_PROPERTY, runUpdateMode);
+        }
     }
 
     @Test
@@ -108,5 +123,21 @@ class SnapshotsTest {
         String flat = Snapshots.flattenWorkbook(xlsx, Normalizer.timestamps());
 
         assertThat(flat).isEqualTo("## Summary\nCreated,<TIMESTAMP>\n\"a,b\",3\n");
+    }
+
+    @Test
+    void literalsAreNormalizedSoRunSpecificBlankNodeLabelsStillMatch() {
+        String turtle = """
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                [] sh:sourceShape "%s" ; sh:resultMessage "kept"@en ; sh:focusNode <urn:x> .
+                """;
+        Model first = RDFParser.fromString(turtle.formatted("40e334d5bede7e358912c392307b6855"), Lang.TURTLE).toModel();
+        Model second = RDFParser.fromString(turtle.formatted("99d51991b491463347e07ac1bb6f16e9"), Lang.TURTLE).toModel();
+
+        assertThat(first.isIsomorphicWith(second)).isFalse();
+        Snapshots.assertIsomorphic(Snapshots.normalizeLiterals(first, Normalizer.blankNodeLabels()),
+                Snapshots.normalizeLiterals(second, Normalizer.blankNodeLabels()));
+        assertThat(Snapshots.normalizeLiterals(first, Normalizer.blankNodeLabels())
+                .contains(null, null, first.createLiteral("kept", "en"))).isTrue();
     }
 }
