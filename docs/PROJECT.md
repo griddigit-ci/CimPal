@@ -203,7 +203,7 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - CI adds a coverage table per module to the job summary, and the Ubuntu leg uploads the
   `coverage-report` artifact.
 
-**Next steps:** open the TEST-1 PR and check both CI legs, then SEC-1 and SEC-2, following the
+**Next steps:** merge TEST-1 ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) once both CI legs are green, then SEC-1 and SEC-2, following the
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action.
 

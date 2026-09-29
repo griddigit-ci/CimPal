@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (implementation done 2026-09-29; push, PR and CI check pending) |
+| Status | In review ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
 | Phase | 1 |
 | Depends on | CI-1 |
 | Size | M |
@@ -74,6 +74,7 @@ Standard footer (applies to every work package):
 | 2026-09-29 | Snapshot normalisation adds `Normalizer.blankNodeLabels()` and `Snapshots.normalizeLiterals(...)`. The report writes the anonymous property shape's blank-node label as a string (`sh:sourceShape`, the workbook `Source` column), which changes on every run. | Claude Code |
 | 2026-09-29 | The timestamped `MappingValidatorTest` pins all 4 workbooks the run writes (per-timestamp report, group summary, overall summary, comparison), not one. The old test only asserted "not empty". | Claude Code |
 | 2026-09-29 | `SnapshotsTest` restores the run's `snapshot.update` value after each test instead of clearing it. Clearing it silently turned later classes in the same update run back into compare mode. | Claude Code |
+| 2026-09-29 | Stopped tracking `.idea/compiler.xml`, `encodings.xml`, `jarRepositories.xml` and `vcs.xml` with `git rm --cached`. `.idea/` was already in `.gitignore`, but these four files were committed before the rule existed, so every Maven re-import showed as a change. IntelliJ regenerates them from the poms. | Maintainer |
 
 ## Notes and results
 
@@ -97,10 +98,10 @@ The aggregate report is at `CimPal-Coverage/target/site/jacoco-aggregate/index.h
 - **Update script.** With a floor set above the measured value, `Update-CoverageBaseline.ps1` kept the higher floor and printed a warning.
 - **Snapshots.** They were generated twice with `-Dsnapshot.update=true` and the two sets were identical. When one line in `mapping-run__workbook.csv` was changed, the test failed with a `-6:`/`+6:` line diff and the rerun hint. The file was then restored.
 
-**Commits:** `f39e4f4` (merge `devel`), `72b58a8` (JaCoCo, ratchet, script, CI), `676cc20` (MappingValidatorTest and snapshot helpers), plus the docs commit.
+**Commits:** `f39e4f4` (merge `devel`), `72b58a8` (JaCoCo, ratchet, script, CI), `676cc20` (MappingValidatorTest and snapshot helpers), `4a1fd05` (docs), `8da826d` (untrack `.idea`), plus the end-of-session docs commit. [PR #43](https://github.com/griddigit-ci/CimPal/pull/43) into `devel` was opened on 2026-09-29.
 
 **Observed, not changed (no production changes in TEST-1):** in the timestamped run, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`, so the report's timestamp is 00:30 rather than 00:00. The snapshot pins the current behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
 
 **Left open:**
-1. Push `feature/test-1-harness`, open a PR into `devel`, and confirm both CI legs are green. Check that Ubuntu coverage is within 0.5 pp of the Windows floors. Main's JavaFX test runs under Xvfb there, which may shift Main's numbers.
-2. After merge, set the README status to Done.
+1. PR #43: both CI legs passed on 2026-09-29 (windows-latest, ubuntu-latest), including the coverage ratchet on Ubuntu, so Ubuntu coverage is above the Windows floors. What's left is review and merge.
+2. After merge, set the status to Done here and in `docs/plans/README.md`.
