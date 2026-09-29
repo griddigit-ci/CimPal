@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 # CimPal
 
 ## Dependencies
@@ -5,7 +10,7 @@
 See [Dependencies](dependencies.md) for the full list of project dependencies.
 
 ## General
-CimPal is an open source Java application published by gridDigIt and Licensed under the [EUPL-1.2](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12)-or-later.
+CimPal is an open-source Java application published by gridDigIt and licensed under the [EUPL-1.2-or-later](https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
 The application is based on Apache Jena (Apache License v2.0), TopBraid SHACL API (Apache License v2.0), and JAVAFX (GPLv2+CE license).
 
 CimPal helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM.
@@ -25,4 +30,4 @@ gridDigIt aims at providing support and further enhancement of the CimPal. Pleas
 Web site: https://cimpal.app/ \
 Support email: cimpal@griddigit.eu 
 
-Copyright 2023, [gridDigIt Kft](https://griddigit.eu). All rights reserved.
+Copyright (c) 2020-2026 [gridDigIt Kft](https://griddigit.eu).

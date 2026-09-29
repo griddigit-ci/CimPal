@@ -1,0 +1,38 @@
+{
+  "_comment": "Template: RDF format conversion (single file or multi-file union).",
+  "_how_to_use": "Copy to your working directory. Fill in the paths. Run: java -jar CimPal-CLI.jar convert --config this-file.json",
+  "_when_to_use": "Use to convert between RDF/XML (.rdf/.xml), Turtle (.ttl), and JSON-LD (.jsonld). Supports merging multiple input files into one output graph (modelUnion mode).",
+
+  "_input_note": "Use 'input' for a single source file, OR 'inputFiles' for multiple files to union. Not both.",
+  "input": "REPLACE_WITH_PATH/source.rdf",
+
+  "_inputFiles_example": [
+    "REPLACE_WITH_PATH/EQ.rdf",
+    "REPLACE_WITH_PATH/TP.rdf",
+    "REPLACE_WITH_PATH/SV.rdf"
+  ],
+
+  "output": "REPLACE_WITH_PATH/output.ttl",
+  "_note_output": "Extension determines the default target format: .ttl → Turtle, .jsonld → JSON-LD, .rdf/.xml → RDF/XML. Override with 'targetFormat'.",
+
+  "sourceFormat": "",
+  "_note_sourceFormat": "RDFXML, TURTLE, or JSONLD. Leave empty for auto-detection from input extension.",
+
+  "targetFormat": "",
+  "_note_targetFormat": "RDFXML, TURTLE, or JSONLD. Leave empty for auto-detection from output extension.",
+
+  "xmlBase": "",
+  "_note_xmlBase": "Base URI used when reading/writing RDF/XML. Empty string is the default. For CGMES profiles use 'http://iec.ch/TC57/CIM100'.",
+
+  "rdfFormat": "RDFXML_PLAIN",
+  "_note_rdfFormat": "RDF/XML sub-format: RDFXML_PLAIN (default), RDFXML_ABBREV, RDFXML_PRETTY, CIMXML (CIM-optimised plain/pretty), RDFS_CIMXML (CIM-optimised plain). Only applies when target format is RDF/XML.",
+
+  "sort": false,
+  "_note_sort": "Sort triples in the output.",
+
+  "sortByPrefix": false,
+  "_note_sortByPrefix": "Sort by namespace prefix. Only meaningful when 'sort' is true.",
+
+  "stripPrefixes": false,
+  "_note_stripPrefixes": "Remove namespace prefix declarations from the output."
+}

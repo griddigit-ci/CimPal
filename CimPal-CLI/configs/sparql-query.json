@@ -1,0 +1,29 @@
+{
+  "_comment": "Template: SPARQL SELECT query against one or more RDF model files.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar sparql --config this-file.json",
+  "_when_to_use": "Use this to inspect model data directly — list instances of a class, check property values, count triples by type, or debug why a SHACL constraint did or did not fire.",
+
+  "models": [
+    "REPLACE_WITH_PATH/model.xml"
+  ],
+  "_note_models": "One or more model files to load. All are merged into a single RDF graph before the query runs, so you can query across multiple instance files at once. Accepts .xml, .rdf, .ttl, or .zip containing RDF/XML. Example: ['C:/Data/EQ.xml', 'C:/Data/TP.xml', 'C:/Data/SV.xml'] — loads all three and queries them as one combined graph.",
+
+  "query": "REPLACE_WITH_PATH/query.sparql",
+  "_note_query": "Either: a path to a .sparql or .rq file containing the SPARQL SELECT query (recommended — keeps the query version-controlled). Or: an inline SPARQL string like 'SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 20'. The CLI checks if the value is a file path first; if the file exists, it reads it; otherwise it treats the value as an inline query.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for parsing the model files. Must match the namespace in the XML. Same values as the validate command: http://iec.ch/TC57/CIM100 for CIM17, http://iec.ch/TC57/2013/CIM-schema-cim16 for CIM16.",
+
+  "output": "REPLACE_WITH_PATH/results.xlsx",
+  "_note_output": "Where to write the query results. Use .xlsx extension for an Excel workbook (one sheet, header row 1). Any other extension writes a CSV file. If omitted, results are printed to stdout in the format specified by the 'format' field below. Inline: use --output flag to set the output file.",
+
+  "_note_format_option": "The 'format' field is not in this config because output is set above, but you can add it. Valid values: 'text' (pipe-separated table to stdout), 'json' (JSON object to stdout), 'csv' (CSV to stdout). Only applies when 'output' is not set.",
+
+  "_example_useful_queries": {
+    "list_all_classes": "SELECT DISTINCT ?type (COUNT(?s) AS ?count) WHERE { ?s a ?type } GROUP BY ?type ORDER BY DESC(?count)",
+    "count_triples": "SELECT (COUNT(*) AS ?total) WHERE { ?s ?p ?o }",
+    "find_by_class": "SELECT ?s ?name WHERE { ?s a cim:ACLineSegment . OPTIONAL { ?s cim:IdentifiedObject.name ?name } } LIMIT 100",
+    "check_property_values": "SELECT ?s ?value WHERE { ?s cim:VoltageLevel.highVoltageLimit ?value } LIMIT 50",
+    "find_missing_required": "SELECT ?s WHERE { ?s a cim:ACLineSegment . FILTER NOT EXISTS { ?s cim:ConductingEquipment.BaseVoltage ?bv } } LIMIT 20"
+  }
+}

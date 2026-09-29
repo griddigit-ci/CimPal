@@ -1,12 +1,8 @@
 /*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- *
- * Theme: Solarized Light
- * Solarized base3/base2 cream surfaces. Canonical body text (base00 #657b83) is only
- * ~3:1 here, so the foreground is darkened toward base01/base02 to clear WCAG AA.
+ * SPDX-License-Identifier: EUPL-1.2+
  */
-
 .root {
     /* --- Modena derivation roots --- */
     -fx-base:                         #eee8d5;   /* base2 */

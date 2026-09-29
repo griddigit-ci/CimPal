@@ -1,7 +1,7 @@
-/**
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
  * Licensed under the EUPL-1.2-or-later.
- * Copyright (c) 2020, gridDigIt Kft. All rights reserved.
- * @author Chavdar Ivanov
+ * SPDX-License-Identifier: EUPL-1.2+
  */
 module CimPal.Main {
     exports eu.griddigit.cimpal.main.application;

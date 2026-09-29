@@ -1,7 +1,13 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 package eu.griddigit.cimpal.main.application;
 
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
@@ -10,6 +16,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+// Needs a display (JavaFX toolkit); exclude on headless machines with -DexcludedGroups=gui.
+@Tag("gui")
 class MainGuiFxmlLoadTest {
     private static boolean toolkitStarted;
 

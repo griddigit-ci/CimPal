@@ -1,0 +1,53 @@
+{
+  "_comment": "Pipeline: Full profile validation — convert to canonical Turtle, then validate against constraints.",
+  "_how_to_use": "Fill in all REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar run pipeline-full-validation.json",
+
+  "name": "Full profile validation",
+  "description": "Convert CGMES model files to canonical Turtle, then validate against SHACL constraints.",
+
+  "stopOnError": true,
+  "_note_stopOnError": "true = pipeline aborts if any step fails (exit >= 2). Violations (exit 1) do not stop the pipeline unless stopOnViolations is also true.",
+
+  "stopOnViolations": false,
+  "_note_stopOnViolations": "false = pipeline continues even if violations are found. Set to true to treat violations as a hard failure.",
+
+  "steps": [
+    {
+      "id": "convert",
+      "name": "Convert to canonical Turtle",
+      "command": "convert",
+      "_note": "Converts the RDF/XML model to sorted Turtle so git diffs are meaningful.",
+      "input": "REPLACE_WITH_PATH/EQ.xml",
+      "_note_input": "Source file. Extension determines format: .xml/.rdf = RDF/XML, .ttl = Turtle.",
+      "output": "REPLACE_WITH_PATH/EQ.ttl",
+      "_note_output": "Output file. Use absolute path.",
+      "xmlBase": "http://iec.ch/TC57/CIM100",
+      "_note_xmlBase": "Must match the CGMES version. CGMES 3.0: http://iec.ch/TC57/CIM100. CGMES 2.4: http://iec.ch/TC57/2013/CIM-schema-cim16.",
+      "sort": true,
+      "stopOnError": true
+    },
+    {
+      "id": "validate",
+      "name": "Validate against SHACL constraints",
+      "command": "validate",
+      "_note": "Runs the mapping-based validation. Results go to the outputDir folder.",
+      "workflow": "mapping",
+      "mappingCsv": "REPLACE_WITH_PATH/mapping.csv",
+      "_note_mappingCsv": "CSV mapping file linking model sets to constraint .ttl files. Three columns: models | constraint.ttl | label.",
+      "modelsDir": "REPLACE_WITH_PATH/models",
+      "_note_modelsDir": "Folder containing model ZIP/XML archives.",
+      "constraintsRoot": "REPLACE_WITH_PATH/constraints",
+      "_note_constraintsRoot": "Root folder for .ttl constraint files. Constraint paths in the CSV are relative to this.",
+      "outputDir": "REPLACE_WITH_PATH/output",
+      "datatypeMap": "CGMES30NC25",
+      "_note_datatypeMap": "CGMES30NC25, CGMES30NC24, or CGMES24NC22.",
+      "xmlBase": "http://iec.ch/TC57/CIM100",
+      "engine": "APACHE_JENA",
+      "workers": 0,
+      "maxResultsPerConstraint": 0,
+      "format": "json",
+      "stopOnViolations": false,
+      "stopOnError": true
+    }
+  ]
+}

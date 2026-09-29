@@ -1,0 +1,47 @@
+{
+  "_comment": "Template: Generate SHACL shape files from RDFS CIM profile definitions.",
+  "_how_to_use": "Copy to your working directory. Fill in the paths. Run: java -jar CimPal-CLI.jar rdfs2shacl --config this-file.json",
+  "_when_to_use": "Use when you have CIM RDFS profile .rdf files (e.g. from the IEC or ENTSO-E) and want to generate SHACL constraints for validating instance data.",
+
+  "rdfsFiles": [
+    "REPLACE_WITH_PATH/EQ_RDFS.rdf",
+    "REPLACE_WITH_PATH/TP_RDFS.rdf"
+  ],
+  "_note_rdfsFiles": "List of RDFS profile .rdf files to convert. One SHACL .ttl file is produced per input profile in the output directory.",
+
+  "outputDir": "REPLACE_WITH_PATH/shacl-output",
+  "_note_outputDir": "Directory where the generated .ttl shape files are written. Created if it does not exist.",
+
+  "rdfsFormat": "2020",
+  "_note_rdfsFormat": "RDFS format version used by the profiles: '2019' or '2020' (default). CGMES 3.0 profiles use 2020.",
+
+  "cimsNamespace": "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#",
+  "_note_cimsNamespace": "Namespace URI for the CIMS extensions (multiplicity, datatype, stereotype). Use the default unless your profiles use a custom CIMS namespace.",
+
+  "ioPrefix": "mRID",
+  "_note_ioPrefix": "Local name of the IdentifiedObject mRID property in the profile. Default 'mRID' is correct for standard CIM/CGMES profiles.",
+
+  "ioUri": "http://iec.ch/TC57/CIM100#IdentifiedObject.mRID",
+  "_note_ioUri": "Full URI of the IdentifiedObject mRID property. Update if working with a non-standard CIM namespace (e.g. CIM16 uses cim16 namespace).",
+
+  "shapesBaseUri": "",
+  "_note_shapesBaseUri": "Base URI inserted in the header of the generated shape graphs. Leave empty to omit.",
+
+  "shapesNsPrefix": "",
+  "_note_shapesNsPrefix": "Prefix for the SHACL shapes namespace declaration (e.g. 'eqsh'). Leave empty to omit.",
+
+  "shapesNsUri": "",
+  "_note_shapesNsUri": "URI for the SHACL shapes namespace (e.g. 'http://example.org/shacl/EQ#'). Leave empty to omit.",
+
+  "closedShapes": false,
+  "_note_closedShapes": "Generate sh:closed shapes that reject unknown properties. Default false (open shapes).",
+
+  "splitDatatypes": false,
+  "_note_splitDatatypes": "Write datatype constraints to a separate 'datatype-<name>.ttl' file alongside the main shapes file.",
+
+  "exportInheritTree": false,
+  "_note_exportInheritTree": "Write an 'inheritance-<name>.ttl' file recording the class inheritance structure.",
+
+  "validateShapes": false,
+  "_note_validateShapes": "After generation, run SHACL-SHACL meta-validation on the generated shapes and print conformance results."
+}

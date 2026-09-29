@@ -1,0 +1,44 @@
+{
+  "_comment": "Pipeline: Profile migration check — compare old and new profile versions, then generate shapes from the new version.",
+  "_how_to_use": "Fill in REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar run pipeline-profile-migration.json",
+
+  "name": "Profile migration check",
+  "description": "Compare two RDFS profile versions to audit what changed, then generate fresh SHACL shapes from the new version.",
+
+  "stopOnError": true,
+  "stopOnViolations": false,
+
+  "steps": [
+    {
+      "id": "compare-profiles",
+      "name": "Compare profile versions",
+      "command": "compare",
+      "_note": "Produces a diff of classes, attributes, and associations between old and new profile. Exit 0 = identical, exit 1 = differences found. The pipeline continues in both cases.",
+      "fileA": "REPLACE_WITH_PATH/EQ-v2024.rdf",
+      "_note_fileA": "The reference (older) profile version.",
+      "fileB": "REPLACE_WITH_PATH/EQ-v2026.rdf",
+      "_note_fileB": "The updated (newer) profile version.",
+      "compareType": "rdfs",
+      "output": "REPLACE_WITH_PATH/migration/profile-diff.xlsx",
+      "_note_output": "Excel diff report. Review this before running the next step.",
+      "stopOnError": true,
+      "stopOnViolations": false
+    },
+    {
+      "id": "generate-shapes",
+      "name": "Generate SHACL shapes from new profile",
+      "command": "rdfs2shacl",
+      "_note": "Generates a fresh scaffold of SHACL shapes from the updated RDFS profile. Review and edit the output before using it in validation.",
+      "rdfsFiles": [
+        "REPLACE_WITH_PATH/EQ-v2026.rdf"
+      ],
+      "_note_rdfsFiles": "The new profile files to generate shapes from.",
+      "outputDir": "REPLACE_WITH_PATH/migration/generated-shapes",
+      "rdfsFormat": "2020",
+      "splitDatatypes": false,
+      "exportInheritTree": false,
+      "validateShapes": true,
+      "stopOnError": true
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "_comment": "Template: Full profile validation using the mapping workflow, CGMES 3.0 / NC 2.5.",
+  "_how_to_use": "Copy this file to your working directory. Replace every REPLACE_WITH_PATH value with a real path. Then run: java -jar CimPal-CLI.jar validate --config this-file.json",
+
+  "workflow": "mapping",
+  "_note_workflow": "Which validation mode to run. Options: 'mapping' (this one), 'timestamped' (see validate-timestamped.json), 'manual' (see validate-manual.json). The mapping workflow reads a CSV file that links model sets to their SHACL constraints.",
+
+  "mappingCsv": "REPLACE_WITH_PATH/mapping.csv",
+  "_note_mappingCsv": "The CSV mapping file. No header row. Three columns separated by | or comma: (1) model file names relative to modelsDir, or GitHub raw URLs; (2) path to the .ttl constraint file relative to constraintsRoot; (3) a label for the report. Example row: 'EQ.xml,TP.xml,SV.xml | QoCDC/Level2-IGM.ttl | IGM Level 2'",
+
+  "modelsDir": "REPLACE_WITH_PATH/models",
+  "_note_modelsDir": "Root folder containing the model ZIP or XML files. The mapping CSV column 1 paths are relative to this folder. Each .zip should contain the RDF/XML instance files for one validation run (e.g. EQ.xml, TP.xml, SV.xml).",
+
+  "constraintsRoot": "REPLACE_WITH_PATH/constraints",
+  "_note_constraintsRoot": "Root folder for all SHACL constraint .ttl files. Paths in column 2 of the mapping CSV are resolved relative to this folder. This is typically a checkout of the shapes repository (Coreso/QoCDC shapes, or your own).",
+
+  "outputDir": "REPLACE_WITH_PATH/output",
+  "_note_outputDir": "Where to write the Excel validation report and ZIP bundles. Created automatically if it does not exist. The Excel file is named validation_report__<timestamp>.xlsx. ZIPs are named after the mapping row label.",
+
+  "datatypeMap": "CGMES30NC25",
+  "_note_datatypeMap": "Which bundled datatype map to use when parsing the model files. Options: 'CGMES30NC25' (CIM17 / CGMES 3.0 / NC 2.5), 'CGMES30NC24' (CIM17 / CGMES 3.0 / NC 2.4), 'CGMES24NC22' (CIM16 / CGMES 2.4 / NC 2.2). Or: an absolute path to a custom .properties file. This is critical — without the right map, numeric and boolean constraints silently pass because literals are treated as plain strings.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for resolving relative URIs in the RDF/XML model files (rdf:about='#_uuid' style). For CGMES 3.0 / CIM17 this is http://iec.ch/TC57/CIM100. For CGMES 2.4 / CIM16 use http://iec.ch/TC57/2013/CIM-schema-cim16. A wrong base makes models load empty.",
+
+  "engine": "APACHE_JENA",
+  "_note_engine": "SHACL evaluation engine. Use 'APACHE_JENA' for all production runs — it is the validated engine for the QoCDC/Coreso shape sets. Other options (PYSHACL, PYSHACL_OXIGRAPH, RUST_SHACL) are experimental and require Python to be installed.",
+
+  "workers": 0,
+  "_note_workers": "Number of parallel validation workers. 0 = auto-sized from available heap (roughly heap_GB / 6, capped at 12). Each worker loads a full data graph. If you get out-of-memory errors, reduce this to 1 or 2. On CI machines with limited RAM, set to 1 explicitly.",
+
+  "maxResultsPerConstraint": 0,
+  "_note_maxResultsPerConstraint": "Maximum SHACL violations to collect per source shape per mapping row. 0 = collect all (use for official runs). 10 = collect up to 10 per shape (faster, marks as 'Partial' — use for quick checks). Values above 0 stop Jena early once the limit is reached.",
+
+  "exportTurtle": false,
+  "_note_exportTurtle": "If true, writes a .ttl SHACL validation report alongside the Excel report for each validated model. The .ttl files can be opened in the AI Assistant tab for explanation and repair proposals. Set to true if you plan to use the AI workflow."
+}

@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" fx:controller="eu.griddigit.cimpal.main.application.controllers.RDFSUnionController" minHeight="0.0" minWidth="0.0">

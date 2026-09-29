@@ -1,0 +1,25 @@
+{
+  "_comment": "Template: Generate SHACL constraints from Excel + RDFS profile.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar excel2shacl --config this-file.json",
+
+  "rdfsFile": "REPLACE_WITH_PATH/EQ.rdf",
+  "_note_rdfsFile": "RDFS profile .rdf file. Provides the class and property vocabulary that the Excel constraints reference. Use the augmented RDFS format exported by cimsyntaxgen.",
+
+  "excelFile": "REPLACE_WITH_PATH/constraints.xlsx",
+  "_note_excelFile": "Excel .xlsx file containing constraint definitions. Must have a data sheet at sheet index 0. May optionally have a 'Config' sheet for namespace declarations — if present, namespace columns from Config override the nsPrefix/nsUri/cimsNamespace/cimNamespace fields below.",
+
+  "output": "REPLACE_WITH_PATH/constraints.ttl",
+  "_note_output": "Where to write the generated SHACL Turtle (.ttl) file.",
+
+  "nsPrefix": "eu-nc",
+  "_note_nsPrefix": "Namespace prefix for generated shapes. Appears in sh:NodeShape URIs. Examples: 'eu-nc', 'cim17-eq-shapes', 'custom-constraints'.",
+
+  "nsUri": "https://cim.ucaiug.io/ns/nc#",
+  "_note_nsUri": "Namespace URI for generated shapes. Must end with # or /. Used as the base for sh:NodeShape and sh:PropertyShape URIs.",
+
+  "cimsNamespace": "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#",
+  "_note_cimsNamespace": "CIMS extensions namespace used to interpret RDFS metadata (multiplicities, stereotypes). Rarely needs changing from the default.",
+
+  "cimNamespace": "http://iec.ch/TC57/CIM100#",
+  "_note_cimNamespace": "CIM namespace. For CGMES 3.0/CIM17: http://iec.ch/TC57/CIM100#. For CGMES 2.4/CIM16: http://iec.ch/TC57/2013/CIM-schema-cim16#."
+}

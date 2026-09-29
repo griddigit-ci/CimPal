@@ -1,0 +1,20 @@
+{
+  "_comment": "Template: Generate CIM instance data from a CimPal Excel template.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar gen-instances --config this-file.json",
+  "_when_to_use": "Use this to generate synthetic CGMES instance data from a spreadsheet template. Useful for creating test fixtures for SHACL shape development.",
+
+  "templateXlsx": "REPLACE_WITH_PATH/my-network.xlsx",
+  "_note_templateXlsx": "CimPal Advanced template (.xlsx). Must have: a 'Config' sheet defining namespaces and class names, and one sheet per class (e.g. 'ACLineSegment', 'VoltageLevel'). Generate a blank template from an RDFS profile using the GUI's Generate Instance Data tab.",
+
+  "output": "REPLACE_WITH_PATH/EQ.xml",
+  "_note_output": "Where to write the generated RDF/XML file. Extension should be .xml. The filename stem becomes the model name embedded in the md:FullModel header.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for the generated model. Must match the CGMES version of the template. CGMES 3.0/CIM17: http://iec.ch/TC57/CIM100. CGMES 2.4/CIM16: http://iec.ch/TC57/2013/CIM-schema-cim16.",
+
+  "stripPrefixes": false,
+  "_note_stripPrefixes": "true removes unused namespace prefix declarations from the output. Produces smaller files; safe to use when the output will be parsed by CimPal or standard tools.",
+
+  "exportExtensions": false,
+  "_note_exportExtensions": "true includes columns marked IsExtension=Yes in the template. Leave false for standard CGMES output."
+}

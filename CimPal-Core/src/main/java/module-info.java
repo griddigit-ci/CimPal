@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2026 gridDigIt Kft.
+ * Licensed under the EUPL-1.2-or-later.
+ * SPDX-License-Identifier: EUPL-1.2+
+ */
 module CimPal.Core {
     exports eu.griddigit.cimpal.core.interfaces;
     exports eu.griddigit.cimpal.core.comparators;
@@ -22,4 +27,6 @@ module CimPal.Core {
     requires java.prefs;
     requires java.xml;
     requires java.net.http;
+    requires org.apache.commons.lang3;
+    requires commons.math3;
 }
