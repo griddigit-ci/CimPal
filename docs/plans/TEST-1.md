@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (handoff 2026-09-29, see Notes) |
+| Status | In progress (implementation done 2026-09-29; push, PR and CI check pending) |
 | Phase | 1 |
 | Depends on | CI-1 |
 | Size | M |
@@ -29,10 +29,10 @@ Shared test infrastructure so every later work package can write fast, network-f
 ## Acceptance criteria (status checklist)
 
 - [x] CLI and Main tests can use the Core test-support classes
-- [ ] `-Dsnapshot.update=true` rewrites golden files; otherwise mismatches fail with a readable diff
-- [ ] JaCoCo aggregate report produced by `mvn verify`; ratchet fails the build on a drop > 0.5 pp
-- [ ] MappingValidatorTest converted to the new helpers as the reference example
-- [ ] Baseline coverage per module recorded below
+- [x] `-Dsnapshot.update=true` rewrites golden files; otherwise mismatches fail with a readable diff
+- [x] JaCoCo aggregate report produced by `mvn verify`; ratchet fails the build on a drop > 0.5 pp
+- [x] MappingValidatorTest converted to the new helpers as the reference example
+- [x] Baseline coverage per module recorded below
 
 ## Instructions for Claude Code
 
@@ -69,40 +69,38 @@ Standard footer (applies to every work package):
 | 2026-09-25 | The ratchet floors live in a per-module `coverage-baseline.properties` (`coverage.line.min`, `coverage.branch.min`), not one root file. Maven can't interpolate per-module key names, and the per-module form keeps the parent config generic. | Claude Code |
 | 2026-09-25 | Dropped `Fixtures.copyAll`, because a directory can't be listed portably when the fixtures sit inside a jar. `Fixtures.copy` handles one file at a time. | Claude Code |
 | 2026-09-25 | Library versions: jacoco 0.8.15, assertj 3.27.7, json-schema-validator 3.0.7 (Jackson 3), properties-maven-plugin 1.3.1, maven-jar-plugin 3.4.2. JUnit stays on 5.13.1. | Claude Code |
+| 2026-09-29 | Merged `devel` (`b0402a0`, timestamped mapping update) into the branch before recording baselines, so the floors match what the PR will merge. | Maintainer |
+| 2026-09-29 | The ratchet `check` lives in a `coverage-ratchet` profile activated by `${basedir}/coverage-baseline.properties`. The floors must not be declared in `<properties>`. The first version declared defaults of 0 there, and Maven substituted them into the check's configuration before the file was read, so the check always passed. The ratchet proof caught it. Modules without a baseline file have no ratchet. | Claude Code |
+| 2026-09-29 | Snapshot normalisation adds `Normalizer.blankNodeLabels()` and `Snapshots.normalizeLiterals(...)`. The report writes the anonymous property shape's blank-node label as a string (`sh:sourceShape`, the workbook `Source` column), which changes on every run. | Claude Code |
+| 2026-09-29 | The timestamped `MappingValidatorTest` pins all 4 workbooks the run writes (per-timestamp report, group summary, overall summary, comparison), not one. The old test only asserted "not empty". | Claude Code |
+| 2026-09-29 | `SnapshotsTest` restores the run's `snapshot.update` value after each test instead of clearing it. Clearing it silently turned later classes in the same update run back into compare mode. | Claude Code |
 
 ## Notes and results
 
-### Handoff 2026-09-29: resume here
+### Results 2026-09-29
 
-Work stopped partway through step 4 (JaCoCo). The previous session ran from the home folder, not the repo, so CLAUDE.md, settings, rules and hooks weren't loaded. Resume in a session started in `C:\GitHub\CimPal`.
+**Tests:** 73 before TEST-1 (Core 65, Main 8, CLI 0), 95 after (Core 81, Main 9, CLI 5). Core's 81 includes 4 tests that came in from `devel` with `TimestampedValidationGraphTest`. `mvn -B clean verify` is green on Windows.
 
-**Test baseline before TEST-1:** 73 (Core 65, Main 8, CLI 0).
+**Baseline coverage** (JaCoCo, `mvn -B clean verify`, Windows, after merging `devel`):
 
-**Committed on `feature/test-1-harness`:**
-1. `5307610`: Core test-support: `TestModels`, `Fixtures`, `Snapshots`, `Normalizer`, `StubHttpServer`, plus self-tests (`SnapshotsTest`, `StubHttpServerTest`, `TestModelsTest`). `ShapeSourceTest.importPointingAtLocalStub_isRefusedAndNeverRequested` added. Core pom: test-jar plus test deps (assertj, Jackson 3). Core = 76 tests.
-2. `cd2b119`: CLI and Main consumers: `CimPalCliTest`, `ConvertCommandTest`, `JsonSchemaSmokeTest` (+ `fixtures/cli-json/summary.schema.json`), and a `WorkspaceRdfStoreTest` case using `TestModels`/`Snapshots`. CLI = 5, Main = 9. `mvn -B -pl CimPal-CLI -am test` resolves the Core test-jar in the reactor without `install`, which the Stop hook needs.
+| Module | Line | Branch | Floor line / branch |
+| --- | ---: | ---: | ---: |
+| CimPal-Core | 28.41% (3218/11327) | 18.20% (1036/5692) | 0.2790 / 0.1770 |
+| CimPal-Main | 4.69% (979/20882) | 1.39% (141/10174) | 0.0418 / 0.0088 |
+| CimPal-CLI | 3.01% (66/2193) | 2.22% (33/1486) | 0.0250 / 0.0172 |
+| CimPal-CustomWriter | no tests | no tests | none |
 
-**Uncommitted in the working tree (step 4, not yet verified end to end):**
-- Root `pom.xml`: `jacoco.version`, default `coverage.line.min`/`coverage.branch.min` = 0, properties-maven-plugin reading `${project.basedir}/coverage-baseline.properties`, jacoco `prepare-agent`, `report` (verify) and `check` (verify, BUNDLE LINE/BRANCH COVEREDRATIO), and the new module `CimPal-Coverage`.
-- New `CimPal-Coverage/pom.xml`: pom packaging, depends on all four modules, `report-aggregate` at verify.
-- `CimPal-Core/pom.xml`: test-jar `Automatic-Module-Name` fix.
-- Last `mvn -B clean verify`: CustomWriter, Core (76) and Main (9) SUCCESS. CLI failed only because Claude Desktop's MCP server was locking `CimPal-CLI.jar` (the known issue). Quit Desktop before running it.
-- Core coverage measured in that run: line 0.2751 (3107/11294), branch 0.1700 (965/5678). Main, CLI and aggregate aren't measured yet.
+The aggregate report is at `CimPal-Coverage/target/site/jacoco-aggregate/index.html`. Core line coverage varied by 0.0002 between two runs (0.2841 vs 0.2839), probably because the timestamped path is threaded. That is well inside the 0.5 pp margin.
 
-**Remaining steps:**
-1. Quit Claude Desktop, then run `mvn -B clean verify` until green, with the aggregate report at `CimPal-Coverage/target/site/jacoco-aggregate/index.html`.
-2. Write `scripts/Update-CoverageBaseline.ps1`. It reads each `<module>/target/site/jacoco/jacoco.csv` and writes `<module>/coverage-baseline.properties` with `min = baseline − 0.005` floored to 4 decimals and the measured baseline as a comment. It only raises floors, unless `-AllowDecrease`. Run it for Core, Main and CLI, then commit those files.
-3. Add `CimPal-Coverage\pom.xml` to the POM list in `scripts/New-ReleaseTag.ps1`, or releases will break on the version mismatch. Update the "five pom.xml" wording in CLAUDE.md to six.
-4. **Ratchet proof:** raise one floor by 0.01 and confirm `verify` fails with the JaCoCo check message, then restore.
-5. `ci.yml`: the Ubuntu leg uploads `CimPal-Coverage/target/site/jacoco-aggregate/` as `coverage-report`, and the summary step adds coverage per module from `jacoco.csv`.
-6. **Convert `MappingValidatorTest`:**
-   - Use `TestModels.THING_SHAPES` / `VIOLATING_THING_MODEL`.
-   - Keep the count asserts.
-   - Add `Snapshots.forFeature("mapping-validation")` with `assertIsomorphic` on the `__report.ttl` and `assertExcelEquals` on the workbook, using `Normalizer.timestamps()` and `Normalizer.paths(tempDir)`, plus a regex for any duration columns found in the output.
-   - Generate with `-Dsnapshot.update=true`, review, commit.
-7. **Snapshot proof:** edit one snapshot line and confirm the diff failure, then restore.
-8. **Docs:**
-   - CLAUDE.md Testing section: test-support, snapshot flag, ratchet script.
-   - `.claude/rules/testing.md`: point to `testsupport` and `src/test/resources/snapshots/<feature>/`.
-   - Record baseline coverage per module below, tick the checklist, and update the README status and `docs/PROJECT.md`.
-9. Push, open a PR into `devel`, and check that both CI legs are green and that Windows and Ubuntu coverage are within 0.5 pp.
+**Proofs:**
+- **Ratchet.** With Core `coverage.line.min` raised to 0.2890, `verify` failed with "Rule violated for bundle CimPal-Core: lines covered ratio is 0.2839, but expected minimum is 0.2890". With the floor restored, it passed.
+- **Update script.** With a floor set above the measured value, `Update-CoverageBaseline.ps1` kept the higher floor and printed a warning.
+- **Snapshots.** They were generated twice with `-Dsnapshot.update=true` and the two sets were identical. When one line in `mapping-run__workbook.csv` was changed, the test failed with a `-6:`/`+6:` line diff and the rerun hint. The file was then restored.
+
+**Commits:** `f39e4f4` (merge `devel`), `72b58a8` (JaCoCo, ratchet, script, CI), `676cc20` (MappingValidatorTest and snapshot helpers), plus the docs commit.
+
+**Observed, not changed (no production changes in TEST-1):** in the timestamped run, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`, so the report's timestamp is 00:30 rather than 00:00. The snapshot pins the current behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
+
+**Left open:**
+1. Push `feature/test-1-harness`, open a PR into `devel`, and confirm both CI legs are green. Check that Ubuntu coverage is within 0.5 pp of the Windows floors. Main's JavaFX test runs under Xvfb there, which may shift Main's numbers.
+2. After merge, set the README status to Done.

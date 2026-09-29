@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-09-25  
+**Last updated:** 2026-09-29  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -190,9 +190,22 @@ ubuntu-latest (under Xvfb) for every push and PR to `devel` and `master`. It pub
 test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest` is tagged `gui`
 (exclude with `-DexcludedGroups=gui`). The release workflow is unchanged.
 
-**Next steps:** TEST-1 (test harness), then SEC-1 and SEC-2, following the phase order in
-`docs/plans/README.md`. Enabling branch protection with the two CI checks as required is a
-maintainer action.
+**Test harness** (added by TEST-1):
+- Shared test helpers are in Core's `eu.griddigit.cimpal.core.testsupport`: `TestModels`,
+  `Fixtures`, `Snapshots`, `Normalizer` and `StubHttpServer`. They are published as the Core
+  `test-jar`, which CLI and Main tests depend on.
+- Golden files are under `src/test/resources/snapshots/<feature>/` and are rewritten only with
+  `-Dsnapshot.update=true`. `MappingValidatorTest` is the reference example.
+- CLI tests (JUnit, AssertJ, JSON Schema validator) run on the classpath.
+- JaCoCo runs in every module, and the `CimPal-Coverage` pom module builds the aggregate report.
+  `verify` fails when a module drops below the floors in its `coverage-baseline.properties`
+  (baseline − 0.5 pp), which `scripts/Update-CoverageBaseline.ps1` maintains.
+- CI adds a coverage table per module to the job summary, and the Ubuntu leg uploads the
+  `coverage-report` artifact.
+
+**Next steps:** open the TEST-1 PR and check both CI legs, then SEC-1 and SEC-2, following the
+phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
+required is a maintainer action.
 
 ---
 
@@ -336,7 +349,9 @@ CimPal/
 
 ## Known issues and limitations
 
-**Test coverage is sparse.** Core has 5 test files covering ~3% of production code. CLI commands have no automated tests. Before any further Core refactoring, add characterisation tests capturing current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
+
+**Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
 
 **`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. `validate --workflow manual` was deliberately left calling `ShaclAutoTester` directly — see the `ShaclAutoTester` row above for why. No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
 

@@ -87,14 +87,23 @@ Core tests run on the classpath (`useModulePath=false`) so they can reach packag
 
 ## Testing
 
-Coverage is sparse: a handful of Core tests, a few in Main, none in CLI. Before refactoring Core behaviour, add characterisation tests that capture the current output. Build small synthetic RDF/SHACL fixtures under `@TempDir`, as `MappingValidatorTest` does, and don't depend on files outside the repo.
+Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Before refactoring Core behaviour, add characterisation tests that capture the current output. Build small synthetic RDF/SHACL fixtures under `@TempDir`, and don't depend on files outside the repo. `MappingValidatorTest` is the reference example.
+
+- **Test support** lives in Core's `eu.griddigit.cimpal.core.testsupport` (test scope). CLI and Main get it through the Core `test-jar` (`<type>test-jar</type>`, test scope). It holds:
+  - `TestModels`: synthetic EQ/SSH models and SHACL shapes.
+  - `Fixtures`: `src/test/resources/fixtures/<feature>/`.
+  - `Snapshots`: golden files under `src/test/resources/snapshots/<feature>/`. RDF is compared by isomorphism, workbooks as CSV, JSON with sorted keys.
+  - `Normalizer`: timestamps, paths, blank-node labels.
+  - `StubHttpServer`: a loopback HTTP stub.
+- **Snapshots** are only rewritten with `-Dsnapshot.update=true`. Otherwise a mismatch fails with a line diff. Review the diff before committing.
+- **Coverage ratchet:** `mvn verify` runs JaCoCo in every module, with the aggregate report in `CimPal-Coverage/target/site/jacoco-aggregate/`. It fails if a module drops below the floors in its `coverage-baseline.properties`, which are the measured value minus 0.5 pp. After coverage rises, run `scripts/Update-CoverageBaseline.ps1` and commit the updated files. Floors only go up unless `-AllowDecrease` is given, and that commit must say why.
 
 ## Git and releases
 
 - Day-to-day work happens on `devel` (or feature branches off it, PR'd into `devel`). `master` is the release branch.
 - Don't commit, push, or open PRs unless asked. `.claude/settings.json` makes `git push` ask for approval every time, and denies `gh release`, the release script, and tag or force pushes.
 - **Never run `scripts/New-ReleaseTag.ps1`** or push version tags unless explicitly asked. A pushed `YYYY.MM.DD.N` tag triggers `.github/workflows/release.yml`, which publishes a GitHub release.
-- Versions live in all five `pom.xml` files plus `<cimpal.version>`; only the release script changes them.
+- Versions live in all six `pom.xml` files (including `CimPal-Coverage`) plus `<cimpal.version>`; only the release script changes them.
 
 ## End of session
 
