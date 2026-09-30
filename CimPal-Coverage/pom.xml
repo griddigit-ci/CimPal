@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
+<!--
+  Aggregate coverage report only. Depends on every code module so `mvn verify` can merge their
+  JaCoCo execution data into one report at CimPal-Coverage/target/site/jacoco-aggregate/.
+  Produces no artifact of its own; the per-module ratchet lives in the parent pom.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>eu.griddigit.CimPal</groupId>
+        <artifactId>CimPal</artifactId>
+        <version>2026.9.10.1</version>
+    </parent>
+
+    <artifactId>CimPal-Coverage</artifactId>
+    <packaging>pom</packaging>
+    <name>CimPal-Coverage</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>eu.griddigit.CimPal</groupId>
+            <artifactId>CimPal-CustomWriter</artifactId>
+            <version>${cimpal.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.griddigit.CimPal</groupId>
+            <artifactId>CimPal-Core</artifactId>
+            <version>${cimpal.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.griddigit.CimPal</groupId>
+            <artifactId>CimPal-Main</artifactId>
+            <version>${cimpal.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.griddigit.CimPal</groupId>
+            <artifactId>CimPal-CLI</artifactId>
+            <version>${cimpal.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>report-aggregate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-aggregate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

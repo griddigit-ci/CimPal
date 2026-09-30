@@ -7,35 +7,29 @@ package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.testsupport.Normalizer;
+import eu.griddigit.cimpal.core.testsupport.Snapshots;
+import eu.griddigit.cimpal.core.testsupport.TestModels;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.riot.RDFDataMgr;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Reference example for the TEST-1 test-support package: synthetic inputs from {@link TestModels},
+ * count asserts on the summary, and {@link Snapshots} golden files for the Turtle report and the
+ * workbook. Regenerate the snapshots with {@code -Dsnapshot.update=true} and review the diff.
+ */
 class MappingValidatorTest {
 
-    private static final String SHAPES = """
-            @prefix sh: <http://www.w3.org/ns/shacl#> .
-            @prefix ex: <urn:test:> .
-            ex:ThingShape a sh:NodeShape ; sh:targetClass ex:Thing ;
-                sh:property [ sh:path ex:size ; sh:minCount 1 ] .
-            """;
-
-    /** One ex:Thing without the ex:size the shapes require, under a model header. */
-    private static final String VIOLATING_MODEL = """
-            <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                     xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#"
-                     xmlns:ex="urn:test:">
-              <md:FullModel rdf:about="urn:uuid:header">
-                <md:Model.scenarioTime>2026-01-01T00:00:00Z</md:Model.scenarioTime>
-              </md:FullModel>
-              <ex:Thing rdf:about="#_1"/>
-            </rdf:RDF>
-            """;
+    private static final Snapshots SNAPSHOTS = Snapshots.forFeature("mapping-validation");
 
     @TempDir
     Path tempDir;
@@ -48,15 +42,31 @@ class MappingValidatorTest {
     }
 
     private MappingValidationOptions.Builder options(String modelPath, String mappingInput) throws Exception {
-        write("models/" + modelPath, VIOLATING_MODEL);
-        write("constraints/shapes.ttl", SHAPES);
+        write("models/" + modelPath, TestModels.VIOLATING_THING_MODEL);
+        write("constraints/shapes.ttl", TestModels.THING_SHAPES);
         return MappingValidationOptions.builder()
                 .mappingCsv(write("mapping.csv", "xml_inputs,ttl,notes\n" + mappingInput + ",shapes.ttl,Thing check\n"))
                 .modelsInput(tempDir.resolve("models"))
                 .constraintsRoot(tempDir.resolve("constraints"))
                 .outputDir(tempDir.resolve("out"))
-                .xmlBase("http://example.com/data")
+                .xmlBase(TestModels.XML_BASE)
                 .threads(1);
+    }
+
+    /**
+     * Workbook cells carry run timestamps, temp-dir paths and the per-run blank-node label of the
+     * anonymous property shape ({@code Source}); all three are replaced by placeholders.
+     */
+    private Normalizer[] workbookNormalizers() {
+        return new Normalizer[] {Normalizer.timestamps(), Normalizer.paths(tempDir), Normalizer.blankNodeLabels()};
+    }
+
+    private Path singleTurtleReport() throws Exception {
+        try (Stream<Path> out = Files.list(tempDir.resolve("out"))) {
+            List<Path> reports = out.filter(p -> p.getFileName().toString().endsWith("__report.ttl")).toList();
+            assertEquals(1, reports.size(), () -> "turtle reports: " + reports);
+            return reports.getFirst();
+        }
     }
 
     @Test
@@ -68,10 +78,14 @@ class MappingValidatorTest {
         assertEquals(0, summary.conforming());
         assertEquals(0, summary.errors());
         assertEquals(1, summary.reports().size());
-        assertTrue(Files.isRegularFile(summary.reports().getFirst()));
-        try (Stream<Path> out = Files.list(tempDir.resolve("out"))) {
-            assertTrue(out.anyMatch(p -> p.getFileName().toString().endsWith("__report.ttl")));
-        }
+        Path workbook = summary.reports().getFirst();
+        assertTrue(Files.isRegularFile(workbook));
+
+        // sh:sourceShape holds the anonymous shape's blank-node label as a string, new on every run.
+        Model report = Snapshots.normalizeLiterals(
+                RDFDataMgr.loadModel(singleTurtleReport().toString()), Normalizer.blankNodeLabels());
+        SNAPSHOTS.assertIsomorphic("mapping-run__report", report);
+        SNAPSHOTS.assertExcelEquals("mapping-run__workbook", workbook, workbookNormalizers());
     }
 
     @Test
@@ -81,7 +95,20 @@ class MappingValidatorTest {
 
         assertEquals(1, summary.violations(), () -> "summary: " + summary);
         assertEquals(0, summary.errors(), () -> "summary: " + summary);
-        assertFalse(summary.reports().isEmpty());
         summary.reports().forEach(report -> assertTrue(Files.isRegularFile(report), report::toString));
+
+        // One report per timestamp, a summary per input group, an overall summary and a comparison.
+        Normalizer names = Normalizer.chain(Normalizer.paths(tempDir), Normalizer.timestamps());
+        SNAPSHOTS.assertTextEquals("timestamped-run__reports.txt", summary.reports().stream()
+                .map(report -> names.apply(report.toString()) + "\n")
+                .sorted()
+                .reduce("", String::concat));
+        for (Path workbook : summary.reports()) {
+            // The group and overall summaries share a file name, so the name keeps the sub-folder.
+            String name = tempDir.resolve("out").relativize(workbook).toString()
+                    .replace('\\', '/').replace("/", "__")
+                    .replaceAll("__\\d{8}_\\d{6}", "").replace(".xlsx", "");
+            SNAPSHOTS.assertExcelEquals("timestamped-run__" + name, workbook, workbookNormalizers());
+        }
     }
 }
