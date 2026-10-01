@@ -1,0 +1,5 @@
+Apache ENTSO-E Application Profiles Library
+
+Copyright 2025 The Apache Software Foundation.
+
+Portions of this software/artifacts were developed at ENTSO-E (https://www.entsoe.eu/).

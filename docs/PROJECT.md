@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-09-21  
+**Last updated:** 2026-10-01  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -91,16 +91,21 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 
 | Class | Module | What it does |
 |---|---|---|
-| `eu.griddigit.cimpal.core.utils.ValidationTools` | Core | Main validation engine. `validateByMapping()`, `validateByTimestampedMapping()`. ~6000 lines. Zero GUI imports. |
-| `eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester` | Core | Manual validation: SHACL files + model archives → Excel reports per archive. |
+| `eu.griddigit.cimpal.core.utils.ValidationTools` | Core | Main validation engine. `validateByMapping()`, `validateByTimestampedMapping()`. ~6000 lines. Zero GUI imports. Prefer `MappingValidator` for new callers — see below. |
+| `eu.griddigit.cimpal.core.utils.MappingValidator` + `eu.griddigit.cimpal.core.models.MappingValidationOptions` | Core | Builder-style facade over `validateByMapping`/`validateByTimestampedMapping` (added 2026-09-23). `MappingValidationOptions.builder()...timestamped(true/false).build()`, then `new MappingValidator(options).validate()` → `MappingValidationSummary`. The GUI's SHACL Validation tab and the CLI's `validate --workflow mapping/timestamped` both go through this now (CLI refactored 2026-09-25). |
+| `eu.griddigit.cimpal.core.models.MappingValidationSummary` | Core | Record: `reports` (List<Path> — one entry for plain mapping, several for timestamped), `conforming`, `violations`, `errors`. Same `hasViolations()`/`totalRows()` semantics as the older `ValidationRunSummary`/`ValidationTimestampedRunSummary`. |
+| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Not a fit for "batch-test many independent model archives against shared shapes, one report each" — that's still `ShaclAutoTester`'s job (see below); this is for single-dataset/programmatic use. |
+| `eu.griddigit.cimpal.core.presets.MappingValidationOptionsPresets` / `SHACLValidationOptionsPresets` | Core | CGMES 3.0 / 2.4.15 starting points for the two builders above. |
+| `eu.griddigit.cimpal.core.utils.DatatypeMapPreset` | Core | Enum: `NONE`, `CGMES24_NC22`, `CGMES30_NC24`, `CGMES30_NC25`. `.load()` reads the matching bundled `.properties` file. |
+| `eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester` | Core | Manual validation: SHACL files + model archives → Excel reports per archive. Deliberately untouched by the `MappingValidator`/`SHACLValidator` builder API (no equivalent "one report per archive" abstraction exists yet) — the CLI's `validate --workflow manual` still calls this directly. |
 | `eu.griddigit.cimpal.core.utils.ValidationEngine` | Core | Enum: APACHE_JENA, PYSHACL, PYSHACL_OXIGRAPH, RUST_SHACL |
 | `eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader` | Core | Loads CGMES datatype maps from bundled classpath resources or .properties files. |
 | `eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback` | Core | Callback: `updateProgress(double)` and `appendOutput(String)`. |
-| `ValidationTools.ValidationRunSummary` | Core | Record: `reportPath`, `conforming`, `violations`, `errors` |
-| `ValidationTools.ValidationTimestampedRunSummary` | Core | Record: `reports` (List<Path>), `conforming`, `violations`, `errors` |
+| `ValidationTools.ValidationRunSummary` | Core | Record: `reportPath`, `conforming`, `violations`, `errors`. Still used internally by `ValidationTools` and by `MappingValidator`, which unwraps it into `MappingValidationSummary`. |
+| `ValidationTools.ValidationTimestampedRunSummary` | Core | Record: `reports` (List<Path>), `conforming`, `violations`, `errors`. Same relationship to `MappingValidationSummary` as above. |
 
 **Static state in ValidationTools (thread safety concern):**  
-`exportTurtleValidationReports` and `DEBUG` are `volatile boolean` statics. Setting and restoring them per-request in a concurrent server is a race condition. The current `serve` command avoids this with a single-threaded executor. Any concurrent HTTP server must either: (a) keep single-threaded execution for validation, or (b) pass these as parameters into the validation call (requires modifying ValidationTools).
+`exportTurtleValidationReports` and `DEBUG` are `volatile boolean` statics. `DEBUG` is still a real concern for a concurrent server. `exportTurtleValidationReports` is now effectively resolved for known callers: as of 2026-09-25, `setExportTurtleValidationReports(...)` has **zero remaining callers** anywhere in the codebase (verified by repo-wide grep) — the GUI never called it, and the CLI's `ValidateCommand` was the last one, now switched to `MappingValidator`'s per-call `exportTurtleReports` builder option instead of the global switch. The setter and field still exist (the old positional `ValidationTools.validateByMapping(...)` overloads without an explicit boolean still read the static as their default, for any external caller not yet migrated to `MappingValidator`), but nothing in this repo mutates it anymore. Any concurrent HTTP server work should still keep single-threaded execution for `DEBUG`, or migrate it the same way.
 
 ### RDF conversion
 
@@ -108,6 +113,8 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 |---|---|---|
 | `eu.griddigit.cimpal.core.converters.RDFConverter` | Core | Format conversion. Call `convert()` then `writeConvertedModel(OutputStream)`. |
 | `eu.griddigit.cimpal.core.models.RDFConvertOptions` | Core | Builder-style config. Formats: RDFXML, TURTLE, JSONLD. |
+
+**Base URI and relative identifiers (fixed 2026-10-01).** `RDFConverter` reads every source against the configured base URI, or against the file's own `file:///` IRI when none is set. Writers get that base back. Turtle and TriG write `BASE`, RDF/XML writes `xml:base`, and identifiers such as CIMXML's `rdf:ID` and `#` references are written relative to it. Without a base URI the writer base is the single source file and no declaration is written, so those identifiers stay document-relative. Commits 38cf674 and 2e783ed had switched to reading by file URI, which turned them into `file:///C:/...` IRIs under any base, in every target format. Jena 6 relativises with one fixed rule whenever a writer has a base, and ignores the RDF/XML `relativeURIs` property. Only CimPal's CIMXML writers honour the six `relativeURIs` kinds. `relativeToBase(false)` writes full IRIs. Never pass `""` as a writer base: Jena resolves it against the working directory. Covered by `RDFConverterTest`.
 
 ### RDFS to SHACL
 
@@ -159,6 +166,48 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.main.core.ModelManipulationFactory` | Main | Instance data manipulation. `generateDataFromXlsV2` now delegates to `InstanceDataBuilder`. |
 | `eu.griddigit.cimpal.main.core.InstanceDataFactory` | Main | Save instance data. `saveInstanceData` now delegates to `InstanceDataWriter` for serialisation. |
 | `eu.griddigit.cimpal.main.application.MainController` | Main | Global static state bag. Do not add new static fields. Many tabs use it as a clipboard. |
+
+---
+
+## Development workflow — plans and Claude Code workspace
+
+Added 2026-09-25 by work package A1. Work is planned in Claude Desktop and handed to Claude Code as
+work packages in `docs/plans/` (see `docs/plans/README.md` for order, status and open decisions).
+The shared Claude Code setup is committed under `.claude/`:
+- **`settings.json`:**
+  - Allows `mvn` and routine git.
+  - `git push` asks for approval every time.
+  - Denies `gh release`, `New-ReleaseTag.ps1`, tag and force pushes, and reading token, env,
+    credential and certificate files.
+  - Its Stop hook, `.claude/hooks/test-changed-modules.sh`, runs `mvn -pl <module> -am test` for
+    the modules with changed Java files at the end of each turn. It skips when nothing changed
+    since the last green run.
+- **Rules:** `rules/security.md`, path-scoped to the security-sensitive classes, and
+  `rules/testing.md` for `src/test`.
+- **Skills:** `/add-regression-test`, `/security-check-change`, `/end-session`, `/wp-footer`.
+- **Agents:** `security-reviewer` (read-only) and `test-writer`.
+
+**CI** (added by CI-1): `.github/workflows/ci.yml` runs `mvn -B verify` on windows-latest and
+ubuntu-latest (under Xvfb) for every push and PR to `devel` and `master`. It publishes a per-module
+test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest` is tagged `gui`
+(exclude with `-DexcludedGroups=gui`). The release workflow is unchanged.
+
+**Test harness** (added by TEST-1):
+- Shared test helpers are in Core's `eu.griddigit.cimpal.core.testsupport`: `TestModels`,
+  `Fixtures`, `Snapshots`, `Normalizer` and `StubHttpServer`. They are published as the Core
+  `test-jar`, which CLI and Main tests depend on.
+- Golden files are under `src/test/resources/snapshots/<feature>/` and are rewritten only with
+  `-Dsnapshot.update=true`. `MappingValidatorTest` is the reference example.
+- CLI tests (JUnit, AssertJ, JSON Schema validator) run on the classpath.
+- JaCoCo runs in every module, and the `CimPal-Coverage` pom module builds the aggregate report.
+  `verify` fails when a module drops below the floors in its `coverage-baseline.properties`
+  (baseline − 0.5 pp), which `scripts/Update-CoverageBaseline.ps1` maintains.
+- CI adds a coverage table per module to the job summary, and the Ubuntu leg uploads the
+  `coverage-report` artifact.
+
+**Next steps:** merge TEST-1 ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) once both CI legs are green, then SEC-1 and SEC-2, following the
+phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
+required is a maintainer action.
 
 ---
 
@@ -302,7 +351,11 @@ CimPal/
 
 ## Known issues and limitations
 
-**Test coverage is sparse.** Core has 5 test files covering ~3% of production code. CLI commands have no automated tests. Before any further Core refactoring, add characterisation tests capturing current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
+
+**Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
+
+**`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. `validate --workflow manual` was deliberately left calling `ShaclAutoTester` directly — see the `ShaclAutoTester` row above for why. No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
 
 **`rdfs2shacl` namespace extraction may miss non-standard profiles.** Auto-extracting nsPrefix/nsUri from `owl:Ontology` works for standard CimSyntaxGen RDFS. Non-standard profiles need explicit config overrides (`--shapes-namespace-prefix`, `--shapes-namespace-uri`).
 
@@ -311,6 +364,8 @@ CimPal/
 **`validate --samples` requires `--export-turtle`.** Per-shape detail is extracted by parsing the `*__report.ttl` files after validation. These are auto-enabled when `--samples > 0` in JSON mode, but they remain on disk as a side effect. This is by design (the AI Assistant also uses them) but should be documented clearly.
 
 **`serve` serialises all requests.** The single-threaded executor prevents concurrent validation runs. For team use (multiple users sharing one server) this is a bottleneck. Addressed in the REST API plan below.
+
+**`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output.
 
 **`MainController` static state bag.** Several GUI tabs still share state through static fields. Do not add new static fields. The pattern of delegating from Main to Core (introduced in Phase 5) is the correct long-term direction.
 

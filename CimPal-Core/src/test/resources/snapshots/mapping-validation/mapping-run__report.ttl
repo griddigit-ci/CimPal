@@ -1,0 +1,17 @@
+[ a       <http://www.w3.org/ns/shacl#ValidationReport>;
+  <http://www.w3.org/ns/shacl#conforms>
+          false;
+  <http://www.w3.org/ns/shacl#result>
+          [ a       <http://www.w3.org/ns/shacl#ValidationResult>;
+            <http://www.w3.org/ns/shacl#focusNode>
+                    "_1";
+            <http://www.w3.org/ns/shacl#resultMessage>
+                    "minCount[1]: Invalid cardinality: expected min 1: Got count = 0";
+            <http://www.w3.org/ns/shacl#resultPath>
+                    "ex:size";
+            <http://www.w3.org/ns/shacl#sourceConstraintComponent>
+                    "sh:MinCountConstraintComponent";
+            <http://www.w3.org/ns/shacl#sourceShape>
+                    "<BNODE>"
+          ]
+] .

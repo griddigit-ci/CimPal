@@ -33,4 +33,21 @@ public interface ITask {
     default String getUnavailableReason() {
         return "";
     }
+
+    /**
+     * Whether the task works on Network Code Profile (NCP) datasets.
+     * <p>
+     * The tasks were written against CGMES grid models - their md:FullModel header, their profiles
+     * and their file naming - so this is opt-in: while an NCP profile version is selected, the
+     * selection list refuses every task that does not override it. Override together with
+     * {@link #getNcpUnsupportedReason()} when a task does not carry over.
+     */
+    default boolean supportsNcp() {
+        return false;
+    }
+
+    /** Why {@link #supportsNcp()} is false, shown to the user when an NCP profile is selected. */
+    default String getNcpUnsupportedReason() {
+        return "This task works on CGMES grid models only.";
+    }
 }

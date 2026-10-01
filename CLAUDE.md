@@ -1,0 +1,111 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in this repository.
+
+## Read first
+
+- `docs/PROJECT.md` — the living project reference (architecture, key classes, decisions, known issues, next steps). Treat it as the briefing; verify against the code before editing.
+- `docs/cli/index.md` — CLI command status and per-command docs.
+- Do not redo a full codebase discovery; start from those two and the source file relevant to the task.
+
+## Current work
+
+- Work is planned in Claude Desktop and handed over as work packages in `docs/plans/`. **Start with `docs/plans/README.md`**: order, status, open decisions and the standard footer.
+- A session usually begins with `Execute docs/plans/<ID>.md` in plan mode. Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
+- Shared tooling in `.claude/`:
+  - Path-scoped rules: `rules/security.md` for security-sensitive code, `rules/testing.md` for `src/test`.
+  - Skills: `/add-regression-test`, `/security-check-change`.
+  - Agents: `security-reviewer` (read-only), `test-writer`.
+  - A Stop hook runs the tests of modules with changed Java files at the end of each turn.
+
+## What CimPal is
+
+Java 25 / Maven multi-module toolset by gridDigIt for CIM/CGMES semantic work: SHACL validation, RDFS→SHACL generation, RDF conversion, SPARQL, profile/instance comparison, Excel-driven shape authoring, CGMES instance generation and manifests. Licensed EUPL-1.2-or-later.
+
+```
+CustomWriter ← Core ← Main   (JavaFX GUI, fat JAR + launch4j exe)
+                  ↖ CLI      (picocli fat JAR: validate, sparql, manifest, convert, rdfs2shacl,
+                              compare, compare-instances, excel2shacl, organize, gen-instances,
+                              run, serve, mcp)
+```
+
+- **CimPal-Core** — all reusable RDF/SHACL logic. No JavaFX, no GUI imports, ever.
+- **CimPal-Main** — JavaFX GUI (FXML in `src/main/resources/fxml`, bundled RDFS/SHACL in `resources`). Uses PowSyBl.
+- **CimPal-CLI** — headless entry point `eu.griddigit.CimPal.cli.CimPalCli`; example configs in `CimPal-CLI/configs/`.
+- **CimPal-CustomWriter** — custom Jena RDF/XML serializers.
+
+Key libs: Apache Jena 6.2.0, TopBraid SHACL 1.5.0, JavaFX 25, Apache POI, Jackson **3** (`tools.jackson.core` groupId — not `com.fasterxml`), picocli, JUnit Jupiter.
+
+## Commands
+
+Run from the repo root (Windows; Maven 3.9 and JDK 25 on PATH).
+
+```bash
+mvn -B package                                   # full build (what the release CI runs)
+mvn -B package -DskipTests                       # faster full build
+mvn -B -pl CimPal-Core -am test                  # Core unit tests (main test suite)
+mvn -B -pl CimPal-Core -am test -Dtest=SHACLValidatorTest            # single test class
+mvn -B -pl CimPal-CLI -am package -DskipTests    # → CimPal-CLI/target/CimPal-CLI.jar
+mvn -B -pl CimPal-Main -am package -DskipTests   # → CimPal-Main/target/CimPal.jar + CimPal.exe
+mvn -pl CimPal-Main exec:java                    # launch the GUI (after `mvn install -DskipTests`, so sibling modules resolve)
+mvn -Psecurity-scan verify                       # OWASP dependency check (slow; fails on CVSS ≥ 7)
+mvn -B test -DexcludedGroups=gui                 # skip display-dependent JavaFX tests (@Tag("gui")) on headless machines
+java -jar CimPal-CLI/target/CimPal-CLI.jar <subcommand> --help
+```
+
+CI (`.github/workflows/ci.yml`) runs `mvn -B verify` on Windows and Ubuntu (under Xvfb) for every push and PR to `devel` and `master`. Keep both green, because Ubuntu catches case mismatches that Windows hides.
+
+Core tests run on the classpath (`useModulePath=false`) so they can reach package-private members — don't add test-only `opens` to `module-info.java`.
+
+## Conventions
+
+- **License header** on every new Java file (and on docs/config where the existing files have it):
+  ```java
+  /*
+   * Copyright (c) 2020-2026 gridDigIt Kft.
+   * Licensed under the EUPL-1.2-or-later.
+   * SPDX-License-Identifier: EUPL-1.2+
+   */
+  ```
+- **Package case must match the directory exactly.** Core/Main use `eu.griddigit.cimpal.*` (lowercase); CLI uses `eu.griddigit.CimPal.cli.*` / `eu.griddigit.CimPal.generators.*` (capital C). A mismatch compiles on Windows but fails at runtime from the fat JAR with `ClassNotFoundException`. Follow the module's existing package.
+- **JPMS modules**: each module has a `module-info.java`. Adding a dependency or JDK API means adding the matching `requires` (e.g. `java.net.http` in Core, `jdk.httpserver` in CLI).
+- **New logic goes in Core**, then is wired into Main and/or CLI. The direction is Main → delegates to Core (e.g. `ShaclTools` → `ShaclOrganizer`).
+- **For validation, use the builder APIs** — `MappingValidator` + `MappingValidationOptions`, `SHACLValidator` + `SHACLValidationOptions` — rather than calling `ValidationTools` (~6000 lines) directly.
+- **Do not add static fields to `MainController`** (legacy static state bag).
+- GUI input fields get the "?" help icon: `GUIhelper.installHelpTooltip(...)`, following `ValidationByMappingController`.
+- CLI: exit codes `0` ok, `1` violations found (a result, not a failure), `2` bad input, `3` internal error (`ExitCode`). In `--format json` mode, stdout must contain only the JSON; progress goes to stderr. Config files are JSON, and keys starting with `_` are documentation and ignored.
+- Match the surrounding code's comment density and Javadoc style; keep diffs focused.
+
+## Gotchas
+
+- `RDFCompareResult.hasDifference()` is **inverted** (true when there are no entries). Use `getEntries().isEmpty()`; don't "fix" it without updating every caller.
+- `ValidationTools` has static flags (`exportTurtleValidationReports`, `DEBUG`), which is why `serve` uses a single-threaded executor. Anything concurrent must deal with this.
+- Never call Jena `TypeMapper.reset()`, and prefer `getSafeTypeByName()`. A reset once emptied the datatype map, typed every literal as `xsd:string`, and silently broke SHACL rules that use typed literals.
+- A failed remote `owl:imports` fetch must surface as an error, never as a silent pass (a false-clean validation is the worst outcome here).
+- `validate --samples` depends on the `*__report.ttl` files written by `--export-turtle`.
+- If Claude Desktop has the CimPal MCP server running (`CimPal-CLI/configs/claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`. `mvn package`/`verify` then fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop (or stop the `CimPal-CLI.jar mcp` processes) first.
+
+## Testing
+
+Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Before refactoring Core behaviour, add characterisation tests that capture the current output. Build small synthetic RDF/SHACL fixtures under `@TempDir`, and don't depend on files outside the repo. `MappingValidatorTest` is the reference example.
+
+- **Test support** lives in Core's `eu.griddigit.cimpal.core.testsupport` (test scope). CLI and Main get it through the Core `test-jar` (`<type>test-jar</type>`, test scope). It holds:
+  - `TestModels`: synthetic EQ/SSH models and SHACL shapes.
+  - `Fixtures`: `src/test/resources/fixtures/<feature>/`.
+  - `Snapshots`: golden files under `src/test/resources/snapshots/<feature>/`. RDF is compared by isomorphism, workbooks as CSV, JSON with sorted keys.
+  - `Normalizer`: timestamps, paths, blank-node labels.
+  - `StubHttpServer`: a loopback HTTP stub.
+- **Snapshots** are only rewritten with `-Dsnapshot.update=true`. Otherwise a mismatch fails with a line diff. Review the diff before committing.
+- **Coverage ratchet:** `mvn verify` runs JaCoCo in every module, with the aggregate report in `CimPal-Coverage/target/site/jacoco-aggregate/`. It fails if a module drops below the floors in its `coverage-baseline.properties`, which are the measured value minus 0.5 pp. After coverage rises, run `scripts/Update-CoverageBaseline.ps1` and commit the updated files. Floors only go up unless `-AllowDecrease` is given, and that commit must say why.
+
+## Git and releases
+
+- Day-to-day work happens on `devel` (or feature branches off it, PR'd into `devel`). `master` is the release branch.
+- Don't commit, push, or open PRs unless asked. `.claude/settings.json` makes `git push` ask for approval every time, and denies `gh release`, the release script, and tag or force pushes.
+- **Never run `scripts/New-ReleaseTag.ps1`** or push version tags unless explicitly asked. A pushed `YYYY.MM.DD.N` tag triggers `.github/workflows/release.yml`, which publishes a GitHub release.
+- Versions live in all six `pom.xml` files (including `CimPal-Coverage`) plus `<cimpal.version>`; only the release script changes them.
+
+## End of session
+
+- Update `docs/PROJECT.md` (date, *Implementation status*, *Known issues*, *Next steps*) when the change affects them.
+- When a CLI command's flags or behaviour change, update its page under `docs/cli/`.

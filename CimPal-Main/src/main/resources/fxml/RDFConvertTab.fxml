@@ -95,6 +95,7 @@
                 </HBox>
                 <HBox alignment="CENTER_LEFT" spacing="8.0">
                     <Label text="Relative URIs: " />
+                    <Label fx:id="helpRelativeUris" text="?" styleClass="help-badge"/>
                     <ChoiceBox fx:id="fcbRelativeURIs" disable="true" prefWidth="200.0" />
                 </HBox>
             </FlowPane>

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Minimal example schema for JsonSchemaSmokeTest. Real CLI output schemas arrive with TEST-4. Copyright (c) 2020-2026 gridDigIt Kft., EUPL-1.2-or-later.",
+  "type": "object",
+  "required": ["command", "exitCode", "violations"],
+  "properties": {
+    "command": { "type": "string" },
+    "exitCode": { "type": "integer", "minimum": 0, "maximum": 3 },
+    "violations": { "type": "integer", "minimum": 0 }
+  }
+}

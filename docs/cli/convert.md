@@ -57,7 +57,7 @@ java -jar CimPal-CLI.jar convert --config configs/convert.json --dry-run
 | `--output` | file path | — | Output file path. Required. Format auto-detected from extension. |
 | `--source-format` | `RDFXML` / `TURTLE` / `JSONLD` | auto | Source format. Defaults to auto-detection from input extension. |
 | `--target-format` | `RDFXML` / `TURTLE` / `JSONLD` | auto | Target format. Defaults to auto-detection from output extension. |
-| `--xml-base` | URI | `""` (empty) | Base URI written into RDF/XML output and used when reading. For CGMES 3.0 use `http://iec.ch/TC57/CIM100`. For CGMES 2.4 use `http://iec.ch/TC57/2013/CIM-schema-cim16`. |
+| `--xml-base` | URI | `""` (empty) | Base URI that relative identifiers in the input resolve against, declared in RDF/XML (`xml:base`) and Turtle (`BASE`) output. See [Base URI and relative identifiers](#base-uri-and-relative-identifiers). For CGMES 3.0 use `http://iec.ch/TC57/CIM100`. For CGMES 2.4 use `http://iec.ch/TC57/2013/CIM-schema-cim16`. |
 | `--rdf-format` | see below | `RDFXML_PLAIN` | RDF/XML sub-format. Only relevant when target is `RDFXML`. |
 | `--sort` | flag | off | Sort triples in the output for deterministic, diffable files. |
 | `--sort-by-prefix` | flag | off | Sort by namespace prefix rather than local name. Only meaningful with `--sort`. |
@@ -93,6 +93,18 @@ Only applies when `--target-format RDFXML` (or when output extension is `.xml`/`
 | `RDFS_CIMXML` | RDFS-specific RDF/XML (IEC 61970-501 style). Use for profile/RDFS files. |
 
 `CIMXML` and `RDFS_CIMXML` use the custom CimPal serializer that produces output matching what CGMES toolchains expect.
+
+---
+
+## Base URI and relative identifiers
+
+CGMES instance files usually identify objects with relative references such as `rdf:ID="_123"` and `rdf:resource="#_123"`, and have no `xml:base`.
+
+- **With `--xml-base`**, those references resolve against it while reading, so `#_123` becomes `<base>#_123`. RDF/XML output declares the base as `xml:base`, Turtle output as `BASE`, and both write the identifiers relative to it again (`rdf:about="#_123"`, `<#_123>`).
+- **Without it**, the identifiers stay relative to the document, as they were in the source, and no base is declared. For a merge of several files (`--input-files`) there is no single document, so Turtle and RDF/XML then write full `file:` IRIs.
+- JSON-LD output always writes full IRIs, so set `--xml-base` when converting such files to JSON-LD, or the identifiers become `file:` paths of the input.
+
+Jena 6 decides the form of a relative IRI itself (same-document, child or parent path). CimPal's `CIMXML` and `RDFS_CIMXML` writers always write same-document references.
 
 ---
 

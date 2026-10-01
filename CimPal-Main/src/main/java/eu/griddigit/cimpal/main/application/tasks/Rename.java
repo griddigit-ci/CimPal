@@ -199,5 +199,10 @@ public class Rename implements ITask {
     public boolean getSaveResult() {
         return this.saveResult;
     }
+
+    @Override
+    public String getNcpUnsupportedReason() {
+        return "Renames the modelling authority set of the md:FullModel header and the GeographicalRegion and ControlArea names of a CGMES EQ, none of which a Network Code Profile dataset has.";
+    }
 }
 
