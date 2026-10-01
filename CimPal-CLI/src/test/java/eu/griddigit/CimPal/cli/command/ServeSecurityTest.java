@@ -62,9 +62,12 @@ class ServeSecurityTest {
             assertThat(PosixFilePermissions.toString(posix.readAttributes().permissions())).isEqualTo("rw-------");
         } else {
             AclFileAttributeView acl = Files.getFileAttributeView(file, AclFileAttributeView.class);
-            UserPrincipal owner = acl.getOwner();
+            // The ACL names the current user. That is not always the file owner: files created
+            // by an elevated process (e.g. a CI runner) are owned by BUILTIN\Administrators.
+            UserPrincipal user = ServeSecurity.windowsUser(System.getenv("USERDOMAIN"), System.getProperty("user.name"));
+            UserPrincipal expected = user != null ? user : acl.getOwner();
             List<AclEntry> entries = acl.getAcl();
-            assertThat(entries).isNotEmpty().allSatisfy(entry -> assertThat(entry.principal()).isEqualTo(owner));
+            assertThat(entries).isNotEmpty().allSatisfy(entry -> assertThat(entry.principal()).isEqualTo(expected));
         }
     }
 
