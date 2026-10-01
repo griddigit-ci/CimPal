@@ -233,8 +233,9 @@ class SecurityRegressionTest {
         Path cache = ((Path) field(ValidationTools.class, "REMOTE_XML_CACHE_DIR")).toAbsolutePath().normalize();
         Path log = ((Path) field(ValidationTools.class, "DEBUG_LOG_PATH")).toAbsolutePath().normalize();
 
-        assertThat(cache).startsWith(userData);
-        assertThat(log).startsWith(userData);
+        // Path.startsWith, not AssertJ's: the latter canonicalises and needs the file to exist.
+        assertThat(cache.startsWith(userData)).as("%s under %s", cache, userData).isTrue();
+        assertThat(log.startsWith(userData)).as("%s under %s", log, userData).isTrue();
         assertThat(userData.startsWith(tmp)).as("%s must not be under %s", userData, tmp).isFalse();
         assertThat(log.toString()).doesNotContainIgnoringCase("C:\\Temp");
     }
