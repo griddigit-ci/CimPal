@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (PR pending) |
+| Status | In review ([PR #46](https://github.com/griddigit-ci/CimPal/pull/46)) |
 | Phase | 2 |
 | Depends on | TEST-1 |
 | Size | M |
