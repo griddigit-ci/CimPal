@@ -44,4 +44,24 @@ class ConvertCommandTest {
         RDFDataMgr.read(converted, output.toString(), Lang.TURTLE);
         Snapshots.assertIsomorphic(eq.toModel(), converted);
     }
+
+    /** Regression: --xml-base was not used for reading, so rdf:ID identifiers became file:/// IRIs of the input. */
+    @Test
+    void xmlBaseResolvesTheRelativeIdentifiersOfAnInputWithoutXmlBase() throws Exception {
+        TestModels.CgmesModelBuilder eq = TestModels.eq().withoutXmlBase()
+                .resource("Substation", "_sub1").literal("IdentifiedObject.name", "North")
+                .resource("VoltageLevel", "_vl1").reference("VoltageLevel.Substation", "_sub1");
+        Path input = Files.writeString(tempDir.resolve("eq.xml"), eq.toRdfXml());
+        Path output = tempDir.resolve("eq.ttl");
+
+        int exitCode = new CommandLine(new CimPalCli()).execute("convert",
+                "--input", input.toString(), "--output", output.toString(),
+                "--xml-base", TestModels.XML_BASE);
+
+        assertThat(exitCode).isEqualTo(ExitCode.OK);
+        assertThat(Files.readString(output)).doesNotContain("file:");
+        Model converted = ModelFactory.createDefaultModel();
+        RDFDataMgr.read(converted, output.toString(), Lang.TURTLE);
+        Snapshots.assertIsomorphic(eq.toModel(), converted);
+    }
 }

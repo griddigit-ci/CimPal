@@ -40,6 +40,14 @@ class TestModelsTest {
     }
 
     @Test
+    void withoutXmlBaseLeavesTheBaseToTheReader() {
+        TestModels.CgmesModelBuilder eq = TestModels.eq().withoutXmlBase().resource("Substation", "_sub1");
+
+        assertThat(eq.toRdfXml()).doesNotContain("xml:base").contains("rdf:ID=\"_sub1\"");
+        assertThat(eq.toModel().containsResource(eq.toModel().getResource(TestModels.XML_BASE + "#_sub1"))).isTrue();
+    }
+
+    @Test
     void shapesAndThingFixturesParse() {
         assertThat(Snapshots.turtle(TestModels.minCountShape("cim:ACLineSegment", "cim:IdentifiedObject.name")).size()).isPositive();
         assertThat(Snapshots.turtle(TestModels.datatypeShape("cim:ACLineSegment", "cim:ACLineSegment.r", "float")).size()).isPositive();

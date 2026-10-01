@@ -22,11 +22,28 @@ public class RDFConverter {
     public Model convertedModel;
     public Model modelInheritance;
     public RDFConvertOptions options;
+    /** IRI of the source file when exactly one was read; relative identifiers are written against it when no base URI is set. */
+    private String sourceDocumentIri;
 
     public RDFConverter(RDFConvertOptions options) {
         this.convertedModel = null;
         this.modelInheritance = null;
         this.options = options;
+    }
+
+    /**
+     * Whether Jena's writer for this format can write IRIs relative to a base. In Jena 6 only the
+     * RDF/XML, Turtle and TriG writers can, by one fixed rule (same document, child or parent
+     * path) applied whenever they are given a base; every other writer writes full IRIs.
+     */
+    public static boolean writesRelativeIris(RDFFormat format) {
+        Lang lang = format.getLang();
+        return lang.equals(Lang.RDFXML) || lang.equals(Lang.TURTLE) || lang.equals(Lang.TRIG);
+    }
+
+    /** Whether the format is written by Jena's RDF/XML writer, which honours the XML and DOCTYPE declaration and tab settings. */
+    public static boolean isRdfXml(RDFFormat format) {
+        return format.getLang().equals(Lang.RDFXML);
     }
 
     //RDF conversion
@@ -76,10 +93,9 @@ public class RDFConverter {
             int count = 1;
             for (File modelFile : modelFiles) {
                 Model modelPart = ModelFactory.createDefaultModel();
-                // Union input may contain different RDF syntaxes. Reading by URI lets Jena
-                // choose a parser from each file's extension instead of applying one format
-                // chosen for the whole batch.
-                RDFDataMgr.read(modelPart, modelFile.toURI().toString());
+                // Union input may contain different RDF syntaxes. Jena chooses a parser from
+                // each file's extension instead of applying one format chosen for the whole batch.
+                readSource(modelPart, modelFile);
                 prefixMap.putAll(modelPart.getNsPrefixMap());
                 model.add(modelPart);
                 if (count == 1) {
@@ -190,7 +206,7 @@ public class RDFConverter {
             Map<String, String> prefixMap = model.getNsPrefixMap();
             for (File modelFile : modelFiles) {
                 Model modelPart = ModelFactory.createDefaultModel();
-                RDFDataMgr.read(modelPart, modelFile.toURI().toString());
+                readSource(modelPart, modelFile);
                 prefixMap.putAll(modelPart.getNsPrefixMap());
                 model.add(modelPart);
             }
@@ -201,9 +217,10 @@ public class RDFConverter {
             for (File modelFile : modelFiles) {
                 // The source syntax is inferred per file by Jena. This permits a mixed batch
                 // (for example RDF/XML, Turtle and JSON-LD) without a source-format control.
-                RDFDataMgr.read(model, modelFile.toURI().toString());
+                readSource(model, modelFile);
             }
         }
+        sourceDocumentIri = modelFiles.size() == 1 ? documentIri(modelFiles.getFirst()) : null;
 
 
         //in case only inheritance related structure should be converted
@@ -393,6 +410,56 @@ public class RDFConverter {
 
         this.convertedModel = model;
 
+    }
+
+    /**
+     * Reads one source, with the parser Jena picks from the file name. Relative identifiers in it,
+     * such as CIMXML's rdf:ID and rdf:about="#...", resolve against the configured base URI, or
+     * against the file's own location when there is none. Resolving them against the location
+     * while a base URI was set turned them into file:/// IRIs that no writer can relativise.
+     */
+    private void readSource(Model model, File file) {
+        String base = configuredBase();
+        RDFParser.source(file.toPath()).base(base != null ? base : documentIri(file)).parse(model);
+    }
+
+    /** The file:/// IRI of a source file, used as the base for its relative identifiers when no base URI is set. */
+    private static String documentIri(File file) {
+        return file.toPath().toAbsolutePath().toUri().toString();
+    }
+
+    /** The configured base URI, or null when it is blank, which means "no base URI". */
+    private String configuredBase() {
+        String base = options.getXmlBase();
+        return base == null || base.isBlank() ? null : base.trim();
+    }
+
+    /**
+     * The base handed to a Jena writer. RDF/XML, Turtle and TriG write every IRI under it in
+     * relative form, so they get none when full IRIs are requested, and the single source's own
+     * location when no base URI is set: identifiers that were relative in the source are then
+     * relative again, not file paths. Never "": Jena resolves that against the working directory.
+     */
+    private String jenaWriterBase(RDFFormat format) {
+        String base = configuredBase();
+        if (!writesRelativeIris(format)) {
+            return base;
+        }
+        if (!options.isRelativeToBase()) {
+            return null;
+        }
+        return base != null ? base : sourceDocumentIri;
+    }
+
+    /** Settings that Jena's RDF/XML writers read from the context; xml:base is written only for a configured base URI. */
+    private Map<String, Object> jenaRdfXmlProperties() {
+        Map<String, Object> properties = new HashMap<>();
+        if (options.getShowXmlDeclaration() != null) properties.put("showXmlDeclaration", options.getShowXmlDeclaration());
+        if (options.getShowDoctypeDeclaration() != null) properties.put("showDoctypeDeclaration", options.getShowDoctypeDeclaration());
+        String tab = options.getTabCharacter();
+        if (tab != null && !tab.isBlank()) properties.put("tab", tab.trim());
+        if (options.isRelativeToBase() && configuredBase() != null) properties.put("xmlbase", configuredBase());
+        return properties;
     }
 
     /** Finds the first configured RDFS stereotype whose lexical value contains "notDefined". */
@@ -602,7 +669,11 @@ public class RDFConverter {
 
         if (jenaTargetFormat != null) {
             try (outputStream) {
-                RDFWriterBuilder writer = RDFWriter.create().base(xmlBase).format(jenaTargetFormat).source(convertedModel);
+                RDFWriterBuilder writer = RDFWriter.create().base(jenaWriterBase(jenaTargetFormat)).format(jenaTargetFormat).source(convertedModel);
+                // Without a base URI the writer base is the source file itself, which must not
+                // appear in the output as a BASE directive.
+                if (configuredBase() == null) writer.set(RIOT.symTurtleOmitBase, true);
+                if (isRdfXml(jenaTargetFormat)) writer.set(SysRIOT.sysRdfWriterProperties, jenaRdfXmlProperties());
                 if (isJsonLd(jenaTargetFormat)) {
                     JsonLdOptions jsonLd = new JsonLdOptions();
                     jsonLd.setUseNativeTypes(options.isJsonLdUseNativeTypes());
@@ -610,9 +681,8 @@ public class RDFConverter {
                     jsonLd.setCompactArrays(options.isJsonLdCompactArrays());
                     jsonLd.setOrdered(options.isJsonLdOrdered());
                     if (!options.getJsonLdContext().isBlank()) jsonLd.setExpandContext(options.getJsonLdContext().trim());
-                    Context context = new Context();
-                    context.set(TitaniumJsonLdOptions.JSONLD_OPTIONS, jsonLd);
-                    writer.context(context);
+                    // set(), not context(): context() would drop the settings made above.
+                    writer.set(TitaniumJsonLdOptions.JSONLD_OPTIONS, jsonLd);
                 }
                 writer.output(outputStream);
             }
@@ -648,7 +718,10 @@ public class RDFConverter {
                         if (putHeaderOnTop) {
                             properties.put("prettyTypes", new Resource[]{ResourceFactory.createResource(headerClassResource)});
                         }
-                        properties.put("xmlbase", xmlBase);
+                        // With xmlbase set the writer relativises against it and writes xml:base.
+                        // Without it, it relativises against the writer base (the source file)
+                        // and writes no xml:base, so rdf:ID-style identifiers stay as they were.
+                        if (configuredBase() != null) properties.put("xmlbase", configuredBase());
                         properties.put("tab", tab);
                         properties.put("relativeURIs", relativeURIs);
                         properties.put("instanceData", convertInstanceData);
@@ -669,7 +742,7 @@ public class RDFConverter {
                         cxt.set(SysRIOT.sysRdfWriterProperties, properties);
 
                         RDFWriter.create()
-                                .base(xmlBase)
+                                .base(configuredBase() != null ? configuredBase() : sourceDocumentIri)
                                 .format(rdfFormat)
                                 .context(cxt)
                                 .source(convertedModel)
@@ -677,21 +750,13 @@ public class RDFConverter {
 
                     } else {
                         try (outputStream) {
-                            Map<String, Object> properties = new HashMap<>();
-                            properties.put("showXmlDeclaration", showXmlDeclaration);
-                            properties.put("showDoctypeDeclaration", showDoctypeDeclaration);
-                            //properties.put("blockRules", RDFSyntax.propertyAttr.toString()); //???? not sure
-                            properties.put("xmlbase", xmlBase);
-                            properties.put("tab", tab);
-                            //properties.put("prettyTypes",new Resource[] {ResourceFactory.createResource("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")});
-                            properties.put("relativeURIs", relativeURIs);
-
-                            // Put a properties object into the Context.
+                            // Jena's own RDF/XML writers. relativeURIs is not passed: Jena 6
+                            // ignores it and relativises whenever it is given a base.
                             Context cxt = new Context();
-                            cxt.set(SysRIOT.sysRdfWriterProperties, properties);
+                            cxt.set(SysRIOT.sysRdfWriterProperties, jenaRdfXmlProperties());
 
                             RDFWriter.create()
-                                    .base(xmlBase)
+                                    .base(jenaWriterBase(rdfFormat))
                                     .format(rdfFormat)
                                     .context(cxt)
                                     .source(convertedModel)
@@ -707,8 +772,9 @@ public class RDFConverter {
                 try (outputStream) {
                     //convertedModel.write(outputStream, RDFFormat.TURTLE.getLang().getLabel().toUpperCase(), xmlBase);
                     RDFWriter.create()
-                            .base(xmlBase)
-                            .set(RIOT.symTurtleOmitBase, false)
+                            .base(jenaWriterBase(RDFFormat.TURTLE))
+                            // BASE is written for a configured base URI only, never for the source file.
+                            .set(RIOT.symTurtleOmitBase, configuredBase() == null)
                             .set(RIOT.symTurtleIndentStyle, "wide")
                             .set(RIOT.symTurtleDirectiveStyle, "rdf10")
                             .set(RIOT.symTurtleMultilineLiterals, true)
