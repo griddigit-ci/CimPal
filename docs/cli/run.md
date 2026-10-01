@@ -57,7 +57,7 @@ Each **step** is a JSON object with these special keys:
 | `command` | **yes** | The CimPal CLI subcommand to run: `validate`, `convert`, `compare`, etc. `serve`, `mcp` and `run` are not allowed (see below). |
 | `id` | no | Identifier used in output and JSON results. Defaults to `step-N`. |
 | `name` | no | Human-readable step name shown in progress. Defaults to the command name. |
-| `config` | no | Path to a base config JSON file for this step. Resolved relative to the pipeline file. |
+| `config` | no | Path to a base config JSON file for this step. Resolved relative to the pipeline file. **Currently not read by any command** (known issue); put options inline. |
 | `stopOnError` | no | Per-step override for the pipeline-level `stopOnError`. |
 | `stopOnViolations` | no | Per-step override for the pipeline-level `stopOnViolations`. |
 | *(any command option)* | no | Inline options for the step, same keys as the command's config file. Override the `config` file values. |
@@ -70,11 +70,11 @@ The special keys (`command`, `id`, `name`, `stopOnError`, `stopOnViolations`) ar
 
 ## How paths work in steps
 
-**`config` in a step** — resolved relative to the pipeline file's directory.
+**Inline option paths** (e.g. `mappingCsv`, `modelsDir`): relative paths resolve against the pipeline file's folder. Absolute paths are used as they are. Before SEC-2, relative paths resolved against the system temp directory, where the step config is written.
 
-**Inline option paths** (e.g. `mappingCsv`, `modelsDir`) — use **absolute paths** in inline step options. Relative paths in inline options are resolved relative to the system temp directory (where the step config is written), which is almost never what you want.
+**`config` in a step**: resolved relative to the pipeline file's folder and checked like any other path. **Known issue:** no command currently reads a `config` key from its config file, so options in a referenced config file are ignored. Put the options inline in the step instead.
 
-If you need relative paths, put them in a separate config file (referenced by `config`) and the command will resolve them relative to that config file's location.
+**Allowed folders.** Step paths may only point inside the allowed folders. By default these are the working directory and the pipeline file's folder; add others with `--root`, `--read-root` or `--write-root` (see [`serve`](serve.md#allowed-folders---root)). Each step is checked just before it runs, so a step may read what an earlier step wrote. A refused path fails that step with exit code 2, naming the path, and the pipeline stops unless `stopOnError` is false. Existing output files named in a step are only replaced when the step sets `"overwrite": true`; files a command creates inside its output folder are replaced. A working directory that is your home folder or a drive root is not used as a default root. Direct use of the other commands (outside `run`) is not restricted.
 
 ---
 
@@ -163,7 +163,9 @@ When `--format json`, the pipeline runner prints a JSON summary to stdout. Step 
 
 ---
 
-## Using `config` in steps (recommended for complex options)
+## Using `config` in steps
+
+> **Known issue (found in SEC-2):** commands don't read the `config` key, so a referenced config file currently has no effect. Until that is fixed, put the options inline in the step.
 
 Each step can reference an existing config file with `config`. Inline step keys override the config file values — the same precedence rule as running a command with `--config base.json --flag override`.
 

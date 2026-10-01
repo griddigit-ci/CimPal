@@ -221,7 +221,16 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - Log lines use the shared Core `LogSanitizer`.
 - Breaking change: `serve` callers must now send the token header and the `Content-Type` header.
 
-**Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) once both CI legs are green, then SEC-2, following the
+**Allowed roots and no SPARQL SERVICE** (added by SEC-2, closing G2 and G3):
+- File paths in `serve`, `mcp` and `run` input must lie under `--root`, `--read-root` or `--write-root`. The defaults are the working directory, plus the pipeline folder for `run`; a home folder or drive root is never an implicit default.
+- `PathGuard` (CLI) checks every path key of each command and rewrites it as the checked absolute path. Core `PathPolicy` resolves real paths and refuses traversal, links and junctions that lead outside, UNC paths in any separator mix, device names and NTFS streams.
+- An active policy also covers paths Core resolves itself: mapping CSV cells, `owl:imports`, timestamped and manual folder walks, and organizer output.
+- Existing output files named in a request need `"overwrite": true`.
+- Network `owl:imports` are refused everywhere.
+- SPARQL `SERVICE` is refused (`SparqlServicePolicy`) and switched off globally in the CLI, the GUI and `ValidationTools`. Shapes with `SERVICE` are refused before they go to the Python engines, and the Python worker disables rdflib `SERVICE`. Jena 6.2 runs `SERVICE` by default (finding in `SEC-2.md`).
+- `serve` now passes `--format json` only to the four commands that support it. Before, the other six endpoints always failed with "Unknown option".
+
+**Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)), then SEC-2, following the
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action.
 
@@ -380,6 +389,16 @@ CimPal/
 **`validate --samples` requires `--export-turtle`.** Per-shape detail is extracted by parsing the `*__report.ttl` files after validation. These are auto-enabled when `--samples > 0` in JSON mode, but they remain on disk as a side effect. This is by design (the AI Assistant also uses them) but should be documented clearly.
 
 **`mcp` has no timeout, queue or memory limit (G4, open).** SEC-1 bounded `serve` only.
+
+**`run` step `config` key is ignored (found in SEC-2).** No command reads a `config` key, so a step's `config` file has no effect. `run.md` documents this; it needs a fix.
+
+**`manifest` can't run through `serve`, `mcp` or `run`** (no `--config` option), although `mcp` advertises the tool.
+
+**`sparql` reads `.zip` models without the archive limits** in `ModelFactory`. A large zip through `serve`/`mcp` can exhaust memory. Candidate for TEST-2 or a follow-up.
+
+**An unresolvable `owl:imports` is only a warning.** The row is validated with those shapes missing. Network imports now fail the row, but the general case needs fixing (TEST-2).
+
+**`mcp`/`serve` with Claude Desktop need `--root`.** After SEC-2, the CimPal MCP server only accepts paths under its working directory unless `--root` is given. Update `claude_desktop_config.json`; see `CimPal-CLI/configs/claude-desktop-config.json`.
 
 **A `serve` command that times out keeps running.** The caller gets 504, but the command isn't interrupted (that could leave truncated reports), so the worker stays busy until it finishes. `/health` then reports `"status":"stalled"`. Restart the server if a command hangs.
 
