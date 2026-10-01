@@ -36,6 +36,32 @@
                          module-path wiring. -->
                     <useModulePath>false</useModulePath>
                 </configuration>
+                <executions>
+                    <!-- The JDK HTTP server reads sun.net.httpserver.maxReqTime once per JVM, so the
+                         test that proves serve's request-read limit runs in a JVM of its own with a
+                         short limit (SEC-1). The default execution skips it. -->
+                    <execution>
+                        <id>default-test</id>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/ServeServerReadTimeoutTest.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>serve-read-timeout</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/ServeServerReadTimeoutTest.java</include>
+                            </includes>
+                            <argLine>@{argLine} -Dsun.net.httpserver.maxReqTime=2</argLine>
+                            <reportNameSuffix>serve-read-timeout</reportNameSuffix>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
