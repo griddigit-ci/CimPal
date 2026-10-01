@@ -7,9 +7,14 @@ package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
+import eu.griddigit.cimpal.core.utils.PathPolicy;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -22,6 +27,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
@@ -136,6 +142,14 @@ public class ServeCommand implements Callable<Integer> {
                     + "not finished in time gets 504.")
     private Duration requestTimeout;
 
+    @CommandLine.Mixin
+    RootOptions rootOptions = new RootOptions();
+
+    /** Commands that accept {@code --format json}; the others print their result files' paths. */
+    static final Set<String> JSON_COMMANDS = Set.of("validate", "sparql", "compare", "compare-instances");
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     /** How long a stopping server waits for a running command to finish writing its output. */
     private static final Duration SHUTDOWN_GRACE = Duration.ofSeconds(60);
 
@@ -181,9 +195,22 @@ public class ServeCommand implements Callable<Integer> {
                 .requestTimeout(requestTimeout)
                 .build();
 
+        List<Path> defaultRoots = List.of(Path.of("").toAbsolutePath());
+        PathPolicy policy;
+        try {
+            policy = rootOptions.policy(defaultRoots);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("[ERROR] " + ex.getMessage());
+            deleteIfOurs(writtenTokenFile, token);
+            return ExitCode.INVALID_INPUT;
+        }
+        Path base = rootOptions.base(defaultRoots);
+
         ServeServer server;
         try {
-            server = ServeServer.start(config, ServeCommand::runInProcess);
+            server = ServeServer.start(config,
+                    (command, configFile) -> runWithPolicy(policy, base, command, configFile),
+                    (command, body) -> checkPaths(policy, base, command, body));
         } catch (IllegalArgumentException ex) {
             System.err.println("[ERROR] " + ex.getMessage());
             deleteIfOurs(writtenTokenFile, token);
@@ -214,6 +241,7 @@ public class ServeCommand implements Callable<Integer> {
         } else {
             System.out.println("[INFO] Bearer token taken from " + ServeSecurity.TOKEN_ENV);
         }
+        System.out.println("[INFO] Allowed roots: read " + policy.readRoots() + ", write " + policy.writeRoots());
         System.out.println("[INFO] Endpoints: " + ServeServer.COMMANDS.stream().map(c -> "/" + c)
                 .reduce((a, b) -> a + "  " + b).orElse(""));
         System.out.println("[INFO] GET /health  GET /commands  POST /shutdown");
@@ -244,6 +272,42 @@ public class ServeCommand implements Callable<Integer> {
         return ExitCode.OK;
     }
 
+    /**
+     * Checks the file paths in a request against the allowed roots and makes them absolute
+     * (SEC-2). Invalid JSON is 400, a refused path 403.
+     */
+    static byte[] checkPaths(PathPolicy policy, Path base, String command, byte[] body) throws ServeServer.Rejected {
+        JsonNode json;
+        try {
+            json = MAPPER.readTree(body);
+        } catch (RuntimeException e) {
+            throw new ServeServer.Rejected(400, "Request body is not valid JSON.");
+        }
+        try {
+            return MAPPER.writeValueAsBytes(PathGuard.check(command, json, policy, base));
+        } catch (PathNotAllowedException e) {
+            throw new ServeServer.Rejected(403, e.getMessage());
+        }
+    }
+
+    /**
+     * Runs the command with the path policy in force for paths Core resolves internally. The
+     * paths are checked again first: an earlier request in the queue may have created an output
+     * file, or the file system may have changed, since the request was accepted.
+     */
+    private static ServeServer.CommandResult runWithPolicy(PathPolicy policy, Path base, String command,
+                                                           Path configFile) throws Exception {
+        ObjectNode checked;
+        try {
+            checked = PathGuard.check(command, MAPPER.readTree(configFile.toFile()), policy, base);
+        } catch (PathNotAllowedException e) {
+            return new ServeServer.CommandResult(ExitCode.INVALID_INPUT,
+                    "{\"exitCode\":2,\"status\":\"INVALID_INPUT\",\"error\":" + ServeServer.jsonStr(e.getMessage()) + "}");
+        }
+        MAPPER.writeValue(configFile.toFile(), checked);
+        return PathPolicy.runWith(policy, () -> runInProcess(command, configFile));
+    }
+
     /** Runs a subcommand in this JVM with JSON output and returns what it printed on stdout. */
     private static ServeServer.CommandResult runInProcess(String command, Path configFile) {
         // ValidateCommand redirects System.out→System.err for --format json internally,
@@ -255,7 +319,10 @@ public class ServeCommand implements Callable<Integer> {
         int exitCode;
         try {
             // The --format flag in the request body is overridden by the inline flag.
-            String[] args = {command, "--config", configFile.toString(), "--format", "json"};
+            // Only some commands have --format; adding it to the others fails as an unknown option.
+            String[] args = JSON_COMMANDS.contains(command)
+                    ? new String[] {command, "--config", configFile.toString(), "--format", "json"}
+                    : new String[] {command, "--config", configFile.toString()};
             exitCode = CimPalCli.inProcess().execute(args);
         } finally {
             System.setOut(origOut);

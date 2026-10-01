@@ -74,6 +74,11 @@ import picocli.CommandLine.Command;
 )
 public class CimPalCli {
 
+    static {
+        // No SPARQL SERVICE for anything run through the CLI, including in-process use (SEC-2).
+        SparqlServicePolicy.disableRemoteServiceGlobally();
+    }
+
     /**
      * Main entry point.  Delegates all subcommand dispatch to picocli and exits with
      * the return code of the executed subcommand.

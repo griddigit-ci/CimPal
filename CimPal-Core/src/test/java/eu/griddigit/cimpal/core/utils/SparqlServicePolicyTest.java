@@ -72,7 +72,13 @@ class SparqlServicePolicyTest {
             "ASK { FILTER EXISTS { SERVICE <http://example.org/sparql> { ?s ?p ?o } } }",
             "SELECT * WHERE { ?x ?y ?z MINUS { SERVICE <http://example.org/s> { ?x ?y ?z } } }",
             "SELECT * WHERE { BIND(EXISTS { SERVICE <http://example.org/s> { ?s ?p ?o } } AS ?b) }",
-            "SELECT * WHERE { ?a ?b ?c FILTER NOT EXISTS { { SELECT ?a { SERVICE <http://e.org/s> { ?a ?b ?c } } } } }"
+            "SELECT * WHERE { ?a ?b ?c FILTER NOT EXISTS { { SELECT ?a { SERVICE <http://e.org/s> { ?a ?b ?c } } } } }",
+            "SELECT (EXISTS { SERVICE <http://e.org/s> { ?s ?p ?o } } AS ?b) WHERE { }",
+            "SELECT ?s WHERE { ?s ?p ?o } ORDER BY (EXISTS { SERVICE <http://e.org/s> { ?s ?p ?o } })",
+            "SELECT ?s WHERE { ?s ?p ?o } GROUP BY ?s HAVING (EXISTS { SERVICE <http://e.org/s> { ?s ?p ?o } })",
+            "SELECT ?g WHERE { ?s ?p ?o } GROUP BY (EXISTS { SERVICE <http://e.org/s> { ?s ?p ?o } } AS ?g)",
+            "SELECT * WHERE { ?s ?p ?o LATERAL { SERVICE <http://e.org/s> { ?s ?q ?r } } }",
+            "SELECT * WHERE { { SELECT (EXISTS { SERVICE <http://e.org/s> { ?s ?p ?o } } AS ?b) WHERE { } } }"
     })
     void queriesContainingServiceAreRefused(String text) {
         Query query = QueryFactory.create(text);
@@ -104,6 +110,42 @@ class SparqlServicePolicyTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(stub.requests()).isEmpty();
         assertThat(out).doesNotExist();
+    }
+
+    @Test
+    void perExecutionSwitchAloneStopsService() {
+        ARQ.getContext().set(Service.httpServiceAllowed, true); // only the per-execution switch below
+
+        try (QueryExecution qe = QueryExecutionFactory.create(serviceQuery(), model())) {
+            SparqlServicePolicy.disableIn(qe.getContext());
+            assertThatThrownBy(() -> ResultSetFormatter.consume(qe.execSelect()))
+                    .isInstanceOf(RuntimeException.class);
+        }
+        assertThat(stub.requests()).isEmpty();
+    }
+
+    @Test
+    void shaclSparqlShapesUsingServiceAreRefusedForExternalEngines() {
+        Model shapes = ModelFactory.createDefaultModel();
+        shapes.read(new java.io.StringReader("""
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                <urn:s> sh:sparql [ sh:select "SELECT $this WHERE { service <http://169.254.169.254/x> { ?s ?p ?o } }" ] .
+                """), null, "TTL");
+
+        assertThatThrownBy(() -> SparqlServicePolicy.requireNoServiceInShapes(shapes))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SERVICE");
+    }
+
+    @Test
+    void shaclSparqlShapesWithoutServiceAreAccepted() {
+        Model shapes = ModelFactory.createDefaultModel();
+        shapes.read(new java.io.StringReader("""
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                <urn:s> sh:sparql [ sh:select "SELECT $this WHERE { $this ?p ?o }" ] ; sh:message "SERVICEable" .
+                """), null, "TTL");
+
+        SparqlServicePolicy.requireNoServiceInShapes(shapes);
     }
 
     @Test

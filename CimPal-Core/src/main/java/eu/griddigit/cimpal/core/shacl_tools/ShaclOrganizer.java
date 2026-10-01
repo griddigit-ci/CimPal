@@ -8,6 +8,7 @@
  */
 package eu.griddigit.cimpal.core.shacl_tools;
 
+import eu.griddigit.cimpal.core.utils.PathPolicy;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RIOT;
@@ -190,7 +191,8 @@ public class ShaclOrganizer {
             Model shaclModelToSave = entry.getValue();
             if (!shaclModelToSave.isEmpty()) {
                 String saveBaseURI = baseMap.get(filePath);
-                Path filePathObj = Path.of(filePath);
+                // File names come from the template; under serve/mcp/run they must stay in the write roots.
+                Path filePathObj = PathPolicy.checkWriteIfActive(Path.of(filePath).toAbsolutePath().normalize());
                 Files.createDirectories(filePathObj.getParent());
 
                 try (OutputStream out = Files.newOutputStream(filePathObj)) {

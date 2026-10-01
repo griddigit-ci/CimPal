@@ -6,6 +6,7 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.utils.PathPolicy;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
@@ -573,6 +574,8 @@ public class ValidateCommand implements Callable<Integer> {
                       return name.endsWith(".xml") || name.endsWith(".rdf")
                               || name.endsWith(".ttl") || name.endsWith(".zip");
                   })
+                  // serve/mcp/run: a link or junction under the models folder must not lead outside the roots.
+                  .map(PathPolicy::checkReadIfActive)
                   .map(Path::toFile)
                   .forEach(result::add);
         }
