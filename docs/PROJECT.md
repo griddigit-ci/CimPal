@@ -221,7 +221,7 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - Log lines use the shared Core `LogSanitizer`.
 - Breaking change: `serve` callers must now send the token header and the `Content-Type` header.
 
-**Next steps:** open the SEC-1 PR and check both CI legs, then SEC-2, following the
+**Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) once both CI legs are green, then SEC-2, following the
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action.
 

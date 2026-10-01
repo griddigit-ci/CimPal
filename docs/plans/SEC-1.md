@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (implementation and both review rounds done 2026-10-01; commit, PR and CI pending) |
+| Status | In review ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) |
 | Phase | 1 |
 | Depends on | TEST-1 |
 | Size | M |
@@ -113,5 +113,5 @@ Standard footer (applies to every work package):
 1. G4 is only partly closed. `mcp` still has no timeout, queue or memory guard, and `serve` has no memory guard. That belongs to a later WP (SEC-3, or a new one).
 2. Callers of `serve` outside this repo must be updated to send the token and `Content-Type` headers.
 3. Accepted residuals, documented in `docs/cli/serve.md`. A local process that keeps opening slow connections can still slow `serve` down. A command that hangs holds the worker until restart; `/health` shows `stalled`. On Windows, if the qualified account lookup fails, the token file is created first and restricted before the write; this only matters for a `--token-file` in a shared folder.
-4. Commit, PR into `devel` and CI (Windows and Ubuntu).
+4. [PR #44](https://github.com/griddigit-ci/CimPal/pull/44) into `devel`: check that both CI legs are green, including the POSIX-only token-file tests on Ubuntu.
 
