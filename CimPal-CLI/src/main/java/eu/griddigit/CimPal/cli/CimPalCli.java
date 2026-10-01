@@ -6,6 +6,7 @@
 package eu.griddigit.CimPal.cli;
 
 import eu.griddigit.CimPal.cli.command.CompareCommand;
+import eu.griddigit.cimpal.core.utils.SparqlServicePolicy;
 import eu.griddigit.CimPal.cli.command.CompareInstancesCommand;
 import eu.griddigit.CimPal.cli.command.ConvertCommand;
 import eu.griddigit.CimPal.cli.command.ExcelToShaclCommand;
@@ -78,6 +79,8 @@ public class CimPalCli {
      * the return code of the executed subcommand.
      */
     public static void main(String[] args) {
+        // No SPARQL SERVICE: user queries and SHACL-SPARQL shapes must not reach the network (SEC-2).
+        SparqlServicePolicy.disableRemoteServiceGlobally();
         int exitCode = new CommandLine(new CimPalCli()).execute(args);
         System.exit(exitCode);
     }
