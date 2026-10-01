@@ -27,7 +27,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | 1 | [TEST-1](TEST-1.md) | Test harness | CI-1 | M | In review ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
 | 1 | [SEC-1](SEC-1.md) | Harden serve | TEST-1 | M | Not started |
 | 1 | [SEC-2](SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | Not started |
-| 2 | [TEST-2](TEST-2.md) | Regression tests for past security findings | TEST-1 | M | Not started |
+| 2 | [TEST-2](TEST-2.md) | Regression tests for past security findings | TEST-1 | M | In review (4 findings reported, see TEST-2.md) |
 | 2 | [TEST-3](TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | Not started |
 | 2 | [TEST-4](TEST-4.md) | CLI contract, packaged JAR and protocol tests | TEST-1 | M | Not started |
 | 3 | [SEC-3](SEC-3.md) | MCP output hygiene and external engines | SEC-2 | S | Not started |
