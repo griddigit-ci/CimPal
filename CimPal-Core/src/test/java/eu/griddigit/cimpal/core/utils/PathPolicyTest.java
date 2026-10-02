@@ -202,8 +202,11 @@ class PathPolicyTest {
         PathPolicy.runWith(policy, () -> {
             assertThat(PathPolicy.active()).contains(policy);
             assertThatThrownBy(() -> PathPolicy.checkReadIfActive(outsideFile)).isInstanceOf(PathNotAllowedException.class);
-            assertThatThrownBy(() -> PathPolicy.refuseNetworkPathIfActive(Path.of("//server/share/x.xml")))
-                    .isInstanceOf(PathNotAllowedException.class);
+            if (windows()) {
+                // Only Windows has UNC paths; on POSIX "//server/share" is the local "/server/share".
+                assertThatThrownBy(() -> PathPolicy.refuseNetworkPathIfActive(Path.of("//server/share/x.xml")))
+                        .isInstanceOf(PathNotAllowedException.class);
+            }
             // Files Core names inside an output folder are replaced; only the location counts.
             assertThat(PathPolicy.checkWriteIfActive(root.resolve("in.ttl"))).isNotNull();
             return null;
