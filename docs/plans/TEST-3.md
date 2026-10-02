@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (validation group in review; other groups not started) |
+| Status | In progress (validation group in review, PR #50; other groups not started) |
 | Phase | 2 |
 | Depends on | TEST-1 |
 | Size | L (one session per feature group) |
