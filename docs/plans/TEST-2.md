@@ -83,7 +83,7 @@ Standard footer (applies to every work package):
 - **Reverted-fix check:** reverting F1 (redirect `NEVER`), F4 (Main formula neutralisation), F5 (splitting on both separators), F8 (normalised containment) or F9 (log neutralisation) fails the matching `F<n>_` tests every time.
 - **Coverage:** Core line 28.4% → 29.1%, Main 4.7% → 7.6%. The floors were raised.
 
-### Findings: not remediated, or regressed in later code (reported, not fixed)
+### Findings: not remediated, or regressed in later code (reported here, fixed in [SEC-5](SEC-5.md))
 
 1. **High: a refused or unresolvable `owl:imports` gives a clean pass (F2, and the CLAUDE.md rule "never a silent pass").** If an import is refused by the egress gate or can't be resolved, the row prints a `[WARN]` and is validated without those shapes. In `F2_refusedImportFailsTheRowInsteadOfPassing`, the only shapes sit in a refused import, and the violating model is reported as **conforming**. The test is committed `@Disabled`; with the check enabled it fails (`conforming` expected 0, was 1). Fix: count an unresolvable or refused import as a row error, or as a "partial" status that is never reported as conforming. SEC-2 already made *network* imports fail the row.
 2. **Medium: CSV formula injection in the CLI (F4).** `sparql` (`--output x.csv` and `--format csv`) and `compare` (`.csv` output and `--format csv`) write CSV with RFC-4180 quoting only. Cells starting with `=`, `+`, `-`, `@`, TAB or CR are not neutralised. These commands came after the attestation, which says "no other CSV emission path exists". Fix: reuse `ComparisonCsvWriter`'s neutralising escape.

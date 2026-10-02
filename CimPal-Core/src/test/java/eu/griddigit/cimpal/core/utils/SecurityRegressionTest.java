@@ -12,7 +12,6 @@ import eu.griddigit.cimpal.core.testsupport.SourceScan;
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
 import eu.griddigit.cimpal.core.testsupport.TestModels;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -141,11 +140,20 @@ class SecurityRegressionTest {
     @ValueSource(strings = {
             "https://127.0.0.1/x.ttl", "https://[::1]/x.ttl", "https://169.254.169.254/latest/meta-data/",
             "https://10.0.0.1/x.ttl", "https://172.16.0.1/x.ttl", "https://192.168.1.1/x.ttl",
-            "https://0.0.0.0/x.ttl", "https://224.0.0.1/x.ttl", "https://[fe80::1]/x.ttl"})
+            "https://0.0.0.0/x.ttl", "https://224.0.0.1/x.ttl", "https://[fe80::1]/x.ttl",
+            // added by SEC-5: IPv6 unique-local and carrier-grade NAT
+            "https://[fd00::1]/x.ttl", "https://[fc00::1]/x.ttl", "https://100.64.0.1/x.ttl", "https://100.127.255.254/x.ttl"})
     void F2_publicHostCheckRefusesInternalAddresses(String url) {
         assertThatThrownBy(() -> vt("requirePublicHost", new Class<?>[] {URI.class}, URI.create(url)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("non-public");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://8.8.8.8/x.ttl", "https://100.128.0.1/x.ttl", "https://100.63.255.255/x.ttl",
+            "https://[2001:4860:4860::8888]/x.ttl"})
+    void F2_publicHostCheckAcceptsPublicAddressesNextToTheRefusedRanges(String url) throws Throwable {
+        vt("requirePublicHost", new Class<?>[] {URI.class}, URI.create(url));
     }
 
     @Test
@@ -160,12 +168,11 @@ class SecurityRegressionTest {
     }
 
     /**
-     * The plan asks that a refused import be "reported as an error, not a pass". Today a
-     * refused or unresolvable import only prints a warning and the row is validated without
-     * those shapes, so the result can look clean. Reported in TEST-2.md, not fixed here.
+     * A refused import must be "reported as an error, not a pass". Until SEC-5 a refused or
+     * unresolvable import only printed a warning and the row was validated without those
+     * shapes, so a violating model could be reported conforming (found by TEST-2).
      */
     @Test
-    @Disabled("TEST-2 finding: a refused owl:imports is a warning, not an error (see docs/plans/TEST-2.md)")
     void F2_refusedImportFailsTheRowInsteadOfPassing() throws Exception {
         Files.createDirectories(tempDir.resolve("models"));
         Files.createDirectories(tempDir.resolve("constraints"));

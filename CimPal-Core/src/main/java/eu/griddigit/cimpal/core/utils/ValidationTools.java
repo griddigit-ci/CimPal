@@ -2000,9 +2000,7 @@ public class ValidationTools {
         }
         try {
             for (InetAddress addr : InetAddress.getAllByName(host)) {
-                if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()
-                        || addr.isSiteLocalAddress() || addr.isAnyLocalAddress()
-                        || addr.isMulticastAddress()) {
+                if (isNonPublicAddress(addr)) {
                     throw new IOException(
                             "Refusing remote fetch: host resolves to a non-public address: " + forLog(host));
                 }
@@ -2010,6 +2008,22 @@ public class ValidationTools {
         } catch (UnknownHostException e) {
             throw new IOException("Cannot resolve remote-fetch host: " + forLog(host), e);
         }
+    }
+
+    /**
+     * Loopback, link-local, private, wildcard and multicast addresses, plus two ranges Java's
+     * checks miss (SEC-5): IPv6 unique-local {@code fc00::/7} ({@code isSiteLocalAddress} only
+     * covers the deprecated {@code fec0::/10}) and carrier-grade NAT {@code 100.64.0.0/10}.
+     */
+    static boolean isNonPublicAddress(InetAddress addr) {
+        if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()
+                || addr.isAnyLocalAddress() || addr.isMulticastAddress()) {
+            return true;
+        }
+        byte[] b = addr.getAddress();
+        boolean uniqueLocal = b.length == 16 && (b[0] & 0xfe) == 0xfc;
+        boolean carrierGradeNat = b.length == 4 && (b[0] & 0xff) == 100 && (b[1] & 0xc0) == 64;
+        return uniqueLocal || carrierGradeNat;
     }
 
     /** Applies both egress policy tiers. Use at the point a request is about to be issued. */
@@ -2553,6 +2567,7 @@ public class ValidationTools {
         long totalFetchedMs = 0;
         int totalImportsFound = 0;
         int unresolvableImports = 0;
+        List<String> unresolvedUris = new ArrayList<>();
 
         while (!stack.isEmpty()) {
             ShapeSource src = stack.pop();
@@ -2626,6 +2641,7 @@ public class ValidationTools {
                                 + " from=" + src.displayName());
                     } else {
                         unresolvableImports++;
+                        unresolvedUris.add(urlForLog(uri));
                         dbg("SHAPES unresolvable import uri=" + urlForLog(uri)
                                 + " could not be resolved to any local or remote file"
                                 + " from=" + src.displayName());
@@ -2634,6 +2650,16 @@ public class ValidationTools {
             }
 
             dbg("SHAPES imports found=" + importsInFile + " src=" + src.displayName());
+        }
+
+        // A refused or unresolvable import means shapes are missing. Validating without them
+        // could report a violating model as conforming, the worst outcome here (TEST-2 / SEC-5),
+        // so the load fails and the row is an error instead.
+        if (!unresolvedUris.isEmpty()) {
+            throw new IOException(unresolvedUris.size()
+                    + " owl:imports could not be resolved to a local file or an allowed remote file, or were refused: "
+                    + String.join(", ", unresolvedUris.subList(0, Math.min(5, unresolvedUris.size())))
+                    + (unresolvedUris.size() > 5 ? ", ..." : ""));
         }
 
         cache.put(rootKey, shapes);
