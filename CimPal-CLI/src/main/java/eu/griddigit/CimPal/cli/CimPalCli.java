@@ -81,4 +81,13 @@ public class CimPalCli {
         int exitCode = new CommandLine(new CimPalCli()).execute(args);
         System.exit(exitCode);
     }
+
+    /**
+     * A command line for running a subcommand inside this JVM on behalf of {@code run},
+     * {@code serve} or {@code mcp}. {@code @file} argument expansion is off, so pipeline or
+     * request data can't pull extra arguments (e.g. another subcommand) in from a file.
+     */
+    public static CommandLine inProcess() {
+        return new CommandLine(new CimPalCli()).setExpandAtFiles(false);
+    }
 }

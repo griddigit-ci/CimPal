@@ -2557,12 +2557,18 @@ java -jar CimPal-CLI.jar convert ^
 <div class="fn-body">
 <h4>HTTP daemon</h4>
 <p><code>serve</code> keeps Jena and the validation runtime warm for repeated local automation.
-It binds to <code>localhost:7474</code> by default. Retain localhost unless the service is protected
-appropriately; every supplied file path is read or written on the local machine.</p>
+It binds to <code>localhost:7474</code> by default; a network address needs <code>--allow-remote</code>.
+Every supplied file path is read or written on the local machine, so each start creates a new
+bearer token in <code>%LOCALAPPDATA%\CimPal\serve.token</code>, readable only by you. Every
+endpoint except <code>GET /health</code> needs it, and POST bodies must be
+<code>application/json</code>. Requests from web pages (a foreign <code>Host</code> or
+<code>Origin</code> header) are refused.</p>
 <pre><code>java -jar CimPal-CLI.jar serve
 curl http://localhost:7474/health
 
+set /p TOKEN=&lt;"%LOCALAPPDATA%\CimPal\serve.token"
 curl -s -X POST http://localhost:7474/sparql ^
+  -H "Authorization: Bearer %TOKEN%" ^
   -H "Content-Type: application/json" ^
   -d "{\"models\":[\"C:/Data/EQ.xml\",\"C:/Data/TP.xml\"],\
        \"query\":\"SELECT ?s ?type { ?s a ?type } LIMIT 10\",\
@@ -2573,7 +2579,9 @@ curl -s -X POST http://localhost:7474/sparql ^
 <code>/gen-instances</code> and <code>/manifest</code>. The JSON body uses the matching CLI
 configuration keys. <code>GET /health</code> and <code>GET /commands</code> are read-only;
 <code>POST /shutdown</code> stops the daemon. HTTP 200 means the command ran, 400 is invalid input,
-and 500 is an internal failure. The daemon processes one request at a time.</p>
+401 a missing or wrong token, 403 a refused Host or Origin, and 500 an internal failure. The daemon
+processes one request at a time; when more than <code>--queue-size</code> (default 4) are waiting
+it answers 503, and after <code>--request-timeout</code> (default 30 minutes) 504.</p>
 <h4>MCP tools</h4>
 <p><code>mcp</code> exposes the same operations as typed tools over standard input/output for an
 MCP-capable desktop agent. It is not an HTTP service. Configure its JVM heap for large CGMES models:</p>

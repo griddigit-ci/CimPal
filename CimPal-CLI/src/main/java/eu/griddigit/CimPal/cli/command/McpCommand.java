@@ -199,7 +199,7 @@ public class McpCommand implements Callable<Integer> {
                 String[] cliArgs = spec.supportsJson
                         ? new String[]{spec.command, "--config", tempConfig.toString(), "--format", "json"}
                         : new String[]{spec.command, "--config", tempConfig.toString()};
-                exitCode = new CommandLine(new CimPalCli()).execute(cliArgs);
+                exitCode = CimPalCli.inProcess().execute(cliArgs);
             } finally {
                 System.setOut(System.err); // restore to stderr
             }

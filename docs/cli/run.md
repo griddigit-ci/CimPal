@@ -54,7 +54,7 @@ Each **step** is a JSON object with these special keys:
 
 | Key | Required | Description |
 |---|---|---|
-| `command` | **yes** | The CimPal CLI subcommand to run: `validate`, `convert`, `compare`, etc. |
+| `command` | **yes** | The CimPal CLI subcommand to run: `validate`, `convert`, `compare`, etc. `serve`, `mcp` and `run` are not allowed (see below). |
 | `id` | no | Identifier used in output and JSON results. Defaults to `step-N`. |
 | `name` | no | Human-readable step name shown in progress. Defaults to the command name. |
 | `config` | no | Path to a base config JSON file for this step. Resolved relative to the pipeline file. |
@@ -63,6 +63,8 @@ Each **step** is a JSON object with these special keys:
 | *(any command option)* | no | Inline options for the step, same keys as the command's config file. Override the `config` file values. |
 
 The special keys (`command`, `id`, `name`, `stopOnError`, `stopOnViolations`) are consumed by the pipeline runner. All other keys are forwarded as-is to the step's command as a config file. Keys the command doesn't recognise are silently ignored.
+
+**Steps that are not allowed.** A pipeline can't start a server or another pipeline. If any step's `command` is `serve`, `mcp` or `run` (in any letter case), the whole pipeline is refused with exit code 2 before the first step runs. The same applies with `--dry-run`. A `run` started from inside a running pipeline is also refused with exit 2.
 
 ---
 
@@ -94,6 +96,7 @@ Located in `CimPal-CLI/configs/`. Fill in the `REPLACE_WITH_PATH` placeholders.
 |---|---|
 | 0 | All steps passed with no violations |
 | 1 | All steps ran; at least one found violations (but no step was configured to stop on violations) |
+| 2 | Bad input: pipeline file missing or malformed, no steps, or a `serve`/`mcp`/`run` step |
 | 3 | A step failed (exit 2 or 3) and `stopOnError` caused the pipeline to abort |
 
 ---

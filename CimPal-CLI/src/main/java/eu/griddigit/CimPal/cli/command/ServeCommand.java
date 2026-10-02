@@ -5,8 +5,6 @@
  */
 package eu.griddigit.CimPal.cli.command;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
 import picocli.CommandLine;
@@ -15,15 +13,17 @@ import picocli.CommandLine.Option;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintStream;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
  * {@code serve} subcommand — starts a local HTTP server that exposes CimPal operations as
@@ -53,20 +53,28 @@ import java.util.concurrent.Executors;
  *   POST /excel2shacl       — Excel → SHACL
  *   POST /gen-instances     — Instance data generation
  *   POST /manifest          — Manifest generation
- *   GET  /health            — {"status":"ok","version":"..."}
+ *   GET  /health            — {"status":"ok","version":"..."} (no token needed)
  *   GET  /commands          — list of available endpoints
+ *   POST /shutdown          — stop the server
  * </pre>
  *
+ * <h2>Security</h2>
+ * <p>Every start creates a new 256-bit bearer token and writes it to a user-only token file
+ * (or takes it from {@code CIMPAL_API_TOKEN}). All endpoints except {@code GET /health} require
+ * {@code Authorization: Bearer <token>}. The Host header must name loopback and the bound port,
+ * an Origin header must be in {@code --allow-origin}, and POST bodies must be
+ * {@code application/json} and at most {@code --max-body-bytes}. See {@link ServeServer}.
+ *
  * <h2>Thread safety</h2>
- * <p>The server uses a single-threaded executor, so requests are serialised.  This avoids
- * races on the static flags in {@code ValidationTools} (debug mode, turtle export).  For a
- * local agent tool this is the right trade-off: a single validation run saturates the CPU
- * anyway, and the agent sends one request at a time.
+ * <p>Commands run one at a time on a single worker thread, so requests are serialised.  This
+ * avoids races on the static flags in {@code ValidationTools} (debug mode, turtle export).  At
+ * most {@code --queue-size} requests wait; more get 503.  A request not finished within
+ * {@code --request-timeout} gets 504.
  *
  * <h2>Exit codes</h2>
  * <ul>
- *   <li>0 — server started and is listening (blocks until SIGINT / {@code /shutdown})
- *   <li>2 — could not bind to the requested port
+ *   <li>0 — server ran and was stopped (blocks until SIGINT / {@code POST /shutdown})
+ *   <li>2 — could not bind to the requested port, or invalid options / token
  *   <li>3 — unexpected startup error
  * </ul>
  */
@@ -77,19 +85,14 @@ import java.util.concurrent.Executors;
                 "Start a local HTTP server exposing CimPal operations as REST endpoints.",
                 "",
                 "Useful for the automated validation agent: a single JVM stays warm across",
-                "many validation calls, avoiding repeated cold-start overhead."
+                "many validation calls, avoiding repeated cold-start overhead.",
+                "",
+                "Every request except GET /health needs 'Authorization: Bearer <token>'.",
+                "The token is new on every start and is written to --token-file."
         },
         sortOptions = false
 )
 public class ServeCommand implements Callable<Integer> {
-
-    private static final String VERSION = "CimPal CLI 2026.9";
-
-    /** Commands exposed as POST endpoints. Must match the picocli command names exactly. */
-    private static final List<String> COMMANDS = List.of(
-            "validate", "sparql", "convert", "compare", "compare-instances",
-            "rdfs2shacl", "organize", "excel2shacl", "gen-instances", "manifest"
-    );
 
     @Option(names = {"--port", "-p"},
             defaultValue = "7474",
@@ -98,182 +101,180 @@ public class ServeCommand implements Callable<Integer> {
 
     @Option(names = "--host",
             defaultValue = "localhost",
-            description = "Bind address (default: localhost — not accessible from the network).")
+            description = "Bind address (default: localhost — not accessible from the network). "
+                    + "A non-loopback address also needs --allow-remote.")
     private String host;
+
+    @Option(names = "--allow-remote",
+            description = "Allow a non-loopback --host. The token is still required, and traffic "
+                    + "is plain HTTP.")
+    private boolean allowRemote;
+
+    @Option(names = "--token-file",
+            description = "Where to write the bearer token (default: %%LOCALAPPDATA%%\\CimPal\\serve.token "
+                    + "on Windows, ~/.cimpal/serve.token elsewhere). Not used when CIMPAL_API_TOKEN is set.")
+    private Path tokenFile;
+
+    @Option(names = "--allow-origin",
+            description = "Browser Origin allowed to call the server (repeatable). A request with any "
+                    + "other Origin header gets 403. No CORS headers are ever sent.")
+    private List<String> allowedOrigins = List.of();
+
+    @Option(names = "--max-body-bytes",
+            defaultValue = "1048576",
+            description = "Largest accepted request body in bytes (default: 1048576 = 1 MB).")
+    private long maxBodyBytes;
+
+    @Option(names = "--queue-size",
+            defaultValue = "4",
+            description = "Requests that may wait while one runs (default: 4); more get 503.")
+    private int queueSize;
+
+    @Option(names = "--request-timeout",
+            defaultValue = "PT30M",
+            description = "Per-request timeout as an ISO-8601 duration (default: PT30M). A request "
+                    + "not finished in time gets 504.")
+    private Duration requestTimeout;
+
+    /** How long a stopping server waits for a running command to finish writing its output. */
+    private static final Duration SHUTDOWN_GRACE = Duration.ofSeconds(60);
+
+    /** Environment the token is looked up in; replaced by tests. */
+    Map<String, String> environment = System.getenv();
+
+    /** Called with the running server once it listens; tests use it to find the port. */
+    Consumer<ServeServer> onStarted = server -> { };
 
     // -------------------------------------------------------------------------
 
     @Override
     public Integer call() {
-        HttpServer server;
+        String token;
+        Path writtenTokenFile = null;
         try {
-            server = HttpServer.create(new InetSocketAddress(host, port), 0);
+            Optional<String> fromEnv = ServeSecurity.tokenFromEnvironment(environment);
+            if (fromEnv.isPresent()) {
+                token = fromEnv.get();
+            } else {
+                token = ServeSecurity.newToken();
+                writtenTokenFile = tokenFile != null ? tokenFile
+                        : ServeSecurity.defaultTokenFile(environment, System.getProperty("os.name"),
+                                Path.of(System.getProperty("user.home")));
+                ServeSecurity.writeTokenFile(writtenTokenFile, token);
+            }
+        } catch (IllegalArgumentException ex) {
+            System.err.println("[ERROR] " + ex.getMessage());
+            return ExitCode.INVALID_INPUT;
         } catch (IOException ex) {
-            System.err.println("[ERROR] Could not bind to " + host + ":" + port + " — " + ex.getMessage());
+            System.err.println("[ERROR] Could not write the token file: " + ex.getMessage());
             return ExitCode.INVALID_INPUT;
         }
 
-        // Single-threaded executor: serialises requests to avoid races on ValidationTools statics.
-        server.setExecutor(Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "cimpal-serve");
-            t.setDaemon(false);
-            return t;
-        }));
+        ServeServer.Config config = ServeServer.Config.builder()
+                .host(host)
+                .port(port)
+                .token(token)
+                .allowedOrigins(new LinkedHashSet<>(allowedOrigins))
+                .allowRemote(allowRemote)
+                .maxBodyBytes(maxBodyBytes)
+                .queueSize(queueSize)
+                .requestTimeout(requestTimeout)
+                .build();
 
-        // --- command endpoints ---
-        for (String cmd : COMMANDS) {
-            final String cmdName = cmd;
-            server.createContext("/" + cmdName, exchange -> handleCommand(exchange, cmdName));
+        ServeServer server;
+        try {
+            server = ServeServer.start(config, ServeCommand::runInProcess);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("[ERROR] " + ex.getMessage());
+            deleteIfOurs(writtenTokenFile, token);
+            return ExitCode.INVALID_INPUT;
+        } catch (IOException ex) {
+            System.err.println("[ERROR] Could not bind to " + host + ":" + port + " - " + ex.getMessage());
+            deleteIfOurs(writtenTokenFile, token);
+            return ExitCode.INVALID_INPUT;
         }
 
-        // --- utility endpoints ---
-        server.createContext("/health",   this::handleHealth);
-        server.createContext("/commands", this::handleCommands);
-        server.createContext("/shutdown", exchange -> {
-            respond(exchange, 200, "{\"status\":\"shutting down\"}");
-            server.stop(1);
-        });
+        Path tokenFileToDelete = writtenTokenFile;
+        String ownToken = token;
+        Thread shutdownHook = new Thread(() -> {
+            server.close();
+            deleteIfOurs(tokenFileToDelete, ownToken);
+        }, "cimpal-serve-shutdown");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
 
-        server.start();
-        System.out.println("[INFO] CimPal daemon listening on http://" + host + ":" + port);
-        System.out.println("[INFO] Endpoints: " + COMMANDS.stream().map(c -> "/" + c)
+        if (!ServeSecurity.isLoopback(host)) {
+            System.err.println("[WARN] Listening on non-loopback address " + host
+                    + ". Anyone who can reach it and has the token can run CimPal commands on this "
+                    + "machine, and traffic is not encrypted.");
+        }
+        System.out.println("[INFO] CimPal daemon listening on http://" + host + ":" + server.port());
+        if (writtenTokenFile != null) {
+            System.out.println("[INFO] Bearer token written to " + writtenTokenFile.toAbsolutePath()
+                    + " (send it as 'Authorization: Bearer <token>')");
+        } else {
+            System.out.println("[INFO] Bearer token taken from " + ServeSecurity.TOKEN_ENV);
+        }
+        System.out.println("[INFO] Endpoints: " + ServeServer.COMMANDS.stream().map(c -> "/" + c)
                 .reduce((a, b) -> a + "  " + b).orElse(""));
         System.out.println("[INFO] GET /health  GET /commands  POST /shutdown");
         System.out.println("[INFO] Send POST /shutdown or press Ctrl-C to stop.");
+        onStarted.accept(server);
 
-        // Block main thread until the server is stopped.
         try {
-            Thread.currentThread().join();
-        } catch (InterruptedException ignored) {}
-
+            server.awaitStop();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } finally {
+            server.close();
+            deleteIfOurs(tokenFileToDelete, ownToken);
+            try {
+                if (!server.awaitWorker(SHUTDOWN_GRACE)) {
+                    System.err.println("[WARN] A command was still running after " + SHUTDOWN_GRACE.toSeconds()
+                            + " s; its output may be incomplete.");
+                }
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // the JVM is already shutting down and runs the hook itself
+            }
+        }
         return ExitCode.OK;
     }
 
-    // -------------------------------------------------------------------------
-    // Command dispatcher
-    // -------------------------------------------------------------------------
-
-    private void handleCommand(HttpExchange exchange, String commandName) throws IOException {
-        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-            respond(exchange, 405, error("Method not allowed — use POST"));
-            return;
-        }
-
-        byte[] body;
+    /** Runs a subcommand in this JVM with JSON output and returns what it printed on stdout. */
+    private static ServeServer.CommandResult runInProcess(String command, Path configFile) {
+        // ValidateCommand redirects System.out→System.err for --format json internally,
+        // so we capture around that entire flow. Commands run one at a time (single worker).
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream captured = new PrintStream(baos, true, StandardCharsets.UTF_8);
+        PrintStream origOut = System.out;
+        System.setOut(captured);
+        int exitCode;
         try {
-            body = exchange.getRequestBody().readAllBytes();
-        } catch (IOException ex) {
-            respond(exchange, 400, error("Could not read request body: " + ex.getMessage()));
-            return;
-        }
-
-        if (body.length == 0) {
-            body = "{}".getBytes(StandardCharsets.UTF_8);
-        }
-
-        // Write the request body to a temp config file
-        Path tempConfig = null;
-        try {
-            tempConfig = Files.createTempFile("cimpal-serve-", ".json");
-            Files.write(tempConfig, body);
-
-            // Capture stdout so we can return it in the response body.
-            // ValidateCommand redirects System.out→System.err for --format json internally,
-            // so we wrap around that entire flow.
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            PrintStream captured = new PrintStream(baos, true, StandardCharsets.UTF_8);
-            PrintStream origOut  = System.out;
-            System.setOut(captured);
-
-            int exitCode;
-            try {
-                // Always request JSON output so the response is machine-readable.
-                // The --format flag in the request body is overridden by the inline flag.
-                String[] args = {commandName, "--config", tempConfig.toString(), "--format", "json"};
-                exitCode = new CommandLine(new CimPalCli()).execute(args);
-            } finally {
-                System.setOut(origOut);
-            }
-
-            String responseBody = baos.toString(StandardCharsets.UTF_8).trim();
-            if (responseBody.isEmpty()) {
-                // Command produced no JSON output — synthesise a minimal response.
-                responseBody = "{\"exitCode\":" + exitCode
-                        + ",\"status\":\"" + statusLabel(exitCode) + "\"}";
-            }
-
-            // HTTP status: treat exit 0 and 1 (violations) as success; 2+ as error.
-            int httpStatus = exitCode <= 1 ? 200 : (exitCode == 2 ? 400 : 500);
-            respond(exchange, httpStatus, responseBody);
-
-        } catch (Exception ex) {
-            respond(exchange, 500, error("Internal error: " + ex.getMessage()));
+            // The --format flag in the request body is overridden by the inline flag.
+            String[] args = {command, "--config", configFile.toString(), "--format", "json"};
+            exitCode = CimPalCli.inProcess().execute(args);
         } finally {
-            if (tempConfig != null) {
-                try { Files.deleteIfExists(tempConfig); } catch (Exception ignored) {}
+            System.setOut(origOut);
+        }
+        return new ServeServer.CommandResult(exitCode, baos.toString(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Deletes the token file if it still holds {@code token}. Another {@code serve} started with
+     * the same token file has overwritten it with its own token, and that file must stay.
+     */
+    private static void deleteIfOurs(Path file, String token) {
+        if (file == null) return;
+        try {
+            if (Files.size(file) <= 1024 && Files.readString(file, StandardCharsets.UTF_8).equals(token)) {
+                Files.delete(file);
             }
+        } catch (IOException ignored) {
+            // best effort: the token is useless once the server has stopped
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // Utility endpoints
-    // -------------------------------------------------------------------------
-
-    private void handleHealth(HttpExchange exchange) throws IOException {
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            respond(exchange, 405, error("Method not allowed"));
-            return;
-        }
-        respond(exchange, 200,
-                "{\"status\":\"ok\",\"version\":" + jsonStr(VERSION) + "}");
-    }
-
-    private void handleCommands(HttpExchange exchange) throws IOException {
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            respond(exchange, 405, error("Method not allowed"));
-            return;
-        }
-        StringBuilder sb = new StringBuilder("{\"commands\":[");
-        for (int i = 0; i < COMMANDS.size(); i++) {
-            sb.append(jsonStr("/" + COMMANDS.get(i)));
-            if (i < COMMANDS.size() - 1) sb.append(",");
-        }
-        sb.append("],\"utility\":[");
-        sb.append(jsonStr("/health")).append(",");
-        sb.append(jsonStr("/commands")).append(",");
-        sb.append(jsonStr("/shutdown"));
-        sb.append("]}");
-        respond(exchange, 200, sb.toString());
-    }
-
-    // -------------------------------------------------------------------------
-    // HTTP helpers
-    // -------------------------------------------------------------------------
-
-    private static void respond(HttpExchange exchange, int status, String body) throws IOException {
-        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-        exchange.sendResponseHeaders(status, bytes.length);
-        try (OutputStream out = exchange.getResponseBody()) {
-            out.write(bytes);
-        }
-    }
-
-    private static String error(String message) {
-        return "{\"error\":" + jsonStr(message) + "}";
-    }
-
-    private static String statusLabel(int exitCode) {
-        return switch (exitCode) {
-            case 0 -> "OK";
-            case 1 -> "VIOLATIONS";
-            case 2 -> "INVALID_INPUT";
-            default -> "ERROR";
-        };
-    }
-
-    private static String jsonStr(String value) {
-        if (value == null) return "null";
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 }
