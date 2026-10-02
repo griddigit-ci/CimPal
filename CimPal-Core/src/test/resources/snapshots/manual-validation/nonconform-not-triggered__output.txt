@@ -1,0 +1,4 @@
+SHACL Rule: Thing.size
+WARNING: Rule not triggered: Thing.size in non-conform model: colourless.xml
+
+Validation log saved to: <BASE>/rules/validation_log_<TIMESTAMP>.xlsx

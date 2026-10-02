@@ -1,0 +1,3 @@
+SHACL Rule: Thing.size
+
+Validation log saved to: <BASE>/rules/validation_log_<TIMESTAMP>.xlsx

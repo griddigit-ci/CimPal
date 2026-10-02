@@ -232,9 +232,16 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - SPARQL `SERVICE` is refused (`SparqlServicePolicy`) and switched off globally in the CLI, the GUI and `ValidationTools`. Shapes with `SERVICE` are refused before they go to the Python engines, and the Python worker disables rdflib `SERVICE`. Jena 6.2 runs `SERVICE` by default (finding in `SEC-2.md`).
 - `serve` now passes `--format json` only to the four commands that support it. Before, the other six endpoints always failed with "Unknown option".
 
-**Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)), then SEC-2, following the
-phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
-required is a maintainer action.
+**Characterisation tests, validation group** (added by TEST-3, 2026-10-02):
+- `SHACLValidatorTest`, `MappingValidatorTest` and the new `ShaclAutoTesterTest` pin the current output of `SHACLValidator`, `MappingValidator` (mapping and timestamped) and `ShaclAutoTester` as golden files under `snapshots/shacl-validator/`, `mapping-validation/` and `manual-validation/`.
+- They cover CGMES 2.4 and 3.0 presets, empty and malformed input, row errors, result limits, ZIP input and a previous comparison workbook.
+- `Snapshots` now also normalises sheet names, and gained `assertExcelEqualsIgnoringRowOrder`.
+- The other TEST-3 feature groups are still open.
+
+**Next steps:**
+- Merge SEC-2 (#45), TEST-2 (#46), SEC-5 (#49) and TEST-3 validation, in that order.
+- Continue TEST-3 with the next feature group, following the phase order in `docs/plans/README.md`.
+- Enabling branch protection with the two CI checks as required is a maintainer action.
 
 ---
 
@@ -384,9 +391,16 @@ CimPal/
 - Zip limits are counted while reading, with a per-entry cap, and also apply in `modelLoadPerFiles`.
 - `requirePublicHost` refuses IPv6 unique-local and carrier-grade NAT addresses.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. After TEST-2, SEC-5 and TEST-3 (validation group), Core is at 38.0% / 25.5% (2026-10-02). CLI tests only cover `--help`, `convert`, `sparql` CSV output and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-3 to TEST-4 are meant to raise it. Before refactoring a Core feature that TEST-3 has not covered yet, add characterisation tests that capture the current output.
 
-**Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
+**Timestamped report times are snapped to minute 30 of the hour (by design, maintainer to confirm).** `ValidationTools.normalizeTimestampToReportTime` sets every report time to `HH:30:00Z`, so `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. It looks like the market-time-unit convention (the middle of the hour). The TEST-3 snapshots pin it.
+
+**`ShaclAutoTester` suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test in `ShaclAutoTesterTest`:
+- Models and reports are cached by file name, so two rule folders holding a `model.xml` share one report.
+- A triggered shape without `sh:name` ends the run with a `NullPointerException`.
+- An unparsable model is logged twice, once as a "Validation Error" without its rule name.
+
+**Single-dataset workbook row order varies between runs.** `SHACLValidationReport.writeExcel` writes results in the engine's result order, which isn't stable. The TEST-3 snapshots compare those rows sorted (`Snapshots.assertExcelEqualsIgnoringRowOrder`).
 
 **`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. `validate --workflow manual` was deliberately left calling `ShaclAutoTester` directly — see the `ShaclAutoTester` row above for why. No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
 
@@ -401,10 +415,6 @@ CimPal/
 **`run` step `config` key is ignored (found in SEC-2).** No command reads a `config` key, so a step's `config` file has no effect. `run.md` documents this; it needs a fix.
 
 **`manifest` can't run through `serve`, `mcp` or `run`** (no `--config` option), although `mcp` advertises the tool.
-
-**`sparql` reads `.zip` models without the archive limits** in `ModelFactory`. A large zip through `serve`/`mcp` can exhaust memory. Candidate for TEST-2 or a follow-up.
-
-**An unresolvable `owl:imports` is only a warning.** The row is validated with those shapes missing. Network imports now fail the row, but the general case needs fixing (TEST-2).
 
 **`mcp`/`serve` with Claude Desktop need `--root`.** After SEC-2, the CimPal MCP server only accepts paths under its working directory unless `--root` is given. Update `claude_desktop_config.json`; see `CimPal-CLI/configs/claude-desktop-config.json`.
 

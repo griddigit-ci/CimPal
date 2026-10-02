@@ -1,0 +1,3 @@
+## Summary
+Rule Name,File Name,Error Type,Expected Conform,Message
+Thing.size,colourless.xml,Expected Trigger Not Found,false,Non-conform model didn't trigger rule.

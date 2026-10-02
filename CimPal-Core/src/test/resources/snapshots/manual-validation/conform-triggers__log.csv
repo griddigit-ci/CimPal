@@ -1,0 +1,3 @@
+## Summary
+Rule Name,File Name,Error Type,Expected Conform,Message
+Thing.size,bad.xml,Unexpected Trigger,true,Conform model triggered the rule that it should conform to.

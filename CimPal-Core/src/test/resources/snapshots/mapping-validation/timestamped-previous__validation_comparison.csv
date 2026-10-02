@@ -1,0 +1,26 @@
+## January 2026
+Region,Timestamp,Dataset,Warnings,Infos,Violations,Total
+RegionA,<TIMESTAMP>,Thing check,0,0,1,1
+## February 2026
+Region,Timestamp,Dataset,Warnings,Infos,Violations,Total
+RegionA,<TIMESTAMP>,Thing check,0,0,1,1
+RegionA,<TIMESTAMP>,Thing check,0,0,0,0
+## Charts
+RegionA
+Dataset,February 2026 Warnings+Violations total,February 2026 Warnings+Violations %,February 2026 Warnings,February 2026 Warnings %,February 2026 Violations,February 2026 Violations %,Previous Warnings+Violations total,Previous Warnings+Violations %,Delta (cur−prev)
+Thing check,1,=B3/SUM($B$3:$B$3)*100,0,=D3/SUM($D$3:$D$3)*100,1,=F3/SUM($F$3:$F$3)*100,1,=H3/SUM($H$3:$H$3)*100,=B3-H3
+Combined (all regions)
+Dataset,February 2026 Warnings+Violations total,February 2026 Warnings+Violations %,Previous Warnings+Violations total,Previous Warnings+Violations %,Delta (cur − prev)
+Thing check,1,=B27/SUM($B$27:$B$27)*100,1,=D27/SUM($D$27:$D$27)*100,=B27-D27
+Compliance Rate (Warnings and Violations) by Region
+Run,RegionA,Combined
+January 2026,0,0
+February 2026,0,0
+Violations Compliance Rate (Violations) by Region
+Run,RegionA,Combined
+January 2026,0,0
+February 2026,0,0
+Warnings Compliance Rate (Warnings) by Region
+Run,RegionA,Combined
+January 2026,100,100
+February 2026,100,100
