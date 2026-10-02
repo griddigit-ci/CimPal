@@ -540,5 +540,10 @@ public class MultiplyCGMFromConfigXLS implements ITask {
     public void setTpbdId(String tpbdId) {
         this.tpbdID = tpbdId;
     }
+
+    @Override
+    public String getNcpUnsupportedReason() {
+        return "Assembles CGMES CGMs out of IGMs; Network Code Profile datasets are not grid models.";
+    }
 }
 

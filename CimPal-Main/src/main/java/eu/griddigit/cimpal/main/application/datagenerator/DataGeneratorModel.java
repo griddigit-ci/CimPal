@@ -12,20 +12,37 @@ import eu.griddigit.cimpal.main.application.datagenerator.resources.UnzippedFile
 import org.apache.commons.io.FilenameUtils;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.RDFNode;
+import org.apache.jena.rdf.model.ResIterator;
+import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.vocabulary.DCAT;
+import org.apache.jena.vocabulary.DCTerms;
+import org.apache.jena.vocabulary.OWL2;
+import org.apache.jena.vocabulary.RDF;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 public class DataGeneratorModel {
+    // Where the two halves of a Network Code Profile's name live: the profile a dataset conforms to
+    // is https://ap.cim4.eu/<name>/<version>, its vocabulary's ontology https://ap-voc.cim4.eu/<name>#Ontology.
+    private static final String NCP_PROFILE_HOST = "https://ap.cim4.eu/";
+    private static final String NCP_VOCABULARY_HOST = "https://ap-voc.cim4.eu/";
+
     // RDFS Profile
     private RDFSProfile rdfsProfileVersion;
     private Map<String,ArrayList<Object>> profileDataMap;
     private Map<String,Model> profileDataMapAsModel;
     private Map<String,Model> profileModelMap ;
+    private Map<String, String> ncpKeywordsByProfileName;
 
     //Base instance model and files unionModel and modelUnionWithoutHeader and all other keywords
     private  Map<String, BaseInstanceModel> baseInstanceModel;
@@ -111,24 +128,12 @@ public class DataGeneratorModel {
 
                 if (unzippedFiles.isSingleZip){
                     inputStream = unzippedFiles.getInputStreamList().getFirst();
-                    Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-
-                    RDFDataMgr.read(model, inputStream, rdfsProfileVersion.getBaseNamespace(), rdfSourceFormat);
-
-                    BaseInstanceModel loadedModel = new BaseInstanceModel(unzippedFiles.fileNames().getFirst());
-                    loadedModel.setBaseInstanceModel(model);
-                    baseModelMap.put(unzippedFiles.fileNames().getFirst(), loadedModel);
+                    readAndRegister(baseModelMap, unzippedFiles.fileNames().getFirst(), inputStream, rdfSourceFormat);
                 }
                 else{
                     for (int i = 0; i < unzippedFiles.fileNames().size(); i++){
                         inputStream = unzippedFiles.getInputStreamList().get(i);
-                        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-
-                        RDFDataMgr.read(model, inputStream, rdfsProfileVersion.getBaseNamespace(), rdfSourceFormat);
-
-                        BaseInstanceModel loadedModel = new BaseInstanceModel(unzippedFiles.fileNames().get(i));
-                        loadedModel.setBaseInstanceModel(model);
-                        baseModelMap.put(unzippedFiles.fileNames().get(i), loadedModel);
+                        readAndRegister(baseModelMap, unzippedFiles.fileNames().get(i), inputStream, rdfSourceFormat);
                     }
                 }
             }
@@ -136,17 +141,132 @@ public class DataGeneratorModel {
                 inputStream = new FileInputStream(file);
                 if (inputStream.available() == 0)
                     throw new IOException("File is empty: " + file);
-                Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-
-                RDFDataMgr.read(model, inputStream, rdfsProfileVersion.getBaseNamespace(), rdfSourceFormat);
-
-                BaseInstanceModel loadedModel = new BaseInstanceModel(FilenameUtils.getName(file));
-                loadedModel.setBaseInstanceModel(model);
-                baseModelMap.put(FilenameUtils.getName(file), loadedModel);
+                readAndRegister(baseModelMap, FilenameUtils.getName(file), inputStream, rdfSourceFormat);
             }
         }
 
         return baseModelMap;
+    }
+
+    // Parses one file. CIM XML tells an object the file defines (rdf:ID) from one it only refers to
+    // (rdf:about), which parsing loses, so the attribute is noted on the way - see RdfAboutScanner.
+    private void readAndRegister(Map<String, BaseInstanceModel> baseModelMap, String fileName, InputStream inputStream, Lang format) throws IOException {
+        RdfAboutScanner scanner = format == Lang.RDFXML ? new RdfAboutScanner(inputStream) : null;
+        Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        RDFDataMgr.read(model, scanner != null ? scanner : inputStream, rdfsProfileVersion.getBaseNamespace(), format);
+        Set<Resource> about = scanner == null ? null : scanner.aboutSubjects(model);
+        register(baseModelMap, fileName, model, about, about == null ? null : scanner.idSubjects(model, about));
+    }
+
+    /**
+     * Wraps one loaded file and records the profile it belongs to.
+     * <p>
+     * Every task keys its work on that profile - the RDFS it reads and the serialisation rules the
+     * file is written back with - so a file whose profile cannot be told is refused here, by name,
+     * rather than failing somewhere in the middle of a task.
+     */
+    private void register(Map<String, BaseInstanceModel> baseModelMap, String fileName, Model model,
+                          Set<Resource> aboutSubjects, Set<Resource> idSubjects) throws IOException {
+        BaseInstanceModel loadedModel = new BaseInstanceModel(fileName);
+        loadedModel.setBaseInstanceModel(model);
+        loadedModel.setWrittenForm(aboutSubjects, idSubjects);
+
+        if (rdfsProfileVersion.isNcp()) {
+            loadedModel.setProfile(ncpProfileKeyword(fileName, model));
+        } else if (loadedModel.getProfile() == null) {
+            throw new IOException("Cannot tell which profile " + fileName + " belongs to: the file name does not follow "
+                    + "<datetime>_<process>_<TSO>_<profile>_<version>.");
+        }
+
+        baseModelMap.put(fileName, loadedModel);
+    }
+
+    /**
+     * The profile keyword of a Network Code Profile dataset - CO, RA, AE...
+     * <p>
+     * NCP datasets are named freely, so unlike CGMES the profile cannot be read off the file name.
+     * The header says it instead: dcterms:conformsTo is mandatory and carries the profile's URI
+     * (https://ap.cim4.eu/Contingency/2.3), which is matched by name against the loaded vocabularies.
+     * dcat:keyword is only the fallback: it is optional, and the data does not use it consistently -
+     * the ReliCapGrid examples include a RemedialActionSchedule dataset keyworded FAP and an
+     * EquipmentReliability one keyworded CommonData.
+     */
+    private String ncpProfileKeyword(String fileName, Model model) throws IOException {
+        ResIterator headers = model.listSubjectsWithProperty(RDF.type, DCAT.Dataset);
+        if (!headers.hasNext()) {
+            throw new IOException(fileName + " has no dcat:Dataset header, so it is not a Network Code Profile dataset. "
+                    + "Select a CGMES profile version for CGMES models.");
+        }
+        Resource header = headers.next();
+
+        Map<String, String> keywordsByProfileName = ncpKeywordsByProfileName();
+        for (Statement conformsTo : model.listStatements(header, DCTerms.conformsTo, (RDFNode) null).toList()) {
+            RDFNode value = conformsTo.getObject();
+            String uri = value.isURIResource() ? value.asResource().getURI()
+                    : value.isLiteral() ? value.asLiteral().getLexicalForm() : null;
+            String keyword = keywordsByProfileName.get(ncpProfileName(uri, NCP_PROFILE_HOST));
+            if (keyword != null) {
+                return keyword;
+            }
+        }
+
+        // A header can carry more than one keyword - the ReliCapGrid Provenance dataset has PV and
+        // Provenance - so the pick is made deterministic: one that names a loaded profile if there is
+        // one, otherwise the shortest, profile keywords being short codes.
+        Comparator<String> preferred = Comparator.comparing((String candidate) -> !profileModelMap.containsKey(candidate))
+                .thenComparing(String::length)
+                .thenComparing(Comparator.naturalOrder());
+        Optional<String> keyword = model.listObjectsOfProperty(header, DCAT.keyword).toList().stream()
+                .filter(RDFNode::isLiteral)
+                .map(value -> value.asLiteral().getString())
+                .filter(candidate -> !candidate.isBlank())
+                .min(preferred);
+        if (keyword.isPresent()) {
+            return keyword.get();
+        }
+        throw new IOException("Cannot tell which profile " + fileName + " belongs to: its dcat:Dataset header names no "
+                + "profile of " + rdfsProfileVersion.getName() + " in dcterms:conformsTo, and has no dcat:keyword.");
+    }
+
+    // Network Code Profile name -> keyword, read off the owl:Ontology of each loaded vocabulary.
+    private Map<String, String> ncpKeywordsByProfileName() throws FileNotFoundException {
+        if (ncpKeywordsByProfileName == null) {
+            if (profileModelMap == null) {
+                loadRDFSProfileModel();
+            }
+            Map<String, String> byName = new HashMap<>();
+            for (Map.Entry<String, Model> entry : profileModelMap.entrySet()) {
+                // The two union models hold every vocabulary's ontology, not one of their own.
+                if (entry.getKey().equals("unionModel") || entry.getKey().equals("modelUnionWithoutHeader")) {
+                    continue;
+                }
+                for (ResIterator ontologies = entry.getValue().listSubjectsWithProperty(RDF.type, OWL2.Ontology); ontologies.hasNext(); ) {
+                    Resource ontology = ontologies.next();
+                    String name = ontology.isURIResource() ? ncpProfileName(ontology.getURI(), NCP_VOCABULARY_HOST) : null;
+                    if (name != null) {
+                        byName.putIfAbsent(name, entry.getKey());
+                    }
+                }
+            }
+            ncpKeywordsByProfileName = byName;
+        }
+        return ncpKeywordsByProfileName;
+    }
+
+    // "Contingency" out of https://ap.cim4.eu/Contingency/2.3 or https://ap-voc.cim4.eu/Contingency#Ontology.
+    private static String ncpProfileName(String uri, String host) {
+        if (uri == null || !uri.startsWith(host)) {
+            return null;
+        }
+        String rest = uri.substring(host.length());
+        int end = rest.length();
+        for (char separator : new char[]{'/', '#'}) {
+            int at = rest.indexOf(separator);
+            if (at >= 0 && at < end) {
+                end = at;
+            }
+        }
+        return end == 0 ? null : rest.substring(0, end);
     }
 
     private  Map<String,Model> modelLoad(String[] files) throws FileNotFoundException { // Used for custom RDFS profile load
@@ -287,17 +407,24 @@ public class DataGeneratorModel {
     }
 
     public void loadProfileAndBaseModelData() throws IOException {
-        if (baseInstanceModel == null) {
-            baseInstanceModel = this.loadBaseInstanceModel(this.baseInstanceModelPaths);
-        }
+        // The RDFS first: an NCP dataset's profile is read from its header and matched against the
+        // loaded vocabularies, so they have to be in place before the instance files are.
         if (profileModelMap == null) {
             this.loadRDFSProfileModel();
+        }
+        if (baseInstanceModel == null) {
+            baseInstanceModel = this.loadBaseInstanceModel(this.baseInstanceModelPaths);
         }
     }
 
 
     public void setRdfsProfileVersion(RDFSProfile selectedRDFSProfile) {
         rdfsProfileVersion = selectedRDFSProfile;
+        // Putting the header on top and writing it with rdf:about both key on this class, so it has
+        // to be the header class of the family being written: md:FullModel or dcat:Dataset.
+        if (selectedRDFSProfile != null) {
+            saveProperties.put("headerClassResource", selectedRDFSProfile.getFamily().getHeaderClass());
+        }
     }
 
     public void setBaseInstanceModelPath(String[] filePaths) {

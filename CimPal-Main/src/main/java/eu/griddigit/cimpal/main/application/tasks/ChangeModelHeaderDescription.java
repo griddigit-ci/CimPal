@@ -10,7 +10,11 @@ import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.Wi
 import eu.griddigit.cimpal.main.application.tasks.ITask;
 import eu.griddigit.cimpal.main.application.tasks.SelectedTask;
 import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
-import org.apache.jena.rdf.model.RDFNode;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.ProfileFamily;
+import org.apache.jena.rdf.model.Literal;
+import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.ResIterator;
+import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.vocabulary.RDF;
@@ -45,30 +49,41 @@ public class ChangeModelHeaderDescription implements ITask {
         wizardContext.getDataGeneratorModel().loadProfileAndBaseModelData();
         taskUpdater.updateState(parent,"In Progress", "10%", wizardContext);
 
+        // The header and its description property depend on the family: md:FullModel and
+        // md:Model.description for CGMES, dcat:Dataset and dcterms:description for NCP.
+        ProfileFamily family = wizardContext.getDataGeneratorModel().getRdfsProfileVersion().getFamily();
+        Resource headerClass = ResourceFactory.createResource(family.getHeaderClass());
+        Property descriptionProperty = ResourceFactory.createProperty(family.getHeaderDescriptionProperty());
+        // "fixChars|<find>|<replace>" edits the existing description, anything else replaces it.
+        boolean fixChars = newHeaderDescription.startsWith("fixChars|");
+        boolean replaceAll = !newHeaderDescription.isBlank() && !fixChars;
+
         var baseInstanceModel = wizardContext.getDataGeneratorModel().getBaseInstanceModel();
         for (Map.Entry<String, BaseInstanceModel> entry : baseInstanceModel.entrySet()) {
 
             var model = entry.getValue().getBaseInstanceModel();
-            //check if there is description
-            Statement fileIDhead1 = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel")).next();
-            if (model.listStatements(fileIDhead1.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.description"), (RDFNode) null).hasNext()) {
-                if (!newHeaderDescription.isBlank() && !newHeaderDescription.startsWith("fixChars|")) {
-                    //use the description provided by user, i.e. replace all
-                    Statement  descrStmt = model.listStatements(fileIDhead1.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.description"), (RDFNode) null).next();
-                    model.remove(descrStmt);
-                    model.add(ResourceFactory.createStatement(fileIDhead1.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.description"), ResourceFactory.createPlainLiteral(newHeaderDescription)));
-                }
-                else if (!newHeaderDescription.isBlank() || newHeaderDescription.startsWith("fixChars|")){
-                    String[] stringParts = newHeaderDescription.split("\\|",3);
-                    Statement  descrStmt = model.listStatements(fileIDhead1.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.description"), (RDFNode) null).next();
-                    model.remove(descrStmt);
-                    model.add(ResourceFactory.createStatement(fileIDhead1.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.description"), ResourceFactory.createPlainLiteral(descrStmt.getObject().toString().replaceAll(stringParts[1],stringParts[2]))));
-                }
+            ResIterator headers = model.listSubjectsWithProperty(RDF.type, headerClass);
+            if (!headers.hasNext()) {
+                throw new IOException(entry.getKey() + " has no " + model.shortForm(headerClass.getURI()) + " header to change.");
             }
-            else {
-                if (!newHeaderDescription.isBlank() && !newHeaderDescription.startsWith("fixChars|")) {
-                    model.add(ResourceFactory.createStatement(fileIDhead1.getSubject(), ResourceFactory.createProperty("http://iec.ch/TC57/61970-552/ModelDescription/1#Model.description"), ResourceFactory.createPlainLiteral(newHeaderDescription)));
+            Resource header = headers.next();
+
+            //check if there is description
+            Statement descrStmt = model.getProperty(header, descriptionProperty);
+            if (descrStmt != null && (replaceAll || fixChars)) {
+                String newValue;
+                if (replaceAll) {
+                    //use the description provided by user, i.e. replace all
+                    newValue = newHeaderDescription;
+                } else {
+                    String[] stringParts = newHeaderDescription.split("\\|",3);
+                    newValue = descrStmt.getLiteral().getLexicalForm().replaceAll(stringParts[1],stringParts[2]);
                 }
+                model.remove(descrStmt);
+                model.add(header, descriptionProperty, description(family, newValue, descrStmt.getLiteral().getLanguage()));
+            }
+            else if (descrStmt == null && replaceAll) {
+                model.add(header, descriptionProperty, description(family, newHeaderDescription, ""));
             }
 
             entry.getValue().setBaseInstanceModel(model);
@@ -85,7 +100,19 @@ public class ChangeModelHeaderDescription implements ITask {
         if (newHeaderDescription == null || newHeaderDescription.isEmpty()) {
             return "No new header description set for task: " + name + "\n";
         }
+        if (newHeaderDescription.startsWith("fixChars|") && newHeaderDescription.split("\\|", 3).length < 3) {
+            return "The header description for task " + name + " starts with fixChars| but is not of the form "
+                    + "fixChars|<find>|<replace>\n";
+        }
         return "";
+    }
+
+    // NCP's dcterms:description is an rdf:langString, so it keeps the language it had, English when
+    // there was none. md:Model.description is a plain string.
+    private static Literal description(ProfileFamily family, String value, String language) {
+        return family == ProfileFamily.NCP
+                ? ResourceFactory.createLangLiteral(value, language.isEmpty() ? "en" : language)
+                : ResourceFactory.createPlainLiteral(value);
     }
 
     public void setNewHeaderDescription(String newHeaderDescription) {
@@ -119,5 +146,10 @@ public class ChangeModelHeaderDescription implements ITask {
     @Override
     public boolean getSaveResult() {
         return this.saveResult;
+    }
+
+    @Override
+    public boolean supportsNcp() {
+        return true;
     }
 }

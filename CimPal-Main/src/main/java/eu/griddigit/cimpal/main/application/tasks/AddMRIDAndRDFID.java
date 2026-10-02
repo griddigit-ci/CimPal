@@ -58,9 +58,13 @@ public class AddMRIDAndRDFID implements ITask {
 
         // The profile that defines the classes an instance file only references. A class that is
         // serialised with rdf:about in, say, SSH is described in EQ, so EQ is where its mRID is
-        // declared - the referencing profile's own RDFS says nothing about it.
-        Model definingProfile = profileDataMapAsModel.get(DEFINING_PROFILE_KEYWORD);
-        if (definingProfile == null) {
+        // declared - the referencing profile's own RDFS says nothing about it. An NCP set has no
+        // such profile to ask: what its datasets write with rdf:about is mostly grid equipment,
+        // described in the CGMES EQ rather than in any NCP vocabulary, so those objects are left as
+        // they are - their existing mRIDs are still aligned - without warning about a missing EQ.
+        boolean ncp = dataModel.getRdfsProfileVersion().isNcp();
+        Model definingProfile = ncp ? null : profileDataMapAsModel.get(DEFINING_PROFILE_KEYWORD);
+        if (definingProfile == null && !ncp) {
             report("No " + DEFINING_PROFILE_KEYWORD + " profile among the selected RDFS files - mRID cannot be added to "
                     + "classes that are only referenced by an instance file; existing mRIDs are still aligned "
                     + "with rdf:ID.");
@@ -148,9 +152,14 @@ public class AddMRIDAndRDFID implements ITask {
 
     /**
      * The mRID that matches a resource's rdf:ID: the local name with the leading underscore of
-     * the rdf:ID form removed, so {@code #_3a3b27be-...} becomes {@code 3a3b27be-...}.
+     * the rdf:ID form removed, so {@code #_3a3b27be-...} becomes {@code 3a3b27be-...}. A
+     * {@code urn:uuid:} id gives its UUID - not its local name, which for a UUID starting with a
+     * digit is missing that digit: the split point has to start an XML name.
      */
     private static String mridFromRdfId(Resource subject) {
+        if (subject.getURI().startsWith("urn:uuid:")) {
+            return subject.getURI().substring("urn:uuid:".length());
+        }
         String localName = subject.getLocalName();
         return localName.startsWith("_") ? localName.substring(1) : localName;
     }
@@ -202,6 +211,11 @@ public class AddMRIDAndRDFID implements ITask {
     @Override
     public boolean getSaveResult() {
         return this.saveResult;
+    }
+
+    @Override
+    public boolean supportsNcp() {
+        return true;
     }
 }
 

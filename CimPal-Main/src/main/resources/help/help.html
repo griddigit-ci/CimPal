@@ -568,6 +568,9 @@ CIM-based data exchange:</p>
   <tr><td>CGMES</td><td>Common Grid Model Exchange Standard &mdash; the IEC standard IEC 61970-600-1 and IEC 61970-600-2.</td></tr>
   <tr><td>NC</td><td>Network Codes profiles &mdash; the ENTSO-E CIM-based profiles supporting additional data needed for the European
       network codes data exchanges.</td></tr>
+  <tr><td>Model header</td><td>The first element of a CIM XML file, describing the file itself: its id, its profile,
+      its description and the models it depends on. CGMES files carry an <code>md:FullModel</code>; Network
+      Codes datasets carry a <code>dcat:Dataset</code>.</td></tr>
   <tr><td>RDFS profile</td><td>The machine-readable definition of one exchange profile: its
       classes, properties, datatypes and multiplicities. CimPal reads the <em>augmented</em> RDFS
       form produced by CimSyntaxGen or CIMTool.</td></tr>
@@ -1443,52 +1446,251 @@ RDF/XML.</p>
 
 <h4>Business logic</h4>
 <p>A guided, multi-step runner for model manipulation tasks. Each task is a self-contained
-transformation of instance data, and the wizard walks you through choosing one, supplying its
-inputs, and running it. Two families of task matter most in practice: <em>scaling</em> &mdash;
-multiplying a base model into a large synthetic system to test performance and assembly &mdash; and
-<em>negative testing</em> &mdash; deliberately breaking a valid model (deleting required properties,
-making datatypes non-conformant) to prove that a constraint set actually detects the defect. The
-identifier tasks resolve the recurring mismatch between an object's <code>rdf:ID</code> and its
-mRID.</p>
+transformation of instance data, and the wizard walks you through choosing the tasks, supplying
+their inputs, and running them. Two families of task matter most in practice: <em>scaling</em>
+&mdash; multiplying a base model into a large synthetic system to test performance and assembly
+&mdash; and <em>negative testing</em> &mdash; deliberately breaking a valid model (deleting required
+properties, making datatypes non-conformant) to prove that a constraint set actually detects the
+defect. The identifier tasks resolve the recurring mismatch between an object's <code>rdf:ID</code>
+and its mRID.</p>
+
+<p>The tasks are <em>chained</em>. They run in the order selected, on one model that is held in
+memory: the first task loads the base instance model, and every later task works on the result of
+the one before it. Only the last task writes into the output folder. Each earlier task saves its
+intermediate result in the working folder, unless you untick <em>Save Result to Working Dir</em>
+on its panel. If a task fails, the run stops, because the next task would be working on a
+half-changed model.</p>
+
+<p>The wizard works on CGMES grid models and on ENTSO-E Network Codes (NC) datasets. Which tasks it
+offers depends on the RDFS profile version chosen on the first page; see <em>Profile versions</em>
+below.</p>
+
+<h4>The three pages</h4>
+<table class="io">
+<tr><th>Step</th><th>Page</th><th>What you do</th></tr>
+<tr><td>1</td><td>Task Selection</td>
+    <td>Choose the RDFS profile version and the base instance model files, then pick the tasks in
+        the order they should run. <em>Next</em> checks that nothing is missing.</td></tr>
+<tr><td>2</td><td>Task Input</td>
+    <td>Fill in the inputs of each selected task and choose the working and output folders.
+        <em>Next</em> becomes <em>Execute</em> on this page: it checks every input and, when all is
+        well, starts the run.</td></tr>
+<tr><td>3</td><td>Task Execution Status</td>
+    <td>Shows the status and progress of each task while the run is going, with messages and errors
+        in the <em>Execution output</em> panel.</td></tr>
+</table>
+<p>The three buttons above the page only show which step you are on. Move between the pages with
+<em>Back</em> and <em>Next</em>.</p>
+
+<h4>Profile versions</h4>
+<p>The profile version tells the wizard which RDFS files describe the data and, with them, which
+family of models it is working on.</p>
+<table class="io">
+<tr><th>Profile version</th><th>Models</th><th>Meaning</th></tr>
+<tr><td>IEC 61970-600-1&amp;2 (CGMES 3.0.0)</td><td>CGMES</td>
+    <td>Base namespace <code>http://iec.ch/TC57/CIM100</code>.</td></tr>
+<tr><td>IEC 61970-45x (CIM17)</td><td>CGMES</td>
+    <td>Base namespace <code>http://iec.ch/TC57/CIM100</code>.</td></tr>
+<tr><td>IEC TS 61970-600-1&amp;2 (CGMES 2.4.15)</td><td>CGMES</td>
+    <td>Base namespace <code>http://iec.ch/TC57/2013/CIM-schema-cim16</code>.</td></tr>
+<tr><td>IEC 61970-45x (CIM16)</td><td>CGMES</td>
+    <td>Base namespace <code>http://iec.ch/TC57/2013/CIM-schema-cim16</code>.</td></tr>
+<tr><td>Network Codes profiles, release 2.4</td><td>NC</td>
+    <td>The 18 vocabularies of the ENTSO-E Network Codes profiles 2.4, bundled with CimPal. Base
+        namespace <code>https://cim.ucaiug.io/ns</code>.</td></tr>
+<tr><td>Other CIM version</td><td>CGMES</td>
+    <td>Your own RDFS files (<em>Browse</em>) and base namespace, treated as CGMES.</td></tr>
+</table>
+
+<p><strong>CGMES files</strong> have to follow the CGMES naming convention
+<code>&lt;datetime&gt;_&lt;process&gt;_&lt;TSO&gt;_&lt;profile&gt;_&lt;version&gt;</code>, for example
+<code>20240101T0000Z_1D_TSO1_SSH_001.xml</code>. The wizard takes the profile (EQ, SSH, TP, SV, ...)
+from the name, and refuses a file that does not follow it with a message naming the file.
+<strong>NC datasets</strong> are named freely. The wizard reads their profile from the model header
+instead: from the profile named in <code>dcterms:conformsTo</code> (for example
+<code>https://ap.cim4.eu/Contingency/2.3</code>) or, failing that, from <code>dcat:keyword</code>. A
+file without a <code>dcat:Dataset</code> header is refused while an NC version is selected.</p>
+
+<p>Tasks can be chosen before the profile version. If you then switch to the NC version,
+<em>Next</em> names the chosen tasks that cannot run on NC datasets, so that you can remove them.</p>
 
 <h4>Inputs</h4>
-<p>Inputs are per task, collected on the wizard pages that follow the task selection; typically a
-base instance data model (XML or ZIP), a configuration spreadsheet for the multiplication tasks,
-and an output location. The twelve available tasks are:</p>
+<p><strong>Task Selection page</strong></p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Select RDFS Profile Version</td><td>choice, required</td>
+    <td>The profile version of the data; see above. The RDFS files of the chosen version are listed
+        beside it.</td></tr>
+<tr><td>Base Namespace</td><td>text</td>
+    <td>The XML base namespace of the profile. Fixed for the listed versions; type it in for
+        <em>Other CIM version</em>.</td></tr>
+<tr><td>Browse (RDFS)</td><td>files</td>
+    <td>Only for <em>Other CIM version</em>: select the RDFS files (<code>.rdf</code> or
+        <code>.ttl</code>).</td></tr>
+<tr><td>Base Instance Model</td><td>files, required</td>
+    <td>The instance data to work on: XML files, or ZIP archives of them. Select the files of a whole
+        model together; a ZIP may hold more than one file.</td></tr>
+<tr><td>Select tasks in order of execution</td><td>list</td>
+    <td>Click a task to add it to the end of <em>Selected tasks</em>. A greyed-out task cannot be
+        chosen under the current profile version: it is marked <em>(CGMES only)</em> when it does not
+        work on NC datasets, and <em>(not available)</em> when it is not finished.</td></tr>
+<tr><td>Selected tasks</td><td>table</td>
+    <td>The tasks in the order they will run. Double-click <em>Remove</em> in the <em>Action</em>
+        column to take one out.</td></tr>
+</table>
+
+<p><strong>Task Input page</strong></p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Task panels</td><td>per task</td>
+    <td>One panel for each selected task with the inputs of that task; see the task list
+        below.</td></tr>
+<tr><td>Save Result to Working Dir</td><td>checkbox, on by default</td>
+    <td>On every task panel. Saves the result of that task in the working folder, in a subfolder
+        named after the task, so that an intermediate result can be inspected. The result of the
+        last task always goes to the output folder, whatever this box says.</td></tr>
+<tr><td>Select Working Directory</td><td>folder</td>
+    <td>Where intermediate results are kept. Needed while any selected task still has <em>Save
+        Result to Working Dir</em> ticked.</td></tr>
+<tr><td>Select Output Directory</td><td>folder, required</td>
+    <td>Where the result of the last task is written.</td></tr>
+<tr><td>Compress files to zip</td><td>checkbox, on by default</td>
+    <td>Writes each result file as a ZIP archive of the same name, instead of a plain XML file.</td></tr>
+</table>
+
+<p><strong>The tasks.</strong> <em>Works on</em> says which models a task can run on. While the NC
+profile version is selected, the tasks that work on CGMES only are greyed out.</p>
+<table class="io">
+<tr><th>Task</th><th>Works on</th><th>What it does, and what it needs</th></tr>
+<tr><td>Regenerate rdf:ID and mRID</td><td>CGMES and NC</td>
+    <td>Gives every object in the selected files a new identifier, including the id of each file's
+        model header, and updates the mRIDs that repeat those ids and every reference to them. An NC
+        dataset's <code>dcterms:identifier</code> follows its header. Objects that a file only refers
+        to (<code>rdf:about</code>) and that none of the selected files defines &mdash; the EQ objects
+        of an SSH chosen without its EQ, the grid equipment an NC dataset points at &mdash; keep their
+        ids, so the references still resolve. No input.</td></tr>
+<tr><td>Replaces mRID with rdf:ID</td><td>CGMES and NC</td>
+    <td>Makes every mRID equal to the identifier of its object (the <code>rdf:ID</code> without the
+        leading underscore, or the UUID of a <code>urn:uuid:</code> id), and adds an mRID to the
+        objects whose profile defines one but that have none. No input.</td></tr>
+<tr><td>Delete Required Properties</td><td>CGMES and NC</td>
+    <td>Removes every property that the SHACL constraints require (<code>sh:minCount</code> of 1 or
+        more), to test that the constraints report the missing values. Input: one or more SHACL files
+        (<em>Browse</em>). Shapes whose <code>sh:path</code> is an alternative path, as some NC
+        constraints are, cannot be read; they are skipped and named once in the <em>Execution
+        output</em>.</td></tr>
+<tr><td>Make Non-Conform Datatypes</td><td>CGMES and NC</td>
+    <td>Replaces attribute values, enumeration values and association targets with deliberately wrong
+        ones, to test that the datatype, enumeration and association constraints catch them. Input:
+        one or more SHACL files (<em>Browse</em>); shapes that cannot be read are skipped and named as
+        above.</td></tr>
+<tr><td>Change Model Header Description</td><td>CGMES and NC</td>
+    <td>Rewrites the description in the model header of each file: <code>md:Model.description</code>
+        in CGMES, <code>dcterms:description</code> in an NC dataset (a language-tagged text, English
+        unless the dataset already had a language). Input: the new text. Plain text replaces the
+        description, or sets it where a file has none. <code>fixChars|find|replace</code> edits the
+        existing description instead: every match of <code>find</code> (a regular expression) is
+        replaced by <code>replace</code>.</td></tr>
+<tr><td>Multiply base model N times</td><td>CGMES and NC</td>
+    <td>Builds a larger dataset from copies of the base model. Input: <em>Number of models in the
+        result</em> &mdash; 2 or more, and the base model counts as one, so 3 gives the base model and
+        two copies. The base model is kept as it is. Every copy gets new rdf:IDs and mRIDs (objects the
+        files only refer to keep theirs) and a timestamped file name, one second apart from the
+        previous copy: a CGMES file gets the timestamp in place of the date-time at the start of its
+        name, an NC dataset has it added before the extension (for example
+        <code>Dataset_CO_20260929T101500Z.xml</code>).</td></tr>
+<tr><td>Multiply and connect</td><td>CGMES only</td>
+    <td>Builds one larger network from copies of the base model. Inputs: <em>Number of models in the
+        result</em> (2 or more, the base model counts as one) and <em>Connect at Connectivity Node
+        Id</em> (with or without the leading underscore). Each copy is chained to the one before it by
+        a new short line &mdash; an <code>ACLineSegment</code> in a <code>Line</code> of its own &mdash;
+        between that connectivity node and its copy, at the base voltage of the node, which is worked
+        out from the model. The copies are merged into the existing files, so the result has the same
+        files as the input; the model header, geographical regions, control areas and load areas are
+        shared rather than copied. Needs an EQ file among the selected models; SSH and TP files, when
+        present, receive the data of the new terminals.</td></tr>
+<tr><td>Multiply IGM from Config xls</td><td>CGMES only</td>
+    <td>Builds individual grid models from the base IGM (its EQ, SSH, TP and SV files) as a
+        configuration spreadsheet describes: new date-times and business processes, each with new model
+        headers that declare their dependencies (the EQ on the EQBD; SSH and TP on the new EQ; the SV on
+        the new TP and SSH and on the TPBD). Inputs: <em>IGM multiply config file</em> (XLSX);
+        <em>Persistent EQ</em>, which keeps the existing EQ for all the new models instead of
+        generating a new one for each; <em>EQBD ID</em> and <em>TPBD ID</em> &mdash; type them, or use
+        <em>Browse</em> to read them from the boundary ZIP files. See <em>Outputs</em> for the workbook
+        it also writes.</td></tr>
+<tr><td>Multiply CGM from Config xls</td><td>CGMES only</td>
+    <td>Builds the SSH and SV datasets of common grid models from IGM files, as a configuration
+        spreadsheet describes. Inputs: <em>Multiply CGM config XLS</em>; <em>Loaded MAS File</em>
+        (XLSX listing the file name, profile, MAS and model id of each IGM file), or <em>Use generated
+        MAS</em> to take that table from a <em>Multiply IGM from Config xls</em> task earlier in the
+        same run; <em>Persistent EQ</em>; <em>TPBD ID</em>, which the new SV datasets declare as a
+        dependency &mdash; type it, or use <em>Browse</em> to read it from the TPBD ZIP file.</td></tr>
+<tr><td>Modify MAS of SV Header</td><td>CGMES only</td>
+    <td>Sets the Modelling Authority Set in the header of the State Variables files. Input:
+        <em>New CGM MAS and SV</em>.</td></tr>
+<tr><td>Rename</td><td>CGMES only</td>
+    <td>Renames the model from a configuration spreadsheet (<em>Rename multiply config file</em>,
+        XLSX) with one row per TSO: the TSO in the file name, the modelling authority set in the header
+        and, in the EQ, the names of the geographical region and of the interchange control area
+        together with its EIC code.</td></tr>
+<tr><td>Generate Instance Data Model</td><td>not available</td>
+    <td>Not finished, so the wizard lists it greyed out and does not let you choose it. To generate
+        instance data from an Excel template, use <a href="#tab-generate-instance-data">Dataset
+        Operations &#9656; Generate</a>.</td></tr>
+</table>
+
+<p>The wizard refuses some orders and names the earlier choice that is in the way:
+<em>Multiply IGM from Config xls</em> and <em>Rename</em> cannot be added after <em>Multiply CGM from
+Config xls</em>, <em>Regenerate rdf:ID and mRID</em> cannot be added after <em>Replaces mRID with
+rdf:ID</em>, and <em>Multiply CGM from Config xls</em> can be added only once.</p>
+
+<h4>Running the tasks</h4>
+<p><em>Execute</em> checks all the inputs first and lists every problem it finds in one dialog: a
+missing file or value, a number of models below 2, a missing output folder, or a missing working
+folder while a task is set to keep its result there. The run then starts on the Task Execution
+Status page, which shows, for each task:</p>
 <ul>
-  <li><strong>Regenerate rdf:ID and mRID</strong> &mdash; issues fresh identifiers throughout the
-      model.</li>
-  <li><strong>Replaces mRID with rdf:ID</strong> &mdash; aligns the mRID property with the
-      serialised resource identifier.</li>
-  <li><strong>Delete Required Properties</strong> &mdash; removes mandatory properties, to test
-      that constraints flag them.</li>
-  <li><strong>Make Non-Conform Datatypes</strong> &mdash; writes values of the wrong datatype, to
-      test datatype constraints.</li>
-  <li><strong>Rename</strong> &mdash; bulk-renames objects in the model.</li>
-  <li><strong>Multiply base model N times</strong> &mdash; replicates the model to build a larger
-      synthetic dataset.</li>
-  <li><strong>Multiply and connect</strong> &mdash; replicates and electrically interconnects the
-      copies, producing one coherent larger network.</li>
-  <li><strong>Multiply IGM from Config xls</strong> &mdash; builds individual grid models according
-      to a configuration spreadsheet.</li>
-  <li><strong>Multiply CGM from Config xls</strong> &mdash; builds common grid models according to a
-      configuration spreadsheet.</li>
-  <li><strong>Change Model Header Description</strong> &mdash; rewrites the model header
-      description fields.</li>
-  <li><strong>Modify MAS of SV Header</strong> &mdash; sets the Modelling Authority Set in the State
-      Variables header.</li>
-  <li><strong>Generate Instance Data Model</strong> &mdash; produces an instance data model from
-      the wizard inputs.</li>
+  <li><strong>Queued</strong> &mdash; waiting for the tasks before it.</li>
+  <li>A progress message and a percentage, for example <em>Loading Base Data</em> or
+      <em>Saving &hellip;</em>, while the task runs.</li>
+  <li><strong>Completed</strong> &mdash; the task finished.</li>
+  <li><strong>Failed</strong> &mdash; the task stopped with an error, which is written to the
+      <em>Execution output</em> panel.</li>
+  <li><strong>Skipped</strong> &mdash; an earlier task failed, so this one did not run.</li>
+  <li><strong>Cancelled</strong> &mdash; <em>Cancel</em> was pressed before the task started.</li>
+</ul>
+<p>A task that fails stops the whole run: the tasks after it are marked <em>Skipped</em>, and the
+<em>Execution output</em> says that the chain stopped.</p>
+<ul>
+  <li><strong>Cancel</strong> does not interrupt the task that is running, so it cannot leave a
+      truncated file behind. That task finishes, and no later task starts.</li>
+  <li><strong>Open Output Directory</strong> opens the output folder in the file explorer.</li>
+  <li><strong>New Execution</strong> stops a run that is still going and clears the selected tasks
+      and inputs, so that the next run starts from scratch. Use <em>Back</em> to return to Task
+      Selection.</li>
 </ul>
 
 <h4>Outputs</h4>
 <ul>
-  <li>The transformed or generated instance data files, written to the location the task asks
-      for.</li>
-  <li>Per-task progress and result messages in the Output window.</li>
+  <li>The result of the last task, written to the output folder under the file names of the models, or
+      as ZIP archives of the same names when <em>Compress files to zip</em> is ticked. Where a task
+      changes a model rather than building a new one, its objects are written back the way they were
+      read: an object that the input defined with <code>rdf:ID</code> is written with
+      <code>rdf:ID</code>, and one that it only referred to with <code>rdf:about</code>.</li>
+  <li>Intermediate results of the earlier tasks, in the working folder, in a subfolder named after
+      the task, for each task that has <em>Save Result to Working Dir</em> ticked.</li>
+  <li>From <em>Multiply IGM from Config xls</em>, a workbook <code>FileMASData.xlsx</code> in the
+      working folder, listing the file name, profile, MAS and model id of every model it generated.</li>
+  <li>Per-task progress and result messages in the <em>Execution output</em> panel, including
+      warnings such as a SHACL constraint that could not be used.</li>
 </ul>
 
-<p class="src">Source: <code>TaskWizardController.forwardWizardPane()</code>; tasks registered in
+<div class="note" style="margin-top:16px"><strong>Keep the output folder apart from your input
+files.</strong> Results are written under the same file names as the models they come from, so
+choosing the folder of the input files as the output folder would overwrite the originals.</div>
+
+<p class="src">Source: <code>TaskWizardController</code>, <code>TaskSelectionController</code>,
+<code>TaskInputController</code>, <code>TaskExecutionService</code>; tasks registered in
 <code>WizardContext</code></p>
 </div>
 </details>

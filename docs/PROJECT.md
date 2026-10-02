@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-09-30  
+**Last updated:** 2026-10-01  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -375,6 +375,12 @@ CimPal/
 ---
 
 ## Known issues and limitations
+
+**Findings reported by TEST-2 (not fixed yet; details in `docs/plans/TEST-2.md`):**
+- **High:** an unresolvable or refused `owl:imports` is only a warning. The row is validated without those shapes and can be reported conforming.
+- **Medium:** the CLI `sparql` and `compare` CSV output doesn't neutralise formula triggers.
+- **Medium:** the zip limits are checked after each entry is read into memory, and `modelLoadPerFiles` has no budget.
+- **Low:** the `requirePublicHost` check misses IPv6 unique-local and carrier-grade NAT addresses.
 
 **Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
 
