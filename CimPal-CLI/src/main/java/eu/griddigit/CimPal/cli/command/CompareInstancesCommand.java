@@ -6,6 +6,7 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.utils.CsvCells;
 import eu.griddigit.cimpal.core.comparators.ComparisonInstanceData;
 import eu.griddigit.cimpal.core.models.RDFCompareResult;
 import eu.griddigit.cimpal.core.models.RDFCompareResultEntry;
@@ -371,12 +372,11 @@ public class CompareInstancesCommand implements Callable<Integer> {
         if (s == null) return "";
         return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
+    /** RFC-4180 quoting with formula neutralisation (SEC-5, finding 4); see {@link CsvCells#escape}. */
     private static String csvEscape(String s) {
-        if (s == null) return "";
-        if (s.contains(",") || s.contains("\"") || s.contains("\n"))
-            return "\"" + s.replace("\"", "\"\"") + "\"";
-        return s;
+        return CsvCells.escape(s);
     }
+
     private static String jsonStr(String value) {
         if (value == null) return "null";
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";

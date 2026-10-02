@@ -186,19 +186,20 @@ class SHACLValidatorTest {
     }
 
     @Test
-    void unresolvableImportIsReportedAsWarning() throws Exception {
-        // A host outside the remote-import allowlist is refused without being contacted.
+    void unresolvableImportFailsTheValidation() throws Exception {
+        // A host outside the remote-import allowlist is refused without being contacted, and
+        // the validation fails rather than running without those shapes (SEC-5).
         Path root = write("root.ttl", SIZE_SHAPES
                 + "<urn:test:root> <http://www.w3.org/2002/07/owl#imports> <https://example.com/shapes.ttl> .\n");
 
-        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+        SHACLValidator validator = new SHACLValidator(SHACLValidationOptions.builder()
                 .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
                 .shapeFiles(root)
                 .xmlBase(BASE)
-                .build()).validate();
+                .build());
 
-        assertTrue(report.getWarnings().stream().anyMatch(w -> w.contains("owl:imports")),
-                () -> "warnings: " + report.getWarnings());
+        java.io.IOException failure = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, validator::validate);
+        assertTrue(failure.getMessage().contains("owl:imports"), failure::getMessage);
     }
 
     @Test

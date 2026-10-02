@@ -42,6 +42,18 @@ A ready-to-edit template is at `CimPal-CLI/configs/claude-desktop-config.json`.
 
 ---
 
+## Allowed folders (`--root`)
+
+File paths in tool arguments may only point inside the allowed folders. The flags are the same as for [`serve`](serve.md#allowed-folders---root): `--root` (default: the working directory), `--read-root`, `--write-root` and `--allow-unc`. Paths CimPal resolves itself (mapping CSV entries, `owl:imports`) are checked too. A refused path returns a tool result with `"isError": true`, and its message names the path. Existing output files named in the arguments are only replaced when the arguments set `"overwrite": true`; files a command creates inside its output folder are replaced. If the server's working directory is your home folder or a drive root, it is not used as a default and `--root` is required.
+
+Claude Desktop starts the server in its own folder, so **always pass `--root`** with your data folder:
+
+```json
+"args": ["-jar", "C:/Tools/CimPal/CimPal-CLI.jar", "mcp", "--root", "C:/Data/CimPal"]
+```
+
+---
+
 ## Available tools
 
 | Tool name | Equivalent CLI command | JSON response |

@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.core.shacl_tools;
 
+import eu.griddigit.cimpal.core.utils.PathPolicy;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -78,7 +79,8 @@ public class SHACLValidationLogger {
             summarySheet.autoSizeColumn(i);
         }
 
-        try (FileOutputStream fileOut = new FileOutputStream(outputFile)) {
+        File target = PathPolicy.checkWriteIfActive(outputFile.toPath()).toFile();
+        try (FileOutputStream fileOut = new FileOutputStream(target)) {
             workbook.write(fileOut);
         }
         workbook.close();

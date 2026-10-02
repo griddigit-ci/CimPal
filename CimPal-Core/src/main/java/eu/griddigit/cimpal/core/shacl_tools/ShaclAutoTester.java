@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.core.shacl_tools;
 
+import eu.griddigit.cimpal.core.utils.PathPolicy;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.SHACLRuleTestData;
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
@@ -301,7 +302,8 @@ public class ShaclAutoTester {
     }
 
     private static void saveTurtleReport(ValidationReport report, File folder, String filename) throws IOException {
-        try (java.io.FileOutputStream output = new java.io.FileOutputStream(new File(folder, filename))) {
+        File target = PathPolicy.checkWriteIfActive(new File(folder, filename).toPath()).toFile();
+        try (java.io.FileOutputStream output = new java.io.FileOutputStream(target)) {
             org.apache.jena.riot.RDFDataMgr.write(output, report.getModel(), org.apache.jena.riot.RDFFormat.TURTLE_PRETTY);
         }
     }

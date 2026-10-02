@@ -79,6 +79,31 @@ final class ServeServer implements AutoCloseable {
         CommandResult run(String command, Path configFile) throws Exception;
     }
 
+    /**
+     * Checks (and may rewrite) a request body before it is queued, e.g. the path policy of
+     * {@code serve}. Throws {@link Rejected} to answer with that status instead.
+     */
+    @FunctionalInterface
+    interface RequestCheck {
+        byte[] check(String command, byte[] body) throws Rejected;
+
+        RequestCheck NONE = (command, body) -> body;
+    }
+
+    /** A request refused by a {@link RequestCheck}; the message goes to the caller. */
+    static final class Rejected extends Exception {
+        private final int status;
+
+        Rejected(int status, String message) {
+            super(message);
+            this.status = status;
+        }
+
+        int status() {
+            return status;
+        }
+    }
+
     /** Server settings; {@link #builder()} holds the defaults. */
     record Config(String host, int port, String token, Set<String> allowedOrigins, boolean allowRemote,
                   long maxBodyBytes, int queueSize, Duration requestTimeout) {
@@ -115,6 +140,7 @@ final class ServeServer implements AutoCloseable {
 
     private final Config config;
     private final CommandRunner runner;
+    private final RequestCheck requestCheck;
     private HttpServer http;
     private final ExecutorService handlers;
     private final ExecutorService worker;
@@ -125,9 +151,10 @@ final class ServeServer implements AutoCloseable {
     /** When the running command started (System.nanoTime), or 0 when the worker is idle. */
     private final AtomicLong runningSince = new AtomicLong();
 
-    private ServeServer(Config config, CommandRunner runner) {
+    private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck) {
         this.config = config;
         this.runner = runner;
+        this.requestCheck = requestCheck;
         this.totalSlots = config.queueSize() + 1;
         this.slots = new Semaphore(totalSlots);
         // The JDK server reads request lines, headers and bodies on these threads too, and up to
@@ -147,10 +174,16 @@ final class ServeServer implements AutoCloseable {
      * @throws IOException              when the address can't be bound
      */
     static ServeServer start(Config config, CommandRunner runner) throws IOException {
+        return start(config, runner, RequestCheck.NONE);
+    }
+
+    /** {@link #start(Config, CommandRunner)} with a check that runs on every command request first. */
+    static ServeServer start(Config config, CommandRunner runner, RequestCheck requestCheck) throws IOException {
+        Objects.requireNonNull(requestCheck, "requestCheck");
         Objects.requireNonNull(runner, "runner");
         validate(config);
         limitRequestReadTime();
-        ServeServer server = new ServeServer(config, runner);
+        ServeServer server = new ServeServer(config, runner, requestCheck);
         try {
             server.http = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
         } catch (IOException | RuntimeException e) {
@@ -344,7 +377,14 @@ final class ServeServer implements AutoCloseable {
         return body.length == 0 ? "{}".getBytes(StandardCharsets.UTF_8) : body;
     }
 
-    private void runCommand(HttpExchange exchange, String command, byte[] body) throws IOException {
+    private void runCommand(HttpExchange exchange, String command, byte[] requestBody) throws IOException {
+        byte[] body;
+        try {
+            body = requestCheck.check(command, requestBody);
+        } catch (Rejected e) {
+            reject(exchange, e.status(), e.getMessage(), "POST", "/" + command);
+            return;
+        }
         if (!slots.tryAcquire()) {
             exchange.getResponseHeaders().set("Retry-After", "30");
             reject(exchange, 503, "Server busy: " + config.queueSize() + " requests already waiting",

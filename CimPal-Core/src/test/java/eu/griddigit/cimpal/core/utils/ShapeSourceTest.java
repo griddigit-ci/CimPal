@@ -277,21 +277,20 @@ class ShapeSourceTest {
     @Test
     void loopbackRemoteImport_isRefusedAndNotFetched() throws Exception {
         // A loopback import is the canonical SSRF probe: it reaches a service bound to the
-        // operator's own machine. The egress policy must decline it, and declining must be
-        // reported as an unresolvable import rather than attempted and rather than silently
-        // ignored. Nothing is listening on this port, so an attempted fetch would surface
-        // as a connection error; the assertion is that no attempt is made at all.
+        // operator's own machine. The egress policy must decline it, and declining must fail
+        // the load (SEC-5: validating without those shapes could pass a violating model)
+        // rather than be attempted or silently ignored. Nothing is listening on this port, so
+        // an attempted fetch would surface as a connection error, not as the refusal below.
         Path root = tempDir.resolve("root.ttl");
         writeOntologyWithImport(root, "urn:root", "http://localhost:19999/nonexistent.ttl");
 
         Map<String, Model> cache = new HashMap<>();
-        var result = ValidationTools.loadShapesWithImports(
-                new ValidationTools.LocalShapeSource(root), tempDir, cache);
+        IOException refused = assertThrows(IOException.class, () -> ValidationTools.loadShapesWithImports(
+                new ValidationTools.LocalShapeSource(root), tempDir, cache));
 
-        assertEquals(1, result.importsFound(), "the import statement must still be counted");
-        assertEquals(1, result.unresolvableImports(),
-                "a policy-refused import must be reported as unresolvable, not silently dropped");
-        assertEquals(1, result.loadedFiles(), "only the local root may be loaded");
+        assertTrue(refused.getMessage().contains("could not be resolved"), refused::getMessage);
+        assertTrue(refused.getMessage().contains("localhost:19999"), refused::getMessage);
+        assertTrue(cache.isEmpty(), "a failed load must not be cached");
     }
 
     @Test
@@ -304,11 +303,9 @@ class ShapeSourceTest {
             Path root = tempDir.resolve("root.ttl");
             writeOntologyWithImport(root, "urn:root", stub.uri("/shapes.ttl").toString());
 
-            var result = ValidationTools.loadShapesWithImports(
-                    new ValidationTools.LocalShapeSource(root), tempDir, new HashMap<>());
+            assertThrows(IOException.class, () -> ValidationTools.loadShapesWithImports(
+                    new ValidationTools.LocalShapeSource(root), tempDir, new HashMap<>()));
 
-            assertEquals(1, result.unresolvableImports());
-            assertEquals(1, result.loadedFiles());
             assertEquals(0, stub.requests().size(), "the egress gate must refuse before connecting");
         }
     }
@@ -320,12 +317,10 @@ class ShapeSourceTest {
         writeOntologyWithImport(root, "urn:root",
                 "http://169.254.169.254/latest/meta-data/iam/security-credentials/x.ttl");
 
-        Map<String, Model> cache = new HashMap<>();
-        var result = ValidationTools.loadShapesWithImports(
-                new ValidationTools.LocalShapeSource(root), tempDir, cache);
+        IOException refused = assertThrows(IOException.class, () -> ValidationTools.loadShapesWithImports(
+                new ValidationTools.LocalShapeSource(root), tempDir, new HashMap<>()));
 
-        assertEquals(1, result.unresolvableImports());
-        assertEquals(1, result.loadedFiles());
+        assertTrue(refused.getMessage().contains("169.254.169.254"), refused::getMessage);
     }
 
     // ---- 5. All-local regression: triple count unchanged ----

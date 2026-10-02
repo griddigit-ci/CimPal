@@ -6,6 +6,7 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.utils.CsvCells;
 import eu.griddigit.cimpal.core.utils.ModelFactory;
 import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.core.utils.SparqlTools.QueryResults;
@@ -146,6 +147,10 @@ public class SparqlCommand implements Callable<Integer> {
 
             return ExitCode.OK;
 
+        } catch (IllegalArgumentException ex) {
+            // Refused query (e.g. SERVICE, not a SELECT) or empty model: bad input, not a crash.
+            System.err.println("[ERROR] " + ex.getMessage());
+            return ExitCode.INVALID_INPUT;
         } catch (Exception ex) {
             System.err.println("[ERROR] " + ex.getMessage());
             ex.printStackTrace(System.err);
@@ -256,7 +261,14 @@ public class SparqlCommand implements Callable<Integer> {
 
     private static String resolveQuery(String queryArg) throws IOException {
         if (queryArg == null) return null;
-        Path candidate = Paths.get(queryArg);
+        Path candidate;
+        try {
+            candidate = Paths.get(queryArg);
+        } catch (java.nio.file.InvalidPathException e) {
+            // Query text such as "SELECT ?s ..." is not a valid path on Windows ('?', '*'):
+            // it is an inline query, not an error.
+            return queryArg;
+        }
         if (Files.isRegularFile(candidate)) {
             return Files.readString(candidate, StandardCharsets.UTF_8);
         }
@@ -375,15 +387,8 @@ public class SparqlCommand implements Callable<Integer> {
                 + "\"";
     }
 
-    /**
-     * RFC 4180 CSV escaping: wrap in double-quotes if the value contains a comma, double-quote,
-     * or newline; double any embedded double-quotes.
-     */
+    /** RFC-4180 quoting with formula neutralisation (SEC-5, finding 4); see {@link CsvCells#escape}. */
     private static String csvEscape(String value) {
-        if (value == null) return "";
-        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        return value;
+        return CsvCells.escape(value);
     }
 }

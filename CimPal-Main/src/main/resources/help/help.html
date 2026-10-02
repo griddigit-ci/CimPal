@@ -1862,6 +1862,11 @@ deliverables, not extracted input data.</p>
   editing a constraint on GitHub and re-running picks up the edit &mdash; there is no need to
   restart CimPal or press <em>Reset</em> first.
   <br><br>
+  Remote files are fetched only over HTTPS from GitHub hosts. An <code>owl:imports</code> that
+  can't be found, or that points somewhere else (another host, a local network address, a
+  network share), stops that row with an error that names the import. The row is not validated
+  without those shapes, because that could report a non-conformant model as conformant.
+  <br><br>
   One delay is outside CimPal's control: <code>raw.githubusercontent.com</code> serves its own
   cached copy of a file for a few minutes after a commit, so a re-run inside that window can still
   be given the previous content by GitHub. If you suspect a stale file for any other reason,
