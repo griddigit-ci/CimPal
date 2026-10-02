@@ -952,18 +952,33 @@ ordering rules. It does not change generic Jena serialisations.</p>
     <td>Set an optional context URI and select native JSON types, <code>rdf:type</code>, compact
         arrays and ordered output. These settings are passed to Jena&rsquo;s JSON-LD writer.</td></tr>
 <tr><td>Base URI</td><td>choice + text</td>
-    <td>The base URI embedded in the serialised output as <code>xml:base</code>; relative URIs in
-        the output are resolved against it. Used when writing RDF/XML.
+    <td>The base URI for relative identifiers such as <code>rdf:ID="_123"</code> and
+        <code>rdf:about="#_123"</code>. The source is read against it, so <code>#_123</code>
+        becomes <em>base</em><code>#_123</code>. RDF/XML, Turtle and TriG output declare it
+        (<code>xml:base</code> or <code>BASE</code>) and write those identifiers relative to it
+        again.
         <br>Choose one of the standard CIM namespaces from the dropdown and the field is filled and
         locked; choose <em>Other</em> to type any base URI. The same preset list as the
         <a href="#tab-validation-by-mapping">SHACL Validation</a> tab uses &mdash; see
         <em>Base URI presets</em> there.
-        <br>This tab defaults to <em>Other</em> with the field empty, because here an empty field
-        means <em>omit <code>xml:base</code> from the output altogether</em>, which is often what
-        you want.</td></tr>
-<tr><td>Show XML declaration, Show DOCTYPE declaration, Tab, Relative URIs</td>
-    <td>checkbox / text / choice</td>
-    <td>RDF/XML writer details, enabled only for the formats that support them.</td></tr>
+        <br>This tab defaults to <em>Other</em> with the field empty. An empty field means
+        <em>no base declaration</em>: identifiers that are relative in the source stay relative to
+        the document, for example <code>&lt;#_123&gt;</code> in Turtle. N-Triples, N-Quads,
+        JSON-LD, RDF/JSON and TriX always write full IRIs, so for those set a base URI, or such
+        identifiers are written as <code>file:</code> paths of the source.</td></tr>
+<tr><td>Show XML declaration, Show DOCTYPE declaration, Tab</td>
+    <td>checkbox / text</td>
+    <td>RDF/XML writer details, enabled for the CimPal CIMXML writers and Jena&rsquo;s RDF/XML
+        writer.</td></tr>
+<tr><td>Relative URIs</td><td>choice</td>
+    <td>How IRIs are written relative to the base URI. For the CimPal CIMXML writers, pick the
+        kind of relative reference (<em>same-document</em>, <em>network</em>, <em>absolute</em>,
+        <em>relative</em>, <em>parent</em>, <em>grandparent</em>).
+        <br>For Jena&rsquo;s RDF/XML, Turtle and TriG writers the choice is <em>relative to
+        base</em> or <em>full IRIs</em>: Jena&rsquo;s writer cannot be limited to one kind, and writes
+        IRIs under the base as same-document, child or parent references. <em>Full IRIs</em> writes
+        every IRI in full, with no base declaration. Other Jena writers always write full IRIs, so
+        the choice is disabled for them.</td></tr>
 <tr><td>Sorting options</td><td>checkbox + choice</td>
     <td>Available for CimPal&rsquo;s custom CIMXML writers. Sorting alphabetically produces
         deterministic, diff-friendly output. <em>Strip declaration of unused prefixes</em> removes

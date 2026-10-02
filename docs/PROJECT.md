@@ -114,6 +114,8 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.core.converters.RDFConverter` | Core | Format conversion. Call `convert()` then `writeConvertedModel(OutputStream)`. |
 | `eu.griddigit.cimpal.core.models.RDFConvertOptions` | Core | Builder-style config. Formats: RDFXML, TURTLE, JSONLD. |
 
+**Base URI and relative identifiers (fixed 2026-10-01).** `RDFConverter` reads every source against the configured base URI, or against the file's own `file:///` IRI when none is set. Writers get that base back. Turtle and TriG write `BASE`, RDF/XML writes `xml:base`, and identifiers such as CIMXML's `rdf:ID` and `#` references are written relative to it. Without a base URI the writer base is the single source file and no declaration is written, so those identifiers stay document-relative. Commits 38cf674 and 2e783ed had switched to reading by file URI, which turned them into `file:///C:/...` IRIs under any base, in every target format. Jena 6 relativises with one fixed rule whenever a writer has a base, and ignores the RDF/XML `relativeURIs` property. Only CimPal's CIMXML writers honour the six `relativeURIs` kinds. `relativeToBase(false)` writes full IRIs. Never pass `""` as a writer base: Jena resolves it against the working directory. Covered by `RDFConverterTest`.
+
 ### RDFS to SHACL
 
 | Class | Module | What it does |
