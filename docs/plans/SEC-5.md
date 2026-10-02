@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (PR pending) |
+| Status | In review (PR #49) |
 | Phase | 2 |
 | Depends on | TEST-2, SEC-2 |
 | Size | S |
