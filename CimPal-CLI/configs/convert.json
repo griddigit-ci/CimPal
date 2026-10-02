@@ -22,7 +22,7 @@
   "_note_targetFormat": "RDFXML, TURTLE, or JSONLD. Leave empty for auto-detection from output extension.",
 
   "xmlBase": "",
-  "_note_xmlBase": "Base URI used when reading/writing RDF/XML. Empty string is the default. For CGMES profiles use 'http://iec.ch/TC57/CIM100'.",
+  "_note_xmlBase": "Base URI that relative identifiers in the input (rdf:ID, rdf:about=\"#...\") resolve against; RDF/XML and Turtle output declare it. Empty string is the default: relative identifiers then stay relative to the document. For CGMES profiles use 'http://iec.ch/TC57/CIM100'.",
 
   "rdfFormat": "RDFXML_PLAIN",
   "_note_rdfFormat": "RDF/XML sub-format: RDFXML_PLAIN (default), RDFXML_ABBREV, RDFXML_PRETTY, CIMXML (CIM-optimised plain/pretty), RDFS_CIMXML (CIM-optimised plain). Only applies when target format is RDF/XML.",

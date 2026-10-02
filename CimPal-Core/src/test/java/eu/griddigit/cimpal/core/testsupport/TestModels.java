@@ -109,11 +109,22 @@ public final class TestModels {
         private final boolean aboutReferences;
         private String modelId = "urn:uuid:00000000-0000-0000-0000-000000000001";
         private String scenarioTime = "2026-01-01T00:00:00Z";
+        private boolean writeXmlBase = true;
         private final List<ResourceSpec> resources = new ArrayList<>();
 
         private CgmesModelBuilder(String profile, boolean aboutReferences) {
             this.profile = profile;
             this.aboutReferences = aboutReferences;
+        }
+
+        /**
+         * Leaves {@code xml:base} out of {@link #toRdfXml()}, as real CGMES files do, so its
+         * {@code rdf:ID} and {@code #} references resolve against whatever base the reader uses.
+         * {@link #toModel()} still reads them against {@link #XML_BASE}.
+         */
+        public CgmesModelBuilder withoutXmlBase() {
+            this.writeXmlBase = false;
+            return this;
         }
 
         public CgmesModelBuilder modelId(String id) {
@@ -148,7 +159,8 @@ public final class TestModels {
             StringBuilder xml = new StringBuilder()
                     .append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                     .append("<rdf:RDF xmlns:rdf=\"").append(RDF_NS).append("\" xmlns:cim=\"").append(CIM_NS)
-                    .append("\" xmlns:md=\"").append(MD_NS).append("\" xml:base=\"").append(XML_BASE).append("\">\n")
+                    .append("\" xmlns:md=\"").append(MD_NS).append('"')
+                    .append(writeXmlBase ? " xml:base=\"" + XML_BASE + "\"" : "").append(">\n")
                     .append("  <md:FullModel rdf:about=\"").append(escape(modelId)).append("\">\n")
                     .append("    <md:Model.scenarioTime>").append(escape(scenarioTime)).append("</md:Model.scenarioTime>\n")
                     .append("    <md:Model.profile>").append(escape(profile)).append("</md:Model.profile>\n")

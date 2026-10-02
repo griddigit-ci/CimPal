@@ -6,10 +6,12 @@
 package eu.griddigit.cimpal.main.application.datagenerator;
 
 import eu.griddigit.cimpal.main.application.controllers.taskWizardControllers.WizardContext;
+import eu.griddigit.cimpal.main.application.datagenerator.resources.BaseInstanceModel;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.vocabulary.DCTerms;
 import org.apache.jena.vocabulary.OWL2;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
@@ -30,13 +32,14 @@ public class ModelManipulationFactory {
      * The models are rewritten in place and handed back, so a caller that needs the originals has
      * to pass clones.
      *
-     * @param idMap filled with the old local name to new local name mapping. A caller that has to
-     *              find a particular resource again in the rewritten model - Multiply and connect
-     *              has to find the connectivity node it chains onto - reads it from here. This
-     *              replaced a pair of static fields that reported the id of the last resource
-     *              matched: the same resource appears in more than one profile, and each sighting
-     *              generated a fresh UUID while only the first was kept, so the id reported was
-     *              usually one that had been thrown away.
+     * @param idMap filled with the old to new id mapping, keyed as {@link #idKey} keys it. A caller
+     *              that has to find a particular resource again in the rewritten model - Multiply
+     *              and connect has to find the connectivity node it chains onto - reads it from
+     *              here. An entry already in the map is kept, so a caller can pin an id by mapping
+     *              it to itself. This replaced a pair of static fields that reported the id of the
+     *              last resource matched: the same resource appears in more than one profile, and
+     *              each sighting generated a fresh UUID while only the first was kept, so the id
+     *              reported was usually one that had been thrown away.
      */
     public static Map<String,Model> regenerateRDFIDmodule(Map<String, Model> instanceModel, List<String> skipList, Map<String,String> idMap)  {
 
@@ -80,23 +83,29 @@ public class ModelManipulationFactory {
                 Model newModel = entry.getValue();
                 for (StmtIterator stmt= newModel.listStatements(); stmt.hasNext();) {
                     Statement stmtItem= stmt.next();
-                    Resource newSubject=stmtItem.getSubject();
+                    Resource newSubject = remapped(stmtItem.getSubject(), idMap);
                     RDFNode newObject=stmtItem.getObject();
-                    if (idMap.containsKey(stmtItem.getSubject().getLocalName())){
-                        newSubject=ResourceFactory.createResource(stmtItem.getSubject().getNameSpace()+idMap.get(stmtItem.getSubject().getLocalName()));
-                    }
                     if (stmtItem.getObject().isResource()) {
-                        if (idMap.containsKey(stmtItem.getObject().asResource().getLocalName())) {
-                            newObject=ResourceFactory.createProperty(stmtItem.getObject().asResource().getNameSpace()+idMap.get(stmtItem.getObject().asResource().getLocalName()));
+                        newObject = remapped(stmtItem.getObject().asResource(), idMap);
+                    } else if (isIdentifierProperty(stmtItem.getPredicate())) {
+                        // The mRID - and an NCP header's dcterms:identifier - repeat the UUID of their
+                        // own subject, so they follow that subject to its new id, as the bare UUID.
+                        // They used to be looked up by value, which never matched - the map is keyed
+                        // "_uuid" and "urn:uuid:uuid", they hold the bare uuid - so they kept the old
+                        // one. Going by the subject, not the value, also keeps a dataset's identifier
+                        // off an object that happens to share its UUID, as the ReliCapGrid Espheim
+                        // contingency dataset and its contingency do.
+                        Literal oldValue = stmtItem.getObject().asLiteral();
+                        Resource oldSubject = stmtItem.getSubject();
+                        if (!newSubject.equals(oldSubject) && repeatsIdOf(oldValue.getLexicalForm(), oldSubject)) {
+                            newObject = oldValue.getLanguage().isEmpty()
+                                    ? ResourceFactory.createTypedLiteral(bareId(newSubject), oldValue.getDatatype())
+                                    : ResourceFactory.createLangLiteral(bareId(newSubject), oldValue.getLanguage());
                         }
                     }else{
                         if (idMap.containsKey(stmtItem.getObject().toString())) {
-                            if (stmtItem.getPredicate().getLocalName().equals("IdentifiedObject.mRID")) {
-                                newObject = ResourceFactory.createProperty( idMap.get(stmtItem.getObject().toString()).split("_", 2)[1]);
-                            } else {
-                                if (!stmtItem.getPredicate().getLocalName().equals("IdentifiedObject.name") && !stmtItem.getPredicate().getLocalName().equals("IdentifiedObject.description")) {
-                                    newObject = ResourceFactory.createProperty(idMap.get(stmtItem.getObject().toString()));
-                                }
+                            if (!stmtItem.getPredicate().getLocalName().equals("IdentifiedObject.name") && !stmtItem.getPredicate().getLocalName().equals("IdentifiedObject.description")) {
+                                newObject = ResourceFactory.createProperty(idMap.get(stmtItem.getObject().toString()));
                             }
                         }
                     }
@@ -112,6 +121,78 @@ public class ModelManipulationFactory {
         }
 
         return modifiedInstanceDataMap;
+    }
+
+    /**
+     * The key {@link #regenerateRDFIDmodule} maps a resource's id under when it is given an empty
+     * skip list: the whole URI for a {@code urn:uuid:} id, the local name for any other.
+     * <p>
+     * A {@code urn:uuid:} id has no namespace to keep, and Jena's local name for it is not the
+     * UUID: the split point has to start an XML name, so {@code urn:uuid:3a3b...} splits into
+     * {@code urn:uuid:3} and {@code a3b...}.
+     */
+    public static String idKey(Resource resource) {
+        String uri = resource.getURI();
+        return uri.startsWith("urn:uuid:") ? uri : resource.getLocalName();
+    }
+
+    /**
+     * Follows the form a file was written in - see {@code BaseInstanceModel.getAboutSubjects()} -
+     * to the ids {@link #regenerateRDFIDmodule} gave its objects, so they are written back the way
+     * they came under their new ids.
+     */
+    public static void remapWrittenForm(BaseInstanceModel file, Map<String, String> idMap) {
+        file.setWrittenForm(remapAll(file.getAboutSubjects(), idMap), remapAll(file.getIdSubjects(), idMap));
+    }
+
+    /**
+     * The given resources under the ids {@link #regenerateRDFIDmodule} gave them. Null stays null.
+     */
+    public static Set<Resource> remapAll(Set<Resource> resources, Map<String, String> idMap) {
+        if (resources == null) {
+            return null;
+        }
+        Set<Resource> remapped = new HashSet<>();
+        for (Resource resource : resources) {
+            remapped.add(remapped(resource, idMap));
+        }
+        return remapped;
+    }
+
+    // The resource with its new id, or the resource itself when its id is not being changed. A
+    // urn:uuid id is looked up - and replaced - whole; any other keeps its namespace.
+    private static Resource remapped(Resource resource, Map<String, String> idMap) {
+        if (!resource.isURIResource()) {
+            return resource;
+        }
+        String wholeId = idMap.get(resource.getURI());
+        if (wholeId != null) {
+            return ResourceFactory.createResource(wholeId);
+        }
+        String localId = idMap.get(resource.getLocalName());
+        return localId == null ? resource : ResourceFactory.createResource(resource.getNameSpace() + localId);
+    }
+
+    private static boolean isIdentifierProperty(Property property) {
+        return property.getLocalName().equals("IdentifiedObject.mRID") || property.equals(DCTerms.identifier);
+    }
+
+    // Whether an identifier literal repeats its subject's id: the bare UUID, or - as some data has
+    // it - the rdf:ID form with its leading underscore.
+    private static boolean repeatsIdOf(String value, Resource subject) {
+        String bare = bareId(subject);
+        return value.equals(bare) || value.equals("_" + bare);
+    }
+
+    // The UUID a resource is identified by: urn:uuid:3a3b... and ...#_3a3b... both give 3a3b...
+    private static String bareId(Resource resource) {
+        String uri = resource.getURI();
+        if (uri.startsWith("urn:uuid:")) {
+            return uri.substring("urn:uuid:".length());
+        }
+        int split = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+        String local = uri.substring(split + 1);
+        return local.startsWith("_") ? local.substring(1) : local;
     }
 
     public static Set<Resource> LoadRDFAbout(String xmlBase) throws FileNotFoundException {

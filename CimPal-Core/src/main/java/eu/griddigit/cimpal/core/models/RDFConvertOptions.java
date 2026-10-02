@@ -35,6 +35,7 @@ public class RDFConvertOptions {
     private final String showDoctypeDeclaration;
     private final String tabCharacter;
     private final String relativeURIs;
+    private final boolean relativeToBase;
     private final boolean modelUnionFlag;
     private final boolean inheritanceOnly;
     private final boolean inheritanceList;
@@ -71,6 +72,7 @@ public class RDFConvertOptions {
         this.showDoctypeDeclaration = b.showDoctypeDeclaration;
         this.tabCharacter = b.tabCharacter;
         this.relativeURIs = b.relativeURIs;
+        this.relativeToBase = b.relativeToBase;
         this.modelUnionFlag = b.modelUnionFlag;
         this.inheritanceOnly = b.inheritanceOnly;
         this.inheritanceList = b.inheritanceList;
@@ -140,8 +142,18 @@ public class RDFConvertOptions {
         return tabCharacter;
     }
 
+    /** Kinds of relative reference (same-document, network, ...) for CimPal's CIMXML writers. */
     public String getRelativeURIs() {
         return relativeURIs;
+    }
+
+    /**
+     * Whether Jena's RDF/XML, Turtle and TriG writers write IRIs relative to the base URI, or to
+     * the single source document when no base URI is set. False writes full IRIs. Jena 6 has one
+     * fixed relativisation rule, so the kinds in {@link #getRelativeURIs()} do not apply here.
+     */
+    public boolean isRelativeToBase() {
+        return relativeToBase;
     }
 
     public boolean isModelUnionFlag() {
@@ -230,6 +242,7 @@ public class RDFConvertOptions {
         private String showDoctypeDeclaration = null;
         private String tabCharacter = null;
         private String relativeURIs = null;
+        private boolean relativeToBase = true;
         private boolean modelUnionFlag = false;
         private boolean inheritanceOnly = false;
         private boolean inheritanceList = false;
@@ -300,6 +313,11 @@ public class RDFConvertOptions {
 
         public Builder relativeURIs(String relativeURIs) {
             this.relativeURIs = relativeURIs;
+            return this;
+        }
+
+        public Builder relativeToBase(boolean on) {
+            this.relativeToBase = on;
             return this;
         }
 

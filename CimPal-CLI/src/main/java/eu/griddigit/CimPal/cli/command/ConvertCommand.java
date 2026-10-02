@@ -82,7 +82,8 @@ public class ConvertCommand implements Callable<Integer> {
     private String targetFormat;
 
     @Option(names = "--xml-base",
-            description = "Base URI used when reading/writing RDF/XML (default: empty string).")
+            description = "Base URI that relative identifiers in the input (rdf:ID, rdf:about=\"#...\") resolve against;"
+                    + " RDF/XML and Turtle output declare it. Default: none, which keeps them relative to the document.")
     private String xmlBase;
 
     @Option(names = "--rdf-format",
