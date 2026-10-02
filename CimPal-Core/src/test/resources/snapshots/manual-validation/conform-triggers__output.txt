@@ -1,0 +1,4 @@
+SHACL Rule: Thing.size
+WARNING: Triggered rule: Thing.size in conform model: bad.xml
+
+Validation log saved to: <BASE>/rules/validation_log_<TIMESTAMP>.xlsx

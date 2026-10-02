@@ -1,0 +1,3 @@
+## SHACL Report
+Focus Node,SourceShape,Severity,Message,Value,Value kind,Path
+_1,urn:test:Size,sh:Violation,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,,,ex:size

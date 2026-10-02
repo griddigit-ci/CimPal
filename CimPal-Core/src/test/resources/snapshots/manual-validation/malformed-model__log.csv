@@ -1,0 +1,4 @@
+## Summary
+Rule Name,File Name,Error Type,Expected Conform,Message
+,broken.xml,Validation Error,N/A,"[line: 1, col: 76] Unqualified typed node element not allowed: <unclosed>"
+Thing.size,broken.xml,Model Load Error,N/A,"[line: 1, col: 76] Unqualified typed node element not allowed: <unclosed>"
