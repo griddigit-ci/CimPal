@@ -24,8 +24,8 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | --- | --- | --- | --- | --- | --- |
 | 0 | [A1](A1.md) | Claude Code workspace setup | — | S | Done ([PR #39](https://github.com/griddigit-ci/CimPal/pull/39)) |
 | 0 | [CI-1](CI-1.md) | PR build and test | — | S | Done ([PR #40](https://github.com/griddigit-ci/CimPal/pull/40)) |
-| 1 | [TEST-1](TEST-1.md) | Test harness | CI-1 | M | In review ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
-| 1 | [SEC-1](SEC-1.md) | Harden serve | TEST-1 | M | Not started |
+| 1 | [TEST-1](TEST-1.md) | Test harness | CI-1 | M | Done ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
+| 1 | [SEC-1](SEC-1.md) | Harden serve | TEST-1 | M | In review ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) |
 | 1 | [SEC-2](SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | Not started |
 | 2 | [TEST-2](TEST-2.md) | Regression tests for past security findings | TEST-1 | M | In review ([PR #46](https://github.com/griddigit-ci/CimPal/pull/46); 4 findings reported) |
 | 2 | [TEST-3](TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | Not started |
@@ -43,7 +43,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | G1 | `serve`: no auth, no Host/Origin/Content-Type check, unbounded body, open `/shutdown` | High | SEC-1 |
 | G2 | `serve`/`mcp`/`run` accept any path; no allowed roots | High | SEC-2 |
 | G3 | User SPARQL `SERVICE` may bypass the egress allowlist | Medium (verify) | SEC-2 |
-| G4 | No timeouts, queue limits or memory guard in `serve`/`mcp` | Medium | SEC-1 |
+| G4 | No timeouts, queue limits or memory guard in `serve`/`mcp` | Medium | SEC-1 (`serve` timeout and queue only; `mcp` limits and a memory guard still open) |
 | G5 | MCP results carry untrusted text into the agent's context | Medium | SEC-3 |
 | G6 | `run` can nest `serve`/`mcp`/`run` | Low | SEC-1 |
 | G7 | CI only on tags; tag-pinned actions; no Dependabot; SBOM not published; unsigned exe | Medium | CI-1, CI-2 |
@@ -52,7 +52,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 
 ## Open decisions (maintainer)
 
-- [ ] Token file location for `serve` (proposed `%LOCALAPPDATA%\CimPal\serve.token`, user-only ACL)
+- [x] Token file location for `serve`: `%LOCALAPPDATA%\CimPal\serve.token` on Windows, `~/.cimpal/serve.token` elsewhere, user-only (decided 2026-09-30, SEC-1)
 - [ ] Default allowed root for `mcp` (proposed: working directory, plus repeatable `--root`)
 - [ ] Code-signing certificate for `CimPal.exe`
 - [ ] Which ENTSO-E conformity models may be used in nightly scale tests (licence)

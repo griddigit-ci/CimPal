@@ -129,7 +129,6 @@ public class ValidationTools {
     private static final long MAX_REMOTE_BODY_BYTES = 64L * 1024 * 1024;
 
     /** Maximum length of a single untrusted value written to the diagnostic log. */
-    private static final int LOG_FIELD_MAX = 512;
 
     private static final long FUTURE_TIMEOUT_MINUTES = 60;
     private static final int DEBUG_MAX_RESULTS_PER_ROW = 5000;
@@ -2051,12 +2050,7 @@ public class ValidationTools {
      * hostile value cannot forge additional log records, and bounds the field length.
      */
     private static String forLog(String value) {
-        if (value == null) {
-            return "null";
-        }
-        // U+241E SYMBOL FOR RECORD SEPARATOR: visible, and cannot start a new log line.
-        String s = value.replaceAll("[\\r\\n\\u0085\\u2028\\u2029]", "\u241e");
-        return s.length() > LOG_FIELD_MAX ? s.substring(0, LOG_FIELD_MAX) + "..." : s;
+        return LogSanitizer.forLog(value);
     }
 
     /**

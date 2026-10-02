@@ -7,6 +7,7 @@ package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.utils.LogSanitizer;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -22,6 +23,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -58,6 +60,18 @@ public class RunCommand implements Callable<Integer> {
     private static final List<String> META_KEYS =
             List.of("command", "id", "name", "stopOnError", "stopOnViolations");
 
+    /**
+     * The only commands a step may run: the same ones {@code serve} exposes. A pipeline must not
+     * start a server or another pipeline (SEC-1, gap G6), so {@code serve}, {@code mcp} and
+     * {@code run} are not in the list, and an allowlist also keeps out {@code @file} arguments
+     * and options. Checked for every step before the first one runs.
+     */
+    static final Set<String> ALLOWED_STEP_COMMANDS = Set.copyOf(ServeServer.COMMANDS);
+
+    /** Pipelines currently running on this thread; a pipeline inside a pipeline is refused. */
+    private static final ThreadLocal<Integer> DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final int MAX_DEPTH = 1;
+
     @Parameters(index = "0", description = "Pipeline JSON file.", paramLabel = "<pipeline.json>")
     private File pipelineFile;
 
@@ -73,6 +87,29 @@ public class RunCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        if (DEPTH.get() >= MAX_DEPTH) {
+            System.err.println("[ERROR] 'run' cannot be started from inside another pipeline.");
+            return ExitCode.INVALID_INPUT;
+        }
+        DEPTH.set(DEPTH.get() + 1);
+        try {
+            return runPipeline();
+        } finally {
+            DEPTH.set(DEPTH.get() - 1);
+        }
+    }
+
+    /** Runs {@code action} as if inside a pipeline on this thread (used by tests of the depth guard). */
+    static void withinPipeline(Runnable action) {
+        DEPTH.set(DEPTH.get() + 1);
+        try {
+            action.run();
+        } finally {
+            DEPTH.set(DEPTH.get() - 1);
+        }
+    }
+
+    private Integer runPipeline() {
         if (format == null) format = "text";
 
         // ---- load pipeline --------------------------------------------------
@@ -92,8 +129,8 @@ public class RunCommand implements Callable<Integer> {
 
         Path pipelineDir = pipelineFile.toPath().toAbsolutePath().getParent();
 
-        String pipelineName = pipeline.path("name").asText("(unnamed)");
-        String pipelineDescription = pipeline.path("description").asText(null);
+        String pipelineName = clean(pipeline.path("name").asText("(unnamed)"));
+        String pipelineDescription = clean(pipeline.path("description").asText(null));
         boolean globalStopOnError      = pipeline.path("stopOnError").asBoolean(true);
         boolean globalStopOnViolations = pipeline.path("stopOnViolations").asBoolean(false);
 
@@ -105,6 +142,23 @@ public class RunCommand implements Callable<Integer> {
 
         int totalSteps = stepsNode.size();
 
+        // ---- refuse unknown commands, servers and nested pipelines before anything runs
+        for (int i = 0; i < totalSteps; i++) {
+            JsonNode step = stepsNode.get(i);
+            JsonNode commandNode = step.path("command");
+            if (commandNode.isMissingNode() || commandNode.isNull()) {
+                continue; // reported as "missing 'command'" when the step is reached
+            }
+            String cmd = commandNode.isString() ? commandNode.asString() : commandNode.toString();
+            if (!ALLOWED_STEP_COMMANDS.contains(cmd)) {
+                String id = step.path("id").asText("step-" + (i + 1));
+                System.err.println("[ERROR] Step " + (i + 1) + " (" + clean(id) + "): command '" + clean(cmd)
+                        + "' is not allowed in a pipeline. Allowed: "
+                        + String.join(", ", ServeServer.COMMANDS) + " (serve, mcp and run cannot be steps).");
+                return ExitCode.INVALID_INPUT;
+            }
+        }
+
         // ---- dry-run header -------------------------------------------------
         if (dryRun) {
             System.out.println("=== Pipeline (dry run): " + pipelineName + " ===");
@@ -114,12 +168,12 @@ public class RunCommand implements Callable<Integer> {
                     + "  stopOnViolations=" + globalStopOnViolations);
             for (int i = 0; i < totalSteps; i++) {
                 JsonNode step = stepsNode.get(i);
-                String cmd  = step.path("command").asText("(missing)");
-                String id   = step.path("id").asText("step-" + (i + 1));
-                String nm   = step.path("name").asText(cmd);
+                String cmd  = clean(step.path("command").asText("(missing)"));
+                String id   = clean(step.path("id").asText("step-" + (i + 1)));
+                String nm   = clean(step.path("name").asText(cmd));
                 System.out.printf("  [%d/%d] id=%-20s command=%-20s name=%s%n",
                         i + 1, totalSteps, id, cmd, nm);
-                String cfg = step.path("config").asText(null);
+                String cfg = clean(step.path("config").asText(null));
                 if (cfg != null) System.out.println("         config: " + cfg);
             }
             return ExitCode.OK;
@@ -140,8 +194,8 @@ public class RunCommand implements Callable<Integer> {
         for (int i = 0; i < totalSteps; i++) {
             JsonNode step = stepsNode.get(i);
             String command = step.path("command").asText(null);
-            String id      = step.path("id").asText("step-" + (i + 1));
-            String nm      = step.path("name").asText(command != null ? command : id);
+            String id      = clean(step.path("id").asText("step-" + (i + 1)));
+            String nm      = clean(step.path("name").asText(command != null ? command : id));
 
             if (command == null || command.isBlank()) {
                 System.err.println("[ERROR] Step " + (i + 1) + " (" + id + ") is missing 'command'.");
@@ -188,7 +242,7 @@ public class RunCommand implements Callable<Integer> {
                 PrintStream origOut = System.out;
                 if (jsonOutput) System.setOut(System.err);
                 try {
-                    exitCode = new CommandLine(new CimPalCli()).execute(args);
+                    exitCode = CimPalCli.inProcess().execute(args);
                 } finally {
                     if (jsonOutput) System.setOut(origOut);
                 }
@@ -291,6 +345,11 @@ public class RunCommand implements Callable<Integer> {
         sb.append("  }\n");
         sb.append("}");
         return sb.toString();
+    }
+
+    /** Pipeline text for output lines: control characters neutralised, length bounded; null stays null. */
+    private static String clean(String value) {
+        return value == null ? null : LogSanitizer.forLog(value);
     }
 
     private static String jsonStr(String v) {

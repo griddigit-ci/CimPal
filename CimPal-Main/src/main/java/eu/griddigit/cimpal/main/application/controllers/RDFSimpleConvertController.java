@@ -29,6 +29,11 @@ import static eu.griddigit.cimpal.main.core.RdfConvert.fileSaveDialog;
 /** Pure RDF conversion. RDFS union and transformation operations live in RDFS Union. */
 public class RDFSimpleConvertController implements Initializable {
     private static final List<String> SOURCE_FILTERS = List.of("*.rdf", "*.xml", "*.owl", "*.ttl", "*.nt", "*.n3", "*.trig", "*.trix", "*.jsonld", "*.json");
+    /** Kinds of relative reference CimPal's CIMXML writers can be limited to. */
+    private static final List<String> CIMXML_RELATIVE_URIS = List.of("same-document", "network", "absolute", "relative", "parent", "grandparent");
+    /** Jena 6 has one relativisation rule, applied whenever its writer is given a base: the only choice is whether to use it. */
+    private static final String RELATIVE_TO_BASE = "relative to base", FULL_IRIS = "full IRIs";
+    private static final List<String> JENA_RELATIVE_URIS = List.of(RELATIVE_TO_BASE, FULL_IRIS);
     private MainController mainController;
     private final List<File> sourceFiles = new ArrayList<>();
     private final Map<String, TargetFormat> cimXmlTargets = new LinkedHashMap<>();
@@ -42,11 +47,10 @@ public class RDFSimpleConvertController implements Initializable {
     @FXML private TitledPane jenaOptionsPane, jsonLdOptionsPane;
     @FXML private TextField jsonLdContextTextField;
     @FXML private CheckBox jsonLdNativeTypesCheckBox, jsonLdRdfTypeCheckBox, jsonLdCompactArraysCheckBox, jsonLdOrderedCheckBox;
-    @FXML private Label helpSource, helpSourceType, helpTargetFormat, helpXmlBase, helpSortingOptions;
+    @FXML private Label helpSource, helpSourceType, helpTargetFormat, helpXmlBase, helpRelativeUris, helpSortingOptions;
 
     @Override public void initialize(URL location, ResourceBundle resources) {
         loadTargetFormats();
-        fcbRelativeURIs.getItems().addAll("same-document", "network", "absolute", "relative", "parent", "grandparent");
         fcbRDFsortOptions.getItems().addAll("Sorting by local name", "Sorting by prefix");
         BaseUriPresets.bind(fcbBaseUri, frdfConvertXmlBase, BaseUriPresets.OTHER);
         ftargetFormatChoiceBox.getSelectionModel().selectedItemProperty().addListener((o, oldValue, value) -> updateTargetOptions());
@@ -54,7 +58,12 @@ public class RDFSimpleConvertController implements Initializable {
         GUIhelper.installHelpTooltip(helpSource, "Select one or more RDF files. Jena detects each source syntax from its content and extension.");
         GUIhelper.installHelpTooltip(helpSourceType, "Use this only with CimPal's IEC 61970-552 / CGMES CIMXML writer. It applies CIM instance-data identifier and ordering rules.");
         GUIhelper.installHelpTooltip(helpTargetFormat, "Select a format family. Jena writer styles, such as pretty, plain and flat JSON-LD, are selected in the options below.");
-        GUIhelper.installHelpTooltip(helpXmlBase, "Base URI for writers that support it. Leave empty to omit it.");
+        GUIhelper.installHelpTooltip(helpXmlBase, "Base URI for relative identifiers such as rdf:ID=\"_123\" and rdf:about=\"#_123\". The source is read against it, and RDF/XML, Turtle and TriG output declares it (xml:base or BASE) and writes those identifiers relative to it.\n\n"
+                + "Leave it empty to keep them relative to the document, as in the source, with no base declaration. N-Triples, N-Quads, JSON-LD, RDF/JSON and TriX always write full IRIs, so without a base URI those identifiers become file: paths of the source.");
+        GUIhelper.installHelpTooltip(helpRelativeUris, "How IRIs are written relative to the base URI.\n\n"
+                + "CIMXML writers: the kind of relative reference to use, e.g. same-document gives rdf:about=\"#_123\".\n\n"
+                + "Jena RDF/XML, Turtle and TriG: Jena 6 cannot be limited to one kind. \"relative to base\" lets it write IRIs under the base as same-document, child or parent references; \"full IRIs\" writes every IRI in full, with no base declaration.\n\n"
+                + "Other formats always write full IRIs.");
         GUIhelper.installHelpTooltip(helpSortingOptions, "Sorting is currently implemented by CimPal's custom CIMXML writers. Other Jena writers retain their own serialization order.");
         updateTargetOptions();
     }
@@ -123,11 +132,12 @@ public class RDFSimpleConvertController implements Initializable {
     private void convert(File source, TargetFormat target, OutputStream output, ConversionSettings settings) throws IOException {
         RDFConvertOptions.Builder builder = RDFConvertOptions.builder().sourceFile(source).sourceFormat(RDFConvertOptions.RDFFormats.RDFXML).targetFormat(RDFConvertOptions.RDFFormats.RDFXML).xmlBase(settings.base())
                 .showXmlDeclaration(Boolean.toString(settings.showXmlDeclaration())).showDoctypeDeclaration(Boolean.toString(settings.showDoctypeDeclaration())).tabCharacter(settings.tab())
-                .relativeURIs(settings.relativeUris()).sortRDF(Boolean.toString(settings.sort())).rdfSortOptions(Boolean.toString(settings.sortByPrefix()))
+                .sortRDF(Boolean.toString(settings.sort())).rdfSortOptions(Boolean.toString(settings.sortByPrefix()))
                 .stripPrefixes(settings.stripPrefixes()).convertInstanceData(Boolean.toString(settings.instanceData()))
                 .jsonLdContext(settings.jsonLdContext()).jsonLdUseNativeTypes(settings.jsonLdNativeTypes()).jsonLdUseRdfType(settings.jsonLdRdfType())
                 .jsonLdCompactArrays(settings.jsonLdCompactArrays()).jsonLdOrdered(settings.jsonLdOrdered());
-        if (target.jenaFormat() != null) builder.jenaTargetFormat(target.jenaFormat()).rdfXmlFormat(RDFFormat.RDFXML_PLAIN); else builder.rdfXmlFormat(target.cimXmlFormat());
+        if (target.jenaFormat() != null) builder.jenaTargetFormat(target.jenaFormat()).rdfXmlFormat(RDFFormat.RDFXML_PLAIN).relativeToBase(!FULL_IRIS.equals(settings.relativeUris()));
+        else builder.rdfXmlFormat(target.cimXmlFormat()).relativeURIs(settings.relativeUris());
         RDFConverter converter = new RDFConverter(builder.build()); converter.convert(); converter.writeConvertedModel(output);
     }
 
@@ -166,10 +176,22 @@ public class RDFSimpleConvertController implements Initializable {
         TargetFormat target = selectedTarget(); boolean cimXml = target != null && target.cimXmlFormat() != null;
         boolean jsonLd = target != null && (target.jenaFormat() != null && (target.jenaFormat().getLang().equals(org.apache.jena.riot.Lang.JSONLD) || target.jenaFormat().getLang().equals(org.apache.jena.riot.Lang.JSONLD11)));
         boolean jena = target != null && target.jenaFormat() != null;
+        // An option is enabled only for writers that honour it: Jena's RDF/XML writer takes the
+        // declaration and tab settings, and its RDF/XML, Turtle and TriG writers relative IRIs.
+        boolean xmlWriter = cimXml || (jena && RDFConverter.isRdfXml(target.jenaFormat()));
+        boolean jenaRelativeIris = jena && RDFConverter.writesRelativeIris(target.jenaFormat());
         jenaOptionsPane.setManaged(jena); jenaOptionsPane.setVisible(jena);
         jsonLdOptionsPane.setManaged(jsonLd); jsonLdOptionsPane.setVisible(jsonLd);
-        fcbShowXMLDeclaration.setDisable(!cimXml); fcbShowDoctypeDeclaration.setDisable(!cimXml); fRDFconvertTab.setDisable(!cimXml); fcbRelativeURIs.setDisable(!cimXml); fcbSortRDF.setDisable(!cimXml); fcbRDFsortOptions.setDisable(!cimXml); fcbStripPrefixes.setDisable(!cimXml); fcbRDFconvertInstanceData.setDisable(!cimXml);
-        if (cimXml) { fcbRelativeURIs.setValue("same-document"); fcbRDFsortOptions.setValue("Sorting by local name"); }
+        fcbShowXMLDeclaration.setDisable(!xmlWriter); fcbShowDoctypeDeclaration.setDisable(!xmlWriter); fRDFconvertTab.setDisable(!xmlWriter); fcbSortRDF.setDisable(!cimXml); fcbRDFsortOptions.setDisable(!cimXml); fcbStripPrefixes.setDisable(!cimXml); fcbRDFconvertInstanceData.setDisable(!cimXml);
+        offerRelativeUris(cimXml ? CIMXML_RELATIVE_URIS : jenaRelativeIris ? JENA_RELATIVE_URIS : List.of());
+        if (cimXml) fcbRDFsortOptions.setValue("Sorting by local name");
+    }
+    /** Shows the relative-URI choices of the selected writer; a choice survives a target change that offers the same list. */
+    private void offerRelativeUris(List<String> choices) {
+        fcbRelativeURIs.setDisable(choices.isEmpty());
+        if (fcbRelativeURIs.getItems().equals(choices)) return;
+        fcbRelativeURIs.getItems().setAll(choices);
+        fcbRelativeURIs.setValue(choices.isEmpty() ? null : choices.getFirst());
     }
     private record TargetFormat(String label, String extension, RDFFormat jenaFormat, RDFFormat cimXmlFormat) { }
     private record ConversionJob(File source, File output) { }

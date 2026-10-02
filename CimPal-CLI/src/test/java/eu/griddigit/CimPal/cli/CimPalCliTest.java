@@ -6,10 +6,13 @@
 package eu.griddigit.CimPal.cli;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,6 +37,20 @@ class CimPalCliTest {
 
         assertThat(run.exitCode()).isEqualTo(ExitCode.OK);
         assertThat(run.out()).contains("validate", "sparql", "convert", "rdfs2shacl", "serve", "mcp");
+    }
+
+    @Test
+    void inProcessCommandLineDoesNotExpandAtFiles(@TempDir Path tempDir) throws Exception {
+        Path args = Files.writeString(tempDir.resolve("args.txt"), "--help");
+        CommandLine expanding = new CommandLine(new CimPalCli());
+        expanding.setOut(new PrintWriter(new StringWriter()));
+        CommandLine inProcess = CimPalCli.inProcess();
+        inProcess.setOut(new PrintWriter(new StringWriter()));
+        inProcess.setErr(new PrintWriter(new StringWriter()));
+
+        assertThat(expanding.execute("@" + args)).isEqualTo(ExitCode.OK);
+        assertThat(inProcess.execute("@" + args)).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(CimPalCli.inProcess().isExpandAtFiles()).isFalse();
     }
 
     @Test

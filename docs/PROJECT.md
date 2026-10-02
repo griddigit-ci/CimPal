@@ -114,6 +114,8 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.core.converters.RDFConverter` | Core | Format conversion. Call `convert()` then `writeConvertedModel(OutputStream)`. |
 | `eu.griddigit.cimpal.core.models.RDFConvertOptions` | Core | Builder-style config. Formats: RDFXML, TURTLE, JSONLD. |
 
+**Base URI and relative identifiers (fixed 2026-10-01).** `RDFConverter` reads every source against the configured base URI, or against the file's own `file:///` IRI when none is set. Writers get that base back. Turtle and TriG write `BASE`, RDF/XML writes `xml:base`, and identifiers such as CIMXML's `rdf:ID` and `#` references are written relative to it. Without a base URI the writer base is the single source file and no declaration is written, so those identifiers stay document-relative. Commits 38cf674 and 2e783ed had switched to reading by file URI, which turned them into `file:///C:/...` IRIs under any base, in every target format. Jena 6 relativises with one fixed rule whenever a writer has a base, and ignores the RDF/XML `relativeURIs` property. Only CimPal's CIMXML writers honour the six `relativeURIs` kinds. `relativeToBase(false)` writes full IRIs. Never pass `""` as a writer base: Jena resolves it against the working directory. Covered by `RDFConverterTest`.
+
 ### RDFS to SHACL
 
 | Class | Module | What it does |
@@ -203,7 +205,25 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - CI adds a coverage table per module to the job summary, and the Ubuntu leg uploads the
   `coverage-report` artifact.
 
-**Next steps:** merge TEST-1 ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) once both CI legs are green, then SEC-1 and SEC-2, following the
+**`serve` hardening** (added by SEC-1, closing G1 and G6, and G4 for `serve`):
+- `ServeCommand` is now a thin picocli wrapper. `ServeServer` holds the HTTP pipeline, and
+  `ServeSecurity` holds the token handling and request checks.
+- Every start writes a new 256-bit bearer token to a user-only file: `%LOCALAPPDATA%\CimPal\serve.token`
+  on Windows, `~/.cimpal/serve.token` elsewhere. `--token-file` changes the path, and
+  `CIMPAL_API_TOKEN` supplies the token instead. Every endpoint except `GET /health` needs it.
+- Requests are refused when the Host is not loopback with the right port, when an Origin is not in
+  `--allow-origin`, when the path doesn't match exactly, or when a POST body isn't
+  `application/json` or is over `--max-body-bytes` (1 MB).
+- A bounded queue (`--queue-size` 4, 503 when full) and `--request-timeout` (30 min, 504) limit
+  the load. A non-loopback `--host` needs `--allow-remote`.
+- `run` steps are an allowlist of the ten `serve` commands. `serve`, `mcp` and `run` can't be
+  steps, and a nested `run` is refused.
+- `run`, `serve` and `mcp` build their in-process command lines with `CimPalCli.inProcess()`,
+  which turns off picocli `@file` expansion.
+- Log lines use the shared Core `LogSanitizer`.
+- Breaking change: `serve` callers must now send the token header and the `Content-Type` header.
+
+**Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) once both CI legs are green, then SEC-2, following the
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action.
 
@@ -221,7 +241,7 @@ required is a maintainer action.
 | 5 | `gen-instances` | Required InstanceDataFactory/Builder extraction |
 | 6 | `run` | Pipeline runner: temp config file → picocli in-process |
 | 7 | `validate --samples` | Per-shape JSON breakdown via TTL report parsing |
-| 8 | `serve` | Local HTTP daemon (JDK HttpServer, localhost:7474) |
+| 8 | `serve` | Local HTTP daemon (JDK HttpServer, localhost:7474), bearer token, Host/Origin checks, bounded queue |
 | 9 | `mcp` | MCP 2024-11-05 stdio server, 10 typed tools |
 
 All 13 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25.
@@ -273,7 +293,7 @@ The Jackson `readTree()` + `.path("key")` pattern silently ignores unrecognized 
 
 ### `serve` uses single-threaded executor
 
-Avoids races on `ValidationTools` static flags (`exportTurtleValidationReports`, `DEBUG`). A single validation run already saturates CPU via its own internal worker pool, so sequential requests is the right trade-off for local developer use. Any concurrent REST API implementation must address this differently — see REST API section below.
+Commands run on one worker thread (`ServeServer`), with a bounded queue and a pool of HTTP handler threads in front of it. This avoids races on `ValidationTools` static flags (`exportTurtleValidationReports`, `DEBUG`). A single validation run already saturates CPU via its own internal worker pool, so sequential requests is the right trade-off for local developer use. Any concurrent REST API implementation must address this differently — see REST API section below.
 
 ---
 
@@ -367,6 +387,12 @@ CimPal/
 
 **`validate --samples` requires `--export-turtle`.** Per-shape detail is extracted by parsing the `*__report.ttl` files after validation. These are auto-enabled when `--samples > 0` in JSON mode, but they remain on disk as a side effect. This is by design (the AI Assistant also uses them) but should be documented clearly.
 
+**`mcp` has no timeout, queue or memory limit (G4, open).** SEC-1 bounded `serve` only.
+
+**A `serve` command that times out keeps running.** The caller gets 504, but the command isn't interrupted (that could leave truncated reports), so the worker stays busy until it finishes. `/health` then reports `"status":"stalled"`. Restart the server if a command hangs.
+
+**`serve` limits connection time, not connection count.** A local process that keeps opening slow connections can still slow the server down. Each one is closed after 60 s (`sun.net.httpserver.maxReqTime`).
+
 **`serve` serialises all requests.** The single-threaded executor prevents concurrent validation runs. For team use (multiple users sharing one server) this is a bottleneck. Addressed in the REST API plan below.
 
 **`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output.
@@ -395,7 +421,7 @@ The gap is that `serve` is a **local developer tool**, not a **team or productio
 |---|---|
 | localhost-only by default | Cannot be accessed by other machines on the network |
 | Single-threaded executor | One request at a time; second caller waits |
-| No authentication | Anyone on the machine can call it |
+| Local bearer token only (SEC-1) | One token per server start, no users or roles |
 | Synchronous only | Long validation (5–30 min) blocks the HTTP connection |
 | No OpenAPI spec | No self-documentation, no client code generation |
 | No result storage | No history, no trend queries across runs |
