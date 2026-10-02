@@ -67,6 +67,30 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 
 ---
 
+## Allowed folders (`--root`)
+
+File paths in requests may only point inside the allowed folders. Every path field in a request (`input`, `output`, `modelsDir`, `mappingCsv`, `shaclConstraintFiles`, and so on) is checked before the command runs, and so are the paths CimPal resolves itself: files named in a mapping CSV, `owl:imports` in shapes, files the `organize` template names. A path outside the roots is refused with **403**, and the message names it.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--root <dir>` | the working directory (refused if that is your home folder or a drive root) | Folder whose files may be read and written. Repeatable. |
+| `--read-root <dir>` | — | Folder that may only be read. Repeatable. |
+| `--write-root <dir>` | — | Folder that outputs may be written to; its files can also be read. Repeatable. |
+| `--allow-unc` | off | Accept UNC network paths (`\server\share`). They still have to be under a root. |
+
+- Relative paths in a request resolve against the first `--root` (or the working directory).
+- `..` and absolute paths outside the roots are refused. So are links and junctions that lead outside, and Windows device names (`CON`, `NUL`, `COM1`, ...) and NTFS alternate data streams.
+- **Existing output files named in the request** (`output`) are not overwritten unless the request sets `"overwrite": true`. Output folders may already exist, and files a command creates inside its output folder (reports, generated shapes) are replaced on every run.
+- UNC paths count in any separator mix (`\host`, `//host`, `\/host`). They are refused before anything touches them, because on Windows even checking whether `\host\share\x` exists can send your credentials to that host.
+- `owl:imports` of a network location (`file://host/...`, `//host/...`) are refused everywhere, also in normal CLI and GUI use, and fail the validation row.
+- The working directory is only used as the default root if it is neither your home folder nor a drive root. Otherwise pass `--root`.
+
+```bash
+java -jar CimPal-CLI.jar serve --root C:/Data/CimPal --read-root C:/Data/shared-constraints
+```
+
+---
+
 ## Security
 
 `serve` runs CimPal commands, which read and write files, on behalf of whoever calls it. The server is therefore closed to everything except the local user who started it:
@@ -76,6 +100,8 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | **Host header** must be `localhost`, `127.0.0.1` or `[::1]` with the server's port (with `--allow-remote`, also the bound host). This blocks DNS-rebinding attacks from web pages. | 403 |
 | **Origin header**, if present, must be listed in `--allow-origin`. Browsers send it on cross-site requests, so pages you visit can't call the server. No CORS headers are ever sent. | 403 |
 | **Path** must match an endpoint exactly (`/validatefoo` is not `/validate`). | 404 |
+| **File paths** in the request must be under the [allowed folders](#allowed-folders---root); existing outputs need `"overwrite": true`. | 403 |
+| **Body** must be valid JSON. | 400 |
 | **Method**: commands and `/shutdown` are POST only; `/health` and `/commands` are GET only. | 405 |
 | **Token**: every endpoint except `GET /health` needs `Authorization: Bearer <token>`. The comparison is constant-time, and the token never appears in logs or responses. | 401 |
 | **Content type**: POST bodies must be `application/json` (a charset parameter is fine). HTML forms can't send that without a CORS preflight. | 415 |
@@ -134,7 +160,7 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 | 200 | Command ran successfully (including when violations were found — exit 0 or 1) |
 | 400 | Bad request — invalid input, missing required field (exit 2) |
 | 401 | Missing or wrong bearer token |
-| 403 | Host or Origin header not allowed |
+| 403 | Host or Origin header not allowed, or a file path outside the allowed folders / an existing output without `"overwrite": true` |
 | 404 | No such endpoint |
 | 405 | Method not allowed — wrong HTTP verb for the endpoint |
 | 413 | Request body larger than `--max-body-bytes` |
@@ -205,7 +231,7 @@ curl -s -X POST http://localhost:7474/sparql \
 
 ## File paths in requests
 
-All file paths in request bodies must be **absolute paths**. The server and the caller share a filesystem (the daemon runs locally), so the files must be accessible from the machine where the server is running.
+File paths in request bodies may be absolute or relative to the first `--root`. They must be inside the [allowed folders](#allowed-folders---root). The server and the caller share a filesystem (the daemon runs locally), so the files must be accessible from the machine where the server is running.
 
 There is no file upload mechanism — the server reads from and writes to local paths that are specified in the request JSON.
 

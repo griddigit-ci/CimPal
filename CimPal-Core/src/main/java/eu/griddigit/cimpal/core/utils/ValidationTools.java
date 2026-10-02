@@ -71,6 +71,12 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
 public class ValidationTools {
+
+    static {
+        // SHACL-SPARQL constraints run through Jena: no SERVICE in any process that validates,
+        // whatever its entry point (SEC-2, G3).
+        SparqlServicePolicy.disableRemoteServiceGlobally();
+    }
     private static volatile boolean exportTurtleValidationReports;
 
     public static void setExportTurtleValidationReports(boolean enabled) { exportTurtleValidationReports = enabled; }
@@ -1835,6 +1841,7 @@ public class ValidationTools {
 
         if (!hasGlob) {
             Path p = modelsBaseDir.resolve(norm).normalize();
+            PathPolicy.refuseNetworkPathIfActive(p); // before the probe below touches it
 
             boolean ok = Files.isRegularFile(p)
                     && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".xml");
@@ -1844,7 +1851,8 @@ public class ValidationTools {
                     + " existsRegularXml=" + ok);
 
             if (ok) {
-                return List.of(p);
+                // serve/mcp/run: a mapping cell must not reach outside the allowed roots.
+                return List.of(PathPolicy.checkReadIfActive(p));
             }
 
             return List.of();
@@ -1855,6 +1863,7 @@ public class ValidationTools {
         String pattern = (lastSlash >= 0) ? norm.substring(lastSlash + 1) : norm;
 
         Path parentDir = modelsBaseDir.resolve(parent).normalize();
+        PathPolicy.refuseNetworkPathIfActive(parentDir); // before isDirectory touches it
 
         dbg("expandToken glob token=" + forLog(token)
                 + " parentDir=" + parentDir.toAbsolutePath()
@@ -1865,6 +1874,7 @@ public class ValidationTools {
             return List.of();
         }
 
+        PathPolicy.checkReadIfActive(parentDir);
         final PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
 
         List<Path> matches = new ArrayList<>();
@@ -1874,7 +1884,7 @@ public class ValidationTools {
                 if (Files.isRegularFile(child)
                         && child.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".xml")
                         && matcher.matches(child.getFileName())) {
-                    matches.add(child);
+                    matches.add(PathPolicy.checkReadIfActive(child));
                 }
             }
         }
@@ -2666,6 +2676,16 @@ public class ValidationTools {
             }
         }
 
+        // An import naming a network host (file://host/share/x.ttl, or a reference starting with
+        // two slashes) is refused outright: just opening it would make Windows connect to that
+        // host and send the user's credentials. Imports come from third-party shapes files.
+        // Thrown, not skipped, so the row fails instead of validating with shapes missing.
+        // From a remote document, "//host/x" is a URL reference: the egress check below handles it.
+        boolean urlReference = current instanceof RemoteShapeSource && !u.regionMatches(true, 0, "file:", 0, 5);
+        if (!urlReference && isNetworkImport(u)) {
+            throw new PathNotAllowedException("owl:imports of a network path is not allowed: " + forLog(importUri));
+        }
+
         if (u.startsWith("file:")) {
             try {
                 Path p = Paths.get(URI.create(u));
@@ -2721,12 +2741,14 @@ public class ValidationTools {
                 : constraintsRoot;
 
         Path candidate1 = currentDir.resolve(u).normalize();
+        PathPolicy.refuseNetworkPathIfActive(candidate1);
         if (Files.exists(candidate1)) {
             dbg("resolveImport candidate1=" + candidate1);
             return new LocalShapeSource(candidate1);
         }
 
         Path candidate2 = constraintsRoot.resolve(u).normalize();
+        PathPolicy.refuseNetworkPathIfActive(candidate2);
         if (Files.exists(candidate2)) {
             dbg("resolveImport candidate2=" + candidate2);
             return new LocalShapeSource(candidate2);
@@ -2737,6 +2759,7 @@ public class ValidationTools {
         if (slash >= 0) fileName = fileName.substring(slash + 1);
 
         Path candidate3 = constraintsRoot.resolve(fileName).normalize();
+        PathPolicy.refuseNetworkPathIfActive(candidate3);
         if (Files.exists(candidate3)) {
             dbg("resolveImport candidate3=" + candidate3);
             return new LocalShapeSource(candidate3);
@@ -2746,8 +2769,39 @@ public class ValidationTools {
         return null;
     }
 
+    /**
+     * An import that names a network location: a UNC-style reference (two leading separators in
+     * any mix), {@code file://host/...} with a host other than localhost, or
+     * {@code file:////host/...}.
+     */
+    static boolean isNetworkImport(String uri) {
+        if (PathPolicy.isUncOrDevice(uri)) {
+            return true;
+        }
+        if (!uri.regionMatches(true, 0, "file:", 0, 5)) {
+            return false;
+        }
+        String rest = uri.substring(5);
+        if (PathPolicy.isUncOrDevice(rest)) {
+            String afterSlashes = rest.substring(2);
+            if (afterSlashes.isEmpty()) {
+                return false;
+            }
+            if (afterSlashes.charAt(0) == '/' || afterSlashes.charAt(0) == '\\') {
+                // file:///C:/x or file:///path is local; file:////host/share is UNC.
+                return PathPolicy.isUncOrDevice(afterSlashes);
+            }
+            String host = afterSlashes.split("[/\\\\]", 2)[0];
+            return !host.isEmpty() && !host.equalsIgnoreCase("localhost");
+        }
+        return false;
+    }
+
     private static Model readLocalShapeSource(LocalShapeSource src) throws IOException {
         Path p = src.path().toAbsolutePath().normalize();
+        // serve/mcp/run: every local shapes file, including owl:imports, must be under a root.
+        // Checked before the existence test, so a refused network path is never touched.
+        PathPolicy.checkReadIfActive(p);
         if (!Files.exists(p)) {
             throw new FileNotFoundException("Imported TTL not found: " + p);
         }
@@ -3318,6 +3372,7 @@ public class ValidationTools {
                     .filter(p -> !isIgnoredTimestampedInputPath(p, normalizedOutput))
                     .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip"))
+                    .map(PathPolicy::checkReadIfActive)
                     .sorted(Comparator.comparing(Path::toString))
                     .toList();
 
@@ -3348,6 +3403,7 @@ public class ValidationTools {
                 List<Path> xmlFiles = stream
                         .filter(p -> !isIgnoredDiscoveryPathForRoot(root, p))                        .filter(Files::isRegularFile)
                         .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".xml"))
+                        .map(PathPolicy::checkReadIfActive)
                         .sorted(Comparator.comparing(Path::toString))
                         .toList();
 

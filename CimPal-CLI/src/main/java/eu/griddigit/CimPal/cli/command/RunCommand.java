@@ -8,6 +8,8 @@ package eu.griddigit.CimPal.cli.command;
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.utils.LogSanitizer;
+import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
+import eu.griddigit.cimpal.core.utils.PathPolicy;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -83,6 +85,9 @@ public class RunCommand implements Callable<Integer> {
             description = "Output format: text (default) or json.")
     private String format;
 
+    @CommandLine.Mixin
+    RootOptions rootOptions = new RootOptions();
+
     // -------------------------------------------------------------------------
 
     @Override
@@ -128,6 +133,20 @@ public class RunCommand implements Callable<Integer> {
         }
 
         Path pipelineDir = pipelineFile.toPath().toAbsolutePath().getParent();
+
+        // Allowed roots for file paths in steps (SEC-2): by default the working directory and the
+        // pipeline file's folder; relative step paths resolve against the pipeline folder.
+        PathPolicy policy;
+        try {
+            List<Path> defaultRoots = new ArrayList<>(List.of(Path.of("").toAbsolutePath()));
+            if (!defaultRoots.contains(pipelineDir)) {
+                defaultRoots.add(pipelineDir);
+            }
+            policy = rootOptions.policy(defaultRoots);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("[ERROR] " + ex.getMessage());
+            return ExitCode.INVALID_INPUT;
+        }
 
         String pipelineName = clean(pipeline.path("name").asText("(unnamed)"));
         String pipelineDescription = clean(pipeline.path("description").asText(null));
@@ -232,8 +251,10 @@ public class RunCommand implements Callable<Integer> {
             int exitCode;
             Path tempConfig = null;
             try {
+                // Checked here, not up front: a step may read what an earlier step wrote.
+                ObjectNode checkedStep = PathGuard.check(command, stepForConfig, policy, pipelineDir);
                 tempConfig = Files.createTempFile("cimpal-pipeline-", ".json");
-                mapper.writeValue(tempConfig.toFile(), stepForConfig);
+                mapper.writeValue(tempConfig.toFile(), checkedStep);
 
                 String[] args = {command, "--config", tempConfig.toString()};
 
@@ -242,11 +263,15 @@ public class RunCommand implements Callable<Integer> {
                 PrintStream origOut = System.out;
                 if (jsonOutput) System.setOut(System.err);
                 try {
-                    exitCode = CimPalCli.inProcess().execute(args);
+                    exitCode = PathPolicy.runWith(policy,
+                            () -> CimPalCli.inProcess().execute(args));
                 } finally {
                     if (jsonOutput) System.setOut(origOut);
                 }
 
+            } catch (PathNotAllowedException ex) {
+                System.err.println("[ERROR] Step " + id + ": " + ex.getMessage());
+                exitCode = ExitCode.INVALID_INPUT;
             } catch (Exception ex) {
                 System.err.println("[ERROR] Step " + id + " failed to launch: " + ex.getMessage());
                 exitCode = ExitCode.INTERNAL_ERROR;

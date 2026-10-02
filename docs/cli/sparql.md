@@ -108,10 +108,16 @@ If a SELECT query has no LIMIT and the model is large (over 100k triples), the c
 
 ---
 
+## No federated queries (`SERVICE`)
+
+Queries run only against the models you load. A query that contains `SERVICE` anywhere, including sub-queries and `EXISTS` / `NOT EXISTS` blocks, is refused with exit code 2 before it runs, and no request is sent. Remote `SERVICE` is also switched off for every query CimPal runs, including SHACL-SPARQL constraints in shapes, in the CLI and in the GUI. Without that, a query could send HTTP requests to any host, past CimPal's download allowlist. Jena executes `SERVICE` by default.
+
+---
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | 0 | Query ran successfully |
-| 2 | Bad input (no models, no query, file not found) |
+| 2 | Bad input (no models, no query, file not found, empty model, not a SELECT, or a refused `SERVICE` query) |
 | 3 | Internal error (RDF parse failure, SPARQL syntax error) |

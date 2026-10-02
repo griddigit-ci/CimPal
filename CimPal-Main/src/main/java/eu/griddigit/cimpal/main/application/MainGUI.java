@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.main.application;
 
+import eu.griddigit.cimpal.core.utils.SparqlServicePolicy;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
 import eu.griddigit.cimpal.main.gui.ThemeManager;
 import javafx.application.Application;
@@ -26,6 +27,8 @@ public class MainGUI extends Application {
     @Override
     public void init() throws Exception {
         super.init();
+        // No SPARQL SERVICE: queries typed in the GUI and SHACL-SPARQL shapes must not reach the network.
+        SparqlServicePolicy.disableRemoteServiceGlobally();
         // Scene for the Main App
         // Load root layout from fxml file.
         Parent rootMainApp = FXMLLoader.load(getClass().getResource("/fxml/CimPalGui.fxml"));

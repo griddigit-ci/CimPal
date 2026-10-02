@@ -146,6 +146,10 @@ public class SparqlCommand implements Callable<Integer> {
 
             return ExitCode.OK;
 
+        } catch (IllegalArgumentException ex) {
+            // Refused query (e.g. SERVICE, not a SELECT) or empty model: bad input, not a crash.
+            System.err.println("[ERROR] " + ex.getMessage());
+            return ExitCode.INVALID_INPUT;
         } catch (Exception ex) {
             System.err.println("[ERROR] " + ex.getMessage());
             ex.printStackTrace(System.err);

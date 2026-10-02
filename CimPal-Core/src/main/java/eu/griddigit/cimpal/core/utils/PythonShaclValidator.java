@@ -42,6 +42,8 @@ final class PythonShaclValidator {
         if (engine == ValidationEngine.APACHE_JENA) {
             throw new IllegalArgumentException("Apache Jena is not a Python validation engine");
         }
+        // The Jena SERVICE switches don't reach the Python process (SEC-2, G3).
+        SparqlServicePolicy.requireNoServiceInShapes(shapesModel);
 
         List<String> command = new ArrayList<>(pythonCommand(engine));
         command.add("-u");
