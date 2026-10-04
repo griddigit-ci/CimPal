@@ -5492,24 +5492,19 @@ public class ValidationTools {
         for (Shape shape : activeTargetShapes(cachedShapes.shapes())) {
             ShapeDependency dependency = cachedShapes.dependencies().getOrDefault(shape.getShapeNode(),
                     ShapeDependency.unknown());
-            Set<Node> previousFocusNodes = new LinkedHashSet<>(VLib.focusNodes(previous.graph().getGraph(), shape));
-            Set<Node> currentFocusNodes = new LinkedHashSet<>(VLib.focusNodes(graph, shape));
             if (!dependency.isAffectedBy(changedPredicates)) {
-                // Neither a constraint predicate nor a target-selection predicate changed.
-                // The old findings remain valid; only remove nodes no longer selected as targets.
-                findings.keySet().removeIf(key -> key.shape().equals(shape.getShapeNode())
-                        && !currentFocusNodes.contains(key.focus()));
+                // Neither a constraint predicate nor a target-selection predicate changed, so
+                // even discovering this shape's focus nodes would be needless work.
                 continue;
             }
+            Set<Node> previousFocusNodes = new LinkedHashSet<>(VLib.focusNodes(previous.graph().getGraph(), shape));
+            Set<Node> currentFocusNodes = new LinkedHashSet<>(VLib.focusNodes(graph, shape));
             if (!dependency.local()) {
                 // Paths and SPARQL may have non-local effects.  Their predicate index still lets
                 // us skip the entire shape above; once affected, safely re-run only this shape.
                 findings.keySet().removeIf(key -> key.shape().equals(shape.getShapeNode()));
-                for (Node focus : currentFocusNodes) {
-                    findings.put(new FocusNodeKey(shape.getShapeNode(), focus),
-                            validateTargetShapeAtFocus(cachedShapes.shapes(), graph, cachedShapes.model(),
-                                    shape, focus, maxResultsPerConstraint, rowIdx).results());
-                }
+                findings.putAll(validateFullTargetShapeFindings(cachedShapes, graph, shape,
+                        maxResultsPerConstraint, rowIdx));
                 continue;
             }
             Set<Node> focusNodes = new LinkedHashSet<>(previousFocusNodes);
@@ -5525,7 +5520,7 @@ public class ValidationTools {
             }
             // Also drop any old cached result whose focus node is no longer selected.
             findings.keySet().removeIf(key -> key.shape().equals(shape.getShapeNode())
-                    && !currentFocusNodes.contains(key.focus()));
+                    && !key.focus().equals(Node.ANY) && !currentFocusNodes.contains(key.focus()));
         }
         return outcomeFromFindings(findings);
     }
@@ -5668,13 +5663,49 @@ public class ValidationTools {
                                                                     int maxResultsPerConstraint, int rowIdx) {
         Map<FocusNodeKey, List<SHACLValidationResult>> findings = new LinkedHashMap<>();
         for (Shape shape : activeTargetShapes(cachedShapes.shapes())) {
-            for (Node focus : VLib.focusNodes(graph, shape)) {
-                findings.put(new FocusNodeKey(shape.getShapeNode(), focus), validateTargetShapeAtFocus(
-                        cachedShapes.shapes(), graph, cachedShapes.model(), shape, focus,
-                        maxResultsPerConstraint, rowIdx).results());
-            }
+            findings.putAll(validateFullTargetShapeFindings(cachedShapes, graph, shape,
+                    maxResultsPerConstraint, rowIdx));
         }
         return outcomeFromFindings(findings);
+    }
+
+    /**
+     * Validates a target shape once, then partitions the resulting Jena report by its raw RDF
+     * {@code sh:focusNode}. This preserves the full-validator performance for a baseline while
+     * creating the exact focus-node cache needed by later incremental deltas.
+     */
+    private static Map<FocusNodeKey, List<SHACLValidationResult>> validateFullTargetShapeFindings(
+            CachedShapes cachedShapes, Graph graph, Shape shape, int maxResultsPerConstraint, int rowIdx) {
+        TargetShapeOutcome outcome = validateTargetShape(cachedShapes.shapes(), graph, cachedShapes.model(), shape,
+                maxResultsPerConstraint, rowIdx);
+        Map<FocusNodeKey, List<SHACLValidationResult>> grouped = new LinkedHashMap<>();
+        for (Node focus : VLib.focusNodes(graph, shape)) {
+            grouped.put(new FocusNodeKey(shape.getShapeNode(), focus), new ArrayList<>());
+        }
+        Model reportModel = outcome.report().getModel();
+        org.apache.jena.rdf.model.Property focusProperty = reportModel.createProperty(
+                "http://www.w3.org/ns/shacl#focusNode");
+        org.apache.jena.rdf.model.Resource validationResult = reportModel.createResource(
+                "http://www.w3.org/ns/shacl#ValidationResult");
+        ResIterator iterator = reportModel.listResourcesWithProperty(RDF.type, validationResult);
+        try {
+            while (iterator.hasNext()) {
+                org.apache.jena.rdf.model.Resource result = iterator.next();
+                Statement focusStatement = result.getProperty(focusProperty);
+                RDFNode focusValue = focusStatement == null ? null : focusStatement.getObject();
+                Node focus = focusValue == null ? Node.ANY : focusValue.asNode();
+                Model fragment = ModelFactory.createDefaultModel();
+                fragment.add(result.listProperties());
+                List<SHACLValidationResult> extracted = ShaclTools.extractSHACLValidationResults(fragment,
+                        cachedShapes.model());
+                grouped.computeIfAbsent(new FocusNodeKey(shape.getShapeNode(), focus), ignored -> new ArrayList<>())
+                        .addAll(extracted);
+            }
+        } finally {
+            iterator.close();
+        }
+        grouped.replaceAll((key, values) -> List.copyOf(new LinkedHashSet<>(values)));
+        return grouped;
     }
 
     private static TargetShapeOutcome validateTargetShapeAtFocus(Shapes shapes, Graph graph, Model shapesModel,
