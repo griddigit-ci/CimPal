@@ -5421,6 +5421,7 @@ public class ValidationTools {
             TimestampResultConsumer completedTimestampConsumer) throws IOException {
         Map<TimestampGroup, List<ValidationTaskResult>> allResults = new LinkedHashMap<>();
         Map<Integer, IncrementalRowState> states = new HashMap<>();
+        IncrementalDatasetCache datasetCache = new IncrementalDatasetCache();
         for (Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks> entry : plannedTimestamps.entrySet()) {
             TimestampGroup timestamp = entry.getKey();
             Map<Path, Model> timestampCache = new ConcurrentHashMap<>();
@@ -5431,13 +5432,14 @@ public class ValidationTools {
                 for (ResolvedMappingRow row : entry.getValue().resolvedRows) {
                     results.add(validateOneResolvedRowIncrementally(row, constraintsRoot, shapesCache,
                             staticXmlModelCache, timestampCache, zipEntriesByVirtualPath, dataTypeMap, xmlBase,
-                            maxResultsPerConstraint, validationEngine, states));
+                            maxResultsPerConstraint, validationEngine, states, datasetCache));
                 }
             } finally {
                 timestampCache.clear();
             }
             allResults.put(timestamp, results);
             if (completedTimestampConsumer != null) completedTimestampConsumer.accept(timestamp, results);
+            datasetCache.completeTimestamp();
         }
         return allResults;
     }
@@ -5446,7 +5448,8 @@ public class ValidationTools {
             ResolvedMappingRow row, Path constraintsRoot, Map<String, CachedShapes> shapesCache,
             Map<Path, Model> staticXmlModelCache, Map<Path, Model> timestampXmlModelCache,
             Map<Path, ZipXmlEntry> zipEntriesByVirtualPath, Map<String, RDFDatatype> dataTypeMap, String xmlBase,
-            int maxResultsPerConstraint, ValidationEngine validationEngine, Map<Integer, IncrementalRowState> states) {
+            int maxResultsPerConstraint, ValidationEngine validationEngine, Map<Integer, IncrementalRowState> states,
+            IncrementalDatasetCache datasetCache) {
         try {
             List<Path> ttlPaths = resolveTtlPaths(constraintsRoot, row.ttlName);
             if (row.xmlFiles == null || row.xmlFiles.isEmpty() || ttlPaths.isEmpty()
@@ -5460,9 +5463,12 @@ public class ValidationTools {
             Graph graph = loadRdfXmlGraphFromFilesWithCache(row.xmlFiles, staticXmlModelCache,
                     timestampXmlModelCache, zipEntriesByVirtualPath, dataTypeMap, xmlBase, row.rowIdx);
             IncrementalRowState state = states.get(row.rowIdx);
+            DatasetDelta datasetDelta = datasetCache.deltaFor(row.xmlFiles, staticXmlModelCache,
+                    timestampXmlModelCache, state);
             LimitedValidationOutcome outcome = validateIncrementally(cachedShapes, graph, state,
-                    maxResultsPerConstraint, row.rowIdx);
-            states.put(row.rowIdx, IncrementalRowState.snapshot(graph, outcome.findingsByFocus()));
+                    datasetDelta, maxResultsPerConstraint, row.rowIdx);
+            states.put(row.rowIdx, IncrementalRowState.snapshot(graph, outcome.findingsByFocus(),
+                    datasetDelta.datasetKeys()));
             return new ValidationTaskResult(row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
                     row.xmlFilesText, "", row.constraintFileText, outcome.results(), outcome.conforms(), null)
                     .withDisplayName(row.sourceRow.notes).withPartialValidation(outcome.partial());
@@ -5475,15 +5481,16 @@ public class ValidationTools {
 
     private static LimitedValidationOutcome validateIncrementally(CachedShapes cachedShapes, Graph graph,
                                                                     IncrementalRowState previous,
+                                                                    DatasetDelta datasetDelta,
                                                                     int maxResultsPerConstraint, int rowIdx) {
         // Sampling deliberately retains the current full-validation semantics: separate focus
         // evaluations would otherwise apply the per-shape limit repeatedly.
         if (previous == null || maxResultsPerConstraint != 0) {
             return validateAllFocusNodes(cachedShapes, graph, maxResultsPerConstraint, rowIdx);
         }
-        Set<Node> changedNodes = changedNodes(previous.graph().getGraph(), graph);
-        Set<Node> changedPredicates = changedPredicates(previous.graph().getGraph(), graph);
-        if (changedNodes.stream().anyMatch(Node::isBlank)) {
+        Set<Node> changedNodes = datasetDelta.changedNodes();
+        Set<Node> changedPredicates = datasetDelta.changedPredicates();
+        if (datasetDelta.hasBlankNodeChange()) {
             // Blank node labels are local parser artefacts; comparing their identity across RDF/XML
             // timestamp files is unsafe, so a blank-node delta revalidates this row completely.
             return validateAllFocusNodes(cachedShapes, graph, maxResultsPerConstraint, rowIdx);
@@ -5509,14 +5516,20 @@ public class ValidationTools {
             }
             Set<Node> focusNodes = new LinkedHashSet<>(previousFocusNodes);
             focusNodes.addAll(currentFocusNodes);
+            List<Node> affectedCurrentFocusNodes = new ArrayList<>();
             for (Node focus : focusNodes) {
                 FocusNodeKey key = new FocusNodeKey(shape.getShapeNode(), focus);
                 if (!currentFocusNodes.contains(focus)) {
                     findings.remove(key);
                 } else if (changedNodes.contains(focus)) {
-                    findings.put(key, validateTargetShapeAtFocus(cachedShapes.shapes(), graph, cachedShapes.model(),
-                            shape, focus, maxResultsPerConstraint, rowIdx).results());
+                    findings.remove(key);
+                    affectedCurrentFocusNodes.add(focus);
                 }
+            }
+            if (!affectedCurrentFocusNodes.isEmpty()) {
+                TargetShapeOutcome outcome = validateTargetShapeForFocusNodes(cachedShapes.shapes(), graph,
+                        cachedShapes.model(), shape, affectedCurrentFocusNodes, maxResultsPerConstraint, rowIdx);
+                findings.putAll(partitionTargetShapeReport(cachedShapes, shape, affectedCurrentFocusNodes, outcome));
             }
             // Also drop any old cached result whose focus node is no longer selected.
             findings.keySet().removeIf(key -> key.shape().equals(shape.getShapeNode())
@@ -5678,8 +5691,14 @@ public class ValidationTools {
             CachedShapes cachedShapes, Graph graph, Shape shape, int maxResultsPerConstraint, int rowIdx) {
         TargetShapeOutcome outcome = validateTargetShape(cachedShapes.shapes(), graph, cachedShapes.model(), shape,
                 maxResultsPerConstraint, rowIdx);
+        return partitionTargetShapeReport(cachedShapes, shape, VLib.focusNodes(graph, shape), outcome);
+    }
+
+    /** Splits one target-shape validation report while retaining empty buckets for conforming nodes. */
+    private static Map<FocusNodeKey, List<SHACLValidationResult>> partitionTargetShapeReport(
+            CachedShapes cachedShapes, Shape shape, Collection<Node> focusNodes, TargetShapeOutcome outcome) {
         Map<FocusNodeKey, List<SHACLValidationResult>> grouped = new LinkedHashMap<>();
-        for (Node focus : VLib.focusNodes(graph, shape)) {
+        for (Node focus : focusNodes) {
             grouped.put(new FocusNodeKey(shape.getShapeNode(), focus), new ArrayList<>());
         }
         Model reportModel = outcome.report().getModel();
@@ -5721,11 +5740,119 @@ public class ValidationTools {
 
     private record FocusNodeKey(Node shape, Node focus) { }
 
-    private record IncrementalRowState(Model graph, Map<FocusNodeKey, List<SHACLValidationResult>> findingsByFocus) {
-        static IncrementalRowState snapshot(Graph graph, Map<FocusNodeKey, List<SHACLValidationResult>> findings) {
+    private record IncrementalRowState(Model graph, Map<FocusNodeKey, List<SHACLValidationResult>> findingsByFocus,
+                                       Set<String> datasetKeys) {
+        static IncrementalRowState snapshot(Graph graph, Map<FocusNodeKey, List<SHACLValidationResult>> findings,
+                                            Set<String> datasetKeys) {
             Model copy = ModelFactory.createDefaultModel();
             copy.add(ModelFactory.createModelForGraph(graph));
-            return new IncrementalRowState(copy, Map.copyOf(findings));
+            return new IncrementalRowState(copy, Map.copyOf(findings), Set.copyOf(datasetKeys));
+        }
+    }
+
+    /**
+     * Caches the exact triple delta for each logical XML dataset once per timestamp. A logical
+     * key removes timestamp text from the filename; the input group itself scopes the cache.
+     * The union of file-level deltas is deliberately an over-approximation of a mapping-row
+     * union delta, which may revalidate extra nodes but cannot miss an affected constraint.
+     */
+    private static final class IncrementalDatasetCache {
+        private static final Pattern DATASET_TIMESTAMP = Pattern.compile("(?:^|[_-])\\d{8}T\\d{4,6}Z?(?=[_-]|\\.)");
+        private final Map<String, Model> previous = new HashMap<>();
+        private final Map<String, Model> pending = new HashMap<>();
+        private final Map<String, DatasetDelta> deltasThisTimestamp = new HashMap<>();
+
+        DatasetDelta deltaFor(Collection<Path> paths, Map<Path, Model> staticCache,
+                              Map<Path, Model> timestampCache, IncrementalRowState rowState) {
+            Set<String> keys = new LinkedHashSet<>();
+            Set<Node> nodes = new HashSet<>();
+            Set<Node> predicates = new HashSet<>();
+            boolean blankNodeChange = false;
+            for (Path path : paths) {
+                Path keyPath = path.toAbsolutePath().normalize();
+                Model current = timestampCache.get(keyPath);
+                if (current == null) current = staticCache.get(keyPath);
+                if (current == null) continue; // the normal row validation will report the load error
+                final Model currentModel = current;
+                String datasetKey = logicalDatasetKey(keyPath);
+                keys.add(datasetKey);
+                DatasetDelta delta = deltasThisTimestamp.computeIfAbsent(datasetKey, ignored -> {
+                    Model old = previous.get(datasetKey);
+                    pending.put(datasetKey, snapshotModel(currentModel));
+                    return old == null ? DatasetDelta.full(currentModel.getGraph(), Set.of(datasetKey))
+                            : DatasetDelta.between(old.getGraph(), currentModel.getGraph(), Set.of(datasetKey));
+                });
+                nodes.addAll(delta.changedNodes());
+                predicates.addAll(delta.changedPredicates());
+                blankNodeChange |= delta.hasBlankNodeChange();
+            }
+            // A dataset selected in the previous mapping row but absent now is a removed dataset.
+            if (rowState != null) {
+                for (String removedKey : rowState.datasetKeys()) {
+                    if (keys.contains(removedKey)) continue;
+                    Model old = previous.get(removedKey);
+                    if (old != null) {
+                        DatasetDelta removed = DatasetDelta.full(old.getGraph(), Set.of(removedKey));
+                        nodes.addAll(removed.changedNodes());
+                        predicates.addAll(removed.changedPredicates());
+                        blankNodeChange |= removed.hasBlankNodeChange();
+                    }
+                }
+            }
+            return new DatasetDelta(Set.copyOf(nodes), Set.copyOf(predicates), blankNodeChange, Set.copyOf(keys));
+        }
+
+        void completeTimestamp() {
+            previous.putAll(pending);
+            pending.clear();
+            deltasThisTimestamp.clear();
+        }
+
+        private static String logicalDatasetKey(Path path) {
+            String name = path.getFileName() == null ? path.toString() : path.getFileName().toString();
+            return DATASET_TIMESTAMP.matcher(name).replaceAll("_").toLowerCase(Locale.ROOT);
+        }
+
+        private static Model snapshotModel(Model source) {
+            Model copy = ModelFactory.createDefaultModel();
+            copy.add(source);
+            return copy;
+        }
+    }
+
+    private record DatasetDelta(Set<Node> changedNodes, Set<Node> changedPredicates,
+                                boolean hasBlankNodeChange, Set<String> datasetKeys) {
+        static DatasetDelta full(Graph graph, Set<String> datasetKeys) {
+            Set<Node> nodes = new HashSet<>();
+            Set<Node> predicates = new HashSet<>();
+            boolean[] blank = {false};
+            graph.find().forEachRemaining(triple -> {
+                addTripleNodes(nodes, triple);
+                predicates.add(triple.getPredicate());
+                blank[0] |= triple.getSubject().isBlank() || triple.getObject().isBlank();
+            });
+            return new DatasetDelta(Set.copyOf(nodes), Set.copyOf(predicates), blank[0], Set.copyOf(datasetKeys));
+        }
+
+        static DatasetDelta between(Graph previous, Graph current, Set<String> datasetKeys) {
+            Set<Node> nodes = new HashSet<>();
+            Set<Node> predicates = new HashSet<>();
+            boolean[] blank = {false};
+            previous.find().forEachRemaining(triple -> {
+                if (!current.contains(triple)) {
+                    addTripleNodes(nodes, triple);
+                    predicates.add(triple.getPredicate());
+                    blank[0] |= triple.getSubject().isBlank() || triple.getObject().isBlank();
+                }
+            });
+            current.find().forEachRemaining(triple -> {
+                if (!previous.contains(triple)) {
+                    addTripleNodes(nodes, triple);
+                    predicates.add(triple.getPredicate());
+                    blank[0] |= triple.getSubject().isBlank() || triple.getObject().isBlank();
+                }
+            });
+            return new DatasetDelta(Set.copyOf(nodes), Set.copyOf(predicates), blank[0], Set.copyOf(datasetKeys));
         }
     }
 
