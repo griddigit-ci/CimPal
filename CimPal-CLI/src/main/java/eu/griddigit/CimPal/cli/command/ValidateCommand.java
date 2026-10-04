@@ -144,6 +144,10 @@ public class ValidateCommand implements Callable<Integer> {
             description = "XLSX from a previous timestamped run, used to build a delta comparison sheet.")
     private File previousComparison;
 
+    @Option(names = "--incremental-timestamps",
+            description = "For timestamped validation, reuse unaffected Jena focus-node findings between consecutive timestamps.")
+    private boolean incrementalTimestamps;
+
     @Option(names = "--dry-run",
             description = "Print the resolved configuration and exit without running validation.")
     private boolean dryRun;
@@ -511,7 +515,8 @@ public class ValidateCommand implements Callable<Integer> {
                 .engine(validationEngine)
                 .maxResultsPerConstraint(maxResults)
                 .threads(workers)
-                .exportTurtleReports(Boolean.TRUE.equals(exportTurtle));
+                .exportTurtleReports(Boolean.TRUE.equals(exportTurtle))
+                .incrementalTimestampValidation(incrementalTimestamps);
         if (prevPath != null) {
             optionsBuilder.previousComparisonCsv(prevPath);
         }

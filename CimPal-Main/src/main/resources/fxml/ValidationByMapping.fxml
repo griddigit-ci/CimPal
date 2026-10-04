@@ -262,6 +262,8 @@
 
         <!-- Optional RDF report export applies to every validation workflow. -->
         <HBox spacing="8.0" alignment="CENTER_LEFT" VBox.vgrow="NEVER">
+            <CheckBox fx:id="cbIncrementalTimestampValidation" mnemonicParsing="false"
+                      text="Incremental validation between timestamps"/>
             <CheckBox fx:id="cbExportDetailedTimestampReports" mnemonicParsing="false"
                       text="Create detailed Excel report for each timestamp" selected="true"/>
             <CheckBox fx:id="cbExportReportsTurtle" mnemonicParsing="false"

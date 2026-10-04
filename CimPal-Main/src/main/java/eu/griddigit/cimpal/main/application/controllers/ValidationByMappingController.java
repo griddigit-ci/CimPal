@@ -206,6 +206,9 @@ public class ValidationByMappingController {
     private CheckBox cbExportReportsTurtle;
 
     @FXML
+    private CheckBox cbIncrementalTimestampValidation;
+
+    @FXML
     private CheckBox cbExportDetailedTimestampReports;
 
     @FXML
@@ -379,6 +382,10 @@ public class ValidationByMappingController {
         setShown(!manual, rowValidationEngineLabel, cbValidationEngine);
         setShown(true, rowValidationWorkersLabel, cbValidationWorkers,
                 rowLimitValidationResults, rowValidationDebug);
+        if (cbIncrementalTimestampValidation != null) {
+            cbIncrementalTimestampValidation.setDisable(!timestamped);
+            if (!timestamped) cbIncrementalTimestampValidation.setSelected(false);
+        }
 
         // Manual constraint file selection: manual workflow only.
         setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
@@ -813,6 +820,8 @@ public class ValidationByMappingController {
         boolean exportTurtleReports = cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected();
         boolean exportDetailedTimestampReports = cbExportDetailedTimestampReports == null
                 || cbExportDetailedTimestampReports.isSelected();
+        boolean incrementalTimestampValidation = runTimestampedWorkflow
+                && cbIncrementalTimestampValidation != null && cbIncrementalTimestampValidation.isSelected();
 
         btnRunValidationByMapping.setDisable(true);
         setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -838,6 +847,7 @@ public class ValidationByMappingController {
                         .threads(threadCount)
                         .exportTurtleReports(exportTurtleReports)
                         .exportDetailedTimestampReports(exportDetailedTimestampReports)
+                        .incrementalTimestampValidation(incrementalTimestampValidation)
                         .build();
                 MappingValidationSummary summary = new MappingValidator(options).validate();
 

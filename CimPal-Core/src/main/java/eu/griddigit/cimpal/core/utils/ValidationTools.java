@@ -8,6 +8,9 @@ package eu.griddigit.cimpal.core.utils;
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
+import org.apache.jena.graph.Triple;
 import org.apache.jena.graph.compose.MultiUnion;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
@@ -367,12 +370,36 @@ public class ValidationTools {
                                                           boolean exportTurtleReports,
                                                           boolean exportDetailedTimestampReports)
             throws IOException {
+        return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, previousComparisonCsv, maxResultsPerConstraint,
+                validationEngine, exportTurtleReports, exportDetailedTimestampReports, false);
+    }
+
+    /** As above, optionally retaining unaffected Jena focus-node results between timestamps. */
+    static ValidationTimestampedRunSummary validateByTimestampedMapping(Path mappingCsvPath,
+                                                          Path inputPath,
+                                                          Path constraintsRoot,
+                                                          Path outputBaseDir,
+                                                          int threadCount,
+                                                          Map<String, RDFDatatype> dataTypeMap,
+                                                          String xmlBase,
+                                                          Path previousComparisonCsv,
+                                                          int maxResultsPerConstraint,
+                                                          ValidationEngine validationEngine,
+                                                          boolean exportTurtleReports,
+                                                          boolean exportDetailedTimestampReports,
+                                                          boolean incrementalTimestampValidation)
+            throws IOException {
 
         if (maxResultsPerConstraint < 0) {
             throw new IllegalArgumentException("maxResultsPerConstraint must be zero or greater");
         }
 
         validationEngine = validationEngine == null ? ValidationEngine.APACHE_JENA : validationEngine;
+        if (incrementalTimestampValidation && validationEngine != ValidationEngine.APACHE_JENA) {
+            logWarn("Incremental timestamp validation is currently supported by Apache Jena only; using full validation");
+            incrementalTimestampValidation = false;
+        }
         long allStart = System.currentTimeMillis();
 
         if (DEBUG) {
@@ -481,35 +508,26 @@ public class ValidationTools {
 
                     Map<TimestampGroup, Future<Path>> timestampReportFutures = new LinkedHashMap<>();
                     Map<TimestampGroup, List<ValidationTaskResult>> timestampResults =
-                            executeTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
+                            (incrementalTimestampValidation
+                                    ? executeIncrementalTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
+                                    shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
+                                    dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine, inputGroup.name,
+                                    (timestampGroup, results) -> {
+                                        if (!exportDetailedTimestampReports) return;
+                                        submitTimestampReport(timestampReportFutures, reportQueue, timestampGroup,
+                                                plannedTimestamps, results, inputGroup.name, groupOutputDir,
+                                                maxResultsPerConstraint);
+                                    })
+                                    : executeTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
                                     shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
                                     dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
                                     threadCount <= 0, inputGroup.name,
                                     (timestampGroup, results) -> {
-                                        if (!exportDetailedTimestampReports) {
-                                            return;
-                                        }
-                                        String analysisName = deriveMonthLabel(timestampGroup,
-                                                plannedTimestamps.get(timestampGroup).resolvedRows) + " Analysis";
-                                        timestampReportFutures.put(timestampGroup, reportQueue.submit(() -> {
-                                            try (ValidationExcelWriter timestampWriter = new ValidationExcelWriter()) {
-                                                timestampWriter.setReportContext(analysisName, inputGroup.name,
-                                                        timestampGroup.timestamp);
-                                                long reportRowsStart = System.currentTimeMillis();
-                                                appendTaskResultsToWriter(timestampWriter, results,
-                                                        maxResultsPerConstraint);
-                                                dbg("DONE append timestamp report rows inputGroup=" + inputGroup.name
-                                                        + " timestamp=" + timestampGroup.timestamp, reportRowsStart);
-
-                                                long reportSaveStart = System.currentTimeMillis();
-                                                Path report = saveTimestampReport(timestampWriter, groupOutputDir,
-                                                        inputGroup.name, timestampGroup.timestamp);
-                                                dbg("DONE save timestamp report inputGroup=" + inputGroup.name
-                                                        + " timestamp=" + timestampGroup.timestamp, reportSaveStart);
-                                                return report;
-                                            }
-                                        }));
-                                    });
+                                        if (!exportDetailedTimestampReports) return;
+                                        submitTimestampReport(timestampReportFutures, reportQueue, timestampGroup,
+                                                plannedTimestamps, results, inputGroup.name, groupOutputDir,
+                                                maxResultsPerConstraint);
+                                    }));
 
                     for (TimestampGroup timestampGroup : tsoIndex.byTimestamp.values()) {
                         long timestampStart = System.currentTimeMillis();
@@ -658,6 +676,22 @@ public class ValidationTools {
         }
 
         return LocalDate.now().format(ANALYSIS_MONTH_YEAR);
+    }
+
+    private static void submitTimestampReport(Map<TimestampGroup, Future<Path>> futures,
+                                              TimestampReportQueue queue, TimestampGroup timestampGroup,
+                                              Map<TimestampGroup, ResolvedRowsAndInputChecks> plannedTimestamps,
+                                              List<ValidationTaskResult> results, String inputGroupName,
+                                              Path groupOutputDir, int maxResultsPerConstraint) throws IOException {
+        String analysisName = deriveMonthLabel(timestampGroup,
+                plannedTimestamps.get(timestampGroup).resolvedRows) + " Analysis";
+        futures.put(timestampGroup, queue.submit(() -> {
+            try (ValidationExcelWriter writer = new ValidationExcelWriter()) {
+                writer.setReportContext(analysisName, inputGroupName, timestampGroup.timestamp);
+                appendTaskResultsToWriter(writer, results, maxResultsPerConstraint);
+                return saveTimestampReport(writer, groupOutputDir, inputGroupName, timestampGroup.timestamp);
+            }
+        }));
     }
 
     private static String monthYearFromInstant(String instant) {
@@ -2543,8 +2577,12 @@ public class ValidationTools {
         return sb.toString();
     }
 
-    /** Run-scoped cache entry retaining the RDF model for result extraction. */
-    record CachedShapes(Model model, Shapes shapes) {}
+    /** Run-scoped cache entry retaining parsed shapes and their conservative delta dependencies. */
+    record CachedShapes(Model model, Shapes shapes, Map<Node, ShapeDependency> dependencies) {
+        CachedShapes(Model model, Shapes shapes) {
+            this(model, shapes, analyseShapeDependencies(model, shapes));
+        }
+    }
 
     static CachedShapes loadParsedShapesWithImports(ShapeSource root,
                                                     Path constraintsRoot,
@@ -5362,6 +5400,304 @@ public class ValidationTools {
         return results;
     }
 
+    /**
+     * Ordered counterpart to {@link #executeTimestampBatches}. A row's prior graph and
+     * shape/focus-node findings are deliberately retained only for the duration of this input
+     * group. This makes the option deterministic and avoids treating a report from another run
+     * as a validation baseline.
+     */
+    private static Map<TimestampGroup, List<ValidationTaskResult>> executeIncrementalTimestampBatches(
+            Map<TimestampGroup, ResolvedRowsAndInputChecks> plannedTimestamps,
+            TimestampExecutionPlan plan,
+            Path constraintsRoot,
+            Map<String, CachedShapes> shapesCache,
+            Map<Path, Model> staticXmlModelCache,
+            Map<Path, ZipXmlEntry> zipEntriesByVirtualPath,
+            Map<String, RDFDatatype> dataTypeMap,
+            String xmlBase,
+            int maxResultsPerConstraint,
+            ValidationEngine validationEngine,
+            String inputGroupName,
+            TimestampResultConsumer completedTimestampConsumer) throws IOException {
+        Map<TimestampGroup, List<ValidationTaskResult>> allResults = new LinkedHashMap<>();
+        Map<Integer, IncrementalRowState> states = new HashMap<>();
+        for (Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks> entry : plannedTimestamps.entrySet()) {
+            TimestampGroup timestamp = entry.getKey();
+            Map<Path, Model> timestampCache = new ConcurrentHashMap<>();
+            List<ValidationTaskResult> results = new ArrayList<>();
+            try {
+                logInfo("START incremental timestamp validation inputGroup=" + inputGroupName
+                        + " timestamp=" + timestamp.timestamp + " rowWorkers=" + plan.rowWorkers());
+                for (ResolvedMappingRow row : entry.getValue().resolvedRows) {
+                    results.add(validateOneResolvedRowIncrementally(row, constraintsRoot, shapesCache,
+                            staticXmlModelCache, timestampCache, zipEntriesByVirtualPath, dataTypeMap, xmlBase,
+                            maxResultsPerConstraint, validationEngine, states));
+                }
+            } finally {
+                timestampCache.clear();
+            }
+            allResults.put(timestamp, results);
+            if (completedTimestampConsumer != null) completedTimestampConsumer.accept(timestamp, results);
+        }
+        return allResults;
+    }
+
+    private static ValidationTaskResult validateOneResolvedRowIncrementally(
+            ResolvedMappingRow row, Path constraintsRoot, Map<String, CachedShapes> shapesCache,
+            Map<Path, Model> staticXmlModelCache, Map<Path, Model> timestampXmlModelCache,
+            Map<Path, ZipXmlEntry> zipEntriesByVirtualPath, Map<String, RDFDatatype> dataTypeMap, String xmlBase,
+            int maxResultsPerConstraint, ValidationEngine validationEngine, Map<Integer, IncrementalRowState> states) {
+        try {
+            List<Path> ttlPaths = resolveTtlPaths(constraintsRoot, row.ttlName);
+            if (row.xmlFiles == null || row.xmlFiles.isEmpty() || ttlPaths.isEmpty()
+                    || ttlPaths.stream().anyMatch(path -> !Files.exists(path))) {
+                // Keep the established error reporting for malformed mapping rows.
+                return validateOneResolvedRow(row, constraintsRoot, shapesCache, staticXmlModelCache,
+                        timestampXmlModelCache, zipEntriesByVirtualPath, dataTypeMap, xmlBase,
+                        maxResultsPerConstraint, validationEngine, 1);
+            }
+            CachedShapes cachedShapes = loadParsedShapesWithImports(ttlPaths, constraintsRoot, shapesCache);
+            Graph graph = loadRdfXmlGraphFromFilesWithCache(row.xmlFiles, staticXmlModelCache,
+                    timestampXmlModelCache, zipEntriesByVirtualPath, dataTypeMap, xmlBase, row.rowIdx);
+            IncrementalRowState state = states.get(row.rowIdx);
+            LimitedValidationOutcome outcome = validateIncrementally(cachedShapes, graph, state,
+                    maxResultsPerConstraint, row.rowIdx);
+            states.put(row.rowIdx, IncrementalRowState.snapshot(graph, outcome.findingsByFocus()));
+            return new ValidationTaskResult(row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
+                    row.xmlFilesText, "", row.constraintFileText, outcome.results(), outcome.conforms(), null)
+                    .withDisplayName(row.sourceRow.notes).withPartialValidation(outcome.partial());
+        } catch (Exception ex) {
+            logError("Unhandled exception in incremental timestamped row", ex);
+            return new ValidationTaskResult(row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
+                    row.xmlFilesText, "", row.constraintFileText, null, false, ex);
+        }
+    }
+
+    private static LimitedValidationOutcome validateIncrementally(CachedShapes cachedShapes, Graph graph,
+                                                                    IncrementalRowState previous,
+                                                                    int maxResultsPerConstraint, int rowIdx) {
+        // Sampling deliberately retains the current full-validation semantics: separate focus
+        // evaluations would otherwise apply the per-shape limit repeatedly.
+        if (previous == null || maxResultsPerConstraint != 0) {
+            return validateAllFocusNodes(cachedShapes, graph, maxResultsPerConstraint, rowIdx);
+        }
+        Set<Node> changedNodes = changedNodes(previous.graph().getGraph(), graph);
+        Set<Node> changedPredicates = changedPredicates(previous.graph().getGraph(), graph);
+        if (changedNodes.stream().anyMatch(Node::isBlank)) {
+            // Blank node labels are local parser artefacts; comparing their identity across RDF/XML
+            // timestamp files is unsafe, so a blank-node delta revalidates this row completely.
+            return validateAllFocusNodes(cachedShapes, graph, maxResultsPerConstraint, rowIdx);
+        }
+        Map<FocusNodeKey, List<SHACLValidationResult>> findings = new LinkedHashMap<>(previous.findingsByFocus());
+        for (Shape shape : activeTargetShapes(cachedShapes.shapes())) {
+            ShapeDependency dependency = cachedShapes.dependencies().getOrDefault(shape.getShapeNode(),
+                    ShapeDependency.unknown());
+            Set<Node> previousFocusNodes = new LinkedHashSet<>(VLib.focusNodes(previous.graph().getGraph(), shape));
+            Set<Node> currentFocusNodes = new LinkedHashSet<>(VLib.focusNodes(graph, shape));
+            if (!dependency.isAffectedBy(changedPredicates)) {
+                // Neither a constraint predicate nor a target-selection predicate changed.
+                // The old findings remain valid; only remove nodes no longer selected as targets.
+                findings.keySet().removeIf(key -> key.shape().equals(shape.getShapeNode())
+                        && !currentFocusNodes.contains(key.focus()));
+                continue;
+            }
+            if (!dependency.local()) {
+                // Paths and SPARQL may have non-local effects.  Their predicate index still lets
+                // us skip the entire shape above; once affected, safely re-run only this shape.
+                findings.keySet().removeIf(key -> key.shape().equals(shape.getShapeNode()));
+                for (Node focus : currentFocusNodes) {
+                    findings.put(new FocusNodeKey(shape.getShapeNode(), focus),
+                            validateTargetShapeAtFocus(cachedShapes.shapes(), graph, cachedShapes.model(),
+                                    shape, focus, maxResultsPerConstraint, rowIdx).results());
+                }
+                continue;
+            }
+            Set<Node> focusNodes = new LinkedHashSet<>(previousFocusNodes);
+            focusNodes.addAll(currentFocusNodes);
+            for (Node focus : focusNodes) {
+                FocusNodeKey key = new FocusNodeKey(shape.getShapeNode(), focus);
+                if (!currentFocusNodes.contains(focus)) {
+                    findings.remove(key);
+                } else if (changedNodes.contains(focus)) {
+                    findings.put(key, validateTargetShapeAtFocus(cachedShapes.shapes(), graph, cachedShapes.model(),
+                            shape, focus, maxResultsPerConstraint, rowIdx).results());
+                }
+            }
+            // Also drop any old cached result whose focus node is no longer selected.
+            findings.keySet().removeIf(key -> key.shape().equals(shape.getShapeNode())
+                    && !currentFocusNodes.contains(key.focus()));
+        }
+        return outcomeFromFindings(findings);
+    }
+
+    private static Set<Node> changedNodes(Graph previous, Graph current) {
+        Set<Node> nodes = new HashSet<>();
+        previous.find().forEachRemaining(triple -> { if (!current.contains(triple)) addTripleNodes(nodes, triple); });
+        current.find().forEachRemaining(triple -> { if (!previous.contains(triple)) addTripleNodes(nodes, triple); });
+        return nodes;
+    }
+
+    private static Set<Node> changedPredicates(Graph previous, Graph current) {
+        Set<Node> predicates = new HashSet<>();
+        previous.find().forEachRemaining(triple -> {
+            if (!current.contains(triple)) predicates.add(triple.getPredicate());
+        });
+        current.find().forEachRemaining(triple -> {
+            if (!previous.contains(triple)) predicates.add(triple.getPredicate());
+        });
+        return predicates;
+    }
+
+    private static void addTripleNodes(Set<Node> nodes, Triple triple) {
+        nodes.add(triple.getSubject());
+        nodes.add(triple.getObject());
+    }
+
+    /**
+     * Builds a conservative dependency signature per target shape. The signature is used only to
+     * prove that a shape cannot be affected: an unknown query/path is never skipped. Direct
+     * property shapes additionally qualify for focus-node-level reuse.
+     */
+    private static Map<Node, ShapeDependency> analyseShapeDependencies(Model model, Shapes shapes) {
+        Map<Node, ShapeDependency> index = new HashMap<>();
+        for (Shape shape : activeTargetShapes(shapes)) {
+            index.put(shape.getShapeNode(), analyseShapeDependency(model.getGraph(), shape.getShapeNode()));
+        }
+        return Map.copyOf(index);
+    }
+
+    private static ShapeDependency analyseShapeDependency(Graph shapeGraph, Node root) {
+        Set<Node> predicates = new LinkedHashSet<>();
+        DependencyFlags flags = new DependencyFlags();
+        collectShapeDependencies(shapeGraph, root, new HashSet<>(), predicates, flags);
+        if (flags.unknownSparql) {
+            return ShapeDependency.unknown();
+        }
+        return new ShapeDependency(Set.copyOf(predicates), !flags.nonLocal && !predicates.isEmpty());
+    }
+
+    private static void collectShapeDependencies(Graph graph, Node node, Set<Node> seen,
+                                                 Set<Node> predicates, DependencyFlags flags) {
+        if (!seen.add(node)) return;
+        for (var iterator = graph.find(node, Node.ANY, Node.ANY); iterator.hasNext();) {
+            Triple triple = iterator.next();
+            Node predicate = triple.getPredicate();
+            Node object = triple.getObject();
+            String local = shaclLocalName(predicate);
+            if ("path".equals(local)) {
+                collectPathPredicates(graph, object, new HashSet<>(), predicates, flags);
+            } else if ("targetSubjectsOf".equals(local) || "targetObjectsOf".equals(local)) {
+                if (object.isURI()) predicates.add(object); else flags.nonLocal = true;
+            } else if ("targetClass".equals(local)) {
+                predicates.add(RDF.Nodes.type);
+            } else if ("sparql".equals(local)) {
+                flags.nonLocal = true;
+                collectSparqlDependencies(graph, object, predicates, flags);
+            } else if (Set.of("node", "qualifiedValueShape", "and", "or", "xone", "not").contains(local)) {
+                flags.nonLocal = true;
+            }
+            if (object.isBlank()) collectShapeDependencies(graph, object, seen, predicates, flags);
+        }
+    }
+
+    private static void collectPathPredicates(Graph graph, Node node, Set<Node> seen,
+                                              Set<Node> predicates, DependencyFlags flags) {
+        if (node.isURI()) {
+            predicates.add(node);
+            return;
+        }
+        if (!node.isBlank() || !seen.add(node)) {
+            flags.nonLocal = true;
+            return;
+        }
+        // A blank path denotes a sequence, alternative, inverse, or quantified path. We can
+        // identify its predicates but cannot safely attribute it to one focus node.
+        flags.nonLocal = true;
+        for (var iterator = graph.find(node, Node.ANY, Node.ANY); iterator.hasNext();) {
+            Node object = iterator.next().getObject();
+            if (object.isURI() || object.isBlank()) collectPathPredicates(graph, object, seen, predicates, flags);
+        }
+    }
+
+    private static void collectSparqlDependencies(Graph graph, Node sparqlNode, Set<Node> predicates,
+                                                   DependencyFlags flags) {
+        Node select = NodeFactory.createURI("http://www.w3.org/ns/shacl#select");
+        for (var iterator = graph.find(sparqlNode, select, Node.ANY); iterator.hasNext();) {
+            Node query = iterator.next().getObject();
+            if (!query.isLiteral()) {
+                flags.unknownSparql = true;
+                continue;
+            }
+            String text = query.getLiteralLexicalForm();
+            String withoutIris = text;
+            Matcher matcher = Pattern.compile("<([^>]+)>").matcher(text);
+            while (matcher.find()) {
+                predicates.add(NodeFactory.createURI(matcher.group(1)));
+            }
+            withoutIris = withoutIris.replaceAll("<[^>]+>", "");
+            // Prefix declarations are resolved by the SHACL engine. Without reproducing that
+            // resolution here, a prefixed predicate leaves this query conservatively unknown.
+            if (Pattern.compile("(?<![\\w])(?:[A-Za-z][\\w-]*):[\\w-]+")
+                    .matcher(withoutIris).find()) flags.unknownSparql = true;
+            if (Pattern.compile("\\ba\\s+").matcher(withoutIris).find()) predicates.add(RDF.Nodes.type);
+        }
+        if (predicates.isEmpty()) flags.unknownSparql = true;
+    }
+
+    private static String shaclLocalName(Node predicate) {
+        String uri = predicate.isURI() ? predicate.getURI() : "";
+        String prefix = "http://www.w3.org/ns/shacl#";
+        return uri.startsWith(prefix) ? uri.substring(prefix.length()) : "";
+    }
+
+    private static final class DependencyFlags {
+        boolean nonLocal;
+        boolean unknownSparql;
+    }
+
+    private record ShapeDependency(Set<Node> predicates, boolean local) {
+        static ShapeDependency unknown() { return new ShapeDependency(Set.of(), false); }
+        boolean isAffectedBy(Set<Node> changedPredicates) {
+            // Empty means the analyser could not establish any safe dependency, therefore it
+            // must be re-run. A non-empty intersection is the only reason to evaluate it.
+            return predicates.isEmpty() || changedPredicates.stream().anyMatch(predicates::contains);
+        }
+    }
+
+    private static LimitedValidationOutcome validateAllFocusNodes(CachedShapes cachedShapes, Graph graph,
+                                                                    int maxResultsPerConstraint, int rowIdx) {
+        Map<FocusNodeKey, List<SHACLValidationResult>> findings = new LinkedHashMap<>();
+        for (Shape shape : activeTargetShapes(cachedShapes.shapes())) {
+            for (Node focus : VLib.focusNodes(graph, shape)) {
+                findings.put(new FocusNodeKey(shape.getShapeNode(), focus), validateTargetShapeAtFocus(
+                        cachedShapes.shapes(), graph, cachedShapes.model(), shape, focus,
+                        maxResultsPerConstraint, rowIdx).results());
+            }
+        }
+        return outcomeFromFindings(findings);
+    }
+
+    private static TargetShapeOutcome validateTargetShapeAtFocus(Shapes shapes, Graph graph, Model shapesModel,
+                                                                   Shape shape, Node focus, int limit, int rowIdx) {
+        return validateTargetShapeForFocusNodes(shapes, graph, shapesModel, shape, List.of(focus), limit, rowIdx);
+    }
+
+    private static LimitedValidationOutcome outcomeFromFindings(Map<FocusNodeKey, List<SHACLValidationResult>> findings) {
+        List<SHACLValidationResult> results = findings.values().stream().flatMap(Collection::stream)
+                .distinct().toList();
+        return new LimitedValidationOutcome(results, results.isEmpty(), false, null, Map.copyOf(findings));
+    }
+
+    private record FocusNodeKey(Node shape, Node focus) { }
+
+    private record IncrementalRowState(Model graph, Map<FocusNodeKey, List<SHACLValidationResult>> findingsByFocus) {
+        static IncrementalRowState snapshot(Graph graph, Map<FocusNodeKey, List<SHACLValidationResult>> findings) {
+            Model copy = ModelFactory.createDefaultModel();
+            copy.add(ModelFactory.createModelForGraph(graph));
+            return new IncrementalRowState(copy, Map.copyOf(findings));
+        }
+    }
+
     @FunctionalInterface
     private interface TimestampResultConsumer {
         void accept(TimestampGroup timestampGroup, List<ValidationTaskResult> results) throws IOException;
@@ -5669,7 +6005,13 @@ public class ValidationTools {
     record LimitedValidationOutcome(List<SHACLValidationResult> results,
                                     boolean conforms,
                                     boolean partial,
-                                    Model reportModel) {}
+                                    Model reportModel,
+                                    Map<FocusNodeKey, List<SHACLValidationResult>> findingsByFocus) {
+        LimitedValidationOutcome(List<SHACLValidationResult> results, boolean conforms, boolean partial,
+                                 Model reportModel) {
+            this(results, conforms, partial, reportModel, Map.of());
+        }
+    }
 
     /**
      * @param retainReport also return the engine's report graph. Mapping runs leave it off: they
@@ -5780,15 +6122,25 @@ public class ValidationTools {
     private static TargetShapeOutcome validateTargetShape(Shapes shapes, Graph dataGraph, Model shapesModel,
                                                             Shape targetShape, int maxResultsPerConstraint,
                                                             int rowIdx) {
+        List<Node> focusNodes = new ArrayList<>();
+        focusNodes.addAll(VLib.focusNodes(dataGraph, targetShape));
+        return validateTargetShapeForFocusNodes(shapes, dataGraph, shapesModel, targetShape, focusNodes,
+                maxResultsPerConstraint, rowIdx);
+    }
+
+    /** Evaluates one target shape for an explicit, already indexed set of focus nodes. */
+    private static TargetShapeOutcome validateTargetShapeForFocusNodes(Shapes shapes, Graph dataGraph,
+                                                                        Model shapesModel, Shape targetShape,
+                                                                        Collection<Node> focusNodes,
+                                                                        int maxResultsPerConstraint, int rowIdx) {
         long started = System.currentTimeMillis();
-        int focusNodeCount = 0;
+        int focusNodeCount = focusNodes.size();
         boolean partial = false;
         ValidationContext context = maxResultsPerConstraint == 0
                 ? ValidationContext.create(shapes, dataGraph)
                 : ValidationContext.create(shapes, dataGraph, new ResultLimitListener(maxResultsPerConstraint));
         try {
-            for (org.apache.jena.graph.Node focusNode : VLib.focusNodes(dataGraph, targetShape)) {
-                focusNodeCount++;
+            for (Node focusNode : focusNodes) {
                 ValidationProc.execValidateShape(context, dataGraph, targetShape, focusNode);
             }
         } catch (ResultLimitReached ex) {

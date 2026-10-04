@@ -40,6 +40,7 @@ public class MappingValidationOptions {
     private final int threads;
     private final boolean exportTurtleReports;
     private final boolean exportDetailedTimestampReports;
+    private final boolean incrementalTimestampValidation;
 
     private MappingValidationOptions(Builder b) {
         this.mappingCsv = b.mappingCsv;
@@ -57,6 +58,7 @@ public class MappingValidationOptions {
         this.threads = b.threads;
         this.exportTurtleReports = b.exportTurtleReports;
         this.exportDetailedTimestampReports = b.exportDetailedTimestampReports;
+        this.incrementalTimestampValidation = b.incrementalTimestampValidation;
     }
 
     public static Builder builder() {
@@ -125,6 +127,14 @@ public class MappingValidationOptions {
         return exportDetailedTimestampReports;
     }
 
+    /**
+     * Reuses unaffected Jena SHACL results between consecutive timestamp groups. This is only
+     * meaningful for the timestamped workflow; unsupported shapes are evaluated in full.
+     */
+    public boolean isIncrementalTimestampValidation() {
+        return incrementalTimestampValidation;
+    }
+
     // ============ the Builder ============
 
     public static class Builder {
@@ -144,6 +154,7 @@ public class MappingValidationOptions {
         private int threads = 0;
         private boolean exportTurtleReports = false;
         private boolean exportDetailedTimestampReports = true;
+        private boolean incrementalTimestampValidation = false;
 
         /** The mapping CSV: one row per validation, columns {@code xml_inputs, ttl[, notes]}. */
         public Builder mappingCsv(Path mappingCsv) {
@@ -252,6 +263,12 @@ public class MappingValidationOptions {
             return this;
         }
 
+        /** Enables conservative, triple-delta based validation between timestamp groups. */
+        public Builder incrementalTimestampValidation(boolean incrementalTimestampValidation) {
+            this.incrementalTimestampValidation = incrementalTimestampValidation;
+            return this;
+        }
+
         /**
          * Builds the immutable MappingValidationOptions, validating required fields.
          */
@@ -279,6 +296,9 @@ public class MappingValidationOptions {
             }
             if (previousComparisonCsv != null && !timestamped) {
                 throw new IllegalStateException("previousComparisonCsv is only used by the timestamped workflow");
+            }
+            if (incrementalTimestampValidation && !timestamped) {
+                throw new IllegalStateException("incrementalTimestampValidation is only used by the timestamped workflow");
             }
             return new MappingValidationOptions(this);
         }
