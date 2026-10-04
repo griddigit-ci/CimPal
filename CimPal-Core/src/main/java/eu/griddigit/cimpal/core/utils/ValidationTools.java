@@ -5620,7 +5620,7 @@ public class ValidationTools {
     private static LimitedValidationOutcome validateTargetShapes(Shapes shapes, Graph dataGraph, Model shapesModel,
                                                                    int maxResultsPerConstraint, int rowIdx,
                                                                    int targetShapeWorkers, boolean retainReport) {
-        List<Shape> targetShapes = new ArrayList<>(shapes.getTargetShapes());
+        List<Shape> targetShapes = activeTargetShapes(shapes);
         if (targetShapes.isEmpty()) {
             // Not reportConformsTrue(): that report's model is a shared singleton.
             return new LimitedValidationOutcome(List.of(), true, false,
@@ -5708,7 +5708,7 @@ public class ValidationTools {
      * rows to parallelise (for example manual rule testing).
      */
     public static ValidationReport validateJenaTargetShapes(Shapes shapes, Graph dataGraph, int workers) {
-        List<Shape> targetShapes = new ArrayList<>(shapes.getTargetShapes());
+        List<Shape> targetShapes = activeTargetShapes(shapes);
         if (targetShapes.isEmpty()) return ValidationReport.reportConformsTrue();
         int workerCount = Math.min(Math.max(1, workers), targetShapes.size());
         ExecutorService pool = Executors.newFixedThreadPool(workerCount);
@@ -5739,6 +5739,17 @@ public class ValidationTools {
 
     private record TargetShapeOutcome(List<SHACLValidationResult> results, ValidationReport report,
                                       boolean conforms, boolean partial) {}
+
+    /**
+     * Imports are merged before parsing, so a configuration can deactivate a shape declared in
+     * any imported file with {@code sh:deactivated true}. Jena retains those shapes in its
+     * target-shape collection; CimPal must exclude them before dispatching validation work.
+     */
+    private static List<Shape> activeTargetShapes(Shapes shapes) {
+        return shapes.getTargetShapes().stream()
+                .filter(shape -> !shape.deactivated())
+                .toList();
+    }
 
     /** Keeps the first {@code maxResultsPerConstraint} report rows for each SHACL source shape. */
     private static List<SHACLValidationResult> limitResultsPerConstraint(

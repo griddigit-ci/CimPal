@@ -10,6 +10,7 @@ import eu.griddigit.cimpal.core.testsupport.TestModels;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.vocabulary.OWL;
 import org.apache.jena.vocabulary.RDF;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -344,6 +346,39 @@ class ShapeSourceTest {
 
         assertEquals(manual.size(), result.model().size(),
                 "loadShapesWithImports must produce the same triple count as a manual merge");
+    }
+
+    @Test
+    void rootConfigurationDeactivatesImportedTargetShape() throws Exception {
+        Path imported = tempDir.resolve("imported.ttl");
+        Files.writeString(imported,
+                "@prefix ex: <urn:test:> .\n"
+                + "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+                + "ex:RequiredValue a sh:NodeShape ;\n"
+                + "    sh:targetNode ex:focus ;\n"
+                + "    sh:property [ sh:path ex:required ; sh:minCount 1 ] .\n",
+                StandardCharsets.UTF_8);
+
+        Path root = tempDir.resolve("root.ttl");
+        Files.writeString(root,
+                "@prefix ex: <urn:test:> .\n"
+                + "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                + "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+                + "<urn:root> a owl:Ontology ; owl:imports <" + imported.toUri() + "> .\n"
+                + "ex:RequiredValue sh:deactivated true .\n",
+                StandardCharsets.UTF_8);
+
+        var loaded = ValidationTools.loadParsedShapesWithImports(
+                List.of(root), tempDir, new HashMap<>());
+        assertTrue(loaded.shapes().getTargetShapes().stream().anyMatch(shape -> shape.deactivated()),
+                "Jena keeps deactivated target shapes in its parsed collection");
+
+        Model data = ModelFactory.createDefaultModel();
+        data.createResource("urn:test:focus");
+        ValidationReport report = ValidationTools.validateJenaTargetShapes(loaded.shapes(), data.getGraph(), 1);
+
+        assertTrue(report.conforms(),
+                "A shape deactivated by the root configuration must not validate imported targets");
     }
 
     // ---- Helpers ----
