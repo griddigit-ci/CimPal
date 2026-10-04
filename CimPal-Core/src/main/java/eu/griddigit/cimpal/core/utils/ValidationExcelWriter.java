@@ -145,6 +145,10 @@ public class ValidationExcelWriter implements Closeable {
     private int nextTimestampOverviewRow = 1;
     private int nextInputCompletenessRow = 1;
 
+    /** Charts and column widths are final layout work: perform them once, after all rows exist. */
+    private boolean detailedLayoutWritten;
+    private boolean summaryLayoutWritten;
+
     private final Map<TimestampConstraintKey, Integer> timestampConstraintStatistics = new LinkedHashMap<>();
 
     public ValidationExcelWriter() {
@@ -278,22 +282,13 @@ public class ValidationExcelWriter implements Closeable {
 
         for (SHACLValidationResult res : results) {
             addConstraintStatistic(reportDataset, reportXmlFiles, reportConstraintFile, res);
-            Row dr = s.createRow(r++);
-            dr.createCell(0).setCellValue(reportDataset);
-            dr.createCell(1).setCellValue(reportXmlFiles);
-            dr.createCell(2).setCellValue(reportConstraintFile);
-            dr.createCell(3).setCellValue(safe(res.getFocusNode()));
-            dr.createCell(4).setCellValue(safe(res.getPath()));
-            dr.createCell(5).setCellValue(safe(res.getValue()));
-            dr.createCell(6).setCellValue(safe(res.getValueKind()));
-            dr.createCell(7).setCellValue(safe(res.getSourceShape()));
-            dr.createCell(8).setCellValue(safe(res.getConstraintComponent()));
-            dr.createCell(9).setCellValue(cleanValidationMessage(res.getMessage()));
-            dr.createCell(10).setCellValue(safe(res.getSeverity()));
-            dr.createCell(11).setCellValue(safe(res.getDescription()));
-            dr.createCell(12).setCellValue(safe(res.getOrder()));
-            dr.createCell(13).setCellValue(safe(res.getName()));
-            dr.createCell(14).setCellValue(safe(res.getGroup()));
+            writeRow(s, r++,
+                    reportDataset, reportXmlFiles, reportConstraintFile,
+                    safe(res.getFocusNode()), safe(res.getPath()), safe(res.getValue()),
+                    safe(res.getValueKind()), safe(res.getSourceShape()),
+                    safe(res.getConstraintComponent()), cleanValidationMessage(res.getMessage()),
+                    safe(res.getSeverity()), safe(res.getDescription()), safe(res.getOrder()),
+                    safe(res.getName()), safe(res.getGroup()));
         }
 
         nextValidationResultsRow = r;
@@ -481,21 +476,11 @@ public class ValidationExcelWriter implements Closeable {
 
         int all = warn + vio + info;
 
-        Row row = statisticsSheet.createRow(nextStatisticsRow++);
-        row.createCell(0).setCellValue(safe(reportDataset));
-        row.createCell(1).setCellValue(safe(reportXmlFiles));
-        row.createCell(2).setCellValue(safe(reportConstraintFile));
-        row.createCell(3).setCellValue(all);
-        row.createCell(4).setCellValue(warn);
-        row.createCell(5).setCellValue(info);
-        row.createCell(6).setCellValue(vio);
-        row.createCell(7).setCellValue(conforms && validationError == null);
-        row.createCell(8).setCellValue(safe(validationError));
-        row.createCell(9).setCellValue(formatMissingXmlFiles(missingXmlFiles));
-        row.createCell(STAT_COL_CHART_NAME).setCellValue(safe(displayName));
-        row.createCell(11).setCellValue(partial
-                ? "Partial — stopped after " + resultLimit + " results per shape"
-                : "Complete");
+        writeRow(statisticsSheet, nextStatisticsRow++,
+                safe(reportDataset), safe(reportXmlFiles), safe(reportConstraintFile), all, warn, info, vio,
+                conforms && validationError == null, safe(validationError), formatMissingXmlFiles(missingXmlFiles),
+                safe(displayName), partial ? "Partial — stopped after " + resultLimit + " results per shape"
+                        : "Complete");
     }
 
     private void addConstraintStatistic(String dataset,
@@ -534,18 +519,9 @@ public class ValidationExcelWriter implements Closeable {
         for (Map.Entry<ConstraintStatisticKey, Integer> entry : constraintStatistics.entrySet()) {
             ConstraintStatisticKey key = entry.getKey();
 
-            Row row = statisticsConstraintSheet.createRow(r++);
-            row.createCell(0).setCellValue(key.dataset);
-            row.createCell(1).setCellValue(key.path);
-            row.createCell(2).setCellValue(key.source);
-            row.createCell(3).setCellValue(entry.getValue());
-            row.createCell(4).setCellValue(key.constraintComponent);
-            row.createCell(5).setCellValue(key.message);
-            row.createCell(6).setCellValue(key.severity);
-            row.createCell(7).setCellValue(key.description);
-            row.createCell(8).setCellValue(key.order);
-            row.createCell(9).setCellValue(key.name);
-            row.createCell(10).setCellValue(key.group);
+            writeRow(statisticsConstraintSheet, r++,
+                    key.dataset, key.path, key.source, entry.getValue(), key.constraintComponent, key.message,
+                    key.severity, key.description, key.order, key.name, key.group);
         }
     }
 
@@ -564,11 +540,15 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         if (timestampedSummaryMode) {
-            writeTimestampConstraintStatisticsRows();
-
-            autosize(timestampOverviewSheet, TIMESTAMP_OVERVIEW_HEADER.length);
-            autosize(timestampConstraintSheet, TIMESTAMP_CONSTRAINT_HEADER.length);
-            autosize(inputCompletenessSheet, INPUT_COMPLETENESS_HEADER.length);
+            if (!summaryLayoutWritten) {
+                writeTimestampConstraintStatisticsRows();
+                // Only text columns need content measurement; numeric columns retain Excel's
+                // standard width. This avoids scanning every summary cell during layout.
+                autosizeColumns(timestampOverviewSheet, 0, 1, 2);
+                autosizeColumns(timestampConstraintSheet, 0, 1, 2, 3, 4, 5, 6, 7, 8);
+                autosizeColumns(inputCompletenessSheet, 0, 1, 3, 4, 7, 8, 9, 10);
+                summaryLayoutWritten = true;
+            }
 
             try (OutputStream os = Files.newOutputStream(out)) {
                 wb.write(os);
@@ -576,8 +556,11 @@ public class ValidationExcelWriter implements Closeable {
             return out;
         }
 
-        writeConstraintStatisticsRows();
-        writeChartsSheet();
+        if (!detailedLayoutWritten) {
+            writeConstraintStatisticsRows();
+            writeChartsSheet();
+            detailedLayoutWritten = true;
+        }
 
         if (AUTO_SIZE_COLUMNS) {
             autosize(validationResultsSheet, RAW_HEADER.length);
@@ -610,7 +593,32 @@ public class ValidationExcelWriter implements Closeable {
         for (int c = 0; c < header.length; c++) {
             Cell cell = hdr.createCell(c);
             cell.setCellValue(header[c]);
-            cell.setCellStyle(headerStyle);
+        }
+        applyStyleToRange(sheet, 0, 0, 0, header.length - 1, headerStyle);
+    }
+
+    /** POI has no native range-style API, so one shared style is applied after all cell values exist. */
+    private static void applyStyleToRange(Sheet sheet, int firstRow, int lastRow,
+                                          int firstColumn, int lastColumn, CellStyle style) {
+        for (int rowIndex = firstRow; rowIndex <= lastRow; rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) continue;
+            for (int columnIndex = firstColumn; columnIndex <= lastColumn; columnIndex++) {
+                Cell cell = row.getCell(columnIndex);
+                if (cell != null) cell.setCellStyle(style);
+            }
+        }
+    }
+
+    /** Writes a complete row before any later layout work is performed. */
+    private static void writeRow(Sheet sheet, int rowIndex, Object... values) {
+        Row row = sheet.createRow(rowIndex);
+        for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
+            Cell cell = row.createCell(columnIndex);
+            Object value = values[columnIndex];
+            if (value instanceof Number number) cell.setCellValue(number.doubleValue());
+            else if (value instanceof Boolean bool) cell.setCellValue(bool);
+            else cell.setCellValue(value == null ? "" : value.toString());
         }
     }
 
@@ -714,15 +722,25 @@ public class ValidationExcelWriter implements Closeable {
 
     private static void autosize(Sheet sheet, int columnCount) {
         for (int c = 0; c < columnCount; c++) {
-            try {
-                sheet.autoSizeColumn(c);
-                int width = sheet.getColumnWidth(c);
-                int maxWidth = 80 * 256;
-                if (width > maxWidth) {
-                    sheet.setColumnWidth(c, maxWidth);
-                }
-            } catch (Exception ignore) {
+            autosizeColumn(sheet, c);
+        }
+    }
+
+    private static void autosizeColumns(Sheet sheet, int... columns) {
+        for (int c : columns) {
+            autosizeColumn(sheet, c);
+        }
+    }
+
+    private static void autosizeColumn(Sheet sheet, int column) {
+        try {
+            sheet.autoSizeColumn(column);
+            int width = sheet.getColumnWidth(column);
+            int maxWidth = 80 * 256;
+            if (width > maxWidth) {
+                sheet.setColumnWidth(column, maxWidth);
             }
+        } catch (Exception ignore) {
         }
     }
 
@@ -1187,8 +1205,11 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         chartsSheet.createFreezePane(0, 1);
-        for (int c = 0; c <= 8; c++) {
-            chartsSheet.autoSizeColumn(c);
+        // Dataset labels are the only variable-width chart columns. Numeric series use a
+        // stable readable width, avoiding eight full-sheet autosize scans per report.
+        autosizeColumns(chartsSheet, 0, 5);
+        for (int c : new int[]{1, 2, 3, 6, 7, 8}) {
+            chartsSheet.setColumnWidth(c, 12 * 256);
         }
 
         XSSFSheet xs = (XSSFSheet) chartsSheet;

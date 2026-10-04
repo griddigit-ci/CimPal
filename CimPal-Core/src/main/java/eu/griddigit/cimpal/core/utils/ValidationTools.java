@@ -140,6 +140,12 @@ public class ValidationTools {
     private static final int DEBUG_MAX_RESULTS_PER_ROW = 5000;
 
     private static final boolean WRITE_SUMMARY_CHECKPOINT_EACH_TIMESTAMP = false;
+    /**
+     * Detailed timestamp workbooks are deliberately produced by one POI-owning worker. Keeping
+     * a few completed validation payloads queued lets validation continue during XLSX
+     * serialization without allowing completed result graphs to consume the entire heap.
+     */
+    private static final int TIMESTAMP_REPORT_QUEUE_CAPACITY = 3;
 
     // Month label like "July 2026" for chart titles / comparison labels, derived from md:FullModel.
     private static final DateTimeFormatter ANALYSIS_MONTH_YEAR =
@@ -416,7 +422,8 @@ public class ValidationTools {
 
         try (ValidationExcelWriter allCountriesSummaryWriter = ValidationExcelWriter.createTimestampedSummaryWriter();
              ValidationExcelWriter.ComparisonExcelWriter comparisonWriter =
-                     new ValidationExcelWriter.ComparisonExcelWriter(previousComparisonCsv, "Previous", "Current")) {
+                     new ValidationExcelWriter.ComparisonExcelWriter(previousComparisonCsv, "Previous", "Current");
+             TimestampReportQueue reportQueue = new TimestampReportQueue(TIMESTAMP_REPORT_QUEUE_CAPACITY)) {
             for (InputGroup inputGroup : inputGroups) {
                 long inputGroupStart = System.currentTimeMillis();
 
@@ -472,11 +479,37 @@ public class ValidationTools {
                         }
                     }
 
+                    Map<TimestampGroup, Future<Path>> timestampReportFutures = new LinkedHashMap<>();
                     Map<TimestampGroup, List<ValidationTaskResult>> timestampResults =
                             executeTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
                                     shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
                                     dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
-                                    threadCount <= 0, inputGroup.name);
+                                    threadCount <= 0, inputGroup.name,
+                                    (timestampGroup, results) -> {
+                                        if (!exportDetailedTimestampReports) {
+                                            return;
+                                        }
+                                        String analysisName = deriveMonthLabel(timestampGroup,
+                                                plannedTimestamps.get(timestampGroup).resolvedRows) + " Analysis";
+                                        timestampReportFutures.put(timestampGroup, reportQueue.submit(() -> {
+                                            try (ValidationExcelWriter timestampWriter = new ValidationExcelWriter()) {
+                                                timestampWriter.setReportContext(analysisName, inputGroup.name,
+                                                        timestampGroup.timestamp);
+                                                long reportRowsStart = System.currentTimeMillis();
+                                                appendTaskResultsToWriter(timestampWriter, results,
+                                                        maxResultsPerConstraint);
+                                                dbg("DONE append timestamp report rows inputGroup=" + inputGroup.name
+                                                        + " timestamp=" + timestampGroup.timestamp, reportRowsStart);
+
+                                                long reportSaveStart = System.currentTimeMillis();
+                                                Path report = saveTimestampReport(timestampWriter, groupOutputDir,
+                                                        inputGroup.name, timestampGroup.timestamp);
+                                                dbg("DONE save timestamp report inputGroup=" + inputGroup.name
+                                                        + " timestamp=" + timestampGroup.timestamp, reportSaveStart);
+                                                return report;
+                                            }
+                                        }));
+                                    });
 
                     for (TimestampGroup timestampGroup : tsoIndex.byTimestamp.values()) {
                         long timestampStart = System.currentTimeMillis();
@@ -501,28 +534,17 @@ public class ValidationTools {
 
                         // NEW: analysis name derived from md:FullModel (scenarioTime / startDate)
                         String monthLabel = deriveMonthLabel(timestampGroup, resolvedRows);
-                        String analysisName = monthLabel + " Analysis";
                         comparisonWriter.setCurrentLabel(monthLabel);
 
-                        Path timestampReport;
-
-                        try (ValidationExcelWriter timestampWriter = new ValidationExcelWriter()) {
-                            timestampWriter.setReportContext(analysisName, inputGroup.name, timestampGroup.timestamp); // NEW
-                            long reportRowsStart = System.currentTimeMillis();
-                            appendTaskResultsToWriter(timestampWriter, results, maxResultsPerConstraint);
-                            if (exportTurtleReports) {
-                                for (ValidationTaskResult result : results) saveValidationReportTurtle(groupOutputDir, result);
-                            }
-                            dbg("DONE append timestamp report rows inputGroup=" + inputGroup.name
-                                    + " timestamp=" + timestampGroup.timestamp, reportRowsStart);
-
-                            long reportSaveStart = System.currentTimeMillis();
-                            timestampReport = saveTimestampReport(
-                                    timestampWriter, groupOutputDir, inputGroup.name, timestampGroup.timestamp);
-                            dbg("DONE save timestamp report inputGroup=" + inputGroup.name
-                                    + " timestamp=" + timestampGroup.timestamp, reportSaveStart);
+                        Path timestampReport = null;
+                        if (exportDetailedTimestampReports) {
+                            timestampReport = awaitTimestampReport(timestampReportFutures.get(timestampGroup));
                             createdReports.add(timestampReport);
                             consoleReport("Timestamp report created: " + timestampReport.toAbsolutePath());
+                        }
+
+                        if (exportTurtleReports) {
+                            for (ValidationTaskResult result : results) saveValidationReportTurtle(groupOutputDir, result);
                         }
 
                         // NEW: feed the comparison workbook (per dataset totals for this timestamp)
@@ -5285,7 +5307,8 @@ public class ValidationTools {
             int maxResultsPerConstraint,
             ValidationEngine validationEngine,
             boolean useSpareWorkersForTargetShapes,
-            String inputGroupName) throws IOException {
+            String inputGroupName,
+            TimestampResultConsumer completedTimestampConsumer) throws IOException {
         Map<TimestampGroup, List<ValidationTaskResult>> results = new LinkedHashMap<>();
         List<Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks>> entries =
                 new ArrayList<>(plannedTimestamps.entrySet());
@@ -5317,8 +5340,13 @@ public class ValidationTools {
                 }
                 for (int i = 0; i < futures.size(); i++) {
                     try {
-                        results.put(batch.get(i).getKey(), futures.get(i).get(FUTURE_TIMEOUT_MINUTES,
-                                TimeUnit.MINUTES));
+                        TimestampGroup timestampGroup = batch.get(i).getKey();
+                        List<ValidationTaskResult> timestampResults = futures.get(i).get(
+                                FUTURE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                        results.put(timestampGroup, timestampResults);
+                        if (completedTimestampConsumer != null) {
+                            completedTimestampConsumer.accept(timestampGroup, timestampResults);
+                        }
                     } catch (InterruptedException ex) {
                         Thread.currentThread().interrupt();
                         throw new IOException("Timestamp batch validation interrupted", ex);
@@ -5332,6 +5360,97 @@ public class ValidationTools {
             }
         }
         return results;
+    }
+
+    @FunctionalInterface
+    private interface TimestampResultConsumer {
+        void accept(TimestampGroup timestampGroup, List<ValidationTaskResult> results) throws IOException;
+    }
+
+    /**
+     * A bounded hand-off from validation workers to the sole Apache POI writer.  A queued item
+     * owns one timestamp's result rows; {@link BlockingQueue#put(Object)} intentionally applies
+     * backpressure once the active writer plus this queue reach the configured memory budget.
+     */
+    private static final class TimestampReportQueue implements AutoCloseable {
+        private final BlockingQueue<ReportWork> queue;
+        private final Thread worker;
+
+        TimestampReportQueue(int capacity) {
+            queue = new ArrayBlockingQueue<>(capacity);
+            worker = new Thread(this::writeReports, "timestamp-report-writer");
+            worker.start();
+        }
+
+        Future<Path> submit(Callable<Path> report) throws IOException {
+            FutureTask<Path> task = new FutureTask<>(report);
+            try {
+                queue.put(new ReportWork(task));
+                return task;
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while queuing timestamp report", ex);
+            }
+        }
+
+        private void writeReports() {
+            try {
+                while (true) {
+                    ReportWork work = queue.take();
+                    if (work.stop) {
+                        return;
+                    }
+                    work.task.run();
+                }
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                queue.put(ReportWork.stop());
+                worker.join();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while finishing timestamp reports", ex);
+            }
+        }
+
+        private static final class ReportWork {
+            final FutureTask<Path> task;
+            final boolean stop;
+
+            ReportWork(FutureTask<Path> task) {
+                this.task = task;
+                this.stop = false;
+            }
+
+            private ReportWork() {
+                this.task = null;
+                this.stop = true;
+            }
+
+            static ReportWork stop() {
+                return new ReportWork();
+            }
+        }
+    }
+
+    private static Path awaitTimestampReport(Future<Path> reportFuture) throws IOException {
+        if (reportFuture == null) {
+            throw new IOException("Timestamp report was not queued");
+        }
+        try {
+            return reportFuture.get(FUTURE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while saving timestamp report", ex);
+        } catch (ExecutionException | TimeoutException ex) {
+            reportFuture.cancel(true);
+            throw new IOException("Timestamp report generation failed", ex);
+        }
     }
 
     private static int workersForRow(int totalWorkers, int activeRows, int rowNumber) {
