@@ -5420,19 +5420,43 @@ public class ValidationTools {
             String inputGroupName,
             TimestampResultConsumer completedTimestampConsumer) throws IOException {
         Map<TimestampGroup, List<ValidationTaskResult>> allResults = new LinkedHashMap<>();
-        Map<Integer, IncrementalRowState> states = new HashMap<>();
+        // Timestamp groups must remain ordered because each row's state is its baseline for
+        // the next timestamp. Rows within one group, however, have independent state slots.
+        Map<Integer, IncrementalRowState> states = new ConcurrentHashMap<>();
         IncrementalDatasetCache datasetCache = new IncrementalDatasetCache();
         for (Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks> entry : plannedTimestamps.entrySet()) {
             TimestampGroup timestamp = entry.getKey();
             Map<Path, Model> timestampCache = new ConcurrentHashMap<>();
-            List<ValidationTaskResult> results = new ArrayList<>();
+            List<ValidationTaskResult> results;
             try {
+                int activeRows = Math.min(plan.rowWorkers(), entry.getValue().resolvedRows.size());
                 logInfo("START incremental timestamp validation inputGroup=" + inputGroupName
-                        + " timestamp=" + timestamp.timestamp + " rowWorkers=" + plan.rowWorkers());
-                for (ResolvedMappingRow row : entry.getValue().resolvedRows) {
-                    results.add(validateOneResolvedRowIncrementally(row, constraintsRoot, shapesCache,
-                            staticXmlModelCache, timestampCache, zipEntriesByVirtualPath, dataTypeMap, xmlBase,
-                            maxResultsPerConstraint, validationEngine, states, datasetCache));
+                        + " timestamp=" + timestamp.timestamp + " rowWorkers=" + activeRows);
+                ExecutorService rowPool = Executors.newFixedThreadPool(activeRows);
+                try {
+                    List<Future<ValidationTaskResult>> futures = new ArrayList<>();
+                    for (ResolvedMappingRow row : entry.getValue().resolvedRows) {
+                        futures.add(rowPool.submit(() -> validateOneResolvedRowIncrementally(row,
+                                constraintsRoot, shapesCache, staticXmlModelCache, timestampCache,
+                                zipEntriesByVirtualPath, dataTypeMap, xmlBase, maxResultsPerConstraint,
+                                validationEngine, states, datasetCache)));
+                    }
+                    // Keep mapping-sheet order in the report even though rows completed in
+                    // parallel. This also keeps the existing output deterministic.
+                    results = new ArrayList<>(futures.size());
+                    for (int rowNumber = 0; rowNumber < futures.size(); rowNumber++) {
+                        try {
+                            results.add(futures.get(rowNumber).get(FUTURE_TIMEOUT_MINUTES, TimeUnit.MINUTES));
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("Incremental timestamp validation interrupted", ex);
+                        } catch (ExecutionException | TimeoutException ex) {
+                            futures.get(rowNumber).cancel(true);
+                            throw new IOException("Incremental timestamp row validation failed", ex);
+                        }
+                    }
+                } finally {
+                    rowPool.shutdownNow();
                 }
             } finally {
                 timestampCache.clear();
@@ -5758,9 +5782,12 @@ public class ValidationTools {
      */
     private static final class IncrementalDatasetCache {
         private static final Pattern DATASET_TIMESTAMP = Pattern.compile("(?:^|[_-])\\d{8}T\\d{4,6}Z?(?=[_-]|\\.)");
-        private final Map<String, Model> previous = new HashMap<>();
-        private final Map<String, Model> pending = new HashMap<>();
-        private final Map<String, DatasetDelta> deltasThisTimestamp = new HashMap<>();
+        // Rows in a timestamp may discover the same logical dataset concurrently. The
+        // per-timestamp delta must still be calculated exactly once, against the preceding
+        // timestamp, and not against a model loaded by another current-timestamp row.
+        private final Map<String, Model> previous = new ConcurrentHashMap<>();
+        private final Map<String, Model> pending = new ConcurrentHashMap<>();
+        private final Map<String, DatasetDelta> deltasThisTimestamp = new ConcurrentHashMap<>();
 
         DatasetDelta deltaFor(Collection<Path> paths, Map<Path, Model> staticCache,
                               Map<Path, Model> timestampCache, IncrementalRowState rowState) {
