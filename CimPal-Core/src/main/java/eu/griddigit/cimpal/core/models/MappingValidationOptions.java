@@ -39,6 +39,7 @@ public class MappingValidationOptions {
     private final int maxResultsPerConstraint;
     private final int threads;
     private final boolean exportTurtleReports;
+    private final boolean exportDetailedTimestampReports;
 
     private MappingValidationOptions(Builder b) {
         this.mappingCsv = b.mappingCsv;
@@ -55,6 +56,7 @@ public class MappingValidationOptions {
         this.maxResultsPerConstraint = b.maxResultsPerConstraint;
         this.threads = b.threads;
         this.exportTurtleReports = b.exportTurtleReports;
+        this.exportDetailedTimestampReports = b.exportDetailedTimestampReports;
     }
 
     public static Builder builder() {
@@ -118,6 +120,11 @@ public class MappingValidationOptions {
         return exportTurtleReports;
     }
 
+    /** Writes a separate detailed Excel workbook for every timestamped validation. */
+    public boolean isExportDetailedTimestampReports() {
+        return exportDetailedTimestampReports;
+    }
+
     // ============ the Builder ============
 
     public static class Builder {
@@ -136,6 +143,7 @@ public class MappingValidationOptions {
         private int maxResultsPerConstraint = 0;
         private int threads = 0;
         private boolean exportTurtleReports = false;
+        private boolean exportDetailedTimestampReports = true;
 
         /** The mapping CSV: one row per validation, columns {@code xml_inputs, ttl[, notes]}. */
         public Builder mappingCsv(Path mappingCsv) {
@@ -235,6 +243,12 @@ public class MappingValidationOptions {
         /** Also writes each validation report as Turtle next to the Excel reports. */
         public Builder exportTurtleReports(boolean exportTurtleReports) {
             this.exportTurtleReports = exportTurtleReports;
+            return this;
+        }
+
+        /** Keeps detailed per-timestamp Excel workbooks; disable for faster summary-only runs. */
+        public Builder exportDetailedTimestampReports(boolean exportDetailedTimestampReports) {
+            this.exportDetailedTimestampReports = exportDetailedTimestampReports;
             return this;
         }
 

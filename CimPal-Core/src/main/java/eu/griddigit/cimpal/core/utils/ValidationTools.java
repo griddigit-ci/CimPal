@@ -344,7 +344,7 @@ public class ValidationTools {
             throws IOException {
         return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot, outputBaseDir,
                 threadCount, dataTypeMap, xmlBase, previousComparisonCsv, maxResultsPerConstraint,
-                validationEngine, exportTurtleValidationReports);
+                validationEngine, exportTurtleValidationReports, true);
     }
 
     /** As above, with the Turtle report export given per run rather than by the global switch. */
@@ -358,7 +358,8 @@ public class ValidationTools {
                                                           Path previousComparisonCsv,
                                                           int maxResultsPerConstraint,
                                                           ValidationEngine validationEngine,
-                                                          boolean exportTurtleReports)
+                                                          boolean exportTurtleReports,
+                                                          boolean exportDetailedTimestampReports)
             throws IOException {
 
         if (maxResultsPerConstraint < 0) {

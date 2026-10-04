@@ -206,6 +206,9 @@ public class ValidationByMappingController {
     private CheckBox cbExportReportsTurtle;
 
     @FXML
+    private CheckBox cbExportDetailedTimestampReports;
+
+    @FXML
     private Label helpExportReports;
 
     private File mappingCsvFile;
@@ -808,6 +811,8 @@ public class ValidationByMappingController {
         int maxResultsPerConstraint = cbLimitValidationResults != null
                 && cbLimitValidationResults.isSelected() ? 10 : 0;
         boolean exportTurtleReports = cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected();
+        boolean exportDetailedTimestampReports = cbExportDetailedTimestampReports == null
+                || cbExportDetailedTimestampReports.isSelected();
 
         btnRunValidationByMapping.setDisable(true);
         setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
@@ -832,6 +837,7 @@ public class ValidationByMappingController {
                         .maxResultsPerConstraint(maxResultsPerConstraint)
                         .threads(threadCount)
                         .exportTurtleReports(exportTurtleReports)
+                        .exportDetailedTimestampReports(exportDetailedTimestampReports)
                         .build();
                 MappingValidationSummary summary = new MappingValidator(options).validate();
 

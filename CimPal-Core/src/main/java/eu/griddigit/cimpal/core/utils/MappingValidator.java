@@ -63,7 +63,7 @@ public class MappingValidator {
                     options.getPreviousComparisonCsv(),
                     options.getMaxResultsPerConstraint(),
                     options.getEngine(),
-                    options.isExportTurtleReports());
+                    options.isExportTurtleReports(), options.isExportDetailedTimestampReports());
             return new MappingValidationSummary(run.reports(), run.conforming(), run.violations(), run.errors());
         }
 
