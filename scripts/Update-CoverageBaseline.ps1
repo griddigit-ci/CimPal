@@ -16,8 +16,11 @@
     (use it only when coverage fell for an agreed reason, and say why in the commit).
 
 .EXAMPLE
-    mvn -B verify
+    mvn -B clean verify
     ./scripts/Update-CoverageBaseline.ps1
+
+    Always `clean`: JaCoCo appends to jacoco.exec, so without it the report also counts tests
+    from earlier builds (even of other branches) and sets floors CI can't reach.
     ./scripts/Update-CoverageBaseline.ps1 -Modules CimPal-Core -AllowDecrease
 #>
 param(
@@ -45,7 +48,7 @@ function Read-ExistingFloor([string]$file, [string]$key) {
 foreach ($module in $Modules) {
     $csv = Join-Path $repoRoot "$module\target\site\jacoco\jacoco.csv"
     if (-not (Test-Path $csv)) {
-        Write-Warning "$module has no JaCoCo report ($csv). Run 'mvn -B verify' first. Skipped."
+        Write-Warning "$module has no JaCoCo report ($csv). Run 'mvn -B clean verify' first. Skipped."
         continue
     }
 

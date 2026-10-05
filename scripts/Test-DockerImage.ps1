@@ -311,11 +311,12 @@ try {
     $r = Invoke-Docker (@('run', '--rm') + $readOnlyFs + @('-e', 'JAVA_OPTS=-XX:MaxRAMPercentage=50 -XX:+PrintCommandLineFlags',
         $Image, '--version'))
     Check 'JAVA_OPTS overrides the JVM defaults' ($r.Stderr -match '-XX:MaxRAMPercentage=50(\.0+)?\b') "stderr=$($r.Stderr)"
-    # A unified-logging warning (a missing CDS archive); by default the JVM would print it on stdout.
+    # A unified-logging message (a missing CDS archive, logged at error level on JDK 25); by default
+    # the JVM would print it on stdout.
     $r = Invoke-Docker (@('run', '--rm') + $readOnlyFs + @('-e', 'JAVA_OPTS=-XX:SharedArchiveFile=/nonexistent.jsa',
         $Image, '--version'))
-    Check 'unified-logging warnings go to stderr, stdout keeps only the CLI output' `
-        (($r.Stderr -match '\[warning\]') -and (($r.Stdout -join "`n") -eq "CimPal CLI $ExpectedVersion")) `
+    Check 'unified-logging messages go to stderr, stdout keeps only the CLI output' `
+        (($r.Stderr -match '\[(warning|error)\]\[cds\]') -and (($r.Stdout -join "`n") -eq "CimPal CLI $ExpectedVersion")) `
         "stdout=$($r.Stdout -join ' | ') stderr=$($r.Stderr)"
     # A heap far too small for a validation: the JVM must end the run with exit 3 (the CLI's
     # "internal error") and say so on stderr, instead of hanging on in a broken state.

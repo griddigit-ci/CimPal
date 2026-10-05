@@ -109,6 +109,10 @@ Standard footer (applies to every work package):
   - Whether `-Xmx4m` reliably runs out of memory during the fixture validation. If the JVM refuses the size or the run fits, use a smaller or larger value.
   - Whether `-XX:SharedArchiveFile=/nonexistent.jsa` produces a unified-logging warning on JDK 25. The check needs one; if there is none, pick another warning trigger.
   - Whether the Temurin certificate hook (`USE_SYSTEM_CA_CERTS`) works with a read-only root filesystem for UID 10001. It should use a temporary truststore in `/tmp`.
+- **First CI run (PR #52):** the smoke test passed 59 of 61 checks. That included out of memory (exit 3, stdout empty), every read-only root filesystem run, and the CA hook with `--read-only`.
+  - The missing CDS archive is logged at `[error]` on JDK 25, not `[warning]`. It went to stderr as intended, so the check now accepts either level.
+  - `COPY --chmod=0644` of `CimPal-CLI/configs/` also gave the directory 0644, so UID 10001 couldn't enter it. That folder is now copied without `--chmod`.
+  - Both "Build and test" legs failed on the Core coverage floor (CI 0.3464/0.3458 line, floor 0.4138), as `devel` does since `19e257f`. That commit raised the floor from a local measurement (0.4188) that CI doesn't reproduce. Cause, confirmed: `jacoco.exec` is appended to across builds (JaCoCo's default), and the local one still held an earlier build's run of the TEST-3 Core tests (`SHACLFromRDFTest`, `ShaclFromXlsTest`, `ShaclOrganizerTest`, `ShaclAutoTesterTest`). Without `clean`, the same tree measures 0.4188; after `mvn clean verify` it measures 0.3461 line / 0.2455 branch, matching CI. As the maintainer decided, the floors are lowered to that clean measurement (0.3411 / 0.2405), and merging TEST-3 ratchets them back up.
 - **Image size:** about 516 MB (CI-3 measurement; this WP adds about 300 KB of configs and the licence PDF).
 - **Java tests:** no Java or Maven file changed, so the counts are unchanged from CI-3 (Core 286, Main 65, CLI 109).
 - **Open:**

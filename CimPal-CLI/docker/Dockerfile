@@ -27,7 +27,9 @@ RUN groupadd --gid 10001 cimpal \
 COPY --chmod=0755 CimPal-CLI/docker/entrypoint.sh /opt/cimpal/entrypoint.sh
 COPY --chmod=0644 CimPal-CLI/target/CimPal-CLI.jar LICENSE.md eupl_v1.2_en.pdf /opt/cimpal/
 # Example configs for reference. Their paths are host paths; inside the container they become /data/...
-COPY --chmod=0644 CimPal-CLI/configs/ /opt/cimpal/configs/
+# No --chmod here: it would also give the directory 0644, which no other user can enter. The checkout's
+# modes (755 directory, 644 files) are kept, owned by root.
+COPY CimPal-CLI/configs/ /opt/cimpal/configs/
 
 # The workflows pass the version (it must match `--version`, which the smoke test checks) and commit.
 ARG CIMPAL_VERSION=unknown
