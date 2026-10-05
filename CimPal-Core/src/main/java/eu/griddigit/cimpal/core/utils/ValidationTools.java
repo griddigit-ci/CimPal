@@ -455,6 +455,7 @@ public class ValidationTools {
                 long inputGroupStart = System.currentTimeMillis();
 
                 Map<Path, Model> staticXmlModelCache = new ConcurrentHashMap<>();
+                ValidationResultReuseCache validationReuseCache = new ValidationResultReuseCache();
 
                 logInfo("START input group=" + inputGroup.name
                         + " roots=" + inputGroup.roots.stream()
@@ -512,6 +513,7 @@ public class ValidationTools {
                                     ? executeIncrementalTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
                                     shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
                                     dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine, inputGroup.name,
+                                    validationReuseCache,
                                     (timestampGroup, results) -> {
                                         if (!exportDetailedTimestampReports) return;
                                         submitTimestampReport(timestampReportFutures, reportQueue, timestampGroup,
@@ -521,7 +523,7 @@ public class ValidationTools {
                                     : executeTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
                                     shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
                                     dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
-                                    threadCount <= 0, inputGroup.name,
+                                    threadCount <= 0, inputGroup.name, validationReuseCache,
                                     (timestampGroup, results) -> {
                                         if (!exportDetailedTimestampReports) return;
                                         submitTimestampReport(timestampReportFutures, reportQueue, timestampGroup,
@@ -5225,6 +5227,103 @@ public class ValidationTools {
         byTimestampSource.forEach((k, v) -> logInfo("  " + k + " = " + v));
     }
 
+    /**
+     * Reuses a completed full validation only when both the selected shapes and the complete RDF/XML
+     * input combination have the same source bytes. It is intentionally scoped to one input group
+     * and one run: neither timestamps nor filename text contribute to its key.
+     */
+    private static final class ValidationResultReuseCache {
+        private final Map<String, CompletableFuture<CachedValidationOutcome>> outcomes = new ConcurrentHashMap<>();
+        private final Map<Path, String> contentHashes = new ConcurrentHashMap<>();
+
+        Claim claim(String key) throws IOException {
+            CompletableFuture<CachedValidationOutcome> created = new CompletableFuture<>();
+            CompletableFuture<CachedValidationOutcome> existing = outcomes.putIfAbsent(key, created);
+            if (existing == null) return new Claim(true, null);
+            try {
+                return new Claim(false, existing.get());
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while waiting for identical validation input", ex);
+            } catch (ExecutionException ex) {
+                outcomes.remove(key, existing);
+                throw new IOException("Prior identical validation input failed", ex.getCause());
+            }
+        }
+
+        void complete(String key, Claim claim, CachedValidationOutcome outcome) {
+            if (claim != null && claim.owner()) {
+                CompletableFuture<CachedValidationOutcome> future = outcomes.get(key);
+                if (future != null) future.complete(outcome);
+            }
+        }
+
+        void fail(String key, Exception failure) {
+            if (key == null) return;
+            CompletableFuture<CachedValidationOutcome> future = outcomes.remove(key);
+            if (future != null) future.completeExceptionally(failure);
+        }
+
+        String keyFor(Collection<Path> ttlPaths, Collection<Path> xmlPaths,
+                      Map<Path, ZipXmlEntry> zipEntriesByVirtualPath, ValidationEngine engine,
+                      int maxResultsPerConstraint, String xmlBase) throws IOException {
+            List<String> shapeHashes = new ArrayList<>();
+            for (Path path : ttlPaths) shapeHashes.add(contentHash(path, Map.of()));
+            List<String> xmlHashes = new ArrayList<>();
+            for (Path path : xmlPaths) xmlHashes.add(contentHash(path, zipEntriesByVirtualPath));
+            Collections.sort(shapeHashes);
+            Collections.sort(xmlHashes);
+
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (java.security.NoSuchAlgorithmException ex) {
+                throw new IllegalStateException("SHA-256 not available", ex);
+            }
+            updateKeyPart(digest, engine.name());
+            updateKeyPart(digest, Integer.toString(maxResultsPerConstraint));
+            updateKeyPart(digest, xmlBase == null ? "" : xmlBase);
+            for (String hash : shapeHashes) updateKeyPart(digest, hash);
+            updateKeyPart(digest, "--xml-inputs--");
+            for (String hash : xmlHashes) updateKeyPart(digest, hash);
+            return HexFormat.of().formatHex(digest.digest());
+        }
+
+        private String contentHash(Path path, Map<Path, ZipXmlEntry> zipEntriesByVirtualPath) throws IOException {
+            Path normalized = path.toAbsolutePath().normalize();
+            String known = contentHashes.get(normalized);
+            if (known != null) return known;
+            ZipXmlEntry zipEntry = zipEntriesByVirtualPath.get(normalized);
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (java.security.NoSuchAlgorithmException ex) {
+                throw new IllegalStateException("SHA-256 not available", ex);
+            }
+            try (InputStream input = zipEntry == null ? Files.newInputStream(normalized) : zipEntry.openStream()) {
+                byte[] buffer = new byte[64 * 1024];
+                for (int count; (count = input.read(buffer)) >= 0;) digest.update(buffer, 0, count);
+            }
+            String computed = HexFormat.of().formatHex(digest.digest());
+            String raced = contentHashes.putIfAbsent(normalized, computed);
+            return raced == null ? computed : raced;
+        }
+
+        private static void updateKeyPart(MessageDigest digest, String value) {
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            digest.update(bytes);
+            digest.update((byte) 0);
+        }
+
+        private record Claim(boolean owner, CachedValidationOutcome outcome) { }
+    }
+
+    private record CachedValidationOutcome(List<SHACLValidationResult> results, boolean conforms, boolean partial) {
+        static CachedValidationOutcome from(LimitedValidationOutcome outcome) {
+            return new CachedValidationOutcome(List.copyOf(outcome.results()), outcome.conforms(), outcome.partial());
+        }
+    }
+
     private static List<ValidationTaskResult> executeResolvedRows(List<ResolvedMappingRow> resolvedRows,
                                                                   Path constraintsRoot,
                                                                   Map<String, CachedShapes> shapesCache,
@@ -5236,7 +5335,9 @@ public class ValidationTools {
                                                                   String xmlBase,
                                                                   int maxResultsPerConstraint,
                                                                   ValidationEngine validationEngine,
-                                                                  boolean useSpareWorkersForTargetShapes) throws IOException {
+                                                                  boolean useSpareWorkersForTargetShapes,
+                                                                  String inputGroupName,
+                                                                  ValidationResultReuseCache validationReuseCache) throws IOException {
 
         int activeRows = Math.min(threads, resolvedRows.size());
         ExecutorService pool = Executors.newFixedThreadPool(activeRows);
@@ -5259,7 +5360,9 @@ public class ValidationTools {
                             xmlBase,
                             maxResultsPerConstraint,
                             validationEngine,
-                            targetShapeWorkers
+                            targetShapeWorkers,
+                            inputGroupName,
+                            validationReuseCache
                     );
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName()
@@ -5346,6 +5449,7 @@ public class ValidationTools {
             ValidationEngine validationEngine,
             boolean useSpareWorkersForTargetShapes,
             String inputGroupName,
+            ValidationResultReuseCache validationReuseCache,
             TimestampResultConsumer completedTimestampConsumer) throws IOException {
         Map<TimestampGroup, List<ValidationTaskResult>> results = new LinkedHashMap<>();
         List<Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks>> entries =
@@ -5368,7 +5472,7 @@ public class ValidationTools {
                             return executeResolvedRows(entry.getValue().resolvedRows, constraintsRoot, shapesCache,
                                     staticXmlModelCache, timestampXmlModelCache, zipEntriesByVirtualPath, rowBudget,
                                     dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
-                                    useSpareWorkersForTargetShapes);
+                                    useSpareWorkersForTargetShapes, inputGroupName, validationReuseCache);
                         } finally {
                             timestampXmlModelCache.clear();
                             printMemory("after clearing timestampXmlModelCache " + inputGroupName
@@ -5418,6 +5522,7 @@ public class ValidationTools {
             int maxResultsPerConstraint,
             ValidationEngine validationEngine,
             String inputGroupName,
+            ValidationResultReuseCache validationReuseCache,
             TimestampResultConsumer completedTimestampConsumer) throws IOException {
         Map<TimestampGroup, List<ValidationTaskResult>> allResults = new LinkedHashMap<>();
         // Timestamp groups must remain ordered because each row's state is its baseline for
@@ -5439,7 +5544,7 @@ public class ValidationTools {
                         futures.add(rowPool.submit(() -> validateOneResolvedRowIncrementally(row,
                                 constraintsRoot, shapesCache, staticXmlModelCache, timestampCache,
                                 zipEntriesByVirtualPath, dataTypeMap, xmlBase, maxResultsPerConstraint,
-                                validationEngine, states, datasetCache)));
+                                validationEngine, states, datasetCache, inputGroupName, validationReuseCache)));
                     }
                     // Keep mapping-sheet order in the report even though rows completed in
                     // parallel. This also keeps the existing output deterministic.
@@ -5473,7 +5578,10 @@ public class ValidationTools {
             Map<Path, Model> staticXmlModelCache, Map<Path, Model> timestampXmlModelCache,
             Map<Path, ZipXmlEntry> zipEntriesByVirtualPath, Map<String, RDFDatatype> dataTypeMap, String xmlBase,
             int maxResultsPerConstraint, ValidationEngine validationEngine, Map<Integer, IncrementalRowState> states,
-            IncrementalDatasetCache datasetCache) {
+            IncrementalDatasetCache datasetCache, String inputGroupName,
+            ValidationResultReuseCache validationReuseCache) {
+        String reuseKey = null;
+        ValidationResultReuseCache.Claim reuseClaim = null;
         try {
             List<Path> ttlPaths = resolveTtlPaths(constraintsRoot, row.ttlName);
             if (row.xmlFiles == null || row.xmlFiles.isEmpty() || ttlPaths.isEmpty()
@@ -5481,7 +5589,21 @@ public class ValidationTools {
                 // Keep the established error reporting for malformed mapping rows.
                 return validateOneResolvedRow(row, constraintsRoot, shapesCache, staticXmlModelCache,
                         timestampXmlModelCache, zipEntriesByVirtualPath, dataTypeMap, xmlBase,
-                        maxResultsPerConstraint, validationEngine, 1);
+                        maxResultsPerConstraint, validationEngine, 1, "incremental-fallback", null);
+            }
+            reuseKey = validationReuseCache.keyFor(ttlPaths, row.xmlFiles, zipEntriesByVirtualPath,
+                    validationEngine, maxResultsPerConstraint, xmlBase);
+            reuseClaim = validationReuseCache.claim(reuseKey);
+            if (!reuseClaim.owner()) {
+                CachedValidationOutcome reused = reuseClaim.outcome();
+                logInfo("validation skipped as input already validated"
+                        + " inputGroup=" + inputGroupName
+                        + " row=" + row.rowIdx
+                        + " timestamp=" + row.timestamp
+                        + " constraint=" + row.ttlName);
+                return new ValidationTaskResult(row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
+                        row.xmlFilesText, "", row.constraintFileText, reused.results(), reused.conforms(), null)
+                        .withDisplayName(row.sourceRow.notes).withPartialValidation(reused.partial());
             }
             CachedShapes cachedShapes = loadParsedShapesWithImports(ttlPaths, constraintsRoot, shapesCache);
             Graph graph = loadRdfXmlGraphFromFilesWithCache(row.xmlFiles, staticXmlModelCache,
@@ -5491,12 +5613,14 @@ public class ValidationTools {
                     timestampXmlModelCache, state);
             LimitedValidationOutcome outcome = validateIncrementally(cachedShapes, graph, state,
                     datasetDelta, maxResultsPerConstraint, row.rowIdx);
+            validationReuseCache.complete(reuseKey, reuseClaim, CachedValidationOutcome.from(outcome));
             states.put(row.rowIdx, IncrementalRowState.snapshot(graph, outcome.findingsByFocus(),
                     datasetDelta.datasetKeys()));
             return new ValidationTaskResult(row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
                     row.xmlFilesText, "", row.constraintFileText, outcome.results(), outcome.conforms(), null)
                     .withDisplayName(row.sourceRow.notes).withPartialValidation(outcome.partial());
         } catch (Exception ex) {
+            if (reuseClaim != null && reuseClaim.owner()) validationReuseCache.fail(reuseKey, ex);
             logError("Unhandled exception in incremental timestamped row", ex);
             return new ValidationTaskResult(row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
                     row.xmlFilesText, "", row.constraintFileText, null, false, ex);
@@ -5602,8 +5726,11 @@ public class ValidationTools {
         Set<Node> predicates = new LinkedHashSet<>();
         DependencyFlags flags = new DependencyFlags();
         collectShapeDependencies(shapeGraph, root, new HashSet<>(), predicates, flags);
-        if (flags.unknownSparql) {
-            return ShapeDependency.unknown();
+        if (flags.hasSparql) {
+            // A SHACL-SPARQL query can read arbitrary graph state (including data reached
+            // outside its declared focus node). Do not infer its dependencies from query text:
+            // execute the complete target shape on every timestamp instead.
+            return ShapeDependency.sparql();
         }
         return new ShapeDependency(Set.copyOf(predicates), !flags.nonLocal && !predicates.isEmpty());
     }
@@ -5623,8 +5750,8 @@ public class ValidationTools {
             } else if ("targetClass".equals(local)) {
                 predicates.add(RDF.Nodes.type);
             } else if ("sparql".equals(local)) {
+                flags.hasSparql = true;
                 flags.nonLocal = true;
-                collectSparqlDependencies(graph, object, predicates, flags);
             } else if (Set.of("node", "qualifiedValueShape", "and", "or", "xone", "not").contains(local)) {
                 flags.nonLocal = true;
             }
@@ -5651,31 +5778,6 @@ public class ValidationTools {
         }
     }
 
-    private static void collectSparqlDependencies(Graph graph, Node sparqlNode, Set<Node> predicates,
-                                                   DependencyFlags flags) {
-        Node select = NodeFactory.createURI("http://www.w3.org/ns/shacl#select");
-        for (var iterator = graph.find(sparqlNode, select, Node.ANY); iterator.hasNext();) {
-            Node query = iterator.next().getObject();
-            if (!query.isLiteral()) {
-                flags.unknownSparql = true;
-                continue;
-            }
-            String text = query.getLiteralLexicalForm();
-            String withoutIris = text;
-            Matcher matcher = Pattern.compile("<([^>]+)>").matcher(text);
-            while (matcher.find()) {
-                predicates.add(NodeFactory.createURI(matcher.group(1)));
-            }
-            withoutIris = withoutIris.replaceAll("<[^>]+>", "");
-            // Prefix declarations are resolved by the SHACL engine. Without reproducing that
-            // resolution here, a prefixed predicate leaves this query conservatively unknown.
-            if (Pattern.compile("(?<![\\w])(?:[A-Za-z][\\w-]*):[\\w-]+")
-                    .matcher(withoutIris).find()) flags.unknownSparql = true;
-            if (Pattern.compile("\\ba\\s+").matcher(withoutIris).find()) predicates.add(RDF.Nodes.type);
-        }
-        if (predicates.isEmpty()) flags.unknownSparql = true;
-    }
-
     private static String shaclLocalName(Node predicate) {
         String uri = predicate.isURI() ? predicate.getURI() : "";
         String prefix = "http://www.w3.org/ns/shacl#";
@@ -5684,11 +5786,12 @@ public class ValidationTools {
 
     private static final class DependencyFlags {
         boolean nonLocal;
-        boolean unknownSparql;
+        boolean hasSparql;
     }
 
     private record ShapeDependency(Set<Node> predicates, boolean local) {
         static ShapeDependency unknown() { return new ShapeDependency(Set.of(), false); }
+        static ShapeDependency sparql() { return new ShapeDependency(Set.of(), false); }
         boolean isAffectedBy(Set<Node> changedPredicates) {
             // Empty means the analyser could not establish any safe dependency, therefore it
             // must be re-run. A non-empty intersection is the only reason to evaluate it.
@@ -6025,9 +6128,13 @@ public class ValidationTools {
                                                                String xmlBase,
                                                                int maxResultsPerConstraint,
                                                                ValidationEngine validationEngine,
-                                                               int targetShapeWorkers) {
+                                                               int targetShapeWorkers,
+                                                               String inputGroupName,
+                                                               ValidationResultReuseCache validationReuseCache) {
 
         long rowStart = System.currentTimeMillis();
+        String reuseKey = null;
+        ValidationResultReuseCache.Claim reuseClaim = null;
 
         dbgRow(row.rowIdx, "START timestamped resolved row"
                 + " tso=" + row.tso
@@ -6070,6 +6177,24 @@ public class ValidationTools {
                 );
             }
 
+            reuseKey = validationReuseCache == null ? null
+                    : validationReuseCache.keyFor(ttlPaths, row.xmlFiles, zipEntriesByVirtualPath,
+                    validationEngine, maxResultsPerConstraint, xmlBase);
+            reuseClaim = reuseKey == null ? null : validationReuseCache.claim(reuseKey);
+            if (reuseClaim != null && !reuseClaim.owner()) {
+                CachedValidationOutcome reused = reuseClaim.outcome();
+                logInfo("validation skipped as input already validated"
+                        + " inputGroup=" + inputGroupName
+                        + " row=" + row.rowIdx
+                        + " timestamp=" + row.timestamp
+                        + " constraint=" + row.ttlName);
+                return new ValidationTaskResult(
+                        row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
+                        row.xmlFilesText, "", row.constraintFileText,
+                        reused.results(), reused.conforms(), null
+                ).withDisplayName(row.sourceRow.notes).withPartialValidation(reused.partial());
+            }
+
             long shapesStart = System.currentTimeMillis();
             CachedShapes cachedShapes = loadParsedShapesWithImports(ttlPaths, constraintsRoot, shapesCache);
             Model shapesModel = cachedShapes.model();
@@ -6092,6 +6217,9 @@ public class ValidationTools {
             LimitedValidationOutcome limitedOutcome = validateWithSelectedEngine(
                     validationEngine, cachedShapes.shapes(), dataGraph, shapesModel,
                     maxResultsPerConstraint, row.rowIdx, targetShapeWorkers, false);
+            if (reuseKey != null) {
+                validationReuseCache.complete(reuseKey, reuseClaim, CachedValidationOutcome.from(limitedOutcome));
+            }
             dbgRow(row.rowIdx, "DONE timestamped SHACL validation"
                     + " conforms=" + limitedOutcome.conforms()
                     + (limitedOutcome.partial() ? " partial=true" : ""), validationStart);
@@ -6119,6 +6247,9 @@ public class ValidationTools {
                     .withPartialValidation(limitedOutcome.partial());
 
         } catch (Exception ex) {
+            if (validationReuseCache != null && reuseClaim != null && reuseClaim.owner()) {
+                validationReuseCache.fail(reuseKey, ex);
+            }
             dbgRow(row.rowIdx, "ERROR timestamped resolved row"
                             + " tso=" + row.tso
                             + " timestamp=" + row.timestamp,
