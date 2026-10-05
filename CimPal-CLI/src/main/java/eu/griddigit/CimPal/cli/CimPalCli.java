@@ -49,7 +49,7 @@ import picocli.CommandLine.Command;
 @Command(
         name = "cimpal",
         mixinStandardHelpOptions = true,
-        version = "CimPal CLI 2026.9",
+        versionProvider = CliVersion.class,
         description = {
                 "CimPal command-line interface for RDF/SHACL tooling.",
                 "",

@@ -25,6 +25,24 @@
 
     <build>
         <finalName>CimPal-CLI</finalName>
+        <resources>
+            <!-- Only the version file is filtered: it carries ${project.version} into CliVersion,
+                 so the CLI, serve and mcp report the release version. -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>eu/griddigit/CimPal/cli/cimpal-cli-version.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>eu/griddigit/CimPal/cli/cimpal-cli-version.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -35,6 +53,10 @@
                          dependencies (test-support jar, AssertJ, schema validator) need no
                          module-path wiring. -->
                     <useModulePath>false</useModulePath>
+                    <systemPropertyVariables>
+                        <!-- CliVersionTest checks the filtered version against the pom. -->
+                        <cimpal.expectedVersion>${project.version}</cimpal.expectedVersion>
+                    </systemPropertyVariables>
                 </configuration>
                 <executions>
                     <!-- The JDK HTTP server reads sun.net.httpserver.maxReqTime once per JVM, so the
