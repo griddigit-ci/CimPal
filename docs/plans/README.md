@@ -33,7 +33,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | 2 | [TEST-4](TEST-4.md) | CLI contract, packaged JAR and protocol tests | TEST-1 | M | Not started |
 | 3 | [SEC-3](SEC-3.md) | MCP output hygiene and external engines | SEC-2 | S | Not started |
 | 3 | [CI-2](CI-2.md) | Supply chain and release integrity | CI-1 | M | Not started |
-| 3 | [CI-3](CI-3.md) | Docker image | CI-1 (SEC-1 before `serve` is advertised) | M | In progress |
+| 3 | [CI-3](CI-3.md) | Docker image | CI-1, SEC-1 | M | In review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) |
 | 3 | [SEC-4](SEC-4.md) | Governance and re-attestation | SEC-1, SEC-2, SEC-3 | S (maintainer signs) | Not started |
 | 4 | [TEST-5](TEST-5.md) | Nightly deep tests | TEST-3 | M | Not started |
 | 4 | [TEST-6](TEST-6.md) | GUI smoke tests | TEST-1 | M | Not started |

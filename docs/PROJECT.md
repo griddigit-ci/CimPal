@@ -259,8 +259,9 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 
 **Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)), then SEC-2, following the
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
-required is a maintainer action. CI-3 still needs its first green CI run on GitHub, and after the first
-release that pushes the image the GHCR package must be made public.
+required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)): its
+"Docker image" job needs a first green run, and after the first release that pushes the image the
+GHCR package must be made public.
 
 ---
 
