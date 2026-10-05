@@ -267,14 +267,26 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
   `serve` `/health`, the `mcp` `serverInfo` and the image tag agree.
 - Usage: `docs/cli/docker.md`. In a container `serve` needs `--host 0.0.0.0 --allow-remote`, the
   token from `CIMPAL_API_TOKEN`, and the same port inside and outside on the host loopback (Host check).
+- DEP-1 (`docs/plans/deployment/DEP-1.md`) added the container runtime defaults. The JVM runs with
+  `-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError`, overridable through `JAVA_OPTS`, and an
+  out-of-memory run exits 3. VM output goes to stderr. With `--read-only --tmpfs /tmp` every UID gets
+  its home in `/tmp`, and without a writable `/tmp` the entrypoint exits 2. The image also carries
+  OCI version and revision labels (build arguments), the example configs and the EUPL PDF.
+  `Test-DockerImage.ps1` runs validation, `mcp` and `serve` on a read-only root filesystem.
+
+**Deployment track** (`docs/plans/deployment/`, DEP-1 to DEP-10): container, sizing, CLI automation
+options, an async `/v1` API, a Python SDK and an Airflow provider for external users. It supersedes
+the ordering of the *REST API — discovery and implementation plan* section below.
 
 **Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)), then SEC-2, following the
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)): its
 "Docker image" job needs a first green run, and after the first release that pushes the image the
-GHCR package must be made public. The SHACL rule test rewrite (branch `feature/shacl-rule-tester`)
-needs a review and a PR into `devel`; whether the rule test should come back to the CLI/MCP, with
-SEC-2 path checks and a JSON summary, is open.
+GHCR package must be made public. DEP-1 needs a green "Docker image" job with its new checks.
+Then follow the deployment track: DEP-2 (benchmark and sizing) and DEP-3 (CLI automation options).
+The SHACL rule test rewrite (branch `feature/shacl-rule-tester`) needs a review and a PR into
+`devel`; whether the rule test should come back to the CLI/MCP, with SEC-2 path checks and a JSON
+summary, is open.
 
 ---
 
@@ -440,7 +452,7 @@ CimPal/
 
 **`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
 **Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
 

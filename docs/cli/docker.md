@@ -62,15 +62,48 @@ Any UID works. A UID other than 10001 gets a private temporary home for the run,
 
 ---
 
-## Memory
+## Memory and CPU
 
-The JVM may use up to 75 % of the memory the container gets (`-XX:MaxRAMPercentage=75`). Give the container a limit with `--memory`, or set the heap directly; an explicit `-Xmx` wins:
+The JVM sizes itself from the container's limits:
+- **Heap:** up to 75 % of the memory the container gets (`-XX:MaxRAMPercentage=75`). The rest is for metaspace, threads and native buffers. Give the container a limit with `--memory`.
+- **CPUs:** the JVM counts the CPUs that `--cpus` (or a Kubernetes CPU limit) allows, and sizes its GC and thread pools from that. CimPal's own parallelism is set per command, e.g. `validate --workers`.
+- **Out of memory:** the run ends at once with exit code `3` (internal error) and `Terminating due to java.lang.OutOfMemoryError: ...` on stderr (`-XX:+ExitOnOutOfMemoryError`). It never carries on in a broken state. Give it more memory, or fewer `--workers`.
 
 ```
-docker run --rm -e JAVA_TOOL_OPTIONS=-Xmx8g -v "C:\Data:/data" ghcr.io/griddigit-ci/cimpal:latest validate --config /data/run.json
+docker run --rm --memory 8g --cpus 4 -v "C:\Data:/data" ghcr.io/griddigit-ci/cimpal:latest validate --config /data/run.json
 ```
 
-The JVM then prints `Picked up JAVA_TOOL_OPTIONS: ...` on stderr, with the whole value, and that ends up in `docker logs` and in the MCP client's log. Never put secrets, such as proxy passwords, in it. With Docker Desktop, the memory of its Linux VM is the upper bound (WSL 2: `.wslconfig`; otherwise Settings → Resources).
+To change the JVM options, set `JAVA_OPTS`. Its flags come after the defaults, so they win:
+
+```
+docker run --rm --memory 8g -e "JAVA_OPTS=-XX:MaxRAMPercentage=60" -v "C:\Data:/data" ghcr.io/griddigit-ci/cimpal:latest validate --config /data/run.json
+docker run --rm -e "JAVA_OPTS=-Xmx6g" -v "C:\Data:/data" ghcr.io/griddigit-ci/cimpal:latest validate --config /data/run.json
+```
+
+- `JAVA_OPTS` is split on spaces; there is no quoting inside it.
+- An explicit `-Xmx` wins over `MaxRAMPercentage`.
+- `-XX:+DisplayVMOutputToStderr`, `-Duser.home` and `-Djava.awt.headless` are set by the image after `JAVA_OPTS` and can't be changed.
+- The JVM's own messages, including its unified-logging warnings, go to stderr, so stdout stays clean for `--format json` and `mcp`.
+- **Logging options in `JAVA_OPTS` must write to stderr or a file**, e.g. `-Xlog:gc:stderr` or `-Xlog:gc:file=/tmp/gc.log`. A bare `-Xlog:gc`, `-verbose:gc` or `-showversion` writes to stdout and breaks JSON output and the MCP protocol.
+- In `serve` and `mcp`, one request that runs out of memory ends the whole container with exit `3`. That fails closed, never with a clean result. Size the memory for the largest model you send, and restart the server, for example with `--restart on-failure` instead of `--rm`.
+- `JAVA_TOOL_OPTIONS` also works, but its flags come before the defaults, so it can't change `MaxRAMPercentage`. The JVM also prints it on stderr (`Picked up JAVA_TOOL_OPTIONS: ...`) with the whole value, and that ends up in `docker logs` and in the MCP client's log. Never put secrets, such as proxy passwords, in either variable.
+- With Docker Desktop, the memory of its Linux VM is the upper bound (WSL 2: `.wslconfig`; otherwise Settings → Resources).
+
+---
+
+## Read-only root filesystem
+
+The image works with a read-only root filesystem as long as `/tmp` is writable:
+
+```
+docker run --rm --read-only --tmpfs /tmp -v "C:\Data:/data" ghcr.io/griddigit-ci/cimpal:latest validate --config /data/run.json
+```
+
+In Kubernetes that is `readOnlyRootFilesystem: true` plus an `emptyDir` volume at `/tmp`. That `emptyDir` must belong to the CimPal container alone. Unlike Docker's `--tmpfs`, an `emptyDir` has no sticky bit, so a sidecar running as another UID that mounts it too could swap the private home.
+- CimPal then writes only to `/data` (or whatever you mount) and `/tmp`.
+- The home folder `/home/cimpal` can't be written, so every user gets a private temporary home in `/tmp`, as other UIDs always do. The `~/.cimpal` fetch cache lives there for the run.
+- Without a writable `/tmp`, the container stops at once with exit code `2` and says so.
+- `serve` writes no token file when the token comes from `CIMPAL_API_TOKEN`, which is how this page runs it.
 
 ---
 
@@ -78,7 +111,7 @@ The JVM then prints `Picked up JAVA_TOOL_OPTIONS: ...` on stderr, with the whole
 
 Remote imports are fetched only from the hosts on CimPal's allowlist (`raw.githubusercontent.com`, `api.github.com`, `github.com`), so the container needs outbound HTTPS to them. Pass a GitHub token with `-e GITHUB_TOKEN`. With `--network none` a remote import fails as an error; it never passes silently.
 
-The fetch cache lives in `/home/cimpal/.cimpal` inside the container (other UIDs: in their temporary home), so `--rm` discards it. A long-running `mcp` or `serve` container keeps it.
+The fetch cache lives in `/home/cimpal/.cimpal` inside the container (other UIDs, and every UID with a read-only root filesystem: in a temporary home), so `--rm` discards it. A long-running `mcp` or `serve` container keeps it.
 
 If a proxy or antivirus re-signs HTTPS (TLS inspection), the JVM has to trust that root certificate. Put it in a folder as a PEM `.crt` file, mount the folder at `/certificates` and set `USE_SYSTEM_CA_CERTS=1`:
 
@@ -181,10 +214,14 @@ The image contains no Python, so only the default `APACHE_JENA` engine works. `P
 | Platforms | `linux/amd64`, `linux/arm64` |
 | User | `10001:10001` (`cimpal`), `HOME=/home/cimpal`; any other UID gets a private temporary home |
 | Working directory | `/data` |
-| Entrypoint | `/opt/cimpal/entrypoint.sh`, which runs `java -XX:MaxRAMPercentage=75 -jar /opt/cimpal/CimPal-CLI.jar` |
+| Entrypoint | `/opt/cimpal/entrypoint.sh`, which runs `java -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -Xlog:disable -Xlog:all=warning:stderr:uptime,level,tags $JAVA_OPTS -XX:+DisplayVMOutputToStderr -Djava.awt.headless=true -Duser.home=<home> -jar /opt/cimpal/CimPal-CLI.jar` (and unsets `LOCALAPPDATA`, which would move the cache) |
 | Default command | `--help` |
 | Exposed ports | none |
-| Licence | EUPL-1.2-or-later; the text is at `/opt/cimpal/LICENSE.md` |
+| Volumes | none declared; mount your folder at `/data` |
+| Example configs | `/opt/cimpal/configs/` (the files of `CimPal-CLI/configs/`; their paths need changing to container paths) |
+| Labels | OCI labels, including `org.opencontainers.image.version` (the CLI version) and `org.opencontainers.image.revision` (the Git commit) |
+| Licence | EUPL-1.2-or-later; the text is at `/opt/cimpal/LICENSE.md` and `/opt/cimpal/eupl_v1.2_en.pdf` |
+| Size | about 520 MB uncompressed (Temurin JRE on Ubuntu about 435 MB, the JAR about 46 MB) |
 
 Release images carry SBOM and provenance attestations:
 
@@ -199,18 +236,33 @@ docker buildx imagetools inspect ghcr.io/griddigit-ci/cimpal:<version> --format 
 
 From the repository root:
 
-```
+PowerShell:
+```powershell
 mvn -B -pl CimPal-CLI -am package -DskipTests
-docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev .
+$version = ([xml](Get-Content pom.xml)).project.properties.'cimpal.version'
+docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev --build-arg "CIMPAL_VERSION=$version" --build-arg "GIT_SHA=$(git rev-parse HEAD)" .
 ./scripts/Test-DockerImage.ps1 -Image cimpal:dev
 ```
 
-The Dockerfile only copies the built JAR; it does not run Maven. `Test-DockerImage.ps1` checks:
+Bash:
+```bash
+mvn -B -pl CimPal-CLI -am package -DskipTests
+version=$(sed -n 's:.*<cimpal.version>\(.*\)</cimpal.version>.*:\1:p' pom.xml | head -1)
+docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev --build-arg "CIMPAL_VERSION=$version" --build-arg "GIT_SHA=$(git rev-parse HEAD)" .
+pwsh ./scripts/Test-DockerImage.ps1 -Image cimpal:dev
+```
+
+The Dockerfile only copies the built JAR; it does not run Maven. Without the two build arguments the labels say `unknown` and the smoke test reports it. `Test-DockerImage.ps1` checks:
 - the version, the numeric non-root user, that no port is exposed, and that the binaries are read-only;
+- that the example configs and licence files are in the image;
 - a mapping validation into a bind mount (JSON on stdout, Excel and Turtle reports on disk);
-- that the cache stays private for the image user and for another UID;
+- that the cache stays private for the image user, for another UID and with a read-only root filesystem;
 - that a remote `owl:imports` fails closed with `--network none`;
 - MCP over stdio, with and without `USE_SYSTEM_CA_CERTS`;
-- `serve` set up as above: `/health`, 403 for a remapped port, 401 without the token, and `POST /shutdown`.
+- `serve` set up as above: `/health`, 403 for a remapped port, 401 without the token, and `POST /shutdown`;
+- the JVM defaults, their override through `JAVA_OPTS`, and exit `3` on out-of-memory;
+- the version and revision labels.
+
+Validation, `mcp` and `serve` run with `--read-only --tmpfs /tmp`, and a run with `--read-only` but no writable `/tmp` must stop with exit `2`.
 
 CI runs it on every push and pull request (job "Docker image"), and the release runs it before pushing.

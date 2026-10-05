@@ -6,7 +6,8 @@
 # compiled here. Build from the repository root after packaging the CLI:
 #
 #   mvn -B -pl CimPal-CLI -am package -DskipTests
-#   docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev .
+#   docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev \
+#       --build-arg CIMPAL_VERSION=<cimpal.version> --build-arg GIT_SHA=$(git rev-parse HEAD) .
 #
 # The release workflow builds this file with the CimPal-CLI.jar it has just published, so the
 # image carries exactly the released bytes. Usage: docs/cli/docker.md.
@@ -24,12 +25,22 @@ RUN groupadd --gid 10001 cimpal \
  && chown cimpal:cimpal /data
 
 COPY --chmod=0755 CimPal-CLI/docker/entrypoint.sh /opt/cimpal/entrypoint.sh
-COPY --chmod=0644 CimPal-CLI/target/CimPal-CLI.jar LICENSE.md /opt/cimpal/
+COPY --chmod=0644 CimPal-CLI/target/CimPal-CLI.jar LICENSE.md eupl_v1.2_en.pdf /opt/cimpal/
+# Example configs for reference. Their paths are host paths; inside the container they become /data/...
+# No --chmod here: it would also give the directory 0644, which no other user can enter. The checkout's
+# modes (755 directory, 644 files) are kept, owned by root.
+COPY CimPal-CLI/configs/ /opt/cimpal/configs/
+
+# The workflows pass the version (it must match `--version`, which the smoke test checks) and commit.
+ARG CIMPAL_VERSION=unknown
+ARG GIT_SHA=unknown
 
 LABEL org.opencontainers.image.title="CimPal CLI" \
       org.opencontainers.image.description="CimPal command-line tools for CIM/CGMES: SHACL validation, RDFS to SHACL, RDF conversion, SPARQL and comparison." \
       org.opencontainers.image.vendor="gridDigIt Kft." \
       org.opencontainers.image.licenses="EUPL-1.2+" \
+      org.opencontainers.image.version="${CIMPAL_VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}" \
       org.opencontainers.image.url="https://cimpal.app/" \
       org.opencontainers.image.source="https://github.com/griddigit-ci/CimPal" \
       org.opencontainers.image.documentation="https://github.com/griddigit-ci/CimPal/blob/master/docs/cli/docker.md"
