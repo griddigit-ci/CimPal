@@ -72,8 +72,10 @@
                     <useModulePath>false</useModulePath>
                 </configuration>
             </plugin>
-            <!-- Publish the shared test helpers (eu.griddigit.cimpal.core.testsupport) as a test-jar
-                 so the CLI and Main test suites can use them. Only that package is included. -->
+            <!-- Publish the shared test helpers (eu.griddigit.cimpal.core.testsupport) and the
+                 synthetic fixtures (src/test/resources/fixtures) as a test-jar so the CLI and Main
+                 test suites can use them. Core's own tests and snapshots are not included. -->
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -87,6 +89,7 @@
                         <configuration>
                             <includes>
                                 <include>eu/griddigit/cimpal/core/testsupport/**</include>
+                                <include>fixtures/**</include>
                             </includes>
                             <!-- Without this the jar's derived module name would be CimPal.Core, the
                                  same as the production module, and module-path compilers ignore it. -->

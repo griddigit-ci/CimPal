@@ -8,11 +8,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In progress (feature groups in review: rdfs2shacl + excel2shacl + organize) |
 | Phase | 2 |
 | Depends on | TEST-1 |
 | Size | L (one session per feature group) |
-| Branch | `feature/test-3-...` |
+| Branch | `feature/test-3-<group>`; this group: `feature/test-3-shacl-generation` |
 
 ## Goal
 
@@ -35,9 +35,9 @@ Capture the current behaviour of every Core feature with golden-output tests, so
 | SHACL validation — mapping, timestamped | `MappingValidator` | [ ] | [ ] `validate` | [ ] |
 | SHACL validation — manual | `ShaclAutoTester` | [ ] | [ ] `validate --workflow manual` | [ ] |
 | Single-dataset validation | `SHACLValidator` | [ ] | — | — |
-| RDFS → SHACL (2019, 2020, closed, split datatypes) | `SHACLFromRDF` | [ ] | [ ] `rdfs2shacl` | [ ] |
-| Excel → SHACL | `ShaclFromXls` | [ ] | [ ] `excel2shacl` | [ ] |
-| SHACL organise | `ShaclOrganizer` | [ ] | [ ] `organize` | [ ] |
+| RDFS → SHACL (2019, 2020, closed, split datatypes) | `SHACLFromRDF` | [x] | [ ] `rdfs2shacl` | [ ] |
+| Excel → SHACL | `ShaclFromXls` | [x] | [ ] `excel2shacl` | [ ] |
+| SHACL organise | `ShaclOrganizer` | [x] | [ ] `organize` | [ ] |
 | RDF convert (XML, Turtle, JSON-LD, CIMXML, sort, union) | `RDFConverter` | [ ] | [ ] `convert` | [ ] |
 | Compare RDFS / SHACL / CIMTool | `Comparison*` | [ ] | [ ] `compare` | [ ] |
 | Compare instances (DL/SV/TP ignores) | `ComparisonInstanceData` | [ ] | [ ] `compare-instances` | [ ] |
@@ -49,7 +49,14 @@ Capture the current behaviour of every Core feature with golden-output tests, so
 
 ## Suspected bugs
 
-(none yet)
+Each has an `@Disabled` test that asserts the correct behaviour and fails today (checked with `-Djunit.jupiter.conditions.deactivate=org.junit.*DisabledCondition`).
+
+| # | Where | Suspected bug | Test |
+| --- | --- | --- | --- |
+| G1 | `SHACLFromRDF` | The IdentifiedObject cardinality shapes reference the group `<ioUri>CardinalityIO`, but the group the converter declares is `<ioUri>CardinalityGroup` (label "CardinalityIO"). | `SHACLFromRDFTest.everyReferencedGroupIsDeclared` |
+| G2 | CLI `rdfs2shacl` | `--io-uri` defaults to the mRID property URI (`cim:IdentifiedObject.mRID`) and is documented as such. The converter uses it as the namespace of the shared IdentifiedObject shapes (the GUI passes `http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#`), so the CLI writes shapes like `cim:IdentifiedObject.mRIDIdentifiedObject.mRID-datatype` into the CIM namespace. | CLI `RdfsToShaclCommandTest.defaultsKeepGeneratedShapesOutOfTheCimNamespace` |
+| G3 | `ShaclFromXls` | Numeric Excel cells are read as doubles, so `sh:minLength`/`sh:maxLength` are written as ill-formed literals such as `"32.0"^^xsd:integer`. | `ShaclFromXlsTest.lengthLimitsAreValidIntegers` |
+| G4 | `ExcelTools.importXLSX` | A missing or unreadable workbook is reported on stderr and gives no rows, so excel2shacl writes a shapes model with only the group in it, without an error. The CLI checks that the file exists first; the Core API doesn't. | `ShaclFromXlsTest.missingWorkbookIsAnError` |
 
 ## Instructions for Claude Code
 
@@ -76,7 +83,38 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-02 | rdfs2shacl, excel2shacl and organize branch off `devel`; none of them depends on SEC-5. | Claude Code |
+| 2026-10-02 | The RDFS inputs are two synthetic profiles written for the tests (`fixtures/shacl-generation/`), in the CimSyntaxGen layout: RDFS 2020 with the CIM100 namespace (CGMES 3.0) and RDFS 2019 with the CIM16 namespace (CGMES 2.4.15). The real profiles bundled in CimPal-Main are not used. | Claude Code |
+| 2026-10-02 | The Core test-jar now also carries `fixtures/**`, so CLI and Main tests can share the synthetic fixtures. | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+### rdfs2shacl + excel2shacl + organize, 2026-10-02
+
+- **Tests:** Core 246 → 269 (+23; 3 more skipped are G1, G3 and G4); CLI 102 → 104 (1 skipped is G2). Core coverage: line 33.6% → 50.6%, branch 22.6% → 35.0% (`SHACLFromRDF` is about 3,300 lines).
+- **`SHACLFromRDFTest`** (11):
+  - CGMES 3.0 / RDFS 2020 and CGMES 2.4 / RDFS 2019 with the CLI options
+  - closed shapes, split datatypes (both models and both saved files), and the inheritance tree
+  - the GUI default preset
+  - SHACL-SHACL conformance of the generated shapes
+  - CIMTool OWL refused (`UnsupportedOperationException`)
+  - an empty RDFS, and saving before converting
+- **`ShaclFromXlsTest`** (5 + 2 disabled): CGMES 3.0 with a Config sheet, with the fallback namespaces, CGMES 2.4, a header-only sheet, and a path without `#` (`ArrayIndexOutOfBoundsException`). The workbook is built with POI and read with `ExcelTools.importXLSX`, as the CLI does.
+- **`ShaclOrganizerTest`** (5):
+  - splitting into template files across sub-folders (`sh:in` lists, SPARQL constraint plus `owl:Ontology` header, groups, and the `a|b` name match)
+  - skip, unknown and short rows
+  - a prefix other than `keep`
+  - an empty template
+  - the same constraint found in two models
+- **Snapshots** were generated with `-Dsnapshot.update=true`, then three normal runs passed unchanged.
+
+Findings (current behaviour, pinned, not bugs):
+- **The generated SHACL header carries the generation time** (`dct:issued`), so snapshots normalise literal timestamps.
+- **`RDFtoSHACLOptionsPresets.defaultPreset` leaves out the RDFS model definitions** (a `todo` in the preset), so `build()` refuses it until the caller adds them.
+- **With the RDFS 2019 layout, `getRdfsHeaderStatements()` is `null`**, not an empty list.
+- **`saveShapeModel` before `convert` throws `NullPointerException`** with a message, not `IllegalStateException`.
+- **`ShaclOrganizer` processes the header row as a constraint**, despite its Javadoc. It only shows as a "not found" line and one extra count on stdout.
+- **When two shape models contain the same constraint, `ShaclOrganizer` merges both copies**, so a shape can end up with two `sh:in` lists.
+- **excel2shacl literals built from Java doubles compare equal to the Turtle output only after a round trip**, so those snapshots compare the model as written.
+
+Left open: the convert, comparisons, sparql, gen-instances + manifest and kgcl groups (validation is in #50).

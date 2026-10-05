@@ -232,9 +232,16 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - SPARQL `SERVICE` is refused (`SparqlServicePolicy`) and switched off globally in the CLI, the GUI and `ValidationTools`. Shapes with `SERVICE` are refused before they go to the Python engines, and the Python worker disables rdflib `SERVICE`. Jena 6.2 runs `SERVICE` by default (finding in `SEC-2.md`).
 - `serve` now passes `--format json` only to the four commands that support it. Before, the other six endpoints always failed with "Unknown option".
 
-**Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)), then SEC-2, following the
-phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
-required is a maintainer action.
+**Characterisation tests, rdfs2shacl + excel2shacl + organize** (added by TEST-3, 2026-10-02):
+- `SHACLFromRDFTest`, `ShaclFromXlsTest` and `ShaclOrganizerTest` pin the current output as golden files under `snapshots/rdfs2shacl/`, `excel2shacl/` and `organize/`. The validation group is in a separate PR (#50).
+- The RDFS inputs are two synthetic profiles in `fixtures/shacl-generation/` (RDFS 2020 with CIM100, RDFS 2019 with CIM16).
+- The Core test-jar now also carries `fixtures/**`, which `RdfsToShaclCommandTest` in the CLI uses.
+
+**Next steps:**
+- Merge the TEST-3 PRs.
+- Continue TEST-3 with the next feature group (convert), following the phase order in `docs/plans/README.md`.
+- Fix the suspected bugs listed in `TEST-3.md`, in a separate WP.
+- Enabling branch protection with the two CI checks as required is a maintainer action.
 
 ---
 
@@ -384,9 +391,15 @@ CimPal/
 - Zip limits are counted while reading, with a per-entry cap, and also apply in `modelLoadPerFiles`.
 - `requirePublicHost` refuses IPv6 unique-local and carrier-grade NAT addresses.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. After SEC-5 and TEST-3 (rdfs2shacl + excel2shacl + organize), Core is at 50.6% / 35.0% (2026-10-02). CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
 
 **Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
+
+**SHACL generation suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test; the details are in `docs/plans/TEST-3.md`:
+- `SHACLFromRDF` references an undeclared `…CardinalityIO` group.
+- The `rdfs2shacl` `--io-uri` default puts the IdentifiedObject shapes in the CIM namespace.
+- excel2shacl writes length limits as `"32.0"^^xsd:integer`.
+- An unreadable workbook gives empty shapes instead of an error.
 
 **`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. `validate --workflow manual` was deliberately left calling `ShaclAutoTester` directly — see the `ShaclAutoTester` row above for why. No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
 
