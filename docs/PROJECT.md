@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-02  
+**Last updated:** 2026-10-05  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -94,7 +94,9 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.core.utils.ValidationTools` | Core | Main validation engine. `validateByMapping()`, `validateByTimestampedMapping()`. ~6000 lines. Zero GUI imports. Prefer `MappingValidator` for new callers — see below. |
 | `eu.griddigit.cimpal.core.utils.MappingValidator` + `eu.griddigit.cimpal.core.models.MappingValidationOptions` | Core | Builder-style facade over `validateByMapping`/`validateByTimestampedMapping` (added 2026-09-23). `MappingValidationOptions.builder()...timestamped(true/false).build()`, then `new MappingValidator(options).validate()` → `MappingValidationSummary`. The GUI's SHACL Validation tab and the CLI's `validate --workflow mapping/timestamped` both go through this now (CLI refactored 2026-09-25). |
 | `eu.griddigit.cimpal.core.models.MappingValidationSummary` | Core | Record: `reports` (List<Path> — one entry for plain mapping, several for timestamped), `conforming`, `violations`, `errors`. Same `hasViolations()`/`totalRows()` semantics as the older `ValidationRunSummary`/`ValidationTimestampedRunSummary`. |
-| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Not a fit for "batch-test many independent model archives against shared shapes, one report each" — that's still `ShaclAutoTester`'s job (see below); this is for single-dataset/programmatic use. |
+| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Not a fit for "batch-test many independent model archives against shared shapes, one report each" — that's still `ShaclAutoTester`'s job (see below); this is for single-dataset/programmatic use. Used by the GUI's *Validate selected files together* workflow (2026-10-05, see below). |
+| `eu.griddigit.cimpal.core.models.SHACLValidationReport` | Core | `SHACLValidator`'s result. `getResultsByConstraintFile()` breaks the results down by the constraint file that declares each result's source shape. `writeExcel(file)` / `writeExcelTo(dir)` write the mapping-report workbook with one validation row per constraint file; `writeTurtle(file)` writes the engine's `sh:ValidationReport`. |
+| `eu.griddigit.cimpal.core.utils.ShapeArchive` | Core | Package-private. The `.ttl`/`.rdf` entries of a shapes ZIP, held in memory (256 MiB budget) as `ShapeSource`s. Each is parsed with the base `<archive URI>/<entry>`, so relative `owl:imports` resolve inside the archive as in a folder (`ValidationTools.resolveImport` answers them from memory, ahead of the network-path refusal). |
 | `eu.griddigit.cimpal.core.presets.MappingValidationOptionsPresets` / `SHACLValidationOptionsPresets` | Core | CGMES 3.0 / 2.4.15 starting points for the two builders above. |
 | `eu.griddigit.cimpal.core.utils.DatatypeMapPreset` | Core | Enum: `NONE`, `CGMES24_NC22`, `CGMES30_NC24`, `CGMES30_NC25`. `.load()` reads the matching bundled `.properties` file. |
 | `eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester` | Core | Manual validation: SHACL files + model archives → Excel reports per archive. Deliberately untouched by the `MappingValidator`/`SHACLValidator` builder API (no equivalent "one report per archive" abstraction exists yet) — the CLI's `validate --workflow manual` still calls this directly. |
@@ -103,6 +105,13 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback` | Core | Callback: `updateProgress(double)` and `appendOutput(String)`. |
 | `ValidationTools.ValidationRunSummary` | Core | Record: `reportPath`, `conforming`, `violations`, `errors`. Still used internally by `ValidationTools` and by `MappingValidator`, which unwraps it into `MappingValidationSummary`. |
 | `ValidationTools.ValidationTimestampedRunSummary` | Core | Record: `reports` (List<Path>), `conforming`, `violations`, `errors`. Same relationship to `MappingValidationSummary` as above. |
+
+**Combined validation (added 2026-10-05).** The SHACL Validation tab has a fourth workflow, *Validate selected files together*. It merges the selected instance data files (`.xml`, or ZIPs of them, nested ZIPs included) into one data graph and validates it against all selected constraint files (`.ttl`/`.rdf`, or ZIPs of them) as one shapes graph, through `SHACLValidator`. It writes one `validation_report__<timestamp>.xlsx` (plus an optional `.ttl`) to the output folder, with one validation row per constraint file. A file with no findings is listed as conforming, unless the run was partial or the engine reported non-conformance without extractable results. When a result can't be placed in a file (an ambiguous shape label, or Python-engine blank nodes) the report falls back to one row. What a shape finds counts under the file that declares it, even if another file added the constraint. Related Core changes:
+- `ValidationTools.loadShapesWithImports(List<ShapeSource>, …, BiConsumer onDocument)` loads several roots as **one** closure. Before, `SHACLValidator` loaded each root separately, so a shared import was parsed once per root and the findings of its anonymous shapes were reported twice.
+- `ModelFactory.forEachZipEntry` streams archive entries, nested ones included, within one `ZipBudget`. It drains every nested entry through the budget, because `ZipInputStream` inflates skipped entries. `safeZipEntryName` refuses absolute names, `:`, `..` that climbs out, and control characters.
+- A data or shapes ZIP with nothing to read fails instead of contributing nothing. Other RDF files in a shapes ZIP are named in the report warnings, which the GUI shows in its finish dialog.
+
+The CLI has no equivalent yet. Covered by `SHACLValidatorTest`, `SHACLValidationReportTest`, `ShapeArchiveTest`, `ZipBudgetTest` and `ShapeSourceTest`.
 
 **Static state in ValidationTools (thread safety concern):**  
 `exportTurtleValidationReports` and `DEBUG` are `volatile boolean` statics. `DEBUG` is still a real concern for a concurrent server. `exportTurtleValidationReports` is now effectively resolved for known callers: as of 2026-09-25, `setExportTurtleValidationReports(...)` has **zero remaining callers** anywhere in the codebase (verified by repo-wide grep) — the GUI never called it, and the CLI's `ValidateCommand` was the last one, now switched to `MappingValidator`'s per-call `exportTurtleReports` builder option instead of the global switch. The setter and field still exist (the old positional `ValidationTools.validateByMapping(...)` overloads without an explicit boolean still read the static as their default, for any external caller not yet migrated to `MappingValidator`), but nothing in this repo mutates it anymore. Any concurrent HTTP server work should still keep single-threaded execution for `DEBUG`, or migrate it the same way.
@@ -383,6 +392,17 @@ CimPal/
 - All CLI CSV output uses `CsvCells.escape`.
 - Zip limits are counted while reading, with a per-entry cap, and also apply in `modelLoadPerFiles`.
 - `requirePublicHost` refuses IPv6 unique-local and carrier-grade NAT addresses.
+
+**Timestamped rows with several TTLs likely double-count shared imports (found 2026-10-05, unverified).** `ValidationTools.loadParsedShapesWithImports(Collection<Path>, …)` loads each `;`-separated root's import closure separately. That is the pattern that made `SHACLValidator` report the findings of a shared import's anonymous shapes twice. The fix is to load them with the multi-root `loadShapesWithImports`, as `SHACLValidator` now does; it needs a regression test first.
+
+**Open points from the combined-validation security review (2026-10-05):**
+- `ValidationExcelWriter` writes string cells without formula-injection neutralisation. ZIP entry names now reach its Constraint file and XML files cells. String cells don't execute when the XLSX opens. Neutralising them changes every workflow's reports, so the maintainer deferred it to a separate change.
+- Data ZIPs read `.xml` entries only. Other RDF files in a data ZIP are skipped without a warning, as top-level entries always were. A shapes ZIP, in turn, reads `.ttl` and `.rdf`, and skips `.xml` (it may be instance data) without a warning. The warnings for other skipped RDF files appear in the GUI's finish dialog and the Output pane, but not in the workbook.
+- Entry names with C1 controls or bidi/format characters (U+202E and the like) pass `LogSanitizer` and `safeZipEntryName`; they can't forge log lines but can spoof how a name displays. Widening `LogSanitizer`'s class would change every log, so it was left as it is.
+- External entities in RDF/XML are not resolved by Jena (pinned by `ShapeArchiveTest.externalEntitiesInRdfEntriesAreNotResolved`).
+- `SHACLValidator` has no `PathPolicy` check on data files, and probes a shape file with `Files.isRegularFile` before `ShapeArchive.read` checks the policy. Add both before wiring it into `serve`/`mcp`/`run`.
+
+**`MainGuiFxmlLoadTest` times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there. CI runs it; locally use `-DexcludedGroups=gui`.
 
 **Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. Before any further Core refactoring, add characterisation tests that capture the current output.
 

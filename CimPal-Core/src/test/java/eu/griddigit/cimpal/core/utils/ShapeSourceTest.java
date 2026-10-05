@@ -260,6 +260,25 @@ class ShapeSourceTest {
     }
 
     @Test
+    void rootsSharingAnImport_loadAsOneClosure_eachFileReadOnceInRootOrder() throws Exception {
+        //   A → C, B → C, with A and B both roots
+        Path c = tempDir.resolve("c.ttl");
+        writeMinimalOntology(c, "urn:c");
+        Path a = tempDir.resolve("a.ttl");
+        writeOntologyWithImport(a, "urn:a", c.toUri().toString());
+        Path b = tempDir.resolve("b.ttl");
+        writeOntologyWithImport(b, "urn:b", c.toUri().toString());
+
+        List<String> read = new java.util.ArrayList<>();
+        var result = ValidationTools.loadShapesWithImports(
+                List.of(new ValidationTools.LocalShapeSource(a), new ValidationTools.LocalShapeSource(b)),
+                tempDir, new HashMap<>(), (source, document) -> read.add(source.displayName()));
+
+        assertEquals(3, result.loadedFiles(), "C read once per root would give 4");
+        assertEquals(List.of("a.ttl", "c.ttl", "b.ttl"), read);
+    }
+
+    @Test
     void cycle_terminates_eachFileLoadedOnce() throws Exception {
         // A imports B, B imports A
         Path a = tempDir.resolve("a.ttl");

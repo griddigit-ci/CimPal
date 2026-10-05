@@ -37,4 +37,9 @@ public final class LogSanitizer {
         String s = UNSAFE.matcher(value).replaceAll("␞");
         return s.length() > MAX_LENGTH ? s.substring(0, MAX_LENGTH) + "..." : s;
     }
+
+    /** True when {@code value} holds a character {@link #forLog(String)} would neutralise. */
+    static boolean hasUnsafeCharacters(String value) {
+        return value != null && UNSAFE.matcher(value).find();
+    }
 }

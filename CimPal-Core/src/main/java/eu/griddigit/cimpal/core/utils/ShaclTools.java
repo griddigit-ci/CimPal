@@ -47,7 +47,7 @@ public class ShaclTools {
 
             Resource sourceShapeRes = result.getPropertyResourceValue(SH.sourceShape);
 
-            String sourceShape = compact(getResourceValue(sourceShapeRes), prefixModel);
+            String sourceShape = sourceShapeLabel(sourceShapeRes, prefixModel);
             String focusNode = compact(getResourceValue(result.getPropertyResourceValue(SH.focusNode)), prefixModel);
             String severity = compact(getResourceValue(result.getPropertyResourceValue(SH.resultSeverity)), prefixModel);
 
@@ -315,6 +315,14 @@ public class ShaclTools {
     private static String getResourceValue(Resource resource) {
         if (resource == null) return "";
         return resource.isAnon() ? resource.getId().toString() : resource.toString();
+    }
+
+    /**
+     * The label a result carries in {@link SHACLValidationResult#getSourceShape()} for this shape:
+     * a blank node's label, or the IRI shortened with the prefixes of {@code prefixModel}.
+     */
+    static String sourceShapeLabel(Resource shape, Model prefixModel) {
+        return compact(getResourceValue(shape), prefixModel);
     }
 
     private static String getStatementValue(Statement statement) {

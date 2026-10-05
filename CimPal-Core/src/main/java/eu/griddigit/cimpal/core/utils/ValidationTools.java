@@ -41,6 +41,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiConsumer;
 
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.OWL;
@@ -2606,7 +2607,27 @@ public class ValidationTools {
     static LoadShapesResult loadShapesWithImports(ShapeSource root,
                                                   Path constraintsRoot,
                                                   Map<String, Model> cache) throws IOException {
-        String rootKey = root.key();
+        return loadShapesWithImports(List.of(root), constraintsRoot, cache, (source, document) -> { });
+    }
+
+    /**
+     * Loads the owl:imports closure of several roots as one, so that a document more than one of
+     * them imports is read once. Read once per root, its anonymous shapes would get a second set
+     * of blank nodes, and each of their constraints would be evaluated, and reported, twice.
+     *
+     * @param onDocument told about each document as it is read, with the triples read from it;
+     *                   not called for a closure served from {@code cache}
+     */
+    static LoadShapesResult loadShapesWithImports(List<? extends ShapeSource> roots,
+                                                  Path constraintsRoot,
+                                                  Map<String, Model> cache,
+                                                  BiConsumer<ShapeSource, Model> onDocument) throws IOException {
+        if (roots.isEmpty()) {
+            throw new IOException("No SHACL constraint files were resolved");
+        }
+        String rootKey = roots.size() == 1
+                ? roots.getFirst().key()
+                : roots.stream().map(ShapeSource::key).collect(Collectors.joining("|", "SHAPES_CLOSURE:", ""));
 
         Model cached = cache.get(rootKey);
         if (cached != null) {
@@ -2619,7 +2640,10 @@ public class ValidationTools {
         Model shapes = ModelFactory.createDefaultModel();
         Set<String> visited = new HashSet<>();
         Deque<ShapeSource> stack = new ArrayDeque<>();
-        stack.push(root);
+        // Pushed in reverse, so the roots' closures are read in the order the roots were given.
+        for (int i = roots.size() - 1; i >= 0; i--) {
+            stack.push(roots.get(i));
+        }
 
         int loadedFiles = 0;
         int localCount = 0;
@@ -2659,6 +2683,8 @@ public class ValidationTools {
                 } else {
                     totalFetchedMs += System.currentTimeMillis() - fetchStart;
                 }
+            } else if (src instanceof ShapeArchive.Entry entry) {
+                tmp = entry.read();
             } else {
                 tmp = readLocalShapeSource((LocalShapeSource) src);
             }
@@ -2667,6 +2693,7 @@ public class ValidationTools {
                     + " tmpTriples=" + tmp.size()
                     + " src=" + src.displayName(), readStart);
 
+            onDocument.accept(src, tmp);
             shapes.add(tmp);
             shapes.setNsPrefixes(tmp.getNsPrefixMap());
 
@@ -2761,6 +2788,16 @@ public class ValidationTools {
                         + " reason=" + forLog(e.getMessage()));
                 return null;
             }
+        }
+
+        // A shapes file in a ZIP archive reaches its sibling entries through URIs inside the
+        // archive (see ShapeArchive). Those are answered from the archive and never looked up on
+        // disk, where nothing exists at such a path; an entry the archive lacks is unresolvable.
+        if (current instanceof ShapeArchive.Entry entry && entry.archive().encloses(u)) {
+            ShapeSource sibling = entry.archive().find(u);
+            dbg("resolveImport archive uri=" + forLog(u)
+                    + (sibling == null ? " not in archive" : " resolved=" + sibling.key()));
+            return sibling;
         }
 
         // An import naming a network host (file://host/share/x.ttl, or a reference starting with
@@ -6843,9 +6880,9 @@ public class ValidationTools {
         }
     }
 
-    // ---- ShapeSource: abstraction over local path or remote URL ----
+    // ---- ShapeSource: abstraction over local path, remote URL or ZIP archive entry ----
 
-    sealed interface ShapeSource permits LocalShapeSource, RemoteShapeSource {
+    sealed interface ShapeSource permits LocalShapeSource, RemoteShapeSource, ShapeArchive.Entry {
         String key();
         String displayName();
     }

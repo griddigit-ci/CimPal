@@ -8,10 +8,13 @@ package eu.griddigit.cimpal.main.application.controllers;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.models.SHACLValidationOptions;
+import eu.griddigit.cimpal.core.models.SHACLValidationReport;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.DatatypeMapPreset;
 import eu.griddigit.cimpal.core.utils.MappingValidator;
+import eu.griddigit.cimpal.core.utils.SHACLValidator;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.main.application.MainController;
@@ -36,18 +39,22 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the <em>Dataset SHACL Validation</em> tab.
  * <p>
- * The tab offers three workflows, selected by the {@code Validation workflow} choice box:
- * two mapping-driven ones that resolve constraint files from a mapping CSV, and
+ * The tab offers four workflows, selected by the {@code Validation workflow} choice box:
+ * two mapping-driven ones that resolve constraint files from a mapping CSV;
  * {@code Validate by manual selection}, which validates every model found under the models
- * root folder against constraint files chosen by hand. The last was previously the separate
- * <em>SHACL tester</em> tab; it is a third workflow here rather than a tab of its own because
+ * root folder against constraint files chosen by hand; and {@code Validate selected files
+ * together}, which merges hand-picked instance data files into one dataset and validates it
+ * against all hand-picked constraint files at once. The manual workflow was previously the
+ * separate <em>SHACL tester</em> tab; it is a workflow here rather than a tab of its own because
  * it shares the models root folder with the mapping workflows.
  */
 public class ValidationByMappingController {
@@ -58,6 +65,8 @@ public class ValidationByMappingController {
     private static final String WORKFLOW_MAPPING = "Validate by mapping file";
     private static final String WORKFLOW_TIMESTAMPED = "Validate by timestamped mapping";
     private static final String WORKFLOW_MANUAL = "Validate by manual selection";
+    /** All selected data files as one dataset, against all selected constraint files. */
+    private static final String WORKFLOW_COMBINED = "Validate selected files together";
 
     /** Depth used when discovering model archives under the models root folder. */
     private static final int MODEL_SCAN_DEPTH = 3;
@@ -80,6 +89,9 @@ public class ValidationByMappingController {
 
     @FXML
     private TextField tfModelsInputFolder;
+
+    @FXML
+    private Button btnBrowseModelsInputFolder;
 
     @FXML
     private TextField tfConstraintsRootFolder;
@@ -202,6 +214,19 @@ public class ValidationByMappingController {
     @FXML
     private Label helpShaclConstraintFiles;
 
+    // ---- combined workflow: hand-picked instance data files ----
+    @FXML
+    private HBox rowInstanceDataFilesLabel;
+
+    @FXML
+    private TextField tfInstanceDataFiles;
+
+    @FXML
+    private Button btnBrowseInstanceDataFiles;
+
+    @FXML
+    private Label helpInstanceDataFiles;
+
     @FXML
     private CheckBox cbExportReportsTurtle;
 
@@ -221,6 +246,7 @@ public class ValidationByMappingController {
     private File previousComparisonCsvFile;
     private File datatypeMapFile;
     private List<File> shaclConstraintFiles;
+    private List<File> instanceDataFiles;
 
     public void setMainController(MainController mainController) {
         this.mainController = mainController;
@@ -244,7 +270,8 @@ public class ValidationByMappingController {
         cbValidationWorkflow.getItems().setAll(
                 WORKFLOW_MAPPING,
                 WORKFLOW_TIMESTAMPED,
-                WORKFLOW_MANUAL
+                WORKFLOW_MANUAL,
+                WORKFLOW_COMBINED
         );
         cbValidationWorkflow.getSelectionModel().select(WORKFLOW_MAPPING);
 
@@ -363,18 +390,20 @@ public class ValidationByMappingController {
      * Enables the fields the selected workflow actually reads, and disables or hides the rest.
      * <p>
      * The two mapping workflows resolve their constraint files from the mapping CSV, so the
-     * manual constraint-files row does not apply to them; the manual workflow reads neither the
+     * constraint-files row does not apply to them; the manual workflow reads neither the
      * mapping CSV nor the constraints root or output folder, so those are disabled in turn.
-     * Without this, {@link #validateInputs()} would demand a mapping CSV for a run that never
-     * looks at one.
+     * The combined workflow reads hand-picked constraint and data files and writes to the output
+     * folder; it reads no folder of models. Without this, {@link #validateInputs()} would demand
+     * a mapping CSV for a run that never looks at one.
      * <p>
-     * The datatype map and base URI are read by all three workflows: the manual one loads its
-     * models through the same datatype-mapping parser, so an untyped load there would let a
+     * The datatype map and base URI are read by every workflow: the manual and combined ones load
+     * their models through the same datatype-mapping parser, so an untyped load there would let a
      * numeric or boolean constraint pass a model it should reject.
      */
     private void updateWorkflowControls() {
         boolean timestamped = isTimestampedWorkflow();
         boolean manual = isManualWorkflow();
+        boolean combined = isCombinedWorkflow();
 
         // Previous-run comparison CSV and Regenerate button: timestamped workflow only.
         setShown(timestamped, rowPreviousComparisonCsvLabel, tfPreviousComparisonCsv,
@@ -387,15 +416,25 @@ public class ValidationByMappingController {
             if (!timestamped) cbIncrementalTimestampValidation.setSelected(false);
         }
 
-        // Manual constraint file selection: manual workflow only.
-        setDisabled(!manual, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
+        // Hand-picked constraint files: manual and combined workflows. Only the combined one reads ZIPs.
+        setDisabled(!manual && !combined, rowShaclConstraintFilesLabel, tfShaclConstraintFiles,
                 btnBrowseShaclConstraintFiles);
+        tfShaclConstraintFiles.setPromptText(combined
+                ? "Select one or more SHACL constraint files (.ttl) or ZIP archives of them"
+                : "Select one or more SHACL constraint files (.ttl)");
 
-        // Mapping-driven inputs: not read by the manual workflow.
-        setDisabled(manual, tfMappingCsvFile, btnBrowseMappingCsv,
-                tfConstraintsRootFolder, btnBrowseConstraintsRootFolder,
-                tfOutputFolder, btnBrowseOutputFolder);
+        // Hand-picked instance data files: combined workflow only.
+        setDisabled(!combined, rowInstanceDataFilesLabel, tfInstanceDataFiles, btnBrowseInstanceDataFiles);
 
+        // Mapping-driven inputs: read by neither the manual nor the combined workflow.
+        setDisabled(manual || combined, tfMappingCsvFile, btnBrowseMappingCsv,
+                tfConstraintsRootFolder, btnBrowseConstraintsRootFolder);
+
+        // The models root folder: the combined workflow validates the data files picked instead.
+        setDisabled(combined, tfModelsInputFolder, btnBrowseModelsInputFolder);
+
+        // The output folder: the manual workflow writes its reports beside the models instead.
+        setDisabled(manual, tfOutputFolder, btnBrowseOutputFolder);
     }
 
     private static void setDisabled(boolean disabled, Node... nodes) {
@@ -422,13 +461,22 @@ public class ValidationByMappingController {
                 "Select which validation process should be executed.\n\n" +
                         "Validate by mapping file: validates the selected input model structure according to the mapping CSV and creates a validation report and ZIP files.\n\n" +
                         "Validate by timestamped mapping: discovers timestamped input files and creates timestamp-based validation reports.\n\n" +
-                        "Validate by manual selection: validates every model archive found under the models root folder against the SHACL constraint files you select by hand, with no mapping file. Results are written to the Output pane."
+                        "Validate by manual selection: validates every model archive found under the models root folder against the SHACL constraint files you select by hand, with no mapping file. Results are written to the Output pane.\n\n" +
+                        "Validate selected files together: merges all the instance data files you select into one dataset and validates it against all the SHACL constraint files you select, at once. Writes one Excel report in the layout of the mapping report, with a row for each constraint file; each finding is listed under the file that declares its shape."
         );
 
         GUIhelper.installHelpTooltip(
                 helpShaclConstraintFiles,
-                "SHACL constraint files (.ttl) used to validate the models. Several files can be selected and are combined into one shapes graph.\n\n" +
-                        "Only used by the \"Validate by manual selection\" workflow; the mapping workflows resolve their constraint files from the mapping CSV instead."
+                "SHACL constraint files (.ttl) used to validate the models. Several files can be selected and are combined into one shapes graph; their owl:imports are followed.\n\n" +
+                        "\"Validate selected files together\" also accepts ZIP archives: every .ttl and .rdf file in the archive is used, and imports between them resolve inside the archive as they would in a folder. Other RDF files in the archive are listed in the warnings.\n\n" +
+                        "Not used by the mapping workflows, which resolve their constraint files from the mapping CSV instead."
+        );
+
+        GUIhelper.installHelpTooltip(
+                helpInstanceDataFiles,
+                "Instance data files (.xml) to validate, or ZIP archives of them; archives inside an archive are read too. " +
+                        "All selected files are merged into one dataset, so references between them (for example from SSH to EQ, or to the boundary set) resolve.\n\n" +
+                        "Only used by the \"Validate selected files together\" workflow."
         );
 
         GUIhelper.installHelpTooltip(
@@ -442,7 +490,8 @@ public class ValidationByMappingController {
                 helpModelsInputFolder,
                 "For normal mapping, select the models root folder.\n\n" +
                         "For timestamped mapping, select the root folder containing timestamped XML or ZIP files.\n\n" +
-                        "For manual selection, this is the parent folder that is searched for model archives to validate."
+                        "For manual selection, this is the parent folder that is searched for model archives to validate.\n\n" +
+                        "Not used by \"Validate selected files together\", which validates the instance data files you select."
         );
 
         GUIhelper.installHelpTooltip(
@@ -460,7 +509,8 @@ public class ValidationByMappingController {
 
         GUIhelper.installHelpTooltip(
                 helpOutputFolder,
-                "Folder where validation reports, timestamped summaries and generated ZIP files will be written."
+                "Folder where validation reports, timestamped summaries and generated ZIP files will be written.\n\n" +
+                        "\"Validate selected files together\" writes its one Excel report here, and its Turtle report if selected."
         );
 
         GUIhelper.installHelpTooltip(
@@ -473,7 +523,7 @@ public class ValidationByMappingController {
                         "CGMES 2.4 / NC 2.2 uses the CIM16 / CGMES 2.4 / NC 2.2 datatype map.\n\n" +
                         "Other reveals a Browse button for a .properties datatype map of your own, in the same " +
                         "format as the bundled ones.\n\n" +
-                        "Used by all three workflows, the manual selection one included."
+                        "Used by every workflow, the manual selection one included."
         );
 
         GUIhelper.installHelpTooltip(
@@ -518,11 +568,13 @@ public class ValidationByMappingController {
                         "to half those limits because every worker is a Python process with another " +
                         "in-memory graph. Select a number explicitly to override Auto.\n\n" +
                         "Increase gradually while observing memory use; selecting every available " +
-                        "core may exhaust memory before it improves throughput.");
+                        "core may exhaust memory before it improves throughput.\n\n" +
+                        "\"Validate selected files together\" validates a single dataset: its workers share that " +
+                        "one graph and check its shapes in parallel, and Auto uses all but one processor.");
         GUIhelper.installHelpTooltip(
                 helpLimitValidationResults,
                 "When selected, CimPal retains at most 10 findings for each source shape, counting "
-                        + "violations, warnings and information results alike. The mapping workflows stop "
+                        + "violations, warnings and information results alike. The mapping and combined workflows stop "
                         + "Jena after that limit and mark affected validations as Partial, because checks "
                         + "after the limit were not run. The manual-selection workflow applies the same "
                         + "cap to its exported findings while retaining its complete pass/fail rule check.\n\n"
@@ -588,16 +640,17 @@ public class ValidationByMappingController {
     }
 
     /**
-     * Selects the constraint files for the manual workflow. Multi-select: the field shows the
-     * joined list and is not restored on restart, but the chooser reopens where it was last
-     * used. Keeps the SHACL tester's path-memory key so that folder survives the tab merge.
+     * Selects the constraint files for the manual and combined workflows; the combined one also
+     * reads ZIP archives of them. Multi-select: the field shows the joined list and is not
+     * restored on restart, but the chooser reopens where it was last used. Keeps the SHACL
+     * tester's path-memory key so that folder survives the tab merge.
      */
     @FXML
     private void actionBrowseShaclConstraintFiles() {
         List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
                 false,
                 "SHACL Constraints file",
-                List.of("*.ttl", "*.rdf"),
+                isCombinedWorkflow() ? List.of("*.ttl", "*.rdf", "*.zip") : List.of("*.ttl", "*.rdf"),
                 "",
                 "tab.shaclTester.shaclFiles"
         );
@@ -607,15 +660,33 @@ public class ValidationByMappingController {
         }
 
         shaclConstraintFiles = selected;
+        tfShaclConstraintFiles.setText(joinPaths(selected));
+    }
 
-        StringBuilder paths = new StringBuilder();
-        for (File file : selected) {
-            if (!paths.isEmpty()) {
-                paths.append(", ");
-            }
-            paths.append(file.toString());
+    /**
+     * Selects the instance data files for the combined workflow: RDF/XML files or ZIP archives
+     * of them. Multi-select, and remembered the same way as the constraint files.
+     */
+    @FXML
+    private void actionBrowseInstanceDataFiles() {
+        List<File> selected = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(
+                false,
+                "Instance data files",
+                List.of("*.xml", "*.zip"),
+                "Select instance data files",
+                "tab.validationByMapping.instanceDataFiles"
+        );
+
+        if (selected == null || selected.isEmpty()) {
+            return;
         }
-        tfShaclConstraintFiles.setText(paths.toString());
+
+        instanceDataFiles = selected;
+        tfInstanceDataFiles.setText(joinPaths(selected));
+    }
+
+    private static String joinPaths(List<File> files) {
+        return files.stream().map(File::toString).collect(Collectors.joining(", "));
     }
 
     @FXML
@@ -760,6 +831,7 @@ public class ValidationByMappingController {
         previousComparisonCsvFile = null;
         datatypeMapFile = null;
         shaclConstraintFiles = null;
+        instanceDataFiles = null;
 
         tfMappingCsvFile.clear();
         tfModelsInputFolder.clear();
@@ -768,6 +840,10 @@ public class ValidationByMappingController {
 
         if (tfShaclConstraintFiles != null) {
             tfShaclConstraintFiles.clear();
+        }
+
+        if (tfInstanceDataFiles != null) {
+            tfInstanceDataFiles.clear();
         }
 
         if (tfPreviousComparisonCsv != null) {
@@ -802,6 +878,11 @@ public class ValidationByMappingController {
 
         if (isManualWorkflow()) {
             runManualValidation();
+            return;
+        }
+
+        if (isCombinedWorkflow()) {
+            runCombinedValidation();
             return;
         }
 
@@ -996,6 +1077,111 @@ public class ValidationByMappingController {
         }, "manual-shacl-validation-runner").start();
     }
 
+    /**
+     * Runs the combined workflow: merges the selected instance data files into one dataset,
+     * validates it against all the selected constraint files at once, and writes one workbook in
+     * the mapping report's layout, with a validation row for each constraint file.
+     */
+    private void runCombinedValidation() {
+        List<Path> shapeFiles = shaclConstraintFiles.stream().map(File::toPath).toList();
+        List<Path> dataFiles = instanceDataFiles.stream().map(File::toPath).toList();
+        Path selectedOutputFolder = outputFolder.toPath();
+        DatatypeMapSource datatypeMapSource = getDatatypeMapSource();
+        String xmlBase = getBaseUri();
+        ValidationEngine validationEngine = cbValidationEngine == null
+                ? ValidationEngine.APACHE_JENA : cbValidationEngine.getValue();
+        // One dataset: the workers check its shapes in parallel on the one shared graph.
+        int workers = selectedWorkerCount();
+        int maxResultsPerConstraint = cbLimitValidationResults != null
+                && cbLimitValidationResults.isSelected() ? 10 : 0;
+        boolean exportTurtleReport = cbExportReportsTurtle != null && cbExportReportsTurtle.isSelected();
+
+        btnRunValidationByMapping.setDisable(true);
+        setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        new Thread(() -> {
+            try {
+                ValidationTools.startValidationDebugRun("combined SHACL validation shapeFiles=" + shapeFiles.size()
+                        + " dataFiles=" + dataFiles.size() + " engine=" + validationEngine
+                        + " workers=" + workers + " resultLimit=" + maxResultsPerConstraint);
+                // As at the start of a mapping run: re-read remote imports instead of reusing earlier fetches.
+                ValidationTools.clearRemoteCaches();
+
+                SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                        .shapeFiles(shapeFiles)
+                        .dataFiles(dataFiles)
+                        .datatypeMap(datatypeMapSource.load())
+                        .xmlBase(xmlBase)
+                        .engine(validationEngine)
+                        .maxResultsPerConstraint(maxResultsPerConstraint)
+                        .workers(workers)
+                        .build()).validate();
+
+                Path workbook = report.writeExcelTo(selectedOutputFolder);
+                System.out.println("Report saved to: " + workbook);
+                if (exportTurtleReport) {
+                    Path turtle = workbook.resolveSibling(
+                            workbook.getFileName().toString().replaceFirst("\\.xlsx$", ".ttl"));
+                    report.writeTurtle(turtle);
+                    System.out.println("Turtle report saved to: " + turtle);
+                }
+                report.getWarnings().forEach(warning -> System.out.println("[WARN] " + warning));
+
+                String outcome = describeOutcome(report) + describeWarnings(report);
+                Platform.runLater(() -> {
+                    setProgress(1);
+                    btnRunValidationByMapping.setDisable(false);
+                    GUIhelper.showInfo("Validation finished", outcome + "\n\nReport saved to:\n" + workbook);
+                });
+
+            } catch (OutOfMemoryError ex) {
+                LOG.error("Combined SHACL validation ran out of memory", ex);
+                reportCombinedFailure("Not enough memory",
+                        "CimPal ran out of memory validating the selected files. Select fewer or smaller "
+                                + "files, or start CimPal with a larger Java heap (-Xmx).");
+
+            } catch (StackOverflowError ex) {
+                // Jena's parsers recurse, so an input nested deeply enough exhausts the stack.
+                LOG.error("Combined SHACL validation overflowed the stack", ex);
+                reportCombinedFailure("Validation failed", "An input file is nested too deeply to be read.");
+
+            } catch (Throwable ex) {
+                // Errors as well as exceptions end here rather than in the application's handler,
+                // which would report them but leave Run disabled.
+                LOG.error("Combined SHACL validation failed", ex);
+                reportCombinedFailure("Validation failed",
+                        ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
+            }
+        }, "combined-shacl-validation-runner").start();
+    }
+
+    /** Ends a failed combined run: shows why, and enables Run again. */
+    private void reportCombinedFailure(String title, String message) {
+        Platform.runLater(() -> {
+            resetProgress();
+            btnRunValidationByMapping.setDisable(false);
+            GUIhelper.showError(title, message);
+        });
+    }
+
+    /** The report's warnings as a paragraph of the finish dialog; they also go to the Output pane. */
+    private static String describeWarnings(SHACLValidationReport report) {
+        return report.getWarnings().isEmpty() ? ""
+                : "\n\nWarnings:\n- " + String.join("\n- ", report.getWarnings());
+    }
+
+    /** One line for the finish dialog, for example {@code 12 result(s): 10 Violation, 2 Warning}. */
+    private static String describeOutcome(SHACLValidationReport report) {
+        if (report.conforms()) {
+            return "The data conforms to all selected constraint files.";
+        }
+        String counts = report.countBySeverity().entrySet().stream()
+                .map(count -> count.getValue() + " " + count.getKey())
+                .collect(Collectors.joining(", "));
+        return report.getResults().size() + " result(s): " + counts
+                + (report.isPartial() ? "\nSample validation: stopped after 10 results per shape." : "");
+    }
+
     private boolean validateInputs() {
         if (cbValidationWorkflow.getSelectionModel().getSelectedItem() == null) {
             GUIhelper.showWarning("Missing workflow", "Please select a validation workflow.");
@@ -1006,12 +1192,44 @@ public class ValidationByMappingController {
             return false;
         }
 
+        // The combined workflow reads the constraint files, the data files, the output folder and
+        // the datatype map and base URI checked above.
+        if (isCombinedWorkflow()) {
+            if (shaclConstraintFiles == null || shaclConstraintFiles.isEmpty()) {
+                GUIhelper.showWarning("Missing constraint files",
+                        "Please select one or more SHACL constraint files (.ttl) or ZIP archives of them.");
+                return false;
+            }
+
+            if (instanceDataFiles == null || instanceDataFiles.isEmpty()) {
+                GUIhelper.showWarning("Missing instance data files",
+                        "Please select one or more instance data files (.xml) or ZIP archives of them.");
+                return false;
+            }
+
+            if (outputFolder == null) {
+                GUIhelper.showWarning("Missing output folder", "Please select the output folder.");
+                return false;
+            }
+
+            return true;
+        }
+
         // The manual workflow reads the constraint files, the models root folder and - like the
-        // other two - the datatype map and base URI checked above.
+        // others - the datatype map and base URI checked above.
         if (isManualWorkflow()) {
             if (shaclConstraintFiles == null || shaclConstraintFiles.isEmpty()) {
                 GUIhelper.showWarning("Missing constraint files",
                         "Please select one or more SHACL constraint files (.ttl).");
+                return false;
+            }
+
+            // Files picked for the combined workflow may include ZIPs, which this one cannot read.
+            if (shaclConstraintFiles.stream().anyMatch(file ->
+                    file.getName().toLowerCase(Locale.ROOT).endsWith(".zip"))) {
+                GUIhelper.showWarning("ZIP archives not supported",
+                        "\"" + WORKFLOW_MANUAL + "\" reads .ttl constraint files only. Select the files "
+                                + "themselves, or use \"" + WORKFLOW_COMBINED + "\" for ZIP archives.");
                 return false;
             }
 
@@ -1052,7 +1270,7 @@ public class ValidationByMappingController {
         return true;
     }
 
-    /** Shared by all three workflows: every one of them loads its models through the map. */
+    /** Shared by every workflow: each of them loads its models through the map. */
     private boolean validateDatatypeMap() {
         if (cbDatatypeMap.getSelectionModel().getSelectedItem() == null) {
             GUIhelper.showWarning("Missing datatype map", "Please select a datatype map.");
@@ -1088,6 +1306,12 @@ public class ValidationByMappingController {
 
     private boolean isManualWorkflow() {
         return WORKFLOW_MANUAL.equals(
+                cbValidationWorkflow.getSelectionModel().getSelectedItem()
+        );
+    }
+
+    private boolean isCombinedWorkflow() {
+        return WORKFLOW_COMBINED.equals(
                 cbValidationWorkflow.getSelectionModel().getSelectedItem()
         );
     }
@@ -1146,15 +1370,24 @@ public class ValidationByMappingController {
         return null;
     }
 
-    private int getThreadCount(boolean timestampedWorkflow, ValidationEngine engine) {
+    /** The worker count picked in the dropdown, or 0 for Auto. */
+    private int selectedWorkerCount() {
         String selection = cbValidationWorkers == null ? "Auto (memory-aware)" : cbValidationWorkers.getValue();
         if (selection != null && !selection.startsWith("Auto")) {
             try {
                 return Math.clamp(Integer.parseInt(selection), 1,
                         Math.max(1, Runtime.getRuntime().availableProcessors() - 1));
             } catch (NumberFormatException ignored) {
-                // Fall through to the resource-aware default.
+                // Treated as Auto.
             }
+        }
+        return 0;
+    }
+
+    private int getThreadCount(boolean timestampedWorkflow, ValidationEngine engine) {
+        int selected = selectedWorkerCount();
+        if (selected > 0) {
+            return selected;
         }
 
         // The core timestamped workflow needs to distinguish Auto from a user-selected worker

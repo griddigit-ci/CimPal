@@ -374,6 +374,11 @@ public class ModelFactory {
             this.maxEntryBytes = maxEntryBytes;
         }
 
+        /** The default entry limit, and at most {@code maxTotalBytes} in all and in any one entry. */
+        static ZipBudget withTotalLimit(long maxTotalBytes) {
+            return new ZipBudget(MAX_ZIP_ENTRIES, maxTotalBytes, Math.min(maxTotalBytes, MAX_ZIP_ENTRY_BYTES));
+        }
+
         /** Counts one more entry. */
         void enterEntry() throws IOException {
             if (entries.incrementAndGet() > maxEntries) {
@@ -427,6 +432,116 @@ public class ModelFactory {
             enterEntry();
             return limit(in).readAllBytes();
         }
+    }
+
+    /** Receives one file entry of an archive walked by {@link #forEachZipEntry(Path, ZipEntryConsumer)}. */
+    @FunctionalInterface
+    interface ZipEntryConsumer {
+        /**
+         * @param name the entry's path in the archive, normalised to {@code /} separators. An entry
+         *             of a nested archive is named {@code <nested archive's name>/<entry>}.
+         * @param in   the entry's content, read within the archive's limits. The consumer may leave
+         *             it unread; closing it leaves the archive open.
+         */
+        void accept(String name, InputStream in) throws IOException;
+    }
+
+    /**
+     * Streams every file entry of {@code zip} to {@code consumer}, nested archives included, within
+     * the same limits as {@link #unzip(File)}: one {@link ZipBudget} for the archive and the archives
+     * inside it, and at most {@code MAX_ZIP_NESTING_DEPTH} levels of nesting. Entries are read in
+     * place and never written to disk.
+     *
+     * @throws IOException if the archive cannot be read, exceeds a limit, or has an entry whose
+     *                     path is absolute or climbs out of the archive
+     */
+    static void forEachZipEntry(Path zip, ZipEntryConsumer consumer) throws IOException {
+        forEachZipEntry(zip, new ZipBudget(), consumer);
+    }
+
+    /** {@link #forEachZipEntry(Path, ZipEntryConsumer)} with a given budget (tests use small limits). */
+    static void forEachZipEntry(Path zip, ZipBudget budget, ZipEntryConsumer consumer) throws IOException {
+        try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                budget.enterEntry();
+                try (InputStream in = zipFile.getInputStream(entry)) {
+                    acceptZipEntry(safeZipEntryName(entry.getName()), budget.limit(in), budget, 0, consumer);
+                }
+            }
+        }
+    }
+
+    private static void acceptZipEntry(String name, InputStream in, ZipBudget budget, int depth,
+                                       ZipEntryConsumer consumer) throws IOException {
+        if (!"zip".equalsIgnoreCase(FilenameUtils.getExtension(name))) {
+            consumer.accept(name, in);
+            return;
+        }
+        if (depth >= MAX_ZIP_NESTING_DEPTH) {
+            throw new IOException("Archive nesting exceeds the depth limit (" + MAX_ZIP_NESTING_DEPTH + ")");
+        }
+        // Closing the nested stream releases its inflater; the budget's wrapper keeps `in` open.
+        try (ZipInputStream nested = new ZipInputStream(in)) {
+            ZipEntry entry;
+            while ((entry = nested.getNextEntry()) != null) {
+                InputStream limited = budget.limit(nested);
+                if (!entry.isDirectory()) {
+                    budget.enterEntry();
+                    acceptZipEntry(name + "/" + safeZipEntryName(entry.getName()), limited, budget, depth + 1,
+                            consumer);
+                }
+                // Moving to the next entry inflates whatever is left of this one, read or not. Read it
+                // here, through the budget, so a bomb in an entry nobody reads still trips the limits.
+                drain(limited);
+            }
+        }
+    }
+
+    private static void drain(InputStream in) throws IOException {
+        byte[] buffer = new byte[8192];
+        while (in.read(buffer) != -1) {
+            // discarded: only the budget's count matters
+        }
+    }
+
+    /**
+     * Normalises an entry name to {@code /}-separated segments without {@code .} or empty ones.
+     * A name that is absolute, has a drive letter or stream suffix, or climbs out of the archive
+     * with {@code ..} is refused: consumers may use the name as a path inside the archive. So is
+     * one with control characters, which would forge lines in the logs that quote it.
+     */
+    static String safeZipEntryName(String rawName) throws IOException {
+        String name = rawName.replace('\\', '/');
+        if (name.startsWith("/") || name.indexOf(':') >= 0 || LogSanitizer.hasUnsafeCharacters(name)) {
+            throw unsafeZipEntryName(rawName);
+        }
+        Deque<String> segments = new ArrayDeque<>();
+        for (String segment : name.split("/")) {
+            if (segment.isEmpty() || segment.equals(".")) {
+                continue;
+            }
+            if (segment.equals("..")) {
+                if (segments.isEmpty()) {
+                    throw unsafeZipEntryName(rawName);
+                }
+                segments.removeLast();
+            } else {
+                segments.addLast(segment);
+            }
+        }
+        if (segments.isEmpty()) {
+            throw unsafeZipEntryName(rawName);
+        }
+        return String.join("/", segments);
+    }
+
+    private static IOException unsafeZipEntryName(String rawName) {
+        return new IOException("Unsafe ZIP entry path: " + LogSanitizer.forLog(rawName));
     }
 
     public static List<InputStream> unzip(File selectedFile) {
