@@ -14,6 +14,7 @@ module CimPal.Core {
     exports eu.griddigit.cimpal.core.generators;
     exports eu.griddigit.cimpal.core.kgcl;
     exports eu.griddigit.cimpal.core.diffexport;
+    exports eu.griddigit.cimpal.core.stats;
 
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
@@ -27,6 +28,8 @@ module CimPal.Core {
     requires java.prefs;
     requires java.xml;
     requires java.net.http;
+    requires java.management;
+    requires jdk.management;
     requires org.apache.commons.lang3;
     requires commons.math3;
 }

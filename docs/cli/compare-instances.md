@@ -50,6 +50,7 @@ java -jar CimPal-CLI.jar compare-instances ^
 | `--ignore-dl` | flag | off | Ignore differences in DL (diagram layout) profile objects. |
 | `--output` | file path | — | Write results to a file. Use `.xlsx` for Excel; any other extension for CSV. If omitted, results go to stdout. |
 | `--format` | `text` / `json` / `csv` | `text` | Output format for stdout. Ignored when `--output` is set. |
+| `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 | `--dry-run` | flag | off | Print resolved config and exit without comparing. |
 
 ---
@@ -90,7 +91,7 @@ Same format options as the `compare` command:
 | 0 | Model sets are identical |
 | 1 | Differences found |
 | 2 | Bad input (file not found, no files specified) |
-| 3 | Internal error |
+| 3 | Internal error; out of memory included (one `[ERROR] Out of memory` line on stderr; see [resource statistics](README.md#resource-statistics---stats)) |
 
 ---
 

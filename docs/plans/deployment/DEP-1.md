@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (on top of CI-3; CI run pending) |
+| Status | Done ([PR #52](https://github.com/griddigit-ci/CimPal/pull/52)) |
 | Phase | D0 |
 | Depends on | CI-1 |
 | Size | S–M |
@@ -39,7 +39,7 @@ CI-3 ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) had already deli
 - [x] `serve` usable in the container with `--host 0.0.0.0 --allow-remote`, `CIMPAL_API_TOKEN` and `/data` as default root; no `HEALTHCHECK` *(CI-3, after SEC-1/SEC-2)*. Read-only root filesystem works because no token file is written when the token comes from the environment.
 - [x] OCI labels: version (`CIMPAL_VERSION` build argument), revision (`GIT_SHA`), source URL, licence *(source and licence: CI-3)*
 - [x] *(changed)* Image size reported: about 516 MB (base 433 MB, JAR 46 MB, from CI-3's measurement). The < 350 MB target is dropped for now; see the decisions log.
-- [ ] CI Ubuntu leg builds the image and runs `--help`/`--version`, a `validate` on a synthetic fixture (exit 1 with JSON on stdout), and `serve` + `GET /health`, with `--read-only --tmpfs /tmp` *(changed: the "Docker image" job of CI-3, not the Ubuntu `verify` leg; open until that job is green on GitHub with the new checks)*
+- [x] CI Ubuntu leg builds the image and runs `--help`/`--version`, a `validate` on a synthetic fixture (exit 1 with JSON on stdout), and `serve` + `GET /health`, with `--read-only --tmpfs /tmp` *(changed: the "Docker image" job of CI-3, not the Ubuntu `verify` leg; green on PR #52: 61 of 61 smoke checks)*
 - [x] *(changed)* Shell smoke test, skipped where Docker is absent: `scripts/Test-DockerImage.ps1` (PowerShell, CI-3), run only by the "Docker image" CI job, so `mvn verify` doesn't need Docker
 - [x] `docs/cli/docker.md`: run, volumes, memory/CPU flags, `JAVA_OPTS`, read-only root filesystem, serve mode, Windows paths, building locally *(run, volumes, serve, Windows paths: CI-3)*
 

@@ -50,8 +50,10 @@ Test-DockerImage.ps1
 Smoke-tests a CimPal CLI Docker image (PowerShell 7, Docker running). Build the image first:
 
     mvn -B -pl CimPal-CLI -am package -DskipTests
-    docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev .
+    docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev --build-arg CIMPAL_VERSION=<cimpal.version> --build-arg GIT_SHA=$(git rev-parse HEAD) .
     ./scripts/Test-DockerImage.ps1 -Image cimpal:dev
+
+Without the two build arguments the version label check fails (docs/cli/docker.md has the full commands).
 
 It checks:
 - the version and the numeric non-root user;
@@ -67,3 +69,10 @@ It exits 1 if any check failed. The "Docker image" job in `ci.yml` and the relea
 Flags
 - -Image <name>           : the image to test (required).
 - -ExpectedVersion <ver>  : the version the CLI must report (default: `<cimpal.version>` from the root pom.xml).
+
+bench/ (Python 3.10+, standard library only)
+
+Benchmark of `validate` by model size (DEP-2): `gen_models.py` writes synthetic CGMES-like models with a known triple count and known violations, and `run_bench.py` runs `validate --stats` over them with different heaps and core counts and writes `results.csv` and `summary.md`. The sizing guide (docs/guide/sizing.md) is built from it, and `--budget` checks time and heap budgets for nightly runs. See bench/README.md.
+
+    python scripts/bench/run_bench.py --sizes 100k --verify --no-matrix
+    python -m unittest discover -s scripts/bench -p "test_*.py"

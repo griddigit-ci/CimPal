@@ -31,6 +31,7 @@
 |---|---|
 | [ci-pipeline](ci-pipeline.md) | Complete command collection for a CI validation run, with placeholder notes |
 | [shape-dev-loop](shape-dev-loop.md) | Fast loop for writing and testing SHACL shapes |
+| [sizing guide](../guide/sizing.md) | Heap, cores and time by model size, measured with `--stats` ([resource statistics](README.md#resource-statistics---stats)) and `scripts/bench/` |
 
 ## Config templates
 

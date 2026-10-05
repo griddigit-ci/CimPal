@@ -10,6 +10,7 @@ import eu.griddigit.cimpal.core.utils.PathPolicy;
 import eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback;
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.stats.RunStats;
 import eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
 import eu.griddigit.cimpal.core.utils.MappingValidator;
@@ -148,6 +149,14 @@ public class ValidateCommand implements Callable<Integer> {
             description = "For timestamped validation, reuse unaffected Jena focus-node findings between consecutive timestamps.")
     private boolean incrementalTimestamps;
 
+    @Option(names = "--stats",
+            description = "Report the run's resource use (wall/CPU time, peak heap, GC, triples loaded): "
+                    + "a \"stats\" field in the JSON output, otherwise a [STATS] line on stderr.")
+    private Boolean stats;
+
+    /** The collector when {@code --stats} is on, otherwise null. */
+    private RunStats runStats;
+
     @Option(names = "--dry-run",
             description = "Print the resolved configuration and exit without running validation.")
     private boolean dryRun;
@@ -164,6 +173,7 @@ public class ValidateCommand implements Callable<Integer> {
 
             // 2. Apply defaults for anything still unset
             applyDefaults();
+            runStats = StatsJson.startIf(stats);
 
             // 3. Dry-run: print resolved config and exit
             if (dryRun) {
@@ -269,6 +279,10 @@ public class ValidateCommand implements Callable<Integer> {
         if (samples == null) {
             JsonNode n = root.path("samples");
             if (!n.isMissingNode() && !n.isNull()) samples = n.asInt(3);
+        }
+        if (stats == null) {
+            JsonNode n = root.path("stats");
+            if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
         if (previousComparison == null) {
             String v = root.path("previousComparison").asText(null);
@@ -477,13 +491,19 @@ public class ValidateCommand implements Callable<Integer> {
                 .maxResultsPerConstraint(maxResults)
                 .threads(workers)
                 .exportTurtleReports(exportTurtleForRun)
+                .runStats(runStats)
                 .build();
 
-        MappingValidationSummary summary = new MappingValidator(options).validate();
+        MappingValidationSummary summary;
+        try (StatsJson.Span ignored = StatsJson.phase(runStats, "validate")) {
+            summary = new MappingValidator(options).validate();
+        }
 
         List<ShapeGroup> shapeGroups = List.of();
         if (needShapeDetail && outputDir != null && outputDir.exists()) {
-            shapeGroups = extractShapeGroups(outputDir.toPath(), samples);
+            try (StatsJson.Span ignored = StatsJson.phase(runStats, "shapeDetail")) {
+                shapeGroups = extractShapeGroups(outputDir.toPath(), samples);
+            }
         }
 
         if (jsonOutput) {
@@ -491,6 +511,7 @@ public class ValidateCommand implements Callable<Integer> {
             System.out.println(buildMappingJson(summary, shapeGroups));
         } else {
             printTextSummary(summary);
+            StatsJson.toStderr(runStats);
         }
 
         return summary.hasViolations() ? ExitCode.VIOLATIONS : ExitCode.OK;
@@ -516,18 +537,23 @@ public class ValidateCommand implements Callable<Integer> {
                 .maxResultsPerConstraint(maxResults)
                 .threads(workers)
                 .exportTurtleReports(Boolean.TRUE.equals(exportTurtle))
-                .incrementalTimestampValidation(incrementalTimestamps);
+                .incrementalTimestampValidation(incrementalTimestamps)
+                .runStats(runStats);
         if (prevPath != null) {
             optionsBuilder.previousComparisonCsv(prevPath);
         }
 
-        MappingValidationSummary summary = new MappingValidator(optionsBuilder.build()).validate();
+        MappingValidationSummary summary;
+        try (StatsJson.Span ignored = StatsJson.phase(runStats, "validate")) {
+            summary = new MappingValidator(optionsBuilder.build()).validate();
+        }
 
         if (jsonOutput) {
             System.setOut(origOut);
             System.out.println(buildTimestampedJson(summary));
         } else {
             printTextSummaryTimestamped(summary);
+            StatsJson.toStderr(runStats);
         }
 
         return summary.hasViolations() ? ExitCode.VIOLATIONS : ExitCode.OK;
@@ -558,13 +584,17 @@ public class ValidateCommand implements Callable<Integer> {
         tester.setDatatypeMapping(dataTypeMap, xmlBase);
         tester.setValidationOptions(workers > 0 ? workers : Runtime.getRuntime().availableProcessors(), maxResults);
 
-        tester.runTestsInternal(
-                shaclFiles,
-                modelsDir,
-                modelFiles,
-                false,
-                Boolean.TRUE.equals(exportTurtle)
-        );
+        try (StatsJson.Span ignored = StatsJson.phase(runStats, "validate")) {
+            tester.runTestsInternal(
+                    shaclFiles,
+                    modelsDir,
+                    modelFiles,
+                    false,
+                    Boolean.TRUE.equals(exportTurtle)
+            );
+        }
+        // No structured summary here, so the statistics always go to stderr (without triples).
+        StatsJson.toStderr(runStats);
 
         // Manual workflow does not produce a structured summary; return OK
         return ExitCode.OK;
@@ -654,7 +684,8 @@ public class ValidateCommand implements Callable<Integer> {
         if (!shapeGroups.isEmpty()) {
             sb.append("  \"shapes\": ").append(buildShapeGroupsJson(shapeGroups)).append(",\n");
         }
-        sb.append("  \"report\": ").append(jsonStr(summary.reports().get(0).toAbsolutePath().toString())).append("\n");
+        sb.append("  \"report\": ").append(jsonStr(summary.reports().get(0).toAbsolutePath().toString()))
+                .append(StatsJson.field(runStats, "\n  ")).append("\n");
         sb.append("}");
         return sb.toString();
     }
@@ -687,7 +718,7 @@ public class ValidateCommand implements Callable<Integer> {
             sb.append(jsonStr(reports.get(i).toAbsolutePath().toString()));
             if (i < reports.size() - 1) sb.append(", ");
         }
-        sb.append("]\n");
+        sb.append("]").append(StatsJson.field(runStats, "\n  ")).append("\n");
         sb.append("}");
         return sb.toString();
     }

@@ -6,6 +6,7 @@
 package eu.griddigit.CimPal.cli;
 
 import eu.griddigit.CimPal.cli.command.CompareCommand;
+import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
 import eu.griddigit.cimpal.core.utils.SparqlServicePolicy;
 import eu.griddigit.CimPal.cli.command.CompareInstancesCommand;
 import eu.griddigit.CimPal.cli.command.ConvertCommand;
@@ -86,7 +87,15 @@ public class CimPalCli {
     public static void main(String[] args) {
         // No SPARQL SERVICE: user queries and SHACL-SPARQL shapes must not reach the network (SEC-2).
         SparqlServicePolicy.disableRemoteServiceGlobally();
-        int exitCode = new CommandLine(new CimPalCli()).execute(args);
+        int exitCode;
+        try {
+            exitCode = rethrowingOutOfMemory(new CommandLine(new CimPalCli())).execute(args);
+        } catch (Throwable t) {
+            if (OutOfMemoryRethrow.find(t).isPresent()) {
+                outOfMemoryExit();
+            }
+            throw t;
+        }
         System.exit(exitCode);
     }
 
@@ -96,6 +105,33 @@ public class CimPalCli {
      * request data can't pull extra arguments (e.g. another subcommand) in from a file.
      */
     public static CommandLine inProcess() {
-        return new CommandLine(new CimPalCli()).setExpandAtFiles(false);
+        return rethrowingOutOfMemory(new CommandLine(new CimPalCli()).setExpandAtFiles(false));
     }
+
+    /**
+     * Lets an {@link OutOfMemoryError} out of picocli, which would otherwise report it like any
+     * other failure, as exit code 1: the same as "violations found" (DEP-2, R2).
+     */
+    private static CommandLine rethrowingOutOfMemory(CommandLine cli) {
+        CommandLine.IExecutionExceptionHandler fallback = cli.getExecutionExceptionHandler();
+        return cli.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
+            OutOfMemoryRethrow.ifCause(ex);
+            return fallback.handleExecutionException(ex, commandLine, parseResult);
+        });
+    }
+
+    /**
+     * Ends the JVM with exit code 3 after an out-of-memory error. The message is built before it
+     * is needed, and {@code halt} skips the shutdown hooks, because both could need memory there
+     * is none of.
+     */
+    private static void outOfMemoryExit() {
+        System.err.println(OUT_OF_MEMORY_MESSAGE);
+        System.err.flush();
+        Runtime.getRuntime().halt(ExitCode.INTERNAL_ERROR);
+    }
+
+    private static final String OUT_OF_MEMORY_MESSAGE = "[ERROR] Out of memory (max heap "
+            + (Runtime.getRuntime().maxMemory() >> 20) + " MB). Give the JVM more memory (-Xmx, or the"
+            + " container's memory limit); see docs/guide/sizing.md for sizes by model.";
 }
