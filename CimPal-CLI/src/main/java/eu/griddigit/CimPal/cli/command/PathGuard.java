@@ -57,7 +57,6 @@ final class PathGuard {
                     new Field("modelsDir", "--models", Kind.READ),
                     new Field("constraintsRoot", "--constraints-root", Kind.READ),
                     new Field("outputDir", "--output", Kind.WRITE_DIR),
-                    new Field("shaclConstraintFiles", "--shacl-files", Kind.READ),
                     new Field("datatypeMap", "--datatype-map", Kind.READ_IF_EXISTS),
                     new Field("previousComparison", "--previous-comparison", Kind.READ))),
             Map.entry("sparql", List.of(

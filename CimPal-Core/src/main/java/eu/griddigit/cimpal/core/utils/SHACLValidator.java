@@ -142,17 +142,33 @@ public class SHACLValidator {
                 : Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
     }
 
+    private LoadedShapes loadShapes(List<String> warnings) throws IOException {
+        return loadShapes(options.getShapeFiles(), options.getConstraintsRoot(), options.getShapesModel(), warnings);
+    }
+
+    /**
+     * Loads shape files exactly as {@link #validate()} does, for a caller that validates many
+     * datasets against the same shapes and passes the result to {@code shapesModel(...)} each time
+     * instead of reading the files again for every dataset.
+     *
+     * @param constraintsRoot extra folder for relative {@code owl:imports}; null means the first
+     *                        file's folder
+     * @throws IOException if a file cannot be read or an {@code owl:imports} cannot be resolved
+     */
+    static Model loadShapeFiles(List<Path> files, Path constraintsRoot, List<String> warnings) throws IOException {
+        return loadShapes(files, constraintsRoot, null, warnings).model();
+    }
+
     /**
      * Loads the shape files, and the {@code .ttl} and {@code .rdf} entries of the ZIP archives among
-     * them, as one owl:imports closure, and unions it with the supplied shapes model.
+     * them, as one owl:imports closure, and unions it with {@code shapesModel}.
      */
-    private LoadedShapes loadShapes(List<String> warnings) throws IOException {
-        List<Path> files = options.getShapeFiles();
+    private static LoadedShapes loadShapes(List<Path> files, Path constraintsRoot, Model shapesModel,
+                                           List<String> warnings) throws IOException {
         if (files.isEmpty()) {
-            return new LoadedShapes(options.getShapesModel(), List.of());
+            return new LoadedShapes(shapesModel, List.of());
         }
 
-        Path constraintsRoot = options.getConstraintsRoot();
         if (constraintsRoot == null) {
             constraintsRoot = files.getFirst().toAbsolutePath().normalize().getParent();
         }
@@ -177,9 +193,9 @@ public class SHACLValidator {
         ValidationTools.LoadShapesResult loaded = ValidationTools.loadShapesWithImports(roots, constraintsRoot,
                 new HashMap<>(), (source, document) -> documents.add(new ShapeDocument(source, document)));
         Model combined = loaded.model();
-        if (options.getShapesModel() != null) {
-            combined.add(options.getShapesModel());
-            combined.withDefaultMappings(options.getShapesModel());
+        if (shapesModel != null) {
+            combined.add(shapesModel);
+            combined.withDefaultMappings(shapesModel);
         }
 
         if (loaded.unresolvableImports() > 0) {

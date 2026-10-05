@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!--
+  The fourth section of the Constraints Operations tab, included into its Accordion. A file of its
+  own with its own controller: it tests the rules of a constraint set against models, which shares
+  nothing with the three Excel routines beside it.
+-->
+<TitledPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.ShaclRuleTestController"
+            animated="false"
+            text="Test SHACL rules against Conform / NonConform models">
+    <VBox spacing="8.0">
+        <Label wrapText="true" styleClass="caption-text"
+               text="Checks that each rule fires on the models that must break it and on none of the models that must pass it. The test suite folder holds a folder per rule, named after the rule's sh:name, with a Conform and a NonConform folder of model archives (.zip) inside."/>
+
+        <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+            <columnConstraints>
+                <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0" />
+                <ColumnConstraints hgrow="ALWAYS" minWidth="0.0" />
+                <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0" />
+            </columnConstraints>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                <Label text="SHACL constraint files:" wrapText="true" />
+                <Label fx:id="helpRuleTestShapeFiles" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfRuleTestShapeFiles" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Select the constraint files (.ttl, .rdf) or ZIP archives of them"
+                       GridPane.rowIndex="0" GridPane.columnIndex="1" />
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseRuleTestShapeFiles" text="Browse"
+                    GridPane.rowIndex="0" GridPane.columnIndex="2" />
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                <Label text="Test suite folder:" wrapText="true" />
+                <Label fx:id="helpRuleTestSuite" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfRuleTestSuite" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Select the folder holding a Conform / NonConform folder pair per rule"
+                       GridPane.rowIndex="1" GridPane.columnIndex="1" />
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseRuleTestSuite" text="Browse"
+                    GridPane.rowIndex="1" GridPane.columnIndex="2" />
+
+            <!-- As on the SHACL Validation tab: "Other" reveals the field and Browse button for a map file. -->
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
+                <Label text="Datatype map:" wrapText="true" />
+                <Label fx:id="helpRuleTestDatatypeMap" text="?" styleClass="help-badge"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <ChoiceBox fx:id="cbRuleTestDatatypeMap" prefWidth="350.0" />
+                <TextField fx:id="tfRuleTestDatatypeMapFile" editable="false" managed="false" minWidth="0.0"
+                           promptText="Select a .properties datatype map" visible="false" HBox.hgrow="ALWAYS" />
+                <Button fx:id="btnBrowseRuleTestDatatypeMapFile" managed="false" minWidth="95.0" mnemonicParsing="false"
+                        onAction="#actionBrowseRuleTestDatatypeMapFile" text="Browse" visible="false" />
+            </HBox>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="3" GridPane.columnIndex="0">
+                <Label text="Base URI:" wrapText="true" />
+                <Label fx:id="helpRuleTestBaseUri" text="?" styleClass="help-badge"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="3" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <ChoiceBox fx:id="cbRuleTestBaseUri" prefWidth="260.0" />
+                <TextField fx:id="tfRuleTestBaseUri" minWidth="0.0" HBox.hgrow="ALWAYS" />
+            </HBox>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="4" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                <CheckBox fx:id="cbRuleTestExcelReports" mnemonicParsing="false" selected="true"
+                          text="Save each model's validation report beside it (.xlsx)" />
+                <CheckBox fx:id="cbRuleTestTurtleReports" mnemonicParsing="false"
+                          text="Also as Turtle (.ttl)" />
+                <Label fx:id="helpRuleTestReports" text="?" styleClass="help-badge"/>
+            </HBox>
+        </GridPane>
+
+        <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionResetRuleTest" text="Reset" />
+            <Button fx:id="btnRunRuleTest" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false"
+                    onAction="#actionRunRuleTest" text="Run" />
+        </HBox>
+    </VBox>
+</TitledPane>

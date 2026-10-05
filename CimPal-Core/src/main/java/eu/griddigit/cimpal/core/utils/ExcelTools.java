@@ -6,12 +6,14 @@
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
+import org.apache.poi.ss.SpreadsheetVersion;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.*;
@@ -227,15 +229,43 @@ public class ExcelTools {
         };
     }
 
-    public static void exportSHACLValidationToExcel(List<SHACLValidationResult> validationResults, File selectedFolder, String fileName) {
+    /** Longest text a cell holds; POI refuses anything longer. */
+    static final int MAX_CELL_TEXT = SpreadsheetVersion.EXCEL2007.getMaxTextLength();
+
+    /**
+     * {@code value} as cell text: null becomes empty, and text longer than a cell holds is cut to
+     * fit, ending in an ellipsis, rather than refused. The cut never splits a surrogate pair.
+     */
+    static String cellText(String value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.length() <= MAX_CELL_TEXT) {
+            return value;
+        }
+        int end = MAX_CELL_TEXT - 1;
+        if (Character.isHighSurrogate(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(0, end) + "…";
+    }
+
+    /**
+     * Writes validation results as a one-sheet workbook, {@code fileName} in {@code selectedFolder}:
+     * the report the SHACL rule test writes beside each model. Text longer than a cell holds is
+     * cut to fit.
+     *
+     * @throws IOException if the folder does not exist or the workbook cannot be written
+     */
+    public static void exportSHACLValidationToExcel(List<SHACLValidationResult> validationResults, File selectedFolder, String fileName) throws IOException {
         if (selectedFolder == null || !selectedFolder.isDirectory()) {
-            System.err.println("Invalid directory: " + selectedFolder);
-            return;
+            throw new FileNotFoundException("Not a folder: " + selectedFolder);
         }
 
         File outputFile = new File(selectedFolder, fileName);
 
-        try (Workbook workbook = new XSSFWorkbook(); FileOutputStream fos = new FileOutputStream(outputFile)) {
+        // Built in memory before the file is opened, so a failure leaves no empty report behind.
+        try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("SHACL Report");
 
             // Create header row
@@ -251,13 +281,13 @@ public class ExcelTools {
             int rowNum = 1;
             for (SHACLValidationResult result : validationResults) {
                 Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(result.getFocusNode());
-                row.createCell(1).setCellValue(result.getSourceShape());
-                row.createCell(2).setCellValue(result.getSeverity());
-                row.createCell(3).setCellValue(result.getMessage());
-                row.createCell(4).setCellValue(result.getValue());
-                row.createCell(5).setCellValue(result.getValueKind());
-                row.createCell(6).setCellValue(result.getPath());
+                row.createCell(0).setCellValue(cellText(result.getFocusNode()));
+                row.createCell(1).setCellValue(cellText(result.getSourceShape()));
+                row.createCell(2).setCellValue(cellText(result.getSeverity()));
+                row.createCell(3).setCellValue(cellText(result.getMessage()));
+                row.createCell(4).setCellValue(cellText(result.getValue()));
+                row.createCell(5).setCellValue(cellText(result.getValueKind()));
+                row.createCell(6).setCellValue(cellText(result.getPath()));
             }
 
             // Auto-size columns
@@ -265,11 +295,9 @@ public class ExcelTools {
                 sheet.autoSizeColumn(i);
             }
 
-            workbook.write(fos);
-            System.out.println("SHACL report successfully exported to: " + outputFile.getAbsolutePath());
-
-        } catch (IOException e) {
-            System.err.println("Error exporting SHACL report: " + e.getMessage());
+            try (FileOutputStream fos = new FileOutputStream(outputFile)) {
+                workbook.write(fos);
+            }
         }
     }
 
