@@ -317,8 +317,8 @@ public class McpCommand implements Callable<Integer> {
                 + "Use this as the primary diagnostic step in the validation loop.",
                 obj -> {
 obj.set("workflow", schema("string",
-                            "Workflow: 'mapping' (default, uses a CSV mapping file), "
-                            + "'timestamped' (groups by timestamp), 'manual' (hand-pick shapes)."));
+                            "Workflow: 'mapping' (default, uses a CSV mapping file) or "
+                            + "'timestamped' (groups by timestamp)."));
 obj.set("mappingCsv", schema("string",
                             "Absolute path to the CSV mapping file. "
                             + "Three columns: model file names | constraint .ttl path | label. "
@@ -329,8 +329,6 @@ obj.set("constraintsRoot", schema("string",
                             "Absolute path to the root folder for SHACL constraint .ttl files."));
 obj.set("outputDir", schema("string",
                             "Absolute path to the output folder for Excel reports and ZIPs."));
-obj.set("shaclConstraintFiles", arraySchema(
-                            "Absolute paths to SHACL .ttl files (manual workflow only)."));
 obj.set("datatypeMap", schema("string",
                             "CGMES version preset: 'CGMES30NC25' (default), 'CGMES30NC24', 'CGMES24NC22', "
                             + "or absolute path to a custom .properties file."));

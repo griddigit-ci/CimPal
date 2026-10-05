@@ -33,7 +33,7 @@ Capture the current behaviour of every Core feature with golden-output tests, so
 | Feature | Core entry point | L2 golden | L3 CLI (TEST-4) | L5 serve/mcp (TEST-4) |
 | --- | --- | --- | --- | --- |
 | SHACL validation — mapping, timestamped | `MappingValidator` | [ ] | [ ] `validate` | [ ] |
-| SHACL validation — manual | `ShaclAutoTester` | [ ] | [ ] `validate --workflow manual` | [ ] |
+| SHACL rule test (Conform / NonConform; was "manual") | `ShaclRuleTester` | [ ] (behaviour pinned by `ShaclRuleTesterTest`, no golden yet) | — GUI only since 2026-10-05 | — |
 | Single-dataset validation | `SHACLValidator` | [ ] | — | — |
 | RDFS → SHACL (2019, 2020, closed, split datatypes) | `SHACLFromRDF` | [ ] | [ ] `rdfs2shacl` | [ ] |
 | Excel → SHACL | `ShaclFromXls` | [ ] | [ ] `excel2shacl` | [ ] |

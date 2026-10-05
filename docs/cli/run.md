@@ -85,7 +85,6 @@ Located in `CimPal-CLI/configs/`. Fill in the `REPLACE_WITH_PATH` placeholders.
 | Template | What it does |
 |---|---|
 | `pipeline-full-validation.json` | Convert to Turtle, then validate against SHACL constraints |
-| `pipeline-shape-dev.json` | Generate conforming + non-conforming fixtures, then validate with your shapes |
 | `pipeline-profile-migration.json` | Diff two RDFS profile versions, then generate fresh shapes from the new version |
 
 ---

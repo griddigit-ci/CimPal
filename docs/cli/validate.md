@@ -43,7 +43,7 @@ java -jar CimPal-CLI.jar validate --config nightly.json --format json > result.j
 
 ## Workflows
 
-The `--workflow` flag selects one of three validation modes. Defaults to `mapping`.
+The `--workflow` flag selects one of two validation modes. Defaults to `mapping`.
 
 ### `mapping` (default)
 
@@ -72,15 +72,9 @@ Required inputs: same as mapping, plus `--previous-comparison` (optional)
 
 Use this when model files are named with a date/time stamp and you want trend tracking across runs.
 
-### `manual`
+### Removed: `manual`
 
-No mapping CSV. You pick the SHACL constraint files directly; the CLI scans the `--models` folder for ZIP model archives and validates each one against all selected shapes.
-
-Results go to the Output pane (stderr in CLI mode). Excel reports are written beside each ZIP archive.
-
-Required inputs: `--shacl-files`, `--models`
-
-Use this when developing or testing a specific shape — it is the fastest way to check one set of constraints against a folder of test models.
+The former `manual` workflow and its `--shacl-files` flag are gone. It did not validate datasets: it tested the rules of a constraint set against a folder of Conform / NonConform test models, and it is now the GUI's **SHACL ▸ Constraints Operations ▸ Test SHACL rules against Conform / NonConform models** (see the help page of that tab). `--workflow manual` exits with code 2 and says so.
 
 ---
 
@@ -89,12 +83,11 @@ Use this when developing or testing a specific shape — it is the fastest way t
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--config` | file path | — | JSON config file. Individual flags override it. |
-| `--workflow` | `mapping` / `timestamped` / `manual` | `mapping` | Which validation mode to run. |
+| `--workflow` | `mapping` / `timestamped` | `mapping` | Which validation mode to run. |
 | `--mapping-csv` | file path | — | The CSV mapping file. Required for mapping and timestamped. |
 | `--models` | folder path | — | Root folder containing model files (ZIP, XML). Required always. |
 | `--constraints-root` | folder path | — | Root folder for constraint files. Paths in the mapping CSV are relative to this. Required for mapping and timestamped. |
 | `--output` | folder path | — | Where to write the Excel report, ZIP bundles, and Turtle reports. Created if it does not exist. Required for mapping and timestamped. |
-| `--shacl-files` | comma-separated file paths | — | SHACL `.ttl` files for the manual workflow. Multiple files are unioned into one shapes graph. |
 | `--datatype-map` | preset or file path | `CGMES30NC25` | See **Datatype map** section below. |
 | `--xml-base` | URI | `http://iec.ch/TC57/CIM100` | Base URI used when parsing RDF/XML model files. See **XML base** section below. |
 | `--engine` | see below | `APACHE_JENA` | SHACL evaluation engine. |
