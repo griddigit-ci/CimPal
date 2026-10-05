@@ -7,6 +7,8 @@ package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.stats.RunStats;
+import eu.griddigit.cimpal.core.stats.RunStatsSnapshot;
 import eu.griddigit.cimpal.core.testsupport.Normalizer;
 import eu.griddigit.cimpal.core.testsupport.Snapshots;
 import eu.griddigit.cimpal.core.testsupport.TestModels;
@@ -86,6 +88,35 @@ class MappingValidatorTest {
                 RDFDataMgr.loadModel(singleTurtleReport().toString()), Normalizer.blankNodeLabels());
         SNAPSHOTS.assertIsomorphic("mapping-run__report", report);
         SNAPSHOTS.assertExcelEquals("mapping-run__workbook", workbook, workbookNormalizers());
+    }
+
+    @Test
+    void mappingRunCountsTheLoadedTriplesWithoutChangingTheResult() throws Exception {
+        RunStats stats = RunStats.start();
+        MappingValidationSummary summary = new MappingValidator(
+                options("data.xml", "data.xml").runStats(stats).build()).validate();
+        RunStatsSnapshot snapshot = stats.stop();
+
+        assertEquals(1, summary.violations());
+        assertEquals(0, summary.conforming());
+        assertEquals(0, summary.errors());
+        assertEquals(TestModels.parseRdfXml(TestModels.VIOLATING_THING_MODEL).size(), snapshot.triplesLoaded());
+        assertEquals(Files.size(tempDir.resolve("models/data.xml")), snapshot.inputBytes());
+    }
+
+    @Test
+    void timestampedRunCountsEachLoadedFileOnce() throws Exception {
+        RunStats stats = RunStats.start();
+        MappingValidationSummary summary = new MappingValidator(
+                options("IGM_Test/IGM_Test_EQ_20260101T0000Z.xml", "EQ").timestamped(true).runStats(stats).build())
+                .validate();
+        RunStatsSnapshot snapshot = stats.stop();
+
+        assertEquals(1, summary.violations(), () -> "summary: " + summary);
+        assertEquals(0, summary.errors(), () -> "summary: " + summary);
+        assertEquals(TestModels.parseRdfXml(TestModels.VIOLATING_THING_MODEL).size(), snapshot.triplesLoaded());
+        assertEquals(Files.size(tempDir.resolve("models/IGM_Test/IGM_Test_EQ_20260101T0000Z.xml")),
+                snapshot.inputBytes());
     }
 
     @Test

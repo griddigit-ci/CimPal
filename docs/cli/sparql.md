@@ -52,6 +52,7 @@ java -jar CimPal-CLI.jar sparql ^
 | `--output` | file path | — | Write results to a file. Use `.xlsx` extension for Excel; any other extension for CSV. If omitted, results go to stdout. |
 | `--format` | `text` / `json` / `csv` | `text` | Format for stdout output. Ignored when `--output` is set. |
 | `--limit` | integer | `0` | Automatically append `LIMIT n` to queries that have none. `0` = do not add a limit. |
+| `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 
 ---
 
@@ -126,4 +127,4 @@ Queries run only against the models you load. A query that contains `SERVICE` an
 |---|---|
 | 0 | Query ran successfully |
 | 2 | Bad input (no models, no query, file not found, empty model, not a SELECT, or a refused `SERVICE` query) |
-| 3 | Internal error (RDF parse failure, SPARQL syntax error) |
+| 3 | Internal error (RDF parse failure, SPARQL syntax error); out of memory included (one `[ERROR] Out of memory` line on stderr; see [resource statistics](README.md#resource-statistics---stats)) |

@@ -6,6 +6,7 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.stats.RunStats;
 import eu.griddigit.cimpal.core.utils.CsvCells;
 import eu.griddigit.cimpal.core.utils.ModelFactory;
 import eu.griddigit.cimpal.core.utils.SparqlTools;
@@ -85,6 +86,14 @@ public class SparqlCommand implements Callable<Integer> {
             description = "Output format for stdout: text (default), json, or csv.")
     private String format;
 
+    @Option(names = "--stats",
+            description = "Report the run's resource use (wall/CPU time, peak heap, GC, triples loaded): "
+                    + "a \"stats\" field in JSON output on stdout, otherwise a [STATS] line on stderr.")
+    private Boolean stats;
+
+    /** The collector when {@code --stats} is on, otherwise null. */
+    private RunStats runStats;
+
     @Option(names = "--limit",
             description = "Warn if the query has no LIMIT and the model exceeds 100k triples; prepend LIMIT to the query (0 = no limit).")
     private int limit = 0;
@@ -101,6 +110,7 @@ public class SparqlCommand implements Callable<Integer> {
 
             // 2. Apply defaults
             applyDefaults();
+            runStats = StatsJson.startIf(stats);
 
             // 3. Validate inputs
             if (!validateInputs()) {
@@ -116,7 +126,11 @@ public class SparqlCommand implements Callable<Integer> {
 
             // 5. Load model
             System.err.println("[INFO] Loading " + modelFiles.size() + " model file(s)...");
-            Model model = ModelFactory.loadCombinedModelForSparql(modelFiles, xmlBase);
+            Model model;
+            try (StatsJson.Span ignored = StatsJson.phase(runStats, "load")) {
+                model = ModelFactory.loadCombinedModelForSparql(modelFiles, xmlBase);
+            }
+            StatsJson.countLoaded(runStats, model.size(), modelFiles.stream().map(File::toPath).toList());
             System.err.println("[INFO] Model loaded: " + model.size() + " triples.");
 
             // 6. Warn and optionally cap if model is large and query has no LIMIT
@@ -135,12 +149,16 @@ public class SparqlCommand implements Callable<Integer> {
 
             // 7. Execute query
             System.err.println("[INFO] Executing SPARQL query...");
-            QueryResults results = SparqlTools.executeSparqlQuery(queryText, model);
+            QueryResults results;
+            try (StatsJson.Span ignored = StatsJson.phase(runStats, "query")) {
+                results = SparqlTools.executeSparqlQuery(queryText, model);
+            }
             System.err.println("[INFO] Query returned " + results.rows.size() + " row(s).");
 
             // 8. Output results
             if (outputFile != null) {
                 writeToFile(results);
+                StatsJson.toStderr(runStats);
             } else {
                 writeToStdout(results);
             }
@@ -210,6 +228,10 @@ public class SparqlCommand implements Callable<Integer> {
         if (format == null) {
             String v = root.path("format").asText(null);
             if (v != null && !v.isBlank()) format = v;
+        }
+        if (stats == null) {
+            JsonNode n = root.path("stats");
+            if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
     }
 
@@ -297,9 +319,16 @@ public class SparqlCommand implements Callable<Integer> {
 
     private void writeToStdout(QueryResults results) {
         switch (format.toLowerCase()) {
-            case "json" -> writeJson(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8));
-            case "csv"  -> writeCsv(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8));
-            default     -> writeText(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8));
+            case "json" -> writeJson(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8),
+                    StatsJson.field(runStats, ""));
+            case "csv"  -> {
+                writeCsv(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8));
+                StatsJson.toStderr(runStats);
+            }
+            default     -> {
+                writeText(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8));
+                StatsJson.toStderr(runStats);
+            }
         }
     }
 
@@ -328,7 +357,8 @@ public class SparqlCommand implements Callable<Integer> {
 
     // ---- JSON --------------------------------------------------------------
 
-    private static void writeJson(QueryResults results, PrintWriter out) {
+    /** {@code statsField} is {@code ,"stats":{...}} or empty (see {@link StatsJson#field}). */
+    private static void writeJson(QueryResults results, PrintWriter out, String statsField) {
         out.print("{\"columns\":[");
         for (int i = 0; i < results.columns.size(); i++) {
             out.print(jsonStr(results.columns.get(i)));
@@ -348,7 +378,9 @@ public class SparqlCommand implements Callable<Integer> {
             out.print("}");
             if (r < results.rows.size() - 1) out.print(",");
         }
-        out.println("]}");
+        out.print("]");
+        out.print(statsField);
+        out.println("}");
         out.flush();
     }
 

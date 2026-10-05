@@ -68,6 +68,7 @@ java -jar CimPal-CLI.jar compare --config configs/compare.json
 | `--ns-prefix` | string | `""` | Which namespace prefix to normalize when `--normalize-profile-ns` is set. |
 | `--output` | file path | — | Write results to a file. Use `.xlsx` for Excel; any other extension for CSV. If omitted, results go to stdout. |
 | `--format` | `text` / `json` / `csv` | `text` | Output format for stdout. Ignored when `--output` is set. |
+| `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 | `--dry-run` | flag | off | Print resolved config and exit without comparing. |
 
 ---
@@ -157,7 +158,7 @@ When a value is `(not present)`, the item exists in one file but not the other. 
 | 0 | Files are identical — no differences found |
 | 1 | Differences found — check the output |
 | 2 | Bad input (file not found, unsupported format) |
-| 3 | Internal error |
+| 3 | Internal error; out of memory included (one `[ERROR] Out of memory` line on stderr; see [resource statistics](README.md#resource-statistics---stats)) |
 
 Exit code 0 / 1 distinction is useful in CI: a diff check can gate on whether a profile version actually changed content.
 

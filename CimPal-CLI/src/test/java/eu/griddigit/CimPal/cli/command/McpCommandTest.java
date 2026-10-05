@@ -8,14 +8,19 @@ package eu.griddigit.CimPal.cli.command;
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -30,7 +35,7 @@ class McpCommandTest {
      * messages it wrote. {@code mcp} reads until end of input, and it redirects System.out to
      * stderr for its own protection, so both streams are restored here.
      */
-    private static List<JsonNode> runMcp(String stdin) {
+    private static List<JsonNode> runMcp(String stdin, String... mcpOptions) {
         InputStream originalIn = System.in;
         PrintStream originalOut = System.out;
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -38,7 +43,10 @@ class McpCommandTest {
         try {
             System.setIn(new ByteArrayInputStream(stdin.getBytes(UTF_8)));
             System.setOut(new PrintStream(stdout, true, UTF_8));
-            exitCode = new CommandLine(new CimPalCli()).execute("mcp");
+            String[] args = new String[mcpOptions.length + 1];
+            args[0] = "mcp";
+            System.arraycopy(mcpOptions, 0, args, 1, mcpOptions.length);
+            exitCode = new CommandLine(new CimPalCli()).execute(args);
         } finally {
             System.setIn(originalIn);
             System.setOut(originalOut);
@@ -56,5 +64,24 @@ class McpCommandTest {
         JsonNode serverInfo = messages.getFirst().path("result").path("serverInfo");
         assertThat(serverInfo.path("name").asText("")).isEqualTo("CimPal");
         assertThat(serverInfo.path("version").asText("")).isEqualTo(System.getProperty("cimpal.expectedVersion"));
+    }
+
+    @Test
+    void statsFromTheToolArgumentsStayInsideTheOneJsonResult(@TempDir Path tempDir) throws Exception {
+        Path model = Files.writeString(tempDir.resolve("m.ttl"), "<urn:x:a> <urn:x:p> \"x\" .\n");
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
+        ObjectNode params = call.putObject("params").put("name", "sparql");
+        ObjectNode arguments = params.putObject("arguments")
+                .put("query", "SELECT ?o WHERE { ?s ?p ?o }").put("stats", true);
+        arguments.putArray("models").add(model.toString());
+
+        List<JsonNode> messages = runMcp(JSON.writeValueAsString(call) + "\n", "--root", tempDir.toString());
+
+        String text = messages.getFirst().path("result").path("content").get(0).path("text").asText();
+        // Exactly one JSON value: trailing content after the object would fail here.
+        JsonNode result = JSON.readerFor(JsonNode.class)
+                .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readValue(text);
+        assertThat(result.path("rows")).hasSize(1);
+        assertThat(result.path("stats").path("triplesLoaded").asLong()).isEqualTo(1);
     }
 }
