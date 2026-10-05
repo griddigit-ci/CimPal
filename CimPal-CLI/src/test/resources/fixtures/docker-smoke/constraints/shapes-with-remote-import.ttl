@@ -1,0 +1,14 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Docker image smoke test, offline check: the same Thing shape, plus an owl:imports of a URL on an
+# allowlisted host. The smoke test runs this with `docker run --network none`, so the import can
+# only fail; the validation must report that as an error, never as a clean pass.
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix ex: <urn:test:> .
+<urn:test:docker-smoke-offline> a owl:Ontology ;
+    owl:imports <https://raw.githubusercontent.com/griddigit-ci/CimPal/master/CimPal-CLI/src/test/resources/fixtures/docker-smoke/constraints/shapes.ttl> .
+ex:ThingShape a sh:NodeShape ; sh:targetClass ex:Thing ;
+    sh:property [ sh:path ex:size ; sh:minCount 1 ] .
