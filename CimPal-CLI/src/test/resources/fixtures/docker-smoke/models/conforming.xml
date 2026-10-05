@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+
+  Docker image smoke test, offline check: one ex:Thing that has the ex:size the shapes require,
+  so the only way for mapping-offline.csv to report a problem is the failed remote owl:imports.
+-->
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#"
+         xmlns:ex="urn:test:">
+  <md:FullModel rdf:about="urn:uuid:header">
+    <md:Model.scenarioTime>2026-01-01T00:00:00Z</md:Model.scenarioTime>
+  </md:FullModel>
+  <ex:Thing rdf:about="#_1">
+    <ex:size>1</ex:size>
+  </ex:Thing>
+</rdf:RDF>

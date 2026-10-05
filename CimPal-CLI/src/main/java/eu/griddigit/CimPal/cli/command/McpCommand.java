@@ -6,6 +6,7 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.CimPalCli;
+import eu.griddigit.CimPal.cli.CliVersion;
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
 import eu.griddigit.cimpal.core.utils.PathPolicy;
@@ -86,7 +87,7 @@ public class McpCommand implements Callable<Integer> {
 
     private static final String PROTOCOL_VERSION = "2024-11-05";
     private static final String SERVER_NAME    = "CimPal";
-    private static final String SERVER_VERSION = "2026.9";
+    private static final String SERVER_VERSION = CliVersion.version();
 
     @Option(names = "--debug",
             description = "Write MCP message traffic to stderr for debugging.")

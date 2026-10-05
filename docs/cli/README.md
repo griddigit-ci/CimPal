@@ -17,6 +17,11 @@ java -jar CimPal-CLI.jar <command> [options]
 
 The fat JAR is built by Maven at `CimPal-CLI/target/CimPal-CLI.jar`. Every dependency is bundled inside it; no separate classpath is needed beyond a JRE 25+.
 
+Without a local Java, run the same JAR from the Docker image that every release publishes. Mount your files and use container paths, see [docker](docker.md):
+```
+docker run --rm -v "C:\Data:/data" ghcr.io/griddigit-ci/cimpal:latest <command> [options]
+```
+
 **List all commands:**
 ```
 java -jar CimPal-CLI.jar --help

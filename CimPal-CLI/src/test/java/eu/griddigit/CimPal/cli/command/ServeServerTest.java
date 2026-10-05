@@ -114,6 +114,16 @@ class ServeServerTest {
         assertThat(response.body()).contains("\"status\":\"ok\"");
     }
 
+    /** The version comes from the pom (CliVersion), not a literal; the Docker image tag relies on it (CI-3). */
+    @Test
+    void healthReportsTheReleaseVersion() throws Exception {
+        start(config());
+        HttpResponse<String> response = send(HttpRequest.newBuilder(uri("/health")).GET());
+
+        assertThat(response.body())
+                .contains("\"version\":\"CimPal CLI " + System.getProperty("cimpal.expectedVersion") + "\"");
+    }
+
     @Test
     void commandWithoutTokenIs401AndNeverRuns() throws Exception {
         AtomicInteger runs = new AtomicInteger();

@@ -122,3 +122,49 @@ jobs:
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
           if-no-files-found: warn
+
+  # The CLI image (CI-3). release.yml pushes it for every release tag; this job keeps the
+  # Dockerfile and the image behaviour from breaking unnoticed in between. Nothing is pushed.
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the CLI JAR
+        run: mvn -B -pl CimPal-CLI -am package -DskipTests
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: docker.io/tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver-opts: image=moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
+
+      # Same platforms as the release, so a Dockerfile change that breaks arm64 fails here.
+      - name: Build for linux/amd64 and linux/arm64
+        run: >-
+          docker buildx build --platform linux/amd64,linux/arm64 --output type=cacheonly
+          -f CimPal-CLI/docker/Dockerfile .
+
+      - name: Build for the smoke test
+        run: docker buildx build --load --provenance=false -t cimpal:ci -f CimPal-CLI/docker/Dockerfile .
+
+      - name: Smoke test
+        shell: pwsh
+        run: ./scripts/Test-DockerImage.ps1 -Image cimpal:ci

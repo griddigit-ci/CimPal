@@ -7,6 +7,7 @@ package eu.griddigit.CimPal.cli.command;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import eu.griddigit.CimPal.cli.CliVersion;
 import eu.griddigit.cimpal.core.utils.LogSanitizer;
 
 import java.io.IOException;
@@ -57,7 +58,7 @@ final class ServeServer implements AutoCloseable {
             "rdfs2shacl", "organize", "excel2shacl", "gen-instances", "manifest"
     );
 
-    static final String VERSION = "CimPal CLI 2026.9";
+    static final String VERSION = CliVersion.displayName();
 
     /** Upper bounds for the operator-set limits. */
     static final int MAX_QUEUE_SIZE = 64;

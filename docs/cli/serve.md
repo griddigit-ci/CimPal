@@ -23,8 +23,10 @@ The server starts on `localhost:7474`. It creates a new bearer token on every st
 Check that it's alive (no token needed):
 ```
 curl http://localhost:7474/health
-# {"status":"ok","version":"CimPal CLI 2026.9"}
+# {"status":"ok","version":"CimPal CLI 2026.9.10.1"}
 ```
+
+The version is the release version of the JAR.
 
 Read the token and call an endpoint (Git Bash / Linux):
 ```bash
@@ -288,3 +290,25 @@ Start-Process -FilePath "java" `
 ```
 
 Or add it to a startup script that runs before your agent session begins. The agent reads the token from the token file after the server has started. To supply a fixed token instead, set `CIMPAL_API_TOKEN` in the server's environment.
+
+---
+
+## Running in Docker
+
+Inside a container the server has to listen on all interfaces, because `localhost` there is the container itself, so it needs `--host 0.0.0.0 --allow-remote` (and prints the matching warning). Keep it reachable from your own machine only:
+- **Publish the port on the host's loopback, with the same number inside and outside** (`-p 127.0.0.1:7474:7474`). The Host check accepts only the port the server listens on, so a remapped port such as `-p 127.0.0.1:8080:7474` gets 403. To use another port, change both: `--port 8080` and `-p 127.0.0.1:8080:8080`.
+- **Hand it a new token for each start through `CIMPAL_API_TOKEN`** (at least 32 characters). `-e CIMPAL_API_TOKEN` without a value copies it from the environment of the `docker` command. So it doesn't appear on the docker command line, and you don't have to read a token file inside the container. Never write `-e CIMPAL_API_TOKEN=<value>`.
+- **Run it on a network of its own, with `--rm`, and mount the inputs read-only.**
+
+```powershell
+$bytes = [byte[]]::new(32); [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$token = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+docker network create cimpal-serve
+$env:CIMPAL_API_TOKEN = $token
+docker run -d --rm --name cimpal-serve --network cimpal-serve -p 127.0.0.1:7474:7474 -e CIMPAL_API_TOKEN `
+  -v "C:\Data\models:/data/models:ro" -v "C:\Data\out:/data/out" `
+  ghcr.io/griddigit-ci/cimpal:latest serve --host 0.0.0.0 --allow-remote
+$env:CIMPAL_API_TOKEN = $null
+```
+
+Request paths are then container paths under the default root `/data`. Never publish with `-p 7474:7474` or `-P`. Other local users can still reach the loopback port, so the token is what keeps them out. See [docker](docker.md#serve) for the Bash version and the rest of the guidance.

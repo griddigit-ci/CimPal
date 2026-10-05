@@ -54,6 +54,14 @@ class CimPalCliTest {
     }
 
     @Test
+    void versionPrintsTheReleaseVersion() {
+        Run run = run("--version");
+
+        assertThat(run.exitCode()).isEqualTo(ExitCode.OK);
+        assertThat(run.out().strip()).isEqualTo("CimPal CLI " + CliVersionTest.EXPECTED);
+    }
+
+    @Test
     void unknownOptionIsAUsageErrorNotACrash() {
         Run run = run("--no-such-option");
 

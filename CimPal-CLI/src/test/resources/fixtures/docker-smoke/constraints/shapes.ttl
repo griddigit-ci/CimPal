@@ -1,0 +1,9 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Docker image smoke test: requires ex:size on every ex:Thing (same as TestModels.THING_SHAPES).
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix ex: <urn:test:> .
+ex:ThingShape a sh:NodeShape ; sh:targetClass ex:Thing ;
+    sh:property [ sh:path ex:size ; sh:minCount 1 ] .
