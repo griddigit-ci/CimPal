@@ -24,10 +24,16 @@
       7. serve runs as the docs say (--allow-remote, token from CIMPAL_API_TOKEN, same port inside
          and outside on the host loopback): /health answers, a remapped port gets 403, a request
          without the token 401, and POST /shutdown with the token stops the container.
+      8. JVM defaults: MaxRAMPercentage=75 and ExitOnOutOfMemoryError are set, JAVA_OPTS overrides
+         them, VM output goes to stderr, and an out-of-memory run ends with exit 3.
+      9. The OCI version label matches the expected version and the revision label is set.
 
-    On Linux the runs that write to the bind mount use --user <uid>:<gid> of the caller, as the
-    docs advise. The work folder is CimPal-CLI/target/docker-smoke. Used by the "Docker image"
-    job in ci.yml and before the push in release.yml.
+    Validation, mcp and serve run with a read-only root filesystem and a tmpfs /tmp
+    (--read-only --tmpfs /tmp), as docs/cli/docker.md recommends; without the tmpfs the entrypoint
+    stops with exit 2 and says why. On Linux the runs that write to the bind mount use
+    --user <uid>:<gid> of the caller, as the docs advise. The work folder is
+    CimPal-CLI/target/docker-smoke. Used by the "Docker image" job in ci.yml and before the push in
+    release.yml. Build the image with the CIMPAL_VERSION and GIT_SHA build arguments (see the docs).
 
 .EXAMPLE
     ./scripts/Test-DockerImage.ps1 -Image cimpal:dev
@@ -156,6 +162,9 @@ $userArguments = @()
 if ($IsLinux) {
     $userArguments = @('--user', "$(id -u):$(id -g)")
 }
+# A read-only root filesystem with a writable /tmp, as the docs recommend (Kubernetes:
+# readOnlyRootFilesystem plus an emptyDir at /tmp).
+$readOnlyFs = @('--read-only', '--tmpfs', '/tmp')
 
 $work = Join-Path $repoRoot 'CimPal-CLI/target/docker-smoke'
 Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
@@ -177,7 +186,8 @@ try {
     Check 'the image exposes no port (so -P cannot publish serve)' (($r.Stdout -join '') -like '* null') "inspect=$($r.Stdout -join ' | ')"
     $r = Invoke-Docker @('run', '--rm', '--entrypoint', 'id', $Image)
     Check 'runs as UID 10001 (cimpal)' (($r.Stdout -join '') -like 'uid=10001(cimpal) gid=10001(cimpal)*') "stdout=$($r.Stdout -join ' | ')"
-    $readOnly = 'test ! -w /opt/cimpal && test ! -w /opt/cimpal/CimPal-CLI.jar && test ! -w /opt/cimpal/entrypoint.sh && echo read-only'
+    $readOnly = 'test ! -w /opt/cimpal && test ! -w /opt/cimpal/CimPal-CLI.jar && test ! -w /opt/cimpal/entrypoint.sh ' +
+        '&& test ! -w /opt/cimpal/configs && echo read-only'
     foreach ($u in @(@(), @('--user', '12345:12345'))) {
         $who = if ($u.Count) { 'UID 12345' } else { 'cimpal' }
         $r = Invoke-Docker (@('run', '--rm') + $u + @('--entrypoint', 'sh', $Image, '-c', $readOnly))
@@ -185,9 +195,16 @@ try {
     }
     $r = Invoke-Docker @('run', '--rm', $Image, '--cimpal-exec', '--version')
     Check 'the internal --cimpal-exec argument is rejected' ($r.ExitCode -ne 0) "exit=$($r.ExitCode) stdout=$($r.Stdout -join ' | ')"
+    $r = Invoke-Docker @('run', '--rm', '--entrypoint', 'sh', $Image, '-c',
+        'test -s /opt/cimpal/configs/validate-mapping-cgmes30.json && test -s /opt/cimpal/LICENSE.md && test -s /opt/cimpal/eupl_v1.2_en.pdf && echo present')
+    Check 'the example configs and the licence files are in /opt/cimpal' (($r.Stdout -join '') -eq 'present') "stdout=$($r.Stdout -join ' | ')"
+    $r = Invoke-Docker @('run', '--rm', '--read-only', $Image, '--version')
+    Check 'with --read-only but no writable /tmp the entrypoint stops with exit 2 and names --tmpfs /tmp' `
+        (($r.ExitCode -eq 2) -and ($r.Stderr -match '--tmpfs /tmp') -and ($r.Stdout.Count -eq 0)) `
+        "exit=$($r.ExitCode) stdout=$($r.Stdout -join ' | ') stderr=$($r.Stderr)"
 
-    # 3. Mapping validation against the bind mount
-    $r = Invoke-Docker (@('run', '--rm', '--mount', $dataMount) + $userArguments + @($Image,
+    # 3. Mapping validation against the bind mount, with a read-only root filesystem
+    $r = Invoke-Docker (@('run', '--rm', '--mount', $dataMount) + $readOnlyFs + $userArguments + @($Image,
         'validate', '--workflow', 'mapping', '--mapping-csv', '/data/mapping.csv', '--models', '/data/models',
         '--constraints-root', '/data/constraints', '--output', '/data/out', '--xml-base', 'http://example.com/data',
         '--workers', '1', '--format', 'json', '--samples', '3'))
@@ -207,12 +224,18 @@ try {
     # 4. Cache privacy, for the image user and for an arbitrary UID
     Test-CachePrivacy 'cimpal' @() '10001' '/home/cimpal'
     Test-CachePrivacy 'UID 12345' @('--user', '12345:12345') '12345' '/tmp/tmp\.\w+'
+    # A read-only root filesystem: /home/cimpal can't be written, so cimpal gets a home in /tmp too.
+    Test-CachePrivacy 'cimpal, read-only root' $readOnlyFs '10001' '/tmp/tmp\.\w+'
+    Test-CachePrivacy 'UID 12345, read-only root' ($readOnlyFs + @('--user', '12345:12345')) '12345' '/tmp/tmp\.\w+'
+    # The image sets -Duser.home after JAVA_OPTS and unsets LOCALAPPDATA, so neither can move the cache.
+    Test-CachePrivacy 'UID 12345, user.home and LOCALAPPDATA overridden' @('--user', '12345:12345',
+        '-e', 'JAVA_OPTS=-Duser.home=/home/cimpal', '-e', 'LOCALAPPDATA=/home/cimpal') '12345' '/tmp/tmp\.\w+'
 
     # 5. Offline: a remote owl:imports must fail closed
-    $r = Invoke-Docker @('run', '--rm', '--network', 'none', '--mount', "type=bind,source=$work,target=/data,readonly", $Image,
+    $r = Invoke-Docker (@('run', '--rm', '--network', 'none', '--mount', "type=bind,source=$work,target=/data,readonly") + $readOnlyFs + @($Image,
         'validate', '--workflow', 'mapping', '--mapping-csv', '/data/mapping-offline.csv', '--models', '/data/models',
         '--constraints-root', '/data/constraints', '--output', '/tmp/out', '--xml-base', 'http://example.com/data',
-        '--workers', '1', '--format', 'json', '--samples', '0')
+        '--workers', '1', '--format', 'json', '--samples', '0'))
     $offline = $null
     try { $offline = ($r.Stdout -join "`n") | ConvertFrom-Json } catch { }
     Check 'offline: an unreachable owl:imports is an error, not a clean pass' `
@@ -220,7 +243,7 @@ try {
         "exit=$($r.ExitCode) totals=$($offline.totals | ConvertTo-Json -Compress)"
 
     # 6. MCP over stdio, plain and with the CA-certificate hook of the base image
-    Test-Mcp '' @() | Out-Null
+    Test-Mcp '' $readOnlyFs | Out-Null
 
     $certificates = Join-Path $work 'certificates'
     New-Item -ItemType Directory -Path $certificates | Out-Null
@@ -229,8 +252,8 @@ try {
         '-out', '/out/smoke.crt', '-subj', '/CN=cimpal-docker-smoke', '-days', '1'))
     Check 'a throwaway CA certificate is generated' (($r.ExitCode -eq 0) -and (Test-Path (Join-Path $certificates 'smoke.crt'))) `
         "exit=$($r.ExitCode) stderr=$($r.Stderr)"
-    $r = Test-Mcp ' with USE_SYSTEM_CA_CERTS' @('-e', 'USE_SYSTEM_CA_CERTS=1',
-        '--mount', "type=bind,source=$certificates,target=/certificates,readonly")
+    $r = Test-Mcp ' with USE_SYSTEM_CA_CERTS' ($readOnlyFs + @('-e', 'USE_SYSTEM_CA_CERTS=1',
+        '--mount', "type=bind,source=$certificates,target=/certificates,readonly"))
     Check 'the CA hook imports the mounted certificate and reports it on stderr' `
         ($r.Stderr -match 'Adding certificate with alias cimpal-docker-smoke') "stderr=$($r.Stderr)"
 
@@ -245,7 +268,7 @@ try {
     $env:CIMPAL_API_TOKEN = $token
     $auth = @{ Authorization = "Bearer $token" }
     # -e without a value copies the token from this process, so it is not on the command line.
-    $container = (& docker run -d --rm -p "127.0.0.1:${port}:${port}" -p "127.0.0.1:${otherPort}:${port}" `
+    $container = (& docker run -d --rm @readOnlyFs -p "127.0.0.1:${port}:${port}" -p "127.0.0.1:${otherPort}:${port}" `
         -e CIMPAL_API_TOKEN $Image serve --host 0.0.0.0 --allow-remote --port $port | Out-String).Trim()
     Check 'serve starts in the background' ($LASTEXITCODE -eq 0) "container=$container"
     $health = $null
@@ -277,6 +300,42 @@ try {
         $stopped = -not (& docker ps -q --filter "id=$container")
     }
     Check 'POST /shutdown with the token stops the container' (($code -eq 200) -and $stopped) "status=$code stopped=$stopped"
+
+    # 8. JVM defaults. -XX:+PrintCommandLineFlags is VM output, which the image sends to stderr,
+    #    so stdout must still hold nothing but the version line.
+    $r = Invoke-Docker (@('run', '--rm') + $readOnlyFs + @('-e', 'JAVA_OPTS=-XX:+PrintCommandLineFlags', $Image, '--version'))
+    Check 'JVM defaults: MaxRAMPercentage=75 and ExitOnOutOfMemoryError' `
+        (($r.Stderr -match '-XX:MaxRAMPercentage=75(\.0+)?\b') -and ($r.Stderr -match '-XX:\+ExitOnOutOfMemoryError')) "stderr=$($r.Stderr)"
+    Check 'JVM output goes to stderr, stdout keeps only the CLI output' `
+        (($r.ExitCode -eq 0) -and (($r.Stdout -join "`n") -eq "CimPal CLI $ExpectedVersion")) "stdout=$($r.Stdout -join ' | ')"
+    $r = Invoke-Docker (@('run', '--rm') + $readOnlyFs + @('-e', 'JAVA_OPTS=-XX:MaxRAMPercentage=50 -XX:+PrintCommandLineFlags',
+        $Image, '--version'))
+    Check 'JAVA_OPTS overrides the JVM defaults' ($r.Stderr -match '-XX:MaxRAMPercentage=50(\.0+)?\b') "stderr=$($r.Stderr)"
+    # A unified-logging warning (a missing CDS archive); by default the JVM would print it on stdout.
+    $r = Invoke-Docker (@('run', '--rm') + $readOnlyFs + @('-e', 'JAVA_OPTS=-XX:SharedArchiveFile=/nonexistent.jsa',
+        $Image, '--version'))
+    Check 'unified-logging warnings go to stderr, stdout keeps only the CLI output' `
+        (($r.Stderr -match '\[warning\]') -and (($r.Stdout -join "`n") -eq "CimPal CLI $ExpectedVersion")) `
+        "stdout=$($r.Stdout -join ' | ') stderr=$($r.Stderr)"
+    # A heap far too small for a validation: the JVM must end the run with exit 3 (the CLI's
+    # "internal error") and say so on stderr, instead of hanging on in a broken state.
+    $r = Invoke-Docker (@('run', '--rm', '--mount', "type=bind,source=$work,target=/data,readonly") + $readOnlyFs + @(
+        '-e', 'JAVA_OPTS=-Xmx4m', $Image,
+        'validate', '--workflow', 'mapping', '--mapping-csv', '/data/mapping.csv', '--models', '/data/models',
+        '--constraints-root', '/data/constraints', '--output', '/tmp/out', '--xml-base', 'http://example.com/data',
+        '--workers', '1', '--format', 'json', '--samples', '0'))
+    Check 'out of memory ends the run with exit 3 and a message on stderr' `
+        (($r.ExitCode -eq 3) -and ($r.Stderr -match 'Terminating due to java\.lang\.OutOfMemoryError')) `
+        "exit=$($r.ExitCode) stderr=$($r.Stderr)"
+    Check 'out of memory leaves stdout empty' ($r.Stdout.Count -eq 0) "stdout=$($r.Stdout -join ' | ')"
+
+    # 9. OCI labels from the CIMPAL_VERSION and GIT_SHA build arguments
+    $r = Invoke-Docker @('image', 'inspect', '-f',
+        '{{index .Config.Labels "org.opencontainers.image.version"}} {{index .Config.Labels "org.opencontainers.image.revision"}}', $Image)
+    $labels = ($r.Stdout -join '').Split(' ')
+    Check 'the version label matches the release version' ($labels[0] -eq $ExpectedVersion) "labels=$($r.Stdout -join ' | ')"
+    Check 'the revision label holds a Git commit' (($labels.Count -ge 2) -and ($labels[1] -match '^[0-9a-f]{7,40}$')) `
+        "labels=$($r.Stdout -join ' | ')"
 } finally {
     # Never leave a serve container behind, even when a check above threw.
     if ($container) {

@@ -38,6 +38,23 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | 4 | [TEST-5](TEST-5.md) | Nightly deep tests | TEST-3 | M | Not started |
 | 4 | [TEST-6](TEST-6.md) | GUI smoke tests | TEST-1 | M | Not started |
 
+## Deployment track
+
+Plans for external users: container, sizing, the async `/v1` API, a Python SDK and an Airflow provider. The rationale, requirements (R1–R16) and decisions D-1 to D-13 are in [`deployment/README.md`](deployment/README.md).
+
+| Phase | ID | Work package | Depends on | Size | Status |
+| --- | --- | --- | --- | --- | --- |
+| D0 | [DEP-1](deployment/DEP-1.md) | Container image (delta on CI-3) | CI-1, CI-3 | S | In progress (CI run pending) |
+| D0 | [DEP-2](deployment/DEP-2.md) | Resource statistics, benchmark and sizing guide | DEP-1 (soft) | M | Not started |
+| D0 | [DEP-3](deployment/DEP-3.md) | CLI automation options and Airflow container pattern | DEP-1 | M | Not started |
+| D0 | [DEP-4](deployment/DEP-4.md) | External user guide, first edition | DEP-1, DEP-2, DEP-3 | M | Not started |
+| D1 | [DEP-5](deployment/DEP-5.md) | Async job API (`/v1`) and OpenAPI spec | SEC-1, SEC-2 | L | Not started |
+| D1 | [DEP-6](deployment/DEP-6.md) | Service deployment: proxy, tokens, probes, SIGTERM, logs, manifests | DEP-5, DEP-1 | M | Not started |
+| D1 | [DEP-7](deployment/DEP-7.md) | File exchange: job workspaces, upload and download | DEP-5 | M–L | Not started |
+| D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | Not started |
+| D2 | [DEP-9](deployment/DEP-9.md) | Python SDK `cimpal-client` | DEP-5, DEP-7 | M | Not started |
+| D2 | [DEP-10](deployment/DEP-10.md) | Airflow provider | DEP-9, DEP-3 | M | Not started |
+
 ## Security gaps referenced by the WPs
 
 | ID | Gap | Severity (estimate) | WP |

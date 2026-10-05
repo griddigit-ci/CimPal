@@ -144,6 +144,9 @@ jobs:
           load: true
           provenance: false
           tags: cimpal:smoke
+          build-args: |
+            CIMPAL_VERSION=${{ github.ref_name }}
+            GIT_SHA=${{ github.sha }}
 
       - name: Smoke test
         shell: pwsh
@@ -165,6 +168,9 @@ jobs:
           file: CimPal-CLI/docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            CIMPAL_VERSION=${{ github.ref_name }}
+            GIT_SHA=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
