@@ -29,7 +29,7 @@ import java.util.Map;
  * @param inputBytes          bytes of instance files read
  * @param triplesLoaded       triples parsed from instance files
  * @param javaVersion         {@code Runtime.version()}
- * @param os                  operating system name, version and architecture
+ * @param os                  operating system name and architecture
  */
 public record RunStatsSnapshot(
         long wallMs,

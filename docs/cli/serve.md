@@ -167,7 +167,7 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 | 405 | Method not allowed — wrong HTTP verb for the endpoint |
 | 413 | Request body larger than `--max-body-bytes` |
 | 415 | POST without `Content-Type: application/json` |
-| 500 | Internal error — command crashed (exit 3) |
+| 500 | Internal error — command crashed (exit 3). Out of memory: the body is `{"exitCode":3,...,"error":"Out of memory; the server stops..."}` and the server then exits with 3; restart it with more memory ([sizing guide](../guide/sizing.md)) |
 | 503 | Queue full (`Retry-After` header set) |
 | 504 | Command didn't finish within `--request-timeout` |
 

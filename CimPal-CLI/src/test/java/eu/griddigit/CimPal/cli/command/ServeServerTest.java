@@ -549,4 +549,32 @@ class ServeServerTest {
             Thread.sleep(20);
         }
     }
+
+    @Test
+    void aCommandThatRunsOutOfMemoryStopsTheServerWithExit3() throws Exception {
+        CountDownLatch halted = new CountDownLatch(1);
+        server = ServeServer.start(config().build(), (command, configFile) -> {
+            throw new OutOfMemoryError("Java heap space");
+        }, ServeServer.RequestCheck.NONE, halted::countDown);
+
+        HttpResponse<String> response = send(authorizedPost("/validate", "{}"));
+
+        assertThat(response.statusCode()).isEqualTo(500);
+        assertThat(response.body()).contains("\"exitCode\":3").contains("Out of memory");
+        assertThat(halted.await(10, TimeUnit.SECONDS)).as("the out-of-memory handler ran").isTrue();
+    }
+
+    @Test
+    void anOrdinaryCommandFailureDoesNotStopTheServer() throws Exception {
+        CountDownLatch halted = new CountDownLatch(1);
+        server = ServeServer.start(config().build(), (command, configFile) -> {
+            throw new IllegalStateException("boom");
+        }, ServeServer.RequestCheck.NONE, halted::countDown);
+
+        HttpResponse<String> response = send(authorizedPost("/validate", "{}"));
+
+        assertThat(response.statusCode()).isEqualTo(500);
+        assertThat(response.body()).doesNotContain("Out of memory");
+        assertThat(halted.getCount()).isEqualTo(1);
+    }
 }

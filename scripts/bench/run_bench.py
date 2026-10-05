@@ -167,6 +167,9 @@ class Launcher:
                     "--constraints-root", "/data/constraints", "--output", "/out"]
             docker = ["docker", "run", "--rm", "--read-only", "--tmpfs", "/tmp",
                       "-v", f"{models}:/data:ro", "-v", f"{out_dir}:/out"]
+            if hasattr(os, "getuid"):
+                # The output folder is private (mkdtemp, 0700); on Linux run as its owner.
+                docker += ["--user", f"{os.getuid()}:{os.getgid()}"]
             if heap:
                 docker += ["--memory", f"{heap_mb(heap)}m"]
             if cores:

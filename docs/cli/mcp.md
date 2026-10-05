@@ -156,7 +156,9 @@ Large CGMES models require significant heap. Configure JVM memory in the Claude 
 }
 ```
 
-`-Xmx8g` gives the server 8 GB heap — enough for most full-grid CGMES 3.0 models with multiple concurrent validation workers.
+`-Xmx8g` gives the server 8 GB heap — enough for most full-grid CGMES 3.0 models with multiple concurrent validation workers. The [sizing guide](../guide/sizing.md) has heap figures by model size.
+
+If a tool call runs out of memory, the server answers it with JSON-RPC error `-32603` ("Out of memory; the CimPal MCP server stops") and exits with code 3; the client then restarts it.
 
 ---
 

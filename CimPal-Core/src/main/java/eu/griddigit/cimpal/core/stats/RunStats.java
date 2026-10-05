@@ -104,8 +104,9 @@ public final class RunStats {
                 inputBytes.sum(),
                 triples.sum(),
                 Runtime.version().toString(),
-                System.getProperty("os.name") + " " + System.getProperty("os.version") + " "
-                        + System.getProperty("os.arch"));
+                // Name and architecture only: serve/mcp clients see this, and os.version (the
+                // kernel build) would help them pick exploits.
+                System.getProperty("os.name") + " " + System.getProperty("os.arch"));
     }
 
     /**

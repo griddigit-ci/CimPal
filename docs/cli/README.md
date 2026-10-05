@@ -59,7 +59,7 @@ Without `--stats` the output is unchanged.
 "stats": {"wallMs": 1984, "phases": {"validate": 1651, "shapeDetail": 9}, "cpuMs": 12250,
           "peakHeapBytes": 103234064, "maxHeapBytes": 4213178368, "peakRssBytes": null, "gcMs": 43,
           "availableProcessors": 16, "inputBytes": 1440999, "triplesLoaded": 19977,
-          "javaVersion": "25.0.1+8-LTS-27", "os": "Windows 11 10.0 amd64"}
+          "javaVersion": "25.0.1+8-LTS-27", "os": "Windows 11 amd64"}
 ```
 
 | Field | Meaning |
@@ -74,11 +74,11 @@ Without `--stats` the output is unchanged.
 | `availableProcessors` | Cores the JVM may use; honours container CPU limits and `-XX:ActiveProcessorCount`. |
 | `inputBytes` | Bytes of model files read. Files inside a ZIP are not counted. |
 | `triplesLoaded` | Triples parsed from the input models: the size measure of the [sizing guide](../guide/sizing.md). For `validate --workflow mapping`, per row (a file used by two rows counts twice); for `timestamped`, each file once. The `manual` workflow reports 0. |
-| `javaVersion`, `os` | The runtime. |
+| `javaVersion`, `os` | The Java runtime, and the operating system name and architecture (no version, since `serve` and `mcp` clients see it). |
 
 The schema is `CimPal-CLI/src/test/resources/fixtures/cli-json/stats.schema.json`. Fields may be added later; none will be removed or renamed.
 
-**Out of memory.** A command that runs out of heap ends at once with exit code **3** and one line on stderr: `[ERROR] Out of memory (max heap N MB). Give the JVM more memory (-Xmx, or the container's memory limit); see docs/guide/sizing.md for sizes by model.` It is never reported as exit 1 ("violations found") and never as a failed row in the report. The [Docker image](docker.md#memory-and-cpu) does the same with `-XX:+ExitOnOutOfMemoryError`.
+**Out of memory.** A command that runs out of heap ends at once with exit code **3** and one line on stderr: `[ERROR] Out of memory (max heap N MB). Give the JVM more memory (-Xmx, or the container's memory limit); see docs/guide/sizing.md for sizes by model.` It is never reported as exit 1 ("violations found") and never as a failed row in the report. `serve` answers that request with `{"exitCode":3,...}` (HTTP 500) and then stops with exit 3, because its JVM can't be trusted with another request; `mcp` answers the tool call with JSON-RPC error `-32603` and exits with 3. Restart either with more memory. The [Docker image](docker.md#memory-and-cpu) does the same with `-XX:+ExitOnOutOfMemoryError`.
 
 ---
 

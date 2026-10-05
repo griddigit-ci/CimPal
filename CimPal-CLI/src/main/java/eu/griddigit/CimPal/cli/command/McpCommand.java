@@ -8,6 +8,7 @@ package eu.griddigit.CimPal.cli.command;
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.CliVersion;
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
 import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
 import eu.griddigit.cimpal.core.utils.PathPolicy;
 import picocli.CommandLine;
@@ -195,7 +196,23 @@ public class McpCommand implements Callable<Integer> {
 
     private void handleToolsCall(JsonNode id, JsonNode params) throws Exception {
         String toolName = params.path("name").asText("");
-        ObjectNode result = callTool(toolName, params.path("arguments"));
+        ObjectNode result;
+        try {
+            result = callTool(toolName, params.path("arguments"));
+        } catch (Error e) {
+            if (OutOfMemoryRethrow.find(e).isPresent()) {
+                // Tell the client why the server goes away; main then ends the JVM with exit 3.
+                try {
+                    synchronized (mcpOut) {
+                        mcpOut.println("{\"jsonrpc\":\"2.0\",\"id\":" + (id.isMissingNode() ? "null" : id) + OUT_OF_MEMORY_ERROR);
+                        mcpOut.flush();
+                    }
+                } catch (Throwable ignored) {
+                    // Best effort: the client sees the server's output end instead.
+                }
+            }
+            throw e;
+        }
         if (result == null) {
             sendError(id, -32602, "Unknown tool: " + toolName);
             return;
@@ -560,6 +577,11 @@ obj.set("output", schema("string",
     // -------------------------------------------------------------------------
     // JSON-RPC send helpers
     // -------------------------------------------------------------------------
+
+    /** The rest of a JSON-RPC error line after the id, built before an out-of-memory error needs it. */
+    private static final String OUT_OF_MEMORY_ERROR = ",\"error\":{\"code\":-32603,\"message\":"
+            + "\"Out of memory; the CimPal MCP server stops (exit 3). Restart it with more memory (-Xmx, or the"
+            + " container's memory limit); see docs/guide/sizing.md.\"}}";
 
     private void send(JsonNode id, JsonNode result) throws Exception {
         ObjectNode msg = mapper.createObjectNode();

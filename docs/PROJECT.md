@@ -263,6 +263,11 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
   OCI version and revision labels (build arguments), the example configs and the EUPL PDF.
   `Test-DockerImage.ps1` runs validation, `mcp` and `serve` on a read-only root filesystem.
 
+**Resource statistics and sizing** (DEP-2, `docs/plans/deployment/DEP-2.md`):
+- `--stats` (and config key `stats`) on `validate`, `sparql`, `compare`, `compare-instances`: a last `stats` field in the JSON object (or a `[STATS]` line on stderr) with wall/phase/CPU time, heap-pool peaks, GC, peak RSS (Linux), triples and bytes loaded. Core `core.stats.RunStats` (no static state), passed via `MappingValidationOptions.runStats`.
+- Out of memory always ends with exit 3: `OutOfMemoryRethrow` in `ValidationTools` stops a worker OOM from becoming a failed row; `CimPalCli.main`, `serve` and `mcp` halt via `OutOfMemoryExit`.
+- `scripts/bench/` (Python, stdlib): seeded synthetic model generator and benchmark runner (`--find-min-heap`, `--core-sweep`, `--verify`, `--budget` for TEST-5). Results and rule of thumb in `docs/guide/sizing.md` (0.6 GB heap per million triples, 2–4 cores).
+
 **Deployment track** (`docs/plans/deployment/`, DEP-1 to DEP-10): container, sizing, CLI automation
 options, an async `/v1` API, a Python SDK and an Airflow provider for external users. It supersedes
 the ordering of the *REST API — discovery and implementation plan* section below.
@@ -271,8 +276,7 @@ the ordering of the *REST API — discovery and implementation plan* section bel
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)): its
 "Docker image" job needs a first green run, and after the first release that pushes the image the
-GHCR package must be made public. DEP-1 needs a green "Docker image" job with its new checks.
-Then follow the deployment track: DEP-2 (benchmark and sizing) and DEP-3 (CLI automation options).
+GHCR package must be made public. DEP-1 is done. DEP-2 is in review (PR #54); next on the deployment track is DEP-3 (CLI automation options).
 
 ---
 
@@ -436,6 +440,8 @@ CimPal/
 - `SHACLValidator` has no `PathPolicy` check on data files, and probes a shape file with `Files.isRegularFile` before `ShapeArchive.read` checks the policy. Add both before wiring it into `serve`/`mcp`/`run`.
 
 **`MainGuiFxmlLoadTest` times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there. CI runs it; locally use `-DexcludedGroups=gui`.
+
+**`validate --workflow manual` always exits 0** (`ValidateCommand.runManualWorkflow`), even when rows failed or violated; it has no structured summary. Found by the DEP-2 security review, not changed there. A CI script can't rely on its exit code.
 
 **Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
