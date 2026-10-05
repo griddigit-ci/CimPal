@@ -64,7 +64,8 @@ public class MappingValidator {
                     options.getMaxResultsPerConstraint(),
                     options.getEngine(),
                     options.isExportTurtleReports(), options.isExportDetailedTimestampReports(),
-                    options.isIncrementalTimestampValidation());
+                    options.isIncrementalTimestampValidation(),
+                    options.getRunStats());
             return new MappingValidationSummary(run.reports(), run.conforming(), run.violations(), run.errors());
         }
 
@@ -78,7 +79,8 @@ public class MappingValidator {
                 options.getXmlBase(),
                 options.getMaxResultsPerConstraint(),
                 options.getEngine(),
-                options.isExportTurtleReports());
+                options.isExportTurtleReports(),
+                options.getRunStats());
         return new MappingValidationSummary(List.of(run.reportPath()), run.conforming(), run.violations(), run.errors());
     }
 }

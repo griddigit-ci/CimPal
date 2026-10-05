@@ -97,6 +97,7 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--samples` | integer | `3` (json mode) / `0` (text mode) | Per-shape detail in JSON output: max focus-node samples per shape group. `0` disables shape groups entirely. Positive values auto-enable `--export-turtle`. |
 | `--export-turtle` | flag | off | Write a `.ttl` SHACL validation report beside each Excel report. |
 | `--previous-comparison` | file path | — | XLSX from a previous timestamped run, for the comparison workbook. Timestamped workflow only. |
+| `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 | `--dry-run` | flag | off | Print the resolved config and exit without running anything. |
 
 ---
@@ -227,6 +228,8 @@ The `--workers 0` default sizes workers from the JVM heap: roughly one worker pe
 
 Each worker loads a full combined data graph into memory. A CGMES 3.0 full-grid model typically occupies 2–4 GB per worker.
 
+`--stats` reports what a run actually used (peak heap, triples loaded, CPU time). For heap and core recommendations by model size, see the [sizing guide](../guide/sizing.md). A run that runs out of memory ends with exit code 3, never 1.
+
 ---
 
 ## Exit codes
@@ -236,4 +239,4 @@ Each worker loads a full combined data graph into memory. A CGMES 3.0 full-grid 
 | 0 | Validation ran — no violations |
 | 1 | Validation ran — violations found (check the Excel report) |
 | 2 | Bad input — missing file, wrong path, unknown workflow name |
-| 3 | Internal error — unexpected exception (check stderr) |
+| 3 | Internal error — unexpected exception (check stderr); out of memory included (one `[ERROR] Out of memory` line on stderr; see [resource statistics](README.md#resource-statistics---stats)) |

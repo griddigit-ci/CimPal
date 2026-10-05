@@ -6,6 +6,7 @@
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
+import eu.griddigit.cimpal.core.stats.RunStats;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.Node;
@@ -391,6 +392,31 @@ public class ValidationTools {
                                                           boolean exportDetailedTimestampReports,
                                                           boolean incrementalTimestampValidation)
             throws IOException {
+        return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot, outputBaseDir,
+                threadCount, dataTypeMap, xmlBase, previousComparisonCsv, maxResultsPerConstraint,
+                validationEngine, exportTurtleReports, exportDetailedTimestampReports,
+                incrementalTimestampValidation, null);
+    }
+
+    /**
+     * As above; {@code stats}, when not null, receives the triples and bytes of every instance
+     * file loaded (each file once, counted when its model cache is dropped).
+     */
+    static ValidationTimestampedRunSummary validateByTimestampedMapping(Path mappingCsvPath,
+                                                          Path inputPath,
+                                                          Path constraintsRoot,
+                                                          Path outputBaseDir,
+                                                          int threadCount,
+                                                          Map<String, RDFDatatype> dataTypeMap,
+                                                          String xmlBase,
+                                                          Path previousComparisonCsv,
+                                                          int maxResultsPerConstraint,
+                                                          ValidationEngine validationEngine,
+                                                          boolean exportTurtleReports,
+                                                          boolean exportDetailedTimestampReports,
+                                                          boolean incrementalTimestampValidation,
+                                                          RunStats stats)
+            throws IOException {
 
         if (maxResultsPerConstraint < 0) {
             throw new IllegalArgumentException("maxResultsPerConstraint must be zero or greater");
@@ -512,7 +538,7 @@ public class ValidationTools {
                             (incrementalTimestampValidation
                                     ? executeIncrementalTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
                                     shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
-                                    dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine, inputGroup.name,
+                                    dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine, inputGroup.name, stats,
                                     (timestampGroup, results) -> {
                                         if (!exportDetailedTimestampReports) return;
                                         submitTimestampReport(timestampReportFutures, reportQueue, timestampGroup,
@@ -522,7 +548,7 @@ public class ValidationTools {
                                     : executeTimestampBatches(plannedTimestamps, executionPlan, constraintsRoot,
                                     shapesCache, staticXmlModelCache, inputGroup.zipEntriesByVirtualPath,
                                     dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
-                                    threadCount <= 0, inputGroup.name,
+                                    threadCount <= 0, inputGroup.name, stats,
                                     (timestampGroup, results) -> {
                                         if (!exportDetailedTimestampReports) return;
                                         submitTimestampReport(timestampReportFutures, reportQueue, timestampGroup,
@@ -616,6 +642,7 @@ public class ValidationTools {
                     consoleReport("Timestamped summary report created: " + summaryReport.toAbsolutePath());
                 }
 
+                countCachedModels(stats, staticXmlModelCache);
                 staticXmlModelCache.clear();
 
                 printMemory("after clearing staticXmlModelCache inputGroup=" + inputGroup.name);
@@ -772,6 +799,26 @@ public class ValidationTools {
                                          ValidationEngine validationEngine,
                                          boolean exportTurtleReports
     ) throws IOException {
+        return validateByMapping(mappingCsvPath, modelsBaseDir, constraintsRoot, outputBaseDir, threadCount,
+                dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine, exportTurtleReports, null);
+    }
+
+    /**
+     * As above; {@code stats}, when not null, receives the triples and bytes of the instance data
+     * of every row (a file used by several rows is parsed, and counted, once per row).
+     */
+    static ValidationRunSummary validateByMapping(Path mappingCsvPath,
+                                         Path modelsBaseDir,
+                                         Path constraintsRoot,
+                                         Path outputBaseDir,
+                                         int threadCount,
+                                         Map<String, RDFDatatype> dataTypeMap,
+                                         String xmlBase,
+                                         int maxResultsPerConstraint,
+                                         ValidationEngine validationEngine,
+                                         boolean exportTurtleReports,
+                                         RunStats stats
+    ) throws IOException {
 
         validationEngine = validationEngine == null ? ValidationEngine.APACHE_JENA : validationEngine;
         final ValidationEngine selectedValidationEngine = validationEngine;
@@ -847,7 +894,7 @@ public class ValidationTools {
                 try {
                     return validateOneRow(idx, row, modelsBaseDir, constraintsRoot, shapesCache,
                             dataTypeMap, xmlBase, maxResultsPerConstraint, selectedValidationEngine,
-                            targetShapeWorkers);
+                            targetShapeWorkers, stats);
                 } catch (Throwable t) {
                     System.err.println("[WORKER_ERROR][" + Thread.currentThread().getName() + "][row " + idx + "]");
                     logError("Unhandled exception", t);
@@ -926,6 +973,7 @@ public class ValidationTools {
                     continue;
 
                 } catch (ExecutionException ex) {
+                    OutOfMemoryRethrow.ifCause(ex);
                     err++;
 
                     System.err.println("[EXECUTION_ERROR] future index=" + i);
@@ -1106,7 +1154,8 @@ public class ValidationTools {
                                                        String xmlBase,
                                                        int maxResultsPerConstraint,
                                                        ValidationEngine validationEngine,
-                                                       int targetShapeWorkers) {
+                                                       int targetShapeWorkers,
+                                                       RunStats stats) {
 
         long rowStart = System.currentTimeMillis();
 
@@ -1213,6 +1262,7 @@ public class ValidationTools {
             long dataStart = System.currentTimeMillis();
 
             Model dataModel = loadRdfXmlFromFilesWithDatatypeMap(xmlFiles, dataTypeMap, xmlBase, rowIdx);
+            countLoaded(stats, xmlFiles, dataModel.size());
 
             dbgRow(rowIdx, "DONE loadRdfXmlFromFilesWithDatatypeMap dataTriples=" + dataModel.size(),
                     dataStart);
@@ -1325,6 +1375,38 @@ public class ValidationTools {
     }
 
 
+
+    /**
+     * {@code --stats} (DEP-2): adds loaded triples and the on-disk size of their files. ZIP
+     * entries (virtual paths) add no bytes. Does nothing when {@code stats} is null.
+     */
+    static void countLoaded(RunStats stats, Collection<Path> files, long triples) {
+        if (stats == null) {
+            return;
+        }
+        stats.addTriples(triples);
+        for (Path file : files) {
+            try {
+                if (Files.isRegularFile(file)) {
+                    stats.addInputBytes(Files.size(file));
+                }
+            } catch (IOException e) {
+                // A file that can't be sized is not counted; statistics never fail a run.
+            }
+        }
+    }
+
+    /** As {@link #countLoaded}, for a model cache about to be dropped. */
+    static void countCachedModels(RunStats stats, Map<Path, Model> cache) {
+        if (stats == null) {
+            return;
+        }
+        long triples = 0;
+        for (Model model : cache.values()) {
+            triples += model.size();
+        }
+        countLoaded(stats, cache.keySet(), triples);
+    }
 
     private static Model loadRdfXmlFromFilesWithDatatypeMap(Collection<Path> xmlFiles,
                                                             Map<String, RDFDatatype> dataTypeMap,
@@ -5345,6 +5427,7 @@ public class ValidationTools {
                 ));
 
             } catch (ExecutionException ex) {
+                OutOfMemoryRethrow.ifCause(ex);
                 results.add(new ValidationTaskResult(
                         i + 1,
                         ValidationExcelWriter.CaseFolder.UNKNOWN,
@@ -5385,6 +5468,7 @@ public class ValidationTools {
             ValidationEngine validationEngine,
             boolean useSpareWorkersForTargetShapes,
             String inputGroupName,
+            RunStats stats,
             TimestampResultConsumer completedTimestampConsumer) throws IOException {
         Map<TimestampGroup, List<ValidationTaskResult>> results = new LinkedHashMap<>();
         List<Map.Entry<TimestampGroup, ResolvedRowsAndInputChecks>> entries =
@@ -5409,6 +5493,7 @@ public class ValidationTools {
                                     dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
                                     useSpareWorkersForTargetShapes, inputGroupName);
                         } finally {
+                            countCachedModels(stats, timestampXmlModelCache);
                             timestampXmlModelCache.clear();
                             printMemory("after clearing timestampXmlModelCache " + inputGroupName
                                     + " " + group.timestamp);
@@ -5428,6 +5513,7 @@ public class ValidationTools {
                         Thread.currentThread().interrupt();
                         throw new IOException("Timestamp batch validation interrupted", ex);
                     } catch (ExecutionException | TimeoutException ex) {
+                        OutOfMemoryRethrow.ifCause(ex);
                         futures.get(i).cancel(true);
                         throw new IOException("Timestamp batch validation failed", ex);
                     }
@@ -5457,6 +5543,7 @@ public class ValidationTools {
             int maxResultsPerConstraint,
             ValidationEngine validationEngine,
             String inputGroupName,
+            RunStats stats,
             TimestampResultConsumer completedTimestampConsumer) throws IOException {
         Map<TimestampGroup, List<ValidationTaskResult>> allResults = new LinkedHashMap<>();
         // Timestamp groups must remain ordered because each row's state is its baseline for
@@ -5490,6 +5577,7 @@ public class ValidationTools {
                             Thread.currentThread().interrupt();
                             throw new IOException("Incremental timestamp validation interrupted", ex);
                         } catch (ExecutionException | TimeoutException ex) {
+                            OutOfMemoryRethrow.ifCause(ex);
                             futures.get(rowNumber).cancel(true);
                             throw new IOException("Incremental timestamp row validation failed", ex);
                         }
@@ -5498,6 +5586,7 @@ public class ValidationTools {
                     rowPool.shutdownNow();
                 }
             } finally {
+                countCachedModels(stats, timestampCache);
                 timestampCache.clear();
             }
             allResults.put(timestamp, results);
@@ -5987,6 +6076,7 @@ public class ValidationTools {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while saving timestamp report", ex);
         } catch (ExecutionException | TimeoutException ex) {
+            OutOfMemoryRethrow.ifCause(ex);
             reportFuture.cancel(true);
             throw new IOException("Timestamp report generation failed", ex);
         }
@@ -6311,6 +6401,7 @@ public class ValidationTools {
                     Thread.currentThread().interrupt();
                     throw new IOException("Target-shape validation interrupted", ex);
                 } catch (ExecutionException | TimeoutException ex) {
+                    OutOfMemoryRethrow.ifCause(ex);
                     future.cancel(true);
                     throw new IOException("Target-shape validation failed", ex);
                 }
@@ -6403,6 +6494,7 @@ public class ValidationTools {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("Target-shape validation interrupted", ex);
                 } catch (ExecutionException | TimeoutException ex) {
+                    OutOfMemoryRethrow.ifCause(ex);
                     future.cancel(true);
                     throw new IllegalStateException("Target-shape validation failed", ex);
                 }

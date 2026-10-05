@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/griddigit-ci/CimPal/schemas/cimpal-stats/1",
+  "$comment": "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+. The \"stats\" object that --stats adds to the JSON output of validate, sparql, compare and compare-instances (DEP-2). Additive: new fields may appear in later versions.",
+  "title": "CimPal run statistics",
+  "type": "object",
+  "required": ["wallMs", "phases", "cpuMs", "peakHeapBytes", "maxHeapBytes", "peakRssBytes", "gcMs",
+               "availableProcessors", "inputBytes", "triplesLoaded", "javaVersion", "os"],
+  "additionalProperties": false,
+  "properties": {
+    "wallMs": {"type": "integer", "minimum": 0, "description": "Wall time from the start of the command until its output is written."},
+    "phases": {
+      "type": "object",
+      "description": "Wall time per named phase, e.g. load, query, compare, validate, shapeDetail.",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "cpuMs": {"type": ["integer", "null"], "minimum": 0, "description": "Process CPU time, all threads; null where the JVM can't report it."},
+    "peakHeapBytes": {"type": "integer", "minimum": 0, "description": "Sum of each heap pool's own peak usage; an upper bound that can exceed maxHeapBytes, because the pools peak at different moments."},
+    "maxHeapBytes": {"type": "integer", "minimum": 0, "description": "The heap limit of the run."},
+    "peakRssBytes": {"type": ["integer", "null"], "minimum": 0, "description": "Peak resident set size (Linux VmHWM); null elsewhere."},
+    "gcMs": {"type": "integer", "minimum": 0, "description": "Garbage-collection time."},
+    "availableProcessors": {"type": "integer", "minimum": 1},
+    "inputBytes": {"type": "integer", "minimum": 0, "description": "Bytes of input model files read (ZIP entries not counted)."},
+    "triplesLoaded": {"type": "integer", "minimum": 0, "description": "Triples parsed from the input models."},
+    "javaVersion": {"type": "string", "minLength": 1},
+    "os": {"type": "string", "minLength": 1}
+  }
+}

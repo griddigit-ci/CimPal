@@ -30,6 +30,7 @@
 | Document | What it covers |
 |---|---|
 | [ci-pipeline](ci-pipeline.md) | Complete command collection for a CI validation run, with placeholder notes |
+| [sizing guide](../guide/sizing.md) | Heap, cores and time by model size, measured with `--stats` ([resource statistics](README.md#resource-statistics---stats)) and `scripts/bench/` |
 
 Testing the rules of a constraint set against Conform / NonConform models is not a CLI task: it is the GUI's **SHACL ▸ Constraints Operations ▸ Test SHACL rules against Conform / NonConform models**, documented in the in-app help.
 

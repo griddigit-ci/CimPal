@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.core.models;
 
+import eu.griddigit.cimpal.core.stats.RunStats;
 import eu.griddigit.cimpal.core.utils.DatatypeMapPreset;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -41,6 +42,7 @@ public class MappingValidationOptions {
     private final boolean exportTurtleReports;
     private final boolean exportDetailedTimestampReports;
     private final boolean incrementalTimestampValidation;
+    private final RunStats runStats;
 
     private MappingValidationOptions(Builder b) {
         this.mappingCsv = b.mappingCsv;
@@ -59,6 +61,7 @@ public class MappingValidationOptions {
         this.exportTurtleReports = b.exportTurtleReports;
         this.exportDetailedTimestampReports = b.exportDetailedTimestampReports;
         this.incrementalTimestampValidation = b.incrementalTimestampValidation;
+        this.runStats = b.runStats;
     }
 
     public static Builder builder() {
@@ -135,6 +138,11 @@ public class MappingValidationOptions {
         return incrementalTimestampValidation;
     }
 
+    /** Collector for the run's resource statistics ({@code --stats}), or {@code null}. */
+    public RunStats getRunStats() {
+        return runStats;
+    }
+
     // ============ the Builder ============
 
     public static class Builder {
@@ -155,6 +163,7 @@ public class MappingValidationOptions {
         private boolean exportTurtleReports = false;
         private boolean exportDetailedTimestampReports = true;
         private boolean incrementalTimestampValidation = false;
+        private RunStats runStats = null;
 
         /** The mapping CSV: one row per validation, columns {@code xml_inputs, ttl[, notes]}. */
         public Builder mappingCsv(Path mappingCsv) {
@@ -266,6 +275,15 @@ public class MappingValidationOptions {
         /** Enables conservative, triple-delta based validation between timestamp groups. */
         public Builder incrementalTimestampValidation(boolean incrementalTimestampValidation) {
             this.incrementalTimestampValidation = incrementalTimestampValidation;
+            return this;
+        }
+
+        /**
+         * Counts the triples and bytes of the instance data loaded into {@code runStats}
+         * (DEP-2, {@code --stats}). Optional; the validation result is the same with or without it.
+         */
+        public Builder runStats(RunStats runStats) {
+            this.runStats = runStats;
             return this;
         }
 

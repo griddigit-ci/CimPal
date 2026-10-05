@@ -284,9 +284,11 @@ required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/
 "Docker image" job needs a first green run, and after the first release that pushes the image the
 GHCR package must be made public. DEP-1 needs a green "Docker image" job with its new checks.
 Then follow the deployment track: DEP-2 (benchmark and sizing) and DEP-3 (CLI automation options).
-The SHACL rule test rewrite (branch `feature/shacl-rule-tester`) needs a review and a PR into
-`devel`; whether the rule test should come back to the CLI/MCP, with SEC-2 path checks and a JSON
-summary, is open.
+The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
+`feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
+with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
+`ShaclAutoTesterTest`, for the `ShaclAutoTester` that PR #53 deletes: whichever merges second drops
+it, as `ShaclRuleTesterTest` covers the replacement.
 
 ---
 
@@ -447,8 +449,6 @@ CimPal/
 - Entry names with C1 controls or bidi/format characters (U+202E and the like) pass `LogSanitizer` and `safeZipEntryName`; they can't forge log lines but can spoof how a name displays. Widening `LogSanitizer`'s class would change every log, so it was left as it is.
 - External entities in RDF/XML are not resolved by Jena (pinned by `ShapeArchiveTest.externalEntitiesInRdfEntriesAreNotResolved`).
 - `SHACLValidator` has no `PathPolicy` check on data files, and probes a shape file with `Files.isRegularFile` before `ShapeArchive.read` checks the policy. Add both before wiring it into `serve`/`mcp`/`run`.
-
-**Core's coverage floor is above what a clean build measures (found 2026-10-05).** `19e257f` raised `CimPal-Core/coverage-baseline.properties` to line 0.4138 / branch 0.2873 from a measurement of 5092/12158 lines. A clean checkout of that `devel` measures 4208/12158 (0.3461) on this machine with the same 286 tests, so `mvn verify` fails at Core's ratchet before Main and CLI run. The difference may be JaCoCo data accumulated across runs (`prepare-agent` appends to `target/jacoco.exec`) when the floor was measured; CI's result was not checked. `feature/shacl-rule-tester` raises Core to 0.3854 / 0.2737, still below the floor. Re-measuring from `mvn clean verify` and lowering the floor needs `-AllowDecrease` and a commit saying why (maintainer's call). Until then, `-Djacoco.haltOnFailure=false` lets the other modules run.
 
 **`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 
