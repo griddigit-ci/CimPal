@@ -162,8 +162,13 @@ jobs:
           docker buildx build --platform linux/amd64,linux/arm64 --output type=cacheonly
           -f CimPal-CLI/docker/Dockerfile .
 
+      # The version label must match the CLI's --version, which reads <cimpal.version> too.
       - name: Build for the smoke test
-        run: docker buildx build --load --provenance=false -t cimpal:ci -f CimPal-CLI/docker/Dockerfile .
+        run: >-
+          docker buildx build --load --provenance=false -t cimpal:ci
+          --build-arg "CIMPAL_VERSION=$(grep -oPm1 '(?<=<cimpal.version>)[^<]+' pom.xml)"
+          --build-arg "GIT_SHA=${GITHUB_SHA}"
+          -f CimPal-CLI/docker/Dockerfile .
 
       - name: Smoke test
         shell: pwsh

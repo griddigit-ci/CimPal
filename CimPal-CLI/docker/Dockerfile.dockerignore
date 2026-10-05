@@ -8,3 +8,5 @@
 !CimPal-CLI/target/CimPal-CLI.jar
 !CimPal-CLI/docker/entrypoint.sh
 !LICENSE.md
+!eupl_v1.2_en.pdf
+!CimPal-CLI/configs/*.json
