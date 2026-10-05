@@ -32,6 +32,8 @@ Starts a Model Context Protocol (MCP) server that exposes all CimPal operations 
 
 A ready-to-edit template is at `CimPal-CLI/configs/claude-desktop-config.json`.
 
+**From the Docker image** (no local Java needed): use `"command": "docker"` with `"args": ["run", "-i", "--rm", "-v", "C:/Data:/data", "ghcr.io/griddigit-ci/cimpal:latest", "mcp"]`. Tool arguments are then container paths such as `/data/models`. The template is `CimPal-CLI/configs/claude-desktop-config-docker.json`; details in [docker](docker.md#mcp-server-for-claude-desktop).
+
 ---
 
 ## All flags

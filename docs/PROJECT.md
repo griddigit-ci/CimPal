@@ -199,7 +199,7 @@ The shared Claude Code setup is committed under `.claude/`:
 **CI** (added by CI-1): `.github/workflows/ci.yml` runs `mvn -B verify` on windows-latest and
 ubuntu-latest (under Xvfb) for every push and PR to `devel` and `master`. It publishes a per-module
 test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest` is tagged `gui`
-(exclude with `-DexcludedGroups=gui`). The release workflow is unchanged.
+(exclude with `-DexcludedGroups=gui`). A third job, "Docker image", is described below.
 
 **Test harness** (added by TEST-1):
 - Shared test helpers are in Core's `eu.griddigit.cimpal.core.testsupport`: `TestModels`,
@@ -241,9 +241,26 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - SPARQL `SERVICE` is refused (`SparqlServicePolicy`) and switched off globally in the CLI, the GUI and `ValidationTools`. Shapes with `SERVICE` are refused before they go to the Python engines, and the Python worker disables rdflib `SERVICE`. Jena 6.2 runs `SERVICE` by default (finding in `SEC-2.md`).
 - `serve` now passes `--format json` only to the four commands that support it. Before, the other six endpoints always failed with "Unknown option".
 
+**Docker image** (added by CI-3, `docs/plans/CI-3.md`):
+- `CimPal-CLI/docker/Dockerfile` copies the built `CimPal-CLI.jar` onto `eclipse-temurin:25-jre-noble`
+  (pinned by digest). Maven never runs inside Docker.
+- The image runs as `10001:10001` (`cimpal`) in `/data`, which is also the default root for `mcp`
+  and `serve`. Any other UID gets a private temporary home. `entrypoint.sh` keeps the base image's
+  CA-certificate hook off stdout.
+- `release.yml` has a second job, on Ubuntu. It downloads the `CimPal-CLI.jar` just published and
+  checks it against the hash the build job recorded, then smoke-tests the image. It then pushes
+  `ghcr.io/griddigit-ci/cimpal:<tag>` (and `:latest` when it is the newest release) for
+  `linux/amd64` and `linux/arm64`, with SBOM and provenance attestations.
+- `ci.yml` builds both platforms and runs `scripts/Test-DockerImage.ps1` on every push and PR.
+- The CLI version now comes from the pom (`CliVersion`, a filtered resource), so `--version`,
+  `serve` `/health`, the `mcp` `serverInfo` and the image tag agree.
+- Usage: `docs/cli/docker.md`. In a container `serve` needs `--host 0.0.0.0 --allow-remote`, the
+  token from `CIMPAL_API_TOKEN`, and the same port inside and outside on the host loopback (Host check).
+
 **Next steps:** merge SEC-1 ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)), then SEC-2, following the
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
-required is a maintainer action.
+required is a maintainer action. CI-3 still needs its first green CI run on GitHub, and after the first
+release that pushes the image the GHCR package must be made public.
 
 ---
 
@@ -262,7 +279,7 @@ required is a maintainer action.
 | 8 | `serve` | Local HTTP daemon (JDK HttpServer, localhost:7474), bearer token, Host/Origin checks, bounded queue |
 | 9 | `mcp` | MCP 2024-11-05 stdio server, 10 typed tools |
 
-All 13 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25.
+All 13 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25. Each release also publishes that JAR as the Docker image `ghcr.io/griddigit-ci/cimpal` (see `docs/cli/docker.md`).
 
 ### How `serve` and `mcp` execute commands (shared mechanism)
 
@@ -331,6 +348,7 @@ CimPal/
 │       ├── run.md                   ← pipeline runner reference
 │       ├── serve.md                 ← HTTP daemon reference
 │       ├── mcp.md                   ← MCP server reference
+│       ├── docker.md                ← running the CLI from the Docker image
 │       ├── ci-pipeline.md           ← CI command collection (fill in paths)
 │       └── shape-dev-loop.md        ← shape development workflow
 │
@@ -344,13 +362,16 @@ CimPal/
 │   │   ├── gen-instances.json
 │   │   ├── pipeline-full-validation.json, pipeline-shape-dev.json
 │   │   ├── pipeline-profile-migration.json
-│   │   └── claude-desktop-config.json  ← MCP config for Claude Desktop
+│   │   ├── claude-desktop-config.json  ← MCP config for Claude Desktop
+│   │   └── claude-desktop-config-docker.json  ← same, running the Docker image
+│   ├── docker/                      ← Dockerfile, Dockerfile.dockerignore, entrypoint.sh (CI-3)
 │   └── src/main/java/
 │       ├── module-info.java             ← requires: picocli, jackson, poi, jdk.httpserver
 │       └── eu/griddigit/CimPal/
 │           ├── generators/ManifestService.java   ← legacy, preserved
 │           └── cli/
 │               ├── CimPalCli.java       ← root @Command
+│               ├── CliVersion.java      ← version from the pom (filtered cimpal-cli-version.properties)
 │               ├── ExitCode.java        ← 0/1/2/3 constants
 │               └── command/
 │                   ├── ValidateCommand.java    ← extractShapeGroups() for Phase 7
@@ -434,7 +455,11 @@ CimPal/
 
 **`serve` serialises all requests.** The single-threaded executor prevents concurrent validation runs. For team use (multiple users sharing one server) this is a bottleneck. Addressed in the REST API plan below.
 
-**`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output.
+**`POST /shutdown` does not end the `serve` process.** It stops the HTTP listener, but `ServeCommand.call()` blocks on `Thread.currentThread().join()` and the executor thread is non-daemon, so the JVM keeps running (in Docker, the container stays up). Stop it with `Ctrl-C` or `docker stop`. Found during CI-3 and handed to SEC-1.
+
+**The Docker image has no Python.** Only the `APACHE_JENA` engine works in the container; `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` need a local install. Until SEC-1 lands, `serve` in a container must be published on the host loopback only (`-p 127.0.0.1:7474:7474`).
+
+**`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output, or the Docker image (`claude-desktop-config-docker.json`), which locks nothing on the host.
 
 **`MainController` static state bag.** Several GUI tabs still share state through static fields. Do not add new static fields. The pattern of delegating from Main to Core (introduced in Phase 5) is the correct long-term direction.
 

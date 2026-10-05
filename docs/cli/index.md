@@ -23,6 +23,7 @@
 | [run](run.md) | Full reference for the `run` command — declarative JSON pipeline runner |
 | [serve](serve.md) | Full reference for the `serve` command — local HTTP daemon for agent integration |
 | [mcp](mcp.md) | Full reference for the `mcp` command — Model Context Protocol server for Claude |
+| [docker](docker.md) | Running the CLI from the Docker image `ghcr.io/griddigit-ci/cimpal` — mounts, paths, MCP, `serve`, certificates |
 
 ## Workflows / How-to
 
