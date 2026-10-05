@@ -108,7 +108,7 @@ Claude Desktop starts the container and talks to it over stdio. Use `-i` (keep s
 }
 ```
 
-- Tool arguments are container paths (`/data/...`), so tell the agent where your files are mounted.
+- Tool arguments are container paths (`/data/...`), so tell the agent where your files are mounted. `/data`, the working directory, is also the default `--root`, so `mcp` refuses paths outside it. Mount everything the tools need below `/data`, or add `--root` after `mcp`. Never mount your home folder or a drive root at `/data`: the container can't tell, so SEC-2's refusal of those as default roots doesn't help there.
 - Prefer read-only inputs and a separate writable output folder: `"-v", "C:/Data/models:/data/models:ro", "-v", "C:/Data/out:/data/out"`.
 - For a GitHub token, add `"-e", "GITHUB_TOKEN"` to `args` (no value, before the image name) and the value under `"env": {"GITHUB_TOKEN": "..."}` of the server entry. Docker then takes it from the environment Claude Desktop starts it with. A value written into `args` would be visible to anyone who can list processes.
 - The ready-to-edit template is `CimPal-CLI/configs/claude-desktop-config-docker.json`.
@@ -120,26 +120,50 @@ Claude Desktop starts the container and talks to it over stdio. Use `-i` (keep s
 
 ## `serve`
 
-> **Not for network use yet.** `serve` has no authentication and an open `/shutdown` (gap G1, closed by work package SEC-1). Anyone who can reach its port can read and write every file the container can see.
+`serve` needs a bearer token on every request except `GET /health`, and it checks the Host header ([serve](serve.md#security)). In a container that means:
+- **`--host 0.0.0.0 --allow-remote`.** The server has to listen on all interfaces, because `localhost` there is the container itself. It then prints a warning about the non-loopback address; that is expected.
+- **A new token for each start, through `CIMPAL_API_TOKEN`** (at least 32 characters).
+  - `-e CIMPAL_API_TOKEN` without a value copies it from the environment of the `docker` command. So it doesn't appear on the docker command line, and you don't have to fetch a token file out of the container.
+  - Never write `-e CIMPAL_API_TOKEN=<value>`.
+  - If `docker logs` shows "Bearer token written to ...", the variable didn't arrive.
+- **The same port number inside and outside, on the host loopback.** The Host header must be `localhost`, `127.0.0.1` or `[::1]` with the port the server listens on. So `-p 127.0.0.1:7474:7474` works, but a remapped `-p 127.0.0.1:8080:7474` gets 403. For another port, change both: `--port 8080` and `-p 127.0.0.1:8080:8080`.
 
-Inside a container `serve` has to listen on all interfaces, because `localhost` there is the container itself. So keep the port on the host's loopback, put the container on a network of its own, and give it as little as possible:
-
-```
+PowerShell (also Windows PowerShell 5.1):
+```powershell
+$bytes = [byte[]]::new(32); [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$token = -join ($bytes | ForEach-Object { $_.ToString('x2') })
 docker network create cimpal-serve
-docker run -d --name cimpal-serve --network cimpal-serve -p 127.0.0.1:7474:7474 `
+$env:CIMPAL_API_TOKEN = $token
+docker run -d --rm --name cimpal-serve --network cimpal-serve -p 127.0.0.1:7474:7474 -e CIMPAL_API_TOKEN `
   -v "C:\Data\models:/data/models:ro" -v "C:\Data\out:/data/out" `
-  ghcr.io/griddigit-ci/cimpal:latest serve --host 0.0.0.0
-curl http://localhost:7474/health
-docker stop cimpal-serve
+  ghcr.io/griddigit-ci/cimpal:latest serve --host 0.0.0.0 --allow-remote
+$env:CIMPAL_API_TOKEN = $null
+Invoke-RestMethod http://localhost:7474/commands -Headers @{ Authorization = "Bearer $token" }
 ```
 
-- The dedicated network keeps other containers away from the port. On the default bridge network, every container can reach it.
-- Mount the inputs read-only; only the output folder is writable.
-- Pass no secrets, such as `GITHUB_TOKEN`, to a `serve` container until SEC-1. Any caller could make CimPal use them.
-- Never use `-p 7474:7474` or `-P`. They publish on every interface of the host, and on Linux Docker's published ports can bypass host firewall rules such as ufw.
-- On Linux, use Docker Engine 28 or later. It blocks direct access to container ports from other hosts on the local network, which older engines allowed.
-- Stop it with `docker stop`. `POST /shutdown` stops the HTTP listener but leaves the process, and so the container, running. This is a known issue, handed to SEC-1.
-- Request paths are container paths, as above.
+Bash:
+```bash
+token=$(openssl rand -hex 32)
+docker network create cimpal-serve
+CIMPAL_API_TOKEN=$token docker run -d --rm --name cimpal-serve --network cimpal-serve \
+  --user "$(id -u):$(id -g)" -p 127.0.0.1:7474:7474 -e CIMPAL_API_TOKEN \
+  -v "$PWD/models:/data/models:ro" -v "$PWD/out:/data/out" \
+  ghcr.io/griddigit-ci/cimpal:latest serve --host 0.0.0.0 --allow-remote
+curl -H @<(printf 'Authorization: Bearer %s\n' "$token") http://localhost:7474/commands
+```
+
+In Bash `$token` is not exported. `curl -H @file` (curl 7.55 or later) reads the header from the process substitution, so the token stays off curl's command line too.
+
+- **The token is the real barrier.** The Host check stops browsers, which defeats DNS rebinding, but any other client can send `Host: localhost:7474`. Other local users, processes on the host, and on Linux anything that can reach the container's bridge IP can all try the port. Only the token keeps them out, so treat it like a password: a new one per start, never shared or reused.
+- **Request paths** are container paths. They must lie under the allowed roots, which default to `/data`, the working directory; add `--root` for others. Existing outputs need `"overwrite": true`.
+- **Never mount your home folder or a drive root at `/data`.** Inside the container `serve` and `mcp` only see `/data`, so SEC-2's refusal of a home folder or drive root as the default root can't protect you. Mount only what the commands need.
+- **Stopping:** use `POST /shutdown` (token and `Content-Type: application/json`) or `docker stop`. Either way the container ends, and `--rm` removes it together with its environment.
+- **Traffic is plain HTTP**, so keep the port on the host loopback. Never use `-p 7474:7474` or `-P`: they publish on every interface of the host, and on Linux Docker's published ports can bypass host firewall rules such as ufw.
+- **Not with `--network host`.** There `-p` is ignored, and `--host 0.0.0.0 --allow-remote` listens on every interface of the host. With host networking, use `serve --host 127.0.0.1` without `--allow-remote`.
+- **The dedicated network** keeps containers on the default bridge from connecting at all. Mount inputs read-only, with only the output folder writable.
+- **`docker inspect`** shows the container's environment, token included, to anyone who can use Docker. On Linux that access is root-equivalent anyway.
+- **Secrets:** anyone with the token can make CimPal use a `GITHUB_TOKEN` you pass to the container, so give a `serve` container only the secrets it needs.
+- **Docker Engine:** on Linux, use version 28 or later. It blocks direct access to container ports from other hosts on the local network, which older engines allowed.
 
 ---
 
@@ -187,6 +211,6 @@ The Dockerfile only copies the built JAR; it does not run Maven. `Test-DockerIma
 - that the cache stays private for the image user and for another UID;
 - that a remote `owl:imports` fails closed with `--network none`;
 - MCP over stdio, with and without `USE_SYSTEM_CA_CERTS`;
-- `serve` `/health` on a loopback port.
+- `serve` set up as above: `/health`, 403 for a remapped port, 401 without the token, and `POST /shutdown`.
 
 CI runs it on every push and pull request (job "Docker image"), and the release runs it before pushing.

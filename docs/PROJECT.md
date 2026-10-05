@@ -455,9 +455,7 @@ CimPal/
 
 **`serve` serialises all requests.** The single-threaded executor prevents concurrent validation runs. For team use (multiple users sharing one server) this is a bottleneck. Addressed in the REST API plan below.
 
-**`POST /shutdown` does not end the `serve` process.** It stops the HTTP listener, but `ServeCommand.call()` blocks on `Thread.currentThread().join()` and the executor thread is non-daemon, so the JVM keeps running (in Docker, the container stays up). Stop it with `Ctrl-C` or `docker stop`. Found during CI-3 and handed to SEC-1.
-
-**The Docker image has no Python.** Only the `APACHE_JENA` engine works in the container; `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` need a local install. Until SEC-1 lands, `serve` in a container must be published on the host loopback only (`-p 127.0.0.1:7474:7474`).
+**The Docker image has no Python.** Only the `APACHE_JENA` engine works in the container; `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` need a local install.
 
 **`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output, or the Docker image (`claude-desktop-config-docker.json`), which locks nothing on the host.
 

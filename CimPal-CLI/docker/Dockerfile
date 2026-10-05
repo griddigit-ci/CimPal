@@ -39,6 +39,7 @@ ENV HOME=/home/cimpal
 USER 10001:10001
 # Mount the files to work on here; every path given to the CLI is a path inside the container.
 WORKDIR /data
-# No EXPOSE: `serve` has no authentication yet (SEC-1), so `docker run -P` must not publish it.
+# No EXPOSE: `serve` speaks plain HTTP and belongs on the host loopback only, with the same port
+# inside and outside (its Host check), so `docker run -P` must not publish it on every interface.
 ENTRYPOINT ["/opt/cimpal/entrypoint.sh"]
 CMD ["--help"]

@@ -21,7 +21,9 @@
       6. mcp answers initialize and tools/list (10 tools) over stdio with nothing but JSON-RPC
          on stdout, also with USE_SYSTEM_CA_CERTS=1 and an extra certificate mounted at
          /certificates.
-      7. serve answers GET /health on a loopback-published port and stops on `docker stop`.
+      7. serve runs as the docs say (--allow-remote, token from CIMPAL_API_TOKEN, same port inside
+         and outside on the host loopback): /health answers, a remapped port gets 403, a request
+         without the token 401, and POST /shutdown with the token stops the container.
 
     On Linux the runs that write to the bind mount use --user <uid>:<gid> of the caller, as the
     docs advise. The work folder is CimPal-CLI/target/docker-smoke. Used by the "Docker image"
@@ -77,6 +79,25 @@ function Invoke-Docker([string[]]$Arguments, [string]$Stdin) {
         }
     } finally {
         Remove-Item $out, $err -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-FreePort {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    $port = $listener.LocalEndpoint.Port
+    $listener.Stop()
+    return $port
+}
+
+# HTTP status of a request, also for 4xx answers.
+function Get-StatusCode([string]$Uri, [hashtable]$Headers = @{}, [string]$Method = 'GET', [string]$Body) {
+    try {
+        $arguments = @{ Uri = $Uri; Method = $Method; Headers = $Headers; TimeoutSec = 10; SkipHttpErrorCheck = $true }
+        if ($Body) { $arguments.Body = $Body; $arguments.ContentType = 'application/json' }
+        return (Invoke-WebRequest @arguments).StatusCode
+    } catch {
+        return "error: $($_.Exception.Message)"
     }
 }
 
@@ -140,6 +161,7 @@ $work = Join-Path $repoRoot 'CimPal-CLI/target/docker-smoke'
 Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $work | Out-Null
 $container = $null
+$callerToken = $env:CIMPAL_API_TOKEN
 try {
     Copy-Item -Recurse (Join-Path $repoRoot 'CimPal-CLI/src/test/resources/fixtures/docker-smoke/*') $work
     $dataMount = "type=bind,source=$work,target=/data"
@@ -212,12 +234,19 @@ try {
     Check 'the CA hook imports the mounted certificate and reports it on stderr' `
         ($r.Stderr -match 'Adding certificate with alias cimpal-docker-smoke') "stderr=$($r.Stderr)"
 
-    # 7. serve, published on the host loopback only
-    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-    $listener.Start()
-    $port = $listener.LocalEndpoint.Port
-    $listener.Stop()
-    $container = (& docker run -d --rm -p "127.0.0.1:${port}:7474" $Image serve --host 0.0.0.0 | Out-String).Trim()
+    # 7. serve the way docs/cli/docker.md runs it: --allow-remote inside the container, the token
+    #    from CIMPAL_API_TOKEN, and the same port inside and outside on the host loopback.
+    $r = Invoke-Docker @('run', '--rm', $Image, 'serve', '--host', '0.0.0.0')
+    Check 'serve refuses a non-loopback --host without --allow-remote' (($r.ExitCode -eq 2) -and ($r.Stderr -match 'allow-remote')) `
+        "exit=$($r.ExitCode) stderr=$($r.Stderr)"
+    $port = Get-FreePort
+    do { $otherPort = Get-FreePort } while ($otherPort -eq $port)
+    $token = [Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+    $env:CIMPAL_API_TOKEN = $token
+    $auth = @{ Authorization = "Bearer $token" }
+    # -e without a value copies the token from this process, so it is not on the command line.
+    $container = (& docker run -d --rm -p "127.0.0.1:${port}:${port}" -p "127.0.0.1:${otherPort}:${port}" `
+        -e CIMPAL_API_TOKEN $Image serve --host 0.0.0.0 --allow-remote --port $port | Out-String).Trim()
     Check 'serve starts in the background' ($LASTEXITCODE -eq 0) "container=$container"
     $health = $null
     $deadline = (Get-Date).AddSeconds(60)
@@ -231,16 +260,30 @@ try {
     Check 'serve answers GET /health on the published port' ($health.status -eq 'ok') "health=$($health | ConvertTo-Json -Compress)"
     Check 'serve /health reports the release version' ($health.version -eq "CimPal CLI $ExpectedVersion") `
         "health=$($health | ConvertTo-Json -Compress)"
-    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    & docker stop --time 20 $container | Out-Null
-    $stopwatch.Stop()
-    Check 'serve stops on docker stop (SIGTERM, no kill)' (($LASTEXITCODE -eq 0) -and ($stopwatch.Elapsed.TotalSeconds -lt 15)) `
-        "took $([int]$stopwatch.Elapsed.TotalSeconds) s"
+    $code = Get-StatusCode "http://127.0.0.1:$otherPort/health"
+    Check 'serve refuses a remapped host port (Host check, 403)' ($code -eq 403) "status=$code"
+    $code = Get-StatusCode "http://127.0.0.1:$port/commands"
+    Check 'serve refuses a request without the token (401)' ($code -eq 401) "status=$code"
+    $code = Get-StatusCode "http://127.0.0.1:$port/commands" $auth
+    Check 'serve accepts the token from CIMPAL_API_TOKEN' ($code -eq 200) "status=$code"
+    $logs = (& docker logs $container 2>&1 | Out-String)
+    Check 'serve logs where the token came from, never the token' `
+        (($logs -match 'Bearer token taken from CIMPAL_API_TOKEN') -and -not $logs.Contains($token))
+    $code = Get-StatusCode "http://127.0.0.1:$port/shutdown" $auth 'POST' '{}'
+    $stopped = $false
+    $deadline = (Get-Date).AddSeconds(20)
+    while (-not $stopped -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 500
+        $stopped = -not (& docker ps -q --filter "id=$container")
+    }
+    Check 'POST /shutdown with the token stops the container' (($code -eq 200) -and $stopped) "status=$code stopped=$stopped"
 } finally {
-    # Never leave an unauthenticated serve behind, even when a check above threw.
+    # Never leave a serve container behind, even when a check above threw.
     if ($container) {
         & docker rm -f $container 2>&1 | Out-Null
     }
+    # Give the caller back whatever token their session had, e.g. for a serve they run themselves.
+    $env:CIMPAL_API_TOKEN = $callerToken
     Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 }
 

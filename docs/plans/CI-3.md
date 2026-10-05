@@ -53,7 +53,8 @@ Publish the CLI as a Docker image on every release tag. Image = Temurin 25 JRE +
 (copied, not rebuilt), non-root, multi-arch (amd64, arm64), on GHCR as ghcr.io/<owner>/cimpal:<tag> and :latest.
 Add a CI job that builds it on every push/PR and smoke-tests it (version, user, validation into a bind mount,
 mcp over stdio, serve on loopback). Fix the hard-coded CLI version so the image tag and the CLI agree.
-serve stays undocumented for network use until SEC-1: loopback-only publish, no EXPOSE.
+serve stays on the host loopback only (no EXPOSE); after the rebase onto SEC-1 it runs with --allow-remote,
+the token from CIMPAL_API_TOKEN and the same port inside and outside.
 Document usage in docs/cli/docker.md. No secrets, no repository settings, nothing pushed.
 ```
 
@@ -77,7 +78,8 @@ Standard footer (applies to every work package):
 | 2026-10-01 | Base `eclipse-temurin:25-jre-noble`, pinned by index digest. It ships fontconfig and DejaVu fonts, which POI's `autoSizeColumn` needs for the Excel reports. It has no curl, and one image serves one-shot runs, `mcp` and `serve`, so there is no `HEALTHCHECK`. | Claude Code |
 | 2026-10-01 | Non-root user `USER 10001:10001` (`cimpal`; numeric for Kubernetes `runAsNonRoot`). `/home/cimpal` belongs to it alone. `entrypoint.sh` gives every other UID a private `mktemp -d` home and passes `-Duser.home`. Examples are `--user "$(id -u):$(id -g)"`, which Linux hosts use to own bind-mount output; root; and `ubuntu` (UID 1000, from the base image). A first version made `/home/cimpal` world-writable instead. The security review showed that would undercut the private-cache fix (attestation finding 6) for UIDs sharing a home. | Claude Code, accepted by maintainer |
 | 2026-10-01 | `entrypoint.sh` runs the base image's `/__cacert_entrypoint.sh` with stdout pointed at stderr and stdin at `/dev/null`, and hands both back to the JVM. That hook `echo`es to stdout; called directly, the first line an MCP client received was "Using a temporary truststore at ...". | Claude Code |
-| 2026-10-01 | No `EXPOSE`. `serve` is documented for loopback only until SEC-1: `-p 127.0.0.1:...` with `--host 0.0.0.0` inside, its own Docker network, read-only inputs, no secrets, Docker Engine ≥ 28 on Linux. | Claude Code, accepted by maintainer |
+| 2026-10-01 | No `EXPOSE`. `serve` is documented for the host loopback only: its own Docker network, read-only inputs, Docker Engine ≥ 28 on Linux. | Claude Code, accepted by maintainer |
+| 2026-10-05 | Rebased onto `devel` after SEC-1, SEC-2, TEST-2 and SEC-5 were merged. In a container, `serve` now runs with `--host 0.0.0.0 --allow-remote`, gets its token from `CIMPAL_API_TOKEN` (`-e` without a value), and is published with the same port inside and outside, because SEC-1's Host check accepts only loopback names with the bound port. A remapped port or a call by container name gets 403. That is SEC-1's design, so no `--allow-host` option is needed. `/data` is the default `--root` (SEC-2) for `mcp` and `serve`. The version constant moved from `ServeCommand` to `ServeServer`. | Claude Code |
 | 2026-10-01 | Release hardening from the security review: `latest` moves only when the tag is the newest release (`gh release view`), and image jobs share a concurrency group; the docker job checks the downloaded JAR against the SHA-256 the build job recorded; BuildKit (`v0.33.1`) and the SBOM scanner (`1.12.0`) are pinned by digest. | Claude Code, accepted by maintainer |
 | 2026-10-01 | The CLI version comes from the filtered resource `cimpal-cli-version.properties` (`${project.version}`), so `New-ReleaseTag.ps1` needs no change. | Claude Code |
 | 2026-10-01 | The smoke test is PowerShell like the other scripts (pwsh is on the Ubuntu runners). On Linux it runs the writing containers with the caller's UID, as the docs advise. | Claude Code |
@@ -92,15 +94,31 @@ Standard footer (applies to every work package):
   - the missing tests: no `EXPOSE`, cache privacy, offline fail-closed, read-only binaries, rejected sentinel.
 
   The sixth Low, updates for the pinned base image, is left to CI-2.
-- **Tests:** `mvn -B verify` green (Windows): Core 81, Main 32, CLI 9, 0 failures; all coverage checks met. CLI tests 5 → 9 (`CliVersionTest` 2, `CimPalCliTest` +1, `McpCommandTest` 1). CLI coverage 3.0 % → 5.6 % line, 2.2 % → 2.8 % branch; its floors were raised with `Update-CoverageBaseline.ps1 -Modules CimPal-CLI`. Core and Main floors are unchanged.
+- **Tests before the rebase:** `mvn -B verify` green (Windows): Core 81, Main 32, CLI 9.
+- **Tests after the rebase onto SEC-1/SEC-2 (2026-10-05):** Core 286, Main 65, CLI 109, 0 failures. CI-3 adds `CliVersionTest` (2), `CimPalCliTest` (+1), `McpCommandTest` (1) and `ServeServerTest.healthReportsTheReleaseVersion`.
+  - Main and CLI meet their coverage floors.
+  - Core fails its floor on `devel` itself (19e257f: 34.6 % line against 41.4 %), so `verify` was run with `-Djacoco.haltOnFailure=false`. Core is untouched here.
+  - The CLI floor was not ratcheted. Windows covers Windows-only code, and the Ubuntu leg may not reach that number. Ratchet it from the lower of the two CI measurements.
 - **Local environment, not this change:** on the maintainer's machine every NIO `Selector.open()` fails ("Unable to establish loopback connection", `UnixDomainSockets.connect0`: Invalid argument), because AF_UNIX sockets, which the JDK uses for the selector's wake-up pipe in the temp folder, fail anywhere under `%LOCALAPPDATA%` there. That breaks the `StubHttpServer`, `AiKnowledgeSearch` and JavaFX FXML tests locally and the Stop hook with them. The green run above used `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=<plain folder>` for that one command; GitHub CI is unaffected.
 - **Verified in the container:** a UID other than 10001 (12345, 1000, 0) gets a private `/tmp/tmp.*` home with its cache at mode 700; with `USE_SYSTEM_CA_CERTS=1` and a mounted certificate the hook imports it and stdout stays pure JSON; killing the `docker` client of a running `mcp` container removes the container within a second (stdin closes, `--rm`); Windows `-v` works with `C:\x:/data` and `C:/x:/data`.
-- **Found:** `POST /shutdown` stops the HTTP listener but not the JVM: `ServeCommand.call()` blocks on `Thread.currentThread().join()`, and the executor thread is non-daemon. Reproduced in the image (the container keeps running). Handed to SEC-1; documented in `serve.md` and `docker.md`.
+- **Second security review, of the post-rebase delta:** no High.
+  - Medium: the Bash `serve` example put the token in curl's argv.
+  - Seven Lows:
+    - the docs implied network isolation, where the token is the real barrier;
+    - no `--user` in the Bash example;
+    - never mount a home folder or drive root at `/data`;
+    - `--network host`;
+    - the smoke test clobbered the caller's `CIMPAL_API_TOKEN`;
+    - the `--allow-remote` refusal check was too loose;
+    - the wildcard bound host accepted by SEC-1's Host check.
+  - Info items: a new token per start, `--rm`, a PowerShell 5.1 token line, the same free port drawn twice.
+
+  All fixed here except the wildcard Host (SEC-1 code). That, plus the curl argv pattern in SEC-1's `serve.md` examples and the superseded token idea in PROJECT.md's REST plan, went to a separate follow-up task. Added: `ServeServerTest.healthReportsTheReleaseVersion`, and a smoke check that `docker logs` names `CIMPAL_API_TOKEN` and never shows the token.
+- **Found, then fixed by SEC-1:** before SEC-1, `POST /shutdown` stopped the HTTP listener but not the JVM, because `ServeCommand.call()` blocked on `Thread.currentThread().join()`. After the rebase, `POST /shutdown` with the token ends the container in about half a second; the smoke test checks this.
 - **Manual GitHub steps for the maintainer:**
   1. After the first release with this workflow: GitHub → Packages → `cimpal` → Package settings → Change visibility → Public. New GHCR packages start private.
   2. Check that the package shows the repository under "Manage Actions access" (expected automatically, because the workflow of this repository pushed it).
 - **Open items:**
-  - SEC-1: an allowed-Host list for containers, the token via `CIMPAL_API_TOKEN` or a mounted `--token-file`, and the `/shutdown` fix (see SEC-1 notes).
   - CI-2: gate the `docker` job like the release job; add the `docker` ecosystem for `/CimPal-CLI/docker` to Dependabot; optionally scan the image nightly. From the security review, present before this WP:
     - the release step puts `${{ github.ref_name }}` straight into PowerShell (move it to `env:`);
     - that job's actions are still `@v4`;

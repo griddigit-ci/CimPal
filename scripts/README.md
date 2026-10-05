@@ -60,7 +60,7 @@ It checks:
 - that the `~/.cimpal` cache stays private per UID;
 - that a remote `owl:imports` fails closed with `--network none`;
 - MCP over stdio (also with `USE_SYSTEM_CA_CERTS=1`);
-- `serve` `/health` on a loopback-published port.
+- `serve` as `docs/cli/docker.md` runs it (`--allow-remote`, token from `CIMPAL_API_TOKEN`, same port on the host loopback): `/health`, 403 for a remapped port, 401 without the token, and `POST /shutdown`.
 
 It exits 1 if any check failed. The "Docker image" job in `ci.yml` and the release run it too. Its work folder is `CimPal-CLI/target/docker-smoke`.
 

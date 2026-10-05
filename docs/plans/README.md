@@ -60,7 +60,6 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 - [ ] Which ENTSO-E conformity models may be used in nightly scale tests (licence)
 - [ ] Attestation signers (engineering owner, approver)
 - [ ] Make the GHCR package `cimpal` public after the first release that pushes it (CI-3)
-- [ ] `serve` in a container: which Host names SEC-1's Host check accepts (e.g. an `--allow-host` list), see CI-3
 
 ## Standard footer (for every WP session)
 
