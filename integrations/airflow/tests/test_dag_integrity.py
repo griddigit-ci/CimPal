@@ -34,9 +34,15 @@ EXPECTED_TASKS = {
 }
 
 
+def _dag(dagbag, dag_id):
+    """The parsed DAG; DagBag.get_dag would also consult the metadata database."""
+    return dagbag.dags[dag_id]
+
+
 @pytest.fixture(scope="module")
 def dagbag() -> DagBag:
-    return DagBag(dag_folder=str(EXAMPLES), include_examples=False)
+    # Airflow 3.3 dropped include_examples; the workflow sets AIRFLOW__CORE__LOAD_EXAMPLES=false.
+    return DagBag(dag_folder=str(EXAMPLES))
 
 
 def test_every_example_dag_imports_without_errors(dagbag):
@@ -49,14 +55,14 @@ def test_the_examples_are_exactly_the_three_documented_dags(dagbag):
 
 @pytest.mark.parametrize("dag_id", sorted(EXPECTED_TASKS))
 def test_each_dag_has_its_tasks(dagbag, dag_id):
-    dag = dagbag.get_dag(dag_id)
+    dag = _dag(dagbag, dag_id)
     assert {t.task_id for t in dag.tasks} == EXPECTED_TASKS[dag_id]
 
 
 @pytest.mark.parametrize("dag_id", sorted(EXPECTED_TASKS))
 def test_cimpal_is_told_to_report_violations_as_data(dagbag, dag_id):
     # Without it a model with findings would fail the task instead of reaching the next one.
-    validate = dagbag.get_dag(dag_id).get_task("validate")
+    validate = _dag(dagbag, dag_id).get_task("validate")
     command = " ".join(str(part) for part in (
         getattr(validate, "arguments", None) or getattr(validate, "command", None)
         or [getattr(validate, "bash_command", "")]))
@@ -67,14 +73,14 @@ def test_cimpal_is_told_to_report_violations_as_data(dagbag, dag_id):
 def test_nothing_is_pasted_into_the_bash_command(dagbag):
     # Values reach the shell as environment variables only; Jinja in the command text would let
     # whoever sets them inject shell code.
-    validate = dagbag.get_dag("cimpal_bash").get_task("validate")
+    validate = _dag(dagbag, "cimpal_bash").get_task("validate")
     assert "{{" not in validate.bash_command
     assert set(validate.env) == {"CIMPAL_JAR", "CIMPAL_DATA_DIR"}
 
 
 @pytest.mark.parametrize("dag_id", sorted(EXPECTED_TASKS))
 def test_one_run_at_a_time_because_runs_share_their_files(dagbag, dag_id):
-    assert dagbag.get_dag(dag_id).max_active_runs == 1
+    assert _dag(dagbag, dag_id).max_active_runs == 1
 
 
 def _example_module(name: str):
@@ -112,7 +118,7 @@ def test_bash_dag_runs_cimpal_and_reports_violations_without_failing(dagbag, mon
     summary_file = DATA / "out" / "summary.json"
     summary_file.unlink(missing_ok=True)
 
-    run = dagbag.get_dag("cimpal_bash").test()
+    run = _dag(dagbag, "cimpal_bash").test()
 
     states = {ti.task_id: str(ti.state) for ti in run.get_task_instances()}
     assert states == {"validate": "success", "read_summary": "success"}, states
