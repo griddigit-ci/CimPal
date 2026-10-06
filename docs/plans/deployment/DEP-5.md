@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In review (PR into `devel`) |
 | Phase | D1 |
 | Depends on | SEC-1, SEC-2 (merged); TEST-4 JSON Schemas (soft) |
 | Size | L |
@@ -52,17 +52,17 @@ All `/v1` endpoints use the SEC-1 checks (Host, Origin, token, content type, siz
 
 ## Acceptance criteria (status checklist)
 
-- [ ] All endpoints in the table, with the listed status codes, behind the SEC-1 checks and SEC-2 path policy
-- [ ] A 20-minute job does not hold any HTTP connection open; submit returns in < 1 s
-- [ ] Job store limits (`--max-jobs`, `--job-ttl`, `--job-timeout`) enforced and tested, including eviction order
-- [ ] `DELETE` cancels queued jobs; running → 409; cancelled jobs never start
-- [ ] Log endpoint returns progress lines with offsets; buffer bounded (`--job-log-lines`, default 5000); lines sanitised with `LogSanitizer`
-- [ ] OpenAPI 3.1 document valid (validator in test scope, e.g. swagger-parser); every path/method/status in the spec is exercised by a test, and every implemented route is in the spec
-- [ ] Command config schemas in the spec equal the MCP tool input schemas (test)
-- [ ] Problem+json on every 4xx/5xx under `/v1`; the old endpoints keep `{"error": ...}`
-- [ ] SIGTERM/`/shutdown` with queued jobs: queued jobs become `cancelled`; behaviour documented
-- [ ] `/security-review` and `/security-check-change` clean or findings fixed with regression tests; mutation check on job-id randomness, token check on every `/v1` route except health/spec
-- [ ] `docs/cli/serve.md` documents `/v1`, with curl and Python `requests` examples for submit → poll → result
+- [x] All endpoints in the table, with the listed status codes, behind the SEC-1 checks and SEC-2 path policy
+- [x] A 20-minute job does not hold any HTTP connection open; submit returns in < 1 s
+- [x] Job store limits (`--max-jobs`, `--job-ttl`, `--job-timeout`) enforced and tested, including eviction order
+- [x] `DELETE` cancels queued jobs; running → 409; cancelled jobs never start
+- [x] Log endpoint returns progress lines with offsets; buffer bounded (`--job-log-lines`, default 5000); lines sanitised with `LogSanitizer`
+- [x] OpenAPI 3.1 document valid (validator in test scope, e.g. swagger-parser); every path/method/status in the spec is exercised by a test, and every implemented route is in the spec
+- [x] Command config schemas in the spec equal the MCP tool input schemas (test)
+- [x] Problem+json on every 4xx/5xx under `/v1`; the old endpoints keep `{"error": ...}`
+- [x] SIGTERM/`/shutdown` with queued jobs: queued jobs become `cancelled`; behaviour documented
+- [x] `/security-review` and `/security-check-change` clean or findings fixed with regression tests; mutation check on job-id randomness, token check on every `/v1` route except health/spec
+- [x] `docs/cli/serve.md` documents `/v1`, with curl and Python `requests` examples for submit → poll → result
 
 ## Instructions for Claude Code
 
@@ -94,7 +94,46 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-06 | D-5: stay on the JDK `HttpServer`. `/v1` is routed inside the existing `"/"` context with exact path matching; no blocker found. | Claude Code (plan approved by maintainer) |
+| 2026-10-06 | D-13: `GET /v1/health` and `GET /v1/openapi.json` need no token; every other `/v1` route does. `/v1/health` doesn't show the number of stored jobs. | Claude Code (plan approved) |
+| 2026-10-06 | Jobs share the server's single worker and queue slots with the synchronous endpoints: one command at a time, as the process-wide `PathPolicy` and `ValidationTools` statics require. | Claude Code (plan approved) |
+| 2026-10-06 | Progress capture: a `System.err` tee (`StderrTee`) during a job run, with lines assembled per thread and sanitised. The server's own threads are skipped, and the tee stops copying when closed. Sound only because of the single worker. | Claude Code (plan approved) |
+| 2026-10-06 | R12 bounds: `--max-result-bytes` (16 MiB; larger results → 410) and, after the security review, `--job-store-bytes` (a quarter of the heap) for all finished results and logs together. | Claude Code |
+| 2026-10-06 | Command config schemas live in `CommandSchemas`, shared by `mcp` and the OpenAPI document; `OpenApiSpecTest` keeps them equal (`-Dopenapi.update=true` regenerates). swagger-parser is test scope only. | Claude Code (plan approved) |
+| 2026-10-06 | Jobs are in memory and lost on restart. A running job is never interrupted (cancel → 409; timeout → `timed_out`), so it can't leave half-written reports. | Claude Code (plan approved) |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+**Built** (branch `feature/dep-5-async-jobs`):
+- **Routes:** `/v1` in `ServeServer`, with `JobManager`, `Job`, `JobLog`, `JobStatus`, `Problem`, `StderrTee` and `CommandSchemas`. The OpenAPI 3.1 document is `CimPal-CLI/src/main/resources/openapi/cimpal-v1.json`.
+- **New flags:** `--job-timeout`, `--max-jobs`, `--job-ttl`, `--job-log-lines`, `--max-result-bytes` and `--job-store-bytes`.
+- **Docs:** `docs/cli/serve.md` (`/v1` section with curl and Python examples), the guide (deployment modes, capabilities) and PROJECT.md.
+
+**Tests:**
+- **New:** `JobApiTest` (25), `OpenApiSpecTest` (4), and one end-to-end case in `ServeCommandTest` (a real `sparql` job; a path outside the roots is refused with 403 at submit).
+- **CLI suite:** 173 tests, 0 failures, 2 skipped.
+- **Coverage of the spec:** `JobApiTest` records every (method, route, status) it sees and checks that every response in the spec is among them.
+- **Manual run:** `serve` from the dev classpath, then a `sparql` job with curl: submit → running → succeeded, result and an 8-line log.
+
+**Security review** (`security-reviewer`, 2026-10-06). No Critical or High. Fixed, with regression tests in `JobApiTest`:
+
+| Severity | Finding | Fix |
+| --- | --- | --- |
+| Medium | A cancelled queued job's task, with its request body, stayed in the worker's unbounded queue. A submit-and-cancel loop could grow the heap while the slots looked free. | The worker is a `ThreadPoolExecutor`. A cancel (or shutdown) removes the job's task from the queue, and so does a synchronous request that timed out before it started. Test: `aCancelledJobLeavesTheWorkerQueueAtOnce`. |
+| Medium | No overall bound on the memory of finished jobs (`maxJobs × maxResultBytes` ≈ 16 GiB by default). An OOM on an HTTP thread wasn't routed to the exit-3 halt. | `--job-store-bytes` (default a quarter of the heap). The oldest finished jobs are evicted beyond it, also when a job finishes. The result size is measured without copying it. `handle()` routes `OutOfMemoryError` to the halt. Tests: `finishedJobsAreDroppedOldestFirstBeyondTheJobStoreBytes`, `aJobRunningOutOfMemoryFailsAndStopsTheServer`. |
+| Low | A malformed `%`-escape in the query string escaped as an exception without a response. | `query()` answers 400. The JDK server already refuses most such targets with its own 400, so the catch is defence in depth. Test: `aMalformedQueryStringIs400`. |
+| Low | The unauthenticated health walked every job and logged a warning on every poll; `/v1/health` showed the job count. | Only the running job is checked, the stall warning is logged once per command, and `jobs` was removed from `/v1/health` and the spec. Test: `healthWithoutTokenShowsNoJobCountAndWarnsOncePerStall`. |
+| Low | The tee kept copying through a stream saved during the job, and copied the HTTP dispatcher's and stopper's lines; its thread map had no bound. | A `closed` flag; the dispatcher and stopper threads are skipped; at most 256 threads with a partial line. Test: `theStderrTeeStopsCopyingWhenClosed`. |
+| Low | A job submitted while `close()` cancelled the queue could still start during shutdown. | `runJob` cancels the job if the server is closing. Not covered by a deterministic test: the window lies between two statements of `submitJob`. |
+| Info | `forLog` cuts lines at 512 characters, below `JobLog.MAX_LINE_CHARS`. | Documented in `serve.md`. |
+
+Also added from the review's list of missing tests:
+- Host and Origin refusals on `/v1` routes;
+- odd paths and methods: `/v1`, `%2e%2e`, a trailing `/` (now 404), extra segments, HEAD/OPTIONS → 405 with `Allow`, 401 before any lookup.
+
+The run-time path re-check of a job is the same `runWithPolicy` call that SEC-2 tests on the synchronous path. A job-specific test that swaps a file for a symlink between submit and run was left out, because Windows needs extra rights to create symlinks.
+
+**Open:**
+- DEP-6: configured host names behind a proxy, probes and SIGTERM handling.
+- DEP-7: job workspaces, upload and download.
+- DEP-9: generate the SDK from `cimpal-v1.json`.

@@ -28,14 +28,16 @@ This is the recommended way to automate CimPal.
 ## `serve`: the local HTTP server
 
 `serve` keeps one JVM running and offers the commands over HTTP.
-- **Each request:** a POST with a JSON config, answered with the command's JSON result.
+- **Job API (`/v1`):** submit a command with its JSON config to `POST /v1/jobs` and get a job id back at once. Then poll the job, fetch its JSON result, and read its progress lines. The API is described by an OpenAPI 3.1 document at `/v1/openapi.json`.
+- **Synchronous endpoints** (`POST /validate`, …), kept for local use: a POST with a JSON config, answered with the command's JSON result.
 - **Built for one machine:**
   - It listens on `localhost:7474` by default.
   - Every request except `GET /health` needs the bearer token. The token is new on every start; it is written to a file you can read, or taken from `CIMPAL_API_TOKEN`.
   - Paths in requests must lie under the allowed folders (`--root`).
 - **Current limits:**
-  - **Synchronous:** the HTTP call stays open until the command ends, up to `--request-timeout` (30 minutes by default). Large validations can take that long.
-  - **One command at a time:** others wait in a short queue (`--queue-size`, default 4) and get HTTP 503 when it is full.
+  - **Synchronous endpoints:** the HTTP call stays open until the command ends, up to `--request-timeout` (30 minutes by default). Large validations can take that long; use the job API instead.
+  - **One command at a time:** jobs and synchronous requests wait in one short queue (`--queue-size`, default 4) and get HTTP 503 when it is full.
+  - **Jobs live in memory:** they are lost when the server restarts.
   - **Plain HTTP, no TLS:** `--allow-remote` lets it listen on other interfaces, but the traffic is not encrypted and its Host check only accepts loopback names. Don't put it on a network without a TLS proxy in front, and even then, see "Planned" below.
   - **No upload or download:** files must already be in a folder the server can reach.
 
@@ -60,7 +62,6 @@ These are on the roadmap but **not available yet**:
 
 | Feature | Work package |
 |---|---|
-| Asynchronous job API under `/v1` (submit, poll, fetch), with an OpenAPI spec | DEP-5 |
 | Service deployment: configured host names behind a reverse proxy or ingress, token rotation, liveness and readiness probes, graceful shutdown, structured logs, Kubernetes manifests | DEP-6 |
 | File exchange: job workspaces, upload and download | DEP-7 |
 | Several jobs in parallel in one JVM (optional; the default answer is more replicas) | DEP-8 |

@@ -48,7 +48,7 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 | D0 | [DEP-2](deployment/DEP-2.md) | Resource statistics, benchmark and sizing guide | DEP-1 (soft) | M | Done ([PR #54](https://github.com/griddigit-ci/CimPal/pull/54), [#55](https://github.com/griddigit-ci/CimPal/pull/55); released 2026.10.6.1) |
 | D0 | [DEP-3](deployment/DEP-3.md) | CLI automation options and Airflow container pattern | DEP-1 | M | Done ([PR #60](https://github.com/griddigit-ci/CimPal/pull/60); manual Kubernetes walkthrough open) |
 | D0 | [DEP-4](deployment/DEP-4.md) | External user guide, first edition | DEP-1, DEP-2, DEP-3 | M | In progress (support policy awaits maintainer review) |
-| D1 | [DEP-5](deployment/DEP-5.md) | Async job API (`/v1`) and OpenAPI spec | SEC-1, SEC-2 | L | Not started |
+| D1 | [DEP-5](deployment/DEP-5.md) | Async job API (`/v1`) and OpenAPI spec | SEC-1, SEC-2 | L | In review |
 | D1 | [DEP-6](deployment/DEP-6.md) | Service deployment: proxy, tokens, probes, SIGTERM, logs, manifests | DEP-5, DEP-1 | M | Not started |
 | D1 | [DEP-7](deployment/DEP-7.md) | File exchange: job workspaces, upload and download | DEP-5 | M–L | Not started |
 | D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | Not started |
