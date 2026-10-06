@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-05  
+**Last updated:** 2026-10-06  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -299,8 +299,9 @@ required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/
 GHCR package must be made public. DEP-1 and DEP-2 are done and released in 2026.10.6.1. DEP-3
 (automation options and Airflow examples) is merged (PR #60) and goes out with the next release; the
 KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. DEP-4 (external
-user guide, `docs/guide/`) is in progress; its support policy awaits maintainer review. Next on the
-deployment track: DEP-5 (async `/v1` job API and OpenAPI spec).
+user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintainer review. DEP-5
+(async `/v1` job API and OpenAPI spec) is in review on `feature/dep-5-async-jobs`. Next on the
+deployment track: DEP-6 (service deployment) and DEP-7 (file exchange).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
@@ -370,6 +371,24 @@ The Jackson `readTree()` + `.path("key")` pattern silently ignores unrecognized 
 ### `hasDifference()` is inverted (known gotcha)
 
 `RDFCompareResult.hasDifference()` returns `true` when entries list is EMPTY. Use `result.getEntries().isEmpty()` explicitly. This is in the original source; do not try to fix it without updating all callers.
+
+### `serve` job API (`/v1`, DEP-5)
+
+`POST /v1/jobs` queues a command on the same single worker and the same queue slots as the
+synchronous endpoints, and answers 202 with a job id (random UUID). Classes in
+`eu.griddigit.CimPal.cli.command`:
+- `JobManager`: the in-memory store, with TTL and `--max-jobs` eviction and `--job-timeout`.
+- `Job`: synchronized state transitions, and the result, kept up to `--max-result-bytes`.
+- `JobLog`: a ring buffer of progress lines.
+- `StderrTee`: while a job runs, it copies `System.err` lines into the job's log. Lines from the
+  server's own threads are skipped. This is safe only because one command runs at a time.
+- `Problem`: RFC 9457 problem+json bodies.
+- `CommandSchemas`: the per-command config schemas, shared by `mcp` and the OpenAPI document.
+
+The OpenAPI 3.1 document is `CimPal-CLI/src/main/resources/openapi/cimpal-v1.json`, served at
+`/v1/openapi.json`. `OpenApiSpecTest` checks that it is valid, that its routes equal
+`ServeServer.V1_ROUTES`, and that its config schemas equal `CommandSchemas`; regenerate the schemas
+with `-Dopenapi.update=true`. `JobApiTest` checks that every documented response is exercised.
 
 ### `serve` uses single-threaded executor
 
@@ -508,6 +527,10 @@ CimPal/
 ---
 
 ## REST API — discovery and implementation plan
+
+> **Superseded by the deployment track.** The asynchronous job API was built in DEP-5
+> (`docs/plans/deployment/DEP-5.md`); see *`serve` job API* above and `docs/cli/serve.md`. The
+> remaining service work is in DEP-6 to DEP-10. The analysis below is kept for background.
 
 ### Context
 

@@ -1,0 +1,961 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "CimPal serve job API",
+    "version" : "1",
+    "summary" : "Asynchronous CimPal jobs: submit, poll, fetch the result.",
+    "description" : "The job API of `cimpal serve` (DEP-5). A job runs one CimPal command with a config object; the server runs one command at a time and keeps finished jobs in memory (lost on restart). Every request needs `Authorization: Bearer <token>` except `GET /v1/health` and `GET /v1/openapi.json`. Requests must also pass the server's Host and Origin checks; a refused Host or Origin is answered with 403 on any route. Paths in a job's config must lie under the server's allowed folders (`--root`). Errors are RFC 9457 problem details.",
+    "license" : {
+      "name" : "EUPL-1.2",
+      "identifier" : "EUPL-1.2"
+    },
+    "x-copyright" : "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+"
+  },
+  "servers" : [ {
+    "url" : "http://localhost:7474",
+    "description" : "Default local server"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
+  "tags" : [ {
+    "name" : "jobs"
+  }, {
+    "name" : "server"
+  } ],
+  "paths" : {
+    "/v1/health" : {
+      "get" : {
+        "tags" : [ "server" ],
+        "operationId" : "getHealth",
+        "summary" : "Server health and queue figures.",
+        "security" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "Health.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/openapi.json" : {
+      "get" : {
+        "tags" : [ "server" ],
+        "operationId" : "getOpenApi",
+        "summary" : "This document.",
+        "security" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "The OpenAPI document.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs" : {
+      "post" : {
+        "tags" : [ "jobs" ],
+        "operationId" : "submitJob",
+        "summary" : "Queue a command as a job.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JobRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Queued. `Location` is the job's URL.",
+            "headers" : {
+              "Location" : {
+                "description" : "The job's URL.",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Not valid JSON, an unknown field, an unknown command, or a bad config.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "A path in the config is outside the allowed folders, or an existing output file without `\"overwrite\": true`.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Request body larger than `--max-body-bytes`.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "Content-Type is not application/json.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Queue full (`--queue-size` jobs and requests already waiting), or shutting down.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get" : {
+        "tags" : [ "jobs" ],
+        "operationId" : "listJobs",
+        "summary" : "Recent jobs, newest first.",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "description" : "Only jobs with this status.",
+          "schema" : {
+            "$ref" : "#/components/schemas/JobStatus"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "description" : "At most this many jobs (default 50).",
+          "schema" : {
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 1000,
+            "default" : 50
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The jobs.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobList"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "A bad `status` or `limit`.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "jobs" ],
+        "operationId" : "getJob",
+        "summary" : "The job's status.",
+        "responses" : {
+          "200" : {
+            "description" : "The job.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "jobs" ],
+        "operationId" : "cancelJob",
+        "summary" : "Cancel a queued job. A running job is not interrupted.",
+        "responses" : {
+          "200" : {
+            "description" : "Cancelled; the job never starts.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job is running or finished.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/result" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "jobs" ],
+        "operationId" : "getJobResult",
+        "summary" : "The command's JSON output, as `--format json` prints it.",
+        "responses" : {
+          "200" : {
+            "description" : "The result. Commands without JSON output give `{\"exitCode\", \"status\"}`.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410" : {
+            "description" : "The result was larger than `--max-result-bytes` and was not kept.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/log" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "jobs" ],
+        "operationId" : "getJobLog",
+        "summary" : "The job's progress lines.",
+        "parameters" : [ {
+          "name" : "offset",
+          "in" : "query",
+          "required" : false,
+          "description" : "The first line to return; use `nextOffset` from the previous call.",
+          "schema" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "default" : 0
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Up to 1000 lines.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobLog"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "A bad `offset`.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "scheme" : "bearer",
+        "description" : "The token `serve` prints or takes from `CIMPAL_API_TOKEN`."
+      }
+    },
+    "schemas" : {
+      "JobStatus" : {
+        "type" : "string",
+        "enum" : [ "queued", "running", "succeeded", "failed", "cancelled", "timed_out" ],
+        "description" : "`succeeded` covers exit 0 and 1 (see `hasViolations`); `failed` exit 2, 3 or an exception; `timed_out` a job running longer than `--job-timeout` (not interrupted; a later result is kept)."
+      },
+      "JobRequest" : {
+        "type" : "object",
+        "required" : [ "command" ],
+        "additionalProperties" : false,
+        "properties" : {
+          "command" : {
+            "type" : "string",
+            "enum" : [ "validate", "sparql", "convert", "compare", "compare-instances", "rdfs2shacl", "organize", "excel2shacl", "gen-instances", "manifest" ]
+          },
+          "config" : {
+            "type" : "object",
+            "description" : "The command's config, as in a `--config` file. Its schema per command: `ValidateConfig`, `SparqlConfig`, `ConvertConfig`, `CompareConfig`, `CompareInstancesConfig`, `Rdfs2shaclConfig`, `OrganizeConfig`, `Excel2shaclConfig`, `GenInstancesConfig`, `ManifestConfig`."
+          },
+          "label" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "description" : "Free text to recognise the job."
+          }
+        }
+      },
+      "Job" : {
+        "type" : "object",
+        "required" : [ "jobId", "command", "label", "status", "createdAt", "startedAt", "finishedAt", "exitCode", "hasViolations", "error", "links" ],
+        "properties" : {
+          "jobId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "command" : {
+            "type" : "string",
+            "enum" : [ "validate", "sparql", "convert", "compare", "compare-instances", "rdfs2shacl", "organize", "excel2shacl", "gen-instances", "manifest" ]
+          },
+          "label" : {
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/JobStatus"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "startedAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "finishedAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "exitCode" : {
+            "type" : [ "integer", "null" ],
+            "description" : "0 ok, 1 violations found, 2 bad input, 3 internal error."
+          },
+          "hasViolations" : {
+            "type" : [ "boolean", "null" ]
+          },
+          "error" : {
+            "type" : [ "string", "null" ]
+          },
+          "links" : {
+            "type" : "object",
+            "required" : [ "self", "result", "log" ],
+            "properties" : {
+              "self" : {
+                "type" : "string"
+              },
+              "result" : {
+                "type" : "string"
+              },
+              "log" : {
+                "type" : "string"
+              }
+            }
+          }
+        }
+      },
+      "JobList" : {
+        "type" : "object",
+        "required" : [ "jobs" ],
+        "properties" : {
+          "jobs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Job"
+            }
+          }
+        }
+      },
+      "JobLog" : {
+        "type" : "object",
+        "required" : [ "jobId", "offset", "nextOffset", "truncated", "lines" ],
+        "properties" : {
+          "jobId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "offset" : {
+            "type" : "integer",
+            "description" : "The offset of the first line returned."
+          },
+          "nextOffset" : {
+            "type" : "integer",
+            "description" : "Ask for this offset next."
+          },
+          "truncated" : {
+            "type" : "boolean",
+            "description" : "Lines before `offset` were dropped (`--job-log-lines`)."
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "Health" : {
+        "type" : "object",
+        "required" : [ "status", "version", "apiVersion", "busy", "stalled", "queued", "running" ],
+        "properties" : {
+          "status" : {
+            "type" : "string",
+            "enum" : [ "ok", "stalled" ]
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "apiVersion" : {
+            "type" : "string"
+          },
+          "busy" : {
+            "type" : "boolean"
+          },
+          "stalled" : {
+            "type" : "boolean"
+          },
+          "queued" : {
+            "type" : "integer"
+          },
+          "running" : {
+            "type" : "integer"
+          }
+        }
+      },
+      "Problem" : {
+        "type" : "object",
+        "required" : [ "type", "title", "status", "detail" ],
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "integer"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "jobId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "ValidateConfig" : {
+        "type" : "object",
+        "properties" : {
+          "workflow" : {
+            "type" : "string",
+            "description" : "Workflow: 'mapping' (default, uses a CSV mapping file) or 'timestamped' (groups by timestamp)."
+          },
+          "mappingCsv" : {
+            "type" : "string",
+            "description" : "Absolute path to the CSV mapping file. Three columns: model file names | constraint .ttl path | label. Required for mapping and timestamped workflows."
+          },
+          "modelsDir" : {
+            "type" : "string",
+            "description" : "Absolute path to the root folder containing model ZIP/XML archives."
+          },
+          "constraintsRoot" : {
+            "type" : "string",
+            "description" : "Absolute path to the root folder for SHACL constraint .ttl files."
+          },
+          "outputDir" : {
+            "type" : "string",
+            "description" : "Absolute path to the output folder for Excel reports and ZIPs."
+          },
+          "datatypeMap" : {
+            "type" : "string",
+            "description" : "CGMES version preset: 'CGMES30NC25' (default), 'CGMES30NC24', 'CGMES24NC22', or absolute path to a custom .properties file."
+          },
+          "xmlBase" : {
+            "type" : "string",
+            "description" : "Base URI for parsing model files. CGMES 3.0: 'http://iec.ch/TC57/CIM100' (default). CGMES 2.4: 'http://iec.ch/TC57/2013/CIM-schema-cim16'."
+          },
+          "engine" : {
+            "type" : "string",
+            "description" : "Validation engine: 'APACHE_JENA' (default, production-grade), 'PYSHACL', 'PYSHACL_OXIGRAPH', 'RUST_SHACL' (experimental)."
+          },
+          "workers" : {
+            "type" : "integer",
+            "description" : "Parallel validation workers. 0 = auto-sized from available heap."
+          },
+          "maxResultsPerConstraint" : {
+            "type" : "integer",
+            "description" : "Max violations per shape (0 = unlimited). Use 10 for quick checks."
+          },
+          "samples" : {
+            "type" : "integer",
+            "description" : "Focus-node samples per shape group in JSON output (default 3). Set 0 to disable per-shape detail."
+          },
+          "exportTurtle" : {
+            "type" : "boolean",
+            "description" : "Write .ttl validation report files alongside Excel output."
+          }
+        },
+        "description" : "Validate CGMES/CIM model files against SHACL constraint shapes. Returns a JSON summary with totals (conforming/violations/errors) and per-shape violation groups with sample focus nodes. Use this as the primary diagnostic step in the validation loop."
+      },
+      "SparqlConfig" : {
+        "type" : "object",
+        "properties" : {
+          "models" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to model files (.xml, .rdf, .ttl, .zip)."
+          },
+          "query" : {
+            "type" : "string",
+            "description" : "SPARQL SELECT query string, or absolute path to a .sparql/.rq file."
+          },
+          "xmlBase" : {
+            "type" : "string",
+            "description" : "Base URI for parsing model files (default: http://iec.ch/TC57/CIM100)."
+          },
+          "output" : {
+            "type" : "string",
+            "description" : "Absolute path for output file (.xlsx or .csv). If omitted, results are returned inline."
+          }
+        },
+        "required" : [ "models", "query" ],
+        "description" : "Execute a SPARQL SELECT query against one or more CIM/RDF model files. Use to inspect model data, count triples, or diagnose why a SHACL constraint fires."
+      },
+      "ConvertConfig" : {
+        "type" : "object",
+        "properties" : {
+          "input" : {
+            "type" : "string",
+            "description" : "Absolute path to the source file."
+          },
+          "inputFiles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to source files for model union (mutually exclusive with 'input')."
+          },
+          "output" : {
+            "type" : "string",
+            "description" : "Absolute path for the output file. Extension determines format: .ttl -> Turtle, .xml/.rdf -> RDF/XML, .jsonld -> JSON-LD."
+          },
+          "xmlBase" : {
+            "type" : "string",
+            "description" : "Base URI for parsing RDF/XML files."
+          },
+          "sort" : {
+            "type" : "boolean",
+            "description" : "Sort triples for deterministic, diffable output."
+          },
+          "rdfFormat" : {
+            "type" : "string",
+            "description" : "RDF/XML sub-format: RDFXML_PLAIN (default), RDFXML_ABBREV, CIMXML, RDFS_CIMXML."
+          }
+        },
+        "required" : [ "output" ],
+        "description" : "Convert RDF model files between formats (RDF/XML, Turtle, JSON-LD). Use to produce canonical Turtle for git-friendly diffs."
+      },
+      "CompareConfig" : {
+        "type" : "object",
+        "properties" : {
+          "fileA" : {
+            "type" : "string",
+            "description" : "Absolute path to the first (reference/before) file."
+          },
+          "fileB" : {
+            "type" : "string",
+            "description" : "Absolute path to the second (changed/after) file."
+          },
+          "compareType" : {
+            "type" : "string",
+            "description" : "Algorithm: 'rdfs' (augmented RDFS), 'shacl' (any RDF), 'rdfs-cimtool', 'auto' (detect from extension, default)."
+          },
+          "normalizeCimVersion" : {
+            "type" : "boolean",
+            "description" : "Rename the 'cim' namespace in fileB to match fileA before comparing. Use when comparing across CIM version boundaries."
+          },
+          "output" : {
+            "type" : "string",
+            "description" : "Absolute path for the diff report (.xlsx or .csv)."
+          }
+        },
+        "required" : [ "fileA", "fileB" ],
+        "description" : "Compare two RDF files (RDFS profiles or SHACL shapes) and report differences. Use to audit what changed between profile versions or shape-set revisions."
+      },
+      "CompareInstancesConfig" : {
+        "type" : "object",
+        "properties" : {
+          "modelsA" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to the first (before/reference) model files."
+          },
+          "modelsB" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to the second (after/changed) model files."
+          },
+          "xmlBase" : {
+            "type" : "string",
+            "description" : "Base URI for parsing files (default: http://iec.ch/TC57/CIM100)."
+          },
+          "ignoreSv" : {
+            "type" : "boolean",
+            "description" : "Ignore SV (state-variable) profile differences."
+          },
+          "ignoreTp" : {
+            "type" : "boolean",
+            "description" : "Ignore TP (topology) differences."
+          },
+          "ignoreDl" : {
+            "type" : "boolean",
+            "description" : "Ignore DL (diagram layout) differences."
+          },
+          "output" : {
+            "type" : "string",
+            "description" : "Absolute path for output (.xlsx or .csv)."
+          }
+        },
+        "required" : [ "modelsA", "modelsB" ],
+        "description" : "Compare two sets of CIM instance-data model files and report differences. Use to verify a conversion or transformation preserved all data."
+      },
+      "Rdfs2shaclConfig" : {
+        "type" : "object",
+        "properties" : {
+          "rdfsFiles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to RDFS profile .rdf files."
+          },
+          "outputDir" : {
+            "type" : "string",
+            "description" : "Absolute path to the output directory for generated .ttl files."
+          },
+          "rdfsFormat" : {
+            "type" : "string",
+            "description" : "RDFS format version: '2020' (default, cimsyntaxgen augmented) or '2019'."
+          },
+          "closedShapes" : {
+            "type" : "boolean",
+            "description" : "Generate sh:closed shapes (very strict - rejects undeclared properties)."
+          },
+          "splitDatatypes" : {
+            "type" : "boolean",
+            "description" : "Write a separate datatype constraint file alongside the main shapes."
+          },
+          "validateShapes" : {
+            "type" : "boolean",
+            "description" : "Run SHACL-SHACL validation on generated shapes and report results."
+          }
+        },
+        "required" : [ "rdfsFiles", "outputDir" ],
+        "description" : "Generate SHACL shape files from RDFS CIM profile definitions. Produces one .ttl shape file per input RDFS file."
+      },
+      "OrganizeConfig" : {
+        "type" : "object",
+        "properties" : {
+          "shaclFiles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to SHACL .ttl/.rdf files to organize."
+          },
+          "templateXlsx" : {
+            "type" : "string",
+            "description" : "Absolute path to the Excel template defining the output structure."
+          },
+          "outputDir" : {
+            "type" : "string",
+            "description" : "Absolute path to the root output directory."
+          }
+        },
+        "required" : [ "shaclFiles", "templateXlsx", "outputDir" ],
+        "description" : "Reorganize SHACL constraint files according to an Excel mapping template. Splits constraints from input .ttl files into per-file outputs with canonical ordering."
+      },
+      "Excel2shaclConfig" : {
+        "type" : "object",
+        "properties" : {
+          "rdfsFile" : {
+            "type" : "string",
+            "description" : "Absolute path to the RDFS profile .rdf file."
+          },
+          "excelFile" : {
+            "type" : "string",
+            "description" : "Absolute path to the Excel .xlsx constraint definitions file."
+          },
+          "output" : {
+            "type" : "string",
+            "description" : "Absolute path for the generated .ttl shape file."
+          },
+          "nsPrefix" : {
+            "type" : "string",
+            "description" : "Namespace prefix for generated shapes."
+          },
+          "nsUri" : {
+            "type" : "string",
+            "description" : "Namespace URI for generated shapes."
+          }
+        },
+        "required" : [ "rdfsFile", "excelFile", "output" ],
+        "description" : "Generate SHACL constraint shapes from an Excel spreadsheet and RDFS profile."
+      },
+      "GenInstancesConfig" : {
+        "type" : "object",
+        "properties" : {
+          "templateXlsx" : {
+            "type" : "string",
+            "description" : "Absolute path to the CimPal Advanced template .xlsx file."
+          },
+          "output" : {
+            "type" : "string",
+            "description" : "Absolute path for the generated RDF/XML file."
+          },
+          "xmlBase" : {
+            "type" : "string",
+            "description" : "Base URI (default: http://iec.ch/TC57/CIM100)."
+          },
+          "stripPrefixes" : {
+            "type" : "boolean",
+            "description" : "Remove unused namespace prefixes."
+          }
+        },
+        "required" : [ "templateXlsx", "output" ],
+        "description" : "Generate CIM/RDF instance data from a CimPal Excel template. Use to create synthetic pass/fail fixtures for shape testing."
+      },
+      "ManifestConfig" : {
+        "type" : "object",
+        "properties" : {
+          "dir" : {
+            "type" : "string",
+            "description" : "Absolute path to a folder containing the model files to describe."
+          },
+          "files" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to individual model files (alternative to 'dir')."
+          },
+          "accessUrl" : {
+            "type" : "string",
+            "description" : "The dcat:accessURL written into the manifest."
+          },
+          "output" : {
+            "type" : "string",
+            "description" : "Absolute path for the manifest .ttl file."
+          }
+        },
+        "description" : "Generate a DCAT/CGMES manifest Turtle file describing a set of model files."
+      }
+    }
+  }
+}
