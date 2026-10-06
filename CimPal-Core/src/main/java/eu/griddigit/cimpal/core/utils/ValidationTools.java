@@ -973,7 +973,10 @@ public class ValidationTools {
                     continue;
 
                 } catch (ExecutionException ex) {
-                    OutOfMemoryRethrow.ifCause(ex);
+                    if (OutOfMemoryRethrow.find(ex).isPresent()) {
+                        pool.shutdownNow(); // the other rows must not keep running on an exhausted heap
+                        OutOfMemoryRethrow.ifCause(ex);
+                    }
                     err++;
 
                     System.err.println("[EXECUTION_ERROR] future index=" + i);
@@ -1309,6 +1312,7 @@ public class ValidationTools {
                     results, conforms, null
             ).withDisplayName(row.notes).withPartialValidation(validationOutcome.partial());
         } catch (Exception ex) {
+            OutOfMemoryRethrow.ifCause(ex);
             dbgRow(rowIdx, "ERROR row dataset=" + datasetName, rowStart);
             logError("Unhandled exception", ex);
 
@@ -5427,7 +5431,10 @@ public class ValidationTools {
                 ));
 
             } catch (ExecutionException ex) {
-                OutOfMemoryRethrow.ifCause(ex);
+                if (OutOfMemoryRethrow.find(ex).isPresent()) {
+                    pool.shutdownNow(); // the other rows must not keep running on an exhausted heap
+                    OutOfMemoryRethrow.ifCause(ex);
+                }
                 results.add(new ValidationTaskResult(
                         i + 1,
                         ValidationExcelWriter.CaseFolder.UNKNOWN,
@@ -5625,6 +5632,7 @@ public class ValidationTools {
                     row.xmlFilesText, "", row.constraintFileText, outcome.results(), outcome.conforms(), null)
                     .withDisplayName(row.sourceRow.notes).withPartialValidation(outcome.partial());
         } catch (Exception ex) {
+            OutOfMemoryRethrow.ifCause(ex);
             logError("Unhandled exception in incremental timestamped row", ex);
             return new ValidationTaskResult(row.rowIdx, row.caseFolder, row.datasetName, row.ttlName,
                     row.xmlFilesText, "", row.constraintFileText, null, false, ex);
@@ -6228,6 +6236,7 @@ public class ValidationTools {
                     .withPartialValidation(limitedOutcome.partial());
 
         } catch (Exception ex) {
+            OutOfMemoryRethrow.ifCause(ex);
             dbgRow(row.rowIdx, "ERROR timestamped resolved row"
                             + " tso=" + row.tso
                             + " timestamp=" + row.timestamp,

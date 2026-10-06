@@ -45,7 +45,7 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 | Phase | ID | Work package | Depends on | Size | Status |
 | --- | --- | --- | --- | --- | --- |
 | D0 | [DEP-1](deployment/DEP-1.md) | Container image (delta on CI-3) | CI-1, CI-3 | S | Done ([PR #52](https://github.com/griddigit-ci/CimPal/pull/52)) |
-| D0 | [DEP-2](deployment/DEP-2.md) | Resource statistics, benchmark and sizing guide | DEP-1 (soft) | M | In progress |
+| D0 | [DEP-2](deployment/DEP-2.md) | Resource statistics, benchmark and sizing guide | DEP-1 (soft) | M | In review ([PR #54](https://github.com/griddigit-ci/CimPal/pull/54)) |
 | D0 | [DEP-3](deployment/DEP-3.md) | CLI automation options and Airflow container pattern | DEP-1 | M | Not started |
 | D0 | [DEP-4](deployment/DEP-4.md) | External user guide, first edition | DEP-1, DEP-2, DEP-3 | M | Not started |
 | D1 | [DEP-5](deployment/DEP-5.md) | Async job API (`/v1`) and OpenAPI spec | SEC-1, SEC-2 | L | Not started |

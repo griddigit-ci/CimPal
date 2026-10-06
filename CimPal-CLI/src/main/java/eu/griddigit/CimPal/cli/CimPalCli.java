@@ -92,7 +92,7 @@ public class CimPalCli {
             exitCode = rethrowingOutOfMemory(new CommandLine(new CimPalCli())).execute(args);
         } catch (Throwable t) {
             if (OutOfMemoryRethrow.find(t).isPresent()) {
-                outOfMemoryExit();
+                OutOfMemoryExit.halt();
             }
             throw t;
         }
@@ -119,19 +119,4 @@ public class CimPalCli {
             return fallback.handleExecutionException(ex, commandLine, parseResult);
         });
     }
-
-    /**
-     * Ends the JVM with exit code 3 after an out-of-memory error. The message is built before it
-     * is needed, and {@code halt} skips the shutdown hooks, because both could need memory there
-     * is none of.
-     */
-    private static void outOfMemoryExit() {
-        System.err.println(OUT_OF_MEMORY_MESSAGE);
-        System.err.flush();
-        Runtime.getRuntime().halt(ExitCode.INTERNAL_ERROR);
-    }
-
-    private static final String OUT_OF_MEMORY_MESSAGE = "[ERROR] Out of memory (max heap "
-            + (Runtime.getRuntime().maxMemory() >> 20) + " MB). Give the JVM more memory (-Xmx, or the"
-            + " container's memory limit); see docs/guide/sizing.md for sizes by model.";
 }

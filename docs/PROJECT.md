@@ -274,6 +274,11 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
   OCI version and revision labels (build arguments), the example configs and the EUPL PDF.
   `Test-DockerImage.ps1` runs validation, `mcp` and `serve` on a read-only root filesystem.
 
+**Resource statistics and sizing** (DEP-2, `docs/plans/deployment/DEP-2.md`):
+- `--stats` (and config key `stats`) on `validate`, `sparql`, `compare`, `compare-instances`: a last `stats` field in the JSON object (or a `[STATS]` line on stderr) with wall/phase/CPU time, heap-pool peaks, GC, peak RSS (Linux), triples and bytes loaded. Core `core.stats.RunStats` (no static state), passed via `MappingValidationOptions.runStats`.
+- Out of memory always ends with exit 3: `OutOfMemoryRethrow` in `ValidationTools` stops a worker OOM from becoming a failed row; `CimPalCli.main`, `serve` and `mcp` halt via `OutOfMemoryExit`.
+- `scripts/bench/` (Python, stdlib): seeded synthetic model generator and benchmark runner (`--find-min-heap`, `--core-sweep`, `--verify`, `--budget` for TEST-5). Results and rule of thumb in `docs/guide/sizing.md` (0.6 GB heap per million triples, 2–4 cores).
+
 **Deployment track** (`docs/plans/deployment/`, DEP-1 to DEP-10): container, sizing, CLI automation
 options, an async `/v1` API, a Python SDK and an Airflow provider for external users. It supersedes
 the ordering of the *REST API — discovery and implementation plan* section below.
@@ -282,8 +287,9 @@ the ordering of the *REST API — discovery and implementation plan* section bel
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)): its
 "Docker image" job needs a first green run, and after the first release that pushes the image the
-GHCR package must be made public. DEP-1 needs a green "Docker image" job with its new checks.
-Then follow the deployment track: DEP-2 (benchmark and sizing) and DEP-3 (CLI automation options).
+GHCR package must be made public. DEP-1 is done. DEP-2's first part was merged with PR #54; the
+sizing guide and the security-review fixes follow in a second PR. Next on the deployment track is
+DEP-3 (CLI automation options).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,

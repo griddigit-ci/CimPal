@@ -46,7 +46,8 @@ python scripts/bench/run_bench.py --sizes 1M --heaps 1g,2g,4g --cores 2,4
 - **Launchers:**
   - `--jar PATH`, the default: `CimPal-CLI/target/CimPal-CLI.jar`.
   - `--classpath CP`: a development tree. Get `CP` with `mvn -pl CimPal-CLI dependency:build-classpath`, plus `CimPal-CLI/target/classes`.
-  - `--docker IMAGE`: the [container image](../../docs/cli/docker.md). `--heaps` becomes `--memory` and `--cores` becomes `--cpus`, and the cgroup's `memory.peak` is recorded too (`cgroupPeakBytes`). The repository's tests don't exercise this mode.
+  - `--docker IMAGE`: the [container image](../../docs/cli/docker.md). `--heaps` becomes `--memory` and `--cores` becomes `--cpus`, and the cgroup's `memory.peak` is recorded too (`cgroupPeakBytes`). On Linux and macOS the container runs as your UID, so it can write to the run's private temporary folder. The repository's tests don't exercise this mode.
+- **Executables:** `java`, `docker` and (macOS) `sysctl` come from `PATH`; pass `--java` to pin the JVM.
 
 ## Method
 

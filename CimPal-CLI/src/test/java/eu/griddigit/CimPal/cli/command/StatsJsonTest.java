@@ -12,6 +12,7 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.stats.RunStatsSnapshot;
 import eu.griddigit.cimpal.core.testsupport.Fixtures;
 import eu.griddigit.cimpal.core.testsupport.Normalizer;
 import eu.griddigit.cimpal.core.testsupport.TestModels;
@@ -140,6 +141,20 @@ class StatsJsonTest {
         Run run = run(withConfig.toArray(String[]::new));
 
         assertThat(JSON.readTree(run.stdout()).has("stats")).as(run.stdout()).isTrue();
+    }
+
+    @Test
+    void stringsAreEscapedSoTheObjectStaysValidJson() {
+        String hostile = "Linux \"quoted\" back\\slash\nnew line \u0001   end";
+        RunStatsSnapshot snapshot = new RunStatsSnapshot(1, java.util.Map.of("load", 1L), null, 2, 3, null, 0, 1,
+                0, 0, hostile, hostile);
+
+        JsonNode parsed = JSON.readTree(StatsJson.object(snapshot));
+
+        assertThat(parsed.path("os").asText()).isEqualTo(hostile);
+        assertThat(parsed.path("javaVersion").asText()).isEqualTo(hostile);
+        assertThat(parsed.path("cpuMs").isNull()).isTrue();
+        assertThat(schemaErrors(parsed)).isEmpty();
     }
 
     @Test

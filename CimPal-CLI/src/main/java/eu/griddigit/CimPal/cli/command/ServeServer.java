@@ -8,7 +8,9 @@ package eu.griddigit.CimPal.cli.command;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import eu.griddigit.CimPal.cli.CliVersion;
+import eu.griddigit.CimPal.cli.OutOfMemoryExit;
 import eu.griddigit.cimpal.core.utils.LogSanitizer;
+import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -142,6 +144,8 @@ final class ServeServer implements AutoCloseable {
     private final Config config;
     private final CommandRunner runner;
     private final RequestCheck requestCheck;
+    /** Ends the JVM after a command ran out of memory ({@link OutOfMemoryExit#halt()}; tests record it). */
+    private final Runnable onOutOfMemory;
     private HttpServer http;
     private final ExecutorService handlers;
     private final ExecutorService worker;
@@ -152,10 +156,11 @@ final class ServeServer implements AutoCloseable {
     /** When the running command started (System.nanoTime), or 0 when the worker is idle. */
     private final AtomicLong runningSince = new AtomicLong();
 
-    private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck) {
+    private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck, Runnable onOutOfMemory) {
         this.config = config;
         this.runner = runner;
         this.requestCheck = requestCheck;
+        this.onOutOfMemory = onOutOfMemory;
         this.totalSlots = config.queueSize() + 1;
         this.slots = new Semaphore(totalSlots);
         // The JDK server reads request lines, headers and bodies on these threads too, and up to
@@ -180,11 +185,18 @@ final class ServeServer implements AutoCloseable {
 
     /** {@link #start(Config, CommandRunner)} with a check that runs on every command request first. */
     static ServeServer start(Config config, CommandRunner runner, RequestCheck requestCheck) throws IOException {
+        return start(config, runner, requestCheck, OutOfMemoryExit::halt);
+    }
+
+    /** As above, with what to do after a command ran out of memory (tests; the default halts). */
+    static ServeServer start(Config config, CommandRunner runner, RequestCheck requestCheck,
+                             Runnable onOutOfMemory) throws IOException {
         Objects.requireNonNull(requestCheck, "requestCheck");
         Objects.requireNonNull(runner, "runner");
+        Objects.requireNonNull(onOutOfMemory, "onOutOfMemory");
         validate(config);
         limitRequestReadTime();
-        ServeServer server = new ServeServer(config, runner, requestCheck);
+        ServeServer server = new ServeServer(config, runner, requestCheck, onOutOfMemory);
         try {
             server.http = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
         } catch (IOException | RuntimeException e) {
@@ -427,6 +439,17 @@ final class ServeServer implements AutoCloseable {
             reject(exchange, 504, "Command did not finish within " + config.requestTimeout(), "POST", "/" + command);
             return;
         } catch (ExecutionException e) {
+            if (OutOfMemoryRethrow.find(e).isPresent()) {
+                // The heap is exhausted and the run's other workers may still be going: this JVM
+                // can't be trusted with another request, so the server ends with exit 3 (DEP-2).
+                try {
+                    respond(exchange, 500, OUT_OF_MEMORY_BODY);
+                } catch (Throwable ignored) {
+                    // Best effort: the client sees the connection close instead.
+                }
+                onOutOfMemory.run();
+                return;
+            }
             System.err.println("[ERROR] serve: /" + command + " failed: " + e.getCause().getClass().getSimpleName());
             respond(exchange, 500, error("Internal error while running " + command));
             return;
@@ -507,6 +530,11 @@ final class ServeServer implements AutoCloseable {
             out.write(bytes);
         }
     }
+
+    /** Built before it is needed: answering an out-of-memory request may find no heap. */
+    private static final String OUT_OF_MEMORY_BODY = "{\"exitCode\":3,\"status\":\"INTERNAL_ERROR\","
+            + "\"error\":\"Out of memory; the server stops. Restart it with more memory (-Xmx, or the"
+            + " container's memory limit); see docs/guide/sizing.md.\"}";
 
     private static String error(String message) {
         return "{\"error\":" + jsonStr(message) + "}";
