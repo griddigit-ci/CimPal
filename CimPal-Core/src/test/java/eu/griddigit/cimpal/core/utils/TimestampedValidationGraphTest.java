@@ -122,6 +122,28 @@ class TimestampedValidationGraphTest {
     }
 
     @Test
+    void importSharedByTwoRootsOfAMappingRowIsLoadedOnceSoEachFindingIsReportedOnce() throws Exception {
+        // A row's ttl cell "eq.ttl;ssh.ttl", both importing common.ttl. Parsed once per root,
+        // common.ttl's anonymous property shape got a second blank node, so the one missing
+        // ex:p was reported twice in the timestamped reports.
+        Path common = tempDir.resolve("common.ttl");
+        Files.writeString(common, """
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                <urn:test:shape> a sh:NodeShape; sh:targetClass <urn:test:Thing>;
+                    sh:property [ sh:path <urn:test:p>; sh:minCount 1 ] .
+                """);
+        Path eq = tempDir.resolve("eq.ttl");
+        Path ssh = tempDir.resolve("ssh.ttl");
+        Files.writeString(eq, "<urn:test:eq> <http://www.w3.org/2002/07/owl#imports> <" + common.toUri() + "> .");
+        Files.writeString(ssh, "<urn:test:ssh> <http://www.w3.org/2002/07/owl#imports> <" + common.toUri() + "> .");
+
+        var shapes = ValidationTools.loadParsedShapesWithImports(List.of(eq, ssh), tempDir, new ConcurrentHashMap<>());
+        var report = ValidationTools.validateJenaTargetShapes(shapes.shapes(), ttl("ex:a a ex:Thing .").getGraph(), 1);
+
+        assertEquals(1, report.getEntries().size(), () -> "entries: " + report.getEntries());
+    }
+
+    @Test
     void selectedUnionMatchesPhysicalMergeIncludingSparqlAndDuplicates() {
         Model first = ttl("ex:a a ex:Thing; ex:p ex:b .");
         Model second = ttl("ex:a a ex:Thing; ex:p ex:b . ex:b ex:q ex:c .");

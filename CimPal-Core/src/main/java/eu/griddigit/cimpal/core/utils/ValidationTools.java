@@ -3404,9 +3404,11 @@ public class ValidationTools {
 
     /**
      * Produces one parsed Jena Shapes object for the exact set of roots selected by a mapping
-     * row. Each root still contributes its full owl:imports closure; RDF set semantics remove
-     * overlapping imported triples. The canonical cache key makes the combination reusable for
-     * every timestamp without conflating it with another shape set.
+     * row. The roots are loaded as one owl:imports closure, so a file that several of them import
+     * is read once: read once per root, its anonymous shapes would get a second set of blank
+     * nodes, and each of their constraints would be evaluated, and reported, twice. The canonical
+     * cache key makes the combination reusable for every timestamp without conflating it with
+     * another shape set.
      */
     static CachedShapes loadParsedShapesWithImports(Collection<Path> roots,
                                                     Path constraintsRoot,
@@ -3427,15 +3429,9 @@ public class ValidationTools {
         try {
             return cache.computeIfAbsent(cacheKey, ignored -> {
                 try {
-                    Model combination = ModelFactory.createDefaultModel();
-                    Map<String, Model> rootsInCombination = new HashMap<>();
-
-                    for (Path root : canonicalRoots) {
-                        Model rootModel = loadShapesWithImports(
-                                new LocalShapeSource(root), constraintsRoot, rootsInCombination).model();
-                        combination.add(rootModel);
-                        combination.setNsPrefixes(rootModel.getNsPrefixMap());
-                    }
+                    Model combination = loadShapesWithImports(
+                            canonicalRoots.stream().map(LocalShapeSource::new).toList(),
+                            constraintsRoot, new HashMap<>(), (source, document) -> { }).model();
 
                     Shapes parsed = Shapes.parse(combination.getGraph());
                     long deactivated = parsed.getShapeMap().values().stream()
