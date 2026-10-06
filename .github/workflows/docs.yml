@@ -1,0 +1,38 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Documentation checks (DEP-4): every relative link and #anchor in the user guide, the CLI
+# reference and the root README resolves. External URLs are not fetched.
+name: Docs
+
+on:
+  push:
+    branches: [devel, master]
+    paths: ['docs/**', 'README.md', 'scripts/check_doc_links.py', '.github/workflows/docs.yml']
+  pull_request:
+    branches: [devel, master]
+    paths: ['docs/**', 'README.md', 'scripts/check_doc_links.py', '.github/workflows/docs.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: Documentation links
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Check links in the guide, the CLI reference and the README
+        run: python scripts/check_doc_links.py docs/guide docs/cli README.md

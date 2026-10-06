@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (CI and the manual Kubernetes walkthrough pending) |
+| Status | Done ([PR #60](https://github.com/griddigit-ci/CimPal/pull/60); the manual Kubernetes walkthrough is open) |
 | Phase | D0 |
 | Depends on | DEP-1 |
 | Size | M |
@@ -52,7 +52,7 @@ Make integration path A work well today: Airflow starts CimPal as a container (o
 - [x] Example DAG `cimpal_docker.py`: `DockerOperator` with a mounted folder; a follow-up task reads the summary file and pushes it to XCom.
 - [x] Example DAG `cimpal_bash.py`: `BashOperator` for workers with JRE 25 and the JAR; values reach the shell only as environment variables.
 - [x] The XCom payload stays small: the examples push `{conforms, hasViolations, totals, report}` only.
-- [ ] `integrations/airflow/tests/test_dag_integrity.py`: all example DAGs import without errors under Airflow 3.3.2, plus structure, security and end-to-end tests. They run in `integrations.yml`, so this stays open until that workflow is green on GitHub.
+- [x] `integrations/airflow/tests/test_dag_integrity.py`: all example DAGs import without errors under Airflow 3.3.2, plus structure, security and end-to-end tests (the Bash DAG runs the CLI). Green in `integrations.yml` on PR #60, after two fixes for Airflow 3.3: `DagBag` has no `include_examples`, and `dag.test()` needs the DAGs serialized (`airflow dags reserialize`).
 - [ ] End-to-end check on a local Kubernetes: described step by step in `integrations/airflow/README.md`; for the maintainer (no Docker or Kubernetes in this session).
 - [x] `docs/guide/airflow.md`:
   - path A;

@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In progress (maintainer review of the support policy pending) |
 | Phase | D0 |
 | Depends on | DEP-1, DEP-2, DEP-3 |
 | Size | M |
@@ -41,14 +41,16 @@ A guide that an external organisation can follow to understand, install, size, s
 
 ## Acceptance criteria (status checklist)
 
-- [ ] All pages above exist, each with the licence header, a "last reviewed" date and the CimPal version they describe
-- [ ] Every command and flag mentioned exists (checked against `--help` output of the current JAR; list the check in notes)
-- [ ] Quickstart verified from a clean folder with the JAR and with the DEP-1 image; commands copy-paste-able for PowerShell and bash
-- [ ] Capability statement fits on two printed pages and has no claims that aren't backed by a test, a benchmark or a doc
-- [ ] Pages that describe planned features (service mode, SDK, provider) mark them clearly as planned, with the WP id
-- [ ] `README.md` (repo root) links to `docs/guide/index.md`; `docs/cli/index.md` links to the guide
-- [ ] Support-policy text drafted and marked `<!-- maintainer review -->`; maintainer review recorded in the decisions log
-- [ ] Markdown link check passes for `docs/guide/**` (script or CI step)
+- [x] All pages exist, each with the licence header, a "last reviewed" date and the CimPal version it describes. `sizing.md` and `airflow.md` (DEP-2/3) got the header line.
+- [x] Every command and flag mentioned exists: checked against the `--help` output of the current `devel` CLI (see notes).
+- [ ] Quickstart verified from a clean folder:
+  - with the CLI on Windows/PowerShell: done (see notes);
+  - Docker and bash: written to match `docs/cli/docker.md`, but not run here (no Docker in this environment); for the maintainer.
+- [x] The capability statement fits on two printed pages (853 words) and makes no unbacked claims. Each security claim maps to a test, the attestation or a CLI doc; the resource numbers come from `sizing.md`.
+- [x] Planned features (service API, deployment, file exchange, concurrency, SDK, provider) are marked "Planned" with their WP ids, in `deployment-modes.md` and `capabilities.md`.
+- [x] `README.md` links to `docs/guide/index.md` (new "Documentation" section), and `docs/cli/index.md` links to the guide.
+- [ ] Support-policy text drafted and marked `<!-- maintainer review -->` in `versioning-and-support.md`; the maintainer's review is still to be recorded below.
+- [x] The Markdown link check passes for `docs/guide/**`, `docs/cli/**` and `README.md`: `scripts/check_doc_links.py` in `.github/workflows/docs.yml`.
 
 ## Instructions for Claude Code
 
@@ -79,7 +81,23 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-06 | Each page says "Describes CimPal 2026.10.6.1 and later". Features that are on `devel` but not in 2026.10.6.1 (`--summary-file`, `--violations-exit-code`) are marked as needing the next release. | Claude Code; approved plan |
+| 2026-10-06 | Command check against `--help` from the `devel` build on its Maven classpath, because `CimPal-CLI.jar` was locked by the local MCP server. Same code as the JAR. | Claude Code; approved plan |
+| 2026-10-06 | The link check is a small stdlib script (`scripts/check_doc_links.py`) in a path-filtered workflow (`docs.yml`), not lychee: no new tool, and it checks heading anchors. External URLs are not fetched. | Claude Code; approved plan |
+| 2026-10-06 | Support contact: the README's existing support address (cimpal@griddigit.eu), plus GitHub private vulnerability reporting for security issues. Both are marked for maintainer confirmation; no address was invented. | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+- **Command check (2026-10-06):**
+  - Captured `--help` for the top level and all 13 commands from `devel` `fe64eb9`. That build reports `CimPal CLI 2026.9.10.1`: `devel` never received the release version bump, which only lives on `master`.
+  - All 21 CimPal flags in `docs/guide/**` occur in the help texts. The other 16 flags in the guide belong to Docker (`--memory`, `--cpus`, `--network`, `--read-only`, `--rm`, `--tmpfs`, `--user`) or `scripts/bench/run_bench.py` (`--sizes`, `--find-min-heap`, `--heap-range`, `--core-sweep`, `--cores`, `--warmup`, `--runs`, `--out`, `--docker`). All 13 command names match the top-level help.
+- **Quickstart run** (Windows, PowerShell, a fresh copy of `integrations/airflow/examples/data` in `%TEMP%`):
+  - `validate --config run.json --format json` exited 1 with `totals {conforming 0, violations 1, errors 0, total 1}` and `hasViolations: true`, and wrote `out/validation_report__<date>_<time>.xlsx`.
+  - The workbook has the sheets "Validation results", "Validation statistics", "StatisticsConstraint" and "Charts".
+  - With `--samples 3`: 5 shape groups with 2 findings each (10 in total), matching the generator's manifest.
+- **Link check:** 31 files, 0 broken links.
+- **Open:**
+  - the maintainer reviews `versioning-and-support.md` (stability promises, deprecation period, supported versions, response time, contacts) and records it here;
+  - the Docker and bash quickstart are run once on Linux;
+  - `devel` should get `master`'s version bump (the guide doesn't depend on it, but `--version` on `devel` is behind);
+  - pages to extend as DEP-5..10 land: deployment modes, capabilities, airflow.

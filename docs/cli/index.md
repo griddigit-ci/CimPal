@@ -5,6 +5,8 @@
 -->
 # CimPal CLI Documentation
 
+This is the per-command reference. For installing, sizing, securing and integrating CimPal, start with the [user guide](../guide/index.md).
+
 ## Reference
 
 | Document | What it covers |

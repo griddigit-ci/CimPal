@@ -284,6 +284,10 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - `--violations-exit-code` (config `violationsExitCode`, 0..255, default 1) replaces only the "violations/differences found" exit; ignored under serve/mcp/run (an active `PathPolicy`), which keep their own status logic. Shared code in `command/AutomationOptions`.
 - `integrations/airflow/`: example DAGs for KubernetesPodOperator, DockerOperator and BashOperator (Airflow 3.3.2), example data from `gen_models.py`, DAG tests; `.github/workflows/integrations.yml` runs them and the Bash DAG end to end. Guide: `docs/guide/airflow.md`.
 
+**External user guide** (DEP-4, `docs/plans/deployment/DEP-4.md`): `docs/guide/` is the task-oriented layer on top of `docs/cli/`.
+- Pages: index, capability statement, install, quickstart, deployment modes, sizing, Airflow, security, configuration, troubleshooting, versioning and support (draft, for maintainer review), glossary.
+- Linked from the root `README.md`. `scripts/check_doc_links.py` checks the links in `.github/workflows/docs.yml`.
+
 **Deployment track** (`docs/plans/deployment/`, DEP-1 to DEP-10): container, sizing, CLI automation
 options, an async `/v1` API, a Python SDK and an Airflow provider for external users. It supersedes
 the ordering of the *REST API — discovery and implementation plan* section below.
@@ -293,9 +297,10 @@ phase order in `docs/plans/README.md`. Enabling branch protection with the two C
 required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)): its
 "Docker image" job needs a first green run, and after the first release that pushes the image the
 GHCR package must be made public. DEP-1 and DEP-2 are done and released in 2026.10.6.1. DEP-3
-(automation options and Airflow examples) is in progress on `feature/dep-3-airflow-container`; the
-KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. Next on the
-deployment track: DEP-4 (external user guide), which links the sizing and Airflow guides.
+(automation options and Airflow examples) is merged (PR #60) and goes out with the next release; the
+KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. DEP-4 (external
+user guide, `docs/guide/`) is in progress; its support policy awaits maintainer review. Next on the
+deployment track: DEP-5 (async `/v1` job API and OpenAPI spec).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
