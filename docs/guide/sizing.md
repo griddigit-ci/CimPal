@@ -5,6 +5,8 @@
 -->
 # Sizing: memory, cores and time by model size
 
+*Last reviewed 2026-10-06 · Describes CimPal 2026.10.6.1 and later; measured on 2026-10-05*
+
 How much heap and how many cores a CimPal validation needs, measured with [`--stats`](../cli/README.md#resource-statistics---stats) and the [benchmark scripts](../../scripts/bench/README.md). The size measure is **triples**: `--stats` reports it as `triplesLoaded`, and it predicts memory far better than file size.
 
 ## Short answer

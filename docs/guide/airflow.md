@@ -5,6 +5,8 @@
 -->
 # Running CimPal from Apache Airflow
 
+*Last reviewed 2026-10-06 · Describes the release after CimPal 2026.10.6.1: `--summary-file` and `--violations-exit-code` are not in 2026.10.6.1*
+
 The simplest way to use CimPal in an Airflow pipeline is one task per validation (path A). Airflow starts CimPal as a container or a process, CimPal writes a small JSON summary, and the following tasks act on it. There is no CimPal server to run. Runnable examples are in [`integrations/airflow/`](../../integrations/airflow/README.md).
 
 ```
