@@ -51,7 +51,10 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r integrations/airflow/requirements-test.txt \
   --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
 export AIRFLOW_HOME=$PWD/target/airflow-home
+export AIRFLOW__CORE__LOAD_EXAMPLES=false
+export AIRFLOW__CORE__DAGS_FOLDER=$PWD/integrations/airflow/examples
 airflow db migrate
+airflow dags reserialize   # Airflow 3 runs only serialized DAGs, dag.test() included
 mvn -B -pl CimPal-CLI -am package -DskipTests
 CIMPAL_JAR=$PWD/CimPal-CLI/target/CimPal-CLI.jar pytest integrations/airflow/tests -v
 ```

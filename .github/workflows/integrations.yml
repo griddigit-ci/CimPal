@@ -33,6 +33,7 @@ jobs:
       PYTHON_VERSION: '3.12'
       AIRFLOW_HOME: ${{ github.workspace }}/target/airflow-home
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/integrations/airflow/examples
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,6 +63,10 @@ jobs:
 
       - name: Create the Airflow metadata database
         run: airflow db migrate
+
+      # Airflow 3 runs a DAG (also dag.test()) only once it is serialized in the database.
+      - name: Serialize the example DAGs
+        run: airflow dags reserialize
 
       - name: DAG tests (integrity and the Bash DAG end to end)
         env:

@@ -7,8 +7,9 @@
         --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
     pytest integrations/airflow/tests
 
-The end-to-end test needs an Airflow metadata database (`airflow db migrate`) and the CLI JAR in
-CIMPAL_JAR; without CIMPAL_JAR it is skipped. Airflow runs on Linux and macOS, not on Windows.
+The end-to-end test needs an Airflow metadata database with the examples serialized
+(`airflow db migrate`, then `airflow dags reserialize` with AIRFLOW__CORE__DAGS_FOLDER pointing at
+examples/) and the CLI JAR in CIMPAL_JAR; without CIMPAL_JAR it is skipped. Airflow runs on Linux and macOS, not on Windows.
 """
 from __future__ import annotations
 
