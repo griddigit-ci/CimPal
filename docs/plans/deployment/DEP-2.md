@@ -99,7 +99,7 @@ Standard footer (applies to every work package):
 | 2026-10-05 | D-4: synthetic models only. ENTSO-E conformity models wait for the licence decision. | Maintainer |
 | 2026-10-05 | The first benchmark ran on the maintainer's laptop with 100k/1M/5M triples and a reduced matrix: min-heap bisection, then a core sweep at twice that heap. | Maintainer |
 | 2026-10-05 | `RunStats` reaches `ValidationTools` as an explicit parameter (`MappingValidationOptions.runStats`). The existing overloads delegate with `null`, so other callers are untouched, and there is no static or thread-local state. | Claude Code |
-| 2026-10-05 | `triplesLoaded` means unique triples parsed from instance files. Plain mapping counts the merged data model of each row (a file used by two rows counts twice, as it is parsed twice). Timestamped counts each cached file once, when its cache is dropped. `manual` reports 0. | Claude Code |
+| 2026-10-05 | `triplesLoaded` means unique triples parsed from instance files. Plain mapping counts the merged data model of each row (a file used by two rows counts twice, as it is parsed twice). Timestamped counts each cached file once, when its cache is dropped. (The CLI's `manual` workflow was removed by PR #53.) | Claude Code |
 | 2026-10-05 | Stats go inside the one JSON object (a last field), never as a separate block, so `serve` and `mcp` keep returning a single JSON value. In text/CSV mode or with `--output`, they are one `[STATS]` line on stderr. Wall time ends where the output starts. | Claude Code |
 | 2026-10-05 | Out of memory:<ul><li>Core rethrows an `OutOfMemoryError` found in an `ExecutionException` or row-level exception (`OutOfMemoryRethrow`), and stops the row pool first.</li><li>picocli's handler rethrows it, and `main` prints a prebuilt line and halts with 3.</li><li>`serve` answers the request with exit 3 and halts too, because its JVM can't be trusted afterwards.</li><li>`mcp` answers the tool call with JSON-RPC `-32603` before exiting with 3.</li></ul>The container's `ExitOnOutOfMemoryError` (DEP-1) gives the same exit code. | Claude Code; `serve` and `mcp` parts from the security review |
 | 2026-10-05 | The OOM test is a surefire test that forks a JVM on the test classpath. Failsafe with the packaged JAR would need the JAR, which Windows locks while the local MCP server runs. | Claude Code |
@@ -136,5 +136,5 @@ Standard footer (applies to every work package):
 - **Open:**
   - **Linux runs:** a Linux machine and a `--docker` series, for peak RSS and a real `--cpus` quota.
   - **Other inputs:** multi-row and timestamped benchmarks, and real CGMES conformity models once D-4 allows them.
-  - **`manual` workflow:** it still always exits 0, even when rows failed (found by the security review). That is not new and out of scope here.
+  - **`manual` workflow:** the review found it always exited 0; PR #53 removed it from the CLI, so that is moot.
   - **DEP-4:** link the guide from the external user guide.
