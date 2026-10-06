@@ -1,0 +1,15 @@
+{
+  "_comment": "Validate config for the Airflow examples (DEP-3). Paths are relative to this file. The data is synthetic (scripts/bench/gen_models.py --triples 2000 --seed 1 --violation-rate 0.1): CGMES-like EQ and SSH files with 10 known violations, see manifest.json.",
+  "_how_to_use": "java -jar CimPal-CLI.jar validate --config run.json --summary-file out/summary.json --violations-exit-code 0",
+
+  "workflow": "mapping",
+  "mappingCsv": "mapping.csv",
+  "modelsDir": "models",
+  "constraintsRoot": "constraints",
+  "outputDir": "out",
+  "xmlBase": "http://example.com/data",
+  "workers": 1,
+
+  "samples": 0,
+  "_note_samples": "No per-shape detail: the summary stays small enough for XCom. Use 3 (the JSON default) to get the shapes with sample focus nodes."
+}

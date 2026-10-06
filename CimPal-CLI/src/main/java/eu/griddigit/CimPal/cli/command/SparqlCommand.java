@@ -20,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -94,6 +95,16 @@ public class SparqlCommand implements Callable<Integer> {
     /** The collector when {@code --stats} is on, otherwise null. */
     private RunStats runStats;
 
+    @Option(names = "--summary-file",
+            description = "Also write the JSON result (the document --format json prints) to this file, "
+                    + "atomically, creating parent folders.")
+    private File summaryFile;
+
+    @Option(names = "--violations-exit-code",
+            description = "Accepted like on the other JSON commands (0..255); sparql never reports violations, "
+                    + "so it never changes the exit code.")
+    private Integer violationsExitCode;
+
     @Option(names = "--limit",
             description = "Warn if the query has no LIMIT and the model exceeds 100k triples; prepend LIMIT to the query (0 = no limit).")
     private int limit = 0;
@@ -155,12 +166,22 @@ public class SparqlCommand implements Callable<Integer> {
             }
             System.err.println("[INFO] Query returned " + results.rows.size() + " row(s).");
 
-            // 8. Output results
+            // 8. Output results. With a summary file the JSON document is built once, so the file
+            //    and stdout carry the same document (and stats snapshot).
+            String json = null;
+            if (summaryFile != null) {
+                StringWriter buffer = new StringWriter();
+                writeJson(results, new PrintWriter(buffer), StatsJson.field(runStats, ""));
+                json = buffer.toString().stripTrailing();
+                if (!AutomationOptions.writeSummary(summaryFile, json)) {
+                    return ExitCode.INTERNAL_ERROR;
+                }
+            }
             if (outputFile != null) {
                 writeToFile(results);
                 StatsJson.toStderr(runStats);
             } else {
-                writeToStdout(results);
+                writeToStdout(results, json);
             }
 
             return ExitCode.OK;
@@ -233,6 +254,14 @@ public class SparqlCommand implements Callable<Integer> {
             JsonNode n = root.path("stats");
             if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
+        if (summaryFile == null) {
+            String v = root.path("summaryFile").asText(null);
+            if (v != null && !v.isBlank()) summaryFile = resolveRelative(configDir, v);
+        }
+        if (violationsExitCode == null) {
+            JsonNode n = root.path("violationsExitCode");
+            if (!n.isMissingNode() && !n.isNull()) violationsExitCode = AutomationOptions.exitCodeFromConfig(n);
+        }
     }
 
     private static File resolveRelative(Path configDir, String value) {
@@ -255,7 +284,7 @@ public class SparqlCommand implements Callable<Integer> {
     // -------------------------------------------------------------------------
 
     private boolean validateInputs() {
-        boolean ok = true;
+        boolean ok = AutomationOptions.checkViolationsExitCode(violationsExitCode);
 
         if (modelFiles == null || modelFiles.isEmpty()) {
             System.err.println("[ERROR] --models is required: specify one or more model files.");
@@ -317,10 +346,17 @@ public class SparqlCommand implements Callable<Integer> {
         }
     }
 
-    private void writeToStdout(QueryResults results) {
+    /** {@code json} is the already built JSON document (with a summary file), or null. */
+    private void writeToStdout(QueryResults results, String json) {
         switch (format.toLowerCase()) {
-            case "json" -> writeJson(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8),
-                    StatsJson.field(runStats, ""));
+            case "json" -> {
+                if (json != null) {
+                    System.out.println(json);
+                } else {
+                    writeJson(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8),
+                            StatsJson.field(runStats, ""));
+                }
+            }
             case "csv"  -> {
                 writeCsv(results, new PrintWriter(System.out, true, StandardCharsets.UTF_8));
                 StatsJson.toStderr(runStats);

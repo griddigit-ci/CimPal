@@ -32,5 +32,8 @@
   "_note_output": "Where to write the diff report. Use .xlsx for Excel (recommended); any other extension for CSV. Remove this field to print to stdout instead.",
 
   "format": "text",
-  "_note_format": "Only used when 'output' is not set. Options: text (pipe-separated table), json, csv."
+  "_note_format": "Only used when 'output' is not set. Options: text (pipe-separated table), json, csv.",
+
+  "_note_summaryFile": "Optional (DEP-3): add \"summaryFile\": \"diff-summary.json\" to also write the JSON result (what --format json prints) to that file, atomically, also when 'output' is set.",
+  "_note_violationsExitCode": "Optional (DEP-3): add \"violationsExitCode\": 0 to end with exit code 0 when differences are found, so a scheduler treats them as data. Default 1. Ignored under serve, mcp and run."
 }

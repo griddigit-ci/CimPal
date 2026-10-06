@@ -94,10 +94,12 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--workers` | integer | `0` (auto) | Parallel validation workers. `0` = memory-aware auto-sizing. |
 | `--max-results` | integer | `0` (unlimited) | Cap SHACL results per source shape. `10` is useful for quick checks. `0` = run fully. |
 | `--format` | `text` / `json` | `text` | Output format. `json` writes a machine-readable summary to stdout. |
-| `--samples` | integer | `3` (json mode) / `0` (text mode) | Per-shape detail in JSON output: max focus-node samples per shape group. `0` disables shape groups entirely. Positive values auto-enable `--export-turtle`. |
+| `--samples` | integer | `3` when JSON is produced (`--format json` or `--summary-file`) / `0` otherwise | Per-shape detail in JSON output: max focus-node samples per shape group. `0` disables shape groups entirely. Positive values auto-enable `--export-turtle`. |
 | `--export-turtle` | flag | off | Write a `.ttl` SHACL validation report beside each Excel report. |
 | `--previous-comparison` | file path | — | XLSX from a previous timestamped run, for the comparison workbook. Timestamped workflow only. |
 | `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
+| `--summary-file` | file path | — | Also write the JSON result (exactly what `--format json` prints) to this file, atomically, creating parent folders. Works with any `--format`. Config key `summaryFile`. See [automation options](README.md#automation-options---summary-file---violations-exit-code). |
+| `--violations-exit-code` | 0–255 | `1` | Exit code when violations are found. `0` lets a scheduler (Airflow, CI) treat findings as data; exits 2 and 3 are unchanged, and so is exit 1 when a row failed with an error. Config key `violationsExitCode`. Ignored under `serve`, `mcp` and `run`. |
 | `--dry-run` | flag | off | Print the resolved config and exit without running anything. |
 
 ---

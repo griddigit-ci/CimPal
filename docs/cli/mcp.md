@@ -122,7 +122,7 @@ Tool call responses use the standard MCP content format:
 }
 ```
 
-`isError` is `true` when the command exits with code 2 (bad input) or 3 (internal error).
+`isError` is `true` when the command exits with code 2 (bad input) or 3 (internal error). A `violationsExitCode` in the arguments is ignored here; `hasViolations` in the result says whether violations were found. A `summaryFile` argument is allowed (checked like any output path), though the tool result already carries the same JSON.
 
 ---
 

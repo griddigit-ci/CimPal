@@ -82,6 +82,25 @@ The schema is `CimPal-CLI/src/test/resources/fixtures/cli-json/stats.schema.json
 
 ---
 
+## Automation options (`--summary-file`, `--violations-exit-code`)
+
+For running the JSON-capable commands (`validate`, `sparql`, `compare`, `compare-instances`) from a scheduler such as Airflow or a CI job. The [Airflow guide](../guide/airflow.md) shows them in use.
+
+- **`--summary-file <path>`** (config key `summaryFile`) also writes the JSON result to a file:
+  - the content is exactly the document `--format json` prints, built once, so stdout and the file match byte for byte (including `stats`);
+  - it works with any `--format`, and also when `--output` writes a CSV or Excel file;
+  - the file is written atomically (temp file, then move) and parent folders are created;
+  - for `validate`, per-shape detail follows `--samples`, which defaults to 3 whenever JSON is produced; `--samples 0` keeps the file small;
+  - if the file can't be written, the command ends with exit 3 and prints nothing on stdout;
+  - under `serve`, `mcp` and `run` the path must lie under the allowed write roots, and an existing file needs `"overwrite": true`.
+- **`--violations-exit-code <0..255>`** (config key `violationsExitCode`, default 1) replaces the exit code for "violations or differences found":
+  - with `0`, findings are data: the run succeeds, and `hasViolations` in the JSON says what happened;
+  - exits 2 (bad input) and 3 (internal error or out of memory) never change, and neither does exit 1 for a `validate` run in which a row failed with an error (e.g. an unreadable model or a failed `owl:imports`): an error is never turned into a pass;
+  - a value that is not an integer from 0 to 255 is bad input (exit 2);
+  - `serve`, `mcp` and `run` ignore it. They report results through HTTP status, `isError` and step status, which keep seeing exit 1.
+
+---
+
 ## Exit codes
 
 Every command returns a numeric exit code. Scripts and CI systems should check this code, not the text output.
@@ -93,7 +112,7 @@ Every command returns a numeric exit code. Scripts and CI systems should check t
 | **2** | Bad input — missing required argument, file not found, wrong format |
 | **3** | Internal error — unexpected exception, or the JVM ran out of memory; check stderr for details |
 
-The distinction between 0 and 1 is the most important one for CI. A code of 1 does not mean the tool broke — it means the model has violations. A code of 2 or 3 means the tool itself failed to run.
+The distinction between 0 and 1 is the most important one for CI. A scheduler that fails a job on any non-zero exit can map exit 1 to 0 with `--violations-exit-code 0` (see above). A code of 1 does not mean the tool broke — it means the model has violations. A code of 2 or 3 means the tool itself failed to run.
 
 In PowerShell:
 ```powershell
