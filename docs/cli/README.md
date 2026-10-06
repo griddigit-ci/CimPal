@@ -153,7 +153,6 @@ Ready-to-use templates are in `CimPal-CLI/configs/`. Copy one to your working di
 | Template | Workflow |
 |---|---|
 | `validate-mapping-cgmes30.json` | Full mapping validation, CGMES 3.0 / NC 2.5 |
-| `validate-manual.json` | Manual SHACL tester — hand-pick shapes, scan a model folder |
 | `validate-timestamped.json` | Timestamped validation with comparison to previous run |
 | `sparql-query.json` | SPARQL SELECT query against model files |
 

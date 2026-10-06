@@ -32,15 +32,21 @@ import java.util.ResourceBundle;
 /**
  * Controller for the <em>SHACL Constraints Operations</em> tab.
  * <p>
- * The tab hosts three independent routines as accordion sections: generating constraints
+ * The tab hosts four independent routines as accordion sections: generating constraints
  * from an Excel template, modifying an existing constraints {@code .ttl} from Excel input,
- * and splitting a constraints {@code .ttl} per an Excel template. The third was previously
- * the separate <em>SHACL Organizer</em> tab; an FXML file has a single controller, so its
- * members were folded in here when the tabs were merged. Each routine's state is kept
- * distinct - nothing is shared between the three sections.
+ * splitting a constraints {@code .ttl} per an Excel template, and testing the rules of a
+ * constraint set against Conform / NonConform models. The third was previously the separate
+ * <em>SHACL Organizer</em> tab; an FXML file has a single controller, so its members were
+ * folded in here when the tabs were merged. The fourth is an included FXML file with a
+ * controller of its own, {@link ShaclRuleTestController}. Each routine's state is kept
+ * distinct - nothing is shared between the sections.
  */
 public class ExcelToSHACLController implements Initializable {
     private MainController mainController;
+
+    /** The rule test section's controller, injected from the fx:include with fx:id paneTestRules. */
+    @FXML
+    private ShaclRuleTestController paneTestRulesController;
 
     // ---- section 3 (split constraints) state, formerly SHACLOrganizerController ----
     private List<File> shaclFilesToSplit;
@@ -136,6 +142,9 @@ public class ExcelToSHACLController implements Initializable {
 
     public void setMainController(MainController mainController) {
         this.mainController = mainController;
+        if (paneTestRulesController != null) {
+            paneTestRulesController.setMainController(mainController);
+        }
     }
 
     private void setProgressBar(double progress) {

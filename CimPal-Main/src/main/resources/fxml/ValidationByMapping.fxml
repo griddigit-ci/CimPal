@@ -54,10 +54,10 @@
             </HBox>
 
             <!--
-              Constraint-files row. The "Validate by manual selection" and "Validate selected
-              files together" workflows use explicitly chosen constraint files; the two mapping
-              workflows resolve them from the mapping CSV instead. The row stays in place and is
-              disabled rather than hidden, so the form does not reflow when the workflow changes.
+              Constraint-files row. The "Validate selected files together" workflow uses explicitly
+              chosen constraint files; the two mapping workflows resolve them from the mapping CSV
+              instead. The row stays in place and is disabled rather than hidden, so the form does
+              not reflow when the workflow changes.
             -->
             <HBox fx:id="rowShaclConstraintFilesLabel" spacing="8.0" alignment="CENTER_LEFT"
                   GridPane.rowIndex="1" GridPane.columnIndex="0">
@@ -69,7 +69,7 @@
             <TextField fx:id="tfShaclConstraintFiles"
                        editable="false"
                        maxWidth="1.7976931348623157E308"
-                       promptText="Select one or more SHACL constraint files (.ttl)"
+                       promptText="Select one or more SHACL constraint files (.ttl) or ZIP archives of them"
                        GridPane.rowIndex="1" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowseShaclConstraintFiles"
                     minWidth="95.0"

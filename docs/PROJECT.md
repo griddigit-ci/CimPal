@@ -94,15 +94,15 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.core.utils.ValidationTools` | Core | Main validation engine. `validateByMapping()`, `validateByTimestampedMapping()`. ~6000 lines. Zero GUI imports. Prefer `MappingValidator` for new callers — see below. |
 | `eu.griddigit.cimpal.core.utils.MappingValidator` + `eu.griddigit.cimpal.core.models.MappingValidationOptions` | Core | Builder-style facade over `validateByMapping`/`validateByTimestampedMapping` (added 2026-09-23). `MappingValidationOptions.builder()...timestamped(true/false).build()`, then `new MappingValidator(options).validate()` → `MappingValidationSummary`. The GUI's SHACL Validation tab and the CLI's `validate --workflow mapping/timestamped` both go through this now (CLI refactored 2026-09-25). |
 | `eu.griddigit.cimpal.core.models.MappingValidationSummary` | Core | Record: `reports` (List<Path> — one entry for plain mapping, several for timestamped), `conforming`, `violations`, `errors`. Same `hasViolations()`/`totalRows()` semantics as the older `ValidationRunSummary`/`ValidationTimestampedRunSummary`. |
-| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Not a fit for "batch-test many independent model archives against shared shapes, one report each" — that's still `ShaclAutoTester`'s job (see below); this is for single-dataset/programmatic use. Used by the GUI's *Validate selected files together* workflow (2026-10-05, see below). |
+| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Used by the GUI's *Validate selected files together* workflow (2026-10-05, see below), and once per distinct model by `ShaclRuleTester`, which loads the shapes once through the package-private `SHACLValidator.loadShapeFiles` and passes them as `shapesModel`. |
 | `eu.griddigit.cimpal.core.models.SHACLValidationReport` | Core | `SHACLValidator`'s result. `getResultsByConstraintFile()` breaks the results down by the constraint file that declares each result's source shape. `writeExcel(file)` / `writeExcelTo(dir)` write the mapping-report workbook with one validation row per constraint file; `writeTurtle(file)` writes the engine's `sh:ValidationReport`. |
 | `eu.griddigit.cimpal.core.utils.ShapeArchive` | Core | Package-private. The `.ttl`/`.rdf` entries of a shapes ZIP, held in memory (256 MiB budget) as `ShapeSource`s. Each is parsed with the base `<archive URI>/<entry>`, so relative `owl:imports` resolve inside the archive as in a folder (`ValidationTools.resolveImport` answers them from memory, ahead of the network-path refusal). |
 | `eu.griddigit.cimpal.core.presets.MappingValidationOptionsPresets` / `SHACLValidationOptionsPresets` | Core | CGMES 3.0 / 2.4.15 starting points for the two builders above. |
 | `eu.griddigit.cimpal.core.utils.DatatypeMapPreset` | Core | Enum: `NONE`, `CGMES24_NC22`, `CGMES30_NC24`, `CGMES30_NC25`. `.load()` reads the matching bundled `.properties` file. |
-| `eu.griddigit.cimpal.core.shacl_tools.ShaclAutoTester` | Core | Manual validation: SHACL files + model archives → Excel reports per archive. Deliberately untouched by the `MappingValidator`/`SHACLValidator` builder API (no equivalent "one report per archive" abstraction exists yet) — the CLI's `validate --workflow manual` still calls this directly. |
+| `eu.griddigit.cimpal.core.utils.ShaclRuleTester` + `eu.griddigit.cimpal.core.models.ShaclRuleTestOptions` | Core | The SHACL rule test (replaced `shacl_tools.ShaclAutoTester` 2026-10-05, see below): tests the **rules** of a constraint set against a suite of `<rule sh:name>/Conform` and `/NonConform` model archives → `ShaclRuleTestReport` (verdict per rule, outcome per model, notes) and `rule_test_results_<timestamp>.xlsx` in the suite folder (`ShaclRuleTestWorkbook`, package-private). A tool of its own, not part of the validation API; GUI only. |
 | `eu.griddigit.cimpal.core.utils.ValidationEngine` | Core | Enum: APACHE_JENA, PYSHACL, PYSHACL_OXIGRAPH, RUST_SHACL |
 | `eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader` | Core | Loads CGMES datatype maps from bundled classpath resources or .properties files. |
-| `eu.griddigit.cimpal.core.interfaces.ShaclAutoTesterCallback` | Core | Callback: `updateProgress(double)` and `appendOutput(String)`. |
+| `eu.griddigit.cimpal.core.interfaces.ShaclRuleTesterCallback` | Core | Callback for `ShaclRuleTester`: `updateProgress(double)` and `appendOutput(String)`, called from worker threads. |
 | `ValidationTools.ValidationRunSummary` | Core | Record: `reportPath`, `conforming`, `violations`, `errors`. Still used internally by `ValidationTools` and by `MappingValidator`, which unwraps it into `MappingValidationSummary`. |
 | `ValidationTools.ValidationTimestampedRunSummary` | Core | Record: `reports` (List<Path>), `conforming`, `violations`, `errors`. Same relationship to `MappingValidationSummary` as above. |
 
@@ -112,6 +112,17 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 - A data or shapes ZIP with nothing to read fails instead of contributing nothing. Other RDF files in a shapes ZIP are named in the report warnings, which the GUI shows in its finish dialog.
 
 The CLI has no equivalent yet. Covered by `SHACLValidatorTest`, `SHACLValidationReportTest`, `ShapeArchiveTest`, `ZipBudgetTest` and `ShapeSourceTest`.
+
+**SHACL rule test (moved and rewritten 2026-10-05).** The SHACL Validation tab's *Validate by manual selection* workflow (before that the *SHACL tester* tab) never validated datasets: it checks that each rule fires on its NonConform models and on none of its Conform models. It is now the fourth section of **SHACL ▸ Constraints Operations**, *Test SHACL rules against Conform / NonConform models* (`ShaclRuleTestPane.fxml`, `ShaclRuleTestController`), and the CLI's `validate --workflow manual`, `--shacl-files`, the MCP `shaclConstraintFiles` field, `validate-manual.json` and `pipeline-shape-dev.json` are gone (`--workflow manual` exits 2 with a pointer). `ShaclRuleTester` replaces `ShaclAutoTester`, `SHACLValidationLogger` and `SHACLRuleTestData`, fixing:
+- Since `f547550` (2026-03-04) every run threw a `NullPointerException` at the first finding: the rule's `sh:name` was looked up from the shortened source-shape label. Rules are now matched by the source shape node.
+- Since `e0c4186` (2026-02-06) reports were cached by file name, so same-named models in different folders shared one report: the full test suite has 554 archives under 82 file names but 111 distinct contents, so at least 29 models were judged on another model's report. Models are now grouped by SHA-256 of their bytes: copies are validated once (111 validations for 554 archives), different content never shares a result.
+- A rule folder no shape names, or whose shapes are all deactivated, or with no models, is an *Error*, never a pass. Model archives outside `Conform`/`NonConform` are notes, not a crash (`getName(1)` on a top-level file) or a silent skip. Constraints Jena cannot parse stop the run once.
+- A rule passes only when it has models on both sides and nothing in its folder was skipped (security review, 2026-10-05). Otherwise it is *Error* "Not completely tested", or stays *Fail* with the gaps appended. A folder of archives with no `Conform`/`NonConform` folder is a rule that could not be tested. `passed()` also needs no notes. Whether a rule fired is decided by the finding's source shape node; the counts are the per-model report's rows. Cell text is cut to Excel's 32,767 characters instead of aborting the run.
+- Only the `.xml` entries of a model ZIP are read (nested ZIPs included), as `SHACLValidator` reads data ZIPs; the maintainer decided a model's files are never `.rdf`.
+- Shapes now load with `SHACLValidator`'s import handling (remote imports, fail closed) instead of `ShapeFactory`, which skipped any non-`file:` import silently. Models load through `SHACLValidator` too, so their `.xml` entries are typed as in dataset validation.
+- `ExcelTools.exportSHACLValidationToExcel` throws instead of printing to stderr; a report that cannot be written is a note.
+
+Checked on the real suites (copies; the tester writes into the suite): *SHACLTest full* against QoCDC v4.1.4, 191 rules, 554 archives, about 8 min with a 10 GB heap: 151 pass, 22 fail, 18 cannot be tested (11 names not in v4.1.4, 3 rules without models, 4 rules with a second, different `TC2_T1_NonConform_1.zip` loose in the rule folder). 21 of the 22 failures also failed in the November 2025 log. Covered by `ShaclRuleTesterTest` (27 tests; the symbolic-link one is skipped on Windows without the privilege), `ExcelToolsTest`, `ShaclRuleTestWorkbookTest` and `ValidateCommandTest`.
 
 **Static state in ValidationTools (thread safety concern):**  
 `exportTurtleValidationReports` and `DEBUG` are `volatile boolean` statics. `DEBUG` is still a real concern for a concurrent server. `exportTurtleValidationReports` is now effectively resolved for known callers: as of 2026-09-25, `setExportTurtleValidationReports(...)` has **zero remaining callers** anywhere in the codebase (verified by repo-wide grep) — the GUI never called it, and the CLI's `ValidateCommand` was the last one, now switched to `MappingValidator`'s per-call `exportTurtleReports` builder option instead of the global switch. The setter and field still exist (the old positional `ValidationTools.validateByMapping(...)` overloads without an explicit boolean still read the static as their default, for any external caller not yet migrated to `MappingValidator`), but nothing in this repo mutates it anymore. Any concurrent HTTP server work should still keep single-threaded execution for `DEBUG`, or migrate it the same way.
@@ -235,7 +246,7 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 **Allowed roots and no SPARQL SERVICE** (added by SEC-2, closing G2 and G3):
 - File paths in `serve`, `mcp` and `run` input must lie under `--root`, `--read-root` or `--write-root`. The defaults are the working directory, plus the pipeline folder for `run`; a home folder or drive root is never an implicit default.
 - `PathGuard` (CLI) checks every path key of each command and rewrites it as the checked absolute path. Core `PathPolicy` resolves real paths and refuses traversal, links and junctions that lead outside, UNC paths in any separator mix, device names and NTFS streams.
-- An active policy also covers paths Core resolves itself: mapping CSV cells, `owl:imports`, timestamped and manual folder walks, and organizer output.
+- An active policy also covers paths Core resolves itself: mapping CSV cells, `owl:imports`, timestamped folder walks, and organizer output. (The manual folder walk went with the CLI's manual workflow on 2026-10-05.)
 - Existing output files named in a request need `"overwrite": true`.
 - Network `owl:imports` are refused everywhere.
 - SPARQL `SERVICE` is refused (`SparqlServicePolicy`) and switched off globally in the CLI, the GUI and `ValidationTools`. Shapes with `SERVICE` are refused before they go to the Python engines, and the Python worker disables rdflib `SERVICE`. Jena 6.2 runs `SERVICE` by default (finding in `SEC-2.md`).
@@ -276,7 +287,14 @@ the ordering of the *REST API — discovery and implementation plan* section bel
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)): its
 "Docker image" job needs a first green run, and after the first release that pushes the image the
-GHCR package must be made public. DEP-1 is done. DEP-2 is in review (PR #54); next on the deployment track is DEP-3 (CLI automation options).
+GHCR package must be made public. DEP-1 is done. DEP-2's first part was merged with PR #54; the
+sizing guide and the security-review fixes follow in a second PR. Next on the deployment track is
+DEP-3 (CLI automation options).
+The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
+`feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
+with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
+`ShaclAutoTesterTest`, for the `ShaclAutoTester` that PR #53 deletes: whichever merges second drops
+it, as `ShaclRuleTesterTest` covers the replacement.
 
 ---
 
@@ -365,18 +383,17 @@ CimPal/
 │       ├── serve.md                 ← HTTP daemon reference
 │       ├── mcp.md                   ← MCP server reference
 │       ├── docker.md                ← running the CLI from the Docker image
-│       ├── ci-pipeline.md           ← CI command collection (fill in paths)
-│       └── shape-dev-loop.md        ← shape development workflow
+│       └── ci-pipeline.md           ← CI command collection (fill in paths)
 │
 ├── CimPal-CLI/
 │   ├── pom.xml
 │   ├── configs/
-│   │   ├── validate-mapping-cgmes30.json, validate-manual.json
+│   │   ├── validate-mapping-cgmes30.json
 │   │   ├── validate-timestamped.json, sparql-query.json
 │   │   ├── convert.json, rdfs2shacl.json, compare.json
 │   │   ├── compare-instances.json, excel2shacl.json, organize.json
 │   │   ├── gen-instances.json
-│   │   ├── pipeline-full-validation.json, pipeline-shape-dev.json
+│   │   ├── pipeline-full-validation.json
 │   │   ├── pipeline-profile-migration.json
 │   │   ├── claude-desktop-config.json  ← MCP config for Claude Desktop
 │   │   └── claude-desktop-config-docker.json  ← same, running the Docker image
@@ -408,9 +425,9 @@ CimPal/
 │   │         RDFCompareResult.java, RDFCompareResultEntry.java, SHACLValidationResult.java
 │   ├── utils/ValidationTools.java (~6000 lines), ValidationEngine.java,
 │   │        SparqlTools.java, ModelFactory.java, CompleteDatatypeMapLoader.java,
-│   │        ExcelTools.java (importXLSX overloads added in Phase 4)
-│   ├── shacl_tools/ShaclAutoTester.java, ShaclFromXls.java,
-│   │              ShapeDataBuilder.java, ShaclOrganizer.java
+│   │        ExcelTools.java (importXLSX overloads added in Phase 4),
+│   │        ShaclRuleTester.java, ShaclRuleTestWorkbook.java (the SHACL rule test)
+│   ├── shacl_tools/ShaclFromXls.java, ShapeDataBuilder.java, ShaclOrganizer.java
 │   └── generators/ManifestGenerator.java, InstanceDataBuilder.java, InstanceDataWriter.java
 │
 └── CimPal-Main/src/main/java/eu/griddigit/cimpal/main/
@@ -439,19 +456,17 @@ CimPal/
 - External entities in RDF/XML are not resolved by Jena (pinned by `ShapeArchiveTest.externalEntitiesInRdfEntriesAreNotResolved`).
 - `SHACLValidator` has no `PathPolicy` check on data files, and probes a shape file with `Files.isRegularFile` before `ShapeArchive.read` checks the policy. Add both before wiring it into `serve`/`mcp`/`run`.
 
-**`MainGuiFxmlLoadTest` times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there. CI runs it; locally use `-DexcludedGroups=gui`.
-
-**`validate --workflow manual` always exits 0** (`ValidateCommand.runManualWorkflow`), even when rows failed or violated; it has no structured summary. Found by the DEP-2 security review, not changed there. A CI script can't rely on its exit code.
+**`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 
 **Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
 **Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
 
-**`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. `validate --workflow manual` was deliberately left calling `ShaclAutoTester` directly — see the `ShaclAutoTester` row above for why. No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
+**`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. (`validate --workflow manual` was removed on 2026-10-05; see *SHACL rule test* above.) No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
 
 **`rdfs2shacl` namespace extraction may miss non-standard profiles.** Auto-extracting nsPrefix/nsUri from `owl:Ontology` works for standard CimSyntaxGen RDFS. Non-standard profiles need explicit config overrides (`--shapes-namespace-prefix`, `--shapes-namespace-uri`).
 
-**`ShaclAutoTester` progress is terse.** The callback emits raw percentage; a richer format (model N of M: pass/fail) would require changes to the callback interface.
+**The rule test writes into the test suite.** Each model's `<model>_report.xlsx` (and `.ttl`) goes beside it and the results workbook into the suite folder, as the SHACL tester always did; a suite under OneDrive syncs every run's reports. Clearing *Save each model's validation report beside it* leaves only the results workbook.
 
 **`validate --samples` requires `--export-turtle`.** Per-shape detail is extracted by parsing the `*__report.ttl` files after validation. These are auto-enabled when `--samples > 0` in JSON mode, but they remain on disk as a side effect. This is by design (the AI Assistant also uses them) but should be documented clearly.
 
@@ -651,7 +666,7 @@ Response format: same as `--format json` output from each command. For async job
 
 The CLI + MCP foundation is complete. The agent itself (Part B of the original plan):
 - Uses MCP tools through Claude's tool-call mechanism
-- Loop: `validate` (get shape groups) → `sparql` (inspect focus nodes) → diagnose cause → edit SHACL or RDFS → `gen_instances` + `validate --workflow manual` (fixture test) → `validate --workflow mapping` (full run)
+- Loop: `validate` (get shape groups) → `sparql` (inspect focus nodes) → diagnose cause → edit SHACL or RDFS → `gen_instances` (fixtures) → `validate --workflow mapping` (full run). The fixture test that `validate --workflow manual` offered is the GUI's rule test since 2026-10-05; an agent would need a CLI/MCP form of `ShaclRuleTester` with SEC-2 path checks first.
 - Enterprise Architect UML stays read-only; agent only modifies SHACL, RDFS, and mapping tables
 - Each change arrives as a git branch with a commit message tracing it to the violation
 - Stopping conditions: zero violations, no improvement over 2 iterations, iteration cap

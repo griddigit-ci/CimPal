@@ -30,8 +30,9 @@
 | Document | What it covers |
 |---|---|
 | [ci-pipeline](ci-pipeline.md) | Complete command collection for a CI validation run, with placeholder notes |
-| [shape-dev-loop](shape-dev-loop.md) | Fast loop for writing and testing SHACL shapes |
 | [sizing guide](../guide/sizing.md) | Heap, cores and time by model size, measured with `--stats` ([resource statistics](README.md#resource-statistics---stats)) and `scripts/bench/` |
+
+Testing the rules of a constraint set against Conform / NonConform models is not a CLI task: it is the GUI's **SHACL ▸ Constraints Operations ▸ Test SHACL rules against Conform / NonConform models**, documented in the in-app help.
 
 ## Config templates
 
@@ -40,7 +41,6 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | Template | Use for |
 |---|---|
 | `validate-mapping-cgmes30.json` | Standard mapping validation, CGMES 3.0 / NC 2.5 |
-| `validate-manual.json` | Manual shape testing against a model folder |
 | `validate-timestamped.json` | Timestamped batch validation with trend comparison |
 | `sparql-query.json` | SPARQL SELECT query against model files |
 | `convert.json` | RDF format conversion |
@@ -51,14 +51,13 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `organize.json` | SHACL organizer / canonical restructuring |
 | `gen-instances.json` | Instance data generation from Excel template |
 | `pipeline-full-validation.json` | Pipeline: convert to Turtle then validate |
-| `pipeline-shape-dev.json` | Pipeline: generate fixtures then validate with shapes |
 | `pipeline-profile-migration.json` | Pipeline: diff profiles then generate fresh shapes |
 
 ## Commands implemented
 
 | Command | Status |
 |---|---|
-| `validate` | Done — mapping, timestamped, and manual workflows |
+| `validate` | Done — mapping and timestamped workflows (the manual workflow moved to the GUI's rule test) |
 | `sparql` | Done |
 | `manifest` | Done |
 | `convert` | Done — single file, multi-file union, all RDF/XML sub-formats |

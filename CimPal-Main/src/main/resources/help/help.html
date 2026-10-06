@@ -490,9 +490,10 @@ CIM-based data exchange:</p>
       shapes</a> &mdash; confirm
       the generated shapes are themselves conformant (or simply leave <em>Validate generated SHACL
       shapes</em> ticked in step 1).</li>
-  <li><a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> &mdash; with the
-      <em>Validate by manual selection</em> workflow, run the new shapes over a folder of
-      known-good models and check that nothing conformant is rejected.</li>
+  <li><a href="#tab-excel-to-shacl">SHACL Generation &#9656; Constraints Operations &#9656; Test SHACL
+      rules</a> &mdash; run the new shapes over a test suite of Conform and NonConform models and
+      check that every rule fires on the models that break it, and on none of those that conform
+      to it.</li>
   <li><a href="#tool-export-shacl-info">Tools &#9656; SHACL Constraints &#9656; Export SHACL
       constraints information to Excel</a> &mdash; produce the human-readable constraint
       documentation that accompanies the release.</li>
@@ -509,9 +510,9 @@ CIM-based data exchange:</p>
 <h3>Checking a received dataset</h3>
 <ol>
   <li><a href="#tab-validation-by-mapping">Dataset Operations &#9656; SHACL Validation</a> &mdash; validate the
-      model against the applicable constraint set. Use <em>Validate by manual selection</em> when
-      you pick the constraint files yourself, or one of the mapping workflows when a CSV drives
-      which constraints apply to which input.</li>
+      model against the applicable constraint set. Use <em>Validate selected files together</em>
+      when you pick the data and constraint files yourself, or one of the mapping workflows when a
+      CSV drives which constraints apply to which input.</li>
   <li><a href="#tab-instance-data-comparison">Dataset Operations &#9656; Comparison</a> &mdash; compare the
       dataset against the reference or previous version.</li>
   <li><a href="#tab-rdf-visualisation">RDF Operations &#9656; Visualisation</a> &mdash; open the
@@ -528,6 +529,10 @@ CIM-based data exchange:</p>
   <li><a href="#tab-task-wizard">Dataset Operations &#9656; Task Wizard</a> &mdash; multiply the base model, regenerate
       identifiers, or deliberately introduce non-conformities to prove that the constraints catch
       them.</li>
+  <li><a href="#tab-excel-to-shacl">SHACL Generation &#9656; Constraints Operations &#9656; Test SHACL
+      rules</a> &mdash; zip each model into the <code>Conform</code> or <code>NonConform</code>
+      folder of the rule it tests, and run the rule test to prove that each rule fires where it
+      must and nowhere else.</li>
 </ol>
 
 <h2 id="using">Using the window</h2>
@@ -738,10 +743,10 @@ instance-data validation, a separate datatypes-only shapes file, and the class i
 <div class="fn-body">
 
 <h4>Business logic</h4>
-<p>The spreadsheet-driven operations on a constraint set, for the cases the automatic
-RDFS&nbsp;&rarr;&nbsp;SHACL derivation cannot cover. Three related routines share the tab, each in
-its own collapsible section with its own <em>Reset</em> and <em>Run</em>; filling in one does not
-affect the others, and only one section is open at a time.</p>
+<p>Operations on a constraint set itself: authoring it from spreadsheets, for the cases the
+automatic RDFS&nbsp;&rarr;&nbsp;SHACL derivation cannot cover, and testing its rules. Four routines
+share the tab, each in its own collapsible section with its own <em>Reset</em> and <em>Run</em>;
+filling in one does not affect the others, and only one section is open at a time.</p>
 <ol>
   <li><strong>Generate SHACL constraints based on Excel template</strong> takes an RDFS ontology
       plus a spreadsheet in which each row defines one constraint, and builds the corresponding
@@ -751,9 +756,75 @@ affect the others, and only one section is open at a time.</p>
       made to a released constraint set without regenerating it.</li>
   <li><strong>Split SHACL Constraints .ttl based on Excel template</strong> restructures a
       constraint set into separate deliverable files according to a spreadsheet plan.</li>
+  <li><strong>Test SHACL rules against Conform / NonConform models</strong> checks that each rule
+      of a constraint set fires on the models that must break it and on none of the models that
+      must pass it. Here the rules are under test and the models are the fixtures: it is the
+      regression test of a constraint set, run before a release or after a change to a rule.</li>
 </ol>
 
-<p class="note">The third routine was previously a separate <em>SHACL Organizer</em> tab.</p>
+<p class="note">The third routine was previously a separate <em>SHACL Organizer</em> tab. The fourth
+was the <em>Validate by manual selection</em> workflow of the SHACL Validation tab, and before that
+the <em>SHACL tester</em> tab; it moved here because it tests constraints rather than
+datasets.</p>
+
+<h4>How the rule test works</h4>
+<p>The test suite folder holds one folder per rule, named exactly like the rule's
+<code>sh:name</code>, and in each a <code>Conform</code> and a <code>NonConform</code> folder of
+model archives: <code>.zip</code> files whose <code>.xml</code> files hold the model, archives
+inside them included. The folder names are matched ignoring case:</p>
+<pre><code>Test suite\
+  ACLineSegmentR\
+    Conform\       models that must not trigger ACLineSegmentR
+      TC1_T8_Conform.zip
+    NonConform\    models that must trigger it
+      TC3_T1_NonConform_L3.zip
+  SwitchContainment\
+    Conform\ ...
+    NonConform\ ...</code></pre>
+<ul>
+  <li>Every model is validated against all the selected constraint files, read as one shapes graph
+      with their <code>owl:imports</code> followed. A rule is <em>triggered</em> by any finding
+      whose source shape has the rule's <code>sh:name</code>; findings of other rules are counted
+      but do not affect its result.</li>
+  <li>A rule <strong>passes</strong> when none of its Conform models triggers it, every one of its
+      NonConform models does, it has at least one model of each kind, and nothing in its folder was
+      left untested: only then has it been seen both to stay silent and to fire. A Conform model
+      that triggers it is an <em>Unexpected trigger</em>, a NonConform model that does not is an
+      <em>Expected trigger not found</em>, and either fails the rule.</li>
+  <li>A rule <strong>could not be tested</strong> (result <em>Error</em>) when no shape carries its
+      name, when its shapes are all deactivated, when one of its models cannot be read, or when its
+      test is incomplete: it has no Conform or no NonConform model, or model archives in its folder
+      sit outside its Conform and NonConform folders. A folder name that no shape carries is never
+      a pass, so a mistyped folder or a rule renamed in the constraints shows up instead of passing
+      its Conform models silently. A rule that fails stays a failure, and its message says what
+      was also left untested.</li>
+  <li>Models are compared by content: a model copied into several rule folders is validated once,
+      and two models that share a file name but not their content are validated separately.</li>
+  <li>Nothing in the suite is passed over silently. A model archive that is not directly inside a
+      Conform or NonConform folder is not tested; it is listed in the Output window and on the
+      results workbook's <em>Notes</em> sheet, and keeps the rule whose folder it is in from
+      passing. A folder of archives without Conform or NonConform folders is listed as a rule that
+      could not be tested. Other files &mdash; reports, notes, unzipped copies &mdash; are not
+      models; an unzipped <code>.xml</code> where a side has no archive is pointed out in that
+      rule's message.</li>
+  <li>The finish dialog says <em>Rule test passed</em> only when every rule passed and there are
+      no notes.</li>
+  <li>The models are parsed with the datatype map and base URI chosen, as dataset validation parses
+      them, and validated with Apache Jena.</li>
+</ul>
+
+<p><strong>When a rule does not fire on a NonConform model</strong>, check, in this order:</p>
+<ol>
+  <li>The datatype map: a rule on a numeric range or a boolean compares typed values, and a model
+      read with the wrong map, or none, holds strings instead.</li>
+  <li>The base URI: if it does not match the models, references between their files resolve
+      nowhere and the shapes find no focus nodes.</li>
+  <li>The shape's <code>sh:targetClass</code> and <code>sh:path</code> against the class and the
+      property the model actually uses &mdash;
+      <a href="#tab-sparql-query">SPARQL Query</a> on the model shows them.</li>
+  <li>That the model breaks the rule at all: its report, written beside it, lists every finding it
+      produced.</li>
+</ol>
 
 <h4>Inputs</h4>
 
@@ -802,17 +873,53 @@ affect the others, and only one section is open at a time.</p>
         manually. The first worksheet is read.</td></tr>
 </table>
 
+<p><strong>4. Test SHACL rules against Conform / NonConform models</strong>:</p>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>SHACL constraint files</td><td>files, required</td>
+    <td>The constraint set whose rules are tested: SHACL files (<code>.ttl</code>,
+        <code>.rdf</code>), or ZIP archives of them. All are read as one shapes graph and their
+        <code>owl:imports</code> are followed; an import that cannot be resolved, or constraints
+        Jena cannot parse, stop the run with the reason.</td></tr>
+<tr><td>Test suite folder</td><td>folder, required</td>
+    <td>The folder of rule folders described above. The results workbook is written into it,
+        and each model's report beside the model.</td></tr>
+<tr><td>Datatype map</td><td>choice, required</td>
+    <td>As on the SHACL Validation tab: the CGMES / NC map the models are typed with, or
+        <em>Other</em> for a <code>.properties</code> map of your own. Match it to the models'
+        CGMES version; read untyped, a rule on a numeric range or a boolean can fire on a model
+        that conforms to it.</td></tr>
+<tr><td>Base URI</td><td>choice + text, required</td>
+    <td>Base URI the models' RDF/XML is parsed with, as on the SHACL Validation tab.</td></tr>
+<tr><td>Save each model's validation report beside it (.xlsx)</td><td>checkbox, on</td>
+    <td>Writes <code>&lt;model&gt;_report.xlsx</code> beside every model, with every finding of
+        every rule, for comparing what a rule's Conform and NonConform models trigger. Clear it
+        for a faster run.</td></tr>
+<tr><td>Also as Turtle (.ttl)</td><td>checkbox</td>
+    <td>Also writes <code>&lt;model&gt;_report.ttl</code>, the standard SHACL
+        <code>ValidationReport</code> graph, which the AI Assistant can explain.</td></tr>
+</table>
+
 <h4>Outputs</h4>
 <ul>
   <li>Routine 1: a SHACL shapes file written to the location chosen in the <em>Save as for shape
       model</em> dialog.</li>
   <li>Routine 2: an updated Turtle file saved through a standard save dialog.</li>
   <li>Routine 3: the reorganised SHACL Turtle files, split as the spreadsheet specifies.</li>
+  <li>Routine 4: <code>rule_test_results_&lt;yyyyMMdd_HHmmss&gt;.xlsx</code> in the test suite
+      folder, with a <em>Summary</em> sheet (a row per rule: its result, and how many of its
+      Conform and NonConform models came out as they must), a <em>Models</em> sheet (a row per
+      model of each rule, with the findings of the rule and of all other rules side by side), a
+      <em>Notes</em> sheet when something in the suite was not tested, and a <em>Run</em> sheet
+      with the inputs and totals. Also the reports beside each model, a line per model and per
+      rule in the Output window, and a dialog with the totals and the rules that did not
+      pass.</li>
   <li>Progress in the status bar and any problems reported in the Output window.</li>
 </ul>
 
 <p class="src">Source: <code>ExcelToSHACLController.actionBtnRunExcelShape()</code>,
-<code>actionBtnRunExcelToTtl()</code>, <code>actionBtnRunShaclOrganizer()</code></p>
+<code>actionBtnRunExcelToTtl()</code>, <code>actionBtnRunShaclOrganizer()</code>,
+<code>ShaclRuleTestController.actionRunRuleTest()</code>, <code>ShaclRuleTester</code></p>
 </div>
 </details>
 
@@ -1826,24 +1933,24 @@ selects one of three routes, and the rest of the form enables only the fields th
       timestamped input files and organises the reports by timestamp, and can compare each run's
       totals against the previous run's &mdash; which is what turns validation from a one-off check
       into a trend you can watch across releases.</li>
-  <li><strong>Validate by manual selection</strong> &mdash; batch validation without a mapping
-      file. Point it at constraint files you pick yourself and at the models root folder, and it
-      validates every model archive it finds against those constraints, reporting conformance for
-      each. This is the regression test for a constraint set: run it over a corpus of known-good
-      and known-bad models and confirm that the good ones pass and the bad ones fail for the
-      expected reason. It is equally the acceptance check for a batch of received datasets.</li>
+  <li><strong>Validate selected files together</strong> &mdash; validation of one dataset without a
+      mapping file. All the instance data files you pick (RDF/XML, or ZIP archives of them, nested
+      archives included) are merged into one dataset, so references between them &mdash; SSH to
+      EQ, or to the boundary set &mdash; resolve, and it is validated against all the constraint
+      files you pick at once. This is the acceptance check for a dataset you received.</li>
 </ul>
 
-<p class="note">The manual workflow was previously a separate <em>SHACL tester</em> tab. Its
-&ldquo;Parent folder for test models&rdquo; field is now the tab's own <em>Models / input root
-folder</em>, shared with the two mapping workflows.</p>
+<p class="note">Testing the rules of a constraint set against models known to conform or not, once
+this tab's <em>Validate by manual selection</em> workflow, is
+<a href="#tab-excel-to-shacl">SHACL Generation &#9656; Constraints Operations &#9656; Test SHACL
+rules</a>: it tests constraints, not datasets.</p>
 
 <p><strong>All three workflows load their models through the datatype map and base URI.</strong>
 The map is what gives the literals their datatypes as the RDF/XML is parsed, and a constraint on a
 numeric range or a boolean value can only fire against a typed literal &mdash; parsed untyped,
-every value is a plain string and such a constraint passes a model it should reject. The manual
-workflow therefore reads the same two fields as the mapping ones, and they stay enabled for
-it.</p>
+every value is a plain string and such a constraint passes a model it should reject.
+<em>Validate selected files together</em> therefore reads the same two fields as the mapping
+workflows.</p>
 
 <p><strong>ZIP model archives are read directly from their entries into memory.</strong> CimPal
 does not extract input XML files into temporary local folders. After a timestamp or model has been
@@ -1885,31 +1992,35 @@ deliverables, not extracted input data.</p>
 <tr><td>Validation workflow</td><td>choice, required</td>
     <td>Which of the three routes above to run. Changing it enables and disables the rest of the
         form accordingly.</td></tr>
-<tr><td>SHACL Constraint files (.ttl)</td><td>files</td>
-    <td>SHACL constraint files (<code>.ttl</code>) used to validate the models. Several files can
-        be selected and are combined into one shapes graph. <strong>Manual selection only</strong>
-        &mdash; the mapping workflows resolve their constraint files from the mapping CSV, and this
-        field is disabled for them.</td></tr>
+<tr><td>SHACL constraint files</td><td>files</td>
+    <td>SHACL constraint files (<code>.ttl</code>, <code>.rdf</code>), or ZIP archives of them,
+        used to validate the selected data files. Several can be selected and are combined into
+        one shapes graph; their <code>owl:imports</code> are followed, and imports between the
+        files of an archive resolve inside it. <strong><em>Validate selected files together</em>
+        only</strong> &mdash; the mapping workflows resolve their constraint files from the mapping
+        CSV, and this field is disabled for them.</td></tr>
+<tr><td>Instance data files</td><td>files</td>
+    <td>The data files to validate as one dataset: RDF/XML (<code>.xml</code>) or ZIP archives of
+        them. <strong><em>Validate selected files together</em> only.</strong></td></tr>
 <tr><td>Mapping CSV file</td><td>file</td>
     <td>CSV mapping file containing the XML input definitions and the SHACL constraint files. Only
         <code>.csv</code> files are accepted. Required for both mapping workflows; disabled for
-        manual selection.</td></tr>
-<tr><td>Models / input root folder</td><td>folder, required</td>
+        <em>Validate selected files together</em>.</td></tr>
+<tr><td>Models / input root folder</td><td>folder</td>
     <td>For normal mapping, the models root folder. For timestamped mapping, the root folder
-        containing timestamped XML or ZIP files. For manual selection, the parent folder that is
-        searched recursively (up to three levels) for <code>.zip</code> model archives.</td></tr>
+        containing timestamped XML or ZIP files. Required for both mapping workflows; disabled for
+        <em>Validate selected files together</em>, which validates the data files picked.</td></tr>
 <tr><td>Constraints root folder</td><td>folder</td>
     <td>Root folder where the SHACL constraint files live. The constraint paths in the mapping file
         are resolved relative to this folder. Required for both mapping workflows; disabled for
-        manual selection.</td></tr>
-<tr><td>Output folder</td><td>folder</td>
+        <em>Validate selected files together</em>.</td></tr>
+<tr><td>Output folder</td><td>folder, required</td>
     <td>Folder where validation reports, timestamped summaries and generated ZIP files are
-        written. Required for both mapping workflows; disabled for manual selection.</td></tr>
+        written. <em>Validate selected files together</em> writes its one workbook here.</td></tr>
 <tr><td>Also save each validation report as Turtle (.ttl)</td><td>checkbox</td>
     <td>Writes the standard SHACL <code>ValidationReport</code> graph as a Turtle file for every
         validation result. It is available for all three workflows and allows a particular report
-        and finding to be selected in the AI Assistant. Manual validation continues to produce its
-        normal Excel reports.</td></tr>
+        and finding to be selected in the AI Assistant.</td></tr>
 <tr><td>Datatype map</td><td>choice, required</td>
     <td>The CGMES and NC version combination whose datatype map is loaded for validation:
         <em>CGMES 3.0 / NC 2.5</em> uses the CIM17 / CGMES 3 / NC 2.5 map, <em>CGMES 3.0 / NC
@@ -1917,7 +2028,7 @@ deliverables, not extracted input data.</p>
         / NC 2.2 map. <em>Other</em> reveals a field and <em>Browse</em> button for a
         <code>.properties</code> map of your own, in the same format as the bundled ones; the run
         refuses to start if <em>Other</em> is selected with no file chosen.
-        <strong>Used by all three workflows</strong>, manual selection included.</td></tr>
+        <strong>Used by all three workflows.</strong></td></tr>
 <tr><td>Base URI</td><td>choice + text, required</td>
     <td>Base URI used when loading RDF/XML files; relative URIs in the models resolve against it.
         Choose the namespace the dataset is based on from the dropdown and the field is filled and
@@ -1935,8 +2046,8 @@ deliverables, not extracted input data.</p>
         choices are experimental comparison engines: pySHACL (RDFLib), pySHACL + Oxigraph, and
         the SHACL Rust Python binding. They receive the same resolved shapes graph and
         datatype-enhanced data graph as Jena, so the mapping logic does not change. The Python
-        engines may reject shape constructs accepted by Jena or run more slowly. This control is
-        used by the mapping workflows; manual selection uses Jena.</td></tr>
+        engines may reject shape constructs accepted by Jena or run more slowly. Used by all three
+        workflows.</td></tr>
 <tr><td>Parallel validation workers</td><td>choice</td>
     <td>Number of independent model validations run concurrently. <em>Auto (memory-aware)</em>
         chooses a total work budget from available CPU cores and Java heap size. It first divides
@@ -1949,10 +2060,9 @@ deliverables, not extracted input data.</p>
         each worker holds validation state, and Python engines also start a Python process.</td></tr>
 <tr><td>Sample validation: stop after 10 results per shape</td><td>checkbox</td>
     <td>Retains at most ten findings for each source shape, across violations, warnings and
-        information results. In the mapping workflows, Jena stops that target shape and marks the
-        affected report as <em>Partial</em>. Python engines complete validation before applying
-        the same report cap. Manual selection caps exported findings while retaining its complete
-        pass/fail rule check.</td></tr>
+        information results. Jena stops that target shape and marks the affected report as
+        <em>Partial</em>. Python engines complete validation before applying the same report
+        cap.</td></tr>
 <tr><td>Write validation diagnostic log</td><td>checkbox</td>
     <td>Writes detailed input-loading, shape-loading, validation and report-writing timings for
         the selected workflow to <code>cimpal_validation_debug.log</code> in CimPal's per-user
@@ -1987,16 +2097,18 @@ base URI cannot silently produce a model whose subjects resolve nowhere.</p>
       also has a separate <code>*.ttl</code> SHACL report.</li>
   <li>Timestamped workflow: additionally timestamp-based summaries and a comparison workbook
       against the previous run's totals.</li>
-  <li>Manual selection: per-model conformance results and validation messages streamed to the
-      Output window as the run proceeds, with normal Excel reports and optional Turtle SHACL
-      reports beside each validated model. Nothing happens, and the progress bar resets, if no
-      model archives are found under the models root folder.</li>
+  <li><em>Validate selected files together</em>: one workbook,
+      <code>validation_report__&lt;yyyyMMdd_HHmmss&gt;.xlsx</code>, in the mapping report's
+      layout, with a validation row for each constraint file and each finding under the file that
+      declares its shape, and with Turtle export its <code>.ttl</code> report beside it. A dialog
+      gives the result counts and any warnings, such as an archive's RDF files that were not
+      read.</li>
   <li>Progress on the shared progress bar in the status line, and messages in the Output
       window.</li>
 </ul>
 
 <p class="src">Source: <code>ValidationByMappingController.actionRunValidationByMapping()</code>,
-<code>runManualValidation()</code></p>
+<code>runCombinedValidation()</code></p>
 </div>
 </details>
 

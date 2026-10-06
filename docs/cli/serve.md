@@ -71,7 +71,7 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 
 ## Allowed folders (`--root`)
 
-File paths in requests may only point inside the allowed folders. Every path field in a request (`input`, `output`, `modelsDir`, `mappingCsv`, `shaclConstraintFiles`, and so on) is checked before the command runs, and so are the paths CimPal resolves itself: files named in a mapping CSV, `owl:imports` in shapes, files the `organize` template names. A path outside the roots is refused with **403**, and the message names it.
+File paths in requests may only point inside the allowed folders. Every path field in a request (`input`, `output`, `modelsDir`, `mappingCsv`, `shaclFiles`, and so on) is checked before the command runs, and so are the paths CimPal resolves itself: files named in a mapping CSV, `owl:imports` in shapes, files the `organize` template names. A path outside the roots is refused with **403**, and the message names it.
 
 | Flag | Default | Description |
 |---|---|---|

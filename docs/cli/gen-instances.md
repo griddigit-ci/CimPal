@@ -90,12 +90,14 @@ Generating templates from an RDFS profile (for hand-filling) can be done with th
 
 ## Use in the shape development loop
 
-`gen-instances` is designed to work with the SHACL tester as a fast fixture loop:
+`gen-instances` makes the test models for the GUI's SHACL rule test (**SHACL ▸ Constraints Operations ▸ Test SHACL rules against Conform / NonConform models**):
 
 1. Write or edit SHACL shapes in `.ttl`
-2. Generate small conforming and non-conforming instance data with `gen-instances`
-3. Validate with `validate --workflow manual --shacl-files shapes.ttl --models generated/`
-4. Fix shapes and repeat
+2. Generate a small conforming and a small non-conforming instance file with `gen-instances`
+3. Zip each one into the rule's folder of a test suite, which is named after the rule's `sh:name`:
+   `<suite>\<rule>\Conform\conform.zip` and `<suite>\<rule>\NonConform\nonconform.zip`
+4. Run the rule test in the GUI: the rule must fire on every NonConform model and on no Conform model
+5. Fix shapes and repeat
 
 This avoids using real grid data for shape development.
 

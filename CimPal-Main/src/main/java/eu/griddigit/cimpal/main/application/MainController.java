@@ -619,7 +619,7 @@ public class MainController implements Initializable {
 
             tabValidationByMapping.setContent(root);
 
-            //the manual-selection workflow streams per-model results to the Output pane
+            //the tab reports progress on the shared status bar
             ValidationByMappingController controller = loader.getController();
             if (controller != null) {
                 controller.setMainController(this);
