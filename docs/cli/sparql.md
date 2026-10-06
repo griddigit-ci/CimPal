@@ -53,6 +53,8 @@ java -jar CimPal-CLI.jar sparql ^
 | `--format` | `text` / `json` / `csv` | `text` | Format for stdout output. Ignored when `--output` is set. |
 | `--limit` | integer | `0` | Automatically append `LIMIT n` to queries that have none. `0` = do not add a limit. |
 | `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
+| `--summary-file` | file path | — | Also write the JSON result (exactly what `--format json` prints) to this file, atomically, creating parent folders. Works with any `--format`. Config key `summaryFile`. See [automation options](README.md#automation-options---summary-file---violations-exit-code). |
+| `--violations-exit-code` | 0–255 | `1` | Accepted like on the other JSON commands; `sparql` never reports violations, so it never changes the exit code. |
 
 ---
 

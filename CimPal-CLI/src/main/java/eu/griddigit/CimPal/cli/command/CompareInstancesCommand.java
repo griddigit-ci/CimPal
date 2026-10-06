@@ -120,6 +120,16 @@ public class CompareInstancesCommand implements Callable<Integer> {
     /** The collector when {@code --stats} is on, otherwise null. */
     private RunStats runStats;
 
+    @Option(names = "--summary-file",
+            description = "Also write the JSON result (the document --format json prints) to this file, "
+                    + "atomically, creating parent folders; also with --output.")
+    private File summaryFile;
+
+    @Option(names = "--violations-exit-code",
+            description = "Exit code when differences are found (default 1, 0..255). 0 lets a scheduler treat "
+                    + "them as data; bad input (2) and internal errors (3) are unchanged.")
+    private Integer violationsExitCode;
+
     @Option(names = "--dry-run",
             description = "Print resolved configuration and exit without comparing.")
     private boolean dryRun;
@@ -169,13 +179,20 @@ public class CompareInstancesCommand implements Callable<Integer> {
             boolean identical = entries.isEmpty();
 
             boolean jsonStdout = outputFile == null && "json".equalsIgnoreCase(format);
-            String statsField = jsonStdout ? StatsJson.field(runStats, "\n  ") : "";
+            // The JSON document is built once, so stdout and the summary file carry the same one.
+            String json = jsonStdout || summaryFile != null
+                    ? buildJson(entries, StatsJson.field(runStats, "\n  ")) : null;
+            if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+                return ExitCode.INTERNAL_ERROR;
+            }
             if (outputFile != null) {
                 writeToFile(entries, outputFile);
                 System.out.println("[OK] Comparison results written to: " + outputFile.getAbsolutePath());
                 System.out.println("     Total differences: " + entries.size());
+            } else if (jsonStdout) {
+                System.out.println(json);
             } else {
-                writeToStdout(entries, format, statsField);
+                writeToStdout(entries, format);
             }
             if (!jsonStdout) {
                 StatsJson.toStderr(runStats);
@@ -186,7 +203,7 @@ public class CompareInstancesCommand implements Callable<Integer> {
                 return ExitCode.OK;
             } else {
                 System.err.println("[OK] Found " + entries.size() + " difference(s).");
-                return ExitCode.VIOLATIONS;
+                return AutomationOptions.violationsExitCode(violationsExitCode);
             }
 
         } catch (Exception ex) {
@@ -239,6 +256,14 @@ public class CompareInstancesCommand implements Callable<Integer> {
             JsonNode n = root.path("stats");
             if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
+        if (summaryFile == null) {
+            String v = root.path("summaryFile").asText(null);
+            if (v != null && !v.isBlank()) summaryFile = resolveRelative(configDir, v);
+        }
+        if (violationsExitCode == null) {
+            JsonNode n = root.path("violationsExitCode");
+            if (!n.isMissingNode() && !n.isNull()) violationsExitCode = AutomationOptions.exitCodeFromConfig(n);
+        }
     }
 
     private void applyDefaults() {
@@ -247,7 +272,7 @@ public class CompareInstancesCommand implements Callable<Integer> {
     }
 
     private boolean validateInputs() {
-        boolean ok = true;
+        boolean ok = AutomationOptions.checkViolationsExitCode(violationsExitCode);
         if (modelsA == null || modelsA.isEmpty()) {
             System.err.println("[ERROR] --models-a is required."); ok = false;
         } else {
@@ -318,9 +343,9 @@ public class CompareInstancesCommand implements Callable<Integer> {
         }
     }
 
-    private static void writeToStdout(List<RDFCompareResultEntry> entries, String format, String statsField) {
+    /** Text or CSV on stdout; the caller prints the JSON document that {@link #buildJson} builds. */
+    private static void writeToStdout(List<RDFCompareResultEntry> entries, String format) {
         switch (format.toLowerCase()) {
-            case "json" -> writeJson(entries, statsField);
             case "csv"  -> writeCsvStdout(entries);
             default     -> writeText(entries);
         }
@@ -346,7 +371,7 @@ public class CompareInstancesCommand implements Callable<Integer> {
     }
 
     /** {@code statsField} is {@code ,"stats":{...}} or empty (see {@link StatsJson#field}). */
-    private static void writeJson(List<RDFCompareResultEntry> entries, String statsField) {
+    private static String buildJson(List<RDFCompareResultEntry> entries, String statsField) {
         StringBuilder sb = new StringBuilder("{\n");
         sb.append("  \"schema\": \"cimpal-compare-instances-result/1\",\n");
         sb.append("  \"totalDifferences\": ").append(entries.size()).append(",\n");
@@ -363,7 +388,7 @@ public class CompareInstancesCommand implements Callable<Integer> {
             sb.append("\n");
         }
         sb.append("  ]").append(statsField).append("\n}");
-        System.out.println(sb);
+        return sb.toString();
     }
 
     private static void writeCsvStdout(List<RDFCompareResultEntry> entries) {

@@ -159,7 +159,7 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 
 | Code | Meaning |
 |---|---|
-| 200 | Command ran successfully (including when violations were found — exit 0 or 1) |
+| 200 | Command ran successfully (including when violations were found — exit 0 or 1; a `violationsExitCode` in the request is ignored) |
 | 400 | Bad request — invalid input, missing required field (exit 2) |
 | 401 | Missing or wrong bearer token |
 | 403 | Host or Origin header not allowed, or a file path outside the allowed folders / an existing output without `"overwrite": true` |

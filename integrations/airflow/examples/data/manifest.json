@@ -1,0 +1,25 @@
+{
+  "generator": "scripts/bench/gen_models.py",
+  "generatorVersion": 1,
+  "seed": 1,
+  "requestedTriples": 2000,
+  "triples": 1983,
+  "rows": 1,
+  "violationRate": 0.1,
+  "groups": [
+    {
+      "name": "g001",
+      "triples": 1983,
+      "units": 68
+    }
+  ],
+  "expectedViolations": {
+    "missingLength": 2,
+    "badSequenceNumber": 2,
+    "wrongContainer": 2,
+    "rAboveX": 2,
+    "missingConnected": 2
+  },
+  "expectedViolationsTotal": 10,
+  "xmlBase": "http://example.com/data"
+}

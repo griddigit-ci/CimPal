@@ -152,6 +152,16 @@ public class ValidateCommand implements Callable<Integer> {
     /** The collector when {@code --stats} is on, otherwise null. */
     private RunStats runStats;
 
+    @Option(names = "--summary-file",
+            description = "Also write the JSON result (the document --format json prints) to this file, "
+                    + "atomically, creating parent folders. For Airflow's KubernetesPodOperator: /airflow/xcom/return.json.")
+    private File summaryFile;
+
+    @Option(names = "--violations-exit-code",
+            description = "Exit code when violations are found (default 1, 0..255). 0 lets a scheduler treat "
+                    + "findings as data; bad input (2) and internal errors (3) are unchanged.")
+    private Integer violationsExitCode;
+
     @Option(names = "--dry-run",
             description = "Print the resolved configuration and exit without running validation.")
     private boolean dryRun;
@@ -269,6 +279,14 @@ public class ValidateCommand implements Callable<Integer> {
             JsonNode n = root.path("stats");
             if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
+        if (summaryFile == null) {
+            String v = root.path("summaryFile").asText(null);
+            if (v != null && !v.isBlank()) summaryFile = resolveRelative(configDir, v);
+        }
+        if (violationsExitCode == null) {
+            JsonNode n = root.path("violationsExitCode");
+            if (!n.isMissingNode() && !n.isNull()) violationsExitCode = AutomationOptions.exitCodeFromConfig(n);
+        }
         if (previousComparison == null) {
             String v = root.path("previousComparison").asText(null);
             if (v != null && !v.isBlank()) previousComparison = resolveRelative(configDir, v);
@@ -294,16 +312,21 @@ public class ValidateCommand implements Callable<Integer> {
         if (maxResults == null) maxResults = 0;
         if (format == null) format = "text";
         if (exportTurtle == null) exportTurtle = false;
-        // Default samples to 3 for JSON mode (per-shape detail); 0 disables it
-        if (samples == null) samples = "json".equalsIgnoreCase(format) ? 3 : 0;
+        // Default samples to 3 whenever the JSON document is produced (per-shape detail); 0 disables it
+        if (samples == null) samples = producesJson() ? 3 : 0;
     }
 
     // -------------------------------------------------------------------------
     // Input validation
     // -------------------------------------------------------------------------
 
+    /** The JSON document is printed ({@code --format json}) or written ({@code --summary-file}). */
+    private boolean producesJson() {
+        return "json".equalsIgnoreCase(format) || summaryFile != null;
+    }
+
     private boolean validateInputs() {
-        boolean ok = true;
+        boolean ok = AutomationOptions.checkViolationsExitCode(violationsExitCode);
 
         switch (workflow) {
             case "mapping" -> {
@@ -454,7 +477,7 @@ public class ValidateCommand implements Callable<Integer> {
                                    PrintStream origOut) throws Exception {
 
         // Per-shape detail requires TTL reports to be written so we can read them back.
-        boolean needShapeDetail = jsonOutput && samples > 0;
+        boolean needShapeDetail = producesJson() && samples > 0;
         boolean exportTurtleForRun = Boolean.TRUE.equals(exportTurtle) || needShapeDetail;
 
         MappingValidationOptions options = MappingValidationOptions.builder()
@@ -483,15 +506,31 @@ public class ValidateCommand implements Callable<Integer> {
             }
         }
 
+        // Built once, so stdout and the summary file carry the same document (and stats snapshot).
+        String json = producesJson() ? buildMappingJson(summary, shapeGroups) : null;
+        if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+            return ExitCode.INTERNAL_ERROR;
+        }
         if (jsonOutput) {
             System.setOut(origOut);
-            System.out.println(buildMappingJson(summary, shapeGroups));
+            System.out.println(json);
         } else {
             printTextSummary(summary);
             StatsJson.toStderr(runStats);
         }
 
-        return summary.hasViolations() ? ExitCode.VIOLATIONS : ExitCode.OK;
+        return exitCodeFor(summary);
+    }
+
+    /**
+     * 1 when a row failed, which is never remapped (an error must not end as a pass); the
+     * {@code --violations-exit-code} when rows have findings; 0 when all conform.
+     */
+    private int exitCodeFor(MappingValidationSummary summary) {
+        if (summary.errors() > 0) {
+            return ExitCode.VIOLATIONS;
+        }
+        return summary.violations() > 0 ? AutomationOptions.violationsExitCode(violationsExitCode) : ExitCode.OK;
     }
 
     // ---- timestamped workflow -----------------------------------------------
@@ -525,15 +564,19 @@ public class ValidateCommand implements Callable<Integer> {
             summary = new MappingValidator(optionsBuilder.build()).validate();
         }
 
+        String json = producesJson() ? buildTimestampedJson(summary) : null;
+        if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+            return ExitCode.INTERNAL_ERROR;
+        }
         if (jsonOutput) {
             System.setOut(origOut);
-            System.out.println(buildTimestampedJson(summary));
+            System.out.println(json);
         } else {
             printTextSummaryTimestamped(summary);
             StatsJson.toStderr(runStats);
         }
 
-        return summary.hasViolations() ? ExitCode.VIOLATIONS : ExitCode.OK;
+        return exitCodeFor(summary);
     }
 
     // -------------------------------------------------------------------------
@@ -671,6 +714,8 @@ public class ValidateCommand implements Callable<Integer> {
         System.out.println("  maxResults       : " + maxResults);
         System.out.println("  format           : " + format);
         System.out.println("  samples          : " + samples);
+        System.out.println("  summaryFile      : " + abs(summaryFile));
+        System.out.println("  violationsExit   : " + AutomationOptions.violationsExitCode(violationsExitCode));
         System.out.println("  exportTurtle     : " + exportTurtle);
         System.out.println("  previousCompar.  : " + abs(previousComparison));
     }

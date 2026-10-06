@@ -1,0 +1,2193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:cim="http://iec.ch/TC57/CIM100#"
+         xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#">
+  <md:FullModel rdf:about="urn:uuid:g001-eq">
+    <md:Model.scenarioTime>2026-01-01T00:00:00Z</md:Model.scenarioTime>
+    <md:Model.created>2026-01-01T00:00:00Z</md:Model.created>
+    <md:Model.profile>http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/3.0</md:Model.profile>
+  </md:FullModel>
+  <cim:Substation rdf:ID="_g001_SUB0">
+    <cim:IdentifiedObject.name>Substation 0</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_SUB0</cim:IdentifiedObject.mRID>
+  </cim:Substation>
+  <cim:VoltageLevel rdf:ID="_g001_VL0">
+    <cim:IdentifiedObject.name>Voltage level 0</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_VL0</cim:IdentifiedObject.mRID>
+    <cim:VoltageLevel.Substation rdf:resource="#_g001_SUB0"/>
+  </cim:VoltageLevel>
+  <cim:ACLineSegment rdf:ID="_g001_L0">
+    <cim:IdentifiedObject.name>Line 0</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L0</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4252</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.9606</cim:ACLineSegment.x>
+    <cim:Conductor.length>31.35</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN0_1">
+    <cim:IdentifiedObject.name>Node 0.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN0_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T0_1">
+    <cim:IdentifiedObject.name>Terminal 0.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T0_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L0"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN0_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN0_2">
+    <cim:IdentifiedObject.name>Node 0.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN0_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T0_2">
+    <cim:IdentifiedObject.name>Terminal 0.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T0_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L0"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN0_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L1">
+    <cim:IdentifiedObject.name>Line 1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L1</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3965</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.013</cim:ACLineSegment.x>
+    <cim:Conductor.length>4.37</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN1_1">
+    <cim:IdentifiedObject.name>Node 1.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN1_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T1_1">
+    <cim:IdentifiedObject.name>Terminal 1.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T1_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L1"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN1_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN1_2">
+    <cim:IdentifiedObject.name>Node 1.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN1_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T1_2">
+    <cim:IdentifiedObject.name>Terminal 1.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T1_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L1"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN1_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L2">
+    <cim:IdentifiedObject.name>Line 2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L2</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.011</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.5597</cim:ACLineSegment.x>
+    <cim:Conductor.length>86.86</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN2_1">
+    <cim:IdentifiedObject.name>Node 2.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN2_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T2_1">
+    <cim:IdentifiedObject.name>Terminal 2.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T2_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L2"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN2_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN2_2">
+    <cim:IdentifiedObject.name>Node 2.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN2_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T2_2">
+    <cim:IdentifiedObject.name>Terminal 2.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T2_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L2"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN2_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L3">
+    <cim:IdentifiedObject.name>Line 3</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L3</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.025</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.712</cim:ACLineSegment.x>
+    <cim:Conductor.length>65.43</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN3_1">
+    <cim:IdentifiedObject.name>Node 3.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN3_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T3_1">
+    <cim:IdentifiedObject.name>Terminal 3.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T3_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L3"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN3_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN3_2">
+    <cim:IdentifiedObject.name>Node 3.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN3_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T3_2">
+    <cim:IdentifiedObject.name>Terminal 3.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T3_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L3"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN3_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L4">
+    <cim:IdentifiedObject.name>Line 4</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L4</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2168</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.7278</cim:ACLineSegment.x>
+    <cim:Conductor.length>27.38</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN4_1">
+    <cim:IdentifiedObject.name>Node 4.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN4_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T4_1">
+    <cim:IdentifiedObject.name>Terminal 4.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T4_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L4"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN4_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN4_2">
+    <cim:IdentifiedObject.name>Node 4.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN4_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T4_2">
+    <cim:IdentifiedObject.name>Terminal 4.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T4_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L4"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN4_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L5">
+    <cim:IdentifiedObject.name>Line 5</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L5</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1231</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.5626</cim:ACLineSegment.x>
+    <cim:Conductor.length>55.69</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN5_1">
+    <cim:IdentifiedObject.name>Node 5.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN5_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T5_1">
+    <cim:IdentifiedObject.name>Terminal 5.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T5_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L5"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN5_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN5_2">
+    <cim:IdentifiedObject.name>Node 5.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN5_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T5_2">
+    <cim:IdentifiedObject.name>Terminal 5.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T5_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L5"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN5_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L6">
+    <cim:IdentifiedObject.name>Line 6</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L6</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2827</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.4261</cim:ACLineSegment.x>
+    <cim:Conductor.length>23.12</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN6_1">
+    <cim:IdentifiedObject.name>Node 6.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN6_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T6_1">
+    <cim:IdentifiedObject.name>Terminal 6.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T6_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L6"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN6_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN6_2">
+    <cim:IdentifiedObject.name>Node 6.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN6_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T6_2">
+    <cim:IdentifiedObject.name>Terminal 6.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T6_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L6"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN6_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L7">
+    <cim:IdentifiedObject.name>Line 7</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L7</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.173</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.7745</cim:ACLineSegment.x>
+    <cim:Conductor.length>85.63</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN7_1">
+    <cim:IdentifiedObject.name>Node 7.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN7_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T7_1">
+    <cim:IdentifiedObject.name>Terminal 7.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T7_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L7"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN7_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN7_2">
+    <cim:IdentifiedObject.name>Node 7.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN7_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T7_2">
+    <cim:IdentifiedObject.name>Terminal 7.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T7_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L7"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN7_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L8">
+    <cim:IdentifiedObject.name>Line 8</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L8</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3384</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.9348</cim:ACLineSegment.x>
+    <cim:Conductor.length>70.92</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN8_1">
+    <cim:IdentifiedObject.name>Node 8.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN8_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T8_1">
+    <cim:IdentifiedObject.name>Terminal 8.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T8_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L8"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN8_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN8_2">
+    <cim:IdentifiedObject.name>Node 8.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN8_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T8_2">
+    <cim:IdentifiedObject.name>Terminal 8.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T8_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L8"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN8_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L9">
+    <cim:IdentifiedObject.name>Line 9</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L9</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2986</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.7519</cim:ACLineSegment.x>
+    <cim:Conductor.length>29.89</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN9_1">
+    <cim:IdentifiedObject.name>Node 9.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN9_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T9_1">
+    <cim:IdentifiedObject.name>Terminal 9.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T9_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L9"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN9_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN9_2">
+    <cim:IdentifiedObject.name>Node 9.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN9_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T9_2">
+    <cim:IdentifiedObject.name>Terminal 9.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T9_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L9"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN9_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L10">
+    <cim:IdentifiedObject.name>Line 10</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L10</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2789</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.6934</cim:ACLineSegment.x>
+    <cim:Conductor.length>81.26</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN10_1">
+    <cim:IdentifiedObject.name>Node 10.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN10_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T10_1">
+    <cim:IdentifiedObject.name>Terminal 10.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T10_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L10"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN10_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN10_2">
+    <cim:IdentifiedObject.name>Node 10.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN10_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T10_2">
+    <cim:IdentifiedObject.name>Terminal 10.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T10_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L10"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN10_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L11">
+    <cim:IdentifiedObject.name>Line 11</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L11</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3914</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.8921</cim:ACLineSegment.x>
+    <cim:Conductor.length>47.8</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN11_1">
+    <cim:IdentifiedObject.name>Node 11.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN11_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T11_1">
+    <cim:IdentifiedObject.name>Terminal 11.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T11_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L11"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN11_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN11_2">
+    <cim:IdentifiedObject.name>Node 11.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN11_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T11_2">
+    <cim:IdentifiedObject.name>Terminal 11.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T11_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L11"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN11_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L12">
+    <cim:IdentifiedObject.name>Line 12</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L12</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3547</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.926</cim:ACLineSegment.x>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN12_1">
+    <cim:IdentifiedObject.name>Node 12.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN12_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T12_1">
+    <cim:IdentifiedObject.name>Terminal 12.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T12_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L12"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN12_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN12_2">
+    <cim:IdentifiedObject.name>Node 12.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN12_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T12_2">
+    <cim:IdentifiedObject.name>Terminal 12.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T12_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L12"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN12_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L13">
+    <cim:IdentifiedObject.name>Line 13</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L13</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2561</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.9211</cim:ACLineSegment.x>
+    <cim:Conductor.length>92.69</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN13_1">
+    <cim:IdentifiedObject.name>Node 13.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN13_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T13_1">
+    <cim:IdentifiedObject.name>Terminal 13.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T13_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L13"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN13_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN13_2">
+    <cim:IdentifiedObject.name>Node 13.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN13_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T13_2">
+    <cim:IdentifiedObject.name>Terminal 13.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T13_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L13"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN13_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L14">
+    <cim:IdentifiedObject.name>Line 14</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L14</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2617</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.7909</cim:ACLineSegment.x>
+    <cim:Conductor.length>69.76</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN14_1">
+    <cim:IdentifiedObject.name>Node 14.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN14_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T14_1">
+    <cim:IdentifiedObject.name>Terminal 14.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T14_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L14"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN14_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN14_2">
+    <cim:IdentifiedObject.name>Node 14.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN14_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T14_2">
+    <cim:IdentifiedObject.name>Terminal 14.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T14_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L14"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN14_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L15">
+    <cim:IdentifiedObject.name>Line 15</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L15</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.479</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.6251</cim:ACLineSegment.x>
+    <cim:Conductor.length>94.25</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN15_1">
+    <cim:IdentifiedObject.name>Node 15.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN15_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T15_1">
+    <cim:IdentifiedObject.name>Terminal 15.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T15_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L15"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN15_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN15_2">
+    <cim:IdentifiedObject.name>Node 15.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN15_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T15_2">
+    <cim:IdentifiedObject.name>Terminal 15.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T15_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L15"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN15_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L16">
+    <cim:IdentifiedObject.name>Line 16</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L16</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4065</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.8822</cim:ACLineSegment.x>
+    <cim:Conductor.length>67.8</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN16_1">
+    <cim:IdentifiedObject.name>Node 16.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN16_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T16_1">
+    <cim:IdentifiedObject.name>Terminal 16.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T16_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L16"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN16_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN16_2">
+    <cim:IdentifiedObject.name>Node 16.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN16_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T16_2">
+    <cim:IdentifiedObject.name>Terminal 16.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T16_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L16"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN16_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L17">
+    <cim:IdentifiedObject.name>Line 17</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L17</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2893</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.4793</cim:ACLineSegment.x>
+    <cim:Conductor.length>61.06</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN17_1">
+    <cim:IdentifiedObject.name>Node 17.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN17_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T17_1">
+    <cim:IdentifiedObject.name>Terminal 17.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T17_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L17"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN17_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN17_2">
+    <cim:IdentifiedObject.name>Node 17.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN17_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T17_2">
+    <cim:IdentifiedObject.name>Terminal 17.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T17_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L17"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN17_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L18">
+    <cim:IdentifiedObject.name>Line 18</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L18</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2739</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.3434</cim:ACLineSegment.x>
+    <cim:Conductor.length>73.88</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN18_1">
+    <cim:IdentifiedObject.name>Node 18.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN18_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T18_1">
+    <cim:IdentifiedObject.name>Terminal 18.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T18_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L18"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN18_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN18_2">
+    <cim:IdentifiedObject.name>Node 18.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN18_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T18_2">
+    <cim:IdentifiedObject.name>Terminal 18.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T18_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L18"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN18_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L19">
+    <cim:IdentifiedObject.name>Line 19</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L19</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0968</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.1716</cim:ACLineSegment.x>
+    <cim:Conductor.length>103.46</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN19_1">
+    <cim:IdentifiedObject.name>Node 19.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN19_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T19_1">
+    <cim:IdentifiedObject.name>Terminal 19.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T19_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L19"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN19_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN19_2">
+    <cim:IdentifiedObject.name>Node 19.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN19_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T19_2">
+    <cim:IdentifiedObject.name>Terminal 19.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T19_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L19"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN19_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L20">
+    <cim:IdentifiedObject.name>Line 20</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L20</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1351</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.3037</cim:ACLineSegment.x>
+    <cim:Conductor.length>81.1</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN20_1">
+    <cim:IdentifiedObject.name>Node 20.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN20_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T20_1">
+    <cim:IdentifiedObject.name>Terminal 20.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T20_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L20"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN20_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN20_2">
+    <cim:IdentifiedObject.name>Node 20.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN20_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T20_2">
+    <cim:IdentifiedObject.name>Terminal 20.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T20_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L20"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN20_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L21">
+    <cim:IdentifiedObject.name>Line 21</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L21</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3802</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.6981</cim:ACLineSegment.x>
+    <cim:Conductor.length>14.03</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN21_1">
+    <cim:IdentifiedObject.name>Node 21.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN21_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T21_1">
+    <cim:IdentifiedObject.name>Terminal 21.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T21_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L21"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN21_1"/>
+    <cim:ACDCTerminal.sequenceNumber>first</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN21_2">
+    <cim:IdentifiedObject.name>Node 21.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN21_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T21_2">
+    <cim:IdentifiedObject.name>Terminal 21.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T21_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L21"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN21_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L22">
+    <cim:IdentifiedObject.name>Line 22</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L22</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0882</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.9205</cim:ACLineSegment.x>
+    <cim:Conductor.length>21.01</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_CN22_1"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN22_1">
+    <cim:IdentifiedObject.name>Node 22.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN22_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T22_1">
+    <cim:IdentifiedObject.name>Terminal 22.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T22_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L22"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN22_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN22_2">
+    <cim:IdentifiedObject.name>Node 22.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN22_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T22_2">
+    <cim:IdentifiedObject.name>Terminal 22.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T22_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L22"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN22_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L23">
+    <cim:IdentifiedObject.name>Line 23</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L23</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1678</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.6846</cim:ACLineSegment.x>
+    <cim:Conductor.length>3.81</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN23_1">
+    <cim:IdentifiedObject.name>Node 23.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN23_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T23_1">
+    <cim:IdentifiedObject.name>Terminal 23.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T23_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L23"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN23_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN23_2">
+    <cim:IdentifiedObject.name>Node 23.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN23_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T23_2">
+    <cim:IdentifiedObject.name>Terminal 23.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T23_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L23"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN23_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L24">
+    <cim:IdentifiedObject.name>Line 24</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L24</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0633</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.5592</cim:ACLineSegment.x>
+    <cim:Conductor.length>61.7</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN24_1">
+    <cim:IdentifiedObject.name>Node 24.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN24_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T24_1">
+    <cim:IdentifiedObject.name>Terminal 24.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T24_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L24"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN24_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN24_2">
+    <cim:IdentifiedObject.name>Node 24.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN24_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T24_2">
+    <cim:IdentifiedObject.name>Terminal 24.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T24_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L24"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN24_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L25">
+    <cim:IdentifiedObject.name>Line 25</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L25</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0202</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.6786</cim:ACLineSegment.x>
+    <cim:Conductor.length>18.43</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN25_1">
+    <cim:IdentifiedObject.name>Node 25.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN25_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T25_1">
+    <cim:IdentifiedObject.name>Terminal 25.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T25_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L25"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN25_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN25_2">
+    <cim:IdentifiedObject.name>Node 25.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN25_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T25_2">
+    <cim:IdentifiedObject.name>Terminal 25.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T25_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L25"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN25_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L26">
+    <cim:IdentifiedObject.name>Line 26</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L26</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3423</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.9967</cim:ACLineSegment.x>
+    <cim:Conductor.length>27.25</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN26_1">
+    <cim:IdentifiedObject.name>Node 26.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN26_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T26_1">
+    <cim:IdentifiedObject.name>Terminal 26.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T26_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L26"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN26_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN26_2">
+    <cim:IdentifiedObject.name>Node 26.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN26_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T26_2">
+    <cim:IdentifiedObject.name>Terminal 26.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T26_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L26"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN26_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L27">
+    <cim:IdentifiedObject.name>Line 27</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L27</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1194</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.4534</cim:ACLineSegment.x>
+    <cim:Conductor.length>47.99</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN27_1">
+    <cim:IdentifiedObject.name>Node 27.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN27_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T27_1">
+    <cim:IdentifiedObject.name>Terminal 27.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T27_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L27"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN27_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN27_2">
+    <cim:IdentifiedObject.name>Node 27.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN27_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T27_2">
+    <cim:IdentifiedObject.name>Terminal 27.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T27_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L27"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN27_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L28">
+    <cim:IdentifiedObject.name>Line 28</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L28</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0388</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.9139</cim:ACLineSegment.x>
+    <cim:Conductor.length>116.18</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN28_1">
+    <cim:IdentifiedObject.name>Node 28.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN28_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T28_1">
+    <cim:IdentifiedObject.name>Terminal 28.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T28_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L28"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN28_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN28_2">
+    <cim:IdentifiedObject.name>Node 28.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN28_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T28_2">
+    <cim:IdentifiedObject.name>Terminal 28.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T28_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L28"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN28_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L29">
+    <cim:IdentifiedObject.name>Line 29</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L29</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1621</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.7329</cim:ACLineSegment.x>
+    <cim:Conductor.length>89.52</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN29_1">
+    <cim:IdentifiedObject.name>Node 29.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN29_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T29_1">
+    <cim:IdentifiedObject.name>Terminal 29.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T29_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L29"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN29_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN29_2">
+    <cim:IdentifiedObject.name>Node 29.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN29_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T29_2">
+    <cim:IdentifiedObject.name>Terminal 29.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T29_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L29"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN29_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L30">
+    <cim:IdentifiedObject.name>Line 30</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L30</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>1.7668</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.7668</cim:ACLineSegment.x>
+    <cim:Conductor.length>98.51</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN30_1">
+    <cim:IdentifiedObject.name>Node 30.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN30_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T30_1">
+    <cim:IdentifiedObject.name>Terminal 30.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T30_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L30"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN30_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN30_2">
+    <cim:IdentifiedObject.name>Node 30.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN30_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T30_2">
+    <cim:IdentifiedObject.name>Terminal 30.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T30_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L30"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN30_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L31">
+    <cim:IdentifiedObject.name>Line 31</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L31</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4352</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.8846</cim:ACLineSegment.x>
+    <cim:Conductor.length>84.78</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN31_1">
+    <cim:IdentifiedObject.name>Node 31.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN31_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T31_1">
+    <cim:IdentifiedObject.name>Terminal 31.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T31_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L31"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN31_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN31_2">
+    <cim:IdentifiedObject.name>Node 31.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN31_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T31_2">
+    <cim:IdentifiedObject.name>Terminal 31.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T31_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L31"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN31_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L32">
+    <cim:IdentifiedObject.name>Line 32</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L32</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1108</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.5663</cim:ACLineSegment.x>
+    <cim:Conductor.length>52.52</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN32_1">
+    <cim:IdentifiedObject.name>Node 32.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN32_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T32_1">
+    <cim:IdentifiedObject.name>Terminal 32.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T32_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L32"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN32_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN32_2">
+    <cim:IdentifiedObject.name>Node 32.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN32_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T32_2">
+    <cim:IdentifiedObject.name>Terminal 32.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T32_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L32"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN32_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L33">
+    <cim:IdentifiedObject.name>Line 33</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L33</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1551</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.7991</cim:ACLineSegment.x>
+    <cim:Conductor.length>39.72</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN33_1">
+    <cim:IdentifiedObject.name>Node 33.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN33_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T33_1">
+    <cim:IdentifiedObject.name>Terminal 33.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T33_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L33"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN33_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN33_2">
+    <cim:IdentifiedObject.name>Node 33.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN33_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T33_2">
+    <cim:IdentifiedObject.name>Terminal 33.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T33_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L33"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN33_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L34">
+    <cim:IdentifiedObject.name>Line 34</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L34</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1084</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.0421</cim:ACLineSegment.x>
+    <cim:Conductor.length>118.46</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN34_1">
+    <cim:IdentifiedObject.name>Node 34.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN34_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T34_1">
+    <cim:IdentifiedObject.name>Terminal 34.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T34_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L34"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN34_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN34_2">
+    <cim:IdentifiedObject.name>Node 34.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN34_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T34_2">
+    <cim:IdentifiedObject.name>Terminal 34.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T34_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L34"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN34_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L35">
+    <cim:IdentifiedObject.name>Line 35</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L35</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1144</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.5676</cim:ACLineSegment.x>
+    <cim:Conductor.length>100.69</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN35_1">
+    <cim:IdentifiedObject.name>Node 35.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN35_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T35_1">
+    <cim:IdentifiedObject.name>Terminal 35.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T35_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L35"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN35_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN35_2">
+    <cim:IdentifiedObject.name>Node 35.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN35_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T35_2">
+    <cim:IdentifiedObject.name>Terminal 35.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T35_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L35"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN35_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L36">
+    <cim:IdentifiedObject.name>Line 36</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L36</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3467</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.7318</cim:ACLineSegment.x>
+    <cim:Conductor.length>118.28</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN36_1">
+    <cim:IdentifiedObject.name>Node 36.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN36_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T36_1">
+    <cim:IdentifiedObject.name>Terminal 36.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T36_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L36"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN36_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN36_2">
+    <cim:IdentifiedObject.name>Node 36.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN36_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T36_2">
+    <cim:IdentifiedObject.name>Terminal 36.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T36_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L36"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN36_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L37">
+    <cim:IdentifiedObject.name>Line 37</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L37</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0932</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.6083</cim:ACLineSegment.x>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN37_1">
+    <cim:IdentifiedObject.name>Node 37.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN37_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T37_1">
+    <cim:IdentifiedObject.name>Terminal 37.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T37_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L37"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN37_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN37_2">
+    <cim:IdentifiedObject.name>Node 37.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN37_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T37_2">
+    <cim:IdentifiedObject.name>Terminal 37.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T37_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L37"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN37_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L38">
+    <cim:IdentifiedObject.name>Line 38</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L38</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4222</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.2197</cim:ACLineSegment.x>
+    <cim:Conductor.length>41.49</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN38_1">
+    <cim:IdentifiedObject.name>Node 38.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN38_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T38_1">
+    <cim:IdentifiedObject.name>Terminal 38.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T38_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L38"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN38_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN38_2">
+    <cim:IdentifiedObject.name>Node 38.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN38_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T38_2">
+    <cim:IdentifiedObject.name>Terminal 38.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T38_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L38"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN38_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L39">
+    <cim:IdentifiedObject.name>Line 39</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L39</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4776</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.504</cim:ACLineSegment.x>
+    <cim:Conductor.length>17.11</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN39_1">
+    <cim:IdentifiedObject.name>Node 39.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN39_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T39_1">
+    <cim:IdentifiedObject.name>Terminal 39.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T39_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L39"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN39_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN39_2">
+    <cim:IdentifiedObject.name>Node 39.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN39_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T39_2">
+    <cim:IdentifiedObject.name>Terminal 39.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T39_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L39"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN39_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L40">
+    <cim:IdentifiedObject.name>Line 40</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L40</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0459</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.4111</cim:ACLineSegment.x>
+    <cim:Conductor.length>94.79</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN40_1">
+    <cim:IdentifiedObject.name>Node 40.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN40_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T40_1">
+    <cim:IdentifiedObject.name>Terminal 40.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T40_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L40"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN40_1"/>
+    <cim:ACDCTerminal.sequenceNumber>first</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN40_2">
+    <cim:IdentifiedObject.name>Node 40.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN40_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T40_2">
+    <cim:IdentifiedObject.name>Terminal 40.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T40_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L40"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN40_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L41">
+    <cim:IdentifiedObject.name>Line 41</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L41</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3931</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.2634</cim:ACLineSegment.x>
+    <cim:Conductor.length>68.92</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN41_1">
+    <cim:IdentifiedObject.name>Node 41.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN41_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T41_1">
+    <cim:IdentifiedObject.name>Terminal 41.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T41_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L41"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN41_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN41_2">
+    <cim:IdentifiedObject.name>Node 41.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN41_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T41_2">
+    <cim:IdentifiedObject.name>Terminal 41.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T41_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L41"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN41_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L42">
+    <cim:IdentifiedObject.name>Line 42</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L42</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4465</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.0836</cim:ACLineSegment.x>
+    <cim:Conductor.length>111.08</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN42_1">
+    <cim:IdentifiedObject.name>Node 42.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN42_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T42_1">
+    <cim:IdentifiedObject.name>Terminal 42.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T42_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L42"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN42_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN42_2">
+    <cim:IdentifiedObject.name>Node 42.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN42_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T42_2">
+    <cim:IdentifiedObject.name>Terminal 42.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T42_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L42"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN42_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L43">
+    <cim:IdentifiedObject.name>Line 43</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L43</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4156</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.6545</cim:ACLineSegment.x>
+    <cim:Conductor.length>80.78</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN43_1">
+    <cim:IdentifiedObject.name>Node 43.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN43_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T43_1">
+    <cim:IdentifiedObject.name>Terminal 43.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T43_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L43"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN43_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN43_2">
+    <cim:IdentifiedObject.name>Node 43.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN43_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T43_2">
+    <cim:IdentifiedObject.name>Terminal 43.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T43_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L43"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN43_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L44">
+    <cim:IdentifiedObject.name>Line 44</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L44</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0296</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.6544</cim:ACLineSegment.x>
+    <cim:Conductor.length>118.59</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN44_1">
+    <cim:IdentifiedObject.name>Node 44.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN44_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T44_1">
+    <cim:IdentifiedObject.name>Terminal 44.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T44_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L44"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN44_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN44_2">
+    <cim:IdentifiedObject.name>Node 44.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN44_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T44_2">
+    <cim:IdentifiedObject.name>Terminal 44.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T44_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L44"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN44_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L45">
+    <cim:IdentifiedObject.name>Line 45</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L45</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1283</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.8736</cim:ACLineSegment.x>
+    <cim:Conductor.length>13.24</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN45_1">
+    <cim:IdentifiedObject.name>Node 45.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN45_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T45_1">
+    <cim:IdentifiedObject.name>Terminal 45.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T45_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L45"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN45_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN45_2">
+    <cim:IdentifiedObject.name>Node 45.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN45_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T45_2">
+    <cim:IdentifiedObject.name>Terminal 45.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T45_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L45"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN45_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L46">
+    <cim:IdentifiedObject.name>Line 46</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L46</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4555</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.8937</cim:ACLineSegment.x>
+    <cim:Conductor.length>31.16</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN46_1">
+    <cim:IdentifiedObject.name>Node 46.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN46_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T46_1">
+    <cim:IdentifiedObject.name>Terminal 46.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T46_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L46"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN46_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN46_2">
+    <cim:IdentifiedObject.name>Node 46.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN46_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T46_2">
+    <cim:IdentifiedObject.name>Terminal 46.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T46_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L46"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN46_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L47">
+    <cim:IdentifiedObject.name>Line 47</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L47</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.0294</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.6462</cim:ACLineSegment.x>
+    <cim:Conductor.length>117.93</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN47_1">
+    <cim:IdentifiedObject.name>Node 47.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN47_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T47_1">
+    <cim:IdentifiedObject.name>Terminal 47.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T47_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L47"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN47_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN47_2">
+    <cim:IdentifiedObject.name>Node 47.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN47_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T47_2">
+    <cim:IdentifiedObject.name>Terminal 47.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T47_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L47"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN47_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L48">
+    <cim:IdentifiedObject.name>Line 48</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L48</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1635</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.877</cim:ACLineSegment.x>
+    <cim:Conductor.length>109.69</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN48_1">
+    <cim:IdentifiedObject.name>Node 48.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN48_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T48_1">
+    <cim:IdentifiedObject.name>Terminal 48.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T48_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L48"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN48_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN48_2">
+    <cim:IdentifiedObject.name>Node 48.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN48_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T48_2">
+    <cim:IdentifiedObject.name>Terminal 48.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T48_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L48"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN48_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L49">
+    <cim:IdentifiedObject.name>Line 49</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L49</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1154</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>3.3184</cim:ACLineSegment.x>
+    <cim:Conductor.length>117.61</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN49_1">
+    <cim:IdentifiedObject.name>Node 49.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN49_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T49_1">
+    <cim:IdentifiedObject.name>Terminal 49.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T49_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L49"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN49_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN49_2">
+    <cim:IdentifiedObject.name>Node 49.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN49_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T49_2">
+    <cim:IdentifiedObject.name>Terminal 49.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T49_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L49"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN49_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L50">
+    <cim:IdentifiedObject.name>Line 50</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L50</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.137</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.983</cim:ACLineSegment.x>
+    <cim:Conductor.length>37.57</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN50_1">
+    <cim:IdentifiedObject.name>Node 50.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN50_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T50_1">
+    <cim:IdentifiedObject.name>Terminal 50.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T50_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L50"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN50_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN50_2">
+    <cim:IdentifiedObject.name>Node 50.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN50_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T50_2">
+    <cim:IdentifiedObject.name>Terminal 50.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T50_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L50"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN50_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L51">
+    <cim:IdentifiedObject.name>Line 51</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L51</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4919</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.5708</cim:ACLineSegment.x>
+    <cim:Conductor.length>78.59</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN51_1">
+    <cim:IdentifiedObject.name>Node 51.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN51_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T51_1">
+    <cim:IdentifiedObject.name>Terminal 51.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T51_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L51"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN51_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN51_2">
+    <cim:IdentifiedObject.name>Node 51.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN51_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T51_2">
+    <cim:IdentifiedObject.name>Terminal 51.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T51_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L51"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN51_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L52">
+    <cim:IdentifiedObject.name>Line 52</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L52</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1603</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.0399</cim:ACLineSegment.x>
+    <cim:Conductor.length>38.69</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN52_1">
+    <cim:IdentifiedObject.name>Node 52.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN52_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T52_1">
+    <cim:IdentifiedObject.name>Terminal 52.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T52_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L52"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN52_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN52_2">
+    <cim:IdentifiedObject.name>Node 52.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN52_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T52_2">
+    <cim:IdentifiedObject.name>Terminal 52.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T52_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L52"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN52_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L53">
+    <cim:IdentifiedObject.name>Line 53</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L53</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1738</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.9946</cim:ACLineSegment.x>
+    <cim:Conductor.length>69.9</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN53_1">
+    <cim:IdentifiedObject.name>Node 53.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN53_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T53_1">
+    <cim:IdentifiedObject.name>Terminal 53.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T53_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L53"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN53_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN53_2">
+    <cim:IdentifiedObject.name>Node 53.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN53_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T53_2">
+    <cim:IdentifiedObject.name>Terminal 53.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T53_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L53"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN53_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L54">
+    <cim:IdentifiedObject.name>Line 54</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L54</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1294</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.9182</cim:ACLineSegment.x>
+    <cim:Conductor.length>66.59</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_CN54_1"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN54_1">
+    <cim:IdentifiedObject.name>Node 54.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN54_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T54_1">
+    <cim:IdentifiedObject.name>Terminal 54.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T54_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L54"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN54_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN54_2">
+    <cim:IdentifiedObject.name>Node 54.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN54_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T54_2">
+    <cim:IdentifiedObject.name>Terminal 54.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T54_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L54"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN54_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L55">
+    <cim:IdentifiedObject.name>Line 55</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L55</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.1525</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.0856</cim:ACLineSegment.x>
+    <cim:Conductor.length>59.7</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN55_1">
+    <cim:IdentifiedObject.name>Node 55.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN55_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T55_1">
+    <cim:IdentifiedObject.name>Terminal 55.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T55_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L55"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN55_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN55_2">
+    <cim:IdentifiedObject.name>Node 55.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN55_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T55_2">
+    <cim:IdentifiedObject.name>Terminal 55.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T55_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L55"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN55_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L56">
+    <cim:IdentifiedObject.name>Line 56</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L56</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3995</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.9393</cim:ACLineSegment.x>
+    <cim:Conductor.length>113.96</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN56_1">
+    <cim:IdentifiedObject.name>Node 56.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN56_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T56_1">
+    <cim:IdentifiedObject.name>Terminal 56.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T56_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L56"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN56_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN56_2">
+    <cim:IdentifiedObject.name>Node 56.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN56_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T56_2">
+    <cim:IdentifiedObject.name>Terminal 56.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T56_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L56"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN56_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L57">
+    <cim:IdentifiedObject.name>Line 57</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L57</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4126</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.007</cim:ACLineSegment.x>
+    <cim:Conductor.length>13.72</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN57_1">
+    <cim:IdentifiedObject.name>Node 57.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN57_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T57_1">
+    <cim:IdentifiedObject.name>Terminal 57.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T57_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L57"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN57_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN57_2">
+    <cim:IdentifiedObject.name>Node 57.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN57_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T57_2">
+    <cim:IdentifiedObject.name>Terminal 57.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T57_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L57"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN57_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L58">
+    <cim:IdentifiedObject.name>Line 58</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L58</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4479</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.2234</cim:ACLineSegment.x>
+    <cim:Conductor.length>109.35</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN58_1">
+    <cim:IdentifiedObject.name>Node 58.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN58_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T58_1">
+    <cim:IdentifiedObject.name>Terminal 58.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T58_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L58"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN58_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN58_2">
+    <cim:IdentifiedObject.name>Node 58.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN58_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T58_2">
+    <cim:IdentifiedObject.name>Terminal 58.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T58_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L58"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN58_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L59">
+    <cim:IdentifiedObject.name>Line 59</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L59</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4039</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.5915</cim:ACLineSegment.x>
+    <cim:Conductor.length>101.05</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN59_1">
+    <cim:IdentifiedObject.name>Node 59.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN59_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T59_1">
+    <cim:IdentifiedObject.name>Terminal 59.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T59_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L59"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN59_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN59_2">
+    <cim:IdentifiedObject.name>Node 59.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN59_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T59_2">
+    <cim:IdentifiedObject.name>Terminal 59.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T59_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L59"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN59_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L60">
+    <cim:IdentifiedObject.name>Line 60</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L60</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.222</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.2947</cim:ACLineSegment.x>
+    <cim:Conductor.length>86.06</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN60_1">
+    <cim:IdentifiedObject.name>Node 60.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN60_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T60_1">
+    <cim:IdentifiedObject.name>Terminal 60.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T60_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L60"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN60_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN60_2">
+    <cim:IdentifiedObject.name>Node 60.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN60_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T60_2">
+    <cim:IdentifiedObject.name>Terminal 60.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T60_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L60"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN60_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L61">
+    <cim:IdentifiedObject.name>Line 61</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L61</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>5.1563</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.1563</cim:ACLineSegment.x>
+    <cim:Conductor.length>66.36</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN61_1">
+    <cim:IdentifiedObject.name>Node 61.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN61_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T61_1">
+    <cim:IdentifiedObject.name>Terminal 61.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T61_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L61"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN61_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN61_2">
+    <cim:IdentifiedObject.name>Node 61.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN61_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T61_2">
+    <cim:IdentifiedObject.name>Terminal 61.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T61_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L61"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN61_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L62">
+    <cim:IdentifiedObject.name>Line 62</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L62</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2039</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.0901</cim:ACLineSegment.x>
+    <cim:Conductor.length>31.7</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN62_1">
+    <cim:IdentifiedObject.name>Node 62.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN62_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T62_1">
+    <cim:IdentifiedObject.name>Terminal 62.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T62_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L62"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN62_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN62_2">
+    <cim:IdentifiedObject.name>Node 62.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN62_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T62_2">
+    <cim:IdentifiedObject.name>Terminal 62.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T62_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L62"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN62_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L63">
+    <cim:IdentifiedObject.name>Line 63</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L63</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2896</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>0.8742</cim:ACLineSegment.x>
+    <cim:Conductor.length>43.24</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN63_1">
+    <cim:IdentifiedObject.name>Node 63.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN63_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T63_1">
+    <cim:IdentifiedObject.name>Terminal 63.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T63_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L63"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN63_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN63_2">
+    <cim:IdentifiedObject.name>Node 63.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN63_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T63_2">
+    <cim:IdentifiedObject.name>Terminal 63.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T63_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L63"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN63_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L64">
+    <cim:IdentifiedObject.name>Line 64</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L64</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.4162</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.3503</cim:ACLineSegment.x>
+    <cim:Conductor.length>48.73</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN64_1">
+    <cim:IdentifiedObject.name>Node 64.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN64_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T64_1">
+    <cim:IdentifiedObject.name>Terminal 64.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T64_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L64"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN64_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN64_2">
+    <cim:IdentifiedObject.name>Node 64.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN64_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T64_2">
+    <cim:IdentifiedObject.name>Terminal 64.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T64_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L64"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN64_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L65">
+    <cim:IdentifiedObject.name>Line 65</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L65</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2691</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>2.804</cim:ACLineSegment.x>
+    <cim:Conductor.length>78.21</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN65_1">
+    <cim:IdentifiedObject.name>Node 65.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN65_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T65_1">
+    <cim:IdentifiedObject.name>Terminal 65.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T65_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L65"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN65_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN65_2">
+    <cim:IdentifiedObject.name>Node 65.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN65_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T65_2">
+    <cim:IdentifiedObject.name>Terminal 65.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T65_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L65"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN65_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L66">
+    <cim:IdentifiedObject.name>Line 66</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L66</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.3684</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>1.6488</cim:ACLineSegment.x>
+    <cim:Conductor.length>59.91</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN66_1">
+    <cim:IdentifiedObject.name>Node 66.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN66_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T66_1">
+    <cim:IdentifiedObject.name>Terminal 66.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T66_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L66"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN66_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN66_2">
+    <cim:IdentifiedObject.name>Node 66.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN66_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T66_2">
+    <cim:IdentifiedObject.name>Terminal 66.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T66_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L66"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN66_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ACLineSegment rdf:ID="_g001_L67">
+    <cim:IdentifiedObject.name>Line 67</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_L67</cim:IdentifiedObject.mRID>
+    <cim:ACLineSegment.r>0.2846</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.5905</cim:ACLineSegment.x>
+    <cim:Conductor.length>110.21</cim:Conductor.length>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_g001_VL0"/>
+  </cim:ACLineSegment>
+  <cim:ConnectivityNode rdf:ID="_g001_CN67_1">
+    <cim:IdentifiedObject.name>Node 67.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN67_1</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T67_1">
+    <cim:IdentifiedObject.name>Terminal 67.1</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T67_1</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L67"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN67_1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+  <cim:ConnectivityNode rdf:ID="_g001_CN67_2">
+    <cim:IdentifiedObject.name>Node 67.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_CN67_2</cim:IdentifiedObject.mRID>
+    <cim:ConnectivityNode.ConnectivityNodeContainer rdf:resource="#_g001_VL0"/>
+  </cim:ConnectivityNode>
+  <cim:Terminal rdf:ID="_g001_T67_2">
+    <cim:IdentifiedObject.name>Terminal 67.2</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.mRID>g001_T67_2</cim:IdentifiedObject.mRID>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_g001_L67"/>
+    <cim:Terminal.ConnectivityNode rdf:resource="#_g001_CN67_2"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+  </cim:Terminal>
+</rdf:RDF>

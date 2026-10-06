@@ -58,11 +58,13 @@ final class PathGuard {
                     new Field("constraintsRoot", "--constraints-root", Kind.READ),
                     new Field("outputDir", "--output", Kind.WRITE_DIR),
                     new Field("datatypeMap", "--datatype-map", Kind.READ_IF_EXISTS),
-                    new Field("previousComparison", "--previous-comparison", Kind.READ))),
+                    new Field("previousComparison", "--previous-comparison", Kind.READ),
+                    new Field("summaryFile", "--summary-file", Kind.WRITE_FILE))),
             Map.entry("sparql", List.of(
                     new Field("models", "--models", Kind.READ_LIST),
                     new Field("query", "--query", Kind.READ_IF_EXISTS),
-                    new Field("output", "--output", Kind.WRITE_FILE))),
+                    new Field("output", "--output", Kind.WRITE_FILE),
+                    new Field("summaryFile", "--summary-file", Kind.WRITE_FILE))),
             Map.entry("convert", List.of(
                     new Field("input", "--input", Kind.READ),
                     new Field("inputFiles", "--input-files", Kind.READ),
@@ -70,11 +72,13 @@ final class PathGuard {
             Map.entry("compare", List.of(
                     new Field("fileA", "--file-a", Kind.READ),
                     new Field("fileB", "--file-b", Kind.READ),
-                    new Field("output", "--output", Kind.WRITE_FILE))),
+                    new Field("output", "--output", Kind.WRITE_FILE),
+                    new Field("summaryFile", "--summary-file", Kind.WRITE_FILE))),
             Map.entry("compare-instances", List.of(
                     new Field("modelsA", "--models-a", Kind.READ),
                     new Field("modelsB", "--models-b", Kind.READ),
-                    new Field("output", "--output", Kind.WRITE_FILE))),
+                    new Field("output", "--output", Kind.WRITE_FILE),
+                    new Field("summaryFile", "--summary-file", Kind.WRITE_FILE))),
             Map.entry("rdfs2shacl", List.of(
                     new Field("rdfsFiles", "--rdfs-files", Kind.READ),
                     new Field("outputDir", "--output-dir", Kind.WRITE_DIR))),

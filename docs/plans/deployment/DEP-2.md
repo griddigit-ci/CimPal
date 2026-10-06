@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review ([PR #54](https://github.com/griddigit-ci/CimPal/pull/54)) |
+| Status | Done ([PR #54](https://github.com/griddigit-ci/CimPal/pull/54), [#55](https://github.com/griddigit-ci/CimPal/pull/55); released 2026.10.6.1) |
 | Phase | D0 |
 | Depends on | DEP-1 (soft: container runs give cgroup-limited numbers) |
 | Size | M |
