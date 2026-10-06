@@ -65,3 +65,9 @@ Standard footer (applies to every work package):
 ## Notes and results
 
 (Claude Code: record findings, baseline numbers and open items here.)
+
+- **Input from CI-3 (2026-10-01):** `release.yml` has a second job, `docker` (Ubuntu, `packages: write`, actions SHA-pinned), that pushes the CLI image to GHCR. Gate it on green CI like the release job, and add the `docker` ecosystem for `/CimPal-CLI/docker` to `dependabot.yml` so the digest-pinned base image gets updates. An image scan (Trivy or Grype) would fit `nightly.yml`. The CI-3 security review also found these, all present before CI-3:
+  - `build-and-release` puts `${{ github.ref_name }}` straight into PowerShell, and the tag filter allows `$()";`, so move it to `env:`;
+  - its actions are still `@v4`;
+  - CI runs neither actionlint nor zizmor;
+  - the image's provenance attestations are unsigned (`actions/attest-build-provenance` with `push-to-registry`).

@@ -3,7 +3,7 @@
   "_how_to_use": "Copy this file to your working directory. Replace every REPLACE_WITH_PATH value with a real path. Then run: java -jar CimPal-CLI.jar validate --config this-file.json",
 
   "workflow": "mapping",
-  "_note_workflow": "Which validation mode to run. Options: 'mapping' (this one), 'timestamped' (see validate-timestamped.json), 'manual' (see validate-manual.json). The mapping workflow reads a CSV file that links model sets to their SHACL constraints.",
+  "_note_workflow": "Which validation mode to run. Options: 'mapping' (this one) or 'timestamped' (see validate-timestamped.json). The mapping workflow reads a CSV file that links model sets to their SHACL constraints.",
 
   "mappingCsv": "REPLACE_WITH_PATH/mapping.csv",
   "_note_mappingCsv": "The CSV mapping file. No header row. Three columns separated by | or comma: (1) model file names relative to modelsDir, or GitHub raw URLs; (2) path to the .ttl constraint file relative to constraintsRoot; (3) a label for the report. Example row: 'EQ.xml,TP.xml,SV.xml | QoCDC/Level2-IGM.ttl | IGM Level 2'",

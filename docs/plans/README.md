@@ -24,17 +24,36 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | --- | --- | --- | --- | --- | --- |
 | 0 | [A1](A1.md) | Claude Code workspace setup | — | S | Done ([PR #39](https://github.com/griddigit-ci/CimPal/pull/39)) |
 | 0 | [CI-1](CI-1.md) | PR build and test | — | S | Done ([PR #40](https://github.com/griddigit-ci/CimPal/pull/40)) |
-| 1 | [TEST-1](TEST-1.md) | Test harness | CI-1 | M | In review ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
-| 1 | [SEC-1](SEC-1.md) | Harden serve | TEST-1 | M | Not started |
-| 1 | [SEC-2](SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | Not started |
-| 2 | [TEST-2](TEST-2.md) | Regression tests for past security findings | TEST-1 | M | Not started |
+| 1 | [TEST-1](TEST-1.md) | Test harness | CI-1 | M | Done ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
+| 1 | [SEC-1](SEC-1.md) | Harden serve | TEST-1 | M | In review ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) |
+| 1 | [SEC-2](SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | In review ([PR #45](https://github.com/griddigit-ci/CimPal/pull/45), stacked on SEC-1) |
+| 2 | [TEST-2](TEST-2.md) | Regression tests for past security findings | TEST-1 | M | In review ([PR #46](https://github.com/griddigit-ci/CimPal/pull/46); 4 findings reported) |
+| 2 | [SEC-5](SEC-5.md) | Fix the findings reported by TEST-2 | TEST-2, SEC-2 | S | In review (PR #49) |
 | 2 | [TEST-3](TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | Not started |
 | 2 | [TEST-4](TEST-4.md) | CLI contract, packaged JAR and protocol tests | TEST-1 | M | Not started |
 | 3 | [SEC-3](SEC-3.md) | MCP output hygiene and external engines | SEC-2 | S | Not started |
 | 3 | [CI-2](CI-2.md) | Supply chain and release integrity | CI-1 | M | Not started |
+| 3 | [CI-3](CI-3.md) | Docker image | CI-1, SEC-1 | M | In review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) |
 | 3 | [SEC-4](SEC-4.md) | Governance and re-attestation | SEC-1, SEC-2, SEC-3 | S (maintainer signs) | Not started |
 | 4 | [TEST-5](TEST-5.md) | Nightly deep tests | TEST-3 | M | Not started |
 | 4 | [TEST-6](TEST-6.md) | GUI smoke tests | TEST-1 | M | Not started |
+
+## Deployment track
+
+Plans for external users: container, sizing, the async `/v1` API, a Python SDK and an Airflow provider. The rationale, requirements (R1–R16) and decisions D-1 to D-13 are in [`deployment/README.md`](deployment/README.md).
+
+| Phase | ID | Work package | Depends on | Size | Status |
+| --- | --- | --- | --- | --- | --- |
+| D0 | [DEP-1](deployment/DEP-1.md) | Container image (delta on CI-3) | CI-1, CI-3 | S | Done ([PR #52](https://github.com/griddigit-ci/CimPal/pull/52)) |
+| D0 | [DEP-2](deployment/DEP-2.md) | Resource statistics, benchmark and sizing guide | DEP-1 (soft) | M | In review ([PR #54](https://github.com/griddigit-ci/CimPal/pull/54)) |
+| D0 | [DEP-3](deployment/DEP-3.md) | CLI automation options and Airflow container pattern | DEP-1 | M | Not started |
+| D0 | [DEP-4](deployment/DEP-4.md) | External user guide, first edition | DEP-1, DEP-2, DEP-3 | M | Not started |
+| D1 | [DEP-5](deployment/DEP-5.md) | Async job API (`/v1`) and OpenAPI spec | SEC-1, SEC-2 | L | Not started |
+| D1 | [DEP-6](deployment/DEP-6.md) | Service deployment: proxy, tokens, probes, SIGTERM, logs, manifests | DEP-5, DEP-1 | M | Not started |
+| D1 | [DEP-7](deployment/DEP-7.md) | File exchange: job workspaces, upload and download | DEP-5 | M–L | Not started |
+| D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | Not started |
+| D2 | [DEP-9](deployment/DEP-9.md) | Python SDK `cimpal-client` | DEP-5, DEP-7 | M | Not started |
+| D2 | [DEP-10](deployment/DEP-10.md) | Airflow provider | DEP-9, DEP-3 | M | Not started |
 
 ## Security gaps referenced by the WPs
 
@@ -43,7 +62,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | G1 | `serve`: no auth, no Host/Origin/Content-Type check, unbounded body, open `/shutdown` | High | SEC-1 |
 | G2 | `serve`/`mcp`/`run` accept any path; no allowed roots | High | SEC-2 |
 | G3 | User SPARQL `SERVICE` may bypass the egress allowlist | Medium (verify) | SEC-2 |
-| G4 | No timeouts, queue limits or memory guard in `serve`/`mcp` | Medium | SEC-1 |
+| G4 | No timeouts, queue limits or memory guard in `serve`/`mcp` | Medium | SEC-1 (`serve` timeout and queue only; `mcp` limits and a memory guard still open) |
 | G5 | MCP results carry untrusted text into the agent's context | Medium | SEC-3 |
 | G6 | `run` can nest `serve`/`mcp`/`run` | Low | SEC-1 |
 | G7 | CI only on tags; tag-pinned actions; no Dependabot; SBOM not published; unsigned exe | Medium | CI-1, CI-2 |
@@ -52,11 +71,12 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 
 ## Open decisions (maintainer)
 
-- [ ] Token file location for `serve` (proposed `%LOCALAPPDATA%\CimPal\serve.token`, user-only ACL)
+- [x] Token file location for `serve`: `%LOCALAPPDATA%\CimPal\serve.token` on Windows, `~/.cimpal/serve.token` elsewhere, user-only (decided 2026-09-30, SEC-1)
 - [ ] Default allowed root for `mcp` (proposed: working directory, plus repeatable `--root`)
 - [ ] Code-signing certificate for `CimPal.exe`
 - [ ] Which ENTSO-E conformity models may be used in nightly scale tests (licence)
 - [ ] Attestation signers (engineering owner, approver)
+- [ ] Make the GHCR package `cimpal` public after the first release that pushes it (CI-3)
 
 ## Standard footer (for every WP session)
 

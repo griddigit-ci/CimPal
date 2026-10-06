@@ -75,6 +75,7 @@ public class SparqlTools {
         }
 
         Query query = QueryFactory.create(sparqlQuery);
+        SparqlServicePolicy.requireNoService(query);
 
         if (!query.isSelectType()) {
             throw new IllegalArgumentException("Only SELECT SPARQL queries can be exported to Excel.");
@@ -84,6 +85,7 @@ public class SparqlTools {
                 QueryExecution queryExecution = QueryExecutionFactory.create(query, model);
                 Workbook workbook = new XSSFWorkbook()
         ) {
+            SparqlServicePolicy.disableIn(queryExecution.getContext());
             ResultSet resultSet = queryExecution.execSelect();
             List<String> columns = resultSet.getResultVars();
 
@@ -259,12 +261,14 @@ public class SparqlTools {
         }
 
         Query query = QueryFactory.create(sparqlQuery);
+        SparqlServicePolicy.requireNoService(query);
 
         if (!query.isSelectType()) {
             throw new IllegalArgumentException("Only SELECT SPARQL queries are supported.");
         }
 
         try (QueryExecution queryExecution = QueryExecutionFactory.create(query, model)) {
+            SparqlServicePolicy.disableIn(queryExecution.getContext());
             ResultSet resultSet = queryExecution.execSelect();
             List<String> columns = resultSet.getResultVars();
             List<Map<String, String>> rows = new ArrayList<>();

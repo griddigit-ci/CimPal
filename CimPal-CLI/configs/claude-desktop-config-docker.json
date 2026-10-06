@@ -1,0 +1,26 @@
+{
+  "_comment": "Add this to your Claude Desktop configuration to run the CimPal MCP server from the Docker image instead of the JAR. See docs/cli/docker.md.",
+  "_location": "Windows: %APPDATA%\\Claude\\claude_desktop_config.json  |  macOS: ~/Library/Application Support/Claude/claude_desktop_config.json",
+  "_how_to_use": "Merge the 'mcpServers' block into your existing claude_desktop_config.json. Replace C:/Data with the folder that holds your models, shapes and outputs. Docker Desktop must be running.",
+
+  "mcpServers": {
+    "cimpal": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "C:/Data:/data",
+        "ghcr.io/griddigit-ci/cimpal:latest",
+        "mcp"
+      ],
+      "_note_args": "'-i' keeps stdin open for the MCP stdio channel; never add '-t'. '-v C:/Data:/data' mounts your folder at /data, and every path in a tool call must then be a container path such as /data/models. Pin a release instead of 'latest' for reproducible results, e.g. ghcr.io/griddigit-ci/cimpal:2026.10.1.1.",
+
+      "_note_mounts": "Safer: mount inputs read-only and give the tools a separate writable output folder, e.g. \"-v\", \"C:/Data/models:/data/models:ro\", \"-v\", \"C:/Data/out:/data/out\".",
+      "_note_token": "For remote owl:imports with a GitHub token, add \"-e\", \"GITHUB_TOKEN\" to args (no value, before the image name) and put the value in an \"env\": {\"GITHUB_TOKEN\": \"...\"} block of this server. Never write the value into args, where any process listing shows it.",
+      "_note_memory": "For large CGMES models, set the heap before the image name: [\"run\", \"-i\", \"--rm\", \"-e\", \"JAVA_OPTS=-Xmx8g\", ...]. Docker Desktop's VM memory is the upper bound. Never put secrets in JAVA_OPTS: it shows in docker inspect.",
+      "_note_debug": "To see MCP message traffic, add '--debug' after 'mcp'. Debug output goes to stderr, not the MCP channel."
+    }
+  }
+}

@@ -7,8 +7,11 @@ package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationOptions;
 import eu.griddigit.cimpal.core.models.SHACLValidationReport;
+import eu.griddigit.cimpal.core.models.SHACLValidationReport.ConstraintFileResults;
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import eu.griddigit.cimpal.core.presets.SHACLValidationOptionsPresets;
+import eu.griddigit.cimpal.core.testsupport.Normalizer;
+import eu.griddigit.cimpal.core.testsupport.Snapshots;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
@@ -21,7 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.topbraid.shacl.vocabulary.SH;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,8 +39,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SHACLValidatorTest {
 
+    private static final Snapshots SNAPSHOTS = Snapshots.forFeature("shacl-validator");
+
     private static final String BASE = "http://example.com/data";
     private static final String SIZE = "urn:test:size";
+    private static final String IMPORTS = "<http://www.w3.org/2002/07/owl#imports>";
 
     /** ex:Thing needs exactly one ex:size, typed xsd:float. */
     private static final String SIZE_SHAPES = """
@@ -61,6 +69,43 @@ class SHACLValidatorTest {
         Files.createDirectories(file.getParent());
         Files.writeString(file, content);
         return file;
+    }
+
+    /** Writes a ZIP archive of name/content pairs; a {@code byte[]} content is stored as is. */
+    private Path zip(String name, Object... namesAndContents) throws Exception {
+        return Files.write(tempDir.resolve(name), zipBytes(namesAndContents));
+    }
+
+    private static byte[] zipBytes(Object... namesAndContents) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream out = new ZipOutputStream(bytes)) {
+            for (int i = 0; i < namesAndContents.length; i += 2) {
+                out.putNextEntry(new ZipEntry((String) namesAndContents[i]));
+                Object content = namesAndContents[i + 1];
+                out.write(content instanceof byte[] raw ? raw : content.toString().getBytes(StandardCharsets.UTF_8));
+                out.closeEntry();
+            }
+        }
+        return bytes.toByteArray();
+    }
+
+    /** A node shape on ex:Thing requiring {@code path}, through an anonymous property shape. */
+    private static String requiredOnThing(String shape, String path) {
+        return """
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                @prefix ex: <urn:test:> .
+                ex:%s a sh:NodeShape ;
+                    sh:targetClass ex:Thing ;
+                    sh:property [ sh:path ex:%s ; sh:minCount 1 ] .
+                """.formatted(shape, path);
+    }
+
+    private static List<String> constraintFiles(SHACLValidationReport report) {
+        return report.getResultsByConstraintFile().stream().map(ConstraintFileResults::constraintFile).toList();
+    }
+
+    private static List<Integer> resultCounts(SHACLValidationReport report) {
+        return report.getResultsByConstraintFile().stream().map(file -> file.results().size()).toList();
     }
 
     private static String rdfXml(String body) {
@@ -186,19 +231,37 @@ class SHACLValidatorTest {
     }
 
     @Test
-    void unresolvableImportIsReportedAsWarning() throws Exception {
-        // A host outside the remote-import allowlist is refused without being contacted.
-        Path root = write("root.ttl", SIZE_SHAPES
-                + "<urn:test:root> <http://www.w3.org/2002/07/owl#imports> <https://example.com/shapes.ttl> .\n");
+    void importSharedByTwoShapeFilesIsLoadedOnceSoEachFindingIsReportedOnce() throws Exception {
+        // Parsing the shared file once per root gave its anonymous property shape a second blank
+        // node, so the one missing ex:size was reported twice.
+        write("constraints/common.ttl", requiredOnThing("ThingShape", "size"));
+        Path eq = write("constraints/eq.ttl", "<urn:test:eq> " + IMPORTS + " <common.ttl> .");
+        Path ssh = write("constraints/ssh.ttl", "<urn:test:ssh> " + IMPORTS + " <common.ttl> .");
 
         SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
                 .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
-                .shapeFiles(root)
+                .shapeFiles(eq, ssh)
                 .xmlBase(BASE)
                 .build()).validate();
 
-        assertTrue(report.getWarnings().stream().anyMatch(w -> w.contains("owl:imports")),
-                () -> "warnings: " + report.getWarnings());
+        assertEquals(1, report.getResults().size(), () -> "results: " + report.getResults());
+    }
+
+    @Test
+    void unresolvableImportFailsTheValidation() throws Exception {
+        // A host outside the remote-import allowlist is refused without being contacted, and
+        // the validation fails rather than running without those shapes (SEC-5).
+        Path root = write("root.ttl", SIZE_SHAPES
+                + "<urn:test:root> <http://www.w3.org/2002/07/owl#imports> <https://example.com/shapes.ttl> .\n");
+
+        SHACLValidator validator = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(root)
+                .xmlBase(BASE)
+                .build());
+
+        java.io.IOException failure = org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, validator::validate);
+        assertTrue(failure.getMessage().contains("owl:imports"), failure::getMessage);
     }
 
     @Test
@@ -232,6 +295,178 @@ class SHACLValidatorTest {
                 .build()).validate();
 
         assertEquals(1, report.getResults().size());
+    }
+
+    @Test
+    void nestedZipArchivesOfDataAreRead() throws Exception {
+        Path cgm = zip("cgm.zip", "igm/igm.zip", zipBytes("eq.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")));
+
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(cgm)
+                .shapeFiles(write("shapes.ttl", SIZE_SHAPES))
+                .xmlBase(BASE)
+                .build()).validate();
+
+        assertEquals(1, report.getResults().size());
+    }
+
+    @Test
+    void dataZipWithoutXmlFilesFailsRatherThanPassing() throws Exception {
+        // Read as data, an archive of the wrong kind would add nothing, and so conform.
+        Path shapesZip = zip("shapes.zip", "shapes.ttl", SIZE_SHAPES);
+
+        IOException failure = assertThrows(IOException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(shapesZip)
+                .shapeFiles(write("shapes.ttl", SIZE_SHAPES))
+                .xmlBase(BASE)
+                .build()).validate());
+
+        assertTrue(failure.getMessage().contains("No .xml files found in archive: shapes.zip"), failure::getMessage);
+    }
+
+    // ---- ZIP archives of shape files ----
+
+    @Test
+    void shapeFilesInAZipAreReadAndImportEachOtherLikeFilesInAFolder() throws Exception {
+        // ../shapes/size.ttl from config/root.ttl names the archive's shapes/size.ttl entry.
+        Path constraints = zip("constraints.zip",
+                "config/root.ttl", "<urn:test:root> " + IMPORTS + " <../shapes/size.ttl> .",
+                "shapes/size.ttl", SIZE_SHAPES,
+                "readme.txt", "not a shapes file");
+
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(constraints)
+                .xmlBase(BASE)
+                .build()).validate();
+
+        assertEquals(1, report.getResults().size(), () -> "results: " + report.getResults());
+        assertEquals("Thing.size", report.getResults().getFirst().getName());
+        assertEquals(List.of("size.ttl"), constraintFiles(report));
+    }
+
+    @Test
+    void importOfAnEntryTheZipLacksFailsTheValidation() throws Exception {
+        // The import names a location inside the archive; a file of that name beside the
+        // archive must not stand in for the missing entry.
+        write("missing.ttl", SIZE_SHAPES);
+        Path constraints = zip("constraints.zip",
+                "root.ttl", SIZE_SHAPES + "<urn:test:root> " + IMPORTS + " <missing.ttl> .\n");
+
+        IOException failure = assertThrows(IOException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(constraints)
+                .xmlBase(BASE)
+                .build()).validate());
+
+        assertTrue(failure.getMessage().contains("owl:imports"), failure::getMessage);
+        assertTrue(failure.getMessage().contains("constraints.zip/missing.ttl"), failure::getMessage);
+    }
+
+    @Test
+    void importLeavingTheZipIsResolvedBesideIt() throws Exception {
+        write("shared/size.ttl", SIZE_SHAPES);
+        Path constraints = zip("constraints.zip", "root.ttl", "<urn:test:root> " + IMPORTS + " <../shared/size.ttl> .");
+
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(constraints)
+                .xmlBase(BASE)
+                .build()).validate();
+
+        assertEquals(1, report.getResults().size());
+        assertEquals(List.of("size.ttl"), constraintFiles(report));
+    }
+
+    @Test
+    void networkImportsFromAZipAreRefused() throws Exception {
+        // An archive entry is as third-party as a shapes file on disk: opening a UNC import would
+        // make Windows contact that host with the user's credentials. That includes the archive's
+        // own path on another host, which must not pass for an entry of the archive.
+        Path data = write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>"));
+        String archivePath = tempDir.resolve("constraints.zip").toUri().getRawPath();
+        List<String> importingShapes = List.of(
+                "<urn:test:root> " + IMPORTS + " <file://attacker.example/share/x.ttl> .",
+                "<urn:test:root> " + IMPORTS + " <file:////attacker.example/share/x.ttl> .",
+                "<urn:test:root> " + IMPORTS + " <file://attacker.example" + archivePath + "/x.ttl> .",
+                "@base <file://attacker.example/share/> .\n<urn:test:root> " + IMPORTS + " <x.ttl> .");
+
+        for (String shapes : importingShapes) {
+            Path constraints = zip("constraints.zip", "root.ttl", SIZE_SHAPES + shapes + "\n");
+            assertThrows(PathNotAllowedException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                    .dataFiles(data)
+                    .shapeFiles(constraints)
+                    .xmlBase(BASE)
+                    .build()).validate(), shapes);
+        }
+    }
+
+    @Test
+    void rdfXmlShapeFilesInAZipAreValidated() throws Exception {
+        Path constraints = zip("constraints.zip", "SSH.rdf", """
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sh="http://www.w3.org/ns/shacl#">
+                  <sh:NodeShape rdf:about="urn:test:NamedThingShape">
+                    <sh:targetClass rdf:resource="urn:test:Thing"/>
+                    <sh:property>
+                      <sh:PropertyShape>
+                        <sh:path rdf:resource="urn:test:name"/>
+                        <sh:minCount rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1</sh:minCount>
+                      </sh:PropertyShape>
+                    </sh:property>
+                  </sh:NodeShape>
+                </rdf:RDF>
+                """);
+
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(constraints)
+                .xmlBase(BASE)
+                .build()).validate();
+
+        assertEquals(List.of("SSH.rdf"), constraintFiles(report));
+        assertEquals(List.of(1), resultCounts(report));
+    }
+
+    @Test
+    void otherRdfFilesInAShapesZipAreNamedInTheWarnings() throws Exception {
+        // Only .ttl and .rdf are read as constraints; any other RDF file is pointed out, not dropped silently.
+        Path constraints = zip("constraints.zip", "EQ.ttl", SIZE_SHAPES, "SSH.jsonld", "{}");
+
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(constraints)
+                .datatypeMap(Map.of(SIZE, XSDDatatype.XSDfloat))
+                .xmlBase(BASE)
+                .build()).validate();
+
+        assertEquals(List.of("constraints.zip: 1 RDF file was not read as constraints; only .ttl and .rdf files are: SSH.jsonld"),
+                report.getWarnings());
+    }
+
+    @Test
+    void shapesZipWithoutShapeFilesFailsRatherThanValidatingNothing() throws Exception {
+        Path modelZip = zip("model.zip", "eq.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>"));
+
+        IOException failure = assertThrows(IOException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(modelZip)
+                .xmlBase(BASE)
+                .build()).validate());
+
+        assertTrue(failure.getMessage().contains("No .ttl or .rdf files found in archive: model.zip"), failure::getMessage);
+    }
+
+    @Test
+    void shapesZipEntryClimbingOutOfTheArchiveIsRefused() throws Exception {
+        Path constraints = zip("constraints.zip", "../evil.ttl", SIZE_SHAPES);
+
+        IOException failure = assertThrows(IOException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(constraints)
+                .xmlBase(BASE)
+                .build()).validate());
+
+        assertTrue(failure.getMessage().contains("Unsafe ZIP entry path"), failure::getMessage);
     }
 
     @Test
@@ -333,5 +568,96 @@ class SHACLValidatorTest {
         assertTrue(Files.size(xlsx) > 0);
         Model reread = RDFDataMgr.loadModel(turtle.toUri().toString());
         assertTrue(reread.isIsomorphicWith(report.getReportModel()));
+    }
+
+    // ---- results by constraint file ----
+
+    /** ex:Thing _1 lacks ex:size, ex:name and ex:extra; nothing is an ex:Other. */
+    private SHACLValidationReport validateThingAgainstFourConstraintFiles() throws Exception {
+        Path size = write("constraints/size.ttl", SIZE_SHAPES);
+        Path name = write("constraints/name.ttl", requiredOnThing("NamedThingShape", "name"));
+        Path passing = write("constraints/passing.ttl", requiredOnThing("OtherShape", "size")
+                .replace("ex:Thing", "ex:Other"));
+        // Declares no shape itself: what it imports is counted under the imported file.
+        write("constraints/imported/extra.ttl", requiredOnThing("ExtraShape", "extra"));
+        Path config = write("constraints/config.ttl", "<urn:test:config> " + IMPORTS + " <imported/extra.ttl> .");
+
+        return new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(size, name, passing, config)
+                .xmlBase(BASE)
+                .build()).validate();
+    }
+
+    @Test
+    void resultsAreBrokenDownByTheConstraintFileDeclaringTheirShape() throws Exception {
+        SHACLValidationReport report = validateThingAgainstFourConstraintFiles();
+
+        assertEquals(3, report.getResults().size());
+        assertEquals(List.of("extra.ttl", "name.ttl", "passing.ttl", "size.ttl"), constraintFiles(report));
+        assertEquals(List.of(1, 1, 0, 1), resultCounts(report));
+        assertEquals("Thing.size", report.getResultsByConstraintFile().get(3).results().getFirst().getName());
+    }
+
+    @Test
+    void aShapeCountsUnderTheFileThatTypesItNotOneThatOnlyAddsToIt() throws Exception {
+        // Read first, extension.ttl only adds a message to the property shape size.ttl declares.
+        Path extension = write("extension.ttl",
+                "<urn:test:ThingSizeShape> <http://www.w3.org/ns/shacl#message> \"Every thing has a size\" .");
+
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(extension, write("size.ttl", SIZE_SHAPES))
+                .xmlBase(BASE)
+                .build()).validate();
+
+        assertEquals(List.of("size.ttl"), constraintFiles(report));
+        assertEquals(List.of(1), resultCounts(report));
+    }
+
+    @Test
+    void resultsAreNotBrokenDownWhenTheirShapeCannotBeToldApart() throws Exception {
+        // Without prefixes both shapes shorten to "X", the label a result names its shape by, so a
+        // result could come from either file and neither may be reported as conforming.
+        String shape = "<http://%s.example/X> a <http://www.w3.org/ns/shacl#PropertyShape> ;"
+                + " <http://www.w3.org/ns/shacl#targetClass> <urn:test:Thing> ;"
+                + " <http://www.w3.org/ns/shacl#path> <urn:test:%s> ;"
+                + " <http://www.w3.org/ns/shacl#minCount> 1 .";
+        Path a = write("a.ttl", shape.formatted("a", "size"));
+        Path b = write("b.ttl", shape.formatted("b", "name"));
+
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(a, b)
+                .xmlBase(BASE)
+                .build()).validate();
+
+        assertEquals(List.of("a.ttl; b.ttl"), constraintFiles(report));
+        assertEquals(List.of(2), resultCounts(report));
+    }
+
+    @Test
+    void suppliedShapesModelIsReportedAsOneValidation() throws Exception {
+        SHACLValidationReport report = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataModel(ttl("ex:t a ex:Thing ."))
+                .shapesModel(ttl(SIZE_SHAPES))
+                .build()).validate();
+
+        assertEquals(List.of("shapes model"), constraintFiles(report));
+        assertEquals(List.of(1), resultCounts(report));
+    }
+
+    @Test
+    void workbookHasTheMappingLayoutWithOneValidationRowPerConstraintFile() throws Exception {
+        SHACLValidationReport report = validateThingAgainstFourConstraintFiles();
+
+        Path workbook = report.writeExcelTo(tempDir.resolve("out"));
+
+        assertEquals(tempDir.resolve("out"), workbook.getParent());
+        assertTrue(workbook.getFileName().toString().matches("validation_report__\\d{8}_\\d{6}\\.xlsx"),
+                workbook::toString);
+        // The anonymous property shapes appear in Source under per-run blank-node labels.
+        SNAPSHOTS.assertExcelEquals("four-constraint-files__workbook", workbook,
+                Normalizer.timestamps(), Normalizer.paths(tempDir), Normalizer.blankNodeLabels());
     }
 }

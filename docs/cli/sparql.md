@@ -52,6 +52,7 @@ java -jar CimPal-CLI.jar sparql ^
 | `--output` | file path | — | Write results to a file. Use `.xlsx` extension for Excel; any other extension for CSV. If omitted, results go to stdout. |
 | `--format` | `text` / `json` / `csv` | `text` | Format for stdout output. Ignored when `--output` is set. |
 | `--limit` | integer | `0` | Automatically append `LIMIT n` to queries that have none. `0` = do not add a limit. |
+| `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 
 ---
 
@@ -108,10 +109,22 @@ If a SELECT query has no LIMIT and the model is large (over 100k triples), the c
 
 ---
 
+## CSV output
+
+CSV output (`--output x.csv`, or `--format csv` to stdout) is RFC-4180 quoted. A cell that starts with `=`, `+`, `-`, `@`, TAB or CR gets a leading apostrophe, so a spreadsheet shows the value instead of running it as a formula. Model values come from third parties.
+
+---
+
+## No federated queries (`SERVICE`)
+
+Queries run only against the models you load. A query that contains `SERVICE` anywhere, including sub-queries and `EXISTS` / `NOT EXISTS` blocks, is refused with exit code 2 before it runs, and no request is sent. Remote `SERVICE` is also switched off for every query CimPal runs, including SHACL-SPARQL constraints in shapes, in the CLI and in the GUI. Without that, a query could send HTTP requests to any host, past CimPal's download allowlist. Jena executes `SERVICE` by default.
+
+---
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | 0 | Query ran successfully |
-| 2 | Bad input (no models, no query, file not found) |
-| 3 | Internal error (RDF parse failure, SPARQL syntax error) |
+| 2 | Bad input (no models, no query, file not found, empty model, not a SELECT, or a refused `SERVICE` query) |
+| 3 | Internal error (RDF parse failure, SPARQL syntax error); out of memory included (one `[ERROR] Out of memory` line on stderr; see [resource statistics](README.md#resource-statistics---stats)) |

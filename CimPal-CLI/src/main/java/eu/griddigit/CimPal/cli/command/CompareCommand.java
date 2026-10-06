@@ -6,6 +6,8 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.stats.RunStats;
+import eu.griddigit.cimpal.core.utils.CsvCells;
 import eu.griddigit.cimpal.core.comparators.ComparisonRDFSprofile;
 import eu.griddigit.cimpal.core.comparators.ComparisonRDFSprofileCIMTool;
 import eu.griddigit.cimpal.core.comparators.ComparisonSHACLshapes;
@@ -96,6 +98,14 @@ public class CompareCommand implements Callable<Integer> {
             description = "Comparison algorithm: rdfs, rdfs-cimtool, shacl, or auto (default: auto).")
     private String compareType;
 
+    @Option(names = "--stats",
+            description = "Report the run's resource use (wall/CPU time, peak heap, GC, triples loaded): "
+                    + "a \"stats\" field in JSON output on stdout, otherwise a [STATS] line on stderr.")
+    private Boolean stats;
+
+    /** The collector when {@code --stats} is on, otherwise null. */
+    private RunStats runStats;
+
     @Option(names = "--normalize-cim-version",
             description = "Rename the 'cim' namespace in file-b to match file-a before comparing.")
     private boolean normalizeCimVersion;
@@ -133,6 +143,7 @@ public class CompareCommand implements Callable<Integer> {
                 loadConfig(configFile);
             }
             applyDefaults();
+            runStats = StatsJson.startIf(stats);
 
             if (dryRun) {
                 printDryRun();
@@ -144,10 +155,15 @@ public class CompareCommand implements Callable<Integer> {
             }
 
             // Load models
-            System.err.println("[INFO] Loading file A: " + fileA.getAbsolutePath());
-            Model modelA = loadModel(fileA);
-            System.err.println("[INFO] Loading file B: " + fileB.getAbsolutePath());
-            Model modelB = loadModel(fileB);
+            Model modelA;
+            Model modelB;
+            try (StatsJson.Span ignored = StatsJson.phase(runStats, "load")) {
+                System.err.println("[INFO] Loading file A: " + fileA.getAbsolutePath());
+                modelA = loadModel(fileA);
+                System.err.println("[INFO] Loading file B: " + fileB.getAbsolutePath());
+                modelB = loadModel(fileB);
+            }
+            StatsJson.countLoaded(runStats, modelA.size() + modelB.size(), List.of(fileA.toPath(), fileB.toPath()));
 
             // Namespace normalisation
             if (normalizeCimVersion) {
@@ -177,7 +193,10 @@ public class CompareCommand implements Callable<Integer> {
                 default -> new ComparisonRDFSprofile();
             };
 
-            RDFCompareResult result = comparator.compare(modelA, modelB);
+            RDFCompareResult result;
+            try (StatsJson.Span ignored = StatsJson.phase(runStats, "compare")) {
+                result = comparator.compare(modelA, modelB);
+            }
             List<RDFCompareResultEntry> entries = result.getEntries();
 
             // NOTE: result.hasDifference() returns true when entries is EMPTY (inverted).
@@ -185,12 +204,17 @@ public class CompareCommand implements Callable<Integer> {
             boolean identical = entries.isEmpty();
 
             // Output results
+            boolean jsonStdout = outputFile == null && "json".equalsIgnoreCase(format);
+            String statsField = jsonStdout ? StatsJson.field(runStats, "\n  ") : "";
             if (outputFile != null) {
                 writeToFile(entries, outputFile, fileA, fileB, resolvedType);
                 System.out.println("[OK] Comparison results written to: " + outputFile.getAbsolutePath());
                 System.out.println("     Total differences: " + entries.size());
             } else {
-                writeToStdout(entries, format, fileA, fileB, resolvedType);
+                writeToStdout(entries, format, fileA, fileB, resolvedType, statsField);
+            }
+            if (!jsonStdout) {
+                StatsJson.toStderr(runStats);
             }
 
             if (identical) {
@@ -254,6 +278,10 @@ public class CompareCommand implements Callable<Integer> {
         if (format == null) {
             String v = root.path("format").asText(null);
             if (v != null && !v.isBlank()) format = v;
+        }
+        if (stats == null) {
+            JsonNode n = root.path("stats");
+            if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
     }
 
@@ -409,9 +437,9 @@ public class CompareCommand implements Callable<Integer> {
     // -------------------------------------------------------------------------
 
     private static void writeToStdout(List<RDFCompareResultEntry> entries, String format,
-                                      File fileA, File fileB, String compareType) {
+                                      File fileA, File fileB, String compareType, String statsField) {
         switch (format.toLowerCase()) {
-            case "json" -> writeJson(entries, fileA, fileB, compareType);
+            case "json" -> writeJson(entries, fileA, fileB, compareType, statsField);
             case "csv"  -> writeCsvStdout(entries);
             default     -> writeText(entries, fileA, fileB);
         }
@@ -441,8 +469,9 @@ public class CompareCommand implements Callable<Integer> {
         System.out.println("Total: " + entries.size() + " difference(s)");
     }
 
+    /** {@code statsField} is {@code ,"stats":{...}} or empty (see {@link StatsJson#field}). */
     private static void writeJson(List<RDFCompareResultEntry> entries,
-                                  File fileA, File fileB, String compareType) {
+                                  File fileA, File fileB, String compareType, String statsField) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         sb.append("  \"schema\": \"cimpal-compare-result/1\",\n");
@@ -463,7 +492,7 @@ public class CompareCommand implements Callable<Integer> {
             if (i < entries.size() - 1) sb.append(",");
             sb.append("\n");
         }
-        sb.append("  ]\n");
+        sb.append("  ]").append(statsField).append("\n");
         sb.append("}");
         System.out.println(sb);
     }
@@ -521,12 +550,9 @@ public class CompareCommand implements Callable<Integer> {
         return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
 
+    /** RFC-4180 quoting with formula neutralisation (SEC-5, finding 4); see {@link CsvCells#escape}. */
     private static String csvEscape(String s) {
-        if (s == null) return "";
-        if (s.contains(",") || s.contains("\"") || s.contains("\n")) {
-            return "\"" + s.replace("\"", "\"\"") + "\"";
-        }
-        return s;
+        return CsvCells.escape(s);
     }
 
     private static String jsonStr(String value) {

@@ -32,6 +32,8 @@ Starts a Model Context Protocol (MCP) server that exposes all CimPal operations 
 
 A ready-to-edit template is at `CimPal-CLI/configs/claude-desktop-config.json`.
 
+**From the Docker image** (no local Java needed): use `"command": "docker"` with `"args": ["run", "-i", "--rm", "-v", "C:/Data:/data", "ghcr.io/griddigit-ci/cimpal:latest", "mcp"]`. Tool arguments are then container paths such as `/data/models`. There `--root` isn't needed: the container's working directory, `/data`, is the default root. Mount only the folders the tools need there, never your home folder or a drive root. The template is `CimPal-CLI/configs/claude-desktop-config-docker.json`; details in [docker](docker.md#mcp-server-for-claude-desktop).
+
 ---
 
 ## All flags
@@ -39,6 +41,18 @@ A ready-to-edit template is at `CimPal-CLI/configs/claude-desktop-config.json`.
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--debug` | flag | off | Write every MCP message to stderr. Use for troubleshooting; has no effect on the protocol channel. |
+
+---
+
+## Allowed folders (`--root`)
+
+File paths in tool arguments may only point inside the allowed folders. The flags are the same as for [`serve`](serve.md#allowed-folders---root): `--root` (default: the working directory), `--read-root`, `--write-root` and `--allow-unc`. Paths CimPal resolves itself (mapping CSV entries, `owl:imports`) are checked too. A refused path returns a tool result with `"isError": true`, and its message names the path. Existing output files named in the arguments are only replaced when the arguments set `"overwrite": true`; files a command creates inside its output folder are replaced. If the server's working directory is your home folder or a drive root, it is not used as a default and `--root` is required.
+
+Claude Desktop starts the server in its own folder, so **always pass `--root`** with your data folder:
+
+```json
+"args": ["-jar", "C:/Tools/CimPal/CimPal-CLI.jar", "mcp", "--root", "C:/Data/CimPal"]
+```
 
 ---
 
@@ -142,7 +156,9 @@ Large CGMES models require significant heap. Configure JVM memory in the Claude 
 }
 ```
 
-`-Xmx8g` gives the server 8 GB heap — enough for most full-grid CGMES 3.0 models with multiple concurrent validation workers.
+`-Xmx8g` gives the server 8 GB heap — enough for most full-grid CGMES 3.0 models with multiple concurrent validation workers. The [sizing guide](../guide/sizing.md) has heap figures by model size.
+
+If a tool call runs out of memory, the server answers it with JSON-RPC error `-32603` ("Out of memory; the CimPal MCP server stops") and exits with code 3; the client then restarts it.
 
 ---
 

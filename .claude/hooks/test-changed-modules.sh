@@ -16,7 +16,7 @@ fi
 
 cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}" || exit 0
 
-files=$( { git diff --name-only HEAD -- '*.java'; git ls-files --others --exclude-standard -- '*.java'; } | sort -u)
+files=$( { git diff --name-only HEAD -- '*.java' 2>/dev/null; git ls-files --others --exclude-standard -- '*.java'; } | sort -u)
 [ -z "$files" ] && exit 0
 
 modules=$(printf '%s\n' "$files" | cut -d/ -f1 | grep -E '^CimPal-(Core|Main|CLI|CustomWriter)$' | sort -u | paste -sd, -)
@@ -26,7 +26,7 @@ modules=$(printf '%s\n' "$files" | cut -d/ -f1 | grep -E '^CimPal-(Core|Main|CLI
 fingerprint=$( {
     printf '%s\n' "$modules"
     printf '%s\n' "$files" | while IFS= read -r f; do
-        if [ -f "$f" ]; then printf '%s %s\n' "$f" "$(git hash-object "$f")"; else printf '%s deleted\n' "$f"; fi
+        if [ -f "$f" ]; then printf '%s %s\n' "$f" "$(git hash-object "$f" 2>/dev/null)"; else printf '%s deleted\n' "$f"; fi
     done
 } | git hash-object --stdin)
 
@@ -34,6 +34,17 @@ state_dir=.claude/state
 if [ -f "$state_dir/last-green" ] && [ "$(cat "$state_dir/last-green")" = "$fingerprint" ]; then
     exit 0
 fi
+
+# In the Claude sandbox the JDK cannot create its Unix-domain socket under %TEMP%, so every
+# loopback test (StubHttpServer) fails with "Unable to establish loopback connection".
+# Point it at a short, writable directory in the project instead.
+case "$JAVA_TOOL_OPTIONS" in
+    *jdk.net.unixdomain.tmpdir*) ;;
+    *)
+        mkdir -p "$state_dir/uds"
+        export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djdk.net.unixdomain.tmpdir=$(pwd -W 2>/dev/null || pwd)/$state_dir/uds"
+        ;;
+esac
 
 log=$(mktemp)
 if mvn -B -q -pl "$modules" -am test >"$log" 2>&1; then

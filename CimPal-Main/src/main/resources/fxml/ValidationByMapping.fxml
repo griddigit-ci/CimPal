@@ -54,14 +54,14 @@
             </HBox>
 
             <!--
-              Manual-selection row. Only the "Validate by manual selection" workflow uses
-              explicitly chosen constraint files; the two mapping workflows resolve them from
-              the mapping CSV instead. The row stays in place and is disabled rather than
-              hidden, so the form does not reflow when the workflow changes.
+              Constraint-files row. The "Validate selected files together" workflow uses explicitly
+              chosen constraint files; the two mapping workflows resolve them from the mapping CSV
+              instead. The row stays in place and is disabled rather than hidden, so the form does
+              not reflow when the workflow changes.
             -->
             <HBox fx:id="rowShaclConstraintFilesLabel" spacing="8.0" alignment="CENTER_LEFT"
                   GridPane.rowIndex="1" GridPane.columnIndex="0">
-                <Label text="SHACL Constraint files (.ttl):" wrapText="true"/>
+                <Label text="SHACL constraint files:" wrapText="true"/>
                 <Label fx:id="helpShaclConstraintFiles"
                        text="?"
                        styleClass="help-badge"/>
@@ -69,7 +69,7 @@
             <TextField fx:id="tfShaclConstraintFiles"
                        editable="false"
                        maxWidth="1.7976931348623157E308"
-                       promptText="Select one or more SHACL constraint files (.ttl)"
+                       promptText="Select one or more SHACL constraint files (.ttl) or ZIP archives of them"
                        GridPane.rowIndex="1" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowseShaclConstraintFiles"
                     minWidth="95.0"
@@ -78,7 +78,31 @@
                     text="Browse"
                     GridPane.rowIndex="1" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0">
+            <!--
+              Instance data files. Only "Validate selected files together" validates hand-picked
+              data files; the other workflows find their models under the models root folder.
+              Disabled rather than hidden, like the constraint-files row above.
+            -->
+            <HBox fx:id="rowInstanceDataFilesLabel" spacing="8.0" alignment="CENTER_LEFT"
+                  GridPane.rowIndex="2" GridPane.columnIndex="0">
+                <Label text="Instance data files:" wrapText="true"/>
+                <Label fx:id="helpInstanceDataFiles"
+                       text="?"
+                       styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfInstanceDataFiles"
+                       editable="false"
+                       maxWidth="1.7976931348623157E308"
+                       promptText="Select one or more instance data files (.xml) or ZIP archives of them"
+                       GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+            <Button fx:id="btnBrowseInstanceDataFiles"
+                    minWidth="95.0"
+                    mnemonicParsing="false"
+                    onAction="#actionBrowseInstanceDataFiles"
+                    text="Browse"
+                    GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="0">
                 <Label text="Mapping CSV file:" wrapText="true"/>
                 <Label fx:id="helpMappingCsvFile"
                        text="?"
@@ -88,15 +112,15 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select a .csv mapping file"
-                       GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                       GridPane.rowIndex="3" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowseMappingCsv"
                     minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseMappingCsv"
                     text="Browse"
-                    GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="3" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="4" GridPane.columnIndex="0">
                 <Label text="Models / input root folder:" wrapText="true"/>
                 <Label fx:id="helpModelsInputFolder"
                        text="?"
@@ -106,14 +130,15 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select model root folder or timestamped input root folder"
-                       GridPane.rowIndex="3" GridPane.columnIndex="1"/>
-            <Button minWidth="95.0"
+                       GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+            <Button fx:id="btnBrowseModelsInputFolder"
+                    minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseModelsInputFolder"
                     text="Browse"
-                    GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="4" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="4" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="5" GridPane.columnIndex="0">
                 <Label text="Constraints root folder:" wrapText="true"/>
                 <Label fx:id="helpConstraintsRootFolder"
                        text="?"
@@ -123,15 +148,15 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select constraints root folder"
-                       GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+                       GridPane.rowIndex="5" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowseConstraintsRootFolder"
                     minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseConstraintsRootFolder"
                     text="Browse"
-                    GridPane.rowIndex="4" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="5" GridPane.columnIndex="2"/>
 
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="5" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="0">
                 <Label text="Output folder:" wrapText="true"/>
                 <Label fx:id="helpOutputFolder"
                        text="?"
@@ -141,26 +166,26 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Select output folder"
-                       GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+                       GridPane.rowIndex="6" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowseOutputFolder"
                     minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowseOutputFolder"
                     text="Browse"
-                    GridPane.rowIndex="5" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="6" GridPane.columnIndex="2"/>
 
             <!--
               Datatype map. The bundled maps need no further input; "Other" reveals the field and
               Browse button for a .properties map of the user's own. Those two share the row
               rather than occupying one of their own, so choosing "Other" does not reflow the form.
             -->
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="0">
                 <Label text="Datatype map:" wrapText="true"/>
                 <Label fx:id="helpDatatypeMap"
                        text="?"
                        styleClass="help-badge"/>
             </HBox>
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="1"
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="1"
                   GridPane.columnSpan="2">
                 <ChoiceBox fx:id="cbDatatypeMap" prefWidth="350.0"/>
                 <TextField fx:id="tfDatatypeMapFile"
@@ -190,13 +215,13 @@
               produces a model whose subjects resolve nowhere. "Other" unlocks it for anything
               not in the list.
             -->
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="8" GridPane.columnIndex="0">
                 <Label text="Base URI:" wrapText="true"/>
                 <Label fx:id="helpXmlBaseUri"
                        text="?"
                        styleClass="help-badge"/>
             </HBox>
-            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="7" GridPane.columnIndex="1"
+            <HBox spacing="8.0" alignment="CENTER_LEFT" GridPane.rowIndex="8" GridPane.columnIndex="1"
                   GridPane.columnSpan="2">
                 <ChoiceBox fx:id="cbBaseUri" prefWidth="260.0"/>
                 <TextField fx:id="tfXmlBaseUri"
@@ -211,7 +236,7 @@
               gap with it instead of leaving a dead field behind.
             -->
             <HBox fx:id="rowPreviousComparisonCsvLabel" spacing="8.0" alignment="CENTER_LEFT"
-                  GridPane.rowIndex="8" GridPane.columnIndex="0">
+                  GridPane.rowIndex="9" GridPane.columnIndex="0">
                 <Label text="Previous comparison CSV:" wrapText="true"/>
                 <Label fx:id="helpPreviousComparisonCsv"
                        text="?"
@@ -221,39 +246,39 @@
                        editable="false"
                        maxWidth="1.7976931348623157E308"
                        promptText="Optional - previous run totals (region,dataset,total)."
-                       GridPane.rowIndex="8" GridPane.columnIndex="1"/>
+                       GridPane.rowIndex="9" GridPane.columnIndex="1"/>
             <Button fx:id="btnBrowsePreviousComparisonCsv"
                     minWidth="95.0"
                     mnemonicParsing="false"
                     onAction="#actionBrowsePreviousComparisonCsv"
                     text="Browse"
-                    GridPane.rowIndex="8" GridPane.columnIndex="2"/>
+                    GridPane.rowIndex="9" GridPane.columnIndex="2"/>
 
             <HBox fx:id="rowValidationEngineLabel" spacing="6.0" alignment="CENTER_LEFT"
-                  GridPane.rowIndex="9" GridPane.columnIndex="0">
+                  GridPane.rowIndex="10" GridPane.columnIndex="0">
                 <Label text="SHACL validation engine:" wrapText="true"/>
                 <Label fx:id="helpValidationEngine" text="?" styleClass="help-badge"/>
             </HBox>
             <ChoiceBox fx:id="cbValidationEngine" maxWidth="1.7976931348623157E308"
-                       GridPane.rowIndex="9" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
+                       GridPane.rowIndex="10" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
 
             <HBox fx:id="rowValidationWorkersLabel" spacing="6.0" alignment="CENTER_LEFT"
-                  GridPane.rowIndex="10" GridPane.columnIndex="0">
+                  GridPane.rowIndex="11" GridPane.columnIndex="0">
                 <Label text="Parallel validation workers:" wrapText="true"/>
                 <Label fx:id="helpValidationWorkers" text="?" styleClass="help-badge"/>
             </HBox>
             <ChoiceBox fx:id="cbValidationWorkers" maxWidth="1.7976931348623157E308"
-                       GridPane.rowIndex="10" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
+                       GridPane.rowIndex="11" GridPane.columnIndex="1" GridPane.columnSpan="2"/>
 
             <HBox fx:id="rowLimitValidationResults" spacing="8.0" alignment="CENTER_LEFT"
-                  GridPane.rowIndex="11" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                  GridPane.rowIndex="12" GridPane.columnIndex="1" GridPane.columnSpan="2">
                 <CheckBox fx:id="cbLimitValidationResults" mnemonicParsing="false"
                           text="Sample validation: stop after 10 results per shape"/>
                 <Label fx:id="helpLimitValidationResults" text="?" styleClass="help-badge"/>
             </HBox>
 
             <HBox fx:id="rowValidationDebug" spacing="8.0" alignment="CENTER_LEFT"
-                  GridPane.rowIndex="12" GridPane.columnIndex="1" GridPane.columnSpan="2">
+                  GridPane.rowIndex="13" GridPane.columnIndex="1" GridPane.columnSpan="2">
                 <CheckBox fx:id="cbValidationDebug" mnemonicParsing="false"
                           text="Write validation diagnostic log"/>
                 <Label fx:id="helpValidationDebug" text="?" styleClass="help-badge"/>
@@ -262,6 +287,10 @@
 
         <!-- Optional RDF report export applies to every validation workflow. -->
         <HBox spacing="8.0" alignment="CENTER_LEFT" VBox.vgrow="NEVER">
+            <CheckBox fx:id="cbIncrementalTimestampValidation" mnemonicParsing="false"
+                      text="Incremental validation between timestamps"/>
+            <CheckBox fx:id="cbExportDetailedTimestampReports" mnemonicParsing="false"
+                      text="Create detailed Excel report for each timestamp" selected="true"/>
             <CheckBox fx:id="cbExportReportsTurtle" mnemonicParsing="false"
                       text="Also save each validation report as Turtle (.ttl)"/>
             <Label fx:id="helpExportReports" text="?" styleClass="help-badge"/>

@@ -28,6 +28,17 @@ import java.util.Map;
  */
 public class SHACLValidationReport {
 
+    /**
+     * The results whose source shape {@code constraintFile} declares; none when all its shapes
+     * passed. What a shape finds counts under the file that declares it, even when another file
+     * added the constraint that found it.
+     */
+    public record ConstraintFileResults(String constraintFile, List<SHACLValidationResult> results) {
+        public ConstraintFileResults {
+            results = List.copyOf(results);
+        }
+    }
+
     private final boolean conforms;
     private final boolean partial;
     private final List<SHACLValidationResult> results;
@@ -37,6 +48,8 @@ public class SHACLValidationReport {
     private final String dataSources;
     private final String shapeSources;
     private final int maxResultsPerConstraint;
+    private final List<ConstraintFileResults> resultsByConstraintFile;
+    private final boolean brokenDownByConstraintFile;
 
     public SHACLValidationReport(boolean conforms,
                                  boolean partial,
@@ -47,6 +60,26 @@ public class SHACLValidationReport {
                                  String dataSources,
                                  String shapeSources,
                                  int maxResultsPerConstraint) {
+        this(conforms, partial, results, reportModel, warnings, datasetName, dataSources, shapeSources,
+                maxResultsPerConstraint, List.of());
+    }
+
+    /**
+     * @param resultsByConstraintFile {@code results} broken down by the constraint file that
+     *                                declares each one's source shape, or empty when they cannot
+     *                                be; the report then holds them as one entry for
+     *                                {@code shapeSources}
+     */
+    public SHACLValidationReport(boolean conforms,
+                                 boolean partial,
+                                 List<SHACLValidationResult> results,
+                                 Model reportModel,
+                                 List<String> warnings,
+                                 String datasetName,
+                                 String dataSources,
+                                 String shapeSources,
+                                 int maxResultsPerConstraint,
+                                 List<ConstraintFileResults> resultsByConstraintFile) {
         this.conforms = conforms;
         this.partial = partial;
         this.results = List.copyOf(results);
@@ -56,6 +89,10 @@ public class SHACLValidationReport {
         this.dataSources = dataSources;
         this.shapeSources = shapeSources;
         this.maxResultsPerConstraint = maxResultsPerConstraint;
+        this.brokenDownByConstraintFile = !resultsByConstraintFile.isEmpty();
+        this.resultsByConstraintFile = brokenDownByConstraintFile
+                ? List.copyOf(resultsByConstraintFile)
+                : List.of(new ConstraintFileResults(shapeSources, this.results));
     }
 
     /** True when the data conforms to every shape. A partial validation never conforms. */
@@ -101,12 +138,49 @@ public class SHACLValidationReport {
         return counts;
     }
 
-    /** Writes the results as a CimPal validation workbook, the same layout mapping runs produce. */
+    /**
+     * {@link #getResults()} broken down by the constraint file that declares each result's source
+     * shape, ordered by file name. Every file that declares an active shape has an entry. When the
+     * results could not be broken down, a single entry holds them all.
+     */
+    public List<ConstraintFileResults> getResultsByConstraintFile() {
+        return resultsByConstraintFile;
+    }
+
+    /**
+     * Writes the results as a CimPal validation workbook, the same layout mapping runs produce,
+     * with one validation row per constraint file as a mapping run has one per mapping row.
+     */
     public void writeExcel(Path file) throws IOException {
         try (ValidationExcelWriter writer = new ValidationExcelWriter()) {
-            writer.appendValidation(ValidationExcelWriter.CaseFolder.UNKNOWN, datasetName, dataSources, "",
-                    shapeSources, results, conforms, datasetName, partial, maxResultsPerConstraint);
+            appendTo(writer);
             writer.saveAs(file);
+        }
+    }
+
+    /**
+     * As {@link #writeExcel(Path)}, into {@code outputDir} under the name mapping runs use,
+     * {@code validation_report__<yyyyMMdd_HHmmss>.xlsx}.
+     *
+     * @return the workbook written
+     */
+    public Path writeExcelTo(Path outputDir) throws IOException {
+        try (ValidationExcelWriter writer = new ValidationExcelWriter()) {
+            appendTo(writer);
+            return writer.saveTo(outputDir);
+        }
+    }
+
+    private void appendTo(ValidationExcelWriter writer) {
+        for (ConstraintFileResults file : resultsByConstraintFile) {
+            // A constraint file conforms when none of its shapes produced a result, unless the run
+            // was cut short (nothing can be said about the checks that did not run), or the engine
+            // found the data non-conforming without a result to show for it (a Python engine's
+            // report may lack them): then which file failed is unknown.
+            boolean fileConforms = conforms || (!partial && file.results().isEmpty() && !results.isEmpty());
+            String chartName = brokenDownByConstraintFile ? file.constraintFile() : datasetName;
+            writer.appendValidation(ValidationExcelWriter.CaseFolder.UNKNOWN, datasetName, dataSources, "",
+                    file.constraintFile(), file.results(), fileConforms, chartName, partial, maxResultsPerConstraint);
         }
     }
 

@@ -15,10 +15,10 @@
     <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" styleClass="tab-root">
 
         <!--
-          Three independent routines share this tab. An Accordion rather than three stacked
-          section boxes: each routine is a complete form with its own Run/Reset pair, and you
-          run one at a time, so collapsing the other two keeps each routine's action bar
-          adjacent to the fields it applies to instead of pushing it off-screen.
+          Four independent routines share this tab. An Accordion rather than stacked section
+          boxes: each routine is a complete form with its own Run/Reset pair, and you run one at
+          a time, so collapsing the others keeps each routine's action bar adjacent to the fields
+          it applies to instead of pushing it off-screen.
         -->
         <Accordion fx:id="accordionShaclOperations" VBox.vgrow="ALWAYS">
 
@@ -199,6 +199,11 @@
                         </HBox>
                     </VBox>
                 </TitledPane>
+
+                <!-- ===== 4. Test the rules against Conform / NonConform models
+                     (was the "Validate by manual selection" workflow of the SHACL Validation tab).
+                     Its own file and controller; see ShaclRuleTestPane.fxml. ===== -->
+                <fx:include fx:id="paneTestRules" source="ShaclRuleTestPane.fxml"/>
 
             </panes>
         </Accordion>

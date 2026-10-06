@@ -11,7 +11,7 @@ Manual, on-demand script — nothing triggers it automatically. Run it yourself 
 
     ./scripts/New-ReleaseTag.ps1
 
-This is what starts the release process: it bumps versions, commits, tags, and pushes. The pushed tag is what triggers `.github/workflows/release.yml` on GitHub's side to build and publish the release (CimPal.exe, CimPal.jar, CimPal-CLI.jar).
+This is what starts the release process: it bumps versions, commits, tags, and pushes. The pushed tag is what triggers `.github/workflows/release.yml` on GitHub's side to build and publish the release (CimPal.exe, CimPal.jar, CimPal-CLI.jar). A second job then builds the Docker image from the released CimPal-CLI.jar, smoke-tests it, and pushes `ghcr.io/griddigit-ci/cimpal:<version>` and `:latest` (linux/amd64 and linux/arm64). If that job fails, the GitHub release is already out: fix the cause and re-run only the failed job.
 
 What it does, step by step
 1. Refuses to run if the working tree isn't clean (avoids releasing with uncommitted changes mixed in).
@@ -44,3 +44,35 @@ Flags
 - -Modules <names> : modules to update (default: CimPal-Core, CimPal-Main, CimPal-CLI).
 - -Margin <ratio>  : allowed drop below the measured value (default 0.005 = 0.5 pp).
 - -AllowDecrease   : allow a floor to go down.
+
+Test-DockerImage.ps1
+
+Smoke-tests a CimPal CLI Docker image (PowerShell 7, Docker running). Build the image first:
+
+    mvn -B -pl CimPal-CLI -am package -DskipTests
+    docker build -f CimPal-CLI/docker/Dockerfile -t cimpal:dev --build-arg CIMPAL_VERSION=<cimpal.version> --build-arg GIT_SHA=$(git rev-parse HEAD) .
+    ./scripts/Test-DockerImage.ps1 -Image cimpal:dev
+
+Without the two build arguments the version label check fails (docs/cli/docker.md has the full commands).
+
+It checks:
+- the version and the numeric non-root user;
+- that no port is exposed and the binaries are read-only;
+- a mapping validation of the `docker-smoke` fixture into a bind mount;
+- that the `~/.cimpal` cache stays private per UID;
+- that a remote `owl:imports` fails closed with `--network none`;
+- MCP over stdio (also with `USE_SYSTEM_CA_CERTS=1`);
+- `serve` as `docs/cli/docker.md` runs it (`--allow-remote`, token from `CIMPAL_API_TOKEN`, same port on the host loopback): `/health`, 403 for a remapped port, 401 without the token, and `POST /shutdown`.
+
+It exits 1 if any check failed. The "Docker image" job in `ci.yml` and the release run it too. Its work folder is `CimPal-CLI/target/docker-smoke`.
+
+Flags
+- -Image <name>           : the image to test (required).
+- -ExpectedVersion <ver>  : the version the CLI must report (default: `<cimpal.version>` from the root pom.xml).
+
+bench/ (Python 3.10+, standard library only)
+
+Benchmark of `validate` by model size (DEP-2): `gen_models.py` writes synthetic CGMES-like models with a known triple count and known violations, and `run_bench.py` runs `validate --stats` over them with different heaps and core counts and writes `results.csv` and `summary.md`. The sizing guide (docs/guide/sizing.md) is built from it, and `--budget` checks time and heap budgets for nightly runs. See bench/README.md.
+
+    python scripts/bench/run_bench.py --sizes 100k --verify --no-matrix
+    python -m unittest discover -s scripts/bench -p "test_*.py"

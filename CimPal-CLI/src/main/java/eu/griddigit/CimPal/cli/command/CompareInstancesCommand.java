@@ -6,6 +6,8 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.stats.RunStats;
+import eu.griddigit.cimpal.core.utils.CsvCells;
 import eu.griddigit.cimpal.core.comparators.ComparisonInstanceData;
 import eu.griddigit.cimpal.core.models.RDFCompareResult;
 import eu.griddigit.cimpal.core.models.RDFCompareResultEntry;
@@ -110,6 +112,14 @@ public class CompareInstancesCommand implements Callable<Integer> {
 
     // ---- misc --------------------------------------------------------------
 
+    @Option(names = "--stats",
+            description = "Report the run's resource use (wall/CPU time, peak heap, GC, triples loaded): "
+                    + "a \"stats\" field in JSON output on stdout, otherwise a [STATS] line on stderr.")
+    private Boolean stats;
+
+    /** The collector when {@code --stats} is on, otherwise null. */
+    private RunStats runStats;
+
     @Option(names = "--dry-run",
             description = "Print resolved configuration and exit without comparing.")
     private boolean dryRun;
@@ -121,16 +131,25 @@ public class CompareInstancesCommand implements Callable<Integer> {
         try {
             if (configFile != null) loadConfig(configFile);
             applyDefaults();
+            runStats = StatsJson.startIf(stats);
 
             if (dryRun) { printDryRun(); return ExitCode.OK; }
 
             if (!validateInputs()) return ExitCode.INVALID_INPUT;
 
-            System.err.println("[INFO] Loading model set A (" + modelsA.size() + " file(s))...");
-            Model modelA = ModelFactory.loadCombinedModelForSparql(modelsA, xmlBase);
+            Model modelA;
+            Model modelB;
+            try (StatsJson.Span ignored = StatsJson.phase(runStats, "load")) {
+                System.err.println("[INFO] Loading model set A (" + modelsA.size() + " file(s))...");
+                modelA = ModelFactory.loadCombinedModelForSparql(modelsA, xmlBase);
 
-            System.err.println("[INFO] Loading model set B (" + modelsB.size() + " file(s))...");
-            Model modelB = ModelFactory.loadCombinedModelForSparql(modelsB, xmlBase);
+                System.err.println("[INFO] Loading model set B (" + modelsB.size() + " file(s))...");
+                modelB = ModelFactory.loadCombinedModelForSparql(modelsB, xmlBase);
+            }
+            List<Path> inputFiles = new ArrayList<>();
+            modelsA.forEach(f -> inputFiles.add(f.toPath()));
+            modelsB.forEach(f -> inputFiles.add(f.toPath()));
+            StatsJson.countLoaded(runStats, modelA.size() + modelB.size(), inputFiles);
 
             // Build options list (indices match the Main.ComparisonInstanceData convention)
             // options[0]=SV, options[1]=DL, options[4]=TP
@@ -140,18 +159,26 @@ public class CompareInstancesCommand implements Callable<Integer> {
             if (ignoreTp) options.set(4, 1);
 
             System.err.println("[INFO] Comparing instance data...");
-            RDFCompareResult result = ComparisonInstanceData.compareInstanceData(
-                    new RDFCompareResult(), modelA, modelB, options);
+            RDFCompareResult result;
+            try (StatsJson.Span ignored = StatsJson.phase(runStats, "compare")) {
+                result = ComparisonInstanceData.compareInstanceData(
+                        new RDFCompareResult(), modelA, modelB, options);
+            }
 
             List<RDFCompareResultEntry> entries = result.getEntries();
             boolean identical = entries.isEmpty();
 
+            boolean jsonStdout = outputFile == null && "json".equalsIgnoreCase(format);
+            String statsField = jsonStdout ? StatsJson.field(runStats, "\n  ") : "";
             if (outputFile != null) {
                 writeToFile(entries, outputFile);
                 System.out.println("[OK] Comparison results written to: " + outputFile.getAbsolutePath());
                 System.out.println("     Total differences: " + entries.size());
             } else {
-                writeToStdout(entries, format);
+                writeToStdout(entries, format, statsField);
+            }
+            if (!jsonStdout) {
+                StatsJson.toStderr(runStats);
             }
 
             if (identical) {
@@ -208,6 +235,10 @@ public class CompareInstancesCommand implements Callable<Integer> {
         if (!ignoreDl) { JsonNode n = root.path("ignoreDl"); if (!n.isMissingNode()) ignoreDl = n.asBoolean(false); }
         if (outputFile == null) { String v = root.path("output").asText(null); if (v != null && !v.isBlank()) outputFile = resolveRelative(configDir, v); }
         if (format == null) { String v = root.path("format").asText(null); if (v != null && !v.isBlank()) format = v; }
+        if (stats == null) {
+            JsonNode n = root.path("stats");
+            if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
+        }
     }
 
     private void applyDefaults() {
@@ -287,9 +318,9 @@ public class CompareInstancesCommand implements Callable<Integer> {
         }
     }
 
-    private static void writeToStdout(List<RDFCompareResultEntry> entries, String format) {
+    private static void writeToStdout(List<RDFCompareResultEntry> entries, String format, String statsField) {
         switch (format.toLowerCase()) {
-            case "json" -> writeJson(entries);
+            case "json" -> writeJson(entries, statsField);
             case "csv"  -> writeCsvStdout(entries);
             default     -> writeText(entries);
         }
@@ -314,7 +345,8 @@ public class CompareInstancesCommand implements Callable<Integer> {
         System.out.println("Total: " + entries.size() + " difference(s)");
     }
 
-    private static void writeJson(List<RDFCompareResultEntry> entries) {
+    /** {@code statsField} is {@code ,"stats":{...}} or empty (see {@link StatsJson#field}). */
+    private static void writeJson(List<RDFCompareResultEntry> entries, String statsField) {
         StringBuilder sb = new StringBuilder("{\n");
         sb.append("  \"schema\": \"cimpal-compare-instances-result/1\",\n");
         sb.append("  \"totalDifferences\": ").append(entries.size()).append(",\n");
@@ -330,7 +362,7 @@ public class CompareInstancesCommand implements Callable<Integer> {
             if (i < entries.size() - 1) sb.append(",");
             sb.append("\n");
         }
-        sb.append("  ]\n}");
+        sb.append("  ]").append(statsField).append("\n}");
         System.out.println(sb);
     }
 
@@ -371,12 +403,11 @@ public class CompareInstancesCommand implements Callable<Integer> {
         if (s == null) return "";
         return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
+    /** RFC-4180 quoting with formula neutralisation (SEC-5, finding 4); see {@link CsvCells#escape}. */
     private static String csvEscape(String s) {
-        if (s == null) return "";
-        if (s.contains(",") || s.contains("\"") || s.contains("\n"))
-            return "\"" + s.replace("\"", "\"\"") + "\"";
-        return s;
+        return CsvCells.escape(s);
     }
+
     private static String jsonStr(String value) {
         if (value == null) return "null";
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";

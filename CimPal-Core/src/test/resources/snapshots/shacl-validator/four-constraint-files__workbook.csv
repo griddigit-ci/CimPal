@@ -1,0 +1,22 @@
+## Validation results
+Dataset,XML files,Constraint file,Focus node,Path,Value,Value kind,Source,Constraint Component,Message,Severity,Description,Order,Name,Group
+data.xml,data.xml,extra.ttl,_1,ex:extra,,,<BNODE>,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+data.xml,data.xml,name.ttl,_1,ex:name,,,<BNODE>,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+data.xml,data.xml,size.ttl,_1,ex:size,,,urn:test:ThingSizeShape,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation,,,Thing.size,urn:test:Sizes
+## Validation statistics
+Dataset,XML files,Constraint file,All,Warnings,Infos,Violations,Conforms,Validation error,Missing XML files,Chart name,Validation scope
+data.xml,data.xml,extra.ttl,1,0,0,1,FALSE,,,extra.ttl,Complete
+data.xml,data.xml,name.ttl,1,0,0,1,FALSE,,,name.ttl,Complete
+data.xml,data.xml,passing.ttl,0,0,0,0,TRUE,,,passing.ttl,Complete
+data.xml,data.xml,size.ttl,1,0,0,1,FALSE,,,size.ttl,Complete
+## StatisticsConstraint
+Dataset,Path,Source,Count,Constraint Component,Message,Severity,Description,Order,Name,Group
+data.xml,ex:extra,<BNODE>,1,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+data.xml,ex:name,<BNODE>,1,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+data.xml,ex:size,urn:test:ThingSizeShape,1,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation,,,Thing.size,urn:test:Sizes
+## Charts
+Dataset,Warnings,Infos,Violations,,Dataset (all),Warnings,Infos,Violations
+extra.ttl,0,0,1,,extra.ttl,0,0,1
+name.ttl,0,0,1,,name.ttl,0,0,1
+size.ttl,0,0,1,,passing.ttl,0,0,0
+,,,,,size.ttl,0,0,1

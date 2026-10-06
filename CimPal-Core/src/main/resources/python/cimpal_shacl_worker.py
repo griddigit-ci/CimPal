@@ -26,9 +26,28 @@ def read_section(marker):
         chunks.append(line)
 
 
+def disable_rdflib_network():
+    """No SPARQL SERVICE and no remote graph loading in SHACL-SPARQL constraints (SEC-2, G3).
+
+    Java already refuses shapes that use SERVICE before they reach this worker; this is the
+    second line of defence, since rdflib would otherwise send HTTP requests to any host.
+    """
+    import rdflib.plugins.sparql as sparql
+    import rdflib.plugins.sparql.evaluate as evaluate
+
+    sparql.SPARQL_LOAD_GRAPHS = False
+
+    def refuse_service(ctx, part):
+        raise RuntimeError("SPARQL SERVICE is disabled by CimPal")
+
+    evaluate.evalServiceQuery = refuse_service
+
+
 def pyshacl_validate(engine, shapes_bytes, data_bytes):
     from rdflib import Graph
     from pyshacl import validate
+
+    disable_rdflib_network()
 
     shapes = Graph().parse(data=shapes_bytes, format="turtle")
     if engine == "PYSHACL_OXIGRAPH":

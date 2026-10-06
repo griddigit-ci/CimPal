@@ -9,8 +9,11 @@
       "args": [
         "-jar",
         "REPLACE_WITH_PATH/CimPal-CLI.jar",
-        "mcp"
+        "mcp",
+        "--root",
+        "REPLACE_WITH_DATA_PATH"
       ],
+      "_note_root": "File paths in tool calls must lie under a --root (repeatable; --read-root for read-only folders, --write-root for outputs). Without one, only the folder Claude Desktop starts the server in is allowed, which is rarely your data folder. Replace REPLACE_WITH_DATA_PATH with your models/constraints/output folder, e.g. C:/Data/CimPal.",
       "_note_args": "Replace REPLACE_WITH_PATH with the absolute path to the CimPal-CLI.jar file, e.g. C:/Tools/CimPal/CimPal-CLI.jar. The 'mcp' argument starts the MCP server on stdio.",
 
       "_note_memory": "For large CGMES models, add JVM memory flags before -jar: [\"-Xmx8g\", \"-jar\", \"...\"] to give the server 8 GB heap.",

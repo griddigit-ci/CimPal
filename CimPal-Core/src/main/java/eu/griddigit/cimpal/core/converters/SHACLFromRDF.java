@@ -18,6 +18,7 @@ import org.apache.jena.rdf.model.impl.PropertyImpl;
 import org.apache.jena.riot.*;
 import org.apache.jena.shacl.ShaclValidator;
 import org.apache.jena.shacl.ValidationReport;
+import org.apache.jena.query.ARQ;
 import org.apache.jena.sparql.util.Context;
 import org.apache.jena.vocabulary.*;
 import org.topbraid.shacl.vocabulary.DASH;
@@ -432,6 +433,7 @@ public class SHACLFromRDF {
     }
 
     public void validateShapeModels() {
+        System.err.println("ARQ BGP reordering enabled: " + ARQ.getContext().isTrue(ARQ.optReorderBGP));
         Model shaclRefModel = eu.griddigit.cimpal.core.utils.ModelFactory.LoadSHACLSHACL();
         for (Model shapeModel : shapeModels) {
             ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), shapeModel.getGraph());

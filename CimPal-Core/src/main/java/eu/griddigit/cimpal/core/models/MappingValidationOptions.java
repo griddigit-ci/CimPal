@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.core.models;
 
+import eu.griddigit.cimpal.core.stats.RunStats;
 import eu.griddigit.cimpal.core.utils.DatatypeMapPreset;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -39,6 +40,9 @@ public class MappingValidationOptions {
     private final int maxResultsPerConstraint;
     private final int threads;
     private final boolean exportTurtleReports;
+    private final boolean exportDetailedTimestampReports;
+    private final boolean incrementalTimestampValidation;
+    private final RunStats runStats;
 
     private MappingValidationOptions(Builder b) {
         this.mappingCsv = b.mappingCsv;
@@ -55,6 +59,9 @@ public class MappingValidationOptions {
         this.maxResultsPerConstraint = b.maxResultsPerConstraint;
         this.threads = b.threads;
         this.exportTurtleReports = b.exportTurtleReports;
+        this.exportDetailedTimestampReports = b.exportDetailedTimestampReports;
+        this.incrementalTimestampValidation = b.incrementalTimestampValidation;
+        this.runStats = b.runStats;
     }
 
     public static Builder builder() {
@@ -118,6 +125,24 @@ public class MappingValidationOptions {
         return exportTurtleReports;
     }
 
+    /** Writes a separate detailed Excel workbook for every timestamped validation. */
+    public boolean isExportDetailedTimestampReports() {
+        return exportDetailedTimestampReports;
+    }
+
+    /**
+     * Reuses unaffected Jena SHACL results between consecutive timestamp groups. This is only
+     * meaningful for the timestamped workflow; unsupported shapes are evaluated in full.
+     */
+    public boolean isIncrementalTimestampValidation() {
+        return incrementalTimestampValidation;
+    }
+
+    /** Collector for the run's resource statistics ({@code --stats}), or {@code null}. */
+    public RunStats getRunStats() {
+        return runStats;
+    }
+
     // ============ the Builder ============
 
     public static class Builder {
@@ -136,6 +161,9 @@ public class MappingValidationOptions {
         private int maxResultsPerConstraint = 0;
         private int threads = 0;
         private boolean exportTurtleReports = false;
+        private boolean exportDetailedTimestampReports = true;
+        private boolean incrementalTimestampValidation = false;
+        private RunStats runStats = null;
 
         /** The mapping CSV: one row per validation, columns {@code xml_inputs, ttl[, notes]}. */
         public Builder mappingCsv(Path mappingCsv) {
@@ -238,6 +266,27 @@ public class MappingValidationOptions {
             return this;
         }
 
+        /** Keeps detailed per-timestamp Excel workbooks; disable for faster summary-only runs. */
+        public Builder exportDetailedTimestampReports(boolean exportDetailedTimestampReports) {
+            this.exportDetailedTimestampReports = exportDetailedTimestampReports;
+            return this;
+        }
+
+        /** Enables conservative, triple-delta based validation between timestamp groups. */
+        public Builder incrementalTimestampValidation(boolean incrementalTimestampValidation) {
+            this.incrementalTimestampValidation = incrementalTimestampValidation;
+            return this;
+        }
+
+        /**
+         * Counts the triples and bytes of the instance data loaded into {@code runStats}
+         * (DEP-2, {@code --stats}). Optional; the validation result is the same with or without it.
+         */
+        public Builder runStats(RunStats runStats) {
+            this.runStats = runStats;
+            return this;
+        }
+
         /**
          * Builds the immutable MappingValidationOptions, validating required fields.
          */
@@ -265,6 +314,9 @@ public class MappingValidationOptions {
             }
             if (previousComparisonCsv != null && !timestamped) {
                 throw new IllegalStateException("previousComparisonCsv is only used by the timestamped workflow");
+            }
+            if (incrementalTimestampValidation && !timestamped) {
+                throw new IllegalStateException("incrementalTimestampValidation is only used by the timestamped workflow");
             }
             return new MappingValidationOptions(this);
         }

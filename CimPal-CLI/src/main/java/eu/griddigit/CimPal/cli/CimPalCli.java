@@ -6,6 +6,8 @@
 package eu.griddigit.CimPal.cli;
 
 import eu.griddigit.CimPal.cli.command.CompareCommand;
+import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
+import eu.griddigit.cimpal.core.utils.SparqlServicePolicy;
 import eu.griddigit.CimPal.cli.command.CompareInstancesCommand;
 import eu.griddigit.CimPal.cli.command.ConvertCommand;
 import eu.griddigit.CimPal.cli.command.ExcelToShaclCommand;
@@ -28,7 +30,7 @@ import picocli.CommandLine.Command;
  *
  * <p>Subcommands:
  * <ul>
- *   <li>{@code validate}   — run SHACL validation (mapping, timestamped, or manual workflow)
+ *   <li>{@code validate}   — run SHACL validation (mapping or timestamped workflow)
  *   <li>{@code sparql}     — execute a SPARQL SELECT query against RDF model files
  *   <li>{@code manifest}   — generate a DCAT manifest for a set of CGMES model files
  *   <li>{@code convert}    — convert RDF files between RDF/XML, Turtle, and JSON-LD formats
@@ -48,7 +50,7 @@ import picocli.CommandLine.Command;
 @Command(
         name = "cimpal",
         mixinStandardHelpOptions = true,
-        version = "CimPal CLI 2026.9",
+        versionProvider = CliVersion.class,
         description = {
                 "CimPal command-line interface for RDF/SHACL tooling.",
                 "",
@@ -73,12 +75,48 @@ import picocli.CommandLine.Command;
 )
 public class CimPalCli {
 
+    static {
+        // No SPARQL SERVICE for anything run through the CLI, including in-process use (SEC-2).
+        SparqlServicePolicy.disableRemoteServiceGlobally();
+    }
+
     /**
      * Main entry point.  Delegates all subcommand dispatch to picocli and exits with
      * the return code of the executed subcommand.
      */
     public static void main(String[] args) {
-        int exitCode = new CommandLine(new CimPalCli()).execute(args);
+        // No SPARQL SERVICE: user queries and SHACL-SPARQL shapes must not reach the network (SEC-2).
+        SparqlServicePolicy.disableRemoteServiceGlobally();
+        int exitCode;
+        try {
+            exitCode = rethrowingOutOfMemory(new CommandLine(new CimPalCli())).execute(args);
+        } catch (Throwable t) {
+            if (OutOfMemoryRethrow.find(t).isPresent()) {
+                OutOfMemoryExit.halt();
+            }
+            throw t;
+        }
         System.exit(exitCode);
+    }
+
+    /**
+     * A command line for running a subcommand inside this JVM on behalf of {@code run},
+     * {@code serve} or {@code mcp}. {@code @file} argument expansion is off, so pipeline or
+     * request data can't pull extra arguments (e.g. another subcommand) in from a file.
+     */
+    public static CommandLine inProcess() {
+        return rethrowingOutOfMemory(new CommandLine(new CimPalCli()).setExpandAtFiles(false));
+    }
+
+    /**
+     * Lets an {@link OutOfMemoryError} out of picocli, which would otherwise report it like any
+     * other failure, as exit code 1: the same as "violations found" (DEP-2, R2).
+     */
+    private static CommandLine rethrowingOutOfMemory(CommandLine cli) {
+        CommandLine.IExecutionExceptionHandler fallback = cli.getExecutionExceptionHandler();
+        return cli.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
+            OutOfMemoryRethrow.ifCause(ex);
+            return fallback.handleExecutionException(ex, commandLine, parseResult);
+        });
     }
 }

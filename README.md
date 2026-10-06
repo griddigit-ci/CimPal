@@ -25,6 +25,8 @@ Currently, the following features are either supported or under development:
 -RDF convert – conversion between different RDF serializations\
 -Instance data comparison (in prototype version)
 
+The command-line interface (validation, SPARQL, conversion, comparison, MCP server and more) is documented in [docs/cli](docs/cli/index.md). Each release ships it as `CimPal-CLI.jar` and as the Docker image `ghcr.io/griddigit-ci/cimpal` ([how to run it](docs/cli/docker.md)).
+
 gridDigIt aims at providing support and further enhancement of the CimPal. Please address any requests either via the support email or in GitHub, by submitting an issue in the repository.
 
 Web site: https://cimpal.app/ \

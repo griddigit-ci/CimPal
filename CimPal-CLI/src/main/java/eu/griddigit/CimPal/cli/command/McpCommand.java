@@ -6,7 +6,11 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.CimPalCli;
+import eu.griddigit.CimPal.cli.CliVersion;
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
+import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
+import eu.griddigit.cimpal.core.utils.PathPolicy;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -22,6 +26,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
@@ -73,7 +78,9 @@ import java.util.concurrent.Callable;
                 "Exposes all CimPal operations as typed MCP tools so a Claude agent can call",
                 "them without shell invocations.  Add to claude_desktop_config.json:",
                 "  {\"mcpServers\":{\"cimpal\":{\"command\":\"java\",",
-                "    \"args\":[\"-jar\",\"CimPal-CLI.jar\",\"mcp\"]}}}"
+                "    \"args\":[\"-jar\",\"CimPal-CLI.jar\",\"mcp\",\"--root\",\"C:/Data\"]}}}",
+                "",
+                "File paths in tool calls must lie under a --root (default: the working directory)."
         },
         sortOptions = false
 )
@@ -81,11 +88,18 @@ public class McpCommand implements Callable<Integer> {
 
     private static final String PROTOCOL_VERSION = "2024-11-05";
     private static final String SERVER_NAME    = "CimPal";
-    private static final String SERVER_VERSION = "2026.9";
+    private static final String SERVER_VERSION = CliVersion.version();
 
     @Option(names = "--debug",
             description = "Write MCP message traffic to stderr for debugging.")
     private boolean debug;
+
+    @CommandLine.Mixin
+    RootOptions rootOptions = new RootOptions();
+
+    /** Allowed roots for file paths in tool arguments (SEC-2); set in {@link #call()}. */
+    private PathPolicy policy;
+    private Path base;
 
     // The REAL stdout â€” used exclusively for MCP protocol output.
     // System.out is redirected to System.err at startup so that any accidental
@@ -101,6 +115,14 @@ public class McpCommand implements Callable<Integer> {
         System.setOut(System.err); // protect the MCP channel from accidental writes
 
         mapper = new ObjectMapper();
+        List<Path> defaultRoots = List.of(Path.of("").toAbsolutePath());
+        try {
+            usePolicy(rootOptions.policy(defaultRoots), rootOptions.base(defaultRoots));
+        } catch (IllegalArgumentException ex) {
+            System.err.println("[ERROR] " + ex.getMessage());
+            return ExitCode.INVALID_INPUT;
+        }
+        System.err.println("[MCP] allowed roots: read " + policy.readRoots() + ", write " + policy.writeRoots());
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
@@ -174,34 +196,80 @@ public class McpCommand implements Callable<Integer> {
 
     private void handleToolsCall(JsonNode id, JsonNode params) throws Exception {
         String toolName = params.path("name").asText("");
-        JsonNode args   = params.path("arguments");
-
-        ToolSpec spec = findTool(toolName);
-        if (spec == null) {
+        ObjectNode result;
+        try {
+            result = callTool(toolName, params.path("arguments"));
+        } catch (Error e) {
+            if (OutOfMemoryRethrow.find(e).isPresent()) {
+                // Tell the client why the server goes away; main then ends the JVM with exit 3.
+                try {
+                    synchronized (mcpOut) {
+                        mcpOut.println("{\"jsonrpc\":\"2.0\",\"id\":" + (id.isMissingNode() ? "null" : id) + OUT_OF_MEMORY_ERROR);
+                        mcpOut.flush();
+                    }
+                } catch (Throwable ignored) {
+                    // Best effort: the client sees the server's output end instead.
+                }
+            }
+            throw e;
+        }
+        if (result == null) {
             sendError(id, -32602, "Unknown tool: " + toolName);
             return;
         }
+        send(id, result);
+    }
 
-        // Build a temp config file from the arguments JsonNode
+    /** Sets the path policy (done by {@link #call()}; tests set it directly). */
+    void usePolicy(PathPolicy policy, Path base) {
+        this.policy = policy;
+        this.base = base;
+        if (mapper == null) {
+            mapper = new ObjectMapper();
+        }
+    }
+
+    /**
+     * Runs one tool and returns the MCP tool result, or null for an unknown tool. File paths in
+     * {@code args} are checked against the allowed roots first; a refused path is an
+     * {@code isError} result naming it, and the command doesn't run.
+     */
+    ObjectNode callTool(String toolName, JsonNode args) throws Exception {
+        ToolSpec spec = findTool(toolName);
+        if (spec == null) {
+            return null;
+        }
+        ObjectNode checked;
+        try {
+            checked = PathGuard.check(spec.command, args, policy, base);
+        } catch (PathNotAllowedException e) {
+            return toolResult("{\"exitCode\":2,\"status\":\"INVALID_INPUT\",\"error\":" + jsonStr(e.getMessage()) + "}",
+                    true);
+        }
+
+        // Build a temp config file from the checked arguments
         Path tempConfig = null;
         try {
             tempConfig = Files.createTempFile("cimpal-mcp-", ".json");
-            mapper.writeValue(tempConfig.toFile(), args);
+            mapper.writeValue(tempConfig.toFile(), checked);
+            Path config = tempConfig;
 
             // Capture System.out during command execution
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PrintStream captured = new PrintStream(baos, true, StandardCharsets.UTF_8);
+            PrintStream previousOut = System.out;
             System.setOut(captured);
 
             int exitCode;
             try {
                 // Always add --format json for commands that support it
                 String[] cliArgs = spec.supportsJson
-                        ? new String[]{spec.command, "--config", tempConfig.toString(), "--format", "json"}
-                        : new String[]{spec.command, "--config", tempConfig.toString()};
-                exitCode = new CommandLine(new CimPalCli()).execute(cliArgs);
+                        ? new String[]{spec.command, "--config", config.toString(), "--format", "json"}
+                        : new String[]{spec.command, "--config", config.toString()};
+                exitCode = PathPolicy.runWith(policy,
+                        () -> CimPalCli.inProcess().execute(cliArgs));
             } finally {
-                System.setOut(System.err); // restore to stderr
+                System.setOut(previousOut);
             }
 
             String output = baos.toString(StandardCharsets.UTF_8).strip();
@@ -212,22 +280,23 @@ public class McpCommand implements Callable<Integer> {
             } else if (!output.startsWith("{") && !output.startsWith("[")) {
                 output = "{\"exitCode\":" + exitCode + ",\"output\":" + jsonStr(output) + "}";
             }
-
-            // MCP tool result
-            ObjectNode result = mapper.createObjectNode();
-            ArrayNode content = result.putArray("content");
-            ObjectNode textNode = content.addObject();
-            textNode.put("type", "text");
-            textNode.put("text", output);
-            result.put("isError", exitCode >= 2);
-
-            send(id, result);
+            return toolResult(output, exitCode >= 2);
 
         } finally {
             if (tempConfig != null) {
                 try { Files.deleteIfExists(tempConfig); } catch (Exception ignored) {}
             }
         }
+    }
+
+    private ObjectNode toolResult(String text, boolean isError) {
+        ObjectNode result = mapper.createObjectNode();
+        ArrayNode content = result.putArray("content");
+        ObjectNode textNode = content.addObject();
+        textNode.put("type", "text");
+        textNode.put("text", text);
+        result.put("isError", isError);
+        return result;
     }
 
     // -------------------------------------------------------------------------
@@ -265,8 +334,8 @@ public class McpCommand implements Callable<Integer> {
                 + "Use this as the primary diagnostic step in the validation loop.",
                 obj -> {
 obj.set("workflow", schema("string",
-                            "Workflow: 'mapping' (default, uses a CSV mapping file), "
-                            + "'timestamped' (groups by timestamp), 'manual' (hand-pick shapes)."));
+                            "Workflow: 'mapping' (default, uses a CSV mapping file) or "
+                            + "'timestamped' (groups by timestamp)."));
 obj.set("mappingCsv", schema("string",
                             "Absolute path to the CSV mapping file. "
                             + "Three columns: model file names | constraint .ttl path | label. "
@@ -277,8 +346,6 @@ obj.set("constraintsRoot", schema("string",
                             "Absolute path to the root folder for SHACL constraint .ttl files."));
 obj.set("outputDir", schema("string",
                             "Absolute path to the output folder for Excel reports and ZIPs."));
-obj.set("shaclConstraintFiles", arraySchema(
-                            "Absolute paths to SHACL .ttl files (manual workflow only)."));
 obj.set("datatypeMap", schema("string",
                             "CGMES version preset: 'CGMES30NC25' (default), 'CGMES30NC24', 'CGMES24NC22', "
                             + "or absolute path to a custom .properties file."));
@@ -508,6 +575,11 @@ obj.set("output", schema("string",
     // -------------------------------------------------------------------------
     // JSON-RPC send helpers
     // -------------------------------------------------------------------------
+
+    /** The rest of a JSON-RPC error line after the id, built before an out-of-memory error needs it. */
+    private static final String OUT_OF_MEMORY_ERROR = ",\"error\":{\"code\":-32603,\"message\":"
+            + "\"Out of memory; the CimPal MCP server stops (exit 3). Restart it with more memory (-Xmx, or the"
+            + " container's memory limit); see docs/guide/sizing.md.\"}}";
 
     private void send(JsonNode id, JsonNode result) throws Exception {
         ObjectNode msg = mapper.createObjectNode();

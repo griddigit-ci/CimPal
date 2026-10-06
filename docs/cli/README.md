@@ -17,6 +17,11 @@ java -jar CimPal-CLI.jar <command> [options]
 
 The fat JAR is built by Maven at `CimPal-CLI/target/CimPal-CLI.jar`. Every dependency is bundled inside it; no separate classpath is needed beyond a JRE 25+.
 
+Without a local Java, run the same JAR from the Docker image that every release publishes. Mount your files and use container paths, see [docker](docker.md):
+```
+docker run --rm -v "C:\Data:/data" ghcr.io/griddigit-ci/cimpal:latest <command> [options]
+```
+
 **List all commands:**
 ```
 java -jar CimPal-CLI.jar --help
@@ -41,6 +46,42 @@ java -jar CimPal-CLI.jar manifest --help
 
 ---
 
+## Resource statistics (`--stats`)
+
+`validate`, `sparql`, `compare` and `compare-instances` take `--stats` (config key `"stats": true`). The run then reports how much it used:
+
+- with `--format json` on stdout: a last field `stats` in the one JSON object, so `serve` and `mcp` still return a single JSON value;
+- otherwise (text or CSV output, or `--output` to a file): one line `[STATS] {...}` on stderr.
+
+Without `--stats` the output is unchanged.
+
+```json
+"stats": {"wallMs": 1984, "phases": {"validate": 1651, "shapeDetail": 9}, "cpuMs": 12250,
+          "peakHeapBytes": 103234064, "maxHeapBytes": 4213178368, "peakRssBytes": null, "gcMs": 43,
+          "availableProcessors": 16, "inputBytes": 1440999, "triplesLoaded": 19977,
+          "javaVersion": "25.0.1+8-LTS-27", "os": "Windows 11 amd64"}
+```
+
+| Field | Meaning |
+|---|---|
+| `wallMs` | Wall time from the start of the command until its output is written. JVM start-up is not included. |
+| `phases` | Wall time per phase: `validate` and `shapeDetail` (validate), `load` and `query` (sparql), `load` and `compare` (the compare commands). |
+| `cpuMs` | CPU time of the whole process during the run, all threads. `cpuMs / wallMs` is about the number of cores actually used. `null` where the JVM can't report it. |
+| `peakHeapBytes` | The sum of each heap pool's own peak usage. The pools (young and old generation) peak at different moments, so this is an upper bound and can be larger than `maxHeapBytes`. The smallest heap a model needs is measured by running it at a given `-Xmx`, as the [sizing guide](../guide/sizing.md) does. |
+| `maxHeapBytes` | The heap limit the run had. |
+| `peakRssBytes` | Peak resident memory of the process (Linux `VmHWM`), which is what a container limit sees. `null` on Windows and macOS. |
+| `gcMs` | Garbage-collection time. A GC share (`gcMs / wallMs`) above about 10 % means the heap is too small. |
+| `availableProcessors` | Cores the JVM may use; honours container CPU limits and `-XX:ActiveProcessorCount`. |
+| `inputBytes` | Bytes of model files read. Files inside a ZIP are not counted. |
+| `triplesLoaded` | Triples parsed from the input models: the size measure of the [sizing guide](../guide/sizing.md). For `validate --workflow mapping`, per row (a file used by two rows counts twice); for `timestamped`, each file once. |
+| `javaVersion`, `os` | The Java runtime, and the operating system name and architecture (no version, since `serve` and `mcp` clients see it). |
+
+The schema is `CimPal-CLI/src/test/resources/fixtures/cli-json/stats.schema.json`. Fields may be added later; none will be removed or renamed.
+
+**Out of memory.** A command that runs out of heap ends at once with exit code **3** and one line on stderr: `[ERROR] Out of memory (max heap N MB). Give the JVM more memory (-Xmx, or the container's memory limit); see docs/guide/sizing.md for sizes by model.` It is never reported as exit 1 ("violations found") and never as a failed row in the report. `serve` answers that request with `{"exitCode":3,...}` (HTTP 500) and then stops with exit 3, because its JVM can't be trusted with another request; `mcp` answers the tool call with JSON-RPC error `-32603` and exits with 3. Restart either with more memory. The [Docker image](docker.md#memory-and-cpu) does the same with `-XX:+ExitOnOutOfMemoryError`.
+
+---
+
 ## Exit codes
 
 Every command returns a numeric exit code. Scripts and CI systems should check this code, not the text output.
@@ -50,7 +91,7 @@ Every command returns a numeric exit code. Scripts and CI systems should check t
 | **0** | Success — ran cleanly, no violations found |
 | **1** | Ran successfully — but validation found violations or warnings |
 | **2** | Bad input — missing required argument, file not found, wrong format |
-| **3** | Internal error — unexpected exception; check stderr for details |
+| **3** | Internal error — unexpected exception, or the JVM ran out of memory; check stderr for details |
 
 The distinction between 0 and 1 is the most important one for CI. A code of 1 does not mean the tool broke — it means the model has violations. A code of 2 or 3 means the tool itself failed to run.
 
@@ -112,7 +153,6 @@ Ready-to-use templates are in `CimPal-CLI/configs/`. Copy one to your working di
 | Template | Workflow |
 |---|---|
 | `validate-mapping-cgmes30.json` | Full mapping validation, CGMES 3.0 / NC 2.5 |
-| `validate-manual.json` | Manual SHACL tester — hand-pick shapes, scan a model folder |
 | `validate-timestamped.json` | Timestamped validation with comparison to previous run |
 | `sparql-query.json` | SPARQL SELECT query against model files |
 

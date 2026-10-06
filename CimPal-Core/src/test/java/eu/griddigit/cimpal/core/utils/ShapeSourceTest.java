@@ -10,6 +10,7 @@ import eu.griddigit.cimpal.core.testsupport.TestModels;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.shacl.ValidationReport;
 import org.apache.jena.vocabulary.OWL;
 import org.apache.jena.vocabulary.RDF;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -258,6 +260,25 @@ class ShapeSourceTest {
     }
 
     @Test
+    void rootsSharingAnImport_loadAsOneClosure_eachFileReadOnceInRootOrder() throws Exception {
+        //   A → C, B → C, with A and B both roots
+        Path c = tempDir.resolve("c.ttl");
+        writeMinimalOntology(c, "urn:c");
+        Path a = tempDir.resolve("a.ttl");
+        writeOntologyWithImport(a, "urn:a", c.toUri().toString());
+        Path b = tempDir.resolve("b.ttl");
+        writeOntologyWithImport(b, "urn:b", c.toUri().toString());
+
+        List<String> read = new java.util.ArrayList<>();
+        var result = ValidationTools.loadShapesWithImports(
+                List.of(new ValidationTools.LocalShapeSource(a), new ValidationTools.LocalShapeSource(b)),
+                tempDir, new HashMap<>(), (source, document) -> read.add(source.displayName()));
+
+        assertEquals(3, result.loadedFiles(), "C read once per root would give 4");
+        assertEquals(List.of("a.ttl", "c.ttl", "b.ttl"), read);
+    }
+
+    @Test
     void cycle_terminates_eachFileLoadedOnce() throws Exception {
         // A imports B, B imports A
         Path a = tempDir.resolve("a.ttl");
@@ -277,21 +298,20 @@ class ShapeSourceTest {
     @Test
     void loopbackRemoteImport_isRefusedAndNotFetched() throws Exception {
         // A loopback import is the canonical SSRF probe: it reaches a service bound to the
-        // operator's own machine. The egress policy must decline it, and declining must be
-        // reported as an unresolvable import rather than attempted and rather than silently
-        // ignored. Nothing is listening on this port, so an attempted fetch would surface
-        // as a connection error; the assertion is that no attempt is made at all.
+        // operator's own machine. The egress policy must decline it, and declining must fail
+        // the load (SEC-5: validating without those shapes could pass a violating model)
+        // rather than be attempted or silently ignored. Nothing is listening on this port, so
+        // an attempted fetch would surface as a connection error, not as the refusal below.
         Path root = tempDir.resolve("root.ttl");
         writeOntologyWithImport(root, "urn:root", "http://localhost:19999/nonexistent.ttl");
 
         Map<String, Model> cache = new HashMap<>();
-        var result = ValidationTools.loadShapesWithImports(
-                new ValidationTools.LocalShapeSource(root), tempDir, cache);
+        IOException refused = assertThrows(IOException.class, () -> ValidationTools.loadShapesWithImports(
+                new ValidationTools.LocalShapeSource(root), tempDir, cache));
 
-        assertEquals(1, result.importsFound(), "the import statement must still be counted");
-        assertEquals(1, result.unresolvableImports(),
-                "a policy-refused import must be reported as unresolvable, not silently dropped");
-        assertEquals(1, result.loadedFiles(), "only the local root may be loaded");
+        assertTrue(refused.getMessage().contains("could not be resolved"), refused::getMessage);
+        assertTrue(refused.getMessage().contains("localhost:19999"), refused::getMessage);
+        assertTrue(cache.isEmpty(), "a failed load must not be cached");
     }
 
     @Test
@@ -304,11 +324,9 @@ class ShapeSourceTest {
             Path root = tempDir.resolve("root.ttl");
             writeOntologyWithImport(root, "urn:root", stub.uri("/shapes.ttl").toString());
 
-            var result = ValidationTools.loadShapesWithImports(
-                    new ValidationTools.LocalShapeSource(root), tempDir, new HashMap<>());
+            assertThrows(IOException.class, () -> ValidationTools.loadShapesWithImports(
+                    new ValidationTools.LocalShapeSource(root), tempDir, new HashMap<>()));
 
-            assertEquals(1, result.unresolvableImports());
-            assertEquals(1, result.loadedFiles());
             assertEquals(0, stub.requests().size(), "the egress gate must refuse before connecting");
         }
     }
@@ -320,12 +338,10 @@ class ShapeSourceTest {
         writeOntologyWithImport(root, "urn:root",
                 "http://169.254.169.254/latest/meta-data/iam/security-credentials/x.ttl");
 
-        Map<String, Model> cache = new HashMap<>();
-        var result = ValidationTools.loadShapesWithImports(
-                new ValidationTools.LocalShapeSource(root), tempDir, cache);
+        IOException refused = assertThrows(IOException.class, () -> ValidationTools.loadShapesWithImports(
+                new ValidationTools.LocalShapeSource(root), tempDir, new HashMap<>()));
 
-        assertEquals(1, result.unresolvableImports());
-        assertEquals(1, result.loadedFiles());
+        assertTrue(refused.getMessage().contains("169.254.169.254"), refused::getMessage);
     }
 
     // ---- 5. All-local regression: triple count unchanged ----
@@ -349,6 +365,39 @@ class ShapeSourceTest {
 
         assertEquals(manual.size(), result.model().size(),
                 "loadShapesWithImports must produce the same triple count as a manual merge");
+    }
+
+    @Test
+    void rootConfigurationDeactivatesImportedTargetShape() throws Exception {
+        Path imported = tempDir.resolve("imported.ttl");
+        Files.writeString(imported,
+                "@prefix ex: <urn:test:> .\n"
+                + "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+                + "ex:RequiredValue a sh:NodeShape ;\n"
+                + "    sh:targetNode ex:focus ;\n"
+                + "    sh:property [ sh:path ex:required ; sh:minCount 1 ] .\n",
+                StandardCharsets.UTF_8);
+
+        Path root = tempDir.resolve("root.ttl");
+        Files.writeString(root,
+                "@prefix ex: <urn:test:> .\n"
+                + "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                + "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+                + "<urn:root> a owl:Ontology ; owl:imports <" + imported.toUri() + "> .\n"
+                + "ex:RequiredValue sh:deactivated true .\n",
+                StandardCharsets.UTF_8);
+
+        var loaded = ValidationTools.loadParsedShapesWithImports(
+                List.of(root), tempDir, new HashMap<>());
+        assertTrue(loaded.shapes().getTargetShapes().stream().anyMatch(shape -> shape.deactivated()),
+                "Jena keeps deactivated target shapes in its parsed collection");
+
+        Model data = ModelFactory.createDefaultModel();
+        data.createResource("urn:test:focus");
+        ValidationReport report = ValidationTools.validateJenaTargetShapes(loaded.shapes(), data.getGraph(), 1);
+
+        assertTrue(report.conforms(),
+                "A shape deactivated by the root configuration must not validate imported targets");
     }
 
     // ---- Helpers ----

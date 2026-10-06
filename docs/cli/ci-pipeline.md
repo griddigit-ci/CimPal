@@ -538,8 +538,9 @@ java -jar $JAR gen-instances `
 # Typical fixture loop:
 #   1. Fill the Excel template for a conforming instance → gen-instances → conforming .xml
 #   2. Fill a second template for a non-conforming instance → gen-instances → nonconforming .xml
-#   3. validate --workflow manual --shacl-files shapes.ttl --models fixtures/
-#   4. Check that conforming passes and non-conforming fires the expected violation.
+#   3. Zip each into <suite>\<rule's sh:name>\Conform\ and \NonConform\ respectively.
+#   4. In the GUI, run SHACL ▸ Constraints Operations ▸ Test SHACL rules: the rule must fire on
+#      the NonConform model and not on the Conform one.
 
 if ($LASTEXITCODE -ne 0) { Write-Error "Instance generation failed (exit $LASTEXITCODE)"; exit $LASTEXITCODE }
 ```
