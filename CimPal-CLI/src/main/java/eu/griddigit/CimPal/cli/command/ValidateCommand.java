@@ -8,11 +8,20 @@ package eu.griddigit.CimPal.cli.command;
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.models.SHACLValidationOptions;
+import eu.griddigit.cimpal.core.models.SHACLValidationReport;
+import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import eu.griddigit.cimpal.core.stats.RunStats;
 import eu.griddigit.cimpal.core.utils.CompleteDatatypeMapLoader;
+import eu.griddigit.cimpal.core.utils.LogSanitizer;
 import eu.griddigit.cimpal.core.utils.MappingValidator;
+import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
+import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
+import eu.griddigit.cimpal.core.utils.SHACLValidator;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
+import eu.griddigit.cimpal.core.utils.ValidationTools;
 import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.shared.JenaException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tools.jackson.databind.JsonNode;
@@ -26,8 +35,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.jena.riot.Lang;
@@ -37,10 +50,12 @@ import org.apache.jena.vocabulary.RDF;
 /**
  * {@code validate} subcommand — run SHACL validation against RDF/CIM model files.
  *
- * <p>Supports two workflows:
+ * <p>Supports three workflows:
  * <ul>
  *   <li>{@code mapping}     — validate files according to a CSV mapping (default)
  *   <li>{@code timestamped} — like mapping, but groups files by timestamp and produces per-timestamp reports
+ *   <li>{@code combined}    — merge the given data files into one dataset and validate it against all the
+ *                             given constraint files at once: the GUI's "Validate selected files together"
  * </ul>
  *
  * <p>The former {@code manual} workflow tested SHACL rules against Conform / NonConform models
@@ -66,6 +81,8 @@ import org.apache.jena.vocabulary.RDF;
 )
 public class ValidateCommand implements Callable<Integer> {
 
+    private static final String WORKFLOWS = "mapping, timestamped, combined";
+
     // ---- config file -------------------------------------------------------
 
     @Option(names = "--config",
@@ -75,7 +92,7 @@ public class ValidateCommand implements Callable<Integer> {
     // ---- workflow ----------------------------------------------------------
 
     @Option(names = "--workflow",
-            description = "Workflow: mapping (default) or timestamped.")
+            description = "Workflow: mapping (default), timestamped or combined.")
     private String workflow;
 
     // ---- input paths -------------------------------------------------------
@@ -85,15 +102,26 @@ public class ValidateCommand implements Callable<Integer> {
     private File mappingCsv;
 
     @Option(names = "--models",
-            description = "Models root folder (required for all workflows).")
+            description = "Models root folder (required for mapping/timestamped workflows).")
     private File modelsDir;
 
     @Option(names = "--constraints-root",
-            description = "Constraints root folder (required for mapping/timestamped workflows).")
+            description = "Constraints root folder (required for mapping/timestamped workflows). Optional for "
+                    + "combined: relative owl:imports are then also resolved against it.")
     private File constraintsRoot;
 
+    @Option(names = "--constraint-files", split = ",",
+            description = "SHACL constraint files (.ttl, .rdf) or ZIP archives of them, comma-separated "
+                    + "(required for the combined workflow). Together they form one shapes graph.")
+    private List<File> constraintFiles;
+
+    @Option(names = "--data-files", split = ",",
+            description = "Instance data files (.xml) or ZIP archives of them, comma-separated "
+                    + "(required for the combined workflow). Together they form one dataset.")
+    private List<File> dataFiles;
+
     @Option(names = "--output",
-            description = "Output folder (required for mapping/timestamped workflows).")
+            description = "Output folder (required).")
     private File outputDir;
 
     // ---- datatype / RDF options -------------------------------------------
@@ -132,8 +160,8 @@ public class ValidateCommand implements Callable<Integer> {
 
     @Option(names = "--samples",
             description = "When --format json: max focus-node samples per shape group in the JSON output. "
-                    + "Default 3. Set 0 to disable per-shape detail. "
-                    + "Enables --export-turtle automatically when positive.")
+                    + "Default 3. Set 0 to disable per-shape detail. For the mapping workflow, "
+                    + "enables --export-turtle automatically when positive.")
     private Integer samples;
 
     @Option(names = "--previous-comparison",
@@ -151,6 +179,16 @@ public class ValidateCommand implements Callable<Integer> {
 
     /** The collector when {@code --stats} is on, otherwise null. */
     private RunStats runStats;
+
+    @Option(names = "--summary-file",
+            description = "Also write the JSON result (the document --format json prints) to this file, "
+                    + "atomically, creating parent folders. For Airflow's KubernetesPodOperator: /airflow/xcom/return.json.")
+    private File summaryFile;
+
+    @Option(names = "--violations-exit-code",
+            description = "Exit code when violations are found (default 1, 0..255). 0 lets a scheduler treat "
+                    + "findings as data; bad input (2) and internal errors (3) are unchanged.")
+    private Integer violationsExitCode;
 
     @Option(names = "--dry-run",
             description = "Print the resolved configuration and exit without running validation.")
@@ -229,6 +267,12 @@ public class ValidateCommand implements Callable<Integer> {
             String v = root.path("constraintsRoot").asText(null);
             if (v != null && !v.isBlank()) constraintsRoot = resolveRelative(configDir, v);
         }
+        if (constraintFiles == null) {
+            constraintFiles = fileList(configDir, root.path("constraintFiles"));
+        }
+        if (dataFiles == null) {
+            dataFiles = fileList(configDir, root.path("dataFiles"));
+        }
         if (outputDir == null) {
             String v = root.path("outputDir").asText(null);
             if (v != null && !v.isBlank()) outputDir = resolveRelative(configDir, v);
@@ -269,6 +313,14 @@ public class ValidateCommand implements Callable<Integer> {
             JsonNode n = root.path("stats");
             if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
+        if (summaryFile == null) {
+            String v = root.path("summaryFile").asText(null);
+            if (v != null && !v.isBlank()) summaryFile = resolveRelative(configDir, v);
+        }
+        if (violationsExitCode == null) {
+            JsonNode n = root.path("violationsExitCode");
+            if (!n.isMissingNode() && !n.isNull()) violationsExitCode = AutomationOptions.exitCodeFromConfig(n);
+        }
         if (previousComparison == null) {
             String v = root.path("previousComparison").asText(null);
             if (v != null && !v.isBlank()) previousComparison = resolveRelative(configDir, v);
@@ -279,6 +331,24 @@ public class ValidateCommand implements Callable<Integer> {
         Path p = Paths.get(value);
         if (p.isAbsolute()) return p.toFile();
         return configDir.resolve(p).normalize().toFile();
+    }
+
+    /**
+     * A config value that lists files: an array of paths, or a single path. Unlike the
+     * {@code --constraint-files} flag, a string is never split on commas, because {@code PathGuard}
+     * checks it as one path. Null when the key is absent.
+     */
+    private static List<File> fileList(Path configDir, JsonNode node) {
+        if (node.isArray()) {
+            List<File> files = new ArrayList<>();
+            for (JsonNode item : node) {
+                String v = item.asText(null);
+                if (v != null && !v.isBlank()) files.add(resolveRelative(configDir, v));
+            }
+            return files;
+        }
+        String v = node.asText(null);
+        return v == null || v.isBlank() ? null : List.of(resolveRelative(configDir, v));
     }
 
     // -------------------------------------------------------------------------
@@ -294,16 +364,21 @@ public class ValidateCommand implements Callable<Integer> {
         if (maxResults == null) maxResults = 0;
         if (format == null) format = "text";
         if (exportTurtle == null) exportTurtle = false;
-        // Default samples to 3 for JSON mode (per-shape detail); 0 disables it
-        if (samples == null) samples = "json".equalsIgnoreCase(format) ? 3 : 0;
+        // Default samples to 3 whenever the JSON document is produced (per-shape detail); 0 disables it
+        if (samples == null) samples = producesJson() ? 3 : 0;
     }
 
     // -------------------------------------------------------------------------
     // Input validation
     // -------------------------------------------------------------------------
 
+    /** The JSON document is printed ({@code --format json}) or written ({@code --summary-file}). */
+    private boolean producesJson() {
+        return "json".equalsIgnoreCase(format) || summaryFile != null;
+    }
+
     private boolean validateInputs() {
-        boolean ok = true;
+        boolean ok = AutomationOptions.checkViolationsExitCode(violationsExitCode);
 
         switch (workflow) {
             case "mapping" -> {
@@ -318,16 +393,24 @@ public class ValidateCommand implements Callable<Integer> {
                 ok &= requireDir(constraintsRoot, "--constraints-root");
                 ok &= requireOutputDir(outputDir, "--output");
             }
+            case "combined" -> {
+                ok &= requireFiles(constraintFiles, "--constraint-files");
+                ok &= requireFiles(dataFiles, "--data-files");
+                if (constraintsRoot != null) {
+                    ok &= requireDir(constraintsRoot, "--constraints-root");
+                }
+                ok &= requireOutputDir(outputDir, "--output");
+            }
             case "manual" -> {
                 // Configurations written for the removed workflow get a pointer, not a bare "unknown".
                 System.err.println("[ERROR] The manual workflow has been removed from the CLI. It tested SHACL "
                         + "rules against Conform / NonConform models; use the GUI's SHACL > Constraints "
-                        + "Operations > Test SHACL rules. Valid workflows: mapping, timestamped.");
+                        + "Operations > Test SHACL rules. Valid workflows: " + WORKFLOWS + ".");
                 ok = false;
             }
             default -> {
                 System.err.println("[ERROR] Unknown workflow: " + workflow
-                        + ". Valid values: mapping, timestamped.");
+                        + ". Valid values: " + WORKFLOWS + ".");
                 ok = false;
             }
         }
@@ -351,6 +434,19 @@ public class ValidateCommand implements Callable<Integer> {
             return false;
         }
         return true;
+    }
+
+    /** At least one file, and every one of them an existing file. */
+    private static boolean requireFiles(List<File> files, String flag) {
+        if (files == null || files.isEmpty()) {
+            System.err.println("[ERROR] " + flag + " is required.");
+            return false;
+        }
+        boolean ok = true;
+        for (File f : files) {
+            ok &= requireFile(f, flag);
+        }
+        return ok;
     }
 
     private static boolean requireDir(File d, String flag) {
@@ -437,6 +533,7 @@ public class ValidateCommand implements Callable<Integer> {
             return switch (workflow) {
                 case "mapping"     -> runMappingWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
                 case "timestamped" -> runTimestampedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+                case "combined"    -> runCombinedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
                 default            -> ExitCode.INVALID_INPUT;
             };
         } finally {
@@ -454,7 +551,7 @@ public class ValidateCommand implements Callable<Integer> {
                                    PrintStream origOut) throws Exception {
 
         // Per-shape detail requires TTL reports to be written so we can read them back.
-        boolean needShapeDetail = jsonOutput && samples > 0;
+        boolean needShapeDetail = producesJson() && samples > 0;
         boolean exportTurtleForRun = Boolean.TRUE.equals(exportTurtle) || needShapeDetail;
 
         MappingValidationOptions options = MappingValidationOptions.builder()
@@ -483,15 +580,31 @@ public class ValidateCommand implements Callable<Integer> {
             }
         }
 
+        // Built once, so stdout and the summary file carry the same document (and stats snapshot).
+        String json = producesJson() ? buildMappingJson(summary, shapeGroups) : null;
+        if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+            return ExitCode.INTERNAL_ERROR;
+        }
         if (jsonOutput) {
             System.setOut(origOut);
-            System.out.println(buildMappingJson(summary, shapeGroups));
+            System.out.println(json);
         } else {
             printTextSummary(summary);
             StatsJson.toStderr(runStats);
         }
 
-        return summary.hasViolations() ? ExitCode.VIOLATIONS : ExitCode.OK;
+        return exitCodeFor(summary);
+    }
+
+    /**
+     * 1 when a row failed, which is never remapped (an error must not end as a pass); the
+     * {@code --violations-exit-code} when rows have findings; 0 when all conform.
+     */
+    private int exitCodeFor(MappingValidationSummary summary) {
+        if (summary.errors() > 0) {
+            return ExitCode.VIOLATIONS;
+        }
+        return summary.violations() > 0 ? AutomationOptions.violationsExitCode(violationsExitCode) : ExitCode.OK;
     }
 
     // ---- timestamped workflow -----------------------------------------------
@@ -525,15 +638,96 @@ public class ValidateCommand implements Callable<Integer> {
             summary = new MappingValidator(optionsBuilder.build()).validate();
         }
 
+        String json = producesJson() ? buildTimestampedJson(summary) : null;
+        if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+            return ExitCode.INTERNAL_ERROR;
+        }
         if (jsonOutput) {
             System.setOut(origOut);
-            System.out.println(buildTimestampedJson(summary));
+            System.out.println(json);
         } else {
             printTextSummaryTimestamped(summary);
             StatsJson.toStderr(runStats);
         }
 
-        return summary.hasViolations() ? ExitCode.VIOLATIONS : ExitCode.OK;
+        return exitCodeFor(summary);
+    }
+
+    // ---- combined workflow --------------------------------------------------
+
+    private int runCombinedWorkflow(Map<String, RDFDatatype> dataTypeMap,
+                                    ValidationEngine validationEngine,
+                                    boolean jsonOutput,
+                                    PrintStream origOut) throws Exception {
+        SHACLValidationReport report;
+        try (StatsJson.Span ignored = StatsJson.phase(runStats, "validate")) {
+            // As a mapping run does: re-read remote imports rather than reuse what an earlier
+            // command in this JVM (serve, mcp) fetched.
+            ValidationTools.clearRemoteCaches();
+            report = new SHACLValidator(SHACLValidationOptions.builder()
+                    .shapeFiles(paths(constraintFiles))
+                    .dataFiles(paths(dataFiles))
+                    .constraintsRoot(constraintsRoot == null ? null : constraintsRoot.toPath())
+                    .datatypeMap(dataTypeMap)
+                    .xmlBase(xmlBase)
+                    .engine(validationEngine)
+                    .maxResultsPerConstraint(maxResults)
+                    .workers(workers)
+                    .runStats(runStats)
+                    .build()).validate();
+        } catch (IOException | JenaException | PathNotAllowedException ex) {
+            // There is one validation, so an input that can't be read, parsed or allowed (an
+            // owl:imports not found, an archive without shape files, a path outside the roots)
+            // stops the run: bad input, never a pass. Out of memory in a worker arrives wrapped.
+            OutOfMemoryRethrow.ifCause(ex);
+            // Jena's parse errors quote the input: one line, bounded, like every logged value.
+            System.err.println("[ERROR] Validation could not run: " + LogSanitizer.forLog(ex.getMessage()));
+            return ExitCode.INVALID_INPUT;
+        }
+        report.getWarnings().forEach(warning -> System.err.println("[WARN] " + LogSanitizer.forLog(warning)));
+        if (report.checkedNothing()) {
+            // No shape with a target, or no data: it "conforms" without a single check, which
+            // a scheduler reading exit 0 would take for a pass.
+            System.err.println("[ERROR] Nothing was validated (see the warnings above); no report was written.");
+            return ExitCode.INVALID_INPUT;
+        }
+
+        SHACLValidationReport.WrittenReports written;
+        try (StatsJson.Span ignored = StatsJson.phase(runStats, "report")) {
+            written = report.writeReportsTo(outputDir.toPath(), Boolean.TRUE.equals(exportTurtle));
+        } catch (IOException ex) {
+            // The input was fine; the output folder, or the disk, was not.
+            System.err.println("[ERROR] Could not write the report: " + LogSanitizer.forLog(ex.getMessage()));
+            return ExitCode.INTERNAL_ERROR;
+        }
+
+        // The results are in memory, so per-shape detail needs no Turtle reports to read back.
+        List<ShapeGroup> shapeGroups = producesJson() && samples > 0
+                ? shapeGroups(report.getResults(), samples) : List.of();
+
+        String json = producesJson() ? buildCombinedJson(report, written, shapeGroups) : null;
+        if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+            return ExitCode.INTERNAL_ERROR;
+        }
+        if (jsonOutput) {
+            System.setOut(origOut);
+            System.out.println(json);
+        } else {
+            printTextSummaryCombined(report, written);
+            StatsJson.toStderr(runStats);
+        }
+
+        return conformingFiles(report) < report.getResultsByConstraintFile().size()
+                ? AutomationOptions.violationsExitCode(violationsExitCode) : ExitCode.OK;
+    }
+
+    /** Constraint files whose row of the workbook says they conform. */
+    private static long conformingFiles(SHACLValidationReport report) {
+        return report.getResultsByConstraintFile().stream().filter(report::conforms).count();
+    }
+
+    private static List<Path> paths(List<File> files) {
+        return files.stream().map(File::toPath).toList();
     }
 
     // -------------------------------------------------------------------------
@@ -570,6 +764,52 @@ public class ValidateCommand implements Callable<Integer> {
             System.out.println("  Result     : VIOLATIONS FOUND");
         } else {
             System.out.println("  Result     : ALL CONFORMING");
+        }
+    }
+
+    private void printTextSummaryCombined(SHACLValidationReport report,
+                                          SHACLValidationReport.WrittenReports written) {
+        int files = report.getResultsByConstraintFile().size();
+        long conforming = conformingFiles(report);
+        SeverityCounts results = SeverityCounts.of(report.getResults());
+        System.out.println();
+        System.out.println("=== Combined Validation Summary ===");
+        System.out.println("  Conforming : " + conforming);
+        System.out.println("  Violations : " + (files - conforming));
+        System.out.println("  Total rows : " + files + " (one per constraint file)");
+        System.out.println("  Results    : " + results.total() + " (violations " + results.violations()
+                + ", warnings " + results.warnings() + ", infos " + results.infos() + ")");
+        if (report.isPartial()) {
+            System.out.println("  Scope      : Partial (stopped after " + maxResults + " results per shape)");
+        }
+        System.out.println("  Report     : " + written.workbook().toAbsolutePath());
+        if (written.turtle() != null) {
+            System.out.println("  Turtle     : " + written.turtle().toAbsolutePath());
+        }
+        System.out.println(conforming < files ? "  Result     : VIOLATIONS FOUND" : "  Result     : ALL CONFORMING");
+    }
+
+    /**
+     * Results by severity, counted the way the workbook's statistics count them: a severity that
+     * names neither a violation nor a warning is an info.
+     */
+    private record SeverityCounts(int total, int violations, int warnings, int infos) {
+        static SeverityCounts of(List<SHACLValidationResult> results) {
+            int violations = 0;
+            int warnings = 0;
+            int infos = 0;
+            for (SHACLValidationResult result : results) {
+                String severity = result.getSeverity() == null ? "" : result.getSeverity().toLowerCase(Locale.ROOT);
+                if (severity.contains("violation")) violations++;
+                else if (severity.contains("warning")) warnings++;
+                else infos++;
+            }
+            return new SeverityCounts(results.size(), violations, warnings, infos);
+        }
+
+        String json() {
+            return "{\"total\": " + total + ", \"violations\": " + violations + ", \"warnings\": " + warnings
+                    + ", \"infos\": " + infos + "}";
         }
     }
 
@@ -641,6 +881,69 @@ public class ValidateCommand implements Callable<Integer> {
         return sb.toString();
     }
 
+    /**
+     * The combined workflow's document. {@code totals} count the workbook's rows, one per
+     * constraint file, as the mapping workflow's count its rows; {@code results} counts findings.
+     */
+    private String buildCombinedJson(SHACLValidationReport report,
+                                     SHACLValidationReport.WrittenReports written,
+                                     List<ShapeGroup> shapeGroups) {
+        List<SHACLValidationReport.ConstraintFileResults> files = report.getResultsByConstraintFile();
+        long conforming = conformingFiles(report);
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"schema\": \"cimpal-validate-summary/1\",\n");
+        sb.append("  \"run\": {\n");
+        sb.append("    \"timestamp\": \"").append(Instant.now()).append("\",\n");
+        sb.append("    \"workflow\": \"combined\",\n");
+        sb.append("    \"inputs\": {\n");
+        sb.append("      \"constraintFiles\": ").append(jsonPaths(constraintFiles)).append(",\n");
+        sb.append("      \"dataFiles\": ").append(jsonPaths(dataFiles)).append(",\n");
+        sb.append("      \"constraintsRoot\": ")
+                .append(constraintsRoot == null ? "null" : jsonStr(abs(constraintsRoot))).append(",\n");
+        sb.append("      \"outputDir\": ").append(jsonStr(abs(outputDir))).append("\n");
+        sb.append("    },\n");
+        sb.append("    \"options\": ").append(buildOptionsJson()).append("\n");
+        sb.append("  },\n");
+        sb.append("  \"totals\": {\n");
+        sb.append("    \"conforming\": ").append(conforming).append(",\n");
+        sb.append("    \"violations\": ").append(files.size() - conforming).append(",\n");
+        sb.append("    \"errors\": 0,\n");
+        sb.append("    \"total\": ").append(files.size()).append("\n");
+        sb.append("  },\n");
+        sb.append("  \"hasViolations\": ").append(conforming < files.size()).append(",\n");
+        sb.append("  \"partial\": ").append(report.isPartial()).append(",\n");
+        sb.append("  \"results\": ").append(SeverityCounts.of(report.getResults()).json()).append(",\n");
+        sb.append("  \"byConstraintFile\": [\n");
+        for (int i = 0; i < files.size(); i++) {
+            SHACLValidationReport.ConstraintFileResults file = files.get(i);
+            sb.append("    {\"constraintFile\": ").append(jsonStr(file.constraintFile()))
+                    .append(", \"conforms\": ").append(report.conforms(file))
+                    .append(", \"results\": ").append(SeverityCounts.of(file.results()).json()).append("}")
+                    .append(i < files.size() - 1 ? ",\n" : "\n");
+        }
+        sb.append("  ],\n");
+        sb.append("  \"warnings\": ").append(jsonStrings(report.getWarnings())).append(",\n");
+        if (!shapeGroups.isEmpty()) {
+            sb.append("  \"shapes\": ").append(buildShapeGroupsJson(shapeGroups)).append(",\n");
+        }
+        if (written.turtle() != null) {
+            sb.append("  \"turtleReport\": ").append(jsonStr(written.turtle().toAbsolutePath().toString())).append(",\n");
+        }
+        sb.append("  \"report\": ").append(jsonStr(written.workbook().toAbsolutePath().toString()))
+                .append(StatsJson.field(runStats, "\n  ")).append("\n");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static String jsonPaths(List<File> files) {
+        return jsonStrings(files == null ? List.of() : files.stream().map(File::getAbsolutePath).toList());
+    }
+
+    private static String jsonStrings(List<String> values) {
+        return values.stream().map(ValidateCommand::jsonStr).collect(Collectors.joining(", ", "[", "]"));
+    }
+
     private String buildOptionsJson() {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
@@ -663,6 +966,8 @@ public class ValidateCommand implements Callable<Integer> {
         System.out.println("  mappingCsv       : " + abs(mappingCsv));
         System.out.println("  modelsDir        : " + abs(modelsDir));
         System.out.println("  constraintsRoot  : " + abs(constraintsRoot));
+        System.out.println("  constraintFiles  : " + absList(constraintFiles));
+        System.out.println("  dataFiles        : " + absList(dataFiles));
         System.out.println("  outputDir        : " + abs(outputDir));
         System.out.println("  datatypeMap      : " + datatypeMap);
         System.out.println("  xmlBase          : " + xmlBase);
@@ -671,6 +976,8 @@ public class ValidateCommand implements Callable<Integer> {
         System.out.println("  maxResults       : " + maxResults);
         System.out.println("  format           : " + format);
         System.out.println("  samples          : " + samples);
+        System.out.println("  summaryFile      : " + abs(summaryFile));
+        System.out.println("  violationsExit   : " + AutomationOptions.violationsExitCode(violationsExitCode));
         System.out.println("  exportTurtle     : " + exportTurtle);
         System.out.println("  previousCompar.  : " + abs(previousComparison));
     }
@@ -683,9 +990,29 @@ public class ValidateCommand implements Callable<Integer> {
         return f == null ? "(not set)" : f.getAbsolutePath();
     }
 
-    private static String jsonStr(String value) {
+    private static String absList(List<File> files) {
+        return files == null || files.isEmpty() ? "(not set)"
+                : files.stream().map(File::getAbsolutePath).collect(Collectors.joining(", "));
+    }
+
+    /** A JSON string literal. Control characters are escaped too, so the document always parses. */
+    static String jsonStr(String value) {
         if (value == null) return "null";
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        StringBuilder sb = new StringBuilder("\"");
+        for (char c : value.toCharArray()) {
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
+                    else sb.append(c);
+                }
+            }
+        }
+        return sb.append('"').toString();
     }
 
     // -------------------------------------------------------------------------
@@ -763,6 +1090,32 @@ public class ValidateCommand implements Callable<Integer> {
                     return new ShapeGroup(shape, constraint, p, e.getValue()[0], fn);
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * The combined workflow's per-shape detail, grouped as {@link #extractShapeGroups} groups the
+     * mapping workflow's Turtle reports, but straight from the results in memory.
+     */
+    private static List<ShapeGroup> shapeGroups(List<SHACLValidationResult> results, int maxSamples) {
+        Map<String, List<SHACLValidationResult>> byShapeAndConstraint = new LinkedHashMap<>();
+        for (SHACLValidationResult result : results) {
+            byShapeAndConstraint.computeIfAbsent(result.getSourceShape() + "||" + result.getConstraintComponent(),
+                    key -> new ArrayList<>()).add(result);
+        }
+        return byShapeAndConstraint.values().stream()
+                .map(group -> new ShapeGroup(
+                        // A Python engine's result may lack a source shape.
+                        Objects.toString(group.getFirst().getSourceShape(), ""),
+                        abbreviateUri(Objects.toString(group.getFirst().getConstraintComponent(), "")),
+                        abbreviateUri(group.getFirst().getPath()),
+                        group.size(),
+                        group.stream().map(SHACLValidationResult::getFocusNode)
+                                .filter(node -> node != null && !node.isBlank())
+                                .distinct().limit(maxSamples).toList()))
+                // Highest count first; shape and constraint make the order the same on every run.
+                .sorted(Comparator.comparingInt(ShapeGroup::count).reversed()
+                        .thenComparing(ShapeGroup::shapeId).thenComparing(ShapeGroup::constraint))
+                .toList();
     }
 
     private static String literal(org.apache.jena.rdf.model.Resource res,

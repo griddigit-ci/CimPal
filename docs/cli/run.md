@@ -47,7 +47,7 @@ A pipeline is a single JSON file. The top-level keys:
 | `name` | string | `(unnamed)` | Human-readable label, shown in progress output. |
 | `description` | string | — | Optional longer description. |
 | `stopOnError` | boolean | `true` | Stop the pipeline if any step exits with code 2 or 3 (bad input / internal error). |
-| `stopOnViolations` | boolean | `false` | Stop the pipeline if any step exits with code 1 (validation violations found). |
+| `stopOnViolations` | boolean | `false` | Stop the pipeline if any step exits with code 1 (validation violations found). A step's `violationsExitCode` is ignored inside a pipeline, so violations always count as such. |
 | `steps` | array | — | Ordered list of step objects. **Required.** |
 
 Each **step** is a JSON object with these special keys:

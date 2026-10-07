@@ -1937,7 +1937,9 @@ selects one of three routes, and the rest of the form enables only the fields th
       mapping file. All the instance data files you pick (RDF/XML, or ZIP archives of them, nested
       archives included) are merged into one dataset, so references between them &mdash; SSH to
       EQ, or to the boundary set &mdash; resolve, and it is validated against all the constraint
-      files you pick at once. This is the acceptance check for a dataset you received.</li>
+      files you pick at once. This is the acceptance check for a dataset you received. The
+      headless CLI runs the same validation as <code>validate --workflow combined</code>
+      (see <a href="#automation-cli">Headless CLI</a>).</li>
 </ul>
 
 <p class="note">Testing the rules of a constraint set against models known to conform or not, once
@@ -2659,7 +2661,16 @@ java -jar CimPal-CLI.jar convert ^
 
 java -jar CimPal-CLI.jar convert ^
   --input-files "C:\Data\EQ.xml,C:\Data\TP.xml,C:\Data\SV.xml" ^
-  --output "C:\Data\combined.ttl"</code></pre>
+  --output "C:\Data\combined.ttl"
+
+java -jar CimPal-CLI.jar validate --workflow combined ^
+  --constraint-files "C:\Data\constraints\EQ.ttl,C:\Data\constraints\SSH.ttl" ^
+  --data-files "C:\Data\IGM.zip,C:\Data\BoundarySet.zip" ^
+  --output "C:\Data\out"</code></pre>
+<p>The last example is <em>Validate selected files together</em> from the command line: the data
+files form one dataset, validated against all the constraint files at once, and the one workbook
+has a row per constraint file. The <code>validate-combined.json</code> template documents its
+configuration keys.</p>
 <h4>Exit codes</h4>
 <table class="io"><tr><th>Code</th><th>Meaning</th></tr>
 <tr><td>0</td><td>Completed successfully; validation found no violations.</td></tr>

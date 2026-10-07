@@ -30,7 +30,7 @@ import picocli.CommandLine.Command;
  *
  * <p>Subcommands:
  * <ul>
- *   <li>{@code validate}   — run SHACL validation (mapping or timestamped workflow)
+ *   <li>{@code validate}   — run SHACL validation (mapping, timestamped or combined workflow)
  *   <li>{@code sparql}     — execute a SPARQL SELECT query against RDF model files
  *   <li>{@code manifest}   — generate a DCAT manifest for a set of CGMES model files
  *   <li>{@code convert}    — convert RDF files between RDF/XML, Turtle, and JSON-LD formats

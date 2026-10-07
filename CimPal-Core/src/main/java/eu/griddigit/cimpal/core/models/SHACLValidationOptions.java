@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.core.models;
 
+import eu.griddigit.cimpal.core.stats.RunStats;
 import eu.griddigit.cimpal.core.utils.DatatypeMapPreset;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import org.apache.jena.datatypes.RDFDatatype;
@@ -38,6 +39,7 @@ public class SHACLValidationOptions {
     private final ValidationEngine engine;
     private final int maxResultsPerConstraint;
     private final int workers;
+    private final RunStats runStats;
 
     private SHACLValidationOptions(Builder b) {
         this.dataFiles = b.dataFiles;
@@ -52,6 +54,7 @@ public class SHACLValidationOptions {
         this.engine = b.engine;
         this.maxResultsPerConstraint = b.maxResultsPerConstraint;
         this.workers = b.workers;
+        this.runStats = b.runStats;
     }
 
     public static Builder builder() {
@@ -108,6 +111,11 @@ public class SHACLValidationOptions {
         return workers;
     }
 
+    /** The collector the loaded data is counted into, or null. */
+    public RunStats getRunStats() {
+        return runStats;
+    }
+
     // ============ the Builder ============
 
     public static class Builder {
@@ -124,6 +132,7 @@ public class SHACLValidationOptions {
         private ValidationEngine engine = ValidationEngine.APACHE_JENA;
         private int maxResultsPerConstraint = 0;
         private int workers = 0;
+        private RunStats runStats = null;
 
         /**
          * Instance data files: RDF/XML ({@code .xml}, {@code .rdf}), ZIP archives of RDF/XML
@@ -232,6 +241,15 @@ public class SHACLValidationOptions {
          */
         public Builder workers(int workers) {
             this.workers = workers;
+            return this;
+        }
+
+        /**
+         * Counts the triples and bytes of the instance data loaded into {@code runStats}
+         * (DEP-2, {@code --stats}). Optional; the validation result is the same with or without it.
+         */
+        public Builder runStats(RunStats runStats) {
+            this.runStats = runStats;
             return this;
         }
 

@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-05  
+**Last updated:** 2026-10-07  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -94,7 +94,7 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.core.utils.ValidationTools` | Core | Main validation engine. `validateByMapping()`, `validateByTimestampedMapping()`. ~6000 lines. Zero GUI imports. Prefer `MappingValidator` for new callers — see below. |
 | `eu.griddigit.cimpal.core.utils.MappingValidator` + `eu.griddigit.cimpal.core.models.MappingValidationOptions` | Core | Builder-style facade over `validateByMapping`/`validateByTimestampedMapping` (added 2026-09-23). `MappingValidationOptions.builder()...timestamped(true/false).build()`, then `new MappingValidator(options).validate()` → `MappingValidationSummary`. The GUI's SHACL Validation tab and the CLI's `validate --workflow mapping/timestamped` both go through this now (CLI refactored 2026-09-25). |
 | `eu.griddigit.cimpal.core.models.MappingValidationSummary` | Core | Record: `reports` (List<Path> — one entry for plain mapping, several for timestamped), `conforming`, `violations`, `errors`. Same `hasViolations()`/`totalRows()` semantics as the older `ValidationRunSummary`/`ValidationTimestampedRunSummary`. |
-| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Used by the GUI's *Validate selected files together* workflow (2026-10-05, see below), and once per distinct model by `ShaclRuleTester`, which loads the shapes once through the package-private `SHACLValidator.loadShapeFiles` and passes them as `shapesModel`. |
+| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Used by the GUI's *Validate selected files together* workflow (2026-10-05, see below) and the CLI's `validate --workflow combined` (2026-10-07), and once per distinct model by `ShaclRuleTester`, which loads the shapes once through the package-private `SHACLValidator.loadShapeFiles` and passes them as `shapesModel`. |
 | `eu.griddigit.cimpal.core.models.SHACLValidationReport` | Core | `SHACLValidator`'s result. `getResultsByConstraintFile()` breaks the results down by the constraint file that declares each result's source shape. `writeExcel(file)` / `writeExcelTo(dir)` write the mapping-report workbook with one validation row per constraint file; `writeTurtle(file)` writes the engine's `sh:ValidationReport`. |
 | `eu.griddigit.cimpal.core.utils.ShapeArchive` | Core | Package-private. The `.ttl`/`.rdf` entries of a shapes ZIP, held in memory (256 MiB budget) as `ShapeSource`s. Each is parsed with the base `<archive URI>/<entry>`, so relative `owl:imports` resolve inside the archive as in a folder (`ValidationTools.resolveImport` answers them from memory, ahead of the network-path refusal). |
 | `eu.griddigit.cimpal.core.presets.MappingValidationOptionsPresets` / `SHACLValidationOptionsPresets` | Core | CGMES 3.0 / 2.4.15 starting points for the two builders above. |
@@ -111,7 +111,7 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 - `ModelFactory.forEachZipEntry` streams archive entries, nested ones included, within one `ZipBudget`. It drains every nested entry through the budget, because `ZipInputStream` inflates skipped entries. `safeZipEntryName` refuses absolute names, `:`, `..` that climbs out, and control characters.
 - A data or shapes ZIP with nothing to read fails instead of contributing nothing. Other RDF files in a shapes ZIP are named in the report warnings, which the GUI shows in its finish dialog.
 
-The CLI has no equivalent yet. Covered by `SHACLValidatorTest`, `SHACLValidationReportTest`, `ShapeArchiveTest`, `ZipBudgetTest` and `ShapeSourceTest`.
+The CLI runs it as `validate --workflow combined` (added 2026-10-07), with `--constraint-files` and `--data-files` (config keys `constraintFiles`, `dataFiles`) and the template `configs/validate-combined.json`. Its JSON summary keeps `cimpal-validate-summary/1`: `totals` count the workbook's rows, one per constraint file, and `results`, `byConstraintFile`, `partial` and `warnings` are added. An input that can't be read (a parse error, which now names the file, a missing `owl:imports`, an archive without matching files) ends the run with exit 2 and writes nothing, and so does a run that would check nothing (`SHACLValidationReport.checkedNothing()`: no active target shape, or no data triples); a report that can't be written ends with exit 3. `SHACLValidationReport.writeReportsTo` names the workbook and the `.ttl` for the GUI and the CLI alike, and `SHACLValidationOptions.runStats` counts the data for `--stats`. Covered by `SHACLValidatorTest`, `SHACLValidationReportTest`, `ShapeArchiveTest`, `ZipBudgetTest`, `ShapeSourceTest`, and in the CLI by `ValidateCommandTest`, `PathGuardTest` and `OutOfMemoryExitTest`.
 
 **SHACL rule test (moved and rewritten 2026-10-05).** The SHACL Validation tab's *Validate by manual selection* workflow (before that the *SHACL tester* tab) never validated datasets: it checks that each rule fires on its NonConform models and on none of its Conform models. It is now the fourth section of **SHACL ▸ Constraints Operations**, *Test SHACL rules against Conform / NonConform models* (`ShaclRuleTestPane.fxml`, `ShaclRuleTestController`), and the CLI's `validate --workflow manual`, `--shacl-files`, the MCP `shaclConstraintFiles` field, `validate-manual.json` and `pipeline-shape-dev.json` are gone (`--workflow manual` exits 2 with a pointer). `ShaclRuleTester` replaces `ShaclAutoTester`, `SHACLValidationLogger` and `SHACLRuleTestData`, fixing:
 - Since `f547550` (2026-03-04) every run threw a `NullPointerException` at the first finding: the rule's `sh:name` was looked up from the shortened source-shape label. Rules are now matched by the source shape node.
@@ -279,6 +279,15 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - Out of memory always ends with exit 3: `OutOfMemoryRethrow` in `ValidationTools` stops a worker OOM from becoming a failed row; `CimPalCli.main`, `serve` and `mcp` halt via `OutOfMemoryExit`.
 - `scripts/bench/` (Python, stdlib): seeded synthetic model generator and benchmark runner (`--find-min-heap`, `--core-sweep`, `--verify`, `--budget` for TEST-5). Results and rule of thumb in `docs/guide/sizing.md` (0.6 GB heap per million triples, 2–4 cores).
 
+**Automation options and Airflow** (DEP-3, `docs/plans/deployment/DEP-3.md`):
+- `--summary-file` (config `summaryFile`) on `validate`, `sparql`, `compare`, `compare-instances` writes the JSON document `--format json` prints to a file as well, built once and written atomically (`core.utils.AtomicFiles`); `PathGuard` checks it as a write path under serve/mcp/run.
+- `--violations-exit-code` (config `violationsExitCode`, 0..255, default 1) replaces only the "violations/differences found" exit; ignored under serve/mcp/run (an active `PathPolicy`), which keep their own status logic. Shared code in `command/AutomationOptions`.
+- `integrations/airflow/`: example DAGs for KubernetesPodOperator, DockerOperator and BashOperator (Airflow 3.3.2), example data from `gen_models.py`, DAG tests; `.github/workflows/integrations.yml` runs them and the Bash DAG end to end. Guide: `docs/guide/airflow.md`.
+
+**External user guide** (DEP-4, `docs/plans/deployment/DEP-4.md`): `docs/guide/` is the task-oriented layer on top of `docs/cli/`.
+- Pages: index, capability statement, install, quickstart, deployment modes, sizing, Airflow, security, configuration, troubleshooting, versioning and support (draft, for maintainer review), glossary.
+- Linked from the root `README.md`. `scripts/check_doc_links.py` checks the links in `.github/workflows/docs.yml`.
+
 **Deployment track** (`docs/plans/deployment/`, DEP-1 to DEP-10): container, sizing, CLI automation
 options, an async `/v1` API, a Python SDK and an Airflow provider for external users. It supersedes
 the ordering of the *REST API — discovery and implementation plan* section below.
@@ -287,9 +296,12 @@ the ordering of the *REST API — discovery and implementation plan* section bel
 phase order in `docs/plans/README.md`. Enabling branch protection with the two CI checks as
 required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)): its
 "Docker image" job needs a first green run, and after the first release that pushes the image the
-GHCR package must be made public. DEP-1 is done. DEP-2's first part was merged with PR #54; the
-sizing guide and the security-review fixes follow in a second PR. Next on the deployment track is
-DEP-3 (CLI automation options).
+GHCR package must be made public. DEP-1 and DEP-2 are done and released in 2026.10.6.1. DEP-3
+(automation options and Airflow examples) is merged (PR #60) and goes out with the next release; the
+KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. DEP-4 (external
+user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintainer review. DEP-5
+(async `/v1` job API and OpenAPI spec) is in review on `feature/dep-5-async-jobs`. Next on the
+deployment track: DEP-6 (service deployment) and DEP-7 (file exchange).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
@@ -360,6 +372,24 @@ The Jackson `readTree()` + `.path("key")` pattern silently ignores unrecognized 
 
 `RDFCompareResult.hasDifference()` returns `true` when entries list is EMPTY. Use `result.getEntries().isEmpty()` explicitly. This is in the original source; do not try to fix it without updating all callers.
 
+### `serve` job API (`/v1`, DEP-5)
+
+`POST /v1/jobs` queues a command on the same single worker and the same queue slots as the
+synchronous endpoints, and answers 202 with a job id (random UUID). Classes in
+`eu.griddigit.CimPal.cli.command`:
+- `JobManager`: the in-memory store, with TTL and `--max-jobs` eviction and `--job-timeout`.
+- `Job`: synchronized state transitions, and the result, kept up to `--max-result-bytes`.
+- `JobLog`: a ring buffer of progress lines.
+- `StderrTee`: while a job runs, it copies `System.err` lines into the job's log. Lines from the
+  server's own threads are skipped. This is safe only because one command runs at a time.
+- `Problem`: RFC 9457 problem+json bodies.
+- `CommandSchemas`: the per-command config schemas, shared by `mcp` and the OpenAPI document.
+
+The OpenAPI 3.1 document is `CimPal-CLI/src/main/resources/openapi/cimpal-v1.json`, served at
+`/v1/openapi.json`. `OpenApiSpecTest` checks that it is valid, that its routes equal
+`ServeServer.V1_ROUTES`, and that its config schemas equal `CommandSchemas`; regenerate the schemas
+with `-Dopenapi.update=true`. `JobApiTest` checks that every documented response is exercised.
+
 ### `serve` uses single-threaded executor
 
 Commands run on one worker thread (`ServeServer`), with a bounded queue and a pool of HTTP handler threads in front of it. This avoids races on `ValidationTools` static flags (`exportTurtleValidationReports`, `DEBUG`). A single validation run already saturates CPU via its own internal worker pool, so sequential requests is the right trade-off for local developer use. Any concurrent REST API implementation must address this differently — see REST API section below.
@@ -388,7 +418,7 @@ CimPal/
 ├── CimPal-CLI/
 │   ├── pom.xml
 │   ├── configs/
-│   │   ├── validate-mapping-cgmes30.json
+│   │   ├── validate-mapping-cgmes30.json, validate-combined.json
 │   │   ├── validate-timestamped.json, sparql-query.json
 │   │   ├── convert.json, rdfs2shacl.json, compare.json
 │   │   ├── compare-instances.json, excel2shacl.json, organize.json
@@ -454,7 +484,8 @@ CimPal/
 - Data ZIPs read `.xml` entries only. Other RDF files in a data ZIP are skipped without a warning, as top-level entries always were. A shapes ZIP, in turn, reads `.ttl` and `.rdf`, and skips `.xml` (it may be instance data) without a warning. The warnings for other skipped RDF files appear in the GUI's finish dialog and the Output pane, but not in the workbook.
 - Entry names with C1 controls or bidi/format characters (U+202E and the like) pass `LogSanitizer` and `safeZipEntryName`; they can't forge log lines but can spoof how a name displays. Widening `LogSanitizer`'s class would change every log, so it was left as it is.
 - External entities in RDF/XML are not resolved by Jena (pinned by `ShapeArchiveTest.externalEntitiesInRdfEntriesAreNotResolved`).
-- `SHACLValidator` has no `PathPolicy` check on data files, and probes a shape file with `Files.isRegularFile` before `ShapeArchive.read` checks the policy. Add both before wiring it into `serve`/`mcp`/`run`.
+- Fixed 2026-10-07, when the CLI's combined workflow wired `SHACLValidator` into `serve`/`mcp`/`run`: it now checks every shape and data file against an active `PathPolicy` before touching it, and `PathGuard` checks `constraintFiles` and `dataFiles` element by element. An `owl:imports` candidate outside the roots is no longer probed: `PathPolicy.mayReadIfActive` tests it without touching the file system, so an import outside the roots fails the same way whether or not the file exists.
+- Open from the CLI combined-workflow review (2026-10-07): Jena's JSON-LD reader may fetch a remote `@context` outside the egress gate (`.jsonld` inputs to `convert`, `sparql` and now `validate --workflow combined`); to verify and, if so, block while a `PathPolicy` is active. The `clearRemoteCaches()` call at the start of a combined run has no test: the egress gate only allows GitHub hosts, so no local stub can serve an import.
 
 **`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 
@@ -497,6 +528,10 @@ CimPal/
 ---
 
 ## REST API — discovery and implementation plan
+
+> **Superseded by the deployment track.** The asynchronous job API was built in DEP-5
+> (`docs/plans/deployment/DEP-5.md`); see *`serve` job API* above and `docs/cli/serve.md`. The
+> remaining service work is in DEP-6 to DEP-10. The analysis below is kept for background.
 
 ### Context
 

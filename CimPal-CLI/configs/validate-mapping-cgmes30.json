@@ -33,5 +33,8 @@
   "_note_maxResultsPerConstraint": "Maximum SHACL violations to collect per source shape per mapping row. 0 = collect all (use for official runs). 10 = collect up to 10 per shape (faster, marks as 'Partial' — use for quick checks). Values above 0 stop Jena early once the limit is reached.",
 
   "exportTurtle": false,
-  "_note_exportTurtle": "If true, writes a .ttl SHACL validation report alongside the Excel report for each validated model. The .ttl files can be opened in the AI Assistant tab for explanation and repair proposals. Set to true if you plan to use the AI workflow."
+  "_note_exportTurtle": "If true, writes a .ttl SHACL validation report alongside the Excel report for each validated model. The .ttl files can be opened in the AI Assistant tab for explanation and repair proposals. Set to true if you plan to use the AI workflow.",
+
+  "_note_summaryFile": "Optional (DEP-3): add \"summaryFile\": \"out/summary.json\" to also write the JSON result (what --format json prints) to that file, atomically. For Airflow's KubernetesPodOperator use /airflow/xcom/return.json. Relative paths are relative to this config file.",
+  "_note_violationsExitCode": "Optional (DEP-3): add \"violationsExitCode\": 0 to end with exit code 0 when violations are found, so a scheduler (Airflow, CI) treats them as data and reads hasViolations from the summary. Default 1. Exits 2 (bad input) and 3 (internal error) never change. Ignored under serve, mcp and run."
 }

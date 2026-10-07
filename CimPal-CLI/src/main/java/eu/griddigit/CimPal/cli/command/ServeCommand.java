@@ -49,7 +49,7 @@ import java.util.function.Consumer;
  * filesystem.
  *
  * <pre>
- *   POST /validate          — SHACL validation (mapping, timestamped)
+ *   POST /validate          — SHACL validation (mapping, timestamped, combined)
  *   POST /sparql            — SPARQL SELECT query
  *   POST /convert           — RDF format conversion
  *   POST /compare           — RDF diff
@@ -62,6 +62,18 @@ import java.util.function.Consumer;
  *   GET  /health            — {"status":"ok","version":"..."} (no token needed)
  *   GET  /commands          — list of available endpoints
  *   POST /shutdown          — stop the server
+ * </pre>
+ *
+ * <p>The asynchronous job API under {@code /v1} (DEP-5) queues a command and answers at once:
+ * <pre>
+ *   POST   /v1/jobs              — submit {"command", "config", "label"}; 202 + Location
+ *   GET    /v1/jobs              — list jobs (?status=, ?limit=)
+ *   GET    /v1/jobs/{id}         — the job's status
+ *   GET    /v1/jobs/{id}/result  — its JSON result once finished
+ *   GET    /v1/jobs/{id}/log     — its progress lines (?offset=)
+ *   DELETE /v1/jobs/{id}         — cancel a queued job
+ *   GET    /v1/health            — health with queue figures (no token needed)
+ *   GET    /v1/openapi.json      — the OpenAPI 3.1 document (no token needed)
  * </pre>
  *
  * <h2>Security</h2>
@@ -142,6 +154,41 @@ public class ServeCommand implements Callable<Integer> {
                     + "not finished in time gets 504.")
     private Duration requestTimeout;
 
+    @Option(names = "--job-timeout",
+            defaultValue = "PT2H",
+            description = "A /v1 job running longer than this (ISO-8601 duration, default: PT2H) is "
+                    + "marked timed_out. It is not interrupted.")
+    private Duration jobTimeout;
+
+    @Option(names = "--max-jobs",
+            defaultValue = "1000",
+            description = "Finished /v1 jobs kept in memory (default: 1000, 100-100000); the oldest "
+                    + "are dropped first.")
+    private int maxJobs;
+
+    @Option(names = "--job-ttl",
+            defaultValue = "PT24H",
+            description = "How long a finished /v1 job is kept (ISO-8601 duration, default: PT24H).")
+    private Duration jobTtl;
+
+    @Option(names = "--job-log-lines",
+            defaultValue = "5000",
+            description = "Progress lines kept per /v1 job (default: 5000, 1-100000); older lines "
+                    + "are dropped.")
+    private int jobLogLines;
+
+    @Option(names = "--max-result-bytes",
+            defaultValue = "16777216",
+            description = "Largest /v1 job result kept in memory (default: 16777216 = 16 MiB); a larger "
+                    + "result is answered with 410. Write large results to a file instead.")
+    private long maxResultBytes;
+
+    @Option(names = "--job-store-bytes",
+            description = "Memory for the results and logs of finished /v1 jobs together (default: a "
+                    + "quarter of the maximum heap, at least 1048576); beyond it the oldest finished "
+                    + "jobs are dropped.")
+    private Long jobStoreBytes;
+
     @CommandLine.Mixin
     RootOptions rootOptions = new RootOptions();
 
@@ -184,7 +231,7 @@ public class ServeCommand implements Callable<Integer> {
             return ExitCode.INVALID_INPUT;
         }
 
-        ServeServer.Config config = ServeServer.Config.builder()
+        ServeServer.Config.Builder builder = ServeServer.Config.builder()
                 .host(host)
                 .port(port)
                 .token(token)
@@ -193,7 +240,15 @@ public class ServeCommand implements Callable<Integer> {
                 .maxBodyBytes(maxBodyBytes)
                 .queueSize(queueSize)
                 .requestTimeout(requestTimeout)
-                .build();
+                .jobTimeout(jobTimeout)
+                .maxJobs(maxJobs)
+                .jobTtl(jobTtl)
+                .jobLogLines(jobLogLines)
+                .maxResultBytes(maxResultBytes);
+        if (jobStoreBytes != null) {
+            builder.jobStoreBytes(jobStoreBytes);
+        }
+        ServeServer.Config config = builder.build();
 
         List<Path> defaultRoots = List.of(Path.of("").toAbsolutePath());
         PathPolicy policy;
@@ -245,6 +300,8 @@ public class ServeCommand implements Callable<Integer> {
         System.out.println("[INFO] Endpoints: " + ServeServer.COMMANDS.stream().map(c -> "/" + c)
                 .reduce((a, b) -> a + "  " + b).orElse(""));
         System.out.println("[INFO] GET /health  GET /commands  POST /shutdown");
+        System.out.println("[INFO] Job API: POST /v1/jobs, then GET /v1/jobs/{id}[/result|/log]; "
+                + "spec at GET /v1/openapi.json");
         System.out.println("[INFO] Send POST /shutdown or press Ctrl-C to stop.");
         onStarted.accept(server);
 

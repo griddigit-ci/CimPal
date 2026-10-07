@@ -57,7 +57,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <!-- As in Core, CustomWriter and Main. 3.13.0 fails on Java 25 class files under
+                     Maven 3.10 ("Unsupported class file major version 69"), which GitHub's Ubuntu
+                     runner image ships since 2026-10. -->
+                <version>3.14.1</version>
                 <configuration>
                     <release>${jdk.version}</release>
                     <fork>true</fork>

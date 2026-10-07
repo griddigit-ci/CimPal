@@ -6,6 +6,7 @@
 package eu.griddigit.cimpal.core.models;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationReport.ConstraintFileResults;
+import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -21,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The Conforms column of the workbook rows a SHACLValidationReport writes per constraint file. */
 class SHACLValidationReportTest {
@@ -81,6 +84,23 @@ class SHACLValidationReportTest {
                 new ConstraintFileResults("a.ttl", List.of(VIOLATION)), new ConstraintFileResults("b.ttl", List.of()));
 
         assertEquals(List.of("FALSE", "FALSE"), conformsColumn(report(false, true, List.of(VIOLATION), byFile)));
+    }
+
+    @Test
+    void theTurtleReportIsWrittenBesideTheWorkbookUnderItsName() throws Exception {
+        // The GUI and the CLI both write a run's reports this way.
+        SHACLValidationReport report = new SHACLValidationReport(false, false, List.of(VIOLATION),
+                ModelFactory.createDefaultModel(), List.of(), "data.xml", "data.xml", "a.ttl", 0);
+
+        SHACLValidationReport.WrittenReports both = report.writeReportsTo(tempDir.resolve("out"), true);
+
+        assertEquals(tempDir.resolve("out"), both.workbook().getParent());
+        assertTrue(both.workbook().getFileName().toString().matches("validation_report__\\d{8}_\\d{6}\\.xlsx"),
+                both.workbook()::toString);
+        assertEquals(both.workbook().resolveSibling(both.workbook().getFileName().toString().replace(".xlsx", ".ttl")),
+                both.turtle());
+        assertTrue(Files.isRegularFile(both.turtle()));
+        assertNull(report.writeReportsTo(tempDir.resolve("workbook-only"), false).turtle());
     }
 
     @Test

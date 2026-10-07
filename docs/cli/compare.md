@@ -69,6 +69,8 @@ java -jar CimPal-CLI.jar compare --config configs/compare.json
 | `--output` | file path | — | Write results to a file. Use `.xlsx` for Excel; any other extension for CSV. If omitted, results go to stdout. |
 | `--format` | `text` / `json` / `csv` | `text` | Output format for stdout. Ignored when `--output` is set. |
 | `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
+| `--summary-file` | file path | — | Also write the JSON result (exactly what `--format json` prints) to this file, atomically, creating parent folders. Works with any `--format`. Config key `summaryFile`. See [automation options](README.md#automation-options---summary-file---violations-exit-code). |
+| `--violations-exit-code` | 0–255 | `1` | Exit code when differences are found. `0` lets a scheduler treat them as data; exits 2 and 3 are unchanged. Config key `violationsExitCode`. Ignored under `serve`, `mcp` and `run`. |
 | `--dry-run` | flag | off | Print resolved config and exit without comparing. |
 
 ---

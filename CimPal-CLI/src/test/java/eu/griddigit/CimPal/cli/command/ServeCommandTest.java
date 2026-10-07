@@ -159,4 +159,61 @@ class ServeCommandTest {
         assertThat(running.exit().get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
         assertThat(Files.readString(tokenFile)).isEqualTo("token-of-a-second-instance");
     }
+
+    private static HttpResponse<String> v1(ServeServer server, String token, String method, String path, String body)
+            throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + token);
+        if (body != null) {
+            request.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(body));
+        } else {
+            request.method(method, HttpRequest.BodyPublishers.noBody());
+        }
+        return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
+    void aRealJobRunsThroughTheJobApiAndPathsAreCheckedAtSubmit() throws Exception {
+        // DEP-5 end to end: the real serve command, path policy and sparql command.
+        String token = "job-token-0123456789abcdef0123456789";
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        Path model = Files.writeString(root.resolve("m.ttl"), "<urn:x:a> <urn:x:p> \"x\" .\n");
+        Path outside = Files.writeString(tempDir.resolve("outside.ttl"), "<urn:x:a> <urn:x:p> \"y\" .\n");
+        Running running = startInBackground(Map.of(ServeSecurity.TOKEN_ENV, token), "--host", "127.0.0.1",
+                "--port", "0", "--root", root.toString());
+        tools.jackson.databind.ObjectMapper json = new tools.jackson.databind.ObjectMapper();
+        String query = "SELECT ?o WHERE { ?s ?p ?o }";
+
+        HttpResponse<String> refused = v1(running.server(), token, "POST", "/v1/jobs",
+                "{\"command\":\"sparql\",\"config\":{\"models\":[" + json.writeValueAsString(outside.toString())
+                        + "],\"query\":\"" + query + "\"}}");
+        assertThat(refused.statusCode()).as(refused.body()).isEqualTo(403);
+        assertThat(refused.headers().firstValue("Content-Type")).hasValue(Problem.CONTENT_TYPE);
+        assertThat(running.server().jobsForTest().size()).as("a refused job is never queued").isZero();
+
+        HttpResponse<String> submitted = v1(running.server(), token, "POST", "/v1/jobs",
+                "{\"command\":\"sparql\",\"label\":\"e2e\",\"config\":{\"models\":["
+                        + json.writeValueAsString(model.toString()) + "],\"query\":\"" + query + "\"}}");
+        assertThat(submitted.statusCode()).as(submitted.body()).isEqualTo(202);
+        String id = json.readTree(submitted.body()).path("jobId").asString();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        String status;
+        do {
+            Thread.sleep(50);
+            status = json.readTree(v1(running.server(), token, "GET", "/v1/jobs/" + id, null).body())
+                    .path("status").asString();
+        } while (!status.equals("succeeded") && !status.equals("failed") && System.nanoTime() < deadline);
+
+        assertThat(status).as(output()).isEqualTo("succeeded");
+        tools.jackson.databind.JsonNode result = json.readTree(v1(running.server(), token, "GET",
+                "/v1/jobs/" + id + "/result", null).body());
+        assertThat(result.path("rows")).hasSize(1);
+        tools.jackson.databind.JsonNode log = json.readTree(v1(running.server(), token, "GET",
+                "/v1/jobs/" + id + "/log", null).body());
+        assertThat(log.path("lines").toString()).contains("Query returned 1 row");
+
+        assertThat(shutdown(running.server(), token).statusCode()).isEqualTo(200);
+        assertThat(running.exit().get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+    }
 }

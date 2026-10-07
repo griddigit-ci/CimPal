@@ -1,0 +1,37 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+# Benchmark shapes written by scripts/bench/gen_models.py (DEP-2).
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix cim:  <http://iec.ch/TC57/CIM100#> .
+@prefix bench: <urn:cimpal:bench:> .
+
+bench:ACLineSegmentShape a sh:NodeShape ;
+    sh:targetClass cim:ACLineSegment ;
+    sh:property [ sh:path cim:IdentifiedObject.name ; sh:minCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path cim:ACLineSegment.r ; sh:minCount 1 ; sh:datatype xsd:float ] ;
+    sh:property [ sh:path cim:ACLineSegment.x ; sh:minCount 1 ; sh:datatype xsd:float ] ;
+    sh:property [ sh:path cim:Conductor.length ; sh:minCount 1 ; sh:datatype xsd:float ] ;
+    sh:property [ sh:path cim:Equipment.EquipmentContainer ; sh:minCount 1 ; sh:class cim:VoltageLevel ] ;
+    sh:sparql [
+        sh:message "ACLineSegment.r is greater than ACLineSegment.x" ;
+        sh:select """
+            PREFIX cim: <http://iec.ch/TC57/CIM100#>
+            SELECT $this WHERE {
+                $this cim:ACLineSegment.r ?r ; cim:ACLineSegment.x ?x .
+                FILTER (?r > ?x)
+            }"""
+    ] .
+
+bench:TerminalShape a sh:NodeShape ;
+    sh:targetClass cim:Terminal ;
+    sh:property [ sh:path cim:Terminal.ConductingEquipment ; sh:minCount 1 ; sh:class cim:ACLineSegment ] ;
+    sh:property [ sh:path cim:Terminal.ConnectivityNode ; sh:minCount 1 ; sh:class cim:ConnectivityNode ] ;
+    sh:property [ sh:path cim:ACDCTerminal.sequenceNumber ; sh:minCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path cim:ACDCTerminal.connected ; sh:minCount 1 ; sh:datatype xsd:boolean ] .
+
+bench:ConnectivityNodeShape a sh:NodeShape ;
+    sh:targetClass cim:ConnectivityNode ;
+    sh:property [ sh:path cim:IdentifiedObject.name ; sh:minCount 1 ] ;
+    sh:property [ sh:path cim:ConnectivityNode.ConnectivityNodeContainer ; sh:minCount 1 ; sh:class cim:VoltageLevel ] .

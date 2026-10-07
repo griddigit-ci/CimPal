@@ -1,0 +1,13 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# For the DAG tests (decision D-12: Airflow 3, pinned). Install with Airflow's constraints file:
+#   pip install -r integrations/airflow/requirements-test.txt \
+#     --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
+# The provider versions are the ones that constraints file pins.
+apache-airflow==3.3.2
+apache-airflow-providers-cncf-kubernetes==10.22.0
+apache-airflow-providers-docker==4.5.9
+apache-airflow-providers-standard==1.19.0
+pytest==9.1.1

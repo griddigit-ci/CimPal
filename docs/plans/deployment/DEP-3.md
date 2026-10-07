@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | Done ([PR #60](https://github.com/griddigit-ci/CimPal/pull/60); the manual Kubernetes walkthrough is open) |
 | Phase | D0 |
 | Depends on | DEP-1 |
 | Size | M |
@@ -34,15 +34,32 @@ Make integration path A work well today: Airflow starts CimPal as a container (o
 
 ## Acceptance criteria (status checklist)
 
-- [ ] `--summary-file`: writes exactly the JSON document that `--format json` prints, atomically (temp file + move), creating parent folders; works with or without `--format json` on stdout; path checked by `PathGuard` when used through `serve`/`mcp`/`run`
-- [ ] `--violations-exit-code N` (default 1): replaces only the "violations/differences found" exit; 2 and 3 unchanged; validated range; tests for each command
-- [ ] Example DAG `cimpal_kpo.py`: `KubernetesPodOperator` running the DEP-1 image with a PVC or hostPath for `/data`, `resources` from the sizing guide, `--summary-file /airflow/xcom/return.json --violations-exit-code 0`, `do_xcom_push=True`, then `@task.branch` on `hasViolations`
-- [ ] Example DAG `cimpal_docker.py`: `DockerOperator` with a mounted folder; a follow-up task reads the summary file and pushes it to XCom
-- [ ] Example DAG `cimpal_bash.py`: `BashOperator` for workers that have JRE 25 and the JAR
-- [ ] XCom payload stays small: the example pushes `{conforms, hasViolations, totals, report}` only, never full reports
-- [ ] `integrations/airflow/tests/test_dag_integrity.py`: all example DAGs import without errors under the pinned Airflow version (`DagBag` with no import errors); runs in `integrations.yml`
-- [ ] End-to-end check on a local Kubernetes (kind or Docker Desktop) with the Airflow Helm chart or `airflow standalone`, described step by step in `integrations/airflow/README.md`; result recorded in notes (maintainer may run it)
-- [ ] `docs/guide/airflow.md`: path A explained, exit-code table and how to map it to task states, XCom, volumes and S3 (copy S3 → volume in an upstream task), sizing link
+- [x] `--summary-file`:
+  - writes exactly the JSON document that `--format json` prints, atomically (temp file in the same folder, then a move), and creates parent folders;
+  - works with or without `--format json` on stdout, and with `--output`;
+  - the path is checked by `PathGuard` (WRITE_FILE) when used through `serve`/`mcp`/`run`, and again by `AtomicFiles`.
+- [x] `--violations-exit-code N` (default 1):
+  - replaces only the "violations/differences found" exit; 2 and 3 are unchanged;
+  - *(changed)* a `validate` run with a failed row keeps exit 1;
+  - the range is validated, and a non-integer config value is bad input;
+  - tested on all four commands.
+- [x] Example DAG `cimpal_kpo.py`:
+  - `KubernetesPodOperator` with the DEP-1 image (pinned release tag) and a PVC at `/data`;
+  - `resources` from the sizing guide;
+  - `--summary-file /airflow/xcom/return.json --violations-exit-code 0`, `do_xcom_push=True`;
+  - `@task.branch` on `hasViolations`;
+  - pod security "restricted".
+- [x] Example DAG `cimpal_docker.py`: `DockerOperator` with a mounted folder; a follow-up task reads the summary file and pushes it to XCom.
+- [x] Example DAG `cimpal_bash.py`: `BashOperator` for workers with JRE 25 and the JAR; values reach the shell only as environment variables.
+- [x] The XCom payload stays small: the examples push `{conforms, hasViolations, totals, report}` only.
+- [x] `integrations/airflow/tests/test_dag_integrity.py`: all example DAGs import without errors under Airflow 3.3.2, plus structure, security and end-to-end tests (the Bash DAG runs the CLI). Green in `integrations.yml` on PR #60, after two fixes for Airflow 3.3: `DagBag` has no `include_examples`, and `dag.test()` needs the DAGs serialized (`airflow dags reserialize`).
+- [ ] End-to-end check on a local Kubernetes: described step by step in `integrations/airflow/README.md`; for the maintainer (no Docker or Kubernetes in this session).
+- [x] `docs/guide/airflow.md`:
+  - path A;
+  - the exit-code table with task states;
+  - XCom, one run at a time;
+  - volumes and S3;
+  - sizing and security.
 
 ## Instructions for Claude Code
 
@@ -78,7 +95,31 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-06 | D-12: Airflow 3 only. Tests are pinned to 3.3.2 and installed with the official constraints file (cncf-kubernetes 10.22.0, docker 4.5.9, standard 1.19.0). | Claude Code; recommendation in the approved plan |
+| 2026-10-06 | `serve`, `mcp` and `run` ignore `violationsExitCode`: under an active `PathPolicy` the remap is always 1, so their HTTP status, `isError` and step status keep their meaning. This is decided in `AutomationOptions.violationsExitCode`, not by stripping request keys, so it also holds for any other way the key arrives. | Claude Code; approved plan |
+| 2026-10-06 | CI runs the DAG integrity tests and the Bash DAG end to end (`dag.test()` against the built JAR). The KPO and Docker end-to-end checks stay manual. | Claude Code; approved plan |
+| 2026-10-06 | The example data is generated by `scripts/bench/gen_models.py` (2k triples, seed 1, violation rate 0.1 → 10 known violations) rather than by `TestModels`. | Claude Code; approved plan |
+| 2026-10-06 | `validate --samples` defaults to 3 whenever the JSON document is produced (`--format json` or `--summary-file`), so the file matches what JSON mode prints. The examples set `"samples": 0` to keep XCom small. | Claude Code |
+| 2026-10-06 | From the security review: row **errors** keep exit 1 under `--violations-exit-code`, because `MappingValidationSummary.hasViolations()` includes errors and an error must never become a pass. | Claude Code |
+| 2026-10-06 | From the security review: the Bash example has no trigger-time param; values go to the shell as environment variables. All examples use `max_active_runs=1` (shared output and summary), pinned image tags, strict `compact()`, and the KPO pod meets Pod Security "restricted". | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+- **Local verification:**
+  - Core 338 tests (was 333; `AtomicFilesTest` adds 5, plus 2 more after the review, one skipped on Windows).
+  - CLI: `AutomationOptionsTest` 19 tests; the full suite passed before the review fixes.
+  - A manual run of `validate --config integrations/airflow/examples/data/run.json --summary-file … --violations-exit-code 0` gave exit 0 and `hasViolations: true` with `totals.violations: 1` (rows, not SHACL findings).
+  - The Python files compile. Airflow itself doesn't run on Windows, so the DAG tests run only in CI.
+- **Security review** (`security-reviewer`). Fixed here:
+  - High: shell injection through the Bash DAG's trigger-time `data_dir` param.
+  - Mediums: arbitrary `data_dir`; row errors remapped to exit 0 (a false clean); concurrent runs sharing the summary.
+  - Lows: `AtomicFiles` with a folder or root target; the temp file re-checked before the move (parent swapped for a link); 0600 permissions; unsanitised stderr; lenient `violationsExitCode` parsing; KPO pod hardening; `:latest` image defaults; `compact()` defaulting to clean.
+  - Left open:
+    - `pip install` without `--require-hashes` in `integrations.yml`, for CI-2 (G7);
+    - `serve`/`mcp` tests for the ignored remap: not observable there, because exit 0 and 1 both map to 200 and `isError: false`.
+- **Known, unchanged:** a `run` step's `config` key is not read by the commands (`docs/cli/run.md`, found in SEC-2).
+- **Open:**
+  - `integrations.yml` green on GitHub;
+  - the maintainer's KPO and Docker walkthrough;
+  - DEP-4 links `docs/guide/airflow.md`;
+  - DEP-10 (Airflow provider) builds on these DAGs.

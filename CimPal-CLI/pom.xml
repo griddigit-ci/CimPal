@@ -193,6 +193,14 @@
             <version>3.0.7</version>
             <scope>test</scope>
         </dependency>
+        <!-- Validates the /v1 OpenAPI 3.1 document (DEP-5). Test scope only: it brings Jackson 2,
+             which never reaches the CLI JAR. -->
+        <dependency>
+            <groupId>io.swagger.parser.v3</groupId>
+            <artifactId>swagger-parser</artifactId>
+            <version>2.1.48</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

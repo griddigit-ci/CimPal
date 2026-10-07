@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.core.utils;
 import eu.griddigit.cimpal.core.models.SHACLValidationOptions;
 import eu.griddigit.cimpal.core.models.SHACLValidationReport;
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
+import eu.griddigit.cimpal.core.stats.RunStats;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.graph.Graph;
@@ -25,6 +26,7 @@ import org.apache.jena.riot.system.StreamRDFWrapper;
 import org.apache.jena.shacl.Shapes;
 import org.apache.jena.shacl.parser.Shape;
 import org.apache.jena.shacl.vocabulary.SHACL;
+import org.apache.jena.shared.JenaException;
 import org.apache.jena.sparql.core.Quad;
 import org.apache.jena.vocabulary.RDF;
 
@@ -130,10 +132,19 @@ public class SHACLValidator {
         ValidationTools.logValidationDebug("DONE SHACLValidator conforms=" + outcome.conforms()
                 + " results=" + outcome.results().size() + " partial=" + outcome.partial()
                 + " elapsedMs=" + (System.currentTimeMillis() - started));
+        boolean noActiveTargets = shapes.getTargetShapes().stream().allMatch(Shape::deactivated);
+        boolean noData = dataModel.isEmpty();
+        if (noActiveTargets && !shapes.getTargetShapes().isEmpty()) {
+            warnings.add("Every shape with a target is deactivated, so no data was validated.");
+        }
+        if (noData) {
+            warnings.add("The data holds no triples, so nothing was validated.");
+        }
         return new SHACLValidationReport(outcome.conforms(), outcome.partial(), outcome.results(),
                 reportModel, warnings, datasetName(), loadedData.sources(), shapeSources(),
                 options.getMaxResultsPerConstraint(),
-                loadedShapes.byConstraintFile(shapes, shapesModel, outcome.results()));
+                loadedShapes.byConstraintFile(shapes, shapesModel, outcome.results()),
+                noActiveTargets || noData);
     }
 
     private int workers() {
@@ -174,7 +185,9 @@ public class SHACLValidator {
         }
 
         List<ValidationTools.ShapeSource> roots = new ArrayList<>();
-        for (Path file : files) {
+        for (Path given : files) {
+            // serve/mcp/run: checked before anything touches the file, and read as checked.
+            Path file = PathPolicy.checkReadIfActive(given);
             if (!Files.isRegularFile(file)) {
                 throw new FileNotFoundException("SHACL shape file not found: " + file.toAbsolutePath());
             }
@@ -218,17 +231,22 @@ public class SHACLValidator {
 
         Model data = ModelFactory.createDefaultModel();
         List<String> read = new ArrayList<>();
-        for (Path file : files) {
+        List<Path> loaded = new ArrayList<>();
+        for (Path given : files) {
+            // serve/mcp/run: checked before anything touches the file, and read as checked.
+            Path file = PathPolicy.checkReadIfActive(given);
             if (!Files.isRegularFile(file)) {
                 throw new FileNotFoundException("Data file not found: " + file.toAbsolutePath());
             }
+            loaded.add(file);
             String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
             if (isZip(file)) {
                 List<String> entries = new ArrayList<>();
                 eu.griddigit.cimpal.core.utils.ModelFactory.forEachZipEntry(file, (entry, in) -> {
                     if (entry.toLowerCase(Locale.ROOT).endsWith(".xml")) {
-                        parseInto(data, in, Lang.RDFXML, dataTypeMap);
-                        entries.add(file.getFileName() + "/" + entry);
+                        String source = file.getFileName() + "/" + entry;
+                        parse(data, in, Lang.RDFXML, dataTypeMap, source);
+                        entries.add(source);
                     }
                 });
                 if (entries.isEmpty()) {
@@ -239,10 +257,12 @@ public class SHACLValidator {
                 continue;
             }
             try (InputStream in = Files.newInputStream(file)) {
-                parseInto(data, in, RDFLanguages.filenameToLang(name, Lang.RDFXML), dataTypeMap);
+                parse(data, in, RDFLanguages.filenameToLang(name, Lang.RDFXML), dataTypeMap,
+                        file.getFileName().toString());
             }
             read.add(file.getFileName().toString());
         }
+        countLoaded(data.size(), loaded);
 
         if (supplied != null) {
             if (dataTypeMap.isEmpty()) {
@@ -253,6 +273,22 @@ public class SHACLValidator {
             data.withDefaultMappings(supplied);
         }
         return new LoadedData(data, describeSources(read, supplied != null, "data model"));
+    }
+
+    /** Adds the data files' triples and sizes to the run statistics, if they are being kept. */
+    private void countLoaded(long triples, List<Path> files) {
+        RunStats stats = options.getRunStats();
+        if (stats == null) {
+            return;
+        }
+        stats.addTriples(triples);
+        for (Path file : files) {
+            try {
+                stats.addInputBytes(Files.size(file));
+            } catch (IOException ex) {
+                // A file that can't be sized is not counted; statistics never fail a run.
+            }
+        }
     }
 
     private static boolean isZip(Path file) {
@@ -269,6 +305,17 @@ public class SHACLValidator {
         warnings.add(archive.getFileName() + ": " + unread.size()
                 + (unread.size() == 1 ? " RDF file was" : " RDF files were")
                 + " not read as constraints; only .ttl and .rdf files are: " + names);
+    }
+
+    /** {@link #parseInto}, naming {@code source} when it fails: a parse error gives a line, not the file. */
+    private void parse(Model target, InputStream in, Lang lang, Map<String, RDFDatatype> dataTypeMap,
+                       String source) throws IOException {
+        try {
+            parseInto(target, in, lang, dataTypeMap);
+        } catch (JenaException ex) {
+            throw new IOException("Could not read the data file " + LogSanitizer.forLog(source) + ": "
+                    + ex.getMessage(), ex);
+        }
     }
 
     @SuppressWarnings("unchecked")

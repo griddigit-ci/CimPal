@@ -5,6 +5,8 @@
 -->
 # CimPal CLI Documentation
 
+This is the per-command reference. For installing, sizing, securing and integrating CimPal, start with the [user guide](../guide/index.md).
+
 ## Reference
 
 | Document | What it covers |
@@ -30,6 +32,7 @@
 | Document | What it covers |
 |---|---|
 | [ci-pipeline](ci-pipeline.md) | Complete command collection for a CI validation run, with placeholder notes |
+| [Airflow guide](../guide/airflow.md) | Running CimPal as an Airflow task (KubernetesPodOperator, DockerOperator, BashOperator) with `--summary-file` and `--violations-exit-code`; examples in `integrations/airflow/` |
 | [sizing guide](../guide/sizing.md) | Heap, cores and time by model size, measured with `--stats` ([resource statistics](README.md#resource-statistics---stats)) and `scripts/bench/` |
 
 Testing the rules of a constraint set against Conform / NonConform models is not a CLI task: it is the GUI's **SHACL ▸ Constraints Operations ▸ Test SHACL rules against Conform / NonConform models**, documented in the in-app help.
@@ -42,6 +45,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 |---|---|
 | `validate-mapping-cgmes30.json` | Standard mapping validation, CGMES 3.0 / NC 2.5 |
 | `validate-timestamped.json` | Timestamped batch validation with trend comparison |
+| `validate-combined.json` | Combined validation: given data files as one dataset against given constraint files, no mapping CSV |
 | `sparql-query.json` | SPARQL SELECT query against model files |
 | `convert.json` | RDF format conversion |
 | `rdfs2shacl.json` | RDFS to SHACL shape generation |
@@ -57,7 +61,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 
 | Command | Status |
 |---|---|
-| `validate` | Done — mapping and timestamped workflows (the manual workflow moved to the GUI's rule test) |
+| `validate` | Done — mapping, timestamped and combined workflows (the manual workflow moved to the GUI's rule test) |
 | `sparql` | Done |
 | `manifest` | Done |
 | `convert` | Done — single file, multi-file union, all RDF/XML sub-formats |

@@ -1,0 +1,46 @@
+{
+  "_comment": "Template: Combined validation. Merges the data files into one dataset and validates it against all the constraint files at once - the GUI's 'Validate selected files together', with no mapping CSV.",
+  "_how_to_use": "Copy this file to your working directory. Replace every REPLACE_WITH_PATH value with a real path. Then run: java -jar CimPal-CLI.jar validate --config this-file.json",
+  "_when_to_use": "Use this for the acceptance check of one dataset you received, for example an IGM's EQ, SSH, TP and SV files plus the boundary set, against a constraint set. For many datasets, or datasets that arrive per timestamp, use the mapping or timestamped workflow instead.",
+
+  "workflow": "combined",
+  "_note_workflow": "Which validation mode to run. Options: 'mapping' (see validate-mapping-cgmes30.json), 'timestamped' (see validate-timestamped.json) or 'combined' (this one). The combined workflow needs no mapping CSV: it validates exactly the files listed below.",
+
+  "constraintFiles": [
+    "REPLACE_WITH_PATH/constraints/EQ-constraints.ttl",
+    "REPLACE_WITH_PATH/constraints/SSH-constraints.ttl"
+  ],
+  "_note_constraintFiles": "The SHACL constraint files (.ttl, .rdf), or ZIP archives of them. All of them form one shapes graph, so a shape in one file can be deactivated or extended by another; their owl:imports are followed, and an import shared by several files is read once. In a ZIP, every .ttl and .rdf file is used, and relative owl:imports resolve inside the archive as they would in a folder; other RDF files in it are named in the warnings. Relative paths are relative to this config file.",
+
+  "dataFiles": [
+    "REPLACE_WITH_PATH/models/IGM.zip",
+    "REPLACE_WITH_PATH/models/BoundarySet.zip"
+  ],
+  "_note_dataFiles": "The instance data files (.xml), or ZIP archives of them (archives inside an archive are read too, up to three levels deep). All of them are merged into one dataset, so references between files - SSH to EQ, or to the boundary set - resolve. A ZIP without any .xml file stops the run with exit code 2 instead of passing with no data. Relative paths are relative to this config file.",
+
+  "outputDir": "REPLACE_WITH_PATH/output",
+  "_note_outputDir": "Where to write the report. Created automatically if it does not exist. The run writes one workbook, validation_report__<timestamp>.xlsx, in the layout of the mapping workflow's report, with one validation row per constraint file: each finding is listed under the file that declares its shape, and a file whose shapes found nothing is marked as conforming.",
+
+  "_note_constraintsRoot": "Optional: add \"constraintsRoot\": \"REPLACE_WITH_PATH/constraints\" if the constraint files import others by a path relative to a library root rather than to themselves. Relative owl:imports are then also resolved against that folder. Without it, the folder of the first constraint file is used.",
+
+  "datatypeMap": "CGMES30NC25",
+  "_note_datatypeMap": "Which bundled datatype map to use when parsing the data files. Options: 'CGMES30NC25' (CIM17 / CGMES 3.0 / NC 2.5), 'CGMES30NC24' (CIM17 / CGMES 3.0 / NC 2.4), 'CGMES24NC22' (CIM16 / CGMES 2.4 / NC 2.2). Or: an absolute path to a custom .properties file. This is critical - without the right map, numeric and boolean constraints silently pass because literals are treated as plain strings.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for resolving relative URIs in the RDF/XML data files (rdf:about='#_uuid' style). For CGMES 3.0 / CIM17 this is http://iec.ch/TC57/CIM100. For CGMES 2.4 / CIM16 use http://iec.ch/TC57/2013/CIM-schema-cim16. A wrong base makes models load empty, and references between the files do not join up.",
+
+  "engine": "APACHE_JENA",
+  "_note_engine": "SHACL evaluation engine. Use 'APACHE_JENA' for all production runs. Other options (PYSHACL, PYSHACL_OXIGRAPH, RUST_SHACL) are experimental and require Python to be installed; with them, the report may show all results in one row instead of one row per constraint file.",
+
+  "workers": 0,
+  "_note_workers": "There is one dataset, so the workers check its shapes in parallel on the one shared graph rather than loading graphs of their own. 0 = auto: all processors but one. Memory is driven by the size of the merged dataset, not by the worker count.",
+
+  "maxResultsPerConstraint": 0,
+  "_note_maxResultsPerConstraint": "Maximum SHACL results to collect per source shape. 0 = collect all (use for official runs). 10 = quick check: Jena stops a shape after 10 results, and the report marks the run as Partial, with no constraint file shown as conforming.",
+
+  "exportTurtle": false,
+  "_note_exportTurtle": "If true, also writes the SHACL validation report graph as Turtle beside the workbook, validation_report__<timestamp>.ttl. It can be opened in the AI Assistant tab for explanation and repair proposals.",
+
+  "_note_summaryFile": "Optional (DEP-3): add \"summaryFile\": \"out/summary.json\" to also write the JSON result (what --format json prints) to that file, atomically. For Airflow's KubernetesPodOperator use /airflow/xcom/return.json. Relative paths are relative to this config file.",
+  "_note_violationsExitCode": "Optional (DEP-3): add \"violationsExitCode\": 0 to end with exit code 0 when violations are found, so a scheduler (Airflow, CI) treats them as data and reads hasViolations from the summary. Default 1. Exits 2 (bad input, including a constraint or data file that can't be read, or a run that would check nothing because no shape has a target or the data is empty) and 3 (internal error) never change. Ignored under serve, mcp and run."
+}

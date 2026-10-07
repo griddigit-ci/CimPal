@@ -62,6 +62,12 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--max-body-bytes` | integer | `1048576` (1 MB) | Largest accepted request body. |
 | `--queue-size` | integer | `4` | Requests that may wait while one runs. More get 503. |
 | `--request-timeout` | ISO-8601 duration | `PT30M` | Time a request may take, including time spent waiting in the queue. Longer gets 504. |
+| `--job-timeout` | ISO-8601 duration | `PT2H` | A [`/v1` job](#job-api-v1) running longer than this is marked `timed_out` and `/v1/health` reports `stalled`. It is not interrupted. |
+| `--max-jobs` | integer | `1000` | Jobs kept in memory (100–100000). Beyond this, the oldest finished jobs are dropped. |
+| `--job-ttl` | ISO-8601 duration | `PT24H` | How long a finished job is kept. |
+| `--job-log-lines` | integer | `5000` | Progress lines kept per job (1–100000); older lines are dropped. |
+| `--max-result-bytes` | integer | `16777216` (16 MiB) | Largest job result kept in memory. A larger result is answered with 410; write such results to a file. |
+| `--job-store-bytes` | integer | a quarter of the maximum heap | Memory for the results and logs of all finished jobs together (at least 1048576). Beyond it the oldest finished jobs are dropped; the most recent one is always kept. |
 
 | Environment variable | Description |
 |---|---|
@@ -71,7 +77,7 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 
 ## Allowed folders (`--root`)
 
-File paths in requests may only point inside the allowed folders. Every path field in a request (`input`, `output`, `modelsDir`, `mappingCsv`, `shaclFiles`, and so on) is checked before the command runs, and so are the paths CimPal resolves itself: files named in a mapping CSV, `owl:imports` in shapes, files the `organize` template names. A path outside the roots is refused with **403**, and the message names it.
+File paths in requests may only point inside the allowed folders. Every path field in a request (`input`, `output`, `modelsDir`, `mappingCsv`, `shaclFiles`, `constraintFiles`, `dataFiles`, and so on) is checked before the command runs, and so are the paths CimPal resolves itself: files named in a mapping CSV, `owl:imports` in shapes, files the `organize` template names. A path outside the roots is refused with **403**, and the message names it.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -128,6 +134,8 @@ Limits that protect the server itself:
 
 ### Command endpoints — `POST /<command>`
 
+*Kept for local use.* The HTTP call stays open until the command ends, so a large validation holds the connection for many minutes. For automation, use the [job API](#job-api-v1).
+
 Each subcommand is exposed as a `POST` endpoint. The request body is a JSON object with the same keys the command's config file accepts. The response is the JSON output the command produces (equivalent to running with `--format json`).
 
 | Endpoint | Equivalent CLI command |
@@ -153,13 +161,102 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 
 `run`, `serve` and `mcp` aren't exposed as endpoints.
 
+### Job API (`/v1`)
+
+The job API runs a command asynchronously.
+- **Submit:** `POST /v1/jobs` answers within milliseconds with a job id.
+- **Follow up:** you poll the job's status, then fetch its result and its progress lines.
+- **Spec:** the OpenAPI 3.1 description is served at `GET /v1/openapi.json`, and the planned Python SDK (DEP-9) is generated from it.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/v1/jobs` | `POST` | Submit `{"command": "<command>", "config": {...}, "label": "..."}`. `command` is one of the ten command endpoints above; `config` has the same keys as that command's config file; `label` (optional, ≤ 200 characters) is for you. Answers **202** with the job and `Location: /v1/jobs/<id>`. |
+| `/v1/jobs` | `GET` | Recent jobs, newest first. `?status=` filters (`queued`, `running`, `succeeded`, `failed`, `cancelled`, `timed_out`); `?limit=` 1–1000, default 50. |
+| `/v1/jobs/<id>` | `GET` | The job: `status`, `createdAt`, `startedAt`, `finishedAt`, `exitCode`, `hasViolations`, `error`, `links`. |
+| `/v1/jobs/<id>/result` | `GET` | The command's JSON output once it finished, the same as the synchronous endpoint returns. **409** while it runs or after a cancel; **410** if it was larger than `--max-result-bytes`. |
+| `/v1/jobs/<id>/log` | `GET` | Progress lines: `{lines, offset, nextOffset, truncated}`. Poll with `?offset=<nextOffset>`. At most 1000 lines per call, and the last `--job-log-lines` are kept. Each line is what the command wrote to stderr, sanitised and cut at 512 characters. |
+| `/v1/jobs/<id>` | `DELETE` | Cancel a **queued** job; it never starts. A running job is not interrupted (409), so it can't leave half-written reports. |
+| `/v1/health` | `GET` | Like `/health`, plus `apiVersion` and `running`. No token needed. |
+| `/v1/openapi.json` | `GET` | The OpenAPI 3.1 document. No token needed. |
+
+**Statuses:**
+- `queued`, then `running`, then one of:
+  - `succeeded`: exit 0 or 1; `hasViolations` and `exitCode` tell them apart;
+  - `failed`: exit 2 or 3, or an internal error; see `error` and the result;
+  - `timed_out`: still running after `--job-timeout`. It isn't interrupted, and a result that arrives later is kept.
+- `cancelled`: cancelled while queued.
+
+**What stays the same:**
+- **Checks:** the token, the Host and Origin checks, the body limit and the [allowed folders](#allowed-folders---root) apply as for the other endpoints. Paths in `config` are checked **when you submit**, so a refused path is a 403 at once, not a failed job later, and they are checked again just before the job runs.
+- **One at a time:** jobs and synchronous requests share the worker and `--queue-size`. Commands still run one at a time, and a full queue answers 503 with `Retry-After`.
+
+**Errors** under `/v1` are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`: `{"type", "title", "status", "detail", "jobId"?}`. The older endpoints keep `{"error": "..."}`.
+
+**Jobs live in memory.**
+- **Restart:** they are lost on restart.
+- **Storage limits:** finished jobs are dropped after `--job-ttl`, then the oldest ones beyond `--max-jobs` or beyond `--job-store-bytes`.
+- **Cancelled jobs:** a cancelled job leaves the queue at once, so its slot and its request body are freed.
+- **Shutdown:** `POST /shutdown` (or stopping the process) cancels queued jobs, and lets the running one finish.
+
+#### Example: submit, poll, fetch (bash)
+
+```bash
+token=$(cat ~/.cimpal/serve.token)
+auth=(-H "Authorization: Bearer $token")
+job=$(curl -s "${auth[@]}" -H 'Content-Type: application/json' -X POST http://localhost:7474/v1/jobs \
+  -d '{"command":"validate","label":"nightly","config":{"mappingCsv":"/data/mapping.csv",
+       "modelsDir":"/data/models","constraintsRoot":"/data/constraints","outputDir":"/data/out"}}')
+id=$(echo "$job" | python3 -c 'import json,sys; print(json.load(sys.stdin)["jobId"])')
+until curl -s "${auth[@]}" "http://localhost:7474/v1/jobs/$id" | grep -qE '"status":"(succeeded|failed|timed_out|cancelled)"'; do
+  sleep 5
+done
+curl -s "${auth[@]}" "http://localhost:7474/v1/jobs/$id/result"
+```
+
+#### Example: Python `requests`
+
+```python
+import time, requests, pathlib
+
+base = "http://localhost:7474"
+token = pathlib.Path.home().joinpath(".cimpal", "serve.token").read_text().strip()
+s = requests.Session()
+s.headers["Authorization"] = f"Bearer {token}"
+
+job = s.post(f"{base}/v1/jobs", json={
+    "command": "validate",
+    "label": "nightly",
+    "config": {"mappingCsv": "/data/mapping.csv", "modelsDir": "/data/models",
+               "constraintsRoot": "/data/constraints", "outputDir": "/data/out"},
+}).json()
+
+offset = 0
+while True:
+    log = s.get(f"{base}/v1/jobs/{job['jobId']}/log", params={"offset": offset}).json()
+    for line in log["lines"]:
+        print(line)
+    offset = log["nextOffset"]
+    status = s.get(f"{base}/v1/jobs/{job['jobId']}").json()
+    if status["status"] not in ("queued", "running"):
+        break
+    time.sleep(5)
+
+if status["status"] == "succeeded":
+    result = s.get(f"{base}/v1/jobs/{job['jobId']}/result").json()
+    print("violations found" if status["hasViolations"] else "all conforming", result["totals"])
+else:
+    print("job ended as", status["status"], status["error"])
+```
+
+On Windows the token file is `%LOCALAPPDATA%\CimPal\serve.token`.
+
 ---
 
 ## HTTP status codes
 
 | Code | Meaning |
 |---|---|
-| 200 | Command ran successfully (including when violations were found — exit 0 or 1) |
+| 200 | Command ran successfully (including when violations were found — exit 0 or 1; a `violationsExitCode` in the request is ignored) |
 | 400 | Bad request — invalid input, missing required field (exit 2) |
 | 401 | Missing or wrong bearer token |
 | 403 | Host or Origin header not allowed, or a file path outside the allowed folders / an existing output without `"overwrite": true` |
@@ -168,6 +265,8 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 | 413 | Request body larger than `--max-body-bytes` |
 | 415 | POST without `Content-Type: application/json` |
 | 500 | Internal error — command crashed (exit 3). Out of memory: the body is `{"exitCode":3,...,"error":"Out of memory; the server stops..."}` and the server then exits with 3; restart it with more memory ([sizing guide](../guide/sizing.md)) |
+| 409 | `/v1`: the job hasn't finished (result), or isn't queued any more (cancel) |
+| 410 | `/v1`: the job's result was larger than `--max-result-bytes` and wasn't kept |
 | 503 | Queue full (`Retry-After` header set) |
 | 504 | Command didn't finish within `--request-timeout` |
 

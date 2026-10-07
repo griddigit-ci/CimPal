@@ -76,3 +76,10 @@ Benchmark of `validate` by model size (DEP-2): `gen_models.py` writes synthetic 
 
     python scripts/bench/run_bench.py --sizes 100k --verify --no-matrix
     python -m unittest discover -s scripts/bench -p "test_*.py"
+
+check_doc_links.py (Python 3.10+, standard library only)
+
+Checks the relative links and #anchors in Markdown files (GitHub heading slugs); external URLs are not fetched. Default targets are docs/guide and README.md; the Docs workflow (.github/workflows/docs.yml) also checks docs/cli. Exits 1 and lists each broken link.
+
+    python scripts/check_doc_links.py
+    python scripts/check_doc_links.py docs/guide docs/cli README.md

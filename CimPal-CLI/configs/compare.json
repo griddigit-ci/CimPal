@@ -29,8 +29,11 @@
 
   "_exit_codes": {
     "0": "Files are identical — no differences found.",
-    "1": "Differences were found (see output).",
+    "1": "Differences were found (see output). violationsExitCode changes this code.",
     "2": "Bad or missing input; command was not executed.",
     "3": "Internal error during comparison."
-  }
+  },
+
+  "_note_summaryFile": "Optional (DEP-3): add \"summaryFile\": \"diff-summary.json\" to also write the JSON result (what --format json prints) to that file, atomically, also when 'output' is set.",
+  "_note_violationsExitCode": "Optional (DEP-3): add \"violationsExitCode\": 0 to end with exit code 0 when differences are found, so a scheduler treats them as data. Default 1. Ignored under serve, mcp and run."
 }

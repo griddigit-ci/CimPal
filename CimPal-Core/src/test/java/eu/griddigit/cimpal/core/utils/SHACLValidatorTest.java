@@ -10,6 +10,8 @@ import eu.griddigit.cimpal.core.models.SHACLValidationReport;
 import eu.griddigit.cimpal.core.models.SHACLValidationReport.ConstraintFileResults;
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
 import eu.griddigit.cimpal.core.presets.SHACLValidationOptionsPresets;
+import eu.griddigit.cimpal.core.stats.RunStats;
+import eu.griddigit.cimpal.core.stats.RunStatsSnapshot;
 import eu.griddigit.cimpal.core.testsupport.Normalizer;
 import eu.griddigit.cimpal.core.testsupport.Snapshots;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -467,6 +469,86 @@ class SHACLValidatorTest {
                 .build()).validate());
 
         assertTrue(failure.getMessage().contains("Unsafe ZIP entry path"), failure::getMessage);
+    }
+
+    @Test
+    void shapeAndDataFilesOutsideTheAllowedRootsAreRefusedBeforeTheyAreRead() throws Exception {
+        // serve, mcp and run check the paths of a request (PathGuard); the validator checks the files
+        // it is given again, so it is safe under an active policy whoever calls it.
+        Path allowed = Files.createDirectories(tempDir.resolve("allowed"));
+        Path shapesInside = write("allowed/shapes.ttl", SIZE_SHAPES);
+        Path dataInside = write("allowed/data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>"));
+        Path shapesOutside = write("outside/shapes.ttl", SIZE_SHAPES);
+        Path dataOutside = write("outside/data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>"));
+        PathPolicy policy = PathPolicy.builder().root(allowed).build();
+        java.util.function.BiFunction<Path, Path, SHACLValidator> validator = (shapes, data) ->
+                new SHACLValidator(SHACLValidationOptions.builder()
+                        .shapeFiles(shapes).dataFiles(data).xmlBase(BASE).build());
+
+        assertThrows(PathNotAllowedException.class,
+                () -> PathPolicy.runWith(policy, () -> validator.apply(shapesInside, dataOutside).validate()));
+        assertThrows(PathNotAllowedException.class,
+                () -> PathPolicy.runWith(policy, () -> validator.apply(shapesOutside, dataInside).validate()));
+        SHACLValidationReport report =
+                PathPolicy.runWith(policy, () -> validator.apply(shapesInside, dataInside).validate());
+        assertEquals(1, report.getResults().size());
+    }
+
+    @Test
+    void anImportOutsideTheAllowedRootsIsRefusedWhetherOrNotItExists() throws Exception {
+        // Otherwise the error tells a shapes file's author what exists outside the roots.
+        Path allowed = Files.createDirectories(tempDir.resolve("allowed"));
+        write("secret.ttl", SIZE_SHAPES);
+        Path data = write("allowed/data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>"));
+        PathPolicy policy = PathPolicy.builder().root(allowed).build();
+        List<String> messages = new java.util.ArrayList<>();
+        for (String target : List.of("../secret.ttl", "../missing.ttl")) {
+            Path shapes = write("allowed/shapes-" + messages.size() + ".ttl",
+                    "<urn:test:s> " + IMPORTS + " <" + target + "> .");
+            Exception refused = assertThrows(Exception.class, () -> PathPolicy.runWith(policy, () -> new SHACLValidator(
+                    SHACLValidationOptions.builder().shapeFiles(shapes).dataFiles(data).xmlBase(BASE).build()).validate()));
+            messages.add(refused.getClass().getSimpleName() + ": "
+                    + refused.getMessage().replace(target.substring(3), "<name>"));
+        }
+        assertEquals(messages.get(0), messages.get(1));
+    }
+
+    @Test
+    void runStatsCountTheDataLoaded() throws Exception {
+        Path data = write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"><ex:size>1.5</ex:size></ex:Thing>"));
+        RunStats stats = RunStats.start();
+
+        new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(data)
+                .shapeFiles(write("shapes.ttl", SIZE_SHAPES))
+                .xmlBase(BASE)
+                .runStats(stats)
+                .build()).validate();
+
+        RunStatsSnapshot snapshot = stats.stop();
+        assertEquals(2, snapshot.triplesLoaded(), "rdf:type and ex:size");
+        assertEquals(Files.size(data), snapshot.inputBytes());
+    }
+
+    @Test
+    void aFileThatDoesNotParseIsNamedInTheError() throws Exception {
+        // Jena's parse errors give a line and a column; with many input files, the file matters.
+        Path brokenData = write("broken.xml", "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
+        IOException dataFailure = assertThrows(IOException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(brokenData).shapeFiles(write("shapes.ttl", SIZE_SHAPES)).xmlBase(BASE).build()).validate());
+        assertTrue(dataFailure.getMessage().contains("data file broken.xml"), dataFailure::getMessage);
+
+        Path brokenShapes = write("broken.ttl", "<urn:test:S> a ");
+        IOException shapesFailure = assertThrows(IOException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(write("ok.ttl", SIZE_SHAPES), brokenShapes)
+                .xmlBase(BASE).build()).validate());
+        assertTrue(shapesFailure.getMessage().contains("shapes file broken.ttl"), shapesFailure::getMessage);
+
+        IOException zippedFailure = assertThrows(IOException.class, () -> new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(zip("igm.zip", "EQ.xml", "<rdf:RDF"))
+                .shapeFiles(write("shapes.ttl", SIZE_SHAPES)).xmlBase(BASE).build()).validate());
+        assertTrue(zippedFailure.getMessage().contains("data file igm.zip/EQ.xml"), zippedFailure::getMessage);
     }
 
     @Test

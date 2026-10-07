@@ -1,0 +1,74 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Airflow integration (DEP-3): the example DAGs import cleanly under the pinned Airflow, and the
+# BashOperator DAG really runs the CLI against the example data. The KubernetesPodOperator and
+# DockerOperator end-to-end checks are a manual walkthrough (integrations/airflow/README.md).
+name: Integrations
+
+on:
+  push:
+    branches: [devel, master]
+    paths: ['integrations/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
+  pull_request:
+    branches: [devel, master]
+    paths: ['integrations/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integrations-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  airflow:
+    name: Airflow example DAGs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AIRFLOW_VERSION: '3.3.2'
+      PYTHON_VERSION: '3.12'
+      AIRFLOW_HOME: ${{ github.workspace }}/target/airflow-home
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/integrations/airflow/examples
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the CLI JAR
+        run: mvn -B -pl CimPal-CLI -am package -DskipTests
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Airflow is installed with its official constraints file, as Airflow recommends.
+      - name: Install Airflow and the providers
+        run: >-
+          pip install -r integrations/airflow/requirements-test.txt
+          --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+
+      - name: Create the Airflow metadata database
+        run: airflow db migrate
+
+      # Airflow 3 runs a DAG (also dag.test()) only once it is serialized in the database.
+      - name: Serialize the example DAGs
+        run: airflow dags reserialize
+
+      - name: DAG tests (integrity and the Bash DAG end to end)
+        env:
+          CIMPAL_JAR: ${{ github.workspace }}/CimPal-CLI/target/CimPal-CLI.jar
+        run: pytest integrations/airflow/tests -v

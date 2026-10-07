@@ -106,6 +106,16 @@ public class CompareCommand implements Callable<Integer> {
     /** The collector when {@code --stats} is on, otherwise null. */
     private RunStats runStats;
 
+    @Option(names = "--summary-file",
+            description = "Also write the JSON result (the document --format json prints) to this file, "
+                    + "atomically, creating parent folders; also with --output.")
+    private File summaryFile;
+
+    @Option(names = "--violations-exit-code",
+            description = "Exit code when differences are found (default 1, 0..255). 0 lets a scheduler treat "
+                    + "them as data; bad input (2) and internal errors (3) are unchanged.")
+    private Integer violationsExitCode;
+
     @Option(names = "--normalize-cim-version",
             description = "Rename the 'cim' namespace in file-b to match file-a before comparing.")
     private boolean normalizeCimVersion;
@@ -204,14 +214,21 @@ public class CompareCommand implements Callable<Integer> {
             boolean identical = entries.isEmpty();
 
             // Output results
+            // The JSON document is built once, so stdout and the summary file carry the same one.
             boolean jsonStdout = outputFile == null && "json".equalsIgnoreCase(format);
-            String statsField = jsonStdout ? StatsJson.field(runStats, "\n  ") : "";
+            String json = jsonStdout || summaryFile != null
+                    ? buildJson(entries, fileA, fileB, resolvedType, StatsJson.field(runStats, "\n  ")) : null;
+            if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+                return ExitCode.INTERNAL_ERROR;
+            }
             if (outputFile != null) {
                 writeToFile(entries, outputFile, fileA, fileB, resolvedType);
                 System.out.println("[OK] Comparison results written to: " + outputFile.getAbsolutePath());
                 System.out.println("     Total differences: " + entries.size());
+            } else if (jsonStdout) {
+                System.out.println(json);
             } else {
-                writeToStdout(entries, format, fileA, fileB, resolvedType, statsField);
+                writeToStdout(entries, format, fileA, fileB);
             }
             if (!jsonStdout) {
                 StatsJson.toStderr(runStats);
@@ -222,7 +239,7 @@ public class CompareCommand implements Callable<Integer> {
                 return ExitCode.OK;
             } else {
                 System.err.println("[OK] Found " + entries.size() + " difference(s).");
-                return ExitCode.VIOLATIONS;
+                return AutomationOptions.violationsExitCode(violationsExitCode);
             }
 
         } catch (Exception ex) {
@@ -283,6 +300,14 @@ public class CompareCommand implements Callable<Integer> {
             JsonNode n = root.path("stats");
             if (!n.isMissingNode() && !n.isNull()) stats = n.asBoolean(false);
         }
+        if (summaryFile == null) {
+            String v = root.path("summaryFile").asText(null);
+            if (v != null && !v.isBlank()) summaryFile = resolveRelative(configDir, v);
+        }
+        if (violationsExitCode == null) {
+            JsonNode n = root.path("violationsExitCode");
+            if (!n.isMissingNode() && !n.isNull()) violationsExitCode = AutomationOptions.exitCodeFromConfig(n);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -300,7 +325,7 @@ public class CompareCommand implements Callable<Integer> {
     // -------------------------------------------------------------------------
 
     private boolean validateInputs() {
-        boolean ok = true;
+        boolean ok = AutomationOptions.checkViolationsExitCode(violationsExitCode);
         if (fileA == null) {
             System.err.println("[ERROR] --file-a is required.");
             ok = false;
@@ -436,10 +461,10 @@ public class CompareCommand implements Callable<Integer> {
     // Output: stdout
     // -------------------------------------------------------------------------
 
+    /** Text or CSV on stdout; the caller prints the JSON document that {@link #buildJson} builds. */
     private static void writeToStdout(List<RDFCompareResultEntry> entries, String format,
-                                      File fileA, File fileB, String compareType, String statsField) {
+                                      File fileA, File fileB) {
         switch (format.toLowerCase()) {
-            case "json" -> writeJson(entries, fileA, fileB, compareType, statsField);
             case "csv"  -> writeCsvStdout(entries);
             default     -> writeText(entries, fileA, fileB);
         }
@@ -470,8 +495,8 @@ public class CompareCommand implements Callable<Integer> {
     }
 
     /** {@code statsField} is {@code ,"stats":{...}} or empty (see {@link StatsJson#field}). */
-    private static void writeJson(List<RDFCompareResultEntry> entries,
-                                  File fileA, File fileB, String compareType, String statsField) {
+    private static String buildJson(List<RDFCompareResultEntry> entries,
+                                    File fileA, File fileB, String compareType, String statsField) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         sb.append("  \"schema\": \"cimpal-compare-result/1\",\n");
@@ -494,7 +519,7 @@ public class CompareCommand implements Callable<Integer> {
         }
         sb.append("  ]").append(statsField).append("\n");
         sb.append("}");
-        System.out.println(sb);
+        return sb.toString();
     }
 
     private static void writeCsvStdout(List<RDFCompareResultEntry> entries) {
