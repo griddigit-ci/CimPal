@@ -13,7 +13,7 @@
 
 | Area | What it does | CLI command |
 |---|---|---|
-| Validation | SHACL validation of CGMES and other CIM models, by mapping CSV or grouped by timestamp; Excel and Turtle reports, JSON summary | `validate` |
+| Validation | SHACL validation of CGMES and other CIM models, by mapping CSV, grouped by timestamp, or as one combined dataset; Excel and Turtle reports, JSON summary | `validate` |
 | Shape authoring | SHACL from RDFS profiles; SHACL from Excel templates; reorganising SHACL files | `rdfs2shacl`, `excel2shacl`, `organize` |
 | RDF handling | Conversion between RDF/XML, Turtle and JSON-LD; SPARQL SELECT queries | `convert`, `sparql` |
 | Comparison | Profile and shape comparison; instance-data comparison | `compare`, `compare-instances` |

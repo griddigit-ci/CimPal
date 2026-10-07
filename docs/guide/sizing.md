@@ -103,6 +103,7 @@ The smallest heap grows by about 0.26 GB per million triples above a base of abo
 
 - **Peak RSS:** Windows has no `VmHWM`, so `peakRssBytes` is null here. On Linux, `--stats` and `run_bench.py --docker` (cgroup `memory.peak`) report it.
 - **The timestamped workflow and multi-row mappings.**
+- **The combined workflow.** It loads all its data files into one graph, so size it by their total triples, as one model.
 - **10M triples or more:** it doesn't fit this 16 GB laptop with room to spare. By the rule of thumb, 10M needs about 6 GB of heap and an 8 GB container.
 - **Real CGMES conformity models:** that needs decision D-4 on the ENTSO-E model licence.
 

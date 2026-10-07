@@ -49,11 +49,14 @@ public final class PathPolicy {
 
     private final List<Path> readRoots;
     private final List<Path> writeRoots;
+    /** Every root as given and as its real path, for {@link #mayReadIfActive}'s lexical test. */
+    private final List<Path> spelledRoots;
     private final boolean allowUnc;
 
-    private PathPolicy(List<Path> readRoots, List<Path> writeRoots, boolean allowUnc) {
+    private PathPolicy(List<Path> readRoots, List<Path> writeRoots, List<Path> spelledRoots, boolean allowUnc) {
         this.readRoots = List.copyOf(readRoots);
         this.writeRoots = List.copyOf(writeRoots);
+        this.spelledRoots = List.copyOf(spelledRoots);
         this.allowUnc = allowUnc;
     }
 
@@ -65,6 +68,7 @@ public final class PathPolicy {
     public static final class Builder {
         private final List<Path> readRoots = new ArrayList<>();
         private final List<Path> writeRoots = new ArrayList<>();
+        private final List<Path> spelledRoots = new ArrayList<>();
         private boolean allowUnc;
 
         /** A root that may be read and written. */
@@ -74,13 +78,20 @@ public final class PathPolicy {
         }
 
         public Builder readRoot(Path root) {
-            readRoots.add(realDirectory(root));
+            readRoots.add(spelled(root, realDirectory(root)));
             return this;
         }
 
         public Builder writeRoot(Path root) {
-            writeRoots.add(realDirectory(root));
+            writeRoots.add(spelled(root, realDirectory(root)));
             return this;
+        }
+
+        /** Remembers how the root was written too: a path built from that spelling is under it. */
+        private Path spelled(Path given, Path real) {
+            spelledRoots.add(real);
+            spelledRoots.add(given.toAbsolutePath().normalize());
+            return real;
         }
 
         /** Accept UNC paths ({@code \\server\share}); they still have to be under a root. */
@@ -93,7 +104,7 @@ public final class PathPolicy {
             if (readRoots.isEmpty() && writeRoots.isEmpty()) {
                 throw new IllegalArgumentException("A path policy needs at least one root.");
             }
-            return new PathPolicy(readRoots, writeRoots, allowUnc);
+            return new PathPolicy(readRoots, writeRoots, spelledRoots, allowUnc);
         }
 
         private static Path realDirectory(Path root) {
@@ -298,6 +309,21 @@ public final class PathPolicy {
     public static Path checkReadIfActive(Path path) {
         PathPolicy policy = active;
         return policy == null ? path : policy.checkRead(path);
+    }
+
+    /**
+     * Without touching the file system: false when a policy is active and {@code path}, made
+     * absolute and normalised, lies outside every root. A caller looking for a file among
+     * candidates (where does this import live?) skips such a path, so the search can't reveal
+     * whether a file outside the roots exists. {@link #checkRead} still decides for a path that
+     * passes, following links.
+     */
+    public static boolean mayReadIfActive(Path path) {
+        PathPolicy policy = active;
+        if (policy == null) {
+            return true;
+        }
+        return under(path.toAbsolutePath().normalize(), policy.spelledRoots);
     }
 
     /**

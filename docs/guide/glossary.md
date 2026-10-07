@@ -27,6 +27,7 @@
 - **Violation / finding:** a focus node that breaks a rule. Severity can be Violation, Warning or Info.
 - **`owl:imports`:** a statement in a constraint file that pulls in another file. CimPal loads local imports, and remote ones from an allowlist of GitHub hosts.
 - **Mapping CSV:** CimPal's list of what to validate. Each row names model files (`xml_inputs`) and the constraint files (`ttl`) to check them against.
+- **Combined validation:** validation without a mapping CSV: the data files you name are merged into one dataset and checked against all the constraint files you name at once. `validate --workflow combined`, or *Validate selected files together* in the GUI.
 - **Datatype map:** tells CimPal the datatype of each CIM property, so values such as `1.5` are checked as numbers. Presets include `CGMES30NC25`.
 - **SPARQL:** the query language for RDF. CimPal runs SELECT queries (`sparql`) and SHACL-SPARQL rules. Federated `SERVICE` queries are disabled.
 

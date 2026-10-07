@@ -56,6 +56,8 @@ final class PathGuard {
                     new Field("mappingCsv", "--mapping-csv", Kind.READ),
                     new Field("modelsDir", "--models", Kind.READ),
                     new Field("constraintsRoot", "--constraints-root", Kind.READ),
+                    new Field("constraintFiles", "--constraint-files", Kind.READ),
+                    new Field("dataFiles", "--data-files", Kind.READ),
                     new Field("outputDir", "--output", Kind.WRITE_DIR),
                     new Field("datatypeMap", "--datatype-map", Kind.READ_IF_EXISTS),
                     new Field("previousComparison", "--previous-comparison", Kind.READ),

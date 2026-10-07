@@ -648,7 +648,7 @@
         "properties" : {
           "workflow" : {
             "type" : "string",
-            "description" : "Workflow: 'mapping' (default, uses a CSV mapping file) or 'timestamped' (groups by timestamp)."
+            "description" : "Workflow: 'mapping' (default, uses a CSV mapping file), 'timestamped' (groups by timestamp) or 'combined' (validates the dataFiles as one dataset against all the constraintFiles at once)."
           },
           "mappingCsv" : {
             "type" : "string",
@@ -656,11 +656,25 @@
           },
           "modelsDir" : {
             "type" : "string",
-            "description" : "Absolute path to the root folder containing model ZIP/XML archives."
+            "description" : "Absolute path to the root folder containing model ZIP/XML archives. Required for mapping and timestamped workflows."
           },
           "constraintsRoot" : {
             "type" : "string",
-            "description" : "Absolute path to the root folder for SHACL constraint .ttl files."
+            "description" : "Absolute path to the root folder for SHACL constraint .ttl files. Required for mapping and timestamped workflows; optional for combined, where relative owl:imports are then also resolved against it."
+          },
+          "constraintFiles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to SHACL constraint files (.ttl, .rdf) or ZIP archives of them, which together form one shapes graph. Required for the combined workflow."
+          },
+          "dataFiles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Absolute paths to instance data files (.xml) or ZIP archives of them, which together form one dataset. Required for the combined workflow."
           },
           "outputDir" : {
             "type" : "string",

@@ -2760,19 +2760,25 @@ public class ValidationTools {
             long readStart = System.currentTimeMillis();
 
             Model tmp;
-            if (isRemote) {
-                boolean inRunCacheHit = REMOTE_IMPORTS_CACHE.containsKey(key);
-                long fetchStart = System.currentTimeMillis();
-                tmp = loadRemoteCached(key);
-                if (inRunCacheHit) {
-                    remoteCacheHits++;
+            try {
+                if (isRemote) {
+                    boolean inRunCacheHit = REMOTE_IMPORTS_CACHE.containsKey(key);
+                    long fetchStart = System.currentTimeMillis();
+                    tmp = loadRemoteCached(key);
+                    if (inRunCacheHit) {
+                        remoteCacheHits++;
+                    } else {
+                        totalFetchedMs += System.currentTimeMillis() - fetchStart;
+                    }
+                } else if (src instanceof ShapeArchive.Entry entry) {
+                    tmp = entry.read();
                 } else {
-                    totalFetchedMs += System.currentTimeMillis() - fetchStart;
+                    tmp = readLocalShapeSource((LocalShapeSource) src);
                 }
-            } else if (src instanceof ShapeArchive.Entry entry) {
-                tmp = entry.read();
-            } else {
-                tmp = readLocalShapeSource((LocalShapeSource) src);
+            } catch (org.apache.jena.shared.JenaException ex) {
+                // A parse error gives a line and a column but not the file; with many files, name it.
+                throw new IOException("Could not read the shapes file " + forLog(src.displayName())
+                        + ": " + ex.getMessage(), ex);
             }
 
             dbg("SHAPES DONE read index=" + loadedFiles
@@ -2914,7 +2920,7 @@ public class ValidationTools {
             try {
                 String windowsPath = u.replaceFirst("(?i)^([a-z]):/+", "$1:/");
                 Path p = Paths.get(windowsPath).toAbsolutePath().normalize();
-                if (Files.isRegularFile(p)) {
+                if (PathPolicy.mayReadIfActive(p) && Files.isRegularFile(p)) {
                     dbg("resolveImport windowsPath=" + forLog(importUri) + " resolved=" + p);
                     return new LocalShapeSource(p);
                 }
@@ -2952,14 +2958,14 @@ public class ValidationTools {
 
         Path candidate1 = currentDir.resolve(u).normalize();
         PathPolicy.refuseNetworkPathIfActive(candidate1);
-        if (Files.exists(candidate1)) {
+        if (PathPolicy.mayReadIfActive(candidate1) && Files.exists(candidate1)) {
             dbg("resolveImport candidate1=" + candidate1);
             return new LocalShapeSource(candidate1);
         }
 
         Path candidate2 = constraintsRoot.resolve(u).normalize();
         PathPolicy.refuseNetworkPathIfActive(candidate2);
-        if (Files.exists(candidate2)) {
+        if (PathPolicy.mayReadIfActive(candidate2) && Files.exists(candidate2)) {
             dbg("resolveImport candidate2=" + candidate2);
             return new LocalShapeSource(candidate2);
         }
@@ -2970,7 +2976,7 @@ public class ValidationTools {
 
         Path candidate3 = constraintsRoot.resolve(fileName).normalize();
         PathPolicy.refuseNetworkPathIfActive(candidate3);
-        if (Files.exists(candidate3)) {
+        if (PathPolicy.mayReadIfActive(candidate3) && Files.exists(candidate3)) {
             dbg("resolveImport candidate3=" + candidate3);
             return new LocalShapeSource(candidate3);
         }
@@ -3011,6 +3017,11 @@ public class ValidationTools {
         Path p = src.path().toAbsolutePath().normalize();
         // serve/mcp/run: every local shapes file, including owl:imports, must be under a root.
         // Checked before the existence test, so a refused network path is never touched.
+        // An import outside the roots is refused the same way whether or not the file exists,
+        // so a shapes file can't use its imports to find out what exists outside them.
+        if (!PathPolicy.mayReadIfActive(p)) {
+            throw new PathNotAllowedException("Shapes file outside the allowed roots: " + forLog(p.toString()));
+        }
         PathPolicy.checkReadIfActive(p);
         if (!Files.exists(p)) {
             throw new FileNotFoundException("Imported TTL not found: " + p);

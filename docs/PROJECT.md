@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-06  
+**Last updated:** 2026-10-07  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -94,7 +94,7 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 | `eu.griddigit.cimpal.core.utils.ValidationTools` | Core | Main validation engine. `validateByMapping()`, `validateByTimestampedMapping()`. ~6000 lines. Zero GUI imports. Prefer `MappingValidator` for new callers — see below. |
 | `eu.griddigit.cimpal.core.utils.MappingValidator` + `eu.griddigit.cimpal.core.models.MappingValidationOptions` | Core | Builder-style facade over `validateByMapping`/`validateByTimestampedMapping` (added 2026-09-23). `MappingValidationOptions.builder()...timestamped(true/false).build()`, then `new MappingValidator(options).validate()` → `MappingValidationSummary`. The GUI's SHACL Validation tab and the CLI's `validate --workflow mapping/timestamped` both go through this now (CLI refactored 2026-09-25). |
 | `eu.griddigit.cimpal.core.models.MappingValidationSummary` | Core | Record: `reports` (List<Path> — one entry for plain mapping, several for timestamped), `conforming`, `violations`, `errors`. Same `hasViolations()`/`totalRows()` semantics as the older `ValidationRunSummary`/`ValidationTimestampedRunSummary`. |
-| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Used by the GUI's *Validate selected files together* workflow (2026-10-05, see below), and once per distinct model by `ShaclRuleTester`, which loads the shapes once through the package-private `SHACLValidator.loadShapeFiles` and passes them as `shapesModel`. |
+| `eu.griddigit.cimpal.core.utils.SHACLValidator` + `eu.griddigit.cimpal.core.models.SHACLValidationOptions` | Core | Builder-style facade for validating **one** dataset (files and/or a Jena model) against **one** set of shapes → `SHACLValidationReport`. Used by the GUI's *Validate selected files together* workflow (2026-10-05, see below) and the CLI's `validate --workflow combined` (2026-10-07), and once per distinct model by `ShaclRuleTester`, which loads the shapes once through the package-private `SHACLValidator.loadShapeFiles` and passes them as `shapesModel`. |
 | `eu.griddigit.cimpal.core.models.SHACLValidationReport` | Core | `SHACLValidator`'s result. `getResultsByConstraintFile()` breaks the results down by the constraint file that declares each result's source shape. `writeExcel(file)` / `writeExcelTo(dir)` write the mapping-report workbook with one validation row per constraint file; `writeTurtle(file)` writes the engine's `sh:ValidationReport`. |
 | `eu.griddigit.cimpal.core.utils.ShapeArchive` | Core | Package-private. The `.ttl`/`.rdf` entries of a shapes ZIP, held in memory (256 MiB budget) as `ShapeSource`s. Each is parsed with the base `<archive URI>/<entry>`, so relative `owl:imports` resolve inside the archive as in a folder (`ValidationTools.resolveImport` answers them from memory, ahead of the network-path refusal). |
 | `eu.griddigit.cimpal.core.presets.MappingValidationOptionsPresets` / `SHACLValidationOptionsPresets` | Core | CGMES 3.0 / 2.4.15 starting points for the two builders above. |
@@ -111,7 +111,7 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 - `ModelFactory.forEachZipEntry` streams archive entries, nested ones included, within one `ZipBudget`. It drains every nested entry through the budget, because `ZipInputStream` inflates skipped entries. `safeZipEntryName` refuses absolute names, `:`, `..` that climbs out, and control characters.
 - A data or shapes ZIP with nothing to read fails instead of contributing nothing. Other RDF files in a shapes ZIP are named in the report warnings, which the GUI shows in its finish dialog.
 
-The CLI has no equivalent yet. Covered by `SHACLValidatorTest`, `SHACLValidationReportTest`, `ShapeArchiveTest`, `ZipBudgetTest` and `ShapeSourceTest`.
+The CLI runs it as `validate --workflow combined` (added 2026-10-07), with `--constraint-files` and `--data-files` (config keys `constraintFiles`, `dataFiles`) and the template `configs/validate-combined.json`. Its JSON summary keeps `cimpal-validate-summary/1`: `totals` count the workbook's rows, one per constraint file, and `results`, `byConstraintFile`, `partial` and `warnings` are added. An input that can't be read (a parse error, which now names the file, a missing `owl:imports`, an archive without matching files) ends the run with exit 2 and writes nothing, and so does a run that would check nothing (`SHACLValidationReport.checkedNothing()`: no active target shape, or no data triples); a report that can't be written ends with exit 3. `SHACLValidationReport.writeReportsTo` names the workbook and the `.ttl` for the GUI and the CLI alike, and `SHACLValidationOptions.runStats` counts the data for `--stats`. Covered by `SHACLValidatorTest`, `SHACLValidationReportTest`, `ShapeArchiveTest`, `ZipBudgetTest`, `ShapeSourceTest`, and in the CLI by `ValidateCommandTest`, `PathGuardTest` and `OutOfMemoryExitTest`.
 
 **SHACL rule test (moved and rewritten 2026-10-05).** The SHACL Validation tab's *Validate by manual selection* workflow (before that the *SHACL tester* tab) never validated datasets: it checks that each rule fires on its NonConform models and on none of its Conform models. It is now the fourth section of **SHACL ▸ Constraints Operations**, *Test SHACL rules against Conform / NonConform models* (`ShaclRuleTestPane.fxml`, `ShaclRuleTestController`), and the CLI's `validate --workflow manual`, `--shacl-files`, the MCP `shaclConstraintFiles` field, `validate-manual.json` and `pipeline-shape-dev.json` are gone (`--workflow manual` exits 2 with a pointer). `ShaclRuleTester` replaces `ShaclAutoTester`, `SHACLValidationLogger` and `SHACLRuleTestData`, fixing:
 - Since `f547550` (2026-03-04) every run threw a `NullPointerException` at the first finding: the rule's `sh:name` was looked up from the shortened source-shape label. Rules are now matched by the source shape node.
@@ -418,7 +418,7 @@ CimPal/
 ├── CimPal-CLI/
 │   ├── pom.xml
 │   ├── configs/
-│   │   ├── validate-mapping-cgmes30.json
+│   │   ├── validate-mapping-cgmes30.json, validate-combined.json
 │   │   ├── validate-timestamped.json, sparql-query.json
 │   │   ├── convert.json, rdfs2shacl.json, compare.json
 │   │   ├── compare-instances.json, excel2shacl.json, organize.json
@@ -484,7 +484,8 @@ CimPal/
 - Data ZIPs read `.xml` entries only. Other RDF files in a data ZIP are skipped without a warning, as top-level entries always were. A shapes ZIP, in turn, reads `.ttl` and `.rdf`, and skips `.xml` (it may be instance data) without a warning. The warnings for other skipped RDF files appear in the GUI's finish dialog and the Output pane, but not in the workbook.
 - Entry names with C1 controls or bidi/format characters (U+202E and the like) pass `LogSanitizer` and `safeZipEntryName`; they can't forge log lines but can spoof how a name displays. Widening `LogSanitizer`'s class would change every log, so it was left as it is.
 - External entities in RDF/XML are not resolved by Jena (pinned by `ShapeArchiveTest.externalEntitiesInRdfEntriesAreNotResolved`).
-- `SHACLValidator` has no `PathPolicy` check on data files, and probes a shape file with `Files.isRegularFile` before `ShapeArchive.read` checks the policy. Add both before wiring it into `serve`/`mcp`/`run`.
+- Fixed 2026-10-07, when the CLI's combined workflow wired `SHACLValidator` into `serve`/`mcp`/`run`: it now checks every shape and data file against an active `PathPolicy` before touching it, and `PathGuard` checks `constraintFiles` and `dataFiles` element by element. An `owl:imports` candidate outside the roots is no longer probed: `PathPolicy.mayReadIfActive` tests it without touching the file system, so an import outside the roots fails the same way whether or not the file exists.
+- Open from the CLI combined-workflow review (2026-10-07): Jena's JSON-LD reader may fetch a remote `@context` outside the egress gate (`.jsonld` inputs to `convert`, `sparql` and now `validate --workflow combined`); to verify and, if so, block while a `PathPolicy` is active. The `clearRemoteCaches()` call at the start of a combined run has no test: the egress gate only allows GitHub hosts, so no local stub can serve an import.
 
 **`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 

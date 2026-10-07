@@ -7,6 +7,7 @@ package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
+import eu.griddigit.cimpal.core.testsupport.TestModels;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
@@ -83,5 +84,71 @@ class McpCommandTest {
                 .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readValue(text);
         assertThat(result.path("rows")).hasSize(1);
         assertThat(result.path("stats").path("triplesLoaded").asLong()).isEqualTo(1);
+    }
+
+    // ---- validate --workflow combined through mcp: PathGuard, the config rewrite and Core's checks ----
+
+    private static final String DATA_WITHOUT_SIZE = """
+            <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:ex="urn:test:">
+              <ex:Thing rdf:about="#_1"/>
+            </rdf:RDF>
+            """;
+
+    private static String combinedCall(Path shapes, Path data, Path out) {
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
+        ObjectNode arguments = call.putObject("params").put("name", "validate").putObject("arguments");
+        arguments.put("workflow", "combined").put("outputDir", out.toString())
+                .put("xmlBase", TestModels.XML_BASE).put("workers", 1);
+        arguments.putArray("constraintFiles").add(shapes.toString());
+        arguments.putArray("dataFiles").add(data.toString());
+        return JSON.writeValueAsString(call) + "\n";
+    }
+
+    private static JsonNode toolResult(List<JsonNode> messages) {
+        return messages.getFirst().path("result");
+    }
+
+    @Test
+    void combinedValidationRunsAsAToolCall(@TempDir Path tempDir) throws Exception {
+        Path shapes = Files.writeString(tempDir.resolve("shapes.ttl"), TestModels.THING_SHAPES);
+        Path data = Files.writeString(tempDir.resolve("data.xml"), DATA_WITHOUT_SIZE);
+
+        JsonNode result = toolResult(runMcp(combinedCall(shapes, data, tempDir.resolve("out")), "--root", tempDir.toString()));
+
+        assertThat(result.path("isError").asBoolean()).isFalse();
+        JsonNode summary = JSON.readTree(result.path("content").get(0).path("text").asText());
+        assertThat(summary.path("run").path("workflow").asText()).isEqualTo("combined");
+        assertThat(summary.path("hasViolations").asBoolean()).isTrue();
+        assertThat(Path.of(summary.path("report").asText())).isRegularFile();
+    }
+
+    @Test
+    void combinedValidationRefusesADataFileOutsideTheRoot(@TempDir Path tempDir) throws Exception {
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        Path shapes = Files.writeString(root.resolve("shapes.ttl"), TestModels.THING_SHAPES);
+        Path outside = Files.writeString(tempDir.resolve("outside.xml"), DATA_WITHOUT_SIZE);
+
+        JsonNode result = toolResult(runMcp(combinedCall(shapes, outside, root.resolve("out")), "--root", root.toString()));
+
+        assertThat(result.path("isError").asBoolean()).isTrue();
+        assertThat(result.path("content").get(0).path("text").asText()).contains("outside the allowed roots");
+        assertThat(root.resolve("out")).doesNotExist();
+    }
+
+    @Test
+    void combinedValidationRefusesAnImportOutsideTheRoot(@TempDir Path tempDir) throws Exception {
+        // PathGuard only sees the request; the import is found by Core while the policy is active.
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        Files.writeString(tempDir.resolve("secret.ttl"), TestModels.THING_SHAPES);
+        Path shapes = Files.writeString(root.resolve("shapes.ttl"),
+                "<urn:test:shapes> <http://www.w3.org/2002/07/owl#imports> <../secret.ttl> .\n");
+        Path data = Files.writeString(root.resolve("data.xml"), DATA_WITHOUT_SIZE);
+
+        JsonNode result = toolResult(runMcp(combinedCall(shapes, data, root.resolve("out")), "--root", root.toString()));
+
+        assertThat(result.path("isError").asBoolean()).isTrue();
+        assertThat(JSON.readTree(result.path("content").get(0).path("text").asText()).path("exitCode").asInt())
+                .isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(root.resolve("out")).doesNotExist();
     }
 }

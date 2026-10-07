@@ -73,7 +73,7 @@ Without `--stats` the output is unchanged.
 | `gcMs` | Garbage-collection time. A GC share (`gcMs / wallMs`) above about 10 % means the heap is too small. |
 | `availableProcessors` | Cores the JVM may use; honours container CPU limits and `-XX:ActiveProcessorCount`. |
 | `inputBytes` | Bytes of model files read. Files inside a ZIP are not counted. |
-| `triplesLoaded` | Triples parsed from the input models: the size measure of the [sizing guide](../guide/sizing.md). For `validate --workflow mapping`, per row (a file used by two rows counts twice); for `timestamped`, each file once. |
+| `triplesLoaded` | Triples parsed from the input models: the size measure of the [sizing guide](../guide/sizing.md). For `validate --workflow mapping`, per row (a file used by two rows counts twice); for `timestamped` and `combined`, each file once. |
 | `javaVersion`, `os` | The Java runtime, and the operating system name and architecture (no version, since `serve` and `mcp` clients see it). |
 
 The schema is `CimPal-CLI/src/test/resources/fixtures/cli-json/stats.schema.json`. Fields may be added later; none will be removed or renamed.
@@ -173,6 +173,7 @@ Ready-to-use templates are in `CimPal-CLI/configs/`. Copy one to your working di
 |---|---|
 | `validate-mapping-cgmes30.json` | Full mapping validation, CGMES 3.0 / NC 2.5 |
 | `validate-timestamped.json` | Timestamped validation with comparison to previous run |
+| `validate-combined.json` | Combined validation of one dataset against a constraint set, no mapping CSV |
 | `sparql-query.json` | SPARQL SELECT query against model files |
 
 ---

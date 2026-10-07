@@ -39,16 +39,26 @@ final class CommandSchemas {
                             + "Use this as the primary diagnostic step in the validation loop.",
                     p -> {
                         p.set("workflow", schema("string",
-                                "Workflow: 'mapping' (default, uses a CSV mapping file) or "
-                                        + "'timestamped' (groups by timestamp)."));
+                                "Workflow: 'mapping' (default, uses a CSV mapping file), "
+                                        + "'timestamped' (groups by timestamp) or 'combined' (validates the "
+                                        + "dataFiles as one dataset against all the constraintFiles at once)."));
                         p.set("mappingCsv", schema("string",
                                 "Absolute path to the CSV mapping file. "
                                         + "Three columns: model file names | constraint .ttl path | label. "
                                         + "Required for mapping and timestamped workflows."));
                         p.set("modelsDir", schema("string",
-                                "Absolute path to the root folder containing model ZIP/XML archives."));
+                                "Absolute path to the root folder containing model ZIP/XML archives. "
+                                        + "Required for mapping and timestamped workflows."));
                         p.set("constraintsRoot", schema("string",
-                                "Absolute path to the root folder for SHACL constraint .ttl files."));
+                                "Absolute path to the root folder for SHACL constraint .ttl files. Required for "
+                                        + "mapping and timestamped workflows; optional for combined, where relative "
+                                        + "owl:imports are then also resolved against it."));
+                        p.set("constraintFiles", arraySchema(
+                                "Absolute paths to SHACL constraint files (.ttl, .rdf) or ZIP archives of them, "
+                                        + "which together form one shapes graph. Required for the combined workflow."));
+                        p.set("dataFiles", arraySchema(
+                                "Absolute paths to instance data files (.xml) or ZIP archives of them, which "
+                                        + "together form one dataset. Required for the combined workflow."));
                         p.set("outputDir", schema("string",
                                 "Absolute path to the output folder for Excel reports and ZIPs."));
                         p.set("datatypeMap", schema("string",

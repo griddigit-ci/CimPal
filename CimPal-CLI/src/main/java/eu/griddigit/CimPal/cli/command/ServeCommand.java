@@ -49,7 +49,7 @@ import java.util.function.Consumer;
  * filesystem.
  *
  * <pre>
- *   POST /validate          — SHACL validation (mapping, timestamped)
+ *   POST /validate          — SHACL validation (mapping, timestamped, combined)
  *   POST /sparql            — SPARQL SELECT query
  *   POST /convert           — RDF format conversion
  *   POST /compare           — RDF diff

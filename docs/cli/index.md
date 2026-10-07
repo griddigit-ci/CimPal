@@ -45,6 +45,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 |---|---|
 | `validate-mapping-cgmes30.json` | Standard mapping validation, CGMES 3.0 / NC 2.5 |
 | `validate-timestamped.json` | Timestamped batch validation with trend comparison |
+| `validate-combined.json` | Combined validation: given data files as one dataset against given constraint files, no mapping CSV |
 | `sparql-query.json` | SPARQL SELECT query against model files |
 | `convert.json` | RDF format conversion |
 | `rdfs2shacl.json` | RDFS to SHACL shape generation |
@@ -60,7 +61,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 
 | Command | Status |
 |---|---|
-| `validate` | Done — mapping and timestamped workflows (the manual workflow moved to the GUI's rule test) |
+| `validate` | Done — mapping, timestamped and combined workflows (the manual workflow moved to the GUI's rule test) |
 | `sparql` | Done |
 | `manifest` | Done |
 | `convert` | Done — single file, multi-file union, all RDF/XML sub-formats |

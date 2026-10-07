@@ -60,6 +60,22 @@ class OutOfMemoryExitTest {
     }
 
     @Test
+    void aCombinedValidationThatRunsOutOfMemoryExitsWithThree() throws Exception {
+        // The combined workflow turns unreadable input into exit 2; running out of memory must not.
+        Path models = Files.createDirectories(tempDir.resolve("models"));
+        writeLargeModel(models.resolve("data.xml"), 100_000);
+        writeShapesAndMapping("data.xml");
+        Forked run = fork(null, "validate", "--workflow", "combined",
+                "--constraint-files", tempDir.resolve("constraints/shapes.ttl").toString(),
+                "--data-files", models.resolve("data.xml").toString(),
+                "--output", tempDir.resolve("out").toString(),
+                "--xml-base", TestModels.XML_BASE, "--workers", "1", "--format", "json");
+
+        assertOutOfMemoryExit(run);
+        assertThat(run.stdout()).as("stdout carries no partial JSON").isEmpty();
+    }
+
+    @Test
     void anMcpToolCallThatRunsOutOfMemoryAnswersWithAnErrorAndExitsWithThree() throws Exception {
         Path models = Files.createDirectories(tempDir.resolve("models"));
         writeLargeModel(models.resolve("data.xml"), 100_000);

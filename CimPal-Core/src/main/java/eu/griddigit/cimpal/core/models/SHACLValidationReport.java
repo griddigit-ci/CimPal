@@ -50,6 +50,7 @@ public class SHACLValidationReport {
     private final int maxResultsPerConstraint;
     private final List<ConstraintFileResults> resultsByConstraintFile;
     private final boolean brokenDownByConstraintFile;
+    private final boolean checkedNothing;
 
     public SHACLValidationReport(boolean conforms,
                                  boolean partial,
@@ -61,7 +62,7 @@ public class SHACLValidationReport {
                                  String shapeSources,
                                  int maxResultsPerConstraint) {
         this(conforms, partial, results, reportModel, warnings, datasetName, dataSources, shapeSources,
-                maxResultsPerConstraint, List.of());
+                maxResultsPerConstraint, List.of(), false);
     }
 
     /**
@@ -80,6 +81,26 @@ public class SHACLValidationReport {
                                  String shapeSources,
                                  int maxResultsPerConstraint,
                                  List<ConstraintFileResults> resultsByConstraintFile) {
+        this(conforms, partial, results, reportModel, warnings, datasetName, dataSources, shapeSources,
+                maxResultsPerConstraint, resultsByConstraintFile, false);
+    }
+
+    /**
+     * @param checkedNothing no active shape has a target, or the data holds no triples: the run
+     *                       conforms without having checked anything
+     */
+    public SHACLValidationReport(boolean conforms,
+                                 boolean partial,
+                                 List<SHACLValidationResult> results,
+                                 Model reportModel,
+                                 List<String> warnings,
+                                 String datasetName,
+                                 String dataSources,
+                                 String shapeSources,
+                                 int maxResultsPerConstraint,
+                                 List<ConstraintFileResults> resultsByConstraintFile,
+                                 boolean checkedNothing) {
+        this.checkedNothing = checkedNothing;
         this.conforms = conforms;
         this.partial = partial;
         this.results = List.copyOf(results);
@@ -101,6 +122,15 @@ public class SHACLValidationReport {
     }
 
     /** True when a per-constraint result limit cut the validation short. */
+    /**
+     * True when the run checked nothing: no active shape has a target, or the data holds no
+     * triples. It then conforms trivially, which a caller must not take for a pass; the warnings
+     * say which.
+     */
+    public boolean checkedNothing() {
+        return checkedNothing;
+    }
+
     public boolean isPartial() {
         return partial;
     }
@@ -171,16 +201,40 @@ public class SHACLValidationReport {
         }
     }
 
+    /** The workbook a run wrote, and the Turtle report beside it, or null when none was asked for. */
+    public record WrittenReports(Path workbook, Path turtle) {
+    }
+
+    /**
+     * Writes the workbook into {@code outputDir} as {@link #writeExcelTo(Path)} does and, when
+     * {@code withTurtle}, {@link #getReportModel()} as Turtle beside it under the same name,
+     * {@code validation_report__<yyyyMMdd_HHmmss>.ttl}.
+     */
+    public WrittenReports writeReportsTo(Path outputDir, boolean withTurtle) throws IOException {
+        Path workbook = writeExcelTo(outputDir);
+        Path turtle = null;
+        if (withTurtle) {
+            turtle = workbook.resolveSibling(workbook.getFileName().toString().replaceFirst("\\.xlsx$", ".ttl"));
+            writeTurtle(turtle);
+        }
+        return new WrittenReports(workbook, turtle);
+    }
+
+    /**
+     * True when {@code file}'s row of the workbook says it conforms: none of its shapes produced a
+     * result. Never when the run was cut short, since nothing can be said about the checks that did
+     * not run, or when the engine found the data non-conforming without a result to show for it
+     * (a Python engine's report may lack them), since which file failed is then unknown.
+     */
+    public boolean conforms(ConstraintFileResults file) {
+        return conforms || (!partial && file.results().isEmpty() && !results.isEmpty());
+    }
+
     private void appendTo(ValidationExcelWriter writer) {
         for (ConstraintFileResults file : resultsByConstraintFile) {
-            // A constraint file conforms when none of its shapes produced a result, unless the run
-            // was cut short (nothing can be said about the checks that did not run), or the engine
-            // found the data non-conforming without a result to show for it (a Python engine's
-            // report may lack them): then which file failed is unknown.
-            boolean fileConforms = conforms || (!partial && file.results().isEmpty() && !results.isEmpty());
             String chartName = brokenDownByConstraintFile ? file.constraintFile() : datasetName;
             writer.appendValidation(ValidationExcelWriter.CaseFolder.UNKNOWN, datasetName, dataSources, "",
-                    file.constraintFile(), file.results(), fileConforms, chartName, partial, maxResultsPerConstraint);
+                    file.constraintFile(), file.results(), conforms(file), chartName, partial, maxResultsPerConstraint);
         }
     }
 

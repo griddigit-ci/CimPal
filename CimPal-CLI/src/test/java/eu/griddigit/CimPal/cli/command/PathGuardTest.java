@@ -140,6 +140,30 @@ class PathGuardTest {
     }
 
     @Test
+    void combinedValidationFilesAreCheckedOneByOne() throws Exception {
+        // validate --workflow combined reads every file listed; one outside the roots refuses the request.
+        ObjectNode checked = PathGuard.check("validate",
+                json("{\"workflow\":\"combined\",\"constraintFiles\":[\"in.ttl\"],\"dataFiles\":[\"in.ttl\"],"
+                        + "\"outputDir\":\"out\"}"), policy, root);
+        Path in = root.resolve("in.ttl").toRealPath();
+        assertThat(Path.of(checked.get("constraintFiles").get(0).asString())).isEqualTo(in);
+        assertThat(Path.of(checked.get("dataFiles").get(0).asString())).isEqualTo(in);
+
+        for (String key : List.of("constraintFiles", "dataFiles")) {
+            assertThatThrownBy(() -> PathGuard.check("validate",
+                    json("{\"workflow\":\"combined\",\"" + key + "\":[\"in.ttl\"," + q(outside.resolve("secret.ttl"))
+                            + "]}"), policy, root))
+                    .as(key)
+                    .isInstanceOf(PathNotAllowedException.class);
+            // A string is one path to check, not a list to split: the command doesn't split it either.
+            assertThatThrownBy(() -> PathGuard.check("validate",
+                    json("{\"workflow\":\"combined\",\"" + key + "\":\"../outside/secret.ttl\"}"), policy, root))
+                    .as(key)
+                    .isInstanceOf(PathNotAllowedException.class);
+        }
+    }
+
+    @Test
     void commaSeparatedListIsCheckedPerEntry() {
         String models = "in.ttl," + outside.resolve("secret.ttl");
 

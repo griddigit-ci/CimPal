@@ -75,7 +75,7 @@ Details: [CLI reference: resource statistics and automation options](../cli/READ
 
 | Command | Writes |
 |---|---|
-| `validate` | `validation_report__<date>_<time>.xlsx` in `outputDir`; with `--export-turtle` (or `--samples` > 0) also `*__report.ttl` per row; timestamped runs write one workbook per timestamp plus summaries |
+| `validate` | `validation_report__<date>_<time>.xlsx` in `outputDir`; with `--export-turtle` (or, for the mapping workflow, `--samples` > 0) also `*__report.ttl` per row; timestamped runs write one workbook per timestamp plus summaries; combined runs write one workbook, and with `--export-turtle` `validation_report__<date>_<time>.ttl` beside it |
 | `compare`, `compare-instances`, `sparql` | stdout, or `--output` (`.xlsx` or CSV) |
 | `rdfs2shacl`, `excel2shacl`, `organize`, `convert`, `manifest`, `gen-instances` | the files their options name |
 

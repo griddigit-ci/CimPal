@@ -958,13 +958,12 @@ public class ValidationByMappingController {
                         .workers(workers)
                         .build()).validate();
 
-                Path workbook = report.writeExcelTo(selectedOutputFolder);
+                SHACLValidationReport.WrittenReports written =
+                        report.writeReportsTo(selectedOutputFolder, exportTurtleReport);
+                Path workbook = written.workbook();
                 System.out.println("Report saved to: " + workbook);
-                if (exportTurtleReport) {
-                    Path turtle = workbook.resolveSibling(
-                            workbook.getFileName().toString().replaceFirst("\\.xlsx$", ".ttl"));
-                    report.writeTurtle(turtle);
-                    System.out.println("Turtle report saved to: " + turtle);
+                if (written.turtle() != null) {
+                    System.out.println("Turtle report saved to: " + written.turtle());
                 }
                 report.getWarnings().forEach(warning -> System.out.println("[WARN] " + warning));
 
