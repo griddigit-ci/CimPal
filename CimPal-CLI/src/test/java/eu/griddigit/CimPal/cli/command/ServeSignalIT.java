@@ -61,7 +61,7 @@ class ServeSignalIT {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         ProcessBuilder pb = new ProcessBuilder(java, "-cp", System.getProperty("java.class.path"),
                 "-Dit.jobMillis=" + jobMillis, "-Dit.dir=" + tempDir, ServeSignalItMain.class.getName(),
-                "serve", "--host", "127.0.0.1", "--port", "0", "--root", tempDir.toString(),
+                "--host", "127.0.0.1", "--port", "0", "--root", tempDir.toString(),
                 "--shutdown-grace", grace);
         pb.environment().put(ServeSecurity.TOKEN_ENV, TOKEN);
         process = pb.start();
@@ -69,6 +69,9 @@ class ServeSignalIT {
         Thread.ofVirtual().start(() -> read(process.inputReader(), port, null));
         Thread.ofVirtual().start(() -> read(new BufferedReader(new InputStreamReader(process.getErrorStream(),
                 StandardCharsets.UTF_8)), null, stderr));
+        // Fail fast, with the child's stderr, if it exits instead of listening.
+        process.onExit().thenRun(() -> port.completeExceptionally(new IllegalStateException(
+                "serve exited with " + process.exitValue() + " before listening; stderr:\n" + String.join("\n", stderr))));
         return port.get(60, TimeUnit.SECONDS);
     }
 
