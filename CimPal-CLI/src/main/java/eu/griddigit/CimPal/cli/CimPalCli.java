@@ -87,11 +87,18 @@ public class CimPalCli {
     public static void main(String[] args) {
         // No SPARQL SERVICE: user queries and SHACL-SPARQL shapes must not reach the network (SEC-2).
         SparqlServicePolicy.disableRemoteServiceGlobally();
+        OutOfMemoryExit.prepare();
         int exitCode;
         try {
             exitCode = rethrowingOutOfMemory(new CommandLine(new CimPalCli())).execute(args);
         } catch (Throwable t) {
-            if (OutOfMemoryRethrow.find(t).isPresent()) {
+            boolean outOfMemory;
+            try {
+                outOfMemory = OutOfMemoryRethrow.find(t).isPresent();
+            } catch (OutOfMemoryError nested) {
+                outOfMemory = true; // The heap is still exhausted: looking through the causes failed.
+            }
+            if (outOfMemory) {
                 OutOfMemoryExit.halt();
             }
             throw t;

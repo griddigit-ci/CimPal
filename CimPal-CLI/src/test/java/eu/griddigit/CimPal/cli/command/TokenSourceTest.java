@@ -41,6 +41,10 @@ class TokenSourceTest {
     /** Writes the file and moves its modification time on, so the change is seen at once. */
     private Path write(Path file, String content, int generation) throws Exception {
         Files.writeString(file, content);
+        if (file.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            // Like a real secret: not readable by any user (umask 022 would make it so, and warn).
+            Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"));
+        }
         Files.setLastModifiedTime(file, FileTime.fromMillis(1_700_000_000_000L + generation * 1000L));
         return file;
     }
