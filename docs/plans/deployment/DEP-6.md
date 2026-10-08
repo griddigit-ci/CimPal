@@ -48,7 +48,7 @@ Run `serve` as a real service for a team or an Airflow installation: inside a co
 - [x] JSON logs: schema documented; test that no token or `Authorization` header ever appears; all log fields sanitised
 - [x] `/metrics` behind a flag (`--metrics`), token-protected, tested
 - [x] `deploy/kubernetes/` passes `kubectl apply --dry-run=client` and kubeconform in `integrations.yml`; compose file passes `docker compose config`
-- [ ] End-to-end on kind or Docker Desktop: deploy, submit a job through the ingress with curl, read the result; steps in `deploy/kubernetes/README.md`; result recorded in notes
+- [x] End-to-end on kind or Docker Desktop: deploy, submit a job through the ingress with curl, read the result; steps in `deploy/kubernetes/README.md`; result recorded in notes
 - [x] `/security-review` clean or findings fixed with regression tests
 
 ## Instructions for Claude Code
@@ -130,5 +130,5 @@ Not covered by a test:
 - **Partial writes of the token file:** the docs say to replace the file in one step.
 
 **Open:**
-- the kind end-to-end result from CI (tick the checklist item then);
+- the kind end-to-end job passed on its first run (PR #64, `integrations.yml` run 37752999161): ingress-nginx, the manifests with an image from the branch, a `sparql` job through the Ingress over TLS, JSON logs without the token, and a clean pod deletion;
 - DEP-7 (file exchange) will replace `kubectl cp`/volume filling.
