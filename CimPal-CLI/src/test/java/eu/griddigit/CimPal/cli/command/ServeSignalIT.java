@@ -13,7 +13,6 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -22,8 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -48,9 +45,8 @@ class ServeSignalIT {
     Path tempDir;
 
     private Process process;
-    private final List<String> stderr = new ArrayList<>();
-    /** Reads the child's stderr until the end of the stream, i.e. until the child has exited. */
-    private Thread stderrReader;
+    /** The child's stderr goes straight to this file, read once the child has exited. */
+    private Path stderrFile;
 
     @AfterEach
     void kill() {
@@ -66,27 +62,30 @@ class ServeSignalIT {
                 "--host", "127.0.0.1", "--port", "0", "--root", tempDir.toString(),
                 "--shutdown-grace", grace);
         pb.environment().put(ServeSecurity.TOKEN_ENV, TOKEN);
+        stderrFile = tempDir.resolve("serve.stderr");
+        pb.redirectError(stderrFile.toFile());
         process = pb.start();
         CompletableFuture<Integer> port = new CompletableFuture<>();
-        Thread.ofVirtual().start(() -> read(process.inputReader(), port, null));
-        stderrReader = Thread.ofVirtual().start(() -> read(new BufferedReader(new InputStreamReader(process.getErrorStream(),
-                StandardCharsets.UTF_8)), null, stderr));
+        Thread.ofVirtual().start(() -> read(process.inputReader(), port));
         // Fail fast, with the child's stderr, if it exits instead of listening.
         process.onExit().thenRun(() -> port.completeExceptionally(new IllegalStateException(
-                "serve exited with " + process.exitValue() + " before listening; stderr:\n" + String.join("\n", stderr))));
+                "serve exited with " + process.exitValue() + " before listening; stderr:\n" + stderr())));
         return port.get(60, TimeUnit.SECONDS);
     }
 
-    private static void read(BufferedReader in, CompletableFuture<Integer> port, List<String> lines) {
+    private String stderr() {
+        try {
+            return Files.readString(stderrFile, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "(stderr not readable: " + e + ")";
+        }
+    }
+
+    private static void read(BufferedReader in, CompletableFuture<Integer> port) {
         try (in) {
             for (String line = in.readLine(); line != null; line = in.readLine()) {
-                if (lines != null) {
-                    synchronized (lines) {
-                        lines.add(line);
-                    }
-                }
                 Matcher m = LISTENING.matcher(line);
-                if (port != null && m.find()) {
+                if (m.find()) {
                     port.complete(Integer.parseInt(m.group(1)));
                 }
             }
@@ -128,7 +127,7 @@ class ServeSignalIT {
         process.destroy(); // SIGTERM
 
         assertThat(process.waitFor(60, TimeUnit.SECONDS)).as("exited").isTrue();
-        assertThat(process.exitValue()).as(String.join("\n", stderr)).isEqualTo(0);
+        assertThat(process.exitValue()).as(stderr()).isEqualTo(0);
         assertThat(tempDir.resolve("first.done")).as("the running job finished").exists();
         assertThat(tempDir.resolve("second.done")).as("the queued job never ran").doesNotExist();
     }
@@ -142,11 +141,8 @@ class ServeSignalIT {
         process.destroy(); // SIGTERM
 
         assertThat(process.waitFor(30, TimeUnit.SECONDS)).as("exited within the grace and some").isTrue();
-        assertThat(process.exitValue()).isEqualTo(3);
-        stderrReader.join(Duration.ofSeconds(10)); // all of stderr read, not a fixed sleep
-        synchronized (stderr) {
-            assertThat(String.join("\n", stderr)).contains("--shutdown-grace");
-        }
+        assertThat(process.exitValue()).as(stderr()).isEqualTo(3);
+        assertThat(stderr()).contains("--shutdown-grace");
         assertThat(Files.exists(tempDir.resolve("slow.done"))).isFalse();
     }
 }
