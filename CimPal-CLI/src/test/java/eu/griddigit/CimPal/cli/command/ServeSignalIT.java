@@ -49,6 +49,8 @@ class ServeSignalIT {
 
     private Process process;
     private final List<String> stderr = new ArrayList<>();
+    /** Reads the child's stderr until the end of the stream, i.e. until the child has exited. */
+    private Thread stderrReader;
 
     @AfterEach
     void kill() {
@@ -67,7 +69,7 @@ class ServeSignalIT {
         process = pb.start();
         CompletableFuture<Integer> port = new CompletableFuture<>();
         Thread.ofVirtual().start(() -> read(process.inputReader(), port, null));
-        Thread.ofVirtual().start(() -> read(new BufferedReader(new InputStreamReader(process.getErrorStream(),
+        stderrReader = Thread.ofVirtual().start(() -> read(new BufferedReader(new InputStreamReader(process.getErrorStream(),
                 StandardCharsets.UTF_8)), null, stderr));
         // Fail fast, with the child's stderr, if it exits instead of listening.
         process.onExit().thenRun(() -> port.completeExceptionally(new IllegalStateException(
@@ -141,7 +143,7 @@ class ServeSignalIT {
 
         assertThat(process.waitFor(30, TimeUnit.SECONDS)).as("exited within the grace and some").isTrue();
         assertThat(process.exitValue()).isEqualTo(3);
-        Thread.sleep(200);
+        stderrReader.join(Duration.ofSeconds(10)); // all of stderr read, not a fixed sleep
         synchronized (stderr) {
             assertThat(String.join("\n", stderr)).contains("--shutdown-grace");
         }
