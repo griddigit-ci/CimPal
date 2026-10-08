@@ -30,7 +30,8 @@ final class StderrTee extends OutputStream {
 
     static final String SERVER_THREAD_PREFIX = "cimpal-serve-http";
     /** The server's other threads: the HTTP dispatcher and the stopper of POST /shutdown. */
-    private static final List<String> OTHER_SERVER_THREADS = List.of("HTTP-Dispatcher", "cimpal-serve-stop");
+    private static final List<String> OTHER_SERVER_THREADS = List.of("HTTP-Dispatcher", "cimpal-serve-stop",
+            "cimpal-serve-shutdown", "SIGTERM handler");
     /** Threads with an unfinished line at once; output of further threads still reaches stderr. */
     static final int MAX_THREADS = 256;
 
@@ -84,13 +85,18 @@ final class StderrTee extends OutputStream {
         original.flush();
     }
 
+    /** A thread of the server itself (HTTP, dispatcher, stop, signal), not of a running command. */
+    static boolean isServerThread(String name) {
+        return name.startsWith(SERVER_THREAD_PREFIX) || OTHER_SERVER_THREADS.stream().anyMatch(name::startsWith);
+    }
+
     private void collect(byte[] b, int off, int len) {
         if (closed) {
             return;
         }
         Thread thread = Thread.currentThread();
         String name = thread.getName();
-        if (name.startsWith(SERVER_THREAD_PREFIX) || OTHER_SERVER_THREADS.stream().anyMatch(name::startsWith)) {
+        if (isServerThread(name)) {
             return;
         }
         ByteArrayOutputStream line = partial.get(thread);

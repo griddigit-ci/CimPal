@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-07  
+**Last updated:** 2026-10-08  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -300,8 +300,10 @@ GHCR package must be made public. DEP-1 and DEP-2 are done and released in 2026.
 (automation options and Airflow examples) is merged (PR #60) and goes out with the next release; the
 KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. DEP-4 (external
 user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintainer review. DEP-5
-(async `/v1` job API and OpenAPI spec) is in review on `feature/dep-5-async-jobs`. Next on the
-deployment track: DEP-6 (service deployment) and DEP-7 (file exchange).
+(async `/v1` job API and OpenAPI spec) is merged (PR #62). DEP-6 (service deployment: proxy names,
+token files, probes, SIGTERM drain, JSON logs, metrics, Compose and Kubernetes examples) is in review
+on `feature/dep-6-service-deployment`; its kind end-to-end job runs in `integrations.yml`. Next on
+the deployment track: DEP-7 (file exchange).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
@@ -389,6 +391,24 @@ The OpenAPI 3.1 document is `CimPal-CLI/src/main/resources/openapi/cimpal-v1.jso
 `/v1/openapi.json`. `OpenApiSpecTest` checks that it is valid, that its routes equal
 `ServeServer.V1_ROUTES`, and that its config schemas equal `CommandSchemas`; regenerate the schemas
 with `-Dopenapi.update=true`. `JobApiTest` checks that every documented response is exercised.
+
+### `serve` as a service (DEP-6)
+
+What makes `serve` deployable behind a proxy (`docs/guide/service.md`, `deploy/`):
+- **Host check:** `--allowed-host` adds public names (`ServeSecurity.isAllowedHost`, `allowedHostEntry`).
+- **Tokens:** a `TokenSource` holds them: a fixed token, or `FileTokens` for `--token-from-file` /
+  `CIMPAL_API_TOKEN_FILE`. That file is read-only to `serve`, holds up to two tokens, and is
+  reloaded lazily by an `InstantSource`; on a failed reload the tokens read last stay in force.
+- **Probes:** `/ready` reports readiness.
+- **Metrics:** `/metrics` (with `--metrics`) is Prometheus text, written by hand in `ServeMetrics`.
+- **Logs:** everything goes through `ServeLog`, as text or as JSON lines. In JSON mode,
+  `System.err` is wrapped, so the commands' own lines become `output` events.
+- **SIGTERM:** a `sun.misc.Signal` handler (`ServeSignals`, `requires jdk.unsupported`) runs the
+  `/shutdown` path. `ServeCommand` waits up to `--shutdown-grace` and exits 3 if a command is
+  still running.
+- **Tests:** `ServeSignalIT` (failsafe, POSIX only) forks a JVM with `ServeSignalItMain` to test
+  the drain. Failsafe needs `package`, so it doesn't run on this Windows machine while Claude
+  Desktop locks the JAR.
 
 ### `serve` uses single-threaded executor
 
@@ -530,7 +550,8 @@ CimPal/
 ## REST API — discovery and implementation plan
 
 > **Superseded by the deployment track.** The asynchronous job API was built in DEP-5
-> (`docs/plans/deployment/DEP-5.md`); see *`serve` job API* above and `docs/cli/serve.md`. The
+> (`docs/plans/deployment/DEP-5.md`) and made deployable in DEP-6; see *`serve` job API* and
+> *`serve` as a service* above and `docs/cli/serve.md`. The
 > remaining service work is in DEP-6 to DEP-10. The analysis below is kept for background.
 
 ### Context

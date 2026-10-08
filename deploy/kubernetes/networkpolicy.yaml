@@ -1,0 +1,25 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# serve is plain HTTP inside the cluster (D-7): only the ingress controller may connect to it.
+# Kubelet probes are not affected. Egress stays open: commands may fetch owl:imports from the
+# hosts CimPal's own egress allowlist permits. Needs a network plugin that enforces policies.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cimpal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cimpal
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 7474

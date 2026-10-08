@@ -5,15 +5,19 @@
 # Airflow integration (DEP-3): the example DAGs import cleanly under the pinned Airflow, and the
 # BashOperator DAG really runs the CLI against the example data. The KubernetesPodOperator and
 # DockerOperator end-to-end checks are a manual walkthrough (integrations/airflow/README.md).
+#
+# Deployment examples (DEP-6): the compose file and the Kubernetes manifests are checked
+# statically, and deploy/kubernetes/e2e-kind.sh runs them end to end on kind with an image built
+# from this commit.
 name: Integrations
 
 on:
   push:
     branches: [devel, master]
-    paths: ['integrations/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
+    paths: ['integrations/**', 'deploy/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
   pull_request:
     branches: [devel, master]
-    paths: ['integrations/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
+    paths: ['integrations/**', 'deploy/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
   workflow_dispatch:
 
 permissions:
@@ -72,3 +76,67 @@ jobs:
         env:
           CIMPAL_JAR: ${{ github.workspace }}/CimPal-CLI/target/CimPal-CLI.jar
         run: pytest integrations/airflow/tests -v
+
+  deploy-static:
+    name: Deployment examples (static checks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compose file
+        run: |
+          docker compose -f deploy/docker-compose/compose.yaml config --quiet
+          # Third-party images are pinned by digest.
+          ! grep -nE '^\s*image: [^$]+' deploy/docker-compose/compose.yaml | grep -v 'griddigit-ci/cimpal' | grep -v '@sha256:'
+
+      - name: Kubernetes manifests (kubeconform, strict)
+        run: >-
+          kubectl kustomize deploy/kubernetes
+          | docker run --rm -i ghcr.io/yannh/kubeconform:v0.7.0@sha256:85dbef6b4b312b99133decc9c6fc9495e9fc5f92293d4ff3b7e1b30f5611823c
+          -strict -summary -
+
+  deploy-kind:
+    name: Kubernetes end to end (kind)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KIND_VERSION: v0.29.0
+      KIND_SHA256: c72eda46430f065fb45c5f70e7c957cc9209402ef309294821978677c8fb3284
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the CLI JAR
+        run: mvn -B -pl CimPal-CLI -am package -DskipTests
+
+      - name: Build the image
+        run: docker build -t cimpal:e2e -f CimPal-CLI/docker/Dockerfile .
+
+      - name: Install kind
+        run: |
+          curl -fsSLo kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_SHA256}  kind" | sha256sum -c -
+          sudo install -m 0755 kind /usr/local/bin/kind
+
+      - name: Deploy, submit a job through the Ingress, read the result
+        run: KEEP=1 IMAGE=cimpal:e2e bash deploy/kubernetes/e2e-kind.sh
+
+      - name: Cluster state on failure
+        if: failure()
+        run: |
+          kubectl get all -A || true
+          kubectl -n cimpal describe pods || true
+          kubectl -n cimpal logs deployment/cimpal --tail=200 || true

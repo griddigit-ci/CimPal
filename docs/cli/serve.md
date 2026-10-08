@@ -58,6 +58,9 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--host` | string | `localhost` | Bind address. The default `localhost` means the server is not accessible from the network, only from processes on the same machine. A non-loopback address also needs `--allow-remote`. |
 | `--allow-remote` | flag | off | Allow a non-loopback `--host`. The token is still required, and a warning is printed. Traffic is plain HTTP, so only use this on a trusted network. |
 | `--token-file` | path | `%LOCALAPPDATA%\CimPal\serve.token` (Windows), `~/.cimpal/serve.token` (elsewhere) | Where the token is written. Not used when `CIMPAL_API_TOKEN` is set. |
+| `--token-from-file` | path | none | Read the accepted token(s) from this file instead, e.g. a mounted secret. See [Token file](#token-file-for-services). Same as `CIMPAL_API_TOKEN_FILE`. |
+| `--token-reload` | ISO-8601 duration | `PT60S` | How often the `--token-from-file` file is checked for changes. |
+| `--allowed-host` | `name[:port]` (repeatable) | none | A name clients use to reach the server through a reverse proxy or ingress. See [Behind a proxy](#behind-a-reverse-proxy-or-ingress). |
 | `--allow-origin` | string (repeatable) | none | Browser `Origin` that may call the server, e.g. `http://localhost:3000`. |
 | `--max-body-bytes` | integer | `1048576` (1 MB) | Largest accepted request body. |
 | `--queue-size` | integer | `4` | Requests that may wait while one runs. More get 503. |
@@ -68,6 +71,9 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--job-log-lines` | integer | `5000` | Progress lines kept per job (1–100000); older lines are dropped. |
 | `--max-result-bytes` | integer | `16777216` (16 MiB) | Largest job result kept in memory. A larger result is answered with 410; write such results to a file. |
 | `--job-store-bytes` | integer | a quarter of the maximum heap | Memory for the results and logs of all finished jobs together (at least 1048576). Beyond it the oldest finished jobs are dropped; the most recent one is always kept. |
+| `--shutdown-grace` | ISO-8601 duration | `PT60S` | On SIGTERM, Ctrl-C or `POST /shutdown`: how long to wait for a running command. If it is still running then, `serve` exits with 3. |
+| `--log-format` | `text` or `json` | `text` | `json`: one JSON object per line on stderr, nothing on stdout. See [Logs](#logs). |
+| `--metrics` | flag | off | Serve Prometheus metrics at `GET /metrics` (needs the token). |
 
 | Environment variable | Description |
 |---|---|
@@ -105,13 +111,13 @@ java -jar CimPal-CLI.jar serve --root C:/Data/CimPal --read-root C:/Data/shared-
 
 | Check | Rejected with |
 |---|---|
-| **Host header** must be `localhost`, `127.0.0.1` or `[::1]` with the server's port (with `--allow-remote`, also the bound host). This blocks DNS-rebinding attacks from web pages. | 403 |
+| **Host header** must be `localhost`, `127.0.0.1` or `[::1]` with the server's port (with `--allow-remote`, also the bound host), or a name given with `--allowed-host`. This blocks DNS-rebinding attacks from web pages. | 403 |
 | **Origin header**, if present, must be listed in `--allow-origin`. Browsers send it on cross-site requests, so pages you visit can't call the server. No CORS headers are ever sent. | 403 |
 | **Path** must match an endpoint exactly (`/validatefoo` is not `/validate`). | 404 |
 | **File paths** in the request must be under the [allowed folders](#allowed-folders---root); existing outputs need `"overwrite": true`. | 403 |
 | **Body** must be valid JSON. | 400 |
 | **Method**: commands and `/shutdown` are POST only; `/health` and `/commands` are GET only. | 405 |
-| **Token**: every endpoint except `GET /health` needs `Authorization: Bearer <token>`. The comparison is constant-time, and the token never appears in logs or responses. | 401 |
+| **Token**: every endpoint except `GET /health`, `GET /ready`, `GET /v1/health` and `GET /v1/openapi.json` needs `Authorization: Bearer <token>`. The comparison is constant-time, and the token never appears in logs or responses. | 401 |
 | **Content type**: POST bodies must be `application/json` (a charset parameter is fine). HTML forms can't send that without a CORS preflight. | 415 |
 | **Body size**: at most `--max-body-bytes`. | 413 |
 | **Queue**: one command runs at a time and at most `--queue-size` wait. | 503 (with `Retry-After`) |
@@ -156,6 +162,8 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 | Endpoint | Method | Description |
 |---|---|---|
 | `/health` | `GET` | Returns `{"status":"ok","version":"...","busy":false,"stalled":false,"queued":0}`. `busy` means a command is running, and `queued` is the number waiting. `status` becomes `"stalled"` (and `stalled` true) when the running command has taken longer than `--request-timeout`: it can't be stopped, so restart the server if it doesn't return. The only endpoint that needs no token. |
+| `/ready` | `GET` | Readiness probe: 200 `{"status":"ready"}`; 503 with `"shutting down"`, or `"no usable token"` while the token file is broken. A full queue still answers 200, so a single instance stays reachable for polling and cancelling. No token needed. |
+| `/metrics` | `GET` | Only with `--metrics`: Prometheus text, see [Metrics](#metrics). Needs the token. |
 | `/commands` | `GET` | Lists all available command and utility endpoints. Needs the token. |
 | `/shutdown` | `POST` | Stops the server gracefully. Needs the token and `Content-Type: application/json`. |
 
@@ -375,6 +383,88 @@ if result.get("hasViolations"):
     for shape in result.get("shapes", []):
         print(f"{shape['count']} violations on {shape['shapeId']}")
 ```
+
+---
+
+## Running as a service
+
+For a team or an orchestrator such as Airflow, run `serve` in a container behind a reverse proxy or Kubernetes Ingress that terminates TLS. CimPal itself only speaks plain HTTP (decision D-7). Worked examples:
+- [deploy/docker-compose](../../deploy/docker-compose/README.md): `serve` behind Caddy with TLS, the token as a Docker secret;
+- [deploy/kubernetes](../../deploy/kubernetes/README.md): Deployment, Service and Ingress, with probes and a read-only root filesystem.
+
+The guide page [Running CimPal as a service](../guide/service.md) explains the choices.
+
+### Behind a reverse proxy or Ingress
+
+The proxy forwards the client's Host header, e.g. `cimpal.example.com`. `serve` refuses names it doesn't know (the DNS-rebinding defence), so list each public name with `--allowed-host`:
+- **`--allowed-host cimpal.example.com`** matches `Host: cimpal.example.com`, `cimpal.example.com:443` and `cimpal.example.com:80`.
+- **`--allowed-host cimpal.example.com:8443`** matches only that port.
+
+Names are compared without case and without DNS lookups. No scheme, path or wildcard is accepted. Loopback names with the server's own port keep working (health probes from inside the pod use `Host: localhost:7474`).
+
+### Token file for services
+
+`--token-from-file <path>` (or `CIMPAL_API_TOKEN_FILE=<path>`) reads the tokens from a file that `serve` never writes or deletes, such as a Kubernetes or Docker secret:
+- **Contents:** one token per line, at most two (two while you rotate), each at least 32 characters. Blank lines and lines starting with `#` are ignored.
+- **Reload:** the file is read every `--token-reload` (60 s), and the tokens change when its content does.
+  - **No token** (empty, or only comments): every token is revoked at once.
+  - **Broken file** (can't be read, or invalid): the tokens read before stay for one more check, which bridges a secret being replaced. If it is still broken then, every request is refused and `/ready` answers 503 until it is fixed. Each check logs a warning.
+  - **At start:** any of these stops `serve` with exit code 2.
+  - **Regular file only:** at most 4 KiB. Replace it in one step (write a new file, then rename) so it is never read half-written.
+- **Rotate:**
+  1. write the old and the new token;
+  2. switch the clients to the new one;
+  3. remove the old line.
+  No restart is needed.
+- **Permissions:** on Linux and macOS, a file any user can read gives a warning. Kubernetes: `defaultMode: 0440` with `fsGroup`.
+- **Conflicts:** a token file together with `CIMPAL_API_TOKEN`, or together with `--token-file` (where a generated token is written), refuses to start (exit 2) rather than guessing.
+
+### Shutdown
+
+SIGTERM (`docker stop`, Kubernetes) does what `POST /shutdown` does:
+- **Stop:** the server stops taking work (`/ready` answers 503) and cancels queued jobs.
+- **Drain:** a running command gets up to `--shutdown-grace` to finish, so its reports aren't cut off.
+- **Exit:** with 0, or with 3 and an error log line if the command was still running.
+
+Give the container more time than the grace period: Docker `--stop-timeout` or `stop_grace_period`, Kubernetes `terminationGracePeriodSeconds`. Ctrl-C drains the same way.
+
+### Logs
+
+With `--log-format json`, stderr carries one JSON object per line and stdout stays empty:
+
+| Field | When |
+|---|---|
+| `ts`, `level` (`info`, `warn`, `error`), `event`, `message` | always |
+| `jobId`, `command`, `status`, `exitCode`, `durationMs` | job and command events |
+| `remote`, `method`, `path` | request events (`remote` is the direct peer, i.e. the proxy behind one) |
+
+**Events:**
+- **Server:** `server.started` (with `tokenSource`, where the token comes from), `server.stopping`, `server.stopped`, `server.grace_exceeded`;
+- **Jobs and commands:** `job.queued`, `job.started`, `job.finished`, `command.finished`;
+- **Problems:** `request.rejected`, `stall`, `token.file`;
+- **Output:** `output`, which is every line the commands themselves write, e.g. `[INFO] Loading …`, tagged with the running job's `jobId`. Its level comes only from the line's start (`[WARN]`, `[ERROR]`, or a logger's `[thread] WARN`).
+
+**Safety:**
+- Every string passes the log sanitiser: control characters are replaced, and long values are cut at 512 characters.
+- Tokens and the `Authorization` header are never logged.
+
+The default `text` format keeps the familiar `[WARN] serve: …` lines.
+
+### Metrics
+
+With `--metrics`, `GET /metrics` (token required) returns Prometheus text format 0.0.4:
+
+| Metric | Type | Labels |
+|---|---|---|
+| `cimpal_info` | gauge | `version` |
+| `cimpal_jobs` | gauge, stored jobs | `status` |
+| `cimpal_jobs_finished_total` | counter | `status` |
+| `cimpal_job_duration_seconds` | histogram (1 s … 2 h) | — |
+| `cimpal_requests_total` | counter, synchronous endpoints | `command`, `outcome` (`ok`, `violations`, `bad_input`, `error`, `timeout`, `busy`) |
+| `cimpal_queue_depth`, `cimpal_busy` | gauge | — |
+| `cimpal_jvm_heap_used_bytes`, `cimpal_jvm_heap_max_bytes` | gauge | — |
+
+The counters start at zero on every start.
 
 ---
 

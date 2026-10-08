@@ -9,10 +9,10 @@ name: Docs
 on:
   push:
     branches: [devel, master]
-    paths: ['docs/**', 'README.md', 'scripts/check_doc_links.py', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'deploy/**', 'README.md', 'scripts/check_doc_links.py', '.github/workflows/docs.yml']
   pull_request:
     branches: [devel, master]
-    paths: ['docs/**', 'README.md', 'scripts/check_doc_links.py', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'deploy/**', 'README.md', 'scripts/check_doc_links.py', '.github/workflows/docs.yml']
   workflow_dispatch:
 
 permissions:
@@ -35,4 +35,4 @@ jobs:
           python-version: '3.12'
 
       - name: Check links in the guide, the CLI reference and the README
-        run: python scripts/check_doc_links.py docs/guide docs/cli README.md
+        run: python scripts/check_doc_links.py docs/guide docs/cli deploy README.md

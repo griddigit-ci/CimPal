@@ -28,7 +28,7 @@ A JavaFX desktop application offers the same functions interactively (Windows `C
 |---|---|---|---|---|
 | **Form** | `CimPal-CLI.jar`, one process per run | `ghcr.io/griddigit-ci/cimpal:<version>`, linux/amd64 and arm64 | Long-running process, JAR or container | Process started by the MCP client |
 | **Needs** | Java 25 | Docker or Kubernetes | Java 25 or the image | Java 25 or the image |
-| **Network exposure** | None | None (no port exposed) | Localhost by default; other interfaces only with `--allow-remote`; plain HTTP | None (stdin/stdout) |
+| **Network exposure** | None | None (no port exposed) | Localhost by default; other interfaces only with `--allow-remote`; plain HTTP, TLS at a proxy or Ingress | None (stdin/stdout) |
 | **Authentication** | OS user | OS user / container runtime | Bearer token on every request except `/health` | OS user |
 | **Concurrency** | One command per process; scale by running more | One per container; scale by replicas | One command at a time, bounded queue (503 when full) | One tool call at a time |
 | **State** | None besides output files and a fetch cache | None (read-only root filesystem works) | None between requests | None between calls |
@@ -56,7 +56,7 @@ Measured with synthetic CGMES-like models: [Sizing](sizing.md).
 | Path | Status |
 |---|---|
 | **A. Container or CLI per task** (Airflow `KubernetesPodOperator`, `DockerOperator`, `BashOperator`; any CI system), with exit codes, a JSON summary file and a configurable violations exit code | Available. Examples and tests in `integrations/airflow/`; see [Airflow](airflow.md). |
-| **B. CimPal as a service** (asynchronous jobs, OpenAPI `/v1`, upload and download, reverse proxy) | Partly available: the asynchronous job API and its OpenAPI spec (`serve`, [`/v1`](../cli/serve.md#job-api-v1)). Planned: service deployment behind a proxy (DEP-6), upload and download (DEP-7). |
+| **B. CimPal as a service** (asynchronous jobs, OpenAPI `/v1`, upload and download, reverse proxy) | Available: the asynchronous job API and its OpenAPI spec ([`/v1`](../cli/serve.md#job-api-v1)), and deployment behind a TLS proxy or Kubernetes Ingress with token files, probes and JSON logs ([service](service.md)). Planned: upload and download (DEP-7). |
 | **C. Python SDK and Airflow provider** | Planned: DEP-9, DEP-10 |
 
 ## Security posture

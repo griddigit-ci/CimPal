@@ -1,0 +1,70 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# CimPal serve behind Caddy with TLS (DEP-6). Caddy terminates TLS with its own local CA
+# ("tls internal"); CimPal stays plain HTTP on the internal network and isn't published.
+# See README.md in this folder.
+name: cimpal
+
+services:
+  cimpal:
+    image: ghcr.io/griddigit-ci/cimpal:${CIMPAL_TAG:-latest}
+    command:
+      - serve
+      - --host=0.0.0.0
+      - --allow-remote
+      # The name clients use, as Caddy forwards it in the Host header.
+      - --allowed-host=localhost:8443
+      - --log-format=json
+      - --metrics
+      - --shutdown-grace=PT60S
+    environment:
+      CIMPAL_API_TOKEN_FILE: /run/secrets/cimpal/token
+    # The token folder, not the file, is mounted: an editor or "mv" replaces the file, and a
+    # single-file bind mount would keep showing the old one, so a revoked token would stay valid.
+    volumes:
+      - ./data:/data
+      - ./secrets:/run/secrets/cimpal:ro
+    # Run as the owner of ./data and ./secrets (CIMPAL_UID=$(id -u) CIMPAL_GID=$(id -g)), so the
+    # token file can stay private (chmod 600). Default: the image's user 10001.
+    user: "${CIMPAL_UID:-10001}:${CIMPAL_GID:-10001}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    # 1 M triples: 1 GB heap (75 % of the limit), see docs/guide/sizing.md.
+    mem_limit: 1536m
+    # Longer than --shutdown-grace, so a running command can finish on "docker compose down".
+    stop_grace_period: 90s
+    healthcheck:
+      # The image has no curl; bash speaks HTTP/1.1 to the readiness endpoint.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7474 && printf 'GET /ready HTTP/1.1\\r\\nHost: localhost:7474\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      cimpal:
+        condition: service_healthy
+    networks:
+      - internal
+
+volumes:
+  caddy-data:
+
+networks:
+  internal:

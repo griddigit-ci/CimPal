@@ -14,7 +14,8 @@ CimPal is one program, `CimPal-CLI.jar`, that you can run in several ways. Pick 
 | **CLI** | `java -jar CimPal-CLI.jar <command> …` | People or scripts run a validation now and then; CI jobs | You need many small calls per minute (each run starts a JVM, ~1.5–2 s) |
 | **Container** | `docker run ghcr.io/griddigit-ci/cimpal:<version> <command> …` | No Java on the host; Kubernetes; scheduled pipelines (Airflow) | — |
 | **Pipeline** (`run`) | `run pipeline.json` | Several steps in a fixed order: validate, then compare, then convert… | Steps need to start servers (not allowed) |
-| **Local server** (`serve`) | `serve` | A tool on the same machine calls CimPal repeatedly and wants a warm JVM | Callers on other machines, long jobs, many parallel users |
+| **Local server** (`serve`) | `serve` | A tool on the same machine calls CimPal repeatedly and wants a warm JVM | Many parallel users (one command at a time) |
+| **Service** (`serve` behind a proxy) | Container behind a TLS reverse proxy or Kubernetes Ingress; [examples](service.md) | A team or an orchestrator (Airflow) submits jobs over the network | Many parallel users in one instance; run several instances instead |
 | **AI assistant** (`mcp`) | Started by Claude Desktop or another MCP client | Interactive analysis and shape development with an AI assistant | Unattended automation; use the CLI or container instead |
 
 ## CLI and container
@@ -38,7 +39,7 @@ This is the recommended way to automate CimPal.
   - **Synchronous endpoints:** the HTTP call stays open until the command ends, up to `--request-timeout` (30 minutes by default). Large validations can take that long; use the job API instead.
   - **One command at a time:** jobs and synchronous requests wait in one short queue (`--queue-size`, default 4) and get HTTP 503 when it is full.
   - **Jobs live in memory:** they are lost when the server restarts.
-  - **Plain HTTP, no TLS:** `--allow-remote` lets it listen on other interfaces, but the traffic is not encrypted and its Host check only accepts loopback names. Don't put it on a network without a TLS proxy in front, and even then, see "Planned" below.
+  - **Plain HTTP, no TLS:** `--allow-remote` lets it listen on other interfaces, but the traffic is not encrypted. For network access, put a TLS proxy or Ingress in front and list its name with `--allowed-host`; see [Running CimPal as a service](service.md).
   - **No upload or download:** files must already be in a folder the server can reach.
 
 Reference: [serve](../cli/serve.md). In a container: [docker.md, `serve`](../cli/docker.md#serve).
@@ -62,7 +63,6 @@ These are on the roadmap but **not available yet**:
 
 | Feature | Work package |
 |---|---|
-| Service deployment: configured host names behind a reverse proxy or ingress, token rotation, liveness and readiness probes, graceful shutdown, structured logs, Kubernetes manifests | DEP-6 |
 | File exchange: job workspaces, upload and download | DEP-7 |
 | Several jobs in parallel in one JVM (optional; the default answer is more replicas) | DEP-8 |
 | Python SDK (`cimpal-client`) | DEP-9 |
