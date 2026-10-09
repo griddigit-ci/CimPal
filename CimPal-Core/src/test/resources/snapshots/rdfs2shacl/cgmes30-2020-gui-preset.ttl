@@ -1,0 +1,268 @@
+PREFIX cim:  <http://iec.ch/TC57/CIM100#>
+PREFIX dcat: <http://www.w3.org/ns/dcat#>
+PREFIX dct:  <http://purl.org/dc/terms/>
+PREFIX dm:   <http://iec.ch/TC57/61970-552/DifferenceModel/1#>
+PREFIX ido:  <http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#>
+PREFIX md:   <http://iec.ch/TC57/61970-552/ModelDescription/1#>
+PREFIX meq:  <http://example.com/ns/MiniEquipment-EU#>
+PREFIX owl:  <http://www.w3.org/2002/07/owl#>
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh:   <http://www.w3.org/ns/shacl#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+<http://example.com/shapes/MiniEquipment#Ontology>
+        rdf:type         owl:Ontology;
+        dct:issued       "<TIMESTAMP>"^^xsd:dateTime;
+        dct:title        "Mini Equipment Vocabulary"@en;
+        owl:versionIRI   <http://example.com/shapes/MiniEquipment/3.0>;
+        owl:versionInfo  "3.0.0"@en .
+
+ido:DatatypesGroupIO  rdf:type  sh:PropertyGroup;
+        rdfs:label  "DatatypesIO";
+        sh:order    1 .
+
+ido:IdentifiedObject.mRID-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:string;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        ido:DatatypesGroupIO;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "IdentifiedObject.mRID-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        0.1;
+        sh:path         cim:IdentifiedObject.mRID;
+        sh:severity     sh:Violation .
+
+meq:Terminal  rdf:type  sh:NodeShape;
+        sh:property     meq:Terminal.ConductingEquipment-valueType , meq:Terminal.phases-datatype , ido:IdentifiedObject.name-cardinality , meq:Terminal.ConductingEquipment-cardinality , ido:IdentifiedObject.mRID-cardinality , ido:IdentifiedObject.mRID-datatype , meq:Terminal.phases-cardinality , ido:IdentifiedObject.name-datatype;
+        sh:targetClass  cim:Terminal .
+
+meq:Terminal.phases-datatype
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        meq:DatatypesGroup;
+        sh:in           ( cim:PhaseCode.A cim:PhaseCode.ABC );
+        sh:message      "The datatype is not IRI (Internationalized Resource Identifier) or it is enumerated value not part of the profile.";
+        sh:name         "Terminal.phases-datatype";
+        sh:nodeKind     sh:IRI;
+        sh:order        -1;
+        sh:path         cim:Terminal.phases;
+        sh:severity     sh:Violation .
+
+meq:ACLineSegment.r-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:float;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        meq:DatatypesGroup;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "ACLineSegment.r-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        2;
+        sh:path         cim:ACLineSegment.r;
+        sh:severity     sh:Violation .
+
+meq:ConductingEquipment.Terminals-propertyInverse
+        rdf:type        sh:PropertyShape;
+        sh:description  "Inverse associations shall not be instantiated.";
+        sh:group        meq:InverseAssociationsGroup;
+        sh:maxCount     0;
+        sh:message      "Inverse association is present.";
+        sh:name         "InverseAssociationPresent";
+        sh:order        1;
+        sh:path         cim:ConductingEquipment.Terminals;
+        sh:severity     sh:Violation .
+
+meq:ACLineSegment-AllowedProperties
+        rdf:type              sh:NodeShape;
+        sh:closed             true;
+        sh:description        "Checks if the dataset contains properties which are not defined in the profile to which this dataset conforms to.";
+        sh:group              meq:ProfilePropertiesGroup;
+        sh:ignoredProperties  ( rdf:type );
+        sh:message            "This property is not part of the profile to which this dataset conforms to.";
+        sh:name               "PropertyNotInProfile";
+        sh:order              2;
+        sh:property           [ sh:path  cim:IdentifiedObject.mRID ];
+        sh:property           [ sh:path  cim:Equipment.aggregate ];
+        sh:property           [ sh:path  cim:ACLineSegment.r ];
+        sh:property           [ sh:path  cim:IdentifiedObject.name ];
+        sh:severity           sh:Info;
+        sh:targetClass        cim:ACLineSegment .
+
+meq:AssociationsGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "Associations";
+        sh:order    2 .
+
+meq:Terminal.ConductingEquipment-cardinality
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the cardinality of the association at the used direction.";
+        sh:group        meq:CardinalityGroup;
+        sh:maxCount     1;
+        sh:message      "Association with cardinality violation at the used direction.";
+        sh:minCount     1;
+        sh:name         "Terminal.ConductingEquipment-cardinality";
+        sh:order        1;
+        sh:path         cim:Terminal.ConductingEquipment;
+        sh:severity     sh:Violation .
+
+ido:IdentifiedObject.name-cardinality
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the cardinality of the property (attribute).";
+        sh:group        ido:CardinalityIO;
+        sh:maxCount     1;
+        sh:message      "Missing required property (attribute).";
+        sh:minCount     1;
+        sh:name         "IdentifiedObject.name-cardinality";
+        sh:order        0.1;
+        sh:path         cim:IdentifiedObject.name;
+        sh:severity     sh:Violation .
+
+meq:Terminal.ConductingEquipment-valueType
+        rdf:type        sh:PropertyShape;
+        sh:class        cim:ACLineSegment;
+        sh:description  "This constraint validates the value of the association at the used direction.";
+        sh:group        meq:AssociationsGroup;
+        sh:message      "One of the following does not conform: 1) The value shall be IRI; 2) The value shall be an instance of the class: cim:ACLineSegment";
+        sh:name         "Terminal.ConductingEquipment-valueType";
+        sh:nodeKind     sh:IRI;
+        sh:order        1;
+        sh:path         cim:Terminal.ConductingEquipment;
+        sh:severity     sh:Violation .
+
+ido:IdentifiedObject.name-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:string;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        ido:DatatypesGroupIO;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "IdentifiedObject.name-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        0.1;
+        sh:path         cim:IdentifiedObject.name;
+        sh:severity     sh:Violation .
+
+meq:Equipment.aggregate-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:boolean;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        meq:DatatypesGroup;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "Equipment.aggregate-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        3;
+        sh:path         cim:Equipment.aggregate;
+        sh:severity     sh:Violation .
+
+meq:CardinalityGroup  rdf:type  sh:PropertyGroup;
+        rdfs:label  "Cardinality";
+        sh:order    0 .
+
+ido:CardinalityGroup  rdf:type  sh:PropertyGroup;
+        rdfs:label  "CardinalityIO";
+        sh:order    0 .
+
+meq:Equipment.aggregate-cardinality
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the cardinality of the property (attribute).";
+        sh:group        meq:CardinalityGroup;
+        sh:maxCount     1;
+        sh:message      "Cardinality violation. Upper bound shall be 1";
+        sh:name         "Equipment.aggregate-cardinality";
+        sh:order        7;
+        sh:path         cim:Equipment.aggregate;
+        sh:severity     sh:Violation .
+
+meq:AllowedClasses-node
+        rdf:type             sh:NodeShape;
+        sh:property          meq:AllowedClasses-property;
+        sh:targetSubjectsOf  rdf:type .
+
+meq:DatatypesGroup  rdf:type  sh:PropertyGroup;
+        rdfs:label  "Datatypes";
+        sh:order    1 .
+
+meq:ProfileClassesGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "ProfileClasses";
+        sh:order    1 .
+
+meq:InverseAssociationsGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "InverseAssociations";
+        sh:order    1 .
+
+meq:ACLineSegment.r-cardinality
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the cardinality of the property (attribute).";
+        sh:group        meq:CardinalityGroup;
+        sh:maxCount     1;
+        sh:message      "Missing required property (attribute).";
+        sh:minCount     1;
+        sh:name         "ACLineSegment.r-cardinality";
+        sh:order        5;
+        sh:path         cim:ACLineSegment.r;
+        sh:severity     sh:Violation .
+
+ido:IdentifiedObject.mRID-cardinality
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the cardinality of the property (attribute).";
+        sh:group        ido:CardinalityIO;
+        sh:maxCount     1;
+        sh:message      "Cardinality violation. Upper bound shall be 1";
+        sh:name         "IdentifiedObject.mRID-cardinality";
+        sh:order        0.1;
+        sh:path         cim:IdentifiedObject.mRID;
+        sh:severity     sh:Violation .
+
+meq:ProfilePropertiesGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "ProfileProperties";
+        sh:order    1 .
+
+meq:ACLineSegment  rdf:type  sh:NodeShape;
+        sh:property     meq:ACLineSegment.r-cardinality , ido:IdentifiedObject.mRID-datatype , ido:IdentifiedObject.name-datatype , meq:ACLineSegment.r-datatype , ido:IdentifiedObject.name-cardinality , ido:IdentifiedObject.mRID-cardinality , meq:Equipment.aggregate-datatype , meq:Equipment.aggregate-cardinality;
+        sh:targetClass  cim:ACLineSegment .
+
+meq:AllowedClasses-property
+        rdf:type        sh:PropertyShape;
+        sh:description  "Checks if the dataset contains classes which are not defined in the profile to which this dataset conforms to.";
+        sh:group        meq:ProfileClassesGroup;
+        sh:in           ( cim:Terminal cim:ACLineSegment md:FullModel dm:DifferenceModel dcat:Dataset );
+        sh:message      "This class is not part of the profile to which this dataset conforms to.";
+        sh:name         "ClassNotInProfile";
+        sh:order        1;
+        sh:path         rdf:type;
+        sh:severity     sh:Info .
+
+meq:Terminal-AllowedProperties
+        rdf:type              sh:NodeShape;
+        sh:closed             true;
+        sh:description        "Checks if the dataset contains properties which are not defined in the profile to which this dataset conforms to.";
+        sh:group              meq:ProfilePropertiesGroup;
+        sh:ignoredProperties  ( rdf:type );
+        sh:message            "This property is not part of the profile to which this dataset conforms to.";
+        sh:name               "PropertyNotInProfile";
+        sh:order              1;
+        sh:property           [ sh:path  cim:IdentifiedObject.mRID ];
+        sh:property           [ sh:path  cim:Terminal.phases ];
+        sh:property           [ sh:path  cim:IdentifiedObject.name ];
+        sh:property           [ sh:path  cim:Terminal.ConductingEquipment ];
+        sh:severity           sh:Info;
+        sh:targetClass        cim:Terminal .
+
+meq:ConductingEquipment.Terminals-inverseNodePresent
+        rdf:type             sh:NodeShape;
+        sh:property          meq:ConductingEquipment.Terminals-propertyInverse;
+        sh:targetSubjectsOf  cim:ConductingEquipment.Terminals .
+
+meq:Terminal.phases-cardinality
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the cardinality of the property (attribute).";
+        sh:group        meq:CardinalityGroup;
+        sh:maxCount     1;
+        sh:message      "Cardinality violation. Upper bound shall be 1";
+        sh:name         "Terminal.phases-cardinality";
+        sh:order        2;
+        sh:path         cim:Terminal.phases;
+        sh:severity     sh:Violation .

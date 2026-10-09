@@ -258,6 +258,11 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - `Snapshots` also normalises sheet names, and has `assertExcelEqualsIgnoringRowOrder`.
 - The `ShaclAutoTesterTest` written alongside was dropped, because PR #53 replaced `ShaclAutoTester`, and `ShaclRuleTesterTest` covers the replacement.
 
+**Characterisation tests, rdfs2shacl + excel2shacl + organize** (TEST-3, written 2026-10-02, merged into devel 2026-10-09):
+- `SHACLFromRDFTest`, `ShaclFromXlsTest` and `ShaclOrganizerTest` pin the current output as golden files under `snapshots/rdfs2shacl/`, `excel2shacl/` and `organize/`.
+- The RDFS inputs are two synthetic profiles in `fixtures/shacl-generation/` (RDFS 2020 with CIM100, RDFS 2019 with CIM16).
+- The Core test-jar now also carries `fixtures/**`, which `RdfsToShaclCommandTest` in the CLI uses.
+
 **Docker image** (added by CI-3, `docs/plans/CI-3.md`):
 - `CimPal-CLI/docker/Dockerfile` copies the built `CimPal-CLI.jar` onto `eclipse-temurin:25-jre-noble`
   (pinned by digest). Maven never runs inside Docker.
@@ -511,16 +516,17 @@ CimPal/
 - Fixed 2026-10-07, when the CLI's combined workflow wired `SHACLValidator` into `serve`/`mcp`/`run`: it now checks every shape and data file against an active `PathPolicy` before touching it, and `PathGuard` checks `constraintFiles` and `dataFiles` element by element. An `owl:imports` candidate outside the roots is no longer probed: `PathPolicy.mayReadIfActive` tests it without touching the file system, so an import outside the roots fails the same way whether or not the file exists.
 - Open from the CLI combined-workflow review (2026-10-07): Jena's JSON-LD reader may fetch a remote `@context` outside the egress gate (`.jsonld` inputs to `convert`, `sparql` and now `validate --workflow combined`); to verify and, if so, block while a `PathPolicy` is active. The `clearRemoteCaches()` call at the start of a combined run has no test: the egress gate only allows GitHub hosts, so no local stub can serve an import.
 
+**SHACL generation suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test; the details are in `docs/plans/TEST-3.md`:
+- `SHACLFromRDF` references an undeclared `…CardinalityIO` group.
+- The `rdfs2shacl` `--io-uri` default puts the IdentifiedObject shapes in the CIM namespace.
+- excel2shacl writes length limits as `"32.0"^^xsd:integer`.
+- An unreadable workbook gives empty shapes instead of an error.
+
 **`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
 **Timestamped report times are snapped to minute 30 of the hour (by design, maintainer to confirm).** `ValidationTools.normalizeTimestampToReportTime` sets every report time to `HH:30:00Z`, so `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. It looks like the market-time-unit convention (the middle of the hour). The TEST-3 snapshots pin it.
-
-**`ShaclAutoTester` suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test in `ShaclAutoTesterTest`:
-- Models and reports are cached by file name, so two rule folders holding a `model.xml` share one report.
-- A triggered shape without `sh:name` ends the run with a `NullPointerException`.
-- An unparsable model is logged twice, once as a "Validation Error" without its rule name.
 
 **Single-dataset workbook row order varies between runs.** `SHACLValidationReport.writeExcel` writes results in the engine's result order, which isn't stable. The TEST-3 snapshots compare those rows sorted (`Snapshots.assertExcelEqualsIgnoringRowOrder`).
 

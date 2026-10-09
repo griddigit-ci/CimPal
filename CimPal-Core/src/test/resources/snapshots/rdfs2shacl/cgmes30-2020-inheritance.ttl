@@ -1,0 +1,22 @@
+PREFIX cim:  <http://iec.ch/TC57/CIM100#>
+PREFIX cims: <http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#>
+PREFIX dct:  <http://purl.org/dc/terms/>
+PREFIX meq:  <http://example.com/ns/MiniEquipment-EU#>
+PREFIX owl:  <http://www.w3.org/2002/07/owl#>
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+cim:Terminal  rdf:type   rdfs:Class;
+        rdfs:subClassOf  cim:IdentifiedObject .
+
+cim:IdentifiedObject  rdf:type  rdfs:Class .
+
+cim:ACLineSegment  rdf:type  rdfs:Class;
+        rdfs:subClassOf  cim:ConductingEquipment .
+
+cim:ConductingEquipment
+        rdf:type         rdfs:Class;
+        rdfs:subClassOf  cim:Equipment .
+
+cim:Equipment  rdf:type  rdfs:Class;
+        rdfs:subClassOf  cim:IdentifiedObject .
