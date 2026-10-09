@@ -1,0 +1,12 @@
+## Validation results
+Dataset,XML files,Constraint file,Focus node,Path,Value,Value kind,Source,Constraint Component,Message,Severity,Description,Order,Name,Group
+many.xml,many.xml,shapes.ttl,_1,ex:size,,,<BNODE>,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+## Validation statistics
+Dataset,XML files,Constraint file,All,Warnings,Infos,Violations,Conforms,Validation error,Missing XML files,Chart name,Validation scope
+many.xml,many.xml,shapes.ttl,1,0,0,1,FALSE,,,Limited,Partial — stopped after 1 results per shape
+## StatisticsConstraint
+Dataset,Path,Source,Count,Constraint Component,Message,Severity,Description,Order,Name,Group
+many.xml,ex:size,<BNODE>,1,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+## Charts
+Dataset,Warnings,Infos,Violations,,Dataset (all),Warnings,Infos,Violations
+Limited,0,0,1,,Limited,0,0,1

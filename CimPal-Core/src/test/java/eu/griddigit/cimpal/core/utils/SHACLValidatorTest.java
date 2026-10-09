@@ -14,6 +14,7 @@ import eu.griddigit.cimpal.core.stats.RunStats;
 import eu.griddigit.cimpal.core.stats.RunStatsSnapshot;
 import eu.griddigit.cimpal.core.testsupport.Normalizer;
 import eu.griddigit.cimpal.core.testsupport.Snapshots;
+import eu.griddigit.cimpal.core.testsupport.TestModels;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
@@ -741,5 +742,145 @@ class SHACLValidatorTest {
         // The anonymous property shapes appear in Source under per-run blank-node labels.
         SNAPSHOTS.assertExcelEquals("four-constraint-files__workbook", workbook,
                 Normalizer.timestamps(), Normalizer.paths(tempDir), Normalizer.blankNodeLabels());
+    }
+
+    // ---- Golden master (TEST-3): current output, compared with src/test/resources/snapshots/shacl-validator ----
+
+    /**
+     * Line shapes in the given CIM namespace, one per severity: {@code r} must be a non-negative
+     * float (Violation), {@code name} is required (Warning), {@code aggregate} must be a boolean (Info).
+     * The float and boolean checks only pass when the preset's datatype map typed the literals.
+     */
+    private static String lineShapes(String cimNs) {
+        return """
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+                @prefix cim: <%s> .
+                @prefix ex: <urn:test:shapes:> .
+                ex:Line a sh:NodeShape ; sh:targetClass cim:ACLineSegment ;
+                    sh:property ex:Line.r , ex:Line.name , ex:Line.aggregate .
+                ex:Line.r a sh:PropertyShape ; sh:path cim:ACLineSegment.r ; sh:name "ACLineSegment.r" ;
+                    sh:datatype xsd:float ; sh:minInclusive 0.0 ; sh:severity sh:Violation ;
+                    sh:message "Resistance must be a non-negative float" .
+                ex:Line.name a sh:PropertyShape ; sh:path cim:IdentifiedObject.name ; sh:name "IdentifiedObject.name" ;
+                    sh:minCount 1 ; sh:severity sh:Warning ; sh:message "Name is missing" .
+                ex:Line.aggregate a sh:PropertyShape ; sh:path cim:Equipment.aggregate ; sh:name "Equipment.aggregate" ;
+                    sh:datatype xsd:boolean ; sh:severity sh:Info ; sh:message "Aggregate must be a boolean" .
+                """.formatted(cimNs);
+    }
+
+    /** Three lines: one clean, one with a negative r and a non-boolean aggregate, one without a name. */
+    private static String lines(String cimNs) {
+        return """
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:cim="%s">
+                  <cim:ACLineSegment rdf:ID="_ok"><cim:IdentifiedObject.name>OK</cim:IdentifiedObject.name>
+                    <cim:ACLineSegment.r>0.25</cim:ACLineSegment.r><cim:Equipment.aggregate>false</cim:Equipment.aggregate></cim:ACLineSegment>
+                  <cim:ACLineSegment rdf:ID="_bad"><cim:IdentifiedObject.name>Bad</cim:IdentifiedObject.name>
+                    <cim:ACLineSegment.r>-1.5</cim:ACLineSegment.r><cim:Equipment.aggregate>maybe</cim:Equipment.aggregate></cim:ACLineSegment>
+                  <cim:ACLineSegment rdf:ID="_anon"><cim:ACLineSegment.r>1.0</cim:ACLineSegment.r></cim:ACLineSegment>
+                </rdf:RDF>
+                """.formatted(cimNs);
+    }
+
+    private SHACLValidationReport validateLines(SHACLValidationOptions.Builder preset, String cimNs, String data) throws Exception {
+        return new SHACLValidator(preset
+                .dataFiles(write("lines.xml", data))
+                .shapeFiles(write("lines.ttl", lineShapes(cimNs)))
+                .workers(1)
+                .build()).validate();
+    }
+
+    private void assertGolden(String name, SHACLValidationReport report) throws Exception {
+        SNAPSHOTS.assertIsomorphic(name + "__report", report.getReportModel());
+        Path xlsx = tempDir.resolve("out/" + name + ".xlsx");
+        report.writeExcel(xlsx);
+        // Rows follow the engine's result order, which differs between runs.
+        SNAPSHOTS.assertExcelEqualsIgnoringRowOrder(name + "__workbook", xlsx, Normalizer.timestamps(), Normalizer.paths(tempDir));
+    }
+
+    @Test
+    void goldenCgmes30SeverityMix() throws Exception {
+        String ns = TestModels.CIM_NS;
+        SHACLValidationReport report = validateLines(SHACLValidationOptionsPresets.cgmes30(), ns, lines(ns));
+
+        assertFalse(report.conforms());
+        assertFalse(report.isPartial());
+        assertEquals(Map.of("Violation", 1L, "Warning", 1L, "Info", 1L), report.countBySeverity());
+        assertEquals(List.of(), report.getWarnings());
+        assertEquals("lines.xml", report.getDatasetName());
+        assertGolden("cgmes30-severity-mix", report);
+    }
+
+    @Test
+    void goldenCgmes24SeverityMix() throws Exception {
+        String ns = "http://iec.ch/TC57/2013/CIM-schema-cim16#";
+        SHACLValidationReport report = validateLines(SHACLValidationOptionsPresets.cgmes24(), ns, lines(ns));
+
+        assertEquals(Map.of("Violation", 1L, "Warning", 1L, "Info", 1L), report.countBySeverity());
+        assertEquals(List.of(), report.getWarnings());
+        assertGolden("cgmes24-severity-mix", report);
+    }
+
+    @Test
+    void goldenCgmes30DataWithTheCgmes24PresetIsNotTyped() throws Exception {
+        // The 2.4 map has no CIM100 keys, so every literal stays an xsd:string: on each of the three
+        // lines r fails both sh:datatype and sh:minInclusive, and both aggregate values fail the boolean check.
+        String ns = TestModels.CIM_NS;
+        SHACLValidationReport report = validateLines(SHACLValidationOptionsPresets.cgmes24(), ns, lines(ns));
+
+        assertEquals(Map.of("Violation", 6L, "Warning", 1L, "Info", 2L), report.countBySeverity());
+        assertGolden("cgmes30-data-cgmes24-preset", report);
+    }
+
+    @Test
+    void goldenConformingData() throws Exception {
+        String ns = TestModels.CIM_NS;
+        String clean = """
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:cim="%s">
+                  <cim:ACLineSegment rdf:ID="_ok"><cim:IdentifiedObject.name>OK</cim:IdentifiedObject.name>
+                    <cim:ACLineSegment.r>0.25</cim:ACLineSegment.r></cim:ACLineSegment>
+                </rdf:RDF>
+                """.formatted(ns);
+        SHACLValidationReport report = validateLines(SHACLValidationOptionsPresets.cgmes30(), ns, clean);
+
+        assertTrue(report.conforms());
+        assertEquals(List.of(), report.getResults());
+        assertEquals(Map.of(), report.countBySeverity());
+        assertGolden("conforming", report);
+    }
+
+    @Test
+    void goldenEmptyDataFileConforms() throws Exception {
+        String ns = TestModels.CIM_NS;
+        SHACLValidationReport report = validateLines(SHACLValidationOptionsPresets.cgmes30(), ns,
+                "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"/>\n");
+
+        assertTrue(report.conforms());
+        // An empty run is not silently clean: it says that nothing was validated.
+        assertEquals(List.of("The data holds no triples, so nothing was validated."), report.getWarnings());
+        assertGolden("empty-data", report);
+    }
+
+    @Test
+    void malformedDataFailsWithTheParserError() throws Exception {
+        String ns = TestModels.CIM_NS;
+        Exception failure = assertThrows(Exception.class, () -> validateLines(
+                SHACLValidationOptionsPresets.cgmes30(), ns, "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"));
+
+        assertEquals(java.io.IOException.class, failure.getClass(), failure::toString);
+        assertTrue(failure.getMessage().startsWith("Could not read the data file lines.xml"), failure::getMessage);
+    }
+
+    @Test
+    void malformedShapesFailWithTheParserError() throws Exception {
+        SHACLValidator validator = new SHACLValidator(SHACLValidationOptions.builder()
+                .dataFiles(write("data.xml", rdfXml("<ex:Thing rdf:about=\"#_1\"/>")))
+                .shapeFiles(write("broken.ttl", "@prefix sh: <http://www.w3.org/ns/shacl#> .\n<urn:a> sh:targetClass ."))
+                .xmlBase(BASE)
+                .build());
+
+        Exception failure = assertThrows(Exception.class, validator::validate);
+        assertEquals(java.io.IOException.class, failure.getClass(), failure::toString);
+        assertTrue(failure.getMessage().startsWith("Could not read the shapes file broken.ttl"), failure::getMessage);
     }
 }

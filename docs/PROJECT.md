@@ -252,6 +252,12 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - SPARQL `SERVICE` is refused (`SparqlServicePolicy`) and switched off globally in the CLI, the GUI and `ValidationTools`. Shapes with `SERVICE` are refused before they go to the Python engines, and the Python worker disables rdflib `SERVICE`. Jena 6.2 runs `SERVICE` by default (finding in `SEC-2.md`).
 - `serve` now passes `--format json` only to the four commands that support it. Before, the other six endpoints always failed with "Unknown option".
 
+**Characterisation tests, validation group** (TEST-3, written 2026-10-02, merged into devel 2026-10-09):
+- `SHACLValidatorTest` and `MappingValidatorTest` pin the current output of `SHACLValidator` and `MappingValidator` (mapping and timestamped) as golden files under `snapshots/shacl-validator` and `snapshots/mapping-validation`.
+- They cover CGMES 2.4 and 3.0 presets, empty and malformed input, row errors, result limits, ZIP input and a previous comparison workbook.
+- `Snapshots` also normalises sheet names, and has `assertExcelEqualsIgnoringRowOrder`.
+- The `ShaclAutoTesterTest` written alongside was dropped, because PR #53 replaced `ShaclAutoTester`, and `ShaclRuleTesterTest` covers the replacement.
+
 **Docker image** (added by CI-3, `docs/plans/CI-3.md`):
 - `CimPal-CLI/docker/Dockerfile` copies the built `CimPal-CLI.jar` onto `eclipse-temurin:25-jre-noble`
   (pinned by digest). Maven never runs inside Docker.
@@ -306,9 +312,7 @@ on `feature/dep-6-service-deployment`; its kind end-to-end job runs in `integrat
 the deployment track: DEP-7 (file exchange).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
-with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
-`ShaclAutoTesterTest`, for the `ShaclAutoTester` that PR #53 deletes: whichever merges second drops
-it, as `ShaclRuleTesterTest` covers the replacement.
+with SEC-2 path checks and a JSON summary, is open.
 
 ---
 
@@ -511,7 +515,14 @@ CimPal/
 
 **Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
-**Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
+**Timestamped report times are snapped to minute 30 of the hour (by design, maintainer to confirm).** `ValidationTools.normalizeTimestampToReportTime` sets every report time to `HH:30:00Z`, so `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. It looks like the market-time-unit convention (the middle of the hour). The TEST-3 snapshots pin it.
+
+**`ShaclAutoTester` suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test in `ShaclAutoTesterTest`:
+- Models and reports are cached by file name, so two rule folders holding a `model.xml` share one report.
+- A triggered shape without `sh:name` ends the run with a `NullPointerException`.
+- An unparsable model is logged twice, once as a "Validation Error" without its rule name.
+
+**Single-dataset workbook row order varies between runs.** `SHACLValidationReport.writeExcel` writes results in the engine's result order, which isn't stable. The TEST-3 snapshots compare those rows sorted (`Snapshots.assertExcelEqualsIgnoringRowOrder`).
 
 **`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. (`validate --workflow manual` was removed on 2026-10-05; see *SHACL rule test* above.) No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
 
@@ -526,10 +537,6 @@ CimPal/
 **`run` step `config` key is ignored (found in SEC-2).** No command reads a `config` key, so a step's `config` file has no effect. `run.md` documents this; it needs a fix.
 
 **`manifest` can't run through `serve`, `mcp` or `run`** (no `--config` option), although `mcp` advertises the tool.
-
-**`sparql` reads `.zip` models without the archive limits** in `ModelFactory`. A large zip through `serve`/`mcp` can exhaust memory. Candidate for TEST-2 or a follow-up.
-
-**An unresolvable `owl:imports` is only a warning.** The row is validated with those shapes missing. Network imports now fail the row, but the general case needs fixing (TEST-2).
 
 **`mcp`/`serve` with Claude Desktop need `--root`.** After SEC-2, the CimPal MCP server only accepts paths under its working directory unless `--root` is given. Update `claude_desktop_config.json`; see `CimPal-CLI/configs/claude-desktop-config.json`.
 
