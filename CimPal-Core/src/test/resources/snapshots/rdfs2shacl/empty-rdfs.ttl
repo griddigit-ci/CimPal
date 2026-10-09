@@ -1,0 +1,61 @@
+PREFIX dcat: <http://www.w3.org/ns/dcat#>
+PREFIX dm:   <http://iec.ch/TC57/61970-552/DifferenceModel/1#>
+PREFIX md:   <http://iec.ch/TC57/61970-552/ModelDescription/1#>
+PREFIX meq:  <http://example.com/ns/MiniEquipment-EU#>
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh:   <http://www.w3.org/ns/shacl#>
+
+<http://iec.ch/TC57/CIM100#IdentifiedObject.mRIDDatatypesGroupIO>
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "DatatypesIO";
+        sh:order    1 .
+
+meq:InverseAssociationsGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "InverseAssociations";
+        sh:order    1 .
+
+meq:DatatypesGroup  rdf:type  sh:PropertyGroup;
+        rdfs:label  "Datatypes";
+        sh:order    1 .
+
+meq:AllowedClasses-property
+        rdf:type        sh:PropertyShape;
+        sh:description  "Checks if the dataset contains classes which are not defined in the profile to which this dataset conforms to.";
+        sh:group        meq:ProfileClassesGroup;
+        sh:in           ( md:FullModel dm:DifferenceModel dcat:Dataset );
+        sh:message      "This class is not part of the profile to which this dataset conforms to.";
+        sh:name         "ClassNotInProfile";
+        sh:order        1;
+        sh:path         rdf:type;
+        sh:severity     sh:Info .
+
+meq:CardinalityGroup  rdf:type  sh:PropertyGroup;
+        rdfs:label  "Cardinality";
+        sh:order    0 .
+
+meq:AssociationsGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "Associations";
+        sh:order    2 .
+
+meq:ProfilePropertiesGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "ProfileProperties";
+        sh:order    1 .
+
+meq:AllowedClasses-node
+        rdf:type             sh:NodeShape;
+        sh:property          meq:AllowedClasses-property;
+        sh:targetSubjectsOf  rdf:type .
+
+meq:ProfileClassesGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "ProfileClasses";
+        sh:order    1 .
+
+<http://iec.ch/TC57/CIM100#IdentifiedObject.mRIDCardinalityGroup>
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "CardinalityIO";
+        sh:order    0 .

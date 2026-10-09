@@ -1,0 +1,10 @@
+## Validation results
+Dataset,XML files,Constraint file,Focus node,Path,Value,Value kind,Source,Constraint Component,Message,Severity,Description,Order,Name,Group
+## Validation statistics
+Dataset,XML files,Constraint file,All,Warnings,Infos,Violations,Conforms,Validation error,Missing XML files,Chart name,Validation scope
+EQ,RegionA_EQ_20260101T0100Z.xml,shapes.ttl,0,0,0,0,TRUE,,,Thing check,Complete
+## StatisticsConstraint
+Dataset,Path,Source,Count,Constraint Component,Message,Severity,Description,Order,Name,Group
+## Charts
+Dataset,Warnings,Infos,Violations,,Dataset (all),Warnings,Infos,Violations
+,,,,,Thing check,0,0,0
