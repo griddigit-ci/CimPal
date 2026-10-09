@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In review (PR into `devel`) |
 | Phase | D1 |
 | Depends on | DEP-5, DEP-1 |
 | Size | M |
@@ -41,15 +41,15 @@ Run `serve` as a real service for a team or an Airflow installation: inside a co
 
 ## Acceptance criteria (status checklist)
 
-- [ ] `--allowed-host` works behind a proxy; unknown Host still 403; tests for port handling and case-insensitivity
-- [ ] Token file mode: read-only, never deleted; two tokens accepted; rotation (replace file → old token refused after reload) tested with an injected clock; file permission check like SEC-1 (warn or refuse if world-readable on POSIX)
-- [ ] `/ready` semantics tested (normal, queue full, shutting down)
-- [ ] SIGTERM drain tested with a forked JVM (failsafe): running job finishes within grace, queued jobs cancelled, exit 0; job exceeding grace → exit non-zero and a log line
-- [ ] JSON logs: schema documented; test that no token or `Authorization` header ever appears; all log fields sanitised
-- [ ] `/metrics` behind a flag (`--metrics`), token-protected, tested
-- [ ] `deploy/kubernetes/` passes `kubectl apply --dry-run=client` and kubeconform in `integrations.yml`; compose file passes `docker compose config`
-- [ ] End-to-end on kind or Docker Desktop: deploy, submit a job through the ingress with curl, read the result; steps in `deploy/kubernetes/README.md`; result recorded in notes
-- [ ] `/security-review` clean or findings fixed with regression tests
+- [x] `--allowed-host` works behind a proxy; unknown Host still 403; tests for port handling and case-insensitivity
+- [x] Token file mode: read-only, never deleted; two tokens accepted; rotation (replace file → old token refused after reload) tested with an injected clock; file permission check like SEC-1 (warn or refuse if world-readable on POSIX)
+- [x] `/ready` semantics tested (normal, queue full, shutting down)
+- [x] SIGTERM drain tested with a forked JVM (failsafe): running job finishes within grace, queued jobs cancelled, exit 0; job exceeding grace → exit non-zero and a log line
+- [x] JSON logs: schema documented; test that no token or `Authorization` header ever appears; all log fields sanitised
+- [x] `/metrics` behind a flag (`--metrics`), token-protected, tested
+- [x] `deploy/kubernetes/` passes `kubectl apply --dry-run=client` and kubeconform in `integrations.yml`; compose file passes `docker compose config`
+- [x] End-to-end on kind or Docker Desktop: deploy, submit a job through the ingress with curl, read the result; steps in `deploy/kubernetes/README.md`; result recorded in notes
+- [x] `/security-review` clean or findings fixed with regression tests
 
 ## Instructions for Claude Code
 
@@ -82,7 +82,53 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-07 | D-7: TLS ends at the proxy or Ingress; CimPal stays plain HTTP and the docs say so. The Kubernetes example adds a NetworkPolicy so only the ingress controller reaches the pod. | Claude Code (plan approved by maintainer) |
+| 2026-10-07 | The end-to-end run is a kind job in CI (`integrations.yml`, `deploy/kubernetes/e2e-kind.sh`); this Windows machine has no Docker or kind. | Claude Code (plan approved) |
+| 2026-10-07 | SIGTERM via `sun.misc.Signal` (`requires jdk.unsupported`) runs the `/shutdown` path; exit 0, or 3 when a command outlives `--shutdown-grace`. The shutdown hook drains as well (Ctrl-C). | Claude Code (plan approved) |
+| 2026-10-07 | No new dependencies: `ServeLog` writes JSON lines with Jackson, `ServeMetrics` writes Prometheus text by hand. | Claude Code (plan approved) |
+| 2026-10-08 | Token file permissions: warn only when the file is world-readable. Group-read is how Kubernetes shares a secret with `fsGroup` (`defaultMode: 0440`). | Claude Code |
+| 2026-10-08 | Token file revocation must not fail open (security review): no token means revoke all; a broken file is bridged for one check, then everything is refused and `/ready` answers 503. Change detection is by content hash. | Claude Code |
+| 2026-10-08 | `/ready` is 503 only while shutting down or without a usable token, never for a full queue: one replica would otherwise drop out of the Service and block polling and cancelling (security review). | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+**Built** (branch `feature/dep-6-service-deployment`, CLI module only):
+- **Host check:** `--allowed-host`, in `ServeSecurity.isAllowedHost`/`allowedHostEntry`.
+- **Token file:** `TokenSource` with `FileTokens` (`--token-from-file`, `CIMPAL_API_TOKEN_FILE`, `--token-reload`).
+- **Endpoints:** `GET /ready`; `GET /metrics` with `--metrics` (`ServeMetrics`).
+- **Logs:** `--log-format json` (`ServeLog`; the commands' stderr is wrapped into `output` events).
+- **Shutdown:** SIGTERM (`ServeSignals`) and `--shutdown-grace`.
+- **Examples:** `deploy/docker-compose` (Caddy, `tls internal`) and `deploy/kubernetes` (kustomization, NetworkPolicy, `e2e-kind.sh`).
+- **CI:** `integrations.yml` gets the `deploy-static` job (compose config, digest pins, kubeconform) and the `deploy-kind` job.
+- **Docs:** `docs/cli/serve.md` ("Running as a service"), the new `docs/guide/service.md`, and the guide's security, deployment-modes, capabilities and index pages.
+
+**Tests:**
+- **CLI suite:** 173 → 217 (0 failures, 3 skipped).
+- **New classes:** `TokenSourceTest`, `ServeLogTest`, `ServeMetricsTest`.
+- **New cases:** in `ServeServerTest`, `ServeSecurityTest` and `ServeCommandTest`.
+- **`ServeSignalIT`** (maven-failsafe, Linux/macOS only, so it runs in CI on Ubuntu): it forks a JVM, sends SIGTERM, and checks that the running job finishes, the queued one never runs and the exit code is 0; and exit 3 when the grace runs out.
+- **Coverage:** CLI line coverage is 65.9 % (floor 28.5 %).
+- **Manual run** from the dev classpath (token file, JSON logs, metrics): `/ready` 200; a proxy name gets 200 and an unknown Host 403; a job runs; `/metrics` answers 200 with the token and 401 without; stdout stays empty, stderr is JSON only, and no token appears in the log.
+
+**Security review** (`security-reviewer`, 2026-10-08). No Critical or High. Fixed with regression tests:
+
+| Severity | Finding | Fix |
+| --- | --- | --- |
+| Medium | A failed token-file reload kept the old tokens forever, so a revocation that broke the file failed open. | No token → revoke all. A broken file is bridged for one check, then refused, and `/ready` answers 503. Each failed check is logged. Tests: `aBrokenFileKeepsTheOldTokensForOneCheckThenRefusesEverything`, `anEmptyFileRevokesEveryTokenAtOnce`, `readyIs503WhileNoTokenCanBeAccepted`. |
+| Medium | `/ready` 503 on a full queue took the only replica out of the Service, so polling and cancelling were blocked too. | Readiness ignores the queue (`readyStays200WithAFullQueueAndIs503OnlyWhenShuttingDown`). |
+| Medium | The compose example mounted the token as a single-file secret, so a replaced file was never seen. | The `./secrets` folder is mounted. The container runs as the folder's owner (`CIMPAL_UID`), so the file can stay `chmod 600`. |
+| Low | The token file was read unbounded, from any file type, with mtime/size change detection, under a lock on request threads. | Regular file only; a bounded read (4 KiB); a content hash; reload under `tryLock`. Tests: `onlyARegularFileOfBoundedSizeIsRead`, `aReplacementOfTheSameSizeAndTimeIsStillSeen`. |
+| Low | The JSON log took a line's level from words anywhere in it; server threads got the job's id; partial lines were lost. | Level from the line's start only; server threads (`StderrTee.isServerThread`) are not attributed; partial lines are flushed at the end; dead threads are pruned. Tests in `ServeLogTest`. |
+| Low | Supply chain: mutable image tags, a manifest fetched by tag, a same-origin checksum. | Caddy and kubeconform pinned by digest (checked in CI); ingress-nginx by commit; the kind SHA-256 is in the workflow. The CimPal image stays a tag, with a comment to pin a release. |
+| Low | No NetworkPolicy; the compose service had capabilities; the field name `token` in the startup event; a fixed sleep in a test. | `networkpolicy.yaml`; `cap_drop: ALL` and `no-new-privileges`; `tokenSource`; the test polls instead. |
+| Low | Unauthenticated probes show the version publicly through the proxy; Prometheus pod discovery is refused by the Host check. | Documented (block at the proxy if needed; scrape through the Ingress). Not changed: `/health` showing the version predates DEP-6. |
+
+Also added from the review's list of missing tests: Host edge cases for `--allowed-host`, and the Host check on `/ready` and `/metrics`.
+
+Not covered by a test:
+- **SIGINT during a SIGTERM drain:** `close()` is idempotent and both paths wait on the same worker.
+- **Partial writes of the token file:** the docs say to replace the file in one step.
+
+**Open:**
+- the kind end-to-end job passed on its first run (PR #64, `integrations.yml` run 37752999161): ingress-nginx, the manifests with an image from the branch, a `sparql` job through the Ingress over TLS, JSON logs without the token, and a clean pod deletion;
+- DEP-7 (file exchange) will replace `kubectl cp`/volume filling.

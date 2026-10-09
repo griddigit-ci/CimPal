@@ -1,0 +1,103 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# One replica: serve runs one command at a time and keeps its jobs in memory. Scale with more
+# Deployments (each with its own data and name), not replicas behind one Service.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cimpal
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # one ReadWriteOnce volume
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cimpal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cimpal
+    spec:
+      automountServiceAccountToken: false
+      # Longer than --shutdown-grace, so a running command can finish after SIGTERM.
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cimpal
+          image: ghcr.io/griddigit-ci/cimpal:latest
+          args:
+            - serve
+            - --host=0.0.0.0
+            - --allow-remote
+            # The name clients use through the Ingress (its Host header).
+            - --allowed-host=cimpal.example.com
+            - --log-format=json
+            - --metrics
+            - --shutdown-grace=PT60S
+          env:
+            - name: CIMPAL_API_TOKEN_FILE
+              value: /var/run/secrets/cimpal/token
+          ports:
+            - name: http
+              containerPort: 7474
+          # 1 M triples: 1 GB heap at 75 % of the limit (docs/guide/sizing.md). Requests equal
+          # limits for memory, so the pod isn't evicted under node pressure.
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1536Mi
+            limits:
+              memory: 1536Mi
+          # The kubelet would send the pod IP as Host, which serve refuses; name loopback instead.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost:7474
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost:7474
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            - name: token
+              mountPath: /var/run/secrets/cimpal
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: cimpal-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: token
+          secret:
+            secretName: cimpal-token
+            # Owner and fsGroup may read; nobody else.
+            defaultMode: 0440

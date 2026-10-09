@@ -78,6 +78,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@code /v1} is {@code application/problem+json}; {@code GET /v1/health} and
  * {@code GET /v1/openapi.json} need no token. The routes are {@link #V1_ROUTES}; the OpenAPI
  * document {@code openapi/cimpal-v1.json} describes them.
+ *
+ * <h2>Service deployment (DEP-6)</h2>
+ * <p>Behind a reverse proxy, {@code --allowed-host} adds the public names the Host check accepts.
+ * The tokens come from a {@link TokenSource}, which may be a reloadable secret file.
+ * {@code GET /ready} (no token) is 200 while the server takes work and 503 when it is shutting
+ * down or its queue is full. With {@code --metrics}, {@code GET /metrics} (token) serves
+ * Prometheus text. Server events go to a {@link ServeLog}, as text or JSON lines.
  */
 final class ServeServer implements AutoCloseable {
 
@@ -165,10 +172,10 @@ final class ServeServer implements AutoCloseable {
     }
 
     /** Server settings; {@link #builder()} holds the defaults. */
-    record Config(String host, int port, String token, Set<String> allowedOrigins, boolean allowRemote,
+    record Config(String host, int port, TokenSource tokens, Set<String> allowedOrigins, boolean allowRemote,
                   long maxBodyBytes, int queueSize, Duration requestTimeout,
                   Duration jobTimeout, int maxJobs, Duration jobTtl, int jobLogLines, long maxResultBytes,
-                  long jobStoreBytes) {
+                  long jobStoreBytes, Set<String> allowedHosts, boolean metrics, ServeLog log) {
 
         static Builder builder() {
             return new Builder();
@@ -178,7 +185,11 @@ final class ServeServer implements AutoCloseable {
             private String host = "localhost";
             private int port = 7474;
             private String token;
+            private TokenSource tokens;
             private Set<String> allowedOrigins = Set.of();
+            private Set<String> allowedHosts = Set.of();
+            private boolean metrics;
+            private ServeLog log = ServeLog.text();
             private boolean allowRemote;
             private long maxBodyBytes = 1024 * 1024;
             private int queueSize = 4;
@@ -194,6 +205,12 @@ final class ServeServer implements AutoCloseable {
             Builder host(String host) { this.host = host; return this; }
             Builder port(int port) { this.port = port; return this; }
             Builder token(String token) { this.token = token; return this; }
+            /** Instead of {@link #token(String)}: e.g. a reloadable token file (DEP-6). */
+            Builder tokens(TokenSource tokens) { this.tokens = tokens; return this; }
+            /** {@code --allowed-host} values, already normalised by {@link ServeSecurity#allowedHostEntry}. */
+            Builder allowedHosts(Set<String> hosts) { this.allowedHosts = Set.copyOf(hosts); return this; }
+            Builder metrics(boolean metrics) { this.metrics = metrics; return this; }
+            Builder log(ServeLog log) { this.log = log; return this; }
             Builder allowedOrigins(Set<String> origins) { this.allowedOrigins = Set.copyOf(origins); return this; }
             Builder allowRemote(boolean allowRemote) { this.allowRemote = allowRemote; return this; }
             Builder maxBodyBytes(long maxBodyBytes) { this.maxBodyBytes = maxBodyBytes; return this; }
@@ -207,8 +224,11 @@ final class ServeServer implements AutoCloseable {
             Builder jobStoreBytes(long jobStoreBytes) { this.jobStoreBytes = jobStoreBytes; return this; }
 
             Config build() {
-                return new Config(host, port, token, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
-                        requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes);
+                TokenSource source = tokens != null ? tokens
+                        : token == null || token.isBlank() ? null : TokenSource.fixed(token);
+                return new Config(host, port, source, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
+                        requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes,
+                        allowedHosts, metrics, log);
             }
         }
     }
@@ -235,6 +255,8 @@ final class ServeServer implements AutoCloseable {
     private final Map<UUID, Future<?>> queuedTasks = new ConcurrentHashMap<>();
     /** The runningSince value the last stall warning was logged for, so it is logged once per command. */
     private final AtomicLong stallWarned = new AtomicLong();
+    private final ServeLog log;
+    private final ServeMetrics metrics = new ServeMetrics();
 
     private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck, Runnable onOutOfMemory,
                         InstantSource clock) {
@@ -242,6 +264,7 @@ final class ServeServer implements AutoCloseable {
         this.runner = runner;
         this.requestCheck = requestCheck;
         this.onOutOfMemory = onOutOfMemory;
+        this.log = config.log();
         this.jobs = new JobManager(config.maxJobs(), config.jobTtl(), config.jobTimeout(), config.jobLogLines(),
                 config.jobStoreBytes(), clock);
         this.totalSlots = config.queueSize() + 1;
@@ -321,7 +344,7 @@ final class ServeServer implements AutoCloseable {
     }
 
     private static void validate(Config config) {
-        if (config.token() == null || config.token().isBlank()) {
+        if (config.tokens() == null) {
             throw new IllegalArgumentException("A token is required.");
         }
         if (!ServeSecurity.isLoopback(config.host()) && !config.allowRemote()) {
@@ -402,10 +425,13 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         // Queued jobs never start; the running one finishes, as for synchronous requests.
+        log.info("server.stopping", "serve: stopping; queued jobs are cancelled, a running command finishes",
+                "queued", (long) jobs.queued().size());
         for (Job job : jobs.queued()) {
             if (job.cancel(jobs.now(), "Server shut down before the job started")) {
                 dropQueuedTask(job);
                 slots.release();
+                jobCancelled(job);
             }
         }
         http.stop(0);
@@ -425,7 +451,7 @@ final class ServeServer implements AutoCloseable {
             String path = exchange.getRequestURI().getPath() == null ? "" : exchange.getRequestURI().getPath();
 
             if (!ServeSecurity.isAllowedHost(exchange.getRequestHeaders().getFirst("Host"), port(),
-                    config.host(), config.allowRemote())) {
+                    config.host(), config.allowRemote(), config.allowedHosts())) {
                 reject(exchange, 403, "Host header not allowed", method, path);
                 return;
             }
@@ -444,6 +470,19 @@ final class ServeServer implements AutoCloseable {
                 case "/health" -> {
                     if (requireMethod(exchange, method, "GET", path)) {
                         respond(exchange, 200, healthJson());
+                    }
+                }
+                case "/ready" -> {
+                    if (requireMethod(exchange, method, "GET", path)) {
+                        String state = readiness();
+                        respond(exchange, state.equals("ready") ? 200 : 503, "{\"status\":" + jsonStr(state) + "}");
+                    }
+                }
+                case "/metrics" -> {
+                    if (!config.metrics()) {
+                        reject(exchange, 404, "Not found (start serve with --metrics)", method, path);
+                    } else if (requireMethod(exchange, method, "GET", path) && requireToken(exchange, method, path)) {
+                        respond(exchange, 200, metricsText(), ServeMetrics.CONTENT_TYPE);
                     }
                 }
                 case "/commands" -> {
@@ -473,9 +512,9 @@ final class ServeServer implements AutoCloseable {
             }
         } catch (IOException e) {
             // Usually the client went away (closed or timed-out connection).
-            System.err.println("[WARN] serve: connection error: " + e.getClass().getSimpleName());
+            log.warn("connection.error", "serve: connection error: " + e.getClass().getSimpleName());
         } catch (Exception e) {
-            System.err.println("[ERROR] serve: request failed: " + e.getClass().getSimpleName());
+            log.error("request.failed", "serve: request failed: " + e.getClass().getSimpleName());
         } catch (OutOfMemoryError e) {
             // As for a command: the heap is exhausted and this JVM can't be trusted any more (DEP-2).
             onOutOfMemory.run();
@@ -493,7 +532,7 @@ final class ServeServer implements AutoCloseable {
     }
 
     private boolean requireToken(HttpExchange exchange, String method, String path) throws IOException {
-        if (ServeSecurity.tokenMatches(config.token(), exchange.getRequestHeaders().getFirst("Authorization"))) {
+        if (config.tokens().matches(exchange.getRequestHeaders().getFirst("Authorization"))) {
             return true;
         }
         exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
@@ -667,6 +706,8 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         Job job = jobs.create(command, label);
+        log.info("job.queued", "serve: job " + job.id() + " (" + command + ") queued", "jobId", job.id().toString(),
+                "command", command, "remote", remote(exchange));
         try {
             queuedTasks.put(job.id(), worker.submit(() -> runJob(job, body)));
         } catch (RejectedExecutionException e) {
@@ -690,14 +731,18 @@ final class ServeServer implements AutoCloseable {
             // Submitted while close() was cancelling the queue: it must not start either.
             if (job.cancel(jobs.now(), "Server shut down before the job started")) {
                 slots.release();
+                jobCancelled(job);
             }
             return;
         }
         if (!job.start(jobs.now())) {
             return; // Cancelled while queued: whoever cancelled it released the slot.
         }
+        long started = System.nanoTime();
+        log.info("job.started", "serve: job " + job.id() + " (" + job.command() + ") started",
+                "jobId", job.id().toString(), "command", job.command());
         runningJob = job;
-        runningSince.set(System.nanoTime());
+        runningSince.set(started);
         try {
             CommandResult result;
             try (StderrTee.Capture ignored = StderrTee.capture(job.log())) {
@@ -710,15 +755,33 @@ final class ServeServer implements AutoCloseable {
                 onOutOfMemory.run();
                 return;
             }
-            System.err.println("[ERROR] serve: job " + job.id() + " (" + job.command() + ") failed: "
-                    + t.getClass().getSimpleName());
+            log.error("job.error", "serve: job " + job.id() + " (" + job.command() + ") failed: "
+                    + t.getClass().getSimpleName(), "jobId", job.id().toString(), "command", job.command());
             job.fail(jobs.now(), "Internal error while running " + job.command());
         } finally {
             runningJob = null;
             runningSince.set(0);
             slots.release();
+            long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            Job.Snapshot s = job.snapshot();
+            metrics.jobFinished(s.status(), millis / 1000.0);
+            log.info("job.finished", "serve: job " + job.id() + " (" + job.command() + ") " + s.status().apiName(),
+                    "jobId", job.id().toString(), "command", job.command(), "status", s.status().apiName(),
+                    "exitCode", s.exitCode(), "durationMs", millis);
         }
         jobs.evict(); // Keep the store within --job-store-bytes as results arrive.
+    }
+
+    private void jobCancelled(Job job) {
+        metrics.jobFinished(JobStatus.CANCELLED, -1);
+        log.info("job.finished", "serve: job " + job.id() + " (" + job.command() + ") cancelled",
+                "jobId", job.id().toString(), "command", job.command(), "status", JobStatus.CANCELLED.apiName());
+    }
+
+    /** The id of the job running now, or null (for the JSON log's output lines). */
+    String runningJobId() {
+        Job job = runningJob;
+        return job == null ? null : job.id().toString();
     }
 
     /** Takes a cancelled job's task out of the worker's queue, so its request body is freed now. */
@@ -733,6 +796,7 @@ final class ServeServer implements AutoCloseable {
         if (job.cancel(jobs.now(), "Cancelled by the client")) {
             dropQueuedTask(job);
             slots.release();
+            jobCancelled(job);
             respond(exchange, 200, jobJson(job.snapshot()));
             return;
         }
@@ -908,10 +972,9 @@ final class ServeServer implements AutoCloseable {
         return false;
     }
 
-    private static void rejectJob(HttpExchange exchange, int status, String message, Job job, String method,
-                                  String path) throws IOException {
-        System.err.println("[WARN] serve: " + status + " " + LogSanitizer.forLog(method) + " "
-                + LogSanitizer.forLog(path) + " - " + message);
+    private void rejectJob(HttpExchange exchange, int status, String message, Job job, String method,
+                           String path) throws IOException {
+        logRejected(exchange, status, message, method, path, job.id());
         respond(exchange, status, Problem.json(status, message, job.id()), Problem.CONTENT_TYPE);
     }
 
@@ -937,6 +1000,7 @@ final class ServeServer implements AutoCloseable {
     // -------------------------------------------------------------------------
 
     private void runCommand(HttpExchange exchange, String command, byte[] requestBody) throws IOException {
+        long received = System.nanoTime();
         byte[] body;
         try {
             body = requestCheck.check(command, requestBody);
@@ -945,6 +1009,7 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         if (!slots.tryAcquire()) {
+            metrics.request(command, "busy");
             exchange.getResponseHeaders().set("Retry-After", "30");
             reject(exchange, 503, "Server busy: " + config.queueSize() + " requests already waiting",
                     "POST", "/" + command);
@@ -983,6 +1048,7 @@ final class ServeServer implements AutoCloseable {
                 // Don't interrupt: a command cut off mid-write could leave truncated reports.
                 future.cancel(false);
             }
+            metrics.request(command, "timeout");
             reject(exchange, 504, "Command did not finish within " + config.requestTimeout(), "POST", "/" + command);
             return;
         } catch (ExecutionException e) {
@@ -997,7 +1063,9 @@ final class ServeServer implements AutoCloseable {
                 onOutOfMemory.run();
                 return;
             }
-            System.err.println("[ERROR] serve: /" + command + " failed: " + e.getCause().getClass().getSimpleName());
+            metrics.request(command, "error");
+            log.error("command.failed", "serve: /" + command + " failed: " + e.getCause().getClass().getSimpleName(),
+                    "command", command, "remote", remote(exchange));
             respond(exchange, 500, error("Internal error while running " + command));
             return;
         } catch (InterruptedException e) {
@@ -1016,6 +1084,10 @@ final class ServeServer implements AutoCloseable {
         }
         // Exit 0 and 1 (violations) are results; 2 is bad input; anything else is an error.
         int status = result.exitCode() <= 1 ? 200 : (result.exitCode() == 2 ? 400 : 500);
+        metrics.request(command, ServeMetrics.outcome(result.exitCode()));
+        log.info("command.finished", "serve: /" + command + " exit " + result.exitCode(), "command", command,
+                "exitCode", result.exitCode(), "status", status,
+                "durationMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - received), "remote", remote(exchange));
         respond(exchange, status, responseBody);
     }
 
@@ -1060,8 +1132,8 @@ final class ServeServer implements AutoCloseable {
                 : jobs.timedOut(job));
         // Health is polled without a token: log once per command, not once per poll.
         if (stalled && stallWarned.getAndSet(since) != since) {
-            System.err.println("[WARN] serve: the running command has exceeded its timeout; "
-                    + "restart the server if it doesn't return.");
+            log.warn("stall", "serve: the running command has exceeded its timeout; "
+                    + "restart the server if it doesn't return.", "jobId", job == null ? null : job.id().toString());
         }
         return stalled;
     }
@@ -1080,15 +1152,50 @@ final class ServeServer implements AutoCloseable {
         return sb.append("]}").toString();
     }
 
-    private static void reject(HttpExchange exchange, int status, String message, String method, String path)
+    private void reject(HttpExchange exchange, int status, String message, String method, String path)
             throws IOException {
-        System.err.println("[WARN] serve: " + status + " " + LogSanitizer.forLog(method) + " "
-                + LogSanitizer.forLog(path) + " - " + message);
+        logRejected(exchange, status, message, method, path, null);
         if (isV1(path)) {
             respond(exchange, status, Problem.json(status, message, null), Problem.CONTENT_TYPE);
         } else {
             respond(exchange, status, error(message));
         }
+    }
+
+    private void logRejected(HttpExchange exchange, int status, String message, String method, String path,
+                             UUID jobId) {
+        log.warn("request.rejected", "serve: " + status + " " + LogSanitizer.forLog(method) + " "
+                        + LogSanitizer.forLog(path) + " - " + LogSanitizer.forLog(message),
+                "status", status, "method", method, "path", path, "remote", remote(exchange),
+                "jobId", jobId == null ? null : jobId.toString());
+    }
+
+    /** The client's address (the proxy's, behind one); never a header the client chose. */
+    private static String remote(HttpExchange exchange) {
+        return exchange.getRemoteAddress() == null || exchange.getRemoteAddress().getAddress() == null ? null
+                : exchange.getRemoteAddress().getAddress().getHostAddress();
+    }
+
+    /**
+     * {@code ready}, or why not: {@code shutting down}, or {@code no usable token} (a broken token
+     * file). A full queue doesn't count: with one replica that would take the only endpoint out of
+     * the load balancer and block polling and cancelling too; a full queue is answered per request
+     * with 503 and {@code Retry-After} instead.
+     */
+    String readiness() {
+        if (closing.get()) {
+            return "shutting down";
+        }
+        return config.tokens().usable() ? "ready" : "no usable token";
+    }
+
+    private String metricsText() {
+        Map<JobStatus, Long> byStatus = new java.util.EnumMap<>(JobStatus.class);
+        for (JobStatus status : JobStatus.values()) {
+            byStatus.put(status, jobs.count(status));
+        }
+        boolean busy = runningSince.get() != 0;
+        return metrics.render(VERSION, byStatus, Math.max(0, inFlight() - (busy ? 1 : 0)), busy);
     }
 
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {

@@ -39,18 +39,22 @@ Direct use of the other commands from a shell is not restricted. The operating s
 
 ## `serve`
 
-- **Token:** every request except `GET /health` needs `Authorization: Bearer <token>`. The token is new on every start: it is written to a file only your user can read, or taken from `CIMPAL_API_TOKEN`. Treat it like a password.
-- **Network:** `serve` binds to localhost. `--allow-remote` is needed for any other address, and the traffic is plain HTTP. There is no TLS inside CimPal (decision D-7), so put a TLS-terminating proxy in front if you need network access; full proxy support is planned (DEP-6).
+- **Token:** every request except the health, readiness and spec endpoints needs `Authorization: Bearer <token>`. Treat it like a password. There are three sources:
+  - by default the token is new on every start and written to a file only your user can read;
+  - it can be taken from `CIMPAL_API_TOKEN`;
+  - for a service, it is read from a secret file (`--token-from-file`, `CIMPAL_API_TOKEN_FILE`). That file holds up to two tokens for rotation and is never written or deleted.
+- **Network:** `serve` binds to localhost. `--allow-remote` is needed for any other address, and the traffic is plain HTTP. There is no TLS inside CimPal (decision D-7). For network access, put a TLS-terminating reverse proxy or Ingress in front and list its public name with `--allowed-host`. See [Running CimPal as a service](service.md).
+- **Logs:** tokens and the `Authorization` header are never logged; every logged value is sanitised. `--log-format json` gives one JSON object per line.
 - **Browsers:** a Host-header check (against DNS rebinding) and an Origin check (no CORS headers are sent; `--allow-origin` lists exceptions).
 - **Limits:** request bodies up to 1 MB, one command at a time with a queue of 4, and a 30-minute timeout per request. All are configurable.
-- **Shutdown:** `POST /shutdown` with the token, or stop the process.
+- **Shutdown:** `POST /shutdown` with the token, SIGTERM or Ctrl-C. Queued jobs are cancelled, and a running command gets `--shutdown-grace` (60 s) to finish.
 
 ## Container
 
 - **User:** UID 10001, not root.
 - **Ports:** no `EXPOSE`. Publish `serve` only on the host loopback, as [docker.md](../cli/docker.md#serve) shows.
 - **Filesystem:** a read-only root filesystem works (`--read-only --tmpfs /tmp`; in Kubernetes `readOnlyRootFilesystem` plus an `emptyDir` at `/tmp`).
-- **Kubernetes:** the Airflow example pod meets Pod Security "restricted": non-root, all capabilities dropped, `RuntimeDefault` seccomp, no service-account token.
+- **Kubernetes:** the Airflow example pod and the `serve` Deployment in `deploy/kubernetes` meet Pod Security "restricted": non-root, all capabilities dropped, `RuntimeDefault` seccomp, no service-account token.
 - **Mounts:** only what the run needs. Mount the models read-only and only the output folder writable. Never mount a home folder or a drive root at `/data`.
 - **Secrets:** pass `GITHUB_TOKEN` and `CIMPAL_API_TOKEN` as environment variables without a value on the command line (`-e NAME`), or from a secret store. Don't put secrets in `JAVA_OPTS`, `JAVA_TOOL_OPTIONS` or config files.
 

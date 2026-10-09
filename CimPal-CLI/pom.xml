@@ -85,6 +85,27 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Integration tests (*IT) that fork a JVM, e.g. the SIGTERM drain of serve (DEP-6). They
+                 run against the compiled classes, not the shaded JAR, and on the plain classpath
+                 so the forked JVM can be started with java.class.path. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.3</version>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                    <useManifestOnlyJar>false</useManifestOnlyJar>
+                    <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

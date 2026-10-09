@@ -5,6 +5,8 @@
  */
 package eu.griddigit.CimPal.cli.command;
 
+import eu.griddigit.cimpal.core.utils.LogSanitizer;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,6 +52,9 @@ final class ServeSecurity {
 
     /** Environment variable that supplies the token instead of a generated one. */
     static final String TOKEN_ENV = "CIMPAL_API_TOKEN";
+
+    /** Environment variable naming a read-only token file, like {@code --token-from-file} (DEP-6). */
+    static final String TOKEN_FILE_ENV = "CIMPAL_API_TOKEN_FILE";
 
     /** Shortest token accepted from {@link #TOKEN_ENV}; a generated token is 43 characters. */
     static final int MIN_ENV_TOKEN_LENGTH = 32;
@@ -282,6 +287,17 @@ final class ServeSecurity {
      * {@code --allow-remote}, the bound host itself). The port may be omitted only on port 80.
      */
     static boolean isAllowedHost(String hostHeader, int port, String boundHost, boolean allowRemote) {
+        return isAllowedHost(hostHeader, port, boundHost, allowRemote, Set.of());
+    }
+
+    /**
+     * As above, and also the public names of {@code --allowed-host} (DEP-6), the names a reverse
+     * proxy or ingress forwards in the Host header. An entry {@code name} matches that name
+     * without a port or with {@code :80} or {@code :443}; {@code name:port} matches only that
+     * port. Entries come from {@link #allowedHostEntry(String)}.
+     */
+    static boolean isAllowedHost(String hostHeader, int port, String boundHost, boolean allowRemote,
+                                 Set<String> allowedHosts) {
         if (hostHeader == null || hostHeader.isBlank()) {
             return false;
         }
@@ -296,6 +312,10 @@ final class ServeSecurity {
             name = value;
             portPart = null;
         }
+        if ((allowedHosts.contains(value) && portPart != null)
+                || (allowedHosts.contains(name) && (portPart == null || portPart.equals("80") || portPart.equals("443")))) {
+            return true;
+        }
         boolean portOk = portPart == null ? port == 80 : portPart.equals(Integer.toString(port));
         if (!portOk) {
             return false;
@@ -304,6 +324,41 @@ final class ServeSecurity {
             return true;
         }
         return allowRemote && boundHost != null && name.equals(boundHost.strip().toLowerCase(Locale.ROOT));
+    }
+
+    private static final Pattern HOST_NAME = Pattern.compile("[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*");
+    private static final Pattern IPV6_LITERAL = Pattern.compile("\\[[0-9a-f:.]+]");
+
+    /**
+     * Normalises one {@code --allowed-host} value: {@code name} or {@code name:port}, a DNS name,
+     * an IPv4 address or a bracketed IPv6 address, lower case. No scheme, path, user or wildcard.
+     *
+     * @throws IllegalArgumentException for anything else
+     */
+    static String allowedHostEntry(String value) {
+        String v = value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
+        String name = v;
+        int colon = v.lastIndexOf(':');
+        if (colon > 0 && colon > v.lastIndexOf(']')) {
+            name = v.substring(0, colon);
+            String portText = v.substring(colon + 1);
+            int p;
+            try {
+                p = Integer.parseInt(portText);
+            } catch (NumberFormatException e) {
+                p = -1;
+            }
+            if (p < 1 || p > 65535 || !portText.equals(Integer.toString(p))) {
+                throw new IllegalArgumentException("--allowed-host " + LogSanitizer.forLog(value)
+                        + ": the port must be a number from 1 to 65535.");
+            }
+        }
+        if (!(HOST_NAME.matcher(name).matches() && name.length() <= 253) && !IPV6_LITERAL.matcher(name).matches()) {
+            throw new IllegalArgumentException("--allowed-host " + LogSanitizer.forLog(value)
+                    + ": expected a host name with an optional port, e.g. cimpal.example.com or cimpal.example.com:8443"
+                    + " (no scheme, path or wildcard).");
+        }
+        return v;
     }
 
     /** {@code application/json}, optionally with parameters such as a charset. */

@@ -33,6 +33,7 @@ There is also a desktop application (`CimPal.exe` / `CimPal.jar`, JavaFX) with t
 | Choose between CLI, container, server and MCP | [Deployment modes](deployment-modes.md) |
 | Know how much memory and CPU a model needs | [Sizing](sizing.md) |
 | Run it from Apache Airflow | [Airflow](airflow.md) |
+| Run `serve` for a team: proxy, TLS, Kubernetes | [Running CimPal as a service](service.md) |
 | Understand what it reads, writes and connects to | [Security for operators](security.md) |
 | Write config files, read exit codes and JSON output | [Configuration](configuration.md) |
 | Fix a problem | [Troubleshooting](troubleshooting.md) |

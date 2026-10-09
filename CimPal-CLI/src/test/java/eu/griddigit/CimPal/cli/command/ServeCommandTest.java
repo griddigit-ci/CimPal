@@ -66,6 +66,7 @@ class ServeCommandTest {
     private Running startInBackground(Map<String, String> env, String... args) throws Exception {
         ServeCommand command = new ServeCommand();
         command.environment = env;
+        command.onTerm = onTerm -> false;
         CompletableFuture<ServeServer> started = new CompletableFuture<>();
         command.onStarted = started::complete;
         CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(args));
@@ -78,6 +79,7 @@ class ServeCommandTest {
     private int runToExit(Map<String, String> env, String... args) {
         ServeCommand command = new ServeCommand();
         command.environment = env;
+        command.onTerm = onTerm -> false;
         return new CommandLine(command).execute(args);
     }
 
@@ -215,5 +217,84 @@ class ServeCommandTest {
 
         assertThat(shutdown(running.server(), token).statusCode()).isEqualTo(200);
         assertThat(running.exit().get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+    }
+
+    // ---- service deployment (DEP-6) ---------------------------------------------------------
+
+    private static final String FILE_TOKEN_A = "file-token-a-0123456789abcdef0123456789";
+    private static final String FILE_TOKEN_B = "file-token-b-0123456789abcdef0123456789";
+
+    private static int status(ServeServer server, String token, String path) throws Exception {
+        return HTTP.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + path))
+                .timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + token).GET().build(),
+                HttpResponse.BodyHandlers.ofString()).statusCode();
+    }
+
+    @Test
+    void aTokenFileFromTheEnvironmentIsReadNeverWrittenOrDeleted() throws Exception {
+        Path secret = Files.writeString(tempDir.resolve("secret"), FILE_TOKEN_A + "\n" + FILE_TOKEN_B + "\n");
+        Running running = startInBackground(Map.of(ServeSecurity.TOKEN_FILE_ENV, secret.toString()),
+                "--host", "127.0.0.1", "--port", "0", "--metrics");
+
+        assertThat(status(running.server(), FILE_TOKEN_A, "/commands")).isEqualTo(200);
+        assertThat(status(running.server(), FILE_TOKEN_B, "/metrics")).isEqualTo(200);
+        assertThat(status(running.server(), "x" + FILE_TOKEN_A, "/commands")).isEqualTo(401);
+        assertThat(shutdown(running.server(), FILE_TOKEN_A).statusCode()).isEqualTo(200);
+        assertThat(running.exit().get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+
+        assertThat(Files.readString(secret)).isEqualTo(FILE_TOKEN_A + "\n" + FILE_TOKEN_B + "\n");
+        assertThat(output()).contains("read from").doesNotContain(FILE_TOKEN_A).doesNotContain(FILE_TOKEN_B);
+    }
+
+    @Test
+    void conflictingTokenSourcesRefuseToStart() throws Exception {
+        Path secret = Files.writeString(tempDir.resolve("secret"), FILE_TOKEN_A + "\n");
+        String envToken = "env-token-0123456789abcdef0123456789";
+
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, envToken), "--port", "0",
+                "--token-from-file", secret.toString())).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_FILE_ENV, secret.toString()), "--port", "0",
+                "--token-from-file", secret.toString())).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(runToExit(Map.of(), "--port", "0", "--token-from-file", secret.toString(),
+                "--token-file", tempDir.resolve("serve.token").toString())).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(runToExit(Map.of(), "--port", "0", "--token-from-file",
+                tempDir.resolve("missing").toString())).isEqualTo(ExitCode.INVALID_INPUT);
+
+        assertThat(output()).contains("not both").contains("can't be combined").doesNotContain(envToken)
+                .doesNotContain(FILE_TOKEN_A);
+        assertThat(secret).exists();
+        assertThat(tempDir.resolve("serve.token")).doesNotExist();
+    }
+
+    @Test
+    void badDeploymentOptionsAreExit2() {
+        String token = "env-token-0123456789abcdef0123456789";
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0",
+                "--allowed-host", "https://cimpal.example.com")).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0",
+                "--log-format", "xml")).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0",
+                "--shutdown-grace", "PT0S")).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(output()).contains("--allowed-host").contains("--log-format").contains("--shutdown-grace");
+    }
+
+    @Test
+    void jsonLogFormatWritesOnlyJsonLinesOnStderrAndNothingOnStdout() throws Exception {
+        String token = "env-token-0123456789abcdef0123456789";
+        Running running = startInBackground(Map.of(ServeSecurity.TOKEN_ENV, token), "--host", "127.0.0.1",
+                "--port", "0", "--log-format", "json", "--allowed-host", "cimpal.example.com");
+        assertThat(status(running.server(), "wrong-" + token, "/commands")).isEqualTo(401);
+        assertThat(shutdown(running.server(), token).statusCode()).isEqualTo(200);
+        assertThat(running.exit().get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEmpty();
+        String stderr = err.toString(StandardCharsets.UTF_8);
+        tools.jackson.databind.ObjectMapper json = new tools.jackson.databind.ObjectMapper();
+        java.util.List<String> events = new java.util.ArrayList<>();
+        for (String line : stderr.split("\\R")) {
+            events.add(json.readTree(line).path("event").asString());
+        }
+        assertThat(events).contains("server.started", "request.rejected", "server.stopping", "server.stopped");
+        assertThat(stderr).contains("cimpal.example.com").doesNotContain(token);
     }
 }

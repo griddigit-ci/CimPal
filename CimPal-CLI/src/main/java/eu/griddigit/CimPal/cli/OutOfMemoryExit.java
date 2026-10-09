@@ -22,8 +22,21 @@ public final class OutOfMemoryExit {
 
     /** Prints the message on stderr and halts the JVM with {@link ExitCode#INTERNAL_ERROR}. */
     public static void halt() {
-        System.err.println(MESSAGE);
-        System.err.flush();
+        try {
+            System.err.println(MESSAGE);
+            System.err.flush();
+        } catch (Throwable ignored) {
+            // Printing may need memory too; the exit code must not depend on it.
+        }
         Runtime.getRuntime().halt(ExitCode.INTERNAL_ERROR);
+    }
+
+    /**
+     * Loads this class and builds its message now. Called at start-up: done only once the heap is
+     * exhausted, the class initialisation could itself run out of memory, and that error would
+     * escape {@code main} as exit code 1 instead of 3.
+     */
+    public static void prepare() {
+        // Loading the class is the work; MESSAGE is built by its static initialiser.
     }
 }
