@@ -198,6 +198,39 @@ class ValidateCommandTest {
     }
 
     @Test
+    void combinedWorkflowTakesFoldersAsTheirFiles() throws Exception {
+        // As the mapping workflow takes a models folder: a folder stands for its own files.
+        combinedRunWithTwoFindings();
+        write("models/readme.txt", "not a model");
+        write("models/old/eq-old.xml", rdfXml("<ex:Thing rdf:about=\"#_3\"/>")); // sub-folders are not entered
+
+        int exitCode = validate("--workflow", "combined",
+                "--constraint-files", tempDir.resolve("constraints").toString(),
+                "--data-files", tempDir.resolve("models").toString(),
+                "--output", tempDir.resolve("out").toString(), "--xml-base", TestModels.XML_BASE, "--workers", "1",
+                "--summary-file", tempDir.resolve("summary.json").toString());
+
+        assertThat(exitCode).isEqualTo(ExitCode.VIOLATIONS);
+        JsonNode summary = JSON.readTree(tempDir.resolve("summary.json").toFile());
+        List<String> data = new java.util.ArrayList<>();
+        summary.path("run").path("inputs").path("dataFiles").forEach(f -> data.add(Path.of(f.asString()).getFileName().toString()));
+        assertThat(data).containsExactly("eq.xml", "ssh.xml");
+        assertThat(summary.path("run").path("inputs").path("constraintFiles")).hasSize(2);
+        assertThat(summary.path("results").path("violations").asInt()).as("same as naming the files").isEqualTo(2);
+    }
+
+    @Test
+    void aFolderWithNothingToUseIsBadInput() throws Exception {
+        Path shapes = write("constraints/shapes.ttl", TestModels.THING_SHAPES);
+        write("models/readme.txt", "no model here");
+
+        assertThat(validate("--workflow", "combined", "--constraint-files", shapes.toString(),
+                "--data-files", tempDir.resolve("models").toString(), "--output", tempDir.resolve("out").toString()))
+                .isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(tempDir.resolve("out")).doesNotExist();
+    }
+
+    @Test
     void combinedWorkflowNeedsItsConstraintAndDataFiles() throws Exception {
         Path shapes = write("constraints/shapes.ttl", TestModels.THING_SHAPES);
         Path data = write("models/eq.xml", CONFORMING_THING_MODEL);

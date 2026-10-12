@@ -55,10 +55,12 @@ final class CommandSchemas {
                                         + "owl:imports are then also resolved against it."));
                         p.set("constraintFiles", arraySchema(
                                 "Absolute paths to SHACL constraint files (.ttl, .rdf) or ZIP archives of them, "
-                                        + "which together form one shapes graph. Required for the combined workflow."));
+                                        + "which together form one shapes graph; a folder stands for the .ttl, .rdf and "
+                                        + ".zip files directly in it. Required for the combined workflow."));
                         p.set("dataFiles", arraySchema(
                                 "Absolute paths to instance data files (.xml) or ZIP archives of them, which "
-                                        + "together form one dataset. Required for the combined workflow."));
+                                        + "together form one dataset; a folder stands for the .xml and .zip files "
+                                        + "directly in it. Required for the combined workflow."));
                         p.set("outputDir", schema("string",
                                 "Absolute path to the output folder for Excel reports and ZIPs."));
                         p.set("datatypeMap", schema("string",

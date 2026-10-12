@@ -90,6 +90,10 @@ Required inputs: `--constraint-files`, `--data-files`, `--output`. Optional: `--
 
 - **Constraint files:** `.ttl` or `.rdf` files, or ZIP archives of them. Together they form one shapes graph, so a shape in one file can be deactivated or extended by another, and an `owl:imports` that several files share is read once. In a ZIP, every `.ttl` and `.rdf` file is used and relative imports resolve inside the archive, as in a folder; other RDF files in it are named in the warnings. Relative imports are also resolved against `--constraints-root` when it is given, otherwise against the first constraint file's folder.
 - **Data files:** RDF/XML (`.xml`) files, or ZIP archives of them, nested archives included (up to three levels). A ZIP without any `.xml` file stops the run instead of validating nothing.
+- **Folders:** either option may also name a folder, as the mapping workflow takes a models folder. It stands for the files directly in it, sorted by name:
+  - for `--data-files`, its `.xml` and `.zip` files;
+  - for `--constraint-files`, its `.ttl`, `.rdf` and `.zip` files.
+  Sub-folders are not entered. A folder with none of these files stops the run with exit code 2. The JSON summary's `run.inputs` lists the files that were used.
 - **Report:** one `validation_report__<date>_<time>.xlsx` in `--output`, in the mapping report's layout, with one validation row per constraint file. Each finding is listed under the file that declares its shape, and a file whose shapes found nothing is marked as conforming. With `--export-turtle`, the SHACL report graph is written beside it as `validation_report__<date>_<time>.ttl`.
 - **No partial pass:** an input that can't be read stops the validation with exit code 2 and writes nothing. That includes a file that doesn't parse (the message names it), an `owl:imports` that can't be found, and a path outside the allowed roots under `serve`, `mcp` or `run`. So does a run that would check nothing: no active shape has a target, or the data holds no triples. `--violations-exit-code` never changes exit 2. A report that can't be written (a full disk, a locked workbook) ends with exit 3.
 
@@ -110,8 +114,8 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--mapping-csv` | file path | — | The CSV mapping file. Required for mapping and timestamped. |
 | `--models` | folder path | — | Root folder containing model files (ZIP, XML). Required for mapping and timestamped. |
 | `--constraints-root` | folder path | — | Root folder for constraint files. Paths in the mapping CSV are relative to this. Required for mapping and timestamped. Optional for combined: relative `owl:imports` are then also resolved against it. |
-| `--constraint-files` | file paths, comma-separated | — | Constraint files (`.ttl`, `.rdf`) or ZIP archives of them, which together form one shapes graph. Required for combined. Config key `constraintFiles`: a JSON array of paths. |
-| `--data-files` | file paths, comma-separated | — | Instance data files (`.xml`) or ZIP archives of them, which together form one dataset. Required for combined. Config key `dataFiles`: a JSON array of paths. |
+| `--constraint-files` | file or folder paths, comma-separated | — | Constraint files (`.ttl`, `.rdf`) or ZIP archives of them, which together form one shapes graph. A folder stands for the `.ttl`, `.rdf` and `.zip` files directly in it. Required for combined. Config key `constraintFiles`: a JSON array of paths. |
+| `--data-files` | file or folder paths, comma-separated | — | Instance data files (`.xml`) or ZIP archives of them, which together form one dataset. A folder stands for the `.xml` and `.zip` files directly in it. Required for combined. Config key `dataFiles`: a JSON array of paths. |
 | `--output` | folder path | — | Where to write the Excel report, ZIP bundles, and Turtle reports. Created if it does not exist. Required for every workflow. |
 | `--datatype-map` | preset or file path | `CGMES30NC25` | See **Datatype map** section below. |
 | `--xml-base` | URI | `http://iec.ch/TC57/CIM100` | Base URI used when parsing RDF/XML model files. See **XML base** section below. |
