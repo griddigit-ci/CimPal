@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -128,8 +129,20 @@ final class ServeServer implements AutoCloseable {
             "GET /v1/jobs/{jobId}",
             "DELETE /v1/jobs/{jobId}",
             "GET /v1/jobs/{jobId}/result",
-            "GET /v1/jobs/{jobId}/log"
+            "GET /v1/jobs/{jobId}/log",
+            "POST /v1/uploads",
+            "GET /v1/uploads/{uploadId}",
+            "DELETE /v1/uploads/{uploadId}",
+            "GET /v1/jobs/{jobId}/files",
+            "GET /v1/jobs/{jobId}/files/{path}",
+            "GET /v1/jobs/{jobId}/archive"
     );
+
+    /** File exchange limits (DEP-7). */
+    static final long MIN_UPLOAD_BYTES = 1024;
+    static final long MAX_UPLOAD_BYTES = 16L << 30;
+    static final long MIN_WORK_MAX_BYTES = 1L << 20;
+    static final String ZIP = "application/zip";
 
     private static final String OPENAPI_RESOURCE = "/openapi/cimpal-v1.json";
     private static final Pattern UUID_TEXT =
@@ -144,6 +157,11 @@ final class ServeServer implements AutoCloseable {
     @FunctionalInterface
     interface CommandRunner {
         CommandResult run(String command, Path configFile) throws Exception;
+
+        /** For a job with an uploaded input (DEP-7); by default as without one. */
+        default CommandResult run(String command, Path configFile, WorkArea.JobWorkspace workspace) throws Exception {
+            return run(command, configFile);
+        }
     }
 
     /**
@@ -153,6 +171,11 @@ final class ServeServer implements AutoCloseable {
     @FunctionalInterface
     interface RequestCheck {
         byte[] check(String command, byte[] body) throws Rejected;
+
+        /** For a job with an uploaded input (DEP-7); by default as without one. */
+        default byte[] check(String command, byte[] body, WorkArea.JobWorkspace workspace) throws Rejected {
+            return check(command, body);
+        }
 
         RequestCheck NONE = (command, body) -> body;
     }
@@ -175,7 +198,8 @@ final class ServeServer implements AutoCloseable {
     record Config(String host, int port, TokenSource tokens, Set<String> allowedOrigins, boolean allowRemote,
                   long maxBodyBytes, int queueSize, Duration requestTimeout,
                   Duration jobTimeout, int maxJobs, Duration jobTtl, int jobLogLines, long maxResultBytes,
-                  long jobStoreBytes, Set<String> allowedHosts, boolean metrics, ServeLog log) {
+                  long jobStoreBytes, Set<String> allowedHosts, boolean metrics, ServeLog log,
+                  Path workRoot, long maxUploadBytes, Duration uploadTtl, long workMaxBytes, Duration requestReadTime) {
 
         static Builder builder() {
             return new Builder();
@@ -201,6 +225,12 @@ final class ServeServer implements AutoCloseable {
             private long maxResultBytes = 16L * 1024 * 1024;
             /** Results and logs of finished jobs together; by default a quarter of the heap. */
             private long jobStoreBytes = Runtime.getRuntime().maxMemory() / 4;
+            /** Null: no file exchange (the upload and download routes answer 404). */
+            private Path workRoot;
+            private long maxUploadBytes = 2L << 30;
+            private Duration uploadTtl = Duration.ofHours(24);
+            private long workMaxBytes = 20L << 30;
+            private Duration requestReadTime = Duration.ofSeconds(REQUEST_READ_SECONDS);
 
             Builder host(String host) { this.host = host; return this; }
             Builder port(int port) { this.port = port; return this; }
@@ -222,13 +252,18 @@ final class ServeServer implements AutoCloseable {
             Builder jobLogLines(int jobLogLines) { this.jobLogLines = jobLogLines; return this; }
             Builder maxResultBytes(long maxResultBytes) { this.maxResultBytes = maxResultBytes; return this; }
             Builder jobStoreBytes(long jobStoreBytes) { this.jobStoreBytes = jobStoreBytes; return this; }
+            Builder workRoot(Path workRoot) { this.workRoot = workRoot; return this; }
+            Builder maxUploadBytes(long maxUploadBytes) { this.maxUploadBytes = maxUploadBytes; return this; }
+            Builder uploadTtl(Duration uploadTtl) { this.uploadTtl = uploadTtl; return this; }
+            Builder workMaxBytes(long workMaxBytes) { this.workMaxBytes = workMaxBytes; return this; }
+            Builder requestReadTime(Duration requestReadTime) { this.requestReadTime = requestReadTime; return this; }
 
             Config build() {
                 TokenSource source = tokens != null ? tokens
                         : token == null || token.isBlank() ? null : TokenSource.fixed(token);
                 return new Config(host, port, source, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
                         requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes,
-                        allowedHosts, metrics, log);
+                        allowedHosts, metrics, log, workRoot, maxUploadBytes, uploadTtl, workMaxBytes, requestReadTime);
             }
         }
     }
@@ -257,6 +292,10 @@ final class ServeServer implements AutoCloseable {
     private final AtomicLong stallWarned = new AtomicLong();
     private final ServeLog log;
     private final ServeMetrics metrics = new ServeMetrics();
+    /** Uploads and job workspaces (DEP-7), or null without {@code --work-root}. */
+    private WorkArea workArea;
+    /** The workspace of each job that uses an upload. */
+    private final Map<UUID, WorkArea.JobWorkspace> workspaces = new ConcurrentHashMap<>();
 
     private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck, Runnable onOutOfMemory,
                         InstantSource clock) {
@@ -310,8 +349,22 @@ final class ServeServer implements AutoCloseable {
         Objects.requireNonNull(onOutOfMemory, "onOutOfMemory");
         Objects.requireNonNull(clock, "clock");
         validate(config);
-        limitRequestReadTime();
+        limitRequestReadTime(config.requestReadTime());
         ServeServer server = new ServeServer(config, runner, requestCheck, onOutOfMemory, clock);
+        if (config.workRoot() != null) {
+            try {
+                server.workArea = new WorkArea(config.workRoot(), config.maxUploadBytes(), config.workMaxBytes(),
+                        config.uploadTtl(), clock);
+            } catch (IOException e) {
+                server.handlers.shutdownNow();
+                server.worker.shutdownNow();
+                throw new IllegalArgumentException("Cannot use --work-root " + config.workRoot() + ": " + e.getMessage());
+            }
+            server.jobs.onRemoved(id -> {
+                server.workspaces.remove(id);
+                server.workArea.deleteWorkspace(id);
+            });
+        }
         try {
             server.http = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
         } catch (IOException | RuntimeException e) {
@@ -337,9 +390,9 @@ final class ServeServer implements AutoCloseable {
      * a large body over a slow {@code --allow-remote} link) is dropped. It bounds how long a
      * connection can be held, not how many a local client can open.
      */
-    private static void limitRequestReadTime() {
+    private static void limitRequestReadTime(Duration readTime) {
         if (System.getProperty(MAX_REQ_TIME_PROPERTY) == null) {
-            System.setProperty(MAX_REQ_TIME_PROPERTY, Integer.toString(REQUEST_READ_SECONDS));
+            System.setProperty(MAX_REQ_TIME_PROPERTY, Long.toString(Math.max(1, readTime.toSeconds())));
         }
     }
 
@@ -380,6 +433,25 @@ final class ServeServer implements AutoCloseable {
         if (config.jobStoreBytes() < MIN_JOB_STORE_BYTES) {
             throw new IllegalArgumentException("--job-store-bytes must be at least " + MIN_JOB_STORE_BYTES + ".");
         }
+        if (config.maxUploadBytes() < MIN_UPLOAD_BYTES || config.maxUploadBytes() > MAX_UPLOAD_BYTES) {
+            throw new IllegalArgumentException("--max-upload-bytes must be between " + MIN_UPLOAD_BYTES + " and "
+                    + MAX_UPLOAD_BYTES + ".");
+        }
+        if (config.workMaxBytes() < MIN_WORK_MAX_BYTES) {
+            throw new IllegalArgumentException("--work-max-bytes must be at least " + MIN_WORK_MAX_BYTES + ".");
+        }
+        if (config.uploadTtl() == null || config.uploadTtl().isNegative() || config.uploadTtl().isZero()) {
+            throw new IllegalArgumentException("--upload-ttl must be positive.");
+        }
+        if (config.requestReadTime() == null || config.requestReadTime().toSeconds() < 1
+                || config.requestReadTime().compareTo(Duration.ofHours(2)) > 0) {
+            throw new IllegalArgumentException("--request-read-time must be between PT1S and PT2H.");
+        }
+    }
+
+    /** The work area (tests). */
+    WorkArea workAreaForTest() {
+        return workArea;
     }
 
     int port() {
@@ -601,7 +673,19 @@ final class ServeServer implements AutoCloseable {
                     }
                 }
             }
-            default -> handleJobPath(exchange, method, path);
+            case "/v1/uploads" -> {
+                if (allowMethods(exchange, method, path, "POST") && requireToken(exchange, method, path)
+                        && requireWorkArea(exchange, method, path)) {
+                    receiveUpload(exchange, path);
+                }
+            }
+            default -> {
+                if (path.startsWith("/v1/uploads/")) {
+                    handleUploadPath(exchange, method, path);
+                } else {
+                    handleJobPath(exchange, method, path);
+                }
+            }
         }
     }
 
@@ -616,7 +700,8 @@ final class ServeServer implements AutoCloseable {
         int slash = rest.indexOf('/');
         String idText = slash < 0 ? rest : rest.substring(0, slash);
         String sub = slash < 0 ? "" : rest.substring(slash + 1);
-        if (slash >= 0 && !sub.equals("result") && !sub.equals("log")) { // also a trailing "/"
+        boolean fileRoute = sub.equals("files") || sub.equals("archive") || sub.startsWith("files/");
+        if (slash >= 0 && !sub.equals("result") && !sub.equals("log") && !fileRoute) { // also a trailing "/"
             reject(exchange, 404, "Not found", method, path);
             return;
         }
@@ -641,7 +726,10 @@ final class ServeServer implements AutoCloseable {
                 }
             }
             case "result" -> jobResult(exchange, job, path);
-            default -> jobLog(exchange, job, path);
+            case "log" -> jobLog(exchange, job, path);
+            case "files" -> jobFiles(exchange, job, path);
+            case "archive" -> jobArchive(exchange, job, path);
+            default -> jobFile(exchange, job, path, idText);
         }
     }
 
@@ -659,9 +747,9 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         for (String key : request.propertyNames()) {
-            if (!key.equals("command") && !key.equals("config") && !key.equals("label")) {
-                reject(exchange, 400, "Unknown field '" + LogSanitizer.forLog(key) + "'; allowed: command, config, label",
-                        "POST", path);
+            if (!key.equals("command") && !key.equals("config") && !key.equals("label") && !key.equals("inputUpload")) {
+                reject(exchange, 400, "Unknown field '" + LogSanitizer.forLog(key)
+                        + "'; allowed: command, config, label, inputUpload", "POST", path);
                 return;
             }
         }
@@ -686,26 +774,65 @@ final class ServeServer implements AutoCloseable {
             }
             label = labelNode.asString();
         }
+        UUID jobId = jobs.newId();
+        WorkArea.JobWorkspace workspace = null;
+        JsonNode uploadNode = request.get("inputUpload");
+        if (uploadNode != null && !uploadNode.isNull()) {
+            if (!uploadNode.isString()) {
+                reject(exchange, 400, "'inputUpload' must be an upload id", "POST", path);
+                return;
+            }
+            if (!requireWorkArea(exchange, "POST", path)) {
+                return;
+            }
+            workArea.evict();
+            String uploadText = uploadNode.asString();
+            try {
+                workspace = UUID_TEXT.matcher(uploadText).matches()
+                        ? workArea.prepare(jobId, UUID.fromString(uploadText)) : null;
+            } catch (IOException | RuntimeException e) {
+                log.error("job.workspace", "serve: could not prepare a job workspace: " + e.getClass().getSimpleName());
+                reject(exchange, 500, "Could not prepare the job's workspace", "POST", path);
+                return;
+            }
+            if (workspace == null) {
+                reject(exchange, 404, "No such upload: " + LogSanitizer.forLog(uploadText), "POST", path);
+                return;
+            }
+        }
         byte[] body;
         try {
             byte[] configBytes = JSON.writeValueAsBytes(config == null || config.isNull() ? JSON.createObjectNode() : config);
             // The same path policy as the synchronous endpoints, checked now rather than when it runs.
-            body = requestCheck.check(command, configBytes);
+            body = workspace == null ? requestCheck.check(command, configBytes)
+                    : requestCheck.check(command, configBytes, workspace);
         } catch (Rejected e) {
+            discardWorkspace(jobId, workspace);
             reject(exchange, e.status(), e.getMessage(), "POST", path);
+            return;
+        } catch (RuntimeException e) {
+            // e.g. a --read-root removed since start: the job policy can't be built
+            discardWorkspace(jobId, workspace);
+            log.error("job.check", "serve: checking a job failed: " + e.getClass().getSimpleName());
+            reject(exchange, 500, "Could not check the job's paths", "POST", path);
             return;
         }
         jobs.evict();
         if (closing.get()) {
+            discardWorkspace(jobId, workspace);
             reject(exchange, 503, "Server is shutting down", "POST", path);
             return;
         }
         if (!slots.tryAcquire()) {
+            discardWorkspace(jobId, workspace);
             exchange.getResponseHeaders().set("Retry-After", "30");
             reject(exchange, 503, "Server busy: " + config().queueSize() + " requests already waiting", "POST", path);
             return;
         }
-        Job job = jobs.create(command, label);
+        Job job = jobs.create(jobId, command, label);
+        if (workspace != null) {
+            workspaces.put(jobId, workspace);
+        }
         log.info("job.queued", "serve: job " + job.id() + " (" + command + ") queued", "jobId", job.id().toString(),
                 "command", command, "remote", remote(exchange));
         try {
@@ -713,6 +840,7 @@ final class ServeServer implements AutoCloseable {
         } catch (RejectedExecutionException e) {
             if (job.cancel(jobs.now(), "Server shut down before the job started")) {
                 slots.release();
+                jobCancelled(job);
             }
             reject(exchange, 503, "Server is shutting down", "POST", path);
             return;
@@ -746,7 +874,7 @@ final class ServeServer implements AutoCloseable {
         try {
             CommandResult result;
             try (StderrTee.Capture ignored = StderrTee.capture(job.log())) {
-                result = runWithConfigFile(job.command(), body);
+                result = runWithConfigFile(job.command(), body, workspaces.get(job.id()));
             }
             job.finish(jobs.now(), result.exitCode(), result.stdout(), config.maxResultBytes());
         } catch (Throwable t) {
@@ -762,6 +890,9 @@ final class ServeServer implements AutoCloseable {
             runningJob = null;
             runningSince.set(0);
             slots.release();
+            if (workArea != null && workspaces.containsKey(job.id())) {
+                workArea.jobEnded(job.id());
+            }
             long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
             Job.Snapshot s = job.snapshot();
             metrics.jobFinished(s.status(), millis / 1000.0);
@@ -773,6 +904,9 @@ final class ServeServer implements AutoCloseable {
     }
 
     private void jobCancelled(Job job) {
+        if (workArea != null && workspaces.containsKey(job.id())) {
+            workArea.jobEnded(job.id()); // its upload is free to expire again
+        }
         metrics.jobFinished(JobStatus.CANCELLED, -1);
         log.info("job.finished", "serve: job " + job.id() + " (" + job.command() + ") cancelled",
                 "jobId", job.id().toString(), "command", job.command(), "status", JobStatus.CANCELLED.apiName());
@@ -803,6 +937,259 @@ final class ServeServer implements AutoCloseable {
         // A running job is not interrupted: a command cut off mid-write could leave truncated reports.
         rejectJob(exchange, 409, "Job is " + job.snapshot().status().apiName() + "; only queued jobs can be cancelled",
                 job, "DELETE", path);
+    }
+
+    // -------------------------------------------------------------------------
+    // File exchange (DEP-7)
+    // -------------------------------------------------------------------------
+
+    private boolean requireWorkArea(HttpExchange exchange, String method, String path) throws IOException {
+        if (workArea != null) {
+            return true;
+        }
+        reject(exchange, 404, "File exchange is not enabled on this server", method, path);
+        return false;
+    }
+
+    /** A workspace prepared for a job that is then not created. */
+    private void discardWorkspace(UUID jobId, WorkArea.JobWorkspace workspace) {
+        if (workspace != null) {
+            workArea.deleteWorkspace(jobId);
+        }
+    }
+
+    /** {@code POST /v1/uploads}: a ZIP body, streamed to disk and extracted. */
+    private void receiveUpload(HttpExchange exchange, String path) throws IOException {
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        String mediaType = type == null ? "" : type.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
+        if (!mediaType.equals(ZIP)) {
+            reject(exchange, 415, "Content-Type must be " + ZIP, "POST", path);
+            return;
+        }
+        long declared = -1;
+        String length = exchange.getRequestHeaders().getFirst("Content-Length");
+        // With Transfer-Encoding the body length is not Content-Length: reserve the full limit.
+        if (length != null && exchange.getRequestHeaders().getFirst("Transfer-Encoding") == null) {
+            try {
+                declared = Long.parseLong(length.strip());
+            } catch (NumberFormatException e) {
+                reject(exchange, 400, "Invalid Content-Length", "POST", path);
+                return;
+            }
+        }
+        WorkArea.Upload upload;
+        try {
+            upload = workArea.receive(exchange.getRequestBody(), declared);
+        } catch (WorkArea.Refused e) {
+            if (e.status() == 413) {
+                exchange.getResponseHeaders().set("Connection", "close");
+            }
+            reject(exchange, e.status(), e.getMessage(), "POST", path);
+            return;
+        }
+        log.info("upload.received", "serve: upload " + upload.id + " (" + upload.files.size() + " files, "
+                + upload.totalBytes + " bytes)", "uploadId", upload.id.toString(), "remote", remote(exchange));
+        exchange.getResponseHeaders().set("Location", "/v1/uploads/" + upload.id);
+        respond(exchange, 201, JSON.writeValueAsString(uploadNode(upload)));
+    }
+
+    /** {@code GET} and {@code DELETE /v1/uploads/{uploadId}}. */
+    private void handleUploadPath(HttpExchange exchange, String method, String path) throws IOException {
+        String idText = path.substring("/v1/uploads/".length());
+        if (idText.contains("/")) {
+            reject(exchange, 404, "Not found", method, path);
+            return;
+        }
+        if (!allowMethods(exchange, method, path, "GET", "DELETE") || !requireToken(exchange, method, path)
+                || !requireWorkArea(exchange, method, path)) {
+            return;
+        }
+        workArea.evict();
+        UUID id = UUID_TEXT.matcher(idText).matches() ? UUID.fromString(idText) : null;
+        WorkArea.Upload upload = id == null ? null : workArea.upload(id);
+        if (upload == null) {
+            reject(exchange, 404, "No such upload", method, path);
+            return;
+        }
+        if (method.equals("GET")) {
+            respond(exchange, 200, JSON.writeValueAsString(uploadNode(upload)));
+            return;
+        }
+        try {
+            if (!workArea.deleteUpload(id)) {
+                reject(exchange, 404, "No such upload", method, path);
+                return;
+            }
+        } catch (WorkArea.Refused e) {
+            reject(exchange, e.status(), e.getMessage(), method, path);
+            return;
+        }
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(204, -1);
+    }
+
+    private static ObjectNode uploadNode(WorkArea.Upload upload) {
+        ObjectNode node = JSON.createObjectNode();
+        node.put("uploadId", upload.id.toString());
+        ArrayNode files = node.putArray("files");
+        for (var entry : upload.files) {
+            files.addObject().put("name", entry.name()).put("size", entry.size());
+        }
+        node.put("totalBytes", upload.totalBytes);
+        node.put("createdAt", upload.createdAt.toString());
+        node.put("expiresAt", upload.expiresAt.toString());
+        return node;
+    }
+
+    /**
+     * True when {@code job} has a workspace and has ended; otherwise answers 404 (no workspace)
+     * or 409 (not finished, or cancelled) and returns false.
+     */
+    private boolean requireOutputs(HttpExchange exchange, Job job, String path) throws IOException {
+        if (workArea == null || !workArea.hasWorkspace(job.id())) {
+            rejectJob(exchange, 404, "This job has no workspace: it read and wrote shared paths, not an upload",
+                    job, "GET", path);
+            return false;
+        }
+        Job.Snapshot s = job.snapshot();
+        if (!s.finished() || s.status() == JobStatus.CANCELLED) {
+            rejectJob(exchange, 409, "Job is " + s.status().apiName() + "; it has no outputs"
+                    + (s.status() == JobStatus.CANCELLED ? "" : " yet"), job, "GET", path);
+            return false;
+        }
+        return true;
+    }
+
+    /** {@code GET /v1/jobs/{id}/files}: the files in the job's {@code out/}. */
+    private void jobFiles(HttpExchange exchange, Job job, String path) throws IOException {
+        if (!requireOutputs(exchange, job, path)) {
+            return;
+        }
+        ObjectNode node = JSON.createObjectNode();
+        node.put("jobId", job.id().toString());
+        ArrayNode files = node.putArray("files");
+        for (WorkArea.OutputFile f : workArea.outputs(job.id())) {
+            files.addObject().put("path", f.path()).put("size", f.size()).put("mediaType", mediaType(f.path()));
+        }
+        respond(exchange, 200, JSON.writeValueAsString(node));
+    }
+
+    /** {@code GET /v1/jobs/{id}/files/{path}}: one output file, streamed. */
+    private void jobFile(HttpExchange exchange, Job job, String path, String idText) throws IOException {
+        if (!requireOutputs(exchange, job, path)) {
+            return;
+        }
+        // Segments from the raw path, each decoded on its own: an encoded "/" or "\" stays inside
+        // its segment, where WorkArea.output refuses it.
+        String raw = exchange.getRequestURI().getRawPath();
+        String prefix = "/v1/jobs/" + idText + "/files/";
+        List<String> segments = new ArrayList<>();
+        if (raw != null && raw.startsWith(prefix)) {
+            for (String part : raw.substring(prefix.length()).split("/", -1)) {
+                try {
+                    segments.add(URLDecoder.decode(part.replace("+", "%2B"), StandardCharsets.UTF_8));
+                } catch (IllegalArgumentException e) {
+                    segments = List.of();
+                    break;
+                }
+            }
+        }
+        Path file = workArea.output(job.id(), segments);
+        if (file == null) {
+            rejectJob(exchange, 404, "No such output file", job, "GET", path);
+            return;
+        }
+        String name = segments.getLast();
+        exchange.getResponseHeaders().set("Content-Type", mediaType(name));
+        exchange.getResponseHeaders().set("Content-Disposition", contentDisposition(name));
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(200, Files.size(file));
+        try (OutputStream out = exchange.getResponseBody()) {
+            Files.copy(file, out);
+        }
+    }
+
+    /** {@code GET /v1/jobs/{id}/archive}: all outputs as one ZIP, streamed. */
+    private void jobArchive(HttpExchange exchange, Job job, String path) throws IOException {
+        if (!requireOutputs(exchange, job, path)) {
+            return;
+        }
+        List<WorkArea.OutputFile> files = workArea.outputs(job.id());
+        exchange.getResponseHeaders().set("Content-Type", ZIP);
+        exchange.getResponseHeaders().set("Content-Disposition", contentDisposition("job-" + job.id() + ".zip"));
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(200, 0);
+        java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(exchange.getResponseBody());
+        try {
+            for (WorkArea.OutputFile f : files) {
+                Path file = workArea.output(job.id(), List.of(f.path().split("/")));
+                if (file == null) {
+                    throw new IOException("output vanished during the download");
+                }
+                zip.putNextEntry(new java.util.zip.ZipEntry(f.path()));
+                Files.copy(file, zip);
+                zip.closeEntry();
+            }
+            zip.finish();
+        } catch (IOException e) {
+            // No central directory: the client gets an unreadable archive, never a complete-looking
+            // one with reports missing.
+            log.warn("download.aborted", "serve: archive of job " + job.id() + " aborted: " + e.getMessage(),
+                    "jobId", job.id().toString());
+            throw e;
+        }
+        zip.flush();
+        exchange.getResponseBody().close();
+    }
+
+    private static final Map<String, String> MEDIA_TYPES = Map.ofEntries(
+            Map.entry("json", "application/json"),
+            Map.entry("jsonld", "application/ld+json"),
+            Map.entry("ttl", "text/turtle"),
+            Map.entry("nt", "application/n-triples"),
+            Map.entry("nq", "application/n-quads"),
+            Map.entry("trig", "application/trig"),
+            Map.entry("rdf", "application/rdf+xml"),
+            Map.entry("owl", "application/rdf+xml"),
+            Map.entry("xml", "application/xml"),
+            Map.entry("csv", "text/csv"),
+            Map.entry("txt", "text/plain"),
+            Map.entry("log", "text/plain"),
+            Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            Map.entry("zip", ZIP));
+
+    /** From a fixed list by extension, never sniffed; anything else is a plain download. */
+    static String mediaType(String name) {
+        int dot = name.lastIndexOf('.');
+        String ext = dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
+        return MEDIA_TYPES.getOrDefault(ext, "application/octet-stream");
+    }
+
+    /**
+     * {@code attachment} with an ASCII-only {@code filename} (anything else becomes {@code _}) and
+     * the exact name as RFC 8187 {@code filename*}; no quote, CR or LF can reach the header.
+     */
+    static String contentDisposition(String name) {
+        StringBuilder ascii = new StringBuilder();
+        StringBuilder encoded = new StringBuilder();
+        for (char c : name.toCharArray()) {
+            boolean safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || c == '.' || c == '-' || c == '_';
+            ascii.append(safe ? c : '_');
+        }
+        for (byte b : name.getBytes(StandardCharsets.UTF_8)) {
+            char c = (char) (b & 0xff);
+            boolean attrChar = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || "!#$&+-.^_`|~".indexOf(c) >= 0;
+            if (attrChar) {
+                encoded.append(c);
+            } else {
+                encoded.append('%').append(String.format("%02X", b & 0xff));
+            }
+        }
+        return "attachment; filename=\"" + ascii + "\"; filename*=UTF-8''" + encoded;
     }
 
     private void jobResult(HttpExchange exchange, Job job, String path) throws IOException {
@@ -1092,10 +1479,14 @@ final class ServeServer implements AutoCloseable {
     }
 
     private CommandResult runWithConfigFile(String command, byte[] body) throws Exception {
+        return runWithConfigFile(command, body, null);
+    }
+
+    private CommandResult runWithConfigFile(String command, byte[] body, WorkArea.JobWorkspace workspace) throws Exception {
         Path configFile = Files.createTempFile("cimpal-serve-", ".json");
         try {
             Files.write(configFile, body);
-            return runner.run(command, configFile);
+            return workspace == null ? runner.run(command, configFile) : runner.run(command, configFile, workspace);
         } finally {
             Files.deleteIfExists(configFile);
         }

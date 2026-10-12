@@ -56,7 +56,7 @@ Measured with synthetic CGMES-like models: [Sizing](sizing.md).
 | Path | Status |
 |---|---|
 | **A. Container or CLI per task** (Airflow `KubernetesPodOperator`, `DockerOperator`, `BashOperator`; any CI system), with exit codes, a JSON summary file and a configurable violations exit code | Available. Examples and tests in `integrations/airflow/`; see [Airflow](airflow.md). |
-| **B. CimPal as a service** (asynchronous jobs, OpenAPI `/v1`, upload and download, reverse proxy) | Available: the asynchronous job API and its OpenAPI spec ([`/v1`](../cli/serve.md#job-api-v1)), and deployment behind a TLS proxy or Kubernetes Ingress with token files, probes and JSON logs ([service](service.md)). Planned: upload and download (DEP-7). |
+| **B. CimPal as a service** (asynchronous jobs, OpenAPI `/v1`, upload and download, reverse proxy) | Available: the asynchronous job API and its OpenAPI spec ([`/v1`](../cli/serve.md#job-api-v1)), deployment behind a TLS proxy or Kubernetes Ingress with token files, probes and JSON logs ([service](service.md)), and file exchange by upload and download ([serve](../cli/serve.md#file-exchange-uploads-and-downloads)). |
 | **C. Python SDK and Airflow provider** | Planned: DEP-9, DEP-10 |
 
 ## Security posture

@@ -69,7 +69,8 @@ class ServeCommandTest {
         command.onTerm = onTerm -> false;
         CompletableFuture<ServeServer> started = new CompletableFuture<>();
         command.onStarted = started::complete;
-        CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(args));
+        String[] all = withWorkRoot(args);
+        CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(all));
         ServeServer server = CompletableFuture.anyOf(started, exit).thenApply(x -> started.getNow(null))
                 .get(30, TimeUnit.SECONDS);
         assertThat(server).as("server started; output: %s", output()).isNotNull();
@@ -80,7 +81,18 @@ class ServeCommandTest {
         ServeCommand command = new ServeCommand();
         command.environment = env;
         command.onTerm = onTerm -> false;
-        return new CommandLine(command).execute(args);
+        return new CommandLine(command).execute(withWorkRoot(args));
+    }
+
+    /** Every test server gets its work area under @TempDir, never in the working directory. */
+    private String[] withWorkRoot(String... args) {
+        if (java.util.Arrays.asList(args).contains("--work-root")) {
+            return args;
+        }
+        String[] all = java.util.Arrays.copyOf(args, args.length + 2);
+        all[args.length] = "--work-root";
+        all[args.length + 1] = tempDir.resolve("work").toString();
+        return all;
     }
 
     private static HttpResponse<String> shutdown(ServeServer server, String token) throws Exception {
@@ -296,5 +308,158 @@ class ServeCommandTest {
         }
         assertThat(events).contains("server.started", "request.rejected", "server.stopping", "server.stopped");
         assertThat(stderr).contains("cimpal.example.com").doesNotContain(token);
+    }
+
+    // ---- file exchange (DEP-7) ---------------------------------------------------------------
+
+    @Test
+    void aRealJobRunsOnAnUploadAndItsOutputIsDownloaded() throws Exception {
+        String token = "job-token-0123456789abcdef0123456789";
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        Path work = tempDir.resolve("work");
+        Running running = startInBackground(Map.of(ServeSecurity.TOKEN_ENV, token), "--host", "127.0.0.1",
+                "--port", "0", "--root", root.toString(), "--work-root", work.toString());
+        String base = "http://127.0.0.1:" + running.server().port();
+        tools.jackson.databind.ObjectMapper json = new tools.jackson.databind.ObjectMapper();
+
+        java.io.ByteArrayOutputStream zip = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream out = new java.util.zip.ZipOutputStream(zip)) {
+            out.putNextEntry(new java.util.zip.ZipEntry("models/m.ttl"));
+            out.write("<http://example.org/a> <http://example.org/p> \"x\" .\n".getBytes(StandardCharsets.UTF_8));
+            out.closeEntry();
+        }
+        HttpResponse<String> uploaded = HTTP.send(HttpRequest.newBuilder(URI.create(base + "/v1/uploads"))
+                .header("Authorization", "Bearer " + token).header("Content-Type", "application/zip")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(zip.toByteArray())).build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(uploaded.statusCode()).as(uploaded.body()).isEqualTo(201);
+        String uploadId = json.readTree(uploaded.body()).path("uploadId").asString();
+
+        HttpResponse<String> submitted = v1(running.server(), token, "POST", "/v1/jobs",
+                "{\"command\":\"sparql\",\"inputUpload\":\"" + uploadId + "\",\"config\":{\"models\":[\"models/m.ttl\"],"
+                        + "\"query\":\"SELECT ?o WHERE { ?s ?p ?o }\",\"summaryFile\":\"result.json\"}}");
+        assertThat(submitted.statusCode()).as(submitted.body()).isEqualTo(202);
+        String id = json.readTree(submitted.body()).path("jobId").asString();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        String status;
+        do {
+            Thread.sleep(50);
+            status = json.readTree(v1(running.server(), token, "GET", "/v1/jobs/" + id, null).body()).path("status").asString();
+        } while (!status.equals("succeeded") && !status.equals("failed") && System.nanoTime() < deadline);
+        assertThat(status).as(output()).isEqualTo("succeeded");
+
+        HttpResponse<String> files = v1(running.server(), token, "GET", "/v1/jobs/" + id + "/files", null);
+        assertThat(files.body()).contains("\"path\":\"result.json\"");
+        HttpResponse<String> result = v1(running.server(), token, "GET", "/v1/jobs/" + id + "/files/result.json", null);
+        assertThat(result.statusCode()).isEqualTo(200);
+        assertThat(json.readTree(result.body()).path("rows")).hasSize(1);
+        // The work area is outside every shared path: a shared-mode job can't reach the upload.
+        HttpResponse<String> sneaky = v1(running.server(), token, "POST", "/v1/jobs", "{\"command\":\"sparql\",\"config\":"
+                + "{\"models\":[" + json.writeValueAsString(work.resolve("uploads/" + uploadId + "/models/m.ttl").toString())
+                + "],\"query\":\"SELECT * WHERE {?s ?p ?o}\"}}");
+        assertThat(sneaky.statusCode()).as(sneaky.body()).isIn(403);
+
+        assertThat(shutdown(running.server(), token).statusCode()).isEqualTo(200);
+        assertThat(running.exit().get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+    }
+
+    @Test
+    void aWorkRootThatIsOrContainsAnAllowedFolderIsRefused() throws Exception {
+        // serve --root D:\data --work-root D:\data would open every upload to shared requests.
+        String token = "job-token-0123456789abcdef0123456789";
+        Path data = Files.createDirectories(tempDir.resolve("data"));
+        Path library = Files.createDirectories(tempDir.resolve("lib/shapes"));
+
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0", "--root", data.toString(),
+                "--work-root", data.toString())).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0", "--root", data.toString(),
+                "--read-root", library.toString(), "--work-root", tempDir.resolve("lib").toString()))
+                .isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0", "--root", data.toString(),
+                "--work-root", tempDir.toString())).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(output()).contains("would open other callers' uploads");
+    }
+
+    @Test
+    void aForeignFolderIsNeverEmptiedAsAWorkArea() throws Exception {
+        // A mistyped --work-root pointing at a folder of the user's.
+        String token = "job-token-0123456789abcdef0123456789";
+        Path data = Files.createDirectories(tempDir.resolve("data"));
+        Path documents = Files.createDirectories(tempDir.resolve("documents/jobs"));
+        Files.writeString(documents.resolve("important.txt"), "keep");
+
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0", "--root", data.toString(),
+                "--work-root", tempDir.resolve("documents").toString())).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(documents.resolve("important.txt")).hasContent("keep");
+        assertThat(output()).contains("not a work area of serve");
+    }
+
+    @Test
+    void aDefaultWorkFolderThatCannotBeCreatedTurnsFileExchangeOffInsteadOfStopping() throws Exception {
+        // A container with a read-only /data (shared-volume mode, as docs/cli/docker.md runs it):
+        // serve must still start. A file in the way stands in for the read-only folder.
+        String token = "job-token-0123456789abcdef0123456789";
+        Path root = Files.createDirectories(tempDir.resolve("readonly-data"));
+        Files.writeString(root.resolve(".cimpal-work"), "in the way");
+        ServeCommand command = new ServeCommand();
+        command.environment = Map.of(ServeSecurity.TOKEN_ENV, token);
+        command.onTerm = onTerm -> false;
+        CompletableFuture<ServeServer> started = new CompletableFuture<>();
+        command.onStarted = started::complete;
+        CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(
+                "--host", "127.0.0.1", "--port", "0", "--root", root.toString()));
+        ServeServer server = CompletableFuture.anyOf(started, exit).thenApply(x -> started.getNow(null))
+                .get(30, TimeUnit.SECONDS);
+
+        assertThat(server).as(output()).isNotNull();
+        assertThat(server.workAreaForTest()).isNull();
+        assertThat(output()).contains("File exchange is off");
+        assertThat(shutdown(server, token).statusCode()).isEqualTo(200);
+        assertThat(exit.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+
+        // An explicit --work-root that can't be used still stops serve.
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0", "--root", root.toString(),
+                "--work-root", root.resolve(".cimpal-work").toString())).isEqualTo(ExitCode.INVALID_INPUT);
+    }
+
+    @Test
+    void fileExchangeCanBeTurnedOff() throws Exception {
+        String token = "job-token-0123456789abcdef0123456789";
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        ServeCommand command = new ServeCommand();
+        command.environment = Map.of(ServeSecurity.TOKEN_ENV, token);
+        command.onTerm = onTerm -> false;
+        CompletableFuture<ServeServer> started = new CompletableFuture<>();
+        command.onStarted = started::complete;
+        CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(
+                "--host", "127.0.0.1", "--port", "0", "--root", root.toString(), "--no-file-exchange"));
+        ServeServer server = CompletableFuture.anyOf(started, exit).thenApply(x -> started.getNow(null))
+                .get(30, TimeUnit.SECONDS);
+        assertThat(server).as(output()).isNotNull();
+
+        assertThat(server.workAreaForTest()).isNull();
+        assertThat(root.resolve(".cimpal-work")).doesNotExist();
+        assertThat(v1(server, token, "GET", "/v1/uploads/" + java.util.UUID.randomUUID(), null).statusCode()).isEqualTo(404);
+        assertThat(shutdown(server, token).statusCode()).isEqualTo(200);
+        assertThat(exit.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+    }
+
+    @Test
+    void theDefaultWorkAreaIsInTheFirstRootAndOutsideEverySharedPath() throws Exception {
+        String token = "job-token-0123456789abcdef0123456789";
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        ServeCommand command = new ServeCommand();
+        command.environment = Map.of(ServeSecurity.TOKEN_ENV, token);
+        command.onTerm = onTerm -> false;
+        CompletableFuture<ServeServer> started = new CompletableFuture<>();
+        command.onStarted = started::complete;
+        CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(
+                "--host", "127.0.0.1", "--port", "0", "--root", root.toString()));
+        ServeServer server = CompletableFuture.anyOf(started, exit).thenApply(x -> started.getNow(null))
+                .get(30, TimeUnit.SECONDS);
+        assertThat(server).as(output()).isNotNull();
+
+        assertThat(server.workAreaForTest().root()).isEqualTo(root.resolve(".cimpal-work").toRealPath());
+        assertThat(shutdown(server, token).statusCode()).isEqualTo(200);
+        assertThat(exit.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
     }
 }

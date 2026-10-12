@@ -42,13 +42,40 @@ final class RootOptions {
      * @throws IllegalArgumentException when a root doesn't exist
      */
     PathPolicy policy(List<Path> defaults) {
+        return policy(defaults, null);
+    }
+
+    /** As {@link #policy(List)}, with {@code excluded} (an existing folder, or null) refused inside every root. */
+    PathPolicy policy(List<Path> defaults, Path excluded) {
         PathPolicy.Builder builder = PathPolicy.builder().allowUnc(allowUnc);
         for (Path root : explicit() ? roots : safeDefaults(defaults)) {
             builder.root(root);
         }
         readRoots.forEach(builder::readRoot);
         writeRoots.forEach(builder::writeRoot);
+        if (excluded != null) {
+            builder.exclude(excluded);
+        }
         return builder.build();
+    }
+
+    /**
+     * The policy of a {@code serve} job that reads an upload (DEP-7): its upload folder and the
+     * {@code --read-root} folders may be read, only its {@code out/} written, and the rest of
+     * {@code workRoot} (other uploads and jobs) is refused.
+     */
+    PathPolicy jobPolicy(Path uploadDir, Path outDir, Path workRoot) {
+        PathPolicy.Builder builder = PathPolicy.builder().allowUnc(allowUnc)
+                .readRoot(uploadDir)
+                .writeRoot(outDir);
+        readRoots.forEach(builder::readRoot);
+        return builder.exclude(workRoot).build();
+    }
+
+    /** Default work area of {@code serve}: {@code .cimpal-work} in the first write root, else in {@link #base}. */
+    Path defaultWorkRoot(List<Path> defaults) {
+        Path parent = !writeRoots.isEmpty() ? writeRoots.getFirst().toAbsolutePath() : base(defaults);
+        return parent.resolve(".cimpal-work");
     }
 
     /** Base for relative paths in requests: the first read-write root, else the first default. */

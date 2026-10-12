@@ -234,6 +234,41 @@ public class ServeCommand implements Callable<Integer> {
             description = "Serve Prometheus metrics at GET /metrics (needs the token).")
     private boolean metrics;
 
+    @Option(names = "--work-root",
+            description = "Folder for uploads and job outputs of the /v1 file exchange (default: .cimpal-work "
+                    + "in the first --write-root, else in the first --root). It is emptied at start and no "
+                    + "request path may point into it.")
+    private Path workRoot;
+
+    @Option(names = "--no-file-exchange",
+            description = "Turn uploads and downloads off: no work folder is created, and the /v1/uploads and "
+                    + "job file routes answer 404.")
+    private boolean noFileExchange;
+
+    @Option(names = "--max-upload-bytes",
+            defaultValue = "2147483648",
+            description = "Largest upload (POST /v1/uploads) in bytes (default: 2147483648 = 2 GiB, at most 16 GiB).")
+    private long maxUploadBytes;
+
+    @Option(names = "--upload-ttl",
+            defaultValue = "PT24H",
+            description = "How long an upload is kept once no queued or running job uses it (ISO-8601 duration, "
+                    + "default: PT24H). Job outputs are kept as long as their job (--job-ttl).")
+    private Duration uploadTtl;
+
+    @Option(names = "--work-max-bytes",
+            defaultValue = "21474836480",
+            description = "Disk space for uploads and job outputs together (default: 21474836480 = 20 GiB); "
+                    + "an upload that doesn't fit gets 507.")
+    private long workMaxBytes;
+
+    @Option(names = "--request-read-time",
+            defaultValue = "PT60S",
+            description = "Time a client has to send a whole request, body included (ISO-8601 duration, default: "
+                    + "PT60S, at most PT2H). Protects against slow clients; raise it for large uploads sent "
+                    + "without a buffering proxy in front.")
+    private Duration requestReadTime;
+
     @CommandLine.Mixin
     RootOptions rootOptions = new RootOptions();
 
@@ -376,25 +411,86 @@ public class ServeCommand implements Callable<Integer> {
         if (jobStoreBytes != null) {
             builder.jobStoreBytes(jobStoreBytes);
         }
-        ServeServer.Config config = builder.build();
 
         List<Path> defaultRoots = List.of(Path.of("").toAbsolutePath());
         PathPolicy policy;
+        Path work = null;
         try {
-            policy = rootOptions.policy(defaultRoots);
-        } catch (IllegalArgumentException ex) {
+            if (!noFileExchange && workRoot == null) {
+                // The default lies in the data folder, which may well be read-only (a container
+                // with a read-only /data, shared-volume mode only): then serve runs without uploads.
+                Path defaultWork = rootOptions.defaultWorkRoot(defaultRoots).toAbsolutePath();
+                try {
+                    Files.createDirectories(defaultWork);
+                } catch (IOException ex) {
+                    System.err.println("[WARN] File exchange is off: the default work folder " + defaultWork
+                            + " can't be created (" + ex.getClass().getSimpleName() + "). Give a writable --work-root"
+                            + " to accept uploads, or --no-file-exchange to silence this.");
+                    defaultWork = null;
+                }
+                work = defaultWork;
+            } else if (!noFileExchange) {
+                work = workRoot.toAbsolutePath();
+                Files.createDirectories(work);
+            }
+            if (work == null) {
+                policy = rootOptions.policy(defaultRoots);
+            } else {
+                // The work area holds other callers' uploads and outputs: no request path may reach it.
+                policy = rootOptions.policy(defaultRoots, work);
+                Path workReal = work.toRealPath();
+                for (Path root : java.util.stream.Stream.concat(policy.readRoots().stream(), policy.writeRoots().stream())
+                        .toList()) {
+                    if (root.startsWith(workReal)) {
+                        throw new IllegalArgumentException("--work-root " + work + " is or contains the allowed folder "
+                                + root + ", which would open other callers' uploads to every request. Use a folder"
+                                + " inside a root (the default .cimpal-work) or outside all of them.");
+                    }
+                }
+            }
+        } catch (IllegalArgumentException | IOException ex) {
             System.err.println("[ERROR] " + ex.getMessage());
             deleteIfOurs(writtenTokenFile, token);
             return ExitCode.INVALID_INPUT;
         }
         Path base = rootOptions.base(defaultRoots);
+        ServeServer.Config config = builder
+                .workRoot(work)
+                .maxUploadBytes(maxUploadBytes)
+                .uploadTtl(uploadTtl)
+                .workMaxBytes(workMaxBytes)
+                .requestReadTime(requestReadTime)
+                .build();
+        Path workArea = work;
+        ServeServer.CommandRunner runner = runnerForTest != null ? runnerForTest : new ServeServer.CommandRunner() {
+            @Override
+            public ServeServer.CommandResult run(String command, Path configFile) throws Exception {
+                return runWithPolicy(policy, base, command, configFile);
+            }
+
+            @Override
+            public ServeServer.CommandResult run(String command, Path configFile, WorkArea.JobWorkspace workspace)
+                    throws Exception {
+                return runWithPolicy(rootOptions.jobPolicy(workspace.uploadDir(), workspace.outDir(), workArea),
+                        workspace.uploadDir(), command, configFile, true);
+            }
+        };
+        ServeServer.RequestCheck check = new ServeServer.RequestCheck() {
+            @Override
+            public byte[] check(String command, byte[] body) throws ServeServer.Rejected {
+                return checkPaths(policy, base, command, body);
+            }
+
+            @Override
+            public byte[] check(String command, byte[] body, WorkArea.JobWorkspace workspace) throws ServeServer.Rejected {
+                return checkUploadPaths(rootOptions.jobPolicy(workspace.uploadDir(), workspace.outDir(), workArea),
+                        workspace, command, body);
+            }
+        };
 
         ServeServer server;
         try {
-            server = ServeServer.start(config,
-                    runnerForTest != null ? runnerForTest
-                            : (command, configFile) -> runWithPolicy(policy, base, command, configFile),
-                    (command, body) -> checkPaths(policy, base, command, body));
+            server = ServeServer.start(config, runner, check);
         } catch (IllegalArgumentException ex) {
             System.err.println("[ERROR] " + ex.getMessage());
             deleteIfOurs(writtenTokenFile, token);
@@ -499,11 +595,37 @@ public class ServeCommand implements Callable<Integer> {
      * paths are checked again first: an earlier request in the queue may have created an output
      * file, or the file system may have changed, since the request was accepted.
      */
+    /**
+     * {@link #checkPaths} for a job that reads an upload (DEP-7): relative paths resolve against
+     * the upload, relative or missing outputs go to the job's {@code out/}, and {@code policy}
+     * allows nothing else to be written.
+     */
+    static byte[] checkUploadPaths(PathPolicy policy, WorkArea.JobWorkspace workspace, String command, byte[] body)
+            throws ServeServer.Rejected {
+        JsonNode json;
+        try {
+            json = MAPPER.readTree(body);
+        } catch (RuntimeException e) {
+            throw new ServeServer.Rejected(400, "Request body is not valid JSON.");
+        }
+        try {
+            ObjectNode placed = PathGuard.placeOutputs(command, json, workspace.outDir());
+            return MAPPER.writeValueAsBytes(PathGuard.check(command, placed, policy, workspace.uploadDir(), true));
+        } catch (PathNotAllowedException e) {
+            throw new ServeServer.Rejected(403, e.getMessage());
+        }
+    }
+
     private static ServeServer.CommandResult runWithPolicy(PathPolicy policy, Path base, String command,
                                                            Path configFile) throws Exception {
+        return runWithPolicy(policy, base, command, configFile, false);
+    }
+
+    private static ServeServer.CommandResult runWithPolicy(PathPolicy policy, Path base, String command,
+                                                           Path configFile, boolean baseOnly) throws Exception {
         ObjectNode checked;
         try {
-            checked = PathGuard.check(command, MAPPER.readTree(configFile.toFile()), policy, base);
+            checked = PathGuard.check(command, MAPPER.readTree(configFile.toFile()), policy, base, baseOnly);
         } catch (PathNotAllowedException e) {
             return new ServeServer.CommandResult(ExitCode.INVALID_INPUT,
                     "{\"exitCode\":2,\"status\":\"INVALID_INPUT\",\"error\":" + ServeServer.jsonStr(e.getMessage()) + "}");

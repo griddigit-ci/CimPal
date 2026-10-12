@@ -29,6 +29,8 @@ final class JobManager {
     private final int logLines;
     private final long storeBytes;
     private final InstantSource clock;
+    /** Told about every job that leaves the store (DEP-7: its workspace goes with it). */
+    private volatile java.util.function.Consumer<UUID> onRemoved = id -> { };
 
     JobManager(int maxJobs, Duration ttl, Duration timeout, int logLines, long storeBytes, InstantSource clock) {
         this.maxJobs = maxJobs;
@@ -43,15 +45,32 @@ final class JobManager {
         return clock.instant();
     }
 
+    void onRemoved(java.util.function.Consumer<UUID> listener) {
+        this.onRemoved = listener;
+    }
+
     /** A new queued job with a random (SecureRandom-based) id. */
     Job create(String command, String label) {
-        UUID id;
         Job job;
         do {
-            id = UUID.randomUUID();
-            job = new Job(id, command, label, now(), logLines);
-        } while (jobs.putIfAbsent(id, job) != null);
+            job = create(UUID.randomUUID(), command, label);
+        } while (job == null);
         return job;
+    }
+
+    /** A random id no job has, for a job whose workspace is prepared before it is created. */
+    UUID newId() {
+        UUID id;
+        do {
+            id = UUID.randomUUID();
+        } while (jobs.containsKey(id));
+        return id;
+    }
+
+    /** A new queued job with the given id, or null if a job already has it. */
+    Job create(UUID id, String command, String label) {
+        Job job = new Job(id, command, label, now(), logLines);
+        return jobs.putIfAbsent(id, job) == null ? job : null;
     }
 
     /** The job, or null; marks it timed out first if it has run too long. */
@@ -80,11 +99,23 @@ final class JobManager {
      * the oldest finished ones until their results and logs fit in {@code --job-store-bytes} (the
      * most recently finished job is always kept, so its result can be fetched).
      */
-    synchronized void evict() {
+    void evict() {
+        List<UUID> removed = new java.util.ArrayList<>();
+        synchronized (this) {
+            evictInto(removed);
+        }
+        removed.forEach(onRemoved);
+    }
+
+    private void evictInto(List<UUID> removed) {
         Instant now = now();
         jobs.values().removeIf(job -> {
             Job.Snapshot s = job.snapshot();
-            return s.finished() && s.finishedAt().plus(ttl).isBefore(now);
+            boolean expired = s.finished() && s.finishedAt().plus(ttl).isBefore(now);
+            if (expired) {
+                removed.add(job.id());
+            }
+            return expired;
         });
         int excess = jobs.size() - maxJobs;
         if (excess > 0) {
@@ -93,7 +124,10 @@ final class JobManager {
                     .filter(Job.Snapshot::finished)
                     .sorted(Comparator.comparing(Job.Snapshot::finishedAt).thenComparing(Job.Snapshot::id))
                     .limit(excess)
-                    .forEach(s -> jobs.remove(s.id()));
+                    .forEach(s -> {
+                        jobs.remove(s.id());
+                        removed.add(s.id());
+                    });
         }
         List<Job> finished = jobs.values().stream()
                 .filter(job -> job.snapshot().finished())
@@ -104,6 +138,7 @@ final class JobManager {
             Job job = finished.get(i);
             retained -= job.retainedBytes();
             jobs.remove(job.id());
+            removed.add(job.id());
         }
     }
 

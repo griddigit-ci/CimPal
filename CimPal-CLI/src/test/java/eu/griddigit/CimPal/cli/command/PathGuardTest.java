@@ -57,6 +57,40 @@ class PathGuardTest {
     }
 
     @Test
+    void aJobOnAnUploadLooksUpRelativeValuesInItsUploadOnly() {
+        // pom.xml exists in the working directory of this test (the module folder), outside the
+        // roots: shared mode refuses it, a job on an upload never even looks there (DEP-7).
+        assertThat(Files.exists(Path.of("pom.xml"))).isTrue();
+        assertThatThrownBy(() -> PathGuard.check("sparql", json("{\"query\":\"pom.xml\"}"), policy, root))
+                .isInstanceOf(PathNotAllowedException.class);
+
+        ObjectNode checked = PathGuard.check("sparql", json("{\"query\":\"pom.xml\"}"), policy, root, true);
+        assertThat(checked.path("query").asString()).as("not a file in the upload: kept as text").isEqualTo("pom.xml");
+        ObjectNode inUpload = PathGuard.check("sparql", json("{\"query\":\"in.ttl\"}"), policy, root, true);
+        assertThat(inUpload.path("query").asString()).isEqualTo(realPath(root.resolve("in.ttl")).toString());
+    }
+
+    @Test
+    void outputsOfAJobOnAnUploadArePlacedInItsOutFolder() throws Exception {
+        Path out = Files.createDirectories(root.resolve("out"));
+        ObjectNode placed = PathGuard.placeOutputs("validate", json("{\"summaryFile\":\"s.json\",\"workflow\":\"mapping\"}"), out);
+
+        assertThat(placed.path("summaryFile").asString()).isEqualTo(out.resolve("s.json").toString());
+        assertThat(placed.path("outputDir").asString()).as("missing folder: out/ itself").isEqualTo(out.toString());
+        ObjectNode absolute = PathGuard.placeOutputs("sparql", json("{\"output\":" + q(outside.resolve("x.csv")) + "}"), out);
+        assertThat(absolute.path("output").asString()).as("left for the policy to refuse")
+                .isEqualTo(outside.resolve("x.csv").toString());
+    }
+
+    private static Path realPath(Path p) {
+        try {
+            return p.toRealPath();
+        } catch (java.io.IOException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    @Test
     void everyFileOptionOfEveryExposedCommandIsInTheRegistry() {
         CommandLine cli = new CommandLine(new CimPalCli());
         for (String command : ServeServer.COMMANDS) {

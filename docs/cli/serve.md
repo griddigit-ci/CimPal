@@ -74,6 +74,12 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--shutdown-grace` | ISO-8601 duration | `PT60S` | On SIGTERM, Ctrl-C or `POST /shutdown`: how long to wait for a running command. If it is still running then, `serve` exits with 3. |
 | `--log-format` | `text` or `json` | `text` | `json`: one JSON object per line on stderr, nothing on stdout. See [Logs](#logs). |
 | `--metrics` | flag | off | Serve Prometheus metrics at `GET /metrics` (needs the token). |
+| `--work-root` | path | `.cimpal-work` in the first `--write-root`, else in the first `--root` | Folder for [uploads and job outputs](#file-exchange-uploads-and-downloads). No request path may point into it.<br>**Start:** it is emptied at every start, but only if it carries `serve`'s `.cimpal-work` marker. A folder that is not empty and has no marker is refused.<br>**Refused:** a work folder that is, or contains, a `--root`/`--read-root`/`--write-root`.<br>**Read-only data folder:** if the default can't be created (e.g. a read-only `/data` in a container), `serve` starts without file exchange and logs a warning. |
+| `--no-file-exchange` | flag | off | Turn uploads and downloads off: no work folder, and those routes answer 404. |
+| `--max-upload-bytes` | integer | `2147483648` (2 GiB, at most 16 GiB) | Largest upload. |
+| `--upload-ttl` | ISO-8601 duration | `PT24H` | How long an upload is kept once no queued or running job uses it. |
+| `--work-max-bytes` | integer | `21474836480` (20 GiB) | Disk space for uploads and job outputs together; an upload that doesn't fit gets 507. |
+| `--request-read-time` | ISO-8601 duration | `PT60S` (at most `PT2H`) | Time a client has to send a whole request, body included. It protects against slow clients; raise it for large uploads sent without a buffering proxy (a proxy receives the upload first and forwards it fast). |
 
 | Environment variable | Description |
 |---|---|
@@ -258,6 +264,58 @@ else:
 
 On Windows the token file is `%LOCALAPPDATA%\CimPal\serve.token`.
 
+### File exchange: uploads and downloads
+
+For callers that share no file system with the server: Airflow on another machine, a laptop, a CI runner. Callers that do share storage (a Kubernetes volume, NFS) keep using paths under the [allowed folders](#allowed-folders---root).
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/v1/uploads` | `POST` | Body: a ZIP (`Content-Type: application/zip`) with the models, constraints, mapping CSV, … Answers **201** `{uploadId, files, totalBytes, createdAt, expiresAt}`. The only POST that isn't JSON. |
+| `/v1/uploads/<id>` | `GET`, `DELETE` | The upload's files; delete it (409 while a queued or running job uses it). |
+| `/v1/jobs` | `POST` | With `"inputUpload": "<uploadId>"` next to `command` and `config`, the job runs on that upload (below). |
+| `/v1/jobs/<id>/files` | `GET` | The job's output files: `{files: [{path, size, mediaType}]}`. 409 until the job has finished; 404 for a job that used shared paths. |
+| `/v1/jobs/<id>/files/<path>` | `GET` | One output file, as an attachment. |
+| `/v1/jobs/<id>/archive` | `GET` | All output files as one ZIP. |
+
+**A job with `inputUpload`:**
+- **Reads:**
+  - relative paths in `config` resolve inside the upload (`"models": ["models/eq.xml"]`);
+  - it may also read the server's `--read-root` folders, e.g. a constraint library kept on the server;
+  - nothing else: no other upload, no `--root`/`--write-root` folder.
+- **Writes:** only its own output folder.
+  - Relative output paths (`output`, `outputDir`, `summaryFile`) are placed there, and a missing `outputDir` becomes that folder.
+  - An output path anywhere else is refused with 403 when the job is submitted.
+
+**The upload is checked as a whole** and refused (400) if any entry:
+- **leaves the folder:** `..`, an absolute name, a drive letter, a UNC name;
+- **has a bad name:** a reserved device name (`CON`, `NUL`, `COM1`, …), a name ending in a dot or blank, or two names that differ only in case;
+- **is too large:**
+  - a central directory over 16 MiB, or more than 10,000 entries (refused from the archive's end record, before it is read);
+  - more than 2 GiB extracted (1 GiB per file), where every file and folder also counts 4 KiB;
+  - a name deeper than 32 folders or longer than 1,024 characters;
+  - a file that expands more than 100 times once it is larger than 1 MiB.
+
+Nested ZIPs are kept as files, not expanded, and link entries become plain files. The upload is streamed to disk and never held in memory. Concurrent uploads reserve their room in `--work-max-bytes` before extracting, so together they can't overshoot it.
+
+**Trust model:** `serve` has one trust domain, its token. Request paths can't reach another caller's upload or outputs, but anyone holding the token can list jobs and download their outputs. Run one instance per team or purpose where that matters.
+
+**Lifetime:**
+- **Uploads:** kept for `--upload-ttl` after creation, but never while a queued or running job uses them.
+- **Job outputs:** kept as long as the job (`--job-ttl`).
+- **Restart:** everything is in memory, as the jobs are, and the work folder is emptied when `serve` starts.
+
+**Request time:** a large upload has to arrive within `--request-read-time` (60 s). A reverse proxy such as ingress-nginx or Caddy receives the upload first and forwards it fast; without one, raise the limit.
+
+```bash
+id=$(curl -s -H "Authorization: Bearer $token" -H 'Content-Type: application/zip' \
+  --data-binary @inputs.zip http://localhost:7474/v1/uploads | python3 -c 'import json,sys; print(json.load(sys.stdin)["uploadId"])')
+job=$(curl -s -H "Authorization: Bearer $token" -H 'Content-Type: application/json' http://localhost:7474/v1/jobs \
+  -d "{\"command\":\"validate\",\"inputUpload\":\"$id\",\"config\":{\"workflow\":\"mapping\",\"mappingCsv\":\"mapping.csv\",\"modelsDir\":\"models\",\"constraintsRoot\":\"constraints\"}}" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["jobId"])')
+# ... poll /v1/jobs/$job until it has finished, then:
+curl -s -H "Authorization: Bearer $token" -o outputs.zip http://localhost:7474/v1/jobs/$job/archive
+```
+
 ---
 
 ## HTTP status codes
@@ -275,6 +333,9 @@ On Windows the token file is `%LOCALAPPDATA%\CimPal\serve.token`.
 | 500 | Internal error — command crashed (exit 3). Out of memory: the body is `{"exitCode":3,...,"error":"Out of memory; the server stops..."}` and the server then exits with 3; restart it with more memory ([sizing guide](../guide/sizing.md)) |
 | 409 | `/v1`: the job hasn't finished (result), or isn't queued any more (cancel) |
 | 410 | `/v1`: the job's result was larger than `--max-result-bytes` and wasn't kept |
+| 413 | Also: an upload larger than `--max-upload-bytes` |
+| 415 | Also: an upload that isn't `application/zip`, or a ZIP sent anywhere else |
+| 507 | `/v1/uploads`: the work area is full (`--work-max-bytes`) |
 | 503 | Queue full (`Retry-After` header set) |
 | 504 | Command didn't finish within `--request-timeout` |
 
