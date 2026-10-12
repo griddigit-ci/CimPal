@@ -697,7 +697,7 @@ class ServeServerTest {
         java.io.PrintStream out = new java.io.PrintStream(captured, true, StandardCharsets.UTF_8);
         ServeLog log = ServeLog.json(out, java.time.InstantSource.system());
         java.io.PrintStream originalErr = System.err;
-        java.io.PrintStream wrapped = log.stderr(() -> server == null ? null : server.runningJobId());
+        java.io.PrintStream wrapped = log.stderr(CliStreams::label);
         System.setErr(wrapped);
         try {
             start(config().log(log), (command, configFile) -> {

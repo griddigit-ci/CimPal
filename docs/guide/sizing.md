@@ -31,6 +31,14 @@ java -Xmx4g -jar CimPal-CLI.jar validate --config run.json --format json --stats
 
 Then compare `stats.triplesLoaded`, `stats.wallMs` and `stats.gcMs` with the table. A GC share (`gcMs / wallMs`) above about 10 % means the heap is too small.
 
+## Several commands in one server
+
+`serve --workers N` runs up to N commands at once in one JVM ([details](../cli/serve.md#thread-safety-and-concurrency)). They share the heap, so size it for the commands that run together, not for one:
+
+- **Heap:** the sum of the largest commands you expect to run at once, each at 0.6 GB per million triples (about 10× the input size). With the default `--max-concurrent-heap-bytes` (75 % of the heap), `serve` holds a command back until the estimates of the running ones plus its own fit; one command alone always starts.
+- **Cores:** each validation run uses its own worker pool, so N workers on fewer than N × 2 cores mostly take turns. Keep N at or below the cores.
+- **Out of memory** ends the whole JVM and every running command with it (exit 3, never a clean result). For large models, prefer more replicas with one worker each.
+
 ## When the heap is too small
 
 The run ends at once with exit code **3** and this line on stderr:

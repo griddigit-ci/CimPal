@@ -11,9 +11,9 @@ import org.apache.jena.rdf.model.Model;
 import java.util.ArrayList;
 
 public class RDFtoSHACLOptionsPresets {
-    public static String DEFAULT_CIMS_NAMESPACE = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
-    public static String DEFAULT_IO_PREFIX = "ido";
-    public static String DEFAULT_IO_URI = "http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#";
+    public static final String DEFAULT_CIMS_NAMESPACE = "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#";
+    public static final String DEFAULT_IO_PREFIX = "ido";
+    public static final String DEFAULT_IO_URI = "http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#";
 
     public static RDFtoSHACLOptions.Builder defaultPreset(ArrayList<Model> rdfsModels, String identifiedObjectPrefix, String identifiedObjectURI, String cimsNamespace) {
         return RDFtoSHACLOptions.builder()

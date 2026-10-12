@@ -53,7 +53,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The HTTP server behind {@code serve}, separated from the picocli command so it can be started
@@ -63,8 +62,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Every request passes, in order: Host allowlist (403), Origin allowlist (403), exact path
  * (404), method (405), bearer token (401, not for {@code GET /health}), {@code application/json}
  * body on POST (415), body limit (413). Commands then take a slot in a bounded queue (503 when
- * full) and run one at a time on a single worker thread, because {@code ValidationTools} keeps
- * static flags. A request that has not finished within the timeout gets 504.
+ * full) and run on {@code --workers} threads, one by default. With more than one, an
+ * {@link AdmissionGate} starts a command only while the estimated heap of the running ones fits
+ * {@code --max-concurrent-heap-bytes}, and each command's path policy, caches and output are its
+ * own (DEP-8). A request that has not finished within the timeout gets 504.
  *
  * <p>A timed-out command is left to finish rather than interrupted, because a command cut off in
  * the middle of writing could leave truncated reports behind. It keeps its queue slot until it
@@ -73,8 +74,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <h2>Job API ({@code /v1}, DEP-5)</h2>
  * <p>{@code POST /v1/jobs} queues a command and answers 202 at once; the caller polls
- * {@code GET /v1/jobs/{id}} and fetches {@code /result} and {@code /log}. Jobs share the worker and
- * the queue slots with the synchronous endpoints, so commands still run one at a time. Paths in a
+ * {@code GET /v1/jobs/{id}} and fetches {@code /result} and {@code /log}. Jobs share the workers and
+ * the queue slots with the synchronous endpoints. Paths in a
  * job's config are checked when it is submitted (403 then, not later). Every error under
  * {@code /v1} is {@code application/problem+json}; {@code GET /v1/health} and
  * {@code GET /v1/openapi.json} need no token. The routes are {@link #V1_ROUTES}; the OpenAPI
@@ -99,6 +100,8 @@ final class ServeServer implements AutoCloseable {
 
     /** Upper bounds for the operator-set limits. */
     static final int MAX_QUEUE_SIZE = 64;
+    static final int MAX_WORKERS = 64;
+    static final long MIN_CONCURRENT_HEAP_BYTES = 1L << 20;
     static final long MAX_BODY_BYTES = 64L * 1024 * 1024;
 
     /** Handler threads beyond those that can be waiting on a command. */
@@ -180,6 +183,17 @@ final class ServeServer implements AutoCloseable {
         RequestCheck NONE = (command, body) -> body;
     }
 
+    /**
+     * Estimates the heap a checked command will need, for the admission of {@code --workers}
+     * (DEP-8). {@code workspace} is the job's upload, or null.
+     */
+    @FunctionalInterface
+    interface SizeEstimator {
+        long estimate(String command, byte[] checkedBody, WorkArea.JobWorkspace workspace);
+
+        SizeEstimator NONE = (command, body, workspace) -> 0;
+    }
+
     /** A request refused by a {@link RequestCheck}; the message goes to the caller. */
     static final class Rejected extends Exception {
         private final int status;
@@ -199,7 +213,8 @@ final class ServeServer implements AutoCloseable {
                   long maxBodyBytes, int queueSize, Duration requestTimeout,
                   Duration jobTimeout, int maxJobs, Duration jobTtl, int jobLogLines, long maxResultBytes,
                   long jobStoreBytes, Set<String> allowedHosts, boolean metrics, ServeLog log,
-                  Path workRoot, long maxUploadBytes, Duration uploadTtl, long workMaxBytes, Duration requestReadTime) {
+                  Path workRoot, long maxUploadBytes, Duration uploadTtl, long workMaxBytes, Duration requestReadTime,
+                  int workers, long maxConcurrentHeapBytes, SizeEstimator sizeEstimator) {
 
         static Builder builder() {
             return new Builder();
@@ -231,6 +246,10 @@ final class ServeServer implements AutoCloseable {
             private Duration uploadTtl = Duration.ofHours(24);
             private long workMaxBytes = 20L << 30;
             private Duration requestReadTime = Duration.ofSeconds(REQUEST_READ_SECONDS);
+            private int workers = 1;
+            /** By default three quarters of the heap. */
+            private long maxConcurrentHeapBytes = Runtime.getRuntime().maxMemory() / 4 * 3;
+            private SizeEstimator sizeEstimator = SizeEstimator.NONE;
 
             Builder host(String host) { this.host = host; return this; }
             Builder port(int port) { this.port = port; return this; }
@@ -257,13 +276,17 @@ final class ServeServer implements AutoCloseable {
             Builder uploadTtl(Duration uploadTtl) { this.uploadTtl = uploadTtl; return this; }
             Builder workMaxBytes(long workMaxBytes) { this.workMaxBytes = workMaxBytes; return this; }
             Builder requestReadTime(Duration requestReadTime) { this.requestReadTime = requestReadTime; return this; }
+            Builder workers(int workers) { this.workers = workers; return this; }
+            Builder maxConcurrentHeapBytes(long bytes) { this.maxConcurrentHeapBytes = bytes; return this; }
+            Builder sizeEstimator(SizeEstimator sizeEstimator) { this.sizeEstimator = sizeEstimator; return this; }
 
             Config build() {
                 TokenSource source = tokens != null ? tokens
                         : token == null || token.isBlank() ? null : TokenSource.fixed(token);
                 return new Config(host, port, source, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
                         requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes,
-                        allowedHosts, metrics, log, workRoot, maxUploadBytes, uploadTtl, workMaxBytes, requestReadTime);
+                        allowedHosts, metrics, log, workRoot, maxUploadBytes, uploadTtl, workMaxBytes, requestReadTime,
+                        workers, maxConcurrentHeapBytes, sizeEstimator);
             }
         }
     }
@@ -280,16 +303,14 @@ final class ServeServer implements AutoCloseable {
     private final int totalSlots;
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closing = new AtomicBoolean();
-    /** When the running command started (System.nanoTime), or 0 when the worker is idle. */
-    private final AtomicLong runningSince = new AtomicLong();
+    /** The commands running now; empty while the workers are idle. */
+    private final Map<Object, Running> running = new ConcurrentHashMap<>();
+    /** Keeps the estimated heap of the running commands within --max-concurrent-heap-bytes (DEP-8). */
+    private final AdmissionGate admission;
     /** The job store of the {@code /v1} API. */
     private final JobManager jobs;
-    /** The {@code /v1} job running on the worker, or null (a synchronous request, or idle). */
-    private volatile Job runningJob;
     /** The worker tasks of queued jobs, so a cancelled job's task (and its body) leaves the queue at once. */
     private final Map<UUID, Future<?>> queuedTasks = new ConcurrentHashMap<>();
-    /** The runningSince value the last stall warning was logged for, so it is logged once per command. */
-    private final AtomicLong stallWarned = new AtomicLong();
     private final ServeLog log;
     private final ServeMetrics metrics = new ServeMetrics();
     /** Uploads and job workspaces (DEP-7), or null without {@code --work-root}. */
@@ -306,7 +327,7 @@ final class ServeServer implements AutoCloseable {
         this.log = config.log();
         this.jobs = new JobManager(config.maxJobs(), config.jobTtl(), config.jobTimeout(), config.jobLogLines(),
                 config.jobStoreBytes(), clock);
-        this.totalSlots = config.queueSize() + 1;
+        this.totalSlots = config.queueSize() + config.workers();
         this.slots = new Semaphore(totalSlots);
         // The JDK server reads request lines, headers and bodies on these threads too, and up to
         // totalSlots of them wait on a running or queued command. SPARE_HTTP_THREADS more stay
@@ -314,9 +335,23 @@ final class ServeServer implements AutoCloseable {
         // slow client from holding one of them indefinitely.
         this.handlers = Executors.newFixedThreadPool(totalSlots + SPARE_HTTP_THREADS,
                 daemonThreads("cimpal-serve-http"));
-        // One thread, and a queue from which a cancelled task can be removed (remove(Runnable)).
-        this.worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(),
-                daemonThreads("cimpal-serve-worker"));
+        // --workers threads, and a queue from which a cancelled task can be removed (remove(Runnable)).
+        this.worker = new ThreadPoolExecutor(config.workers(), config.workers(), 0, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(), daemonThreads("cimpal-serve-worker"));
+        this.admission = new AdmissionGate(config.maxConcurrentHeapBytes());
+    }
+
+    /** A running command: its job (null for a synchronous request) and when it started (System.nanoTime). */
+    private static final class Running {
+        final Job job;
+        final long since;
+        /** Health is polled without a token: a stall is logged once per command, not once per poll. */
+        final AtomicBoolean stallWarned = new AtomicBoolean();
+
+        Running(Job job, long since) {
+            this.job = job;
+            this.since = since;
+        }
     }
 
     /**
@@ -410,6 +445,16 @@ final class ServeServer implements AutoCloseable {
         if (config.queueSize() < 0 || config.queueSize() > MAX_QUEUE_SIZE) {
             throw new IllegalArgumentException("--queue-size must be between 0 and " + MAX_QUEUE_SIZE + ".");
         }
+        if (config.workers() < 1 || config.workers() > MAX_WORKERS) {
+            throw new IllegalArgumentException("--workers must be between 1 and " + MAX_WORKERS + ".");
+        }
+        if (config.maxConcurrentHeapBytes() < MIN_CONCURRENT_HEAP_BYTES) {
+            throw new IllegalArgumentException("--max-concurrent-heap-bytes must be at least "
+                    + MIN_CONCURRENT_HEAP_BYTES + ".");
+        }
+        if (config.sizeEstimator() == null) {
+            throw new IllegalArgumentException("A size estimator is required.");
+        }
         if (config.requestTimeout() == null || config.requestTimeout().isNegative()
                 || config.requestTimeout().isZero()) {
             throw new IllegalArgumentException("--request-timeout must be positive.");
@@ -479,9 +524,9 @@ final class ServeServer implements AutoCloseable {
     }
 
     /**
-     * After {@link #close()}: waits up to {@code grace} for a running command to finish, so it
-     * isn't cut off in the middle of writing its reports when the JVM exits. Queued commands are
-     * not started. True when the worker is idle.
+     * After {@link #close()}: waits up to {@code grace} for the running commands to finish, so
+     * they aren't cut off in the middle of writing their reports when the JVM exits. Queued
+     * commands are not started. True when the workers are idle.
      */
     boolean awaitWorker(Duration grace) throws InterruptedException {
         return worker.awaitTermination(grace.toMillis(), TimeUnit.MILLISECONDS);
@@ -496,8 +541,8 @@ final class ServeServer implements AutoCloseable {
         if (!closing.compareAndSet(false, true)) {
             return;
         }
-        // Queued jobs never start; the running one finishes, as for synchronous requests.
-        log.info("server.stopping", "serve: stopping; queued jobs are cancelled, a running command finishes",
+        // Queued jobs never start; running ones finish, as for synchronous requests.
+        log.info("server.stopping", "serve: stopping; queued jobs are cancelled, running commands finish",
                 "queued", (long) jobs.queued().size());
         for (Job job : jobs.queued()) {
             if (job.cancel(jobs.now(), "Server shut down before the job started")) {
@@ -863,18 +908,47 @@ final class ServeServer implements AutoCloseable {
             }
             return;
         }
+        AdmissionGate.Ticket ticket;
+        try {
+            ticket = admission.acquire(estimate(job.command(), body, workspaces.get(job.id())),
+                    () -> closing.get() || job.snapshot().status() != JobStatus.QUEUED);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            ticket = null;
+        } catch (Error e) {
+            // e.g. out of memory while estimating: the job never started, and its slot is freed once.
+            if (job.cancel(jobs.now(), "Internal error before the job started")) {
+                slots.release();
+                jobCancelled(job);
+            }
+            if (OutOfMemoryRethrow.find(e).isPresent()) {
+                onOutOfMemory.run();
+            }
+            return;
+        }
+        if (ticket == null) {
+            // Cancelled while it waited for memory (whoever cancelled it released the slot), or shutting down.
+            if (job.cancel(jobs.now(), "Server shut down before the job started")) {
+                slots.release();
+                jobCancelled(job);
+            }
+            return;
+        }
         if (!job.start(jobs.now())) {
+            ticket.close();
             return; // Cancelled while queued: whoever cancelled it released the slot.
         }
         long started = System.nanoTime();
         log.info("job.started", "serve: job " + job.id() + " (" + job.command() + ") started",
                 "jobId", job.id().toString(), "command", job.command());
-        runningJob = job;
-        runningSince.set(started);
+        Object key = new Object();
+        running.put(key, new Running(job, started));
         try {
             CommandResult result;
-            try (StderrTee.Capture ignored = StderrTee.capture(job.log())) {
-                result = runWithConfigFile(job.command(), body, workspaces.get(job.id()));
+            // The job's stderr (its log) and its id for the JSON log, on this thread and those it starts.
+            try (StderrTee.Capture capture = StderrTee.capture(job.log())) {
+                result = CliStreams.bind(null, capture.stream(), job.id().toString(),
+                        () -> runWithConfigFile(job.command(), body, workspaces.get(job.id())));
             }
             job.finish(jobs.now(), result.exitCode(), result.stdout(), config.maxResultBytes());
         } catch (Throwable t) {
@@ -887,8 +961,8 @@ final class ServeServer implements AutoCloseable {
                     + t.getClass().getSimpleName(), "jobId", job.id().toString(), "command", job.command());
             job.fail(jobs.now(), "Internal error while running " + job.command());
         } finally {
-            runningJob = null;
-            runningSince.set(0);
+            running.remove(key);
+            ticket.close();
             slots.release();
             if (workArea != null && workspaces.containsKey(job.id())) {
                 workArea.jobEnded(job.id());
@@ -912,10 +986,21 @@ final class ServeServer implements AutoCloseable {
                 "jobId", job.id().toString(), "command", job.command(), "status", JobStatus.CANCELLED.apiName());
     }
 
-    /** The id of the job running now, or null (for the JSON log's output lines). */
-    String runningJobId() {
-        Job job = runningJob;
-        return job == null ? null : job.id().toString();
+    /** The ids of the jobs running now (synchronous requests have none). */
+    List<String> runningJobIds() {
+        return running.values().stream().filter(r -> r.job != null).map(r -> r.job.id().toString())
+                .sorted().toList();
+    }
+
+    /** The heap a command is estimated to need; when that can't be told, all of the budget (it runs alone). */
+    private long estimate(String command, byte[] body, WorkArea.JobWorkspace workspace) {
+        try {
+            return config.sizeEstimator().estimate(command, body, workspace);
+        } catch (RuntimeException e) {
+            log.warn("admission.estimate", "serve: could not estimate the size of a " + command
+                    + " command; it runs alone: " + e.getClass().getSimpleName(), "command", command);
+            return Long.MAX_VALUE;
+        }
     }
 
     /** Takes a cancelled job's task out of the worker's queue, so its request body is freed now. */
@@ -1312,17 +1397,17 @@ final class ServeServer implements AutoCloseable {
     }
 
     private String v1HealthJson() {
-        long since = runningSince.get();
-        boolean busy = since != 0;
+        int runningNow = running.size();
         boolean stalled = stalled();
         ObjectNode node = JSON.createObjectNode();
         node.put("status", stalled ? "stalled" : "ok");
         node.put("version", VERSION);
         node.put("apiVersion", API_VERSION);
-        node.put("busy", busy);
+        node.put("busy", runningNow > 0);
         node.put("stalled", stalled);
-        node.put("queued", Math.max(0, inFlight() - (busy ? 1 : 0)));
-        node.put("running", busy ? 1 : 0);
+        node.put("queued", Math.max(0, inFlight() - runningNow));
+        node.put("running", runningNow);
+        node.put("workers", config.workers());
         return JSON.writeValueAsString(node);
     }
 
@@ -1408,14 +1493,35 @@ final class ServeServer implements AutoCloseable {
         Future<CommandResult> future;
         try {
             future = worker.submit(() -> {
-                if (!claimed.compareAndSet(false, true)) {
+                AdmissionGate.Ticket ticket;
+                try {
+                    // Abandoned when the request timed out (or the server stops) while it waited.
+                    ticket = admission.acquire(estimate(command, body, null), claimed::get);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    ticket = null;
+                } catch (Error e) {
+                    // The handler sees it as a failure (or out of memory); the slot is freed once.
+                    if (claimed.compareAndSet(false, true)) {
+                        slots.release();
+                    }
+                    throw e;
+                }
+                if (ticket == null || !claimed.compareAndSet(false, true)) {
+                    if (ticket != null) {
+                        ticket.close();
+                    } else if (claimed.compareAndSet(false, true)) {
+                        slots.release(); // interrupted: nobody else claimed the slot
+                    }
                     return null;
                 }
-                runningSince.set(System.nanoTime());
+                Object key = new Object();
+                running.put(key, new Running(null, System.nanoTime()));
                 try {
                     return runWithConfigFile(command, body);
                 } finally {
-                    runningSince.set(0);
+                    running.remove(key);
+                    ticket.close();
                     slots.release();
                 }
             });
@@ -1497,36 +1603,39 @@ final class ServeServer implements AutoCloseable {
     // -------------------------------------------------------------------------
 
     /**
-     * {@code status} is {@code "ok"}, or {@code "stalled"} when the running command has taken
-     * longer than the request timeout (it can't be stopped, so the worker stays blocked until it
-     * returns; restart the server). {@code busy} tells whether a command is running.
+     * {@code status} is {@code "ok"}, or {@code "stalled"} when a running command has taken
+     * longer than its timeout (it can't be stopped, so its worker stays blocked until it returns;
+     * restart the server). {@code busy} tells whether a command is running.
      */
     private String healthJson() {
-        long since = runningSince.get();
-        boolean busy = since != 0;
+        int runningNow = running.size();
         boolean stalled = stalled();
         return "{\"status\":" + jsonStr(stalled ? "stalled" : "ok") + ",\"version\":" + jsonStr(VERSION)
-                + ",\"busy\":" + busy + ",\"stalled\":" + stalled + ",\"queued\":"
-                + Math.max(0, inFlight() - (busy ? 1 : 0)) + "}";
+                + ",\"busy\":" + (runningNow > 0) + ",\"stalled\":" + stalled + ",\"queued\":"
+                + Math.max(0, inFlight() - runningNow) + "}";
     }
 
     /**
-     * True when the running command has taken longer than its limit: {@code --request-timeout}
-     * for a synchronous request, {@code --job-timeout} for a job. It can't be stopped, so the
+     * True when a running command has taken longer than its limit: {@code --request-timeout}
+     * for a synchronous request, {@code --job-timeout} for a job. It can't be stopped, so its
      * worker stays blocked until it returns; restart the server if it doesn't.
      */
     private boolean stalled() {
-        long since = runningSince.get();
-        Job job = runningJob;
-        boolean stalled = since != 0 && (job == null
-                ? System.nanoTime() - since > config.requestTimeout().toNanos()
-                : jobs.timedOut(job));
-        // Health is polled without a token: log once per command, not once per poll.
-        if (stalled && stallWarned.getAndSet(since) != since) {
-            log.warn("stall", "serve: the running command has exceeded its timeout; "
-                    + "restart the server if it doesn't return.", "jobId", job == null ? null : job.id().toString());
+        boolean any = false;
+        for (Running r : running.values()) {
+            boolean stalled = r.job == null
+                    ? System.nanoTime() - r.since > config.requestTimeout().toNanos()
+                    : jobs.timedOut(r.job);
+            if (stalled) {
+                any = true;
+                if (r.stallWarned.compareAndSet(false, true)) {
+                    log.warn("stall", "serve: a running command has exceeded its timeout; "
+                            + "restart the server if it doesn't return.",
+                            "jobId", r.job == null ? null : r.job.id().toString());
+                }
+            }
         }
-        return stalled;
+        return any;
     }
 
     private static String commandsJson() {
@@ -1585,8 +1694,8 @@ final class ServeServer implements AutoCloseable {
         for (JobStatus status : JobStatus.values()) {
             byStatus.put(status, jobs.count(status));
         }
-        boolean busy = runningSince.get() != 0;
-        return metrics.render(VERSION, byStatus, Math.max(0, inFlight() - (busy ? 1 : 0)), busy);
+        int runningNow = running.size();
+        return metrics.render(VERSION, byStatus, Math.max(0, inFlight() - runningNow), runningNow, config.workers());
     }
 
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {

@@ -111,7 +111,7 @@ public class McpCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        mcpOut = System.out;
+        mcpOut = CliStreams.currentOut(); // the real stdout, also when an earlier run installed routing
         System.setOut(System.err); // protect the MCP channel from accidental writes
 
         mapper = new ObjectMapper();
@@ -254,23 +254,21 @@ public class McpCommand implements Callable<Integer> {
             mapper.writeValue(tempConfig.toFile(), checked);
             Path config = tempConfig;
 
-            // Capture System.out during command execution
+            // Capture System.out during command execution, on this thread and those it starts
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PrintStream captured = new PrintStream(baos, true, StandardCharsets.UTF_8);
-            PrintStream previousOut = System.out;
-            System.setOut(captured);
 
-            int exitCode;
-            try {
-                // Always add --format json for commands that support it
-                String[] cliArgs = spec.supportsJson()
-                        ? new String[]{spec.command(), "--config", config.toString(), "--format", "json"}
-                        : new String[]{spec.command(), "--config", config.toString()};
-                exitCode = PathPolicy.runWith(policy,
-                        () -> CimPalCli.inProcess().execute(cliArgs));
-            } finally {
-                System.setOut(previousOut);
-            }
+            // Always add --format json for commands that support it
+            String[] cliArgs = spec.supportsJson()
+                    ? new String[]{spec.command(), "--config", config.toString(), "--format", "json"}
+                    : new String[]{spec.command(), "--config", config.toString()};
+            // While it runs, a path check on a thread without the policy (e.g. a common-pool thread
+            // that didn't inherit it) is refused rather than unrestricted (DEP-8).
+            int exitCode = CliStreams.bind(captured, null, null, () -> {
+                try (PathPolicy.Requirement required = PathPolicy.requireContext()) {
+                    return PathPolicy.runWith(policy, () -> CimPalCli.inProcess().execute(cliArgs));
+                }
+            });
 
             String output = baos.toString(StandardCharsets.UTF_8).strip();
 

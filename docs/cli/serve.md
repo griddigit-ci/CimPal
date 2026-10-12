@@ -63,7 +63,9 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--allowed-host` | `name[:port]` (repeatable) | none | A name clients use to reach the server through a reverse proxy or ingress. See [Behind a proxy](#behind-a-reverse-proxy-or-ingress). |
 | `--allow-origin` | string (repeatable) | none | Browser `Origin` that may call the server, e.g. `http://localhost:3000`. |
 | `--max-body-bytes` | integer | `1048576` (1 MB) | Largest accepted request body. |
-| `--queue-size` | integer | `4` | Requests that may wait while one runs. More get 503. |
+| `--queue-size` | integer | `4` | Requests that may wait while the workers are busy. More get 503. |
+| `--workers` | integer | `1` (at most 64) | Commands that may run at once. See [Thread safety and concurrency](#thread-safety-and-concurrency). |
+| `--max-concurrent-heap-bytes` | integer | three quarters of the maximum heap | With `--workers` above 1: a command starts only while the estimated heap of the running commands plus its own fits this. A command alone always starts. |
 | `--request-timeout` | ISO-8601 duration | `PT30M` | Time a request may take, including time spent waiting in the queue. Longer gets 504. |
 | `--job-timeout` | ISO-8601 duration | `PT2H` | A [`/v1` job](#job-api-v1) running longer than this is marked `timed_out` and `/v1/health` reports `stalled`. It is not interrupted. |
 | `--max-jobs` | integer | `1000` | Jobs kept in memory (100–100000). Beyond this, the oldest finished jobs are dropped. |
@@ -126,19 +128,19 @@ java -jar CimPal-CLI.jar serve --root C:/Data/CimPal --read-root C:/Data/shared-
 | **Token**: every endpoint except `GET /health`, `GET /ready`, `GET /v1/health` and `GET /v1/openapi.json` needs `Authorization: Bearer <token>`. The comparison is constant-time, and the token never appears in logs or responses. | 401 |
 | **Content type**: POST bodies must be `application/json` (a charset parameter is fine). HTML forms can't send that without a CORS preflight. | 415 |
 | **Body size**: at most `--max-body-bytes`. | 413 |
-| **Queue**: one command runs at a time and at most `--queue-size` wait. | 503 (with `Retry-After`) |
+| **Queue**: `--workers` commands run at once (one by default) and at most `--queue-size` wait. | 503 (with `Retry-After`) |
 | **Timeout**: after `--request-timeout`, the caller gets 504. | 504 |
 
 The token is 256 random bits, new on every start. The token file is created with owner-only permissions before the token is written into it: POSIX `rw-------`, or on Windows an ACL that grants only your account (looked up as `%USERDOMAIN%\%USERNAME%`). A link already at the path is replaced, not followed. On POSIX, a token directory that other users can write to is refused. The file is deleted when the server stops, unless another `serve` instance has since written its own token there. Anyone who can read the file can call the server, so don't copy it to shared locations.
 
 If Windows can't look up your account by its qualified name (for example on some Entra ID machines), the file is created first and restricted to its owner before the token is written. With the default location under `%LOCALAPPDATA%`, which only you can read, that makes no difference. With `--token-file` in a shared folder, prefer `CIMPAL_API_TOKEN` there.
 
-A command that times out while still waiting in the queue never runs. A command that times out while running is left to finish, because interrupting it could leave half-written reports behind. It keeps its place in the queue until it returns, so the queue limit still holds, but the worker stays busy. Restart the server if a command hangs.
+A command that times out while still waiting in the queue never runs. A command that times out while running is left to finish, because interrupting it could leave half-written reports behind. It keeps its place in the queue until it returns, so the queue limit still holds, but its worker stays busy. Restart the server if a command hangs.
 
 Limits that protect the server itself:
 - A request (headers and body) must arrive within 60 seconds, so a client can't hold a connection open by sending slowly. Commands that run longer than that are not affected. This is the JDK setting `sun.net.httpserver.maxReqTime`; set `-Dsun.net.httpserver.maxReqTime=<seconds>` to change it. It applies to the whole JVM, and a body that takes longer than this to upload (e.g. a large body over a slow `--allow-remote` link) is dropped.
 - This bounds how long one connection is held, not how many a client opens. A local process that keeps opening slow connections can still slow the server down. That is a limit of this design, and it needs local access unless `--allow-remote` is used.
-- `--queue-size` can be at most 64, and `--max-body-bytes` at most 64 MB.
+- `--queue-size` and `--workers` can be at most 64, and `--max-body-bytes` at most 64 MB.
 
 ---
 
@@ -167,7 +169,7 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/health` | `GET` | Returns `{"status":"ok","version":"...","busy":false,"stalled":false,"queued":0}`. `busy` means a command is running, and `queued` is the number waiting. `status` becomes `"stalled"` (and `stalled` true) when the running command has taken longer than `--request-timeout`: it can't be stopped, so restart the server if it doesn't return. The only endpoint that needs no token. |
+| `/health` | `GET` | Returns `{"status":"ok","version":"...","busy":false,"stalled":false,"queued":0}`. `busy` means a command is running, and `queued` is the number waiting. `status` becomes `"stalled"` (and `stalled` true) when a running command has taken longer than `--request-timeout`: it can't be stopped, so restart the server if it doesn't return. `GET /v1/health` also gives `running` and `workers`. The only endpoint that needs no token. |
 | `/ready` | `GET` | Readiness probe: 200 `{"status":"ready"}`; 503 with `"shutting down"`, or `"no usable token"` while the token file is broken. A full queue still answers 200, so a single instance stays reachable for polling and cancelling. No token needed. |
 | `/metrics` | `GET` | Only with `--metrics`: Prometheus text, see [Metrics](#metrics). Needs the token. |
 | `/commands` | `GET` | Lists all available command and utility endpoints. Needs the token. |
@@ -202,7 +204,7 @@ The job API runs a command asynchronously.
 
 **What stays the same:**
 - **Checks:** the token, the Host and Origin checks, the body limit and the [allowed folders](#allowed-folders---root) apply as for the other endpoints. Paths in `config` are checked **when you submit**, so a refused path is a 403 at once, not a failed job later, and they are checked again just before the job runs.
-- **One at a time:** jobs and synchronous requests share the worker and `--queue-size`. Commands still run one at a time, and a full queue answers 503 with `Retry-After`.
+- **Workers and queue:** jobs and synchronous requests share the `--workers` and `--queue-size`. A full queue answers 503 with `Retry-After`.
 
 **Errors** under `/v1` are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`: `{"type", "title", "status", "detail", "jobId"?}`. The older endpoints keep `{"error": "..."}`.
 
@@ -403,15 +405,24 @@ curl -s -X POST http://localhost:7474/sparql \
 
 File paths in request bodies may be absolute or relative to the first `--root`. They must be inside the [allowed folders](#allowed-folders---root). The server and the caller share a filesystem (the daemon runs locally), so the files must be accessible from the machine where the server is running.
 
-There is no file upload mechanism — the server reads from and writes to local paths that are specified in the request JSON.
+Paths in a job's `config` are local paths on the server; to send files with the job, see [File exchange](#file-exchange-uploads-and-downloads).
 
 ---
 
 ## Thread safety and concurrency
 
-Commands run on a **single worker thread**, one at a time. This avoids race conditions on the static flags in `ValidationTools` (debug mode, Turtle report export). For the intended use case, a local validation agent sending one request at a time, this is the right trade-off: a single validation run already saturates the available CPU cores through its own worker pool. While one command runs, up to `--queue-size` requests wait, and more are rejected with 503. `/health` still answers while commands run.
+By default commands run **one at a time** on a single worker. While one runs, up to `--queue-size` requests wait, and more are rejected with 503. `/health` still answers while commands run. A single validation run already uses the available cores through its own worker pool, so for one agent sending one request at a time this is the right setting.
 
-If you need to run multiple pipelines concurrently, start multiple daemon instances on different ports.
+With `--workers N`, up to N commands run at once in the same JVM. Each command keeps its own:
+- **allowed folders:** the path policy is per command, and threads the command starts inherit it. While `serve` runs, a path check on a thread without a command's policy is refused, never unrestricted;
+- **remote-import caches** and temporary downloads;
+- **output:** what a command prints goes to its own result and job log, also from the threads it starts. With `--log-format json`, each `output` line carries the `jobId` of the job that wrote it.
+
+The results are the same as with one worker; a stress test runs mixed jobs with four workers and compares every result with the one-worker run.
+
+**Memory admission.** Concurrent commands share one heap. Each command is estimated at **10 times the size of its input files** (files, the files in input folders, archives as they are), at least 64 MiB; the [sizing guide](../guide/sizing.md) measures about 9 times the RDF/XML size. A command whose inputs hold more than 100 000 files and folders, or can't be read, counts as too large to share: it runs alone. A command starts only while the estimates of the running commands plus its own fit `--max-concurrent-heap-bytes` (default: three quarters of `-Xmx`). A command with nothing else running always starts, however large. Waiting is first come, first served, so a large command is not overtaken by smaller ones behind it. A command waiting for memory still counts as queued, and a queued job can be cancelled.
+
+**When to use workers or replicas.** More replicas (one worker each) remain the recommended production shape: an out-of-memory error ends the whole JVM, which with several workers fails every running command (they end with exit 3 like any OOM, never with a clean result). Use `--workers` for many small commands, where JVM start-up dominates, and keep the number at or below the cores. Process-wide numbers in `--stats` (CPU time, peak heap, GC) cover all running commands when there is more than one.
 
 ---
 
@@ -484,8 +495,8 @@ Names are compared without case and without DNS lookups. No scheme, path or wild
 
 SIGTERM (`docker stop`, Kubernetes) does what `POST /shutdown` does:
 - **Stop:** the server stops taking work (`/ready` answers 503) and cancels queued jobs.
-- **Drain:** a running command gets up to `--shutdown-grace` to finish, so its reports aren't cut off.
-- **Exit:** with 0, or with 3 and an error log line if the command was still running.
+- **Drain:** running commands get up to `--shutdown-grace` to finish, so their reports aren't cut off.
+- **Exit:** with 0, or with 3 and an error log line (naming the running jobs) if a command was still running.
 
 Give the container more time than the grace period: Docker `--stop-timeout` or `stop_grace_period`, Kubernetes `terminationGracePeriodSeconds`. Ctrl-C drains the same way.
 
@@ -503,7 +514,7 @@ With `--log-format json`, stderr carries one JSON object per line and stdout sta
 - **Server:** `server.started` (with `tokenSource`, where the token comes from), `server.stopping`, `server.stopped`, `server.grace_exceeded`;
 - **Jobs and commands:** `job.queued`, `job.started`, `job.finished`, `command.finished`;
 - **Problems:** `request.rejected`, `stall`, `token.file`;
-- **Output:** `output`, which is every line the commands themselves write, e.g. `[INFO] Loading …`, tagged with the running job's `jobId`. Its level comes only from the line's start (`[WARN]`, `[ERROR]`, or a logger's `[thread] WARN`).
+- **Output:** `output`, which is every line the commands themselves write, e.g. `[INFO] Loading …`, tagged with the `jobId` of the job whose thread wrote it. Its level comes only from the line's start (`[WARN]`, `[ERROR]`, or a logger's `[thread] WARN`).
 
 **Safety:**
 - Every string passes the log sanitiser: control characters are replaced, and long values are cut at 512 characters.
@@ -522,7 +533,7 @@ With `--metrics`, `GET /metrics` (token required) returns Prometheus text format
 | `cimpal_jobs_finished_total` | counter | `status` |
 | `cimpal_job_duration_seconds` | histogram (1 s … 2 h) | — |
 | `cimpal_requests_total` | counter, synchronous endpoints | `command`, `outcome` (`ok`, `violations`, `bad_input`, `error`, `timeout`, `busy`) |
-| `cimpal_queue_depth`, `cimpal_busy` | gauge | — |
+| `cimpal_queue_depth`, `cimpal_busy`, `cimpal_running`, `cimpal_workers` | gauge | — |
 | `cimpal_jvm_heap_used_bytes`, `cimpal_jvm_heap_max_bytes` | gauge | — |
 
 The counters start at zero on every start.

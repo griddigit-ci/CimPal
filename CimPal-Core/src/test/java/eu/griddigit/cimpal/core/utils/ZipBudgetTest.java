@@ -246,4 +246,31 @@ class ZipBudgetTest {
 
         assertThat(ModelFactory.modelLoadPerFiles(List.of(archive.toFile()), "urn:base", Lang.TURTLE)).hasSize(2);
     }
+
+    @Test
+    void everyStreamOfAnArchiveCarriesItsOwnEntryName() throws Exception {
+        // There was one static list of names, shared by every caller and lined up by position:
+        // two archives loaded in parallel (or concurrent serve jobs, DEP-8) mixed them up, and a
+        // nested archive gave several streams but one name.
+        Path a = Files.write(tempDir.resolve("a.zip"), zip("eq.xml", TTL, "ssh.xml", TTL));
+        Path b = Files.write(tempDir.resolve("b.zip"), zip("tp.xml", TTL));
+        byte[] nested = zipOf("igm.zip", zip("sv.xml", TTL, "dl.xml", TTL));
+        Path c = Files.write(tempDir.resolve("c.zip"), nested);
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var namesA = pool.submit(() -> names(ModelFactory.unzipNamed(a.toFile())));
+            var namesB = pool.submit(() -> names(ModelFactory.unzipNamed(b.toFile())));
+            assertThat(namesA.get()).containsExactly("eq.xml", "ssh.xml");
+            assertThat(namesB.get()).containsExactly("tp.xml");
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(names(ModelFactory.unzipNamed(c.toFile()))).containsExactly("igm.zip", "igm.zip");
+        assertThat(ModelFactory.unzip(c.toFile())).hasSize(2);
+    }
+
+    private static List<String> names(List<java.util.Map.Entry<String, java.io.InputStream>> named) {
+        return named.stream().map(java.util.Map.Entry::getKey).toList();
+    }
 }

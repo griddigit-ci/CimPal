@@ -127,7 +127,7 @@ These are also listed in the master README. Each WP names the decisions it needs
 | D-5 | HTTP layer for `/v1` | Stay on the JDK `HttpServer` (SEC-1 hardening is built on it); revisit Javalin only if SSE or many endpoints make it painful | DEP-5 |
 | D-6 | File exchange | Shared volume + upload/download in v1; no native S3 in CimPal (Airflow copies S3 ↔ volume or uploads through the SDK) | DEP-7 |
 | D-7 | TLS | Terminate at the reverse proxy / ingress; no TLS inside CimPal in v1 | DEP-6 |
-| D-8 | In-JVM concurrency | Not now; scale with replicas. Do DEP-8 only if a customer needs several jobs per instance | DEP-8 |
+| D-8 | In-JVM concurrency | **Yes** (maintainer, 2026-10-12): DEP-8 adds `serve --workers N`; replicas stay the recommended production shape | DEP-8 |
 | D-9 | Where the Python code lives | Same repo, `clients/python/` and `clients/airflow/`, versioned with CimPal | DEP-9 |
 | D-10 | Python package names | `cimpal-client` (import `cimpal_client`) and `airflow-provider-cimpal` (import `cimpal_provider`). The `apache-airflow-providers-*` prefix is reserved for Apache community providers. | DEP-9 |
 | D-11 | Licence of the Python packages | EUPL-1.2 like the rest, or Apache-2.0 to match the Airflow ecosystem | DEP-9 |

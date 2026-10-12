@@ -131,6 +131,27 @@ class ServeCommandTest {
     }
 
     @Test
+    void whileServeRunsAPathCheckOnAThreadWithoutAPolicyIsRefused() throws Exception {
+        // DEP-8: e.g. a pool thread that didn't inherit a command's policy must not be unrestricted.
+        String token = "env-token-0123456789abcdef0123456789";
+        Path file = Files.writeString(tempDir.resolve("data.xml"), "<x/>");
+        assertThat(eu.griddigit.cimpal.core.utils.PathPolicy.checkReadIfActive(file)).isEqualTo(file);
+
+        Running running = startInBackground(Map.of(ServeSecurity.TOKEN_ENV, token), "--host", "127.0.0.1",
+                "--port", "0", "--root", tempDir.toString());
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> eu.griddigit.cimpal.core.utils.PathPolicy.checkReadIfActive(file))
+                    .isInstanceOf(eu.griddigit.cimpal.core.utils.PathNotAllowedException.class);
+        } finally {
+            assertThat(shutdown(running.server(), token).statusCode()).isEqualTo(200);
+            assertThat(running.exit().get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+        }
+        assertThat(eu.griddigit.cimpal.core.utils.PathPolicy.checkReadIfActive(file)).as("released when serve stops")
+                .isEqualTo(file);
+    }
+
+    @Test
     void shortEnvironmentTokenIsRefused() {
         int exit = runToExit(Map.of(ServeSecurity.TOKEN_ENV, "short"), "--host", "127.0.0.1", "--port", "0",
                 "--token-file", tempDir.resolve("serve.token").toString());

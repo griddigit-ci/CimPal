@@ -130,6 +130,88 @@ class PathPolicyTest {
         assertThat(PathPolicy.isReservedName(null)).isFalse();
     }
 
+    // ---- per-thread context (DEP-8) ----------------------------------------------------------
+
+    @Test
+    void threadsACommandStartsSeeItsPolicy() throws Exception {
+        PathPolicy.runWith(policy, () -> {
+            java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(1);
+            try {
+                assertThat(pool.submit(() -> PathPolicy.checkReadIfActive(root.resolve("in.ttl"))).get())
+                        .isEqualTo(realPath(root.resolve("in.ttl")));
+                assertThatThrownBy(() -> pool.submit(() -> PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"))).get())
+                        .hasCauseInstanceOf(PathNotAllowedException.class);
+            } finally {
+                pool.shutdownNow();
+            }
+            return null;
+        });
+    }
+
+    @Test
+    void aThreadStillHoldingAnEndedCommandsPolicyIsRefused() throws Exception {
+        // E.g. a pool thread created during one command and reused after it: fail closed.
+        java.util.concurrent.atomic.AtomicReference<Thread> later = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Throwable> seen = new java.util.concurrent.atomic.AtomicReference<>();
+        PathPolicy.runWith(policy, () -> {
+            later.set(new Thread(() -> {
+                try {
+                    PathPolicy.checkReadIfActive(root.resolve("in.ttl"));
+                } catch (Throwable t) {
+                    seen.set(t);
+                }
+            }));
+            return null;
+        });
+        later.get().start();
+        later.get().join();
+
+        assertThat(seen.get()).isInstanceOf(PathNotAllowedException.class);
+        assertThat(PathPolicy.active()).isEmpty();
+        assertThat(PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"))).as("no policy here: unchanged")
+                .isEqualTo(outside.resolve("secret.ttl"));
+    }
+
+    @Test
+    void whileAContextIsRequiredAThreadWithoutOneIsRefused() throws Exception {
+        try (PathPolicy.Requirement required = PathPolicy.requireContext()) {
+            assertThatThrownBy(() -> PathPolicy.checkReadIfActive(root.resolve("in.ttl")))
+                    .isInstanceOf(PathNotAllowedException.class);
+            assertThatThrownBy(() -> PathPolicy.checkWriteIfActive(root.resolve("x.ttl")))
+                    .isInstanceOf(PathNotAllowedException.class);
+            assertThat(PathPolicy.runWith(policy, () -> PathPolicy.checkReadIfActive(root.resolve("in.ttl"))))
+                    .isEqualTo(realPath(root.resolve("in.ttl")));
+        }
+        assertThat(PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"))).isEqualTo(outside.resolve("secret.ttl"));
+    }
+
+    @Test
+    void concurrentCommandsEachKeepTheirOwnPolicy() throws Exception {
+        PathPolicy other = PathPolicy.builder().root(outside).build();
+        java.util.concurrent.CyclicBarrier together = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(() -> PathPolicy.runWith(policy, () -> {
+                together.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                PathPolicy.checkReadIfActive(root.resolve("in.ttl"));
+                assertThatThrownBy(() -> PathPolicy.checkReadIfActive(outside.resolve("secret.ttl")))
+                        .isInstanceOf(PathNotAllowedException.class);
+                return PathPolicy.active().orElseThrow();
+            }));
+            var b = pool.submit(() -> PathPolicy.runWith(other, () -> {
+                together.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"));
+                assertThatThrownBy(() -> PathPolicy.checkReadIfActive(root.resolve("in.ttl")))
+                        .isInstanceOf(PathNotAllowedException.class);
+                return PathPolicy.active().orElseThrow();
+            }));
+            assertThat(a.get()).isSameAs(policy);
+            assertThat(b.get()).isSameAs(other);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     @Test
     void traversalOutOfTheRootIsRefused() {
         Path sneaky = root.resolve("../outside/secret.ttl");
@@ -308,5 +390,11 @@ class PathPolicyTest {
         } catch (Exception e) {
             throw new AssertionError(e);
         }
+    }
+
+    @Test
+    void aNullPolicyIsRefusedRatherThanRunningUnrestricted() {
+        // A null policy would leave the thread unrestricted even while a context is required.
+        assertThatThrownBy(() -> PathPolicy.runWith(null, () -> "ran")).isInstanceOf(NullPointerException.class);
     }
 }

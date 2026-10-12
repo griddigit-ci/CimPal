@@ -32,9 +32,20 @@ public class CustomRDFFormat extends RDFFormat {
      * registers the factories for the custom formats
      */
     public static void RegisterCustomFormatWriters() {
-        RDFWriterRegistry.register(Lang.RDFXML, CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-        RDFWriterRegistry.register(CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY, new RDFXMLCustomWriterFactory());
-        RDFWriterRegistry.register(Lang.RDFXML, CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
-        RDFWriterRegistry.register(CustomRDFFormat.RDFXML_CUSTOM_PLAIN, new RDFXMLCustomWriterFactory());
+        // Once per JVM: the registry is process-wide, and re-registering while another command
+        // (serve --workers, DEP-8) is writing would change it under that writer.
+        synchronized (CustomRDFFormat.class) {
+            if (registered) {
+                return;
+            }
+            RDFWriterRegistry.register(Lang.RDFXML, CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
+            RDFWriterRegistry.register(CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY, new RDFXMLCustomWriterFactory());
+            RDFWriterRegistry.register(Lang.RDFXML, CustomRDFFormat.RDFXML_CUSTOM_PLAIN);
+            RDFWriterRegistry.register(CustomRDFFormat.RDFXML_CUSTOM_PLAIN, new RDFXMLCustomWriterFactory());
+            registered = true;
+        }
     }
+
+    /** Guarded by the class lock. */
+    private static boolean registered;
 }

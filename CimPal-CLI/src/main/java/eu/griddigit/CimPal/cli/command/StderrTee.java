@@ -19,9 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Copies what a running {@code /v1} job writes to {@code System.err} into the job's
  * {@link JobLog} (DEP-5), while everything still reaches the real stderr as before.
  *
- * <p>{@code System.err} is process-wide, so this is only sound because {@code serve} runs one
- * command at a time (its single worker; the process-wide {@code PathPolicy} requires that
- * anyway). Lines are assembled per thread, because a validation writes from its worker pools;
+ * <p>The job's worker binds {@link Capture#stream()} as its {@code System.err} through
+ * {@link CliStreams}, so with {@code --workers} above 1 each job's log holds only its own lines
+ * (DEP-8). Lines are assembled per thread, because a validation writes from its worker pools;
  * lines from the server's own HTTP threads ({@value #SERVER_THREAD_PREFIX}*, the dispatcher, the
  * stopper) stay out of the job's log. Each line passes through {@link LogSanitizer#forLog(String)}
  * before it is stored, so it is at most {@value LogSanitizer#MAX_LENGTH} characters.
@@ -35,8 +35,11 @@ final class StderrTee extends OutputStream {
     /** Threads with an unfinished line at once; output of further threads still reaches stderr. */
     static final int MAX_THREADS = 256;
 
-    /** Restores {@code System.err} and flushes partial lines into the log. */
+    /** A job's stderr; closing it flushes partial lines into the log and stops collecting. */
     interface Capture extends AutoCloseable {
+        /** The stream to bind as the job's {@code System.err}. */
+        PrintStream stream();
+
         @Override
         void close();
     }
@@ -52,19 +55,25 @@ final class StderrTee extends OutputStream {
         this.log = log;
     }
 
-    /** Starts copying {@code System.err} into {@code log}, until the returned capture is closed. */
+    /**
+     * A stream that copies into {@code log} what it is given, and passes everything on to the
+     * stderr that applies on this thread now.
+     */
     static Capture capture(JobLog log) {
-        PrintStream original = System.err;
-        StderrTee tee = new StderrTee(original, log);
+        StderrTee tee = new StderrTee(CliStreams.currentErr(), log);
         PrintStream stream = new PrintStream(tee, true, StandardCharsets.UTF_8);
-        System.setErr(stream);
-        return () -> {
-            stream.flush();
-            if (System.err == stream) {
-                System.setErr(original);
+        return new Capture() {
+            @Override
+            public PrintStream stream() {
+                return stream;
             }
-            tee.closed = true;
-            tee.flushPartialLines();
+
+            @Override
+            public void close() {
+                stream.flush();
+                tee.closed = true;
+                tee.flushPartialLines();
+            }
         };
     }
 

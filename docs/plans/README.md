@@ -50,8 +50,8 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 | D0 | [DEP-4](deployment/DEP-4.md) | External user guide, first edition | DEP-1, DEP-2, DEP-3 | M | In progress (support policy awaits maintainer review) |
 | D1 | [DEP-5](deployment/DEP-5.md) | Async job API (`/v1`) and OpenAPI spec | SEC-1, SEC-2 | L | Done (PR #62) |
 | D1 | [DEP-6](deployment/DEP-6.md) | Service deployment: proxy, tokens, probes, SIGTERM, logs, manifests | DEP-5, DEP-1 | M | Done (PR #64) |
-| D1 | [DEP-7](deployment/DEP-7.md) | File exchange: job workspaces, upload and download | DEP-5 | M–L | In review |
-| D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | Not started |
+| D1 | [DEP-7](deployment/DEP-7.md) | File exchange: job workspaces, upload and download | DEP-5 | M–L | Done (PR #66) |
+| D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | In review |
 | D2 | [DEP-9](deployment/DEP-9.md) | Python SDK `cimpal-client` | DEP-5, DEP-7 | M | Not started |
 | D2 | [DEP-10](deployment/DEP-10.md) | Airflow provider | DEP-9, DEP-3 | M | Not started |
 
