@@ -394,6 +394,34 @@ class ServeCommandTest {
     }
 
     @Test
+    void aDefaultWorkFolderThatCannotBeCreatedTurnsFileExchangeOffInsteadOfStopping() throws Exception {
+        // A container with a read-only /data (shared-volume mode, as docs/cli/docker.md runs it):
+        // serve must still start. A file in the way stands in for the read-only folder.
+        String token = "job-token-0123456789abcdef0123456789";
+        Path root = Files.createDirectories(tempDir.resolve("readonly-data"));
+        Files.writeString(root.resolve(".cimpal-work"), "in the way");
+        ServeCommand command = new ServeCommand();
+        command.environment = Map.of(ServeSecurity.TOKEN_ENV, token);
+        command.onTerm = onTerm -> false;
+        CompletableFuture<ServeServer> started = new CompletableFuture<>();
+        command.onStarted = started::complete;
+        CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(
+                "--host", "127.0.0.1", "--port", "0", "--root", root.toString()));
+        ServeServer server = CompletableFuture.anyOf(started, exit).thenApply(x -> started.getNow(null))
+                .get(30, TimeUnit.SECONDS);
+
+        assertThat(server).as(output()).isNotNull();
+        assertThat(server.workAreaForTest()).isNull();
+        assertThat(output()).contains("File exchange is off");
+        assertThat(shutdown(server, token).statusCode()).isEqualTo(200);
+        assertThat(exit.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+
+        // An explicit --work-root that can't be used still stops serve.
+        assertThat(runToExit(Map.of(ServeSecurity.TOKEN_ENV, token), "--port", "0", "--root", root.toString(),
+                "--work-root", root.resolve(".cimpal-work").toString())).isEqualTo(ExitCode.INVALID_INPUT);
+    }
+
+    @Test
     void fileExchangeCanBeTurnedOff() throws Exception {
         String token = "job-token-0123456789abcdef0123456789";
         Path root = Files.createDirectories(tempDir.resolve("root"));

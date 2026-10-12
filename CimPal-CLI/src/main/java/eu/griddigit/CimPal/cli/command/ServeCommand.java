@@ -416,11 +416,26 @@ public class ServeCommand implements Callable<Integer> {
         PathPolicy policy;
         Path work = null;
         try {
-            if (noFileExchange) {
+            if (!noFileExchange && workRoot == null) {
+                // The default lies in the data folder, which may well be read-only (a container
+                // with a read-only /data, shared-volume mode only): then serve runs without uploads.
+                Path defaultWork = rootOptions.defaultWorkRoot(defaultRoots).toAbsolutePath();
+                try {
+                    Files.createDirectories(defaultWork);
+                } catch (IOException ex) {
+                    System.err.println("[WARN] File exchange is off: the default work folder " + defaultWork
+                            + " can't be created (" + ex.getClass().getSimpleName() + "). Give a writable --work-root"
+                            + " to accept uploads, or --no-file-exchange to silence this.");
+                    defaultWork = null;
+                }
+                work = defaultWork;
+            } else if (!noFileExchange) {
+                work = workRoot.toAbsolutePath();
+                Files.createDirectories(work);
+            }
+            if (work == null) {
                 policy = rootOptions.policy(defaultRoots);
             } else {
-                work = (workRoot != null ? workRoot : rootOptions.defaultWorkRoot(defaultRoots)).toAbsolutePath();
-                Files.createDirectories(work);
                 // The work area holds other callers' uploads and outputs: no request path may reach it.
                 policy = rootOptions.policy(defaultRoots, work);
                 Path workReal = work.toRealPath();
