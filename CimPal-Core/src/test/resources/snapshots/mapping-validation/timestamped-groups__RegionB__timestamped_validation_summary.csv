@@ -1,0 +1,8 @@
+## TimestampOverview
+Country,Timestamp,Report file,Validation count,Conform validations,Non-conform validations,Validation errors,Total results,Violations,Warnings,Infos,Worst severity,Check priority,Partial validations,Result limit
+RegionB,<TIMESTAMP>,validation_report_RegionB_<TIMESTAMP>.xlsx,1,1,0,0,0,0,0,0,,Probably OK,0
+## TopConstraints
+Country,Timestamp,Report file,Constraint file,Source,Constraint Component,Description,Message,Severity,Count
+## InputCompleteness
+Country,Timestamp,Mapping row,Constraint file,Requested input,Expected file count,Resolved file count,Status,Resolved files,Missing input,Message
+RegionB,<TIMESTAMP>,1,shapes.ttl,EQ,1,1,OK,RegionB_EQ_20260101T0000Z.xml,,All requested inputs were resolved.

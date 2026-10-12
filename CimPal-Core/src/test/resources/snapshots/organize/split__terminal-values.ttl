@@ -1,0 +1,32 @@
+PREFIX cim:  <http://iec.ch/TC57/CIM100#>
+PREFIX ex:   <http://example.com/constraints#>
+PREFIX owl:  <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh:   <http://www.w3.org/ns/shacl#>
+
+ex:Terminal.phases-in
+        a         sh:PropertyShape;
+        sh:group  ex:Values;
+        sh:in     ( cim:PhaseCode.A cim:PhaseCode.ABC );
+        sh:name   "Terminal.phases-in";
+        sh:path   cim:Terminal.phases .
+
+ex:Terminal  a          sh:NodeShape;
+        sh:property     ex:Terminal.phases-in , ex:Terminal.sequence-sparql;
+        sh:targetClass  cim:Terminal .
+
+ex:Values  a        sh:PropertyGroup;
+        rdfs:label  "Values";
+        sh:order    1 .
+
+ex:SequenceQuery  a  sh:SPARQLConstraint;
+        sh:select  "SELECT $this WHERE { }" .
+
+ex:Ontology  a      owl:Ontology;
+        rdfs:label  "Constraints" .
+
+ex:Terminal.sequence-sparql
+        a          sh:PropertyShape;
+        sh:name    "Terminal.sequence-sparql";
+        sh:path    cim:ACDCTerminal.sequenceNumber;
+        sh:sparql  ex:SequenceQuery .

@@ -1,0 +1,19 @@
+## January 2026
+Region,Timestamp,Dataset,Warnings,Infos,Violations,Total
+models,<TIMESTAMP>,Thing check,0,0,1,1
+## Charts
+models
+Dataset,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %,January 2026 Warnings,January 2026 Warnings %,January 2026 Violations,January 2026 Violations %
+Thing check,1,=B3/SUM($B$3:$B$3)*100,0,=D3/SUM($D$3:$D$3)*100,1,=F3/SUM($F$3:$F$3)*100
+Combined (all regions)
+Dataset,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %
+Thing check,1,=B27/SUM($B$27:$B$27)*100
+Compliance Rate (Warnings and Violations) by Region
+Run,models,Combined
+January 2026,0,0
+Violations Compliance Rate (Violations) by Region
+Run,models,Combined
+January 2026,0,0
+Warnings Compliance Rate (Warnings) by Region
+Run,models,Combined
+January 2026,100,100

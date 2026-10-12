@@ -1,0 +1,16 @@
+## Validation results
+Dataset,XML files,Constraint file,Focus node,Path,Value,Value kind,Source,Constraint Component,Message,Severity,Description,Order,Name,Group
+lines.xml,lines.xml,lines.ttl,cim:_anon,cim:IdentifiedObject.name,,,urn:test:shapes:Line.name,sh:MinCountConstraintComponent,Name is missing,sh:Warning,,,IdentifiedObject.name
+lines.xml,lines.xml,lines.ttl,cim:_bad,cim:ACLineSegment.r,-1.5,Literal^^xsd:float,urn:test:shapes:Line.r,sh:MinInclusiveConstraintComponent,Resistance must be a non-negative float,sh:Violation,,,ACLineSegment.r
+lines.xml,lines.xml,lines.ttl,cim:_bad,cim:Equipment.aggregate,maybe,Literal^^xsd:boolean,urn:test:shapes:Line.aggregate,sh:DatatypeConstraintComponent,Aggregate must be a boolean,sh:Info,,,Equipment.aggregate
+## Validation statistics
+Dataset,XML files,Constraint file,All,Warnings,Infos,Violations,Conforms,Validation error,Missing XML files,Chart name,Validation scope
+lines.xml,lines.xml,lines.ttl,3,1,1,1,FALSE,,,lines.ttl,Complete
+## StatisticsConstraint
+Dataset,Path,Source,Count,Constraint Component,Message,Severity,Description,Order,Name,Group
+lines.xml,cim:ACLineSegment.r,urn:test:shapes:Line.r,1,sh:MinInclusiveConstraintComponent,Resistance must be a non-negative float,sh:Violation,,,ACLineSegment.r
+lines.xml,cim:Equipment.aggregate,urn:test:shapes:Line.aggregate,1,sh:DatatypeConstraintComponent,Aggregate must be a boolean,sh:Info,,,Equipment.aggregate
+lines.xml,cim:IdentifiedObject.name,urn:test:shapes:Line.name,1,sh:MinCountConstraintComponent,Name is missing,sh:Warning,,,IdentifiedObject.name
+## Charts
+Dataset,Warnings,Infos,Violations,,Dataset (all),Warnings,Infos,Violations
+lines.ttl,1,1,1,,lines.ttl,1,1,1

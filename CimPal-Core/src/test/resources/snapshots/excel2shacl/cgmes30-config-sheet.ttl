@@ -1,0 +1,55 @@
+PREFIX cim:  <http://iec.ch/TC57/CIM100#>
+PREFIX meqc: <http://example.com/constraints/MiniEquipment#>
+PREFIX owl:  <http://www.w3.org/2002/07/owl#>
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh:   <http://www.w3.org/ns/shacl#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+meqc:IdentifiedObject.name-length
+        rdf:type        sh:PropertyShape;
+        sh:description  "Description of IdentifiedObject.name-length";
+        sh:group        meqc:ValueConstraintsGroup;
+        sh:maxLength    "32.0"^^xsd:integer;
+        sh:message      "Message of IdentifiedObject.name-length";
+        sh:minLength    "1.0"^^xsd:integer;
+        sh:name         "IdentifiedObject.name-length";
+        sh:order        2;
+        sh:path         cim:IdentifiedObject.name;
+        sh:severity     sh:Violation .
+
+meqc:ValueConstraintsGroup
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "ValueConstraints";
+        sh:order    0 .
+
+meqc:ACLineSegment.r-range
+        rdf:type         sh:PropertyShape;
+        sh:description   "Description of ACLineSegment.r-range";
+        sh:group         meqc:ValueConstraintsGroup;
+        sh:maxExclusive  "1000.0"^^xsd:float;
+        sh:message       "Message of ACLineSegment.r-range";
+        sh:minInclusive  "0.0"^^xsd:float;
+        sh:name          "ACLineSegment.r-range";
+        sh:order         1;
+        sh:path          cim:ACLineSegment.r;
+        sh:severity      sh:Violation .
+
+meqc:ACLineSegment  rdf:type  sh:NodeShape;
+        sh:property     meqc:ACLineSegment.r-range , meqc:IdentifiedObject.name-length , meqc:Equipment.aggregate-equals;
+        sh:targetClass  cim:ACLineSegment .
+
+meqc:Terminal  rdf:type  sh:NodeShape;
+        sh:property     meqc:IdentifiedObject.name-length;
+        sh:targetClass  cim:Terminal .
+
+meqc:Equipment.aggregate-equals
+        rdf:type        sh:PropertyShape;
+        sh:description  "Description of Equipment.aggregate-equals";
+        sh:equals       cim:Equipment.aggregate;
+        sh:group        meqc:ValueConstraintsGroup;
+        sh:message      "Message of Equipment.aggregate-equals";
+        sh:name         "Equipment.aggregate-equals";
+        sh:order        3;
+        sh:path         cim:Equipment.aggregate;
+        sh:severity     sh:Violation .

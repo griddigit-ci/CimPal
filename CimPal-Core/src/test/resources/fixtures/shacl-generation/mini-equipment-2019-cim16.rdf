@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+
+  Synthetic test profile (TEST-3): a tiny augmented RDFS in the CimSyntaxGen layout, written for
+  the tests. RDFS 2019 layout (no header), CIM16 namespace as in CGMES 2.4.15.
+-->
+<rdf:RDF xmlns:cim16="http://iec.ch/TC57/2013/CIM-schema-cim16#" xmlns:cims="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#" xmlns:owl="http://www.w3.org/2002/07/owl#"
+         xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:dct="http://purl.org/dc/terms/" xmlns:meq="http://example.com/ns/MiniEquipment#" xml:base="http://iec.ch/TC57/2013/CIM-schema-cim16">
+<rdf:Description rdf:about="http://example.com/ns/MiniEquipment#Package_MiniEquipment">
+  <rdfs:label xml:lang="en">MiniEquipment</rdfs:label>
+  <rdf:type rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#ClassCategory"/>
+</rdf:Description>
+<rdf:Description rdf:about="#IdentifiedObject">
+  <rdfs:label xml:lang="en">IdentifiedObject</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#IdentifiedObject.mRID">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">mRID</rdfs:label>
+  <rdfs:domain rdf:resource="#IdentifiedObject"/>
+  <cims:dataType rdf:resource="#String"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:0..1"/>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#IdentifiedObject.name">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">name</rdfs:label>
+  <rdfs:domain rdf:resource="#IdentifiedObject"/>
+  <cims:dataType rdf:resource="#String"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:1..1"/>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Equipment">
+  <rdfs:label xml:lang="en">Equipment</rdfs:label>
+  <rdfs:subClassOf rdf:resource="#IdentifiedObject"/>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Equipment.aggregate">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">aggregate</rdfs:label>
+  <rdfs:domain rdf:resource="#Equipment"/>
+  <cims:dataType rdf:resource="#Boolean"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:0..1"/>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#ConductingEquipment">
+  <rdfs:label xml:lang="en">ConductingEquipment</rdfs:label>
+  <rdfs:subClassOf rdf:resource="#Equipment"/>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#ACLineSegment">
+  <rdfs:label xml:lang="en">ACLineSegment</rdfs:label>
+  <rdfs:subClassOf rdf:resource="#ConductingEquipment"/>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#concrete"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#ACLineSegment.r">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">r</rdfs:label>
+  <rdfs:domain rdf:resource="#ACLineSegment"/>
+  <cims:dataType rdf:resource="#Resistance"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:1..1"/>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Terminal">
+  <rdfs:label xml:lang="en">Terminal</rdfs:label>
+  <rdfs:subClassOf rdf:resource="#IdentifiedObject"/>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#concrete"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Terminal.phases">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">phases</rdfs:label>
+  <rdfs:domain rdf:resource="#Terminal"/>
+  <rdfs:range rdf:resource="#PhaseCode"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:0..1"/>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Terminal.ConductingEquipment">
+  <rdfs:label xml:lang="en">ConductingEquipment</rdfs:label>
+  <rdfs:domain rdf:resource="#Terminal"/>
+  <rdfs:range rdf:resource="#ConductingEquipment"/>
+  <cims:inverseRoleName rdf:resource="#ConductingEquipment.Terminals"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:1"/>
+  <cims:AssociationUsed>Yes</cims:AssociationUsed>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#ConductingEquipment.Terminals">
+  <rdfs:label xml:lang="en">Terminals</rdfs:label>
+  <rdfs:domain rdf:resource="#ConductingEquipment"/>
+  <rdfs:range rdf:resource="#Terminal"/>
+  <cims:inverseRoleName rdf:resource="#Terminal.ConductingEquipment"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:0..n"/>
+  <cims:AssociationUsed>No</cims:AssociationUsed>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Resistance">
+  <rdfs:label xml:lang="en">Resistance</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype>CIMDatatype</cims:stereotype>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Resistance.value">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">value</rdfs:label>
+  <rdfs:domain rdf:resource="#Resistance"/>
+  <cims:dataType rdf:resource="#Float"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:0..1"/>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Resistance.unit">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">unit</rdfs:label>
+  <rdfs:domain rdf:resource="#Resistance"/>
+  <rdfs:range rdf:resource="#UnitSymbol"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:0..1"/>
+  <cims:isFixed rdf:datatype="http://www.w3.org/2001/XMLSchema#string">ohm</cims:isFixed>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Resistance.multiplier">
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#attribute"/>
+  <rdfs:label xml:lang="en">multiplier</rdfs:label>
+  <rdfs:domain rdf:resource="#Resistance"/>
+  <rdfs:range rdf:resource="#UnitMultiplier"/>
+  <cims:multiplicity rdf:resource="http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#M:0..1"/>
+  <cims:isFixed rdf:datatype="http://www.w3.org/2001/XMLSchema#string">none</cims:isFixed>
+  <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Float">
+  <rdfs:label xml:lang="en">Float</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype>Primitive</cims:stereotype>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#Boolean">
+  <rdfs:label xml:lang="en">Boolean</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype>Primitive</cims:stereotype>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#String">
+  <rdfs:label xml:lang="en">String</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype>Primitive</cims:stereotype>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#PhaseCode">
+  <rdfs:label xml:lang="en">PhaseCode</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#enumeration"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#PhaseCode.ABC">
+  <rdfs:label xml:lang="en">ABC</rdfs:label>
+  <cims:stereotype>enum</cims:stereotype>
+  <rdf:type rdf:resource="#PhaseCode"/>
+</rdf:Description>
+<rdf:Description rdf:about="#PhaseCode.A">
+  <rdfs:label xml:lang="en">A</rdfs:label>
+  <cims:stereotype>enum</cims:stereotype>
+  <rdf:type rdf:resource="#PhaseCode"/>
+</rdf:Description>
+<rdf:Description rdf:about="#UnitSymbol">
+  <rdfs:label xml:lang="en">UnitSymbol</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#enumeration"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#UnitSymbol.ohm">
+  <rdfs:label xml:lang="en">ohm</rdfs:label>
+  <cims:stereotype>enum</cims:stereotype>
+  <rdf:type rdf:resource="#UnitSymbol"/>
+</rdf:Description>
+<rdf:Description rdf:about="#UnitMultiplier">
+  <rdfs:label xml:lang="en">UnitMultiplier</rdfs:label>
+  <cims:belongsToCategory rdf:resource="http://example.com/ns/MiniEquipment#Package_MiniEquipment"/>
+  <cims:stereotype rdf:resource="http://iec.ch/TC57/NonStandard/UML#enumeration"/>
+  <rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+</rdf:Description>
+<rdf:Description rdf:about="#UnitMultiplier.none">
+  <rdfs:label xml:lang="en">none</rdfs:label>
+  <cims:stereotype>enum</cims:stereotype>
+  <rdf:type rdf:resource="#UnitMultiplier"/>
+</rdf:Description>
+</rdf:RDF>
