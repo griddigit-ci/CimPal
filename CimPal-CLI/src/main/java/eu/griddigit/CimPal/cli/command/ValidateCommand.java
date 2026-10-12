@@ -394,6 +394,9 @@ public class ValidateCommand implements Callable<Integer> {
                 ok &= requireOutputDir(outputDir, "--output");
             }
             case "combined" -> {
+                // A folder stands for its files, as the mapping workflow takes a models folder.
+                constraintFiles = expandFolders(constraintFiles, CONSTRAINT_EXTENSIONS, "--constraint-files");
+                dataFiles = expandFolders(dataFiles, DATA_EXTENSIONS, "--data-files");
                 ok &= requireFiles(constraintFiles, "--constraint-files");
                 ok &= requireFiles(dataFiles, "--data-files");
                 if (constraintsRoot != null) {
@@ -429,11 +432,48 @@ public class ValidateCommand implements Callable<Integer> {
             System.err.println("[ERROR] " + flag + " is required.");
             return false;
         }
+        if (f.isDirectory()) {
+            System.err.println("[ERROR] " + flag + " names a folder with no file to use in it: " + f.getAbsolutePath()
+                    + (flag.equals("--data-files") ? " (expected .xml or .zip files)"
+                    : flag.equals("--constraint-files") ? " (expected .ttl, .rdf or .zip files)" : ""));
+            return false;
+        }
         if (!f.exists() || !f.isFile()) {
             System.err.println("[ERROR] File not found for " + flag + ": " + f.getAbsolutePath());
             return false;
         }
         return true;
+    }
+
+    /** What a folder given to the combined workflow contributes. */
+    static final List<String> CONSTRAINT_EXTENSIONS = List.of(".ttl", ".rdf", ".zip");
+    static final List<String> DATA_EXTENSIONS = List.of(".xml", ".zip");
+
+    /**
+     * Replaces each folder in {@code files} by the files directly in it whose name ends in one of
+     * {@code extensions} (any case), sorted by name; sub-folders are not entered. A folder with no
+     * such file stays as it is, so the next check reports it. Files and missing paths are kept.
+     */
+    static List<File> expandFolders(List<File> files, List<String> extensions, String flag) {
+        if (files == null) {
+            return null;
+        }
+        List<File> expanded = new ArrayList<>();
+        for (File f : files) {
+            if (!f.isDirectory()) {
+                expanded.add(f);
+                continue;
+            }
+            File[] children = f.listFiles(child -> child.isFile() && extensions.stream()
+                    .anyMatch(ext -> child.getName().toLowerCase(Locale.ROOT).endsWith(ext)));
+            if (children == null || children.length == 0) {
+                expanded.add(f);
+                continue;
+            }
+            java.util.Arrays.sort(children, Comparator.comparing(File::getName));
+            expanded.addAll(List.of(children));
+        }
+        return expanded;
     }
 
     /** At least one file, and every one of them an existing file. */
