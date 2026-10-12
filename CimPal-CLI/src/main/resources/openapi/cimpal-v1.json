@@ -22,6 +22,9 @@
     "name" : "jobs"
   }, {
     "name" : "server"
+  }, {
+    "name" : "files",
+    "description" : "File exchange: uploads and job outputs (for callers without a shared file system)."
   } ],
   "paths" : {
     "/v1/health" : {
@@ -119,7 +122,7 @@
             }
           },
           "403" : {
-            "description" : "A path in the config is outside the allowed folders, or an existing output file without `\"overwrite\": true`.",
+            "description" : "A path in the config is outside the allowed folders, or an existing output file without `\"overwrite\": true`. With `inputUpload`, the job may read only its upload and the server's read-only roots, and write only its own output folder.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -158,6 +161,16 @@
                 }
               }
             },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "`inputUpload` names no upload (or it expired).",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -460,6 +473,379 @@
           }
         }
       }
+    },
+    "/v1/uploads" : {
+      "post" : {
+        "tags" : [ "files" ],
+        "operationId" : "createUpload",
+        "summary" : "Upload a ZIP of input files (models, constraints, mapping CSV) for jobs to read.",
+        "description" : "The body is streamed to disk, at most `--max-upload-bytes`, and extracted. Entries must stay inside the upload: absolute names, `..`, drive letters, device names (CON, NUL, ...), names that differ only in case, and archives that expand too much are refused as a whole. Nested ZIPs are kept as files. A job reads the upload with `inputUpload`; the upload expires `--upload-ttl` after creation once no queued or running job uses it.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/zip" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "201" : {
+            "description" : "The upload; `Location` is its URL.",
+            "headers" : {
+              "Location" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "description" : "`/v1/uploads/{uploadId}`"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Not a usable ZIP: unreadable, an unsafe entry name, too many entries, or too large once extracted.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Larger than `--max-upload-bytes`.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "The Content-Type is not `application/zip`.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "The work area is full (`--work-max-bytes`).",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/uploads/{uploadId}" : {
+      "parameters" : [ {
+        "name" : "uploadId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The upload id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "getUpload",
+        "summary" : "An upload's files and lifetime.",
+        "responses" : {
+          "200" : {
+            "description" : "The upload.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such upload (or it expired).",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "files" ],
+        "operationId" : "deleteUpload",
+        "summary" : "Delete an upload.",
+        "responses" : {
+          "204" : {
+            "description" : "Deleted."
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such upload.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A queued or running job uses it.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/files" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "listJobFiles",
+        "summary" : "The output files of a job that read an upload.",
+        "responses" : {
+          "200" : {
+            "description" : "The files in the job's output folder.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FileList"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job, or the job used shared paths and has no output folder here.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/files/{path}" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      }, {
+        "name" : "path",
+        "in" : "path",
+        "required" : true,
+        "description" : "The file's path in the output folder, as `files` lists it; `/` separates folders. `..`, `.` and encoded separators are refused.",
+        "schema" : {
+          "type" : "string"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "downloadJobFile",
+        "summary" : "Download one output file.",
+        "responses" : {
+          "200" : {
+            "description" : "The file, as an attachment. The media type comes from the file extension.",
+            "headers" : {
+              "Content-Disposition" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "description" : "`attachment` with an ASCII `filename` and the exact name as `filename*`."
+              }
+            },
+            "content" : {
+              "application/octet-stream" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job or file, or the job has no output folder here.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/archive" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "downloadJobArchive",
+        "summary" : "All output files of a job as one ZIP.",
+        "responses" : {
+          "200" : {
+            "description" : "The ZIP, streamed.",
+            "content" : {
+              "application/zip" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job, or the job has no output folder here.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -493,6 +879,11 @@
             "type" : "string",
             "maxLength" : 200,
             "description" : "Free text to recognise the job."
+          },
+          "inputUpload" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Run on an upload (`POST /v1/uploads`) instead of shared paths: relative paths in `config` resolve inside the upload, outputs go to the job's own folder (relative or missing output paths are placed there), and the outputs are fetched with `/files` and `/archive`."
           }
         }
       },
@@ -969,6 +1360,72 @@
           }
         },
         "description" : "Generate a DCAT/CGMES manifest Turtle file describing a set of model files."
+      },
+      "Upload" : {
+        "type" : "object",
+        "required" : [ "uploadId", "files", "totalBytes", "createdAt", "expiresAt" ],
+        "properties" : {
+          "uploadId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "files" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "required" : [ "name", "size" ],
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "Path inside the upload, `/`-separated."
+                },
+                "size" : {
+                  "type" : "integer"
+                }
+              }
+            }
+          },
+          "totalBytes" : {
+            "type" : "integer"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "From then on the upload is deleted once no queued or running job uses it."
+          }
+        }
+      },
+      "FileList" : {
+        "type" : "object",
+        "required" : [ "jobId", "files" ],
+        "properties" : {
+          "jobId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "files" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "required" : [ "path", "size", "mediaType" ],
+              "properties" : {
+                "path" : {
+                  "type" : "string"
+                },
+                "size" : {
+                  "type" : "integer"
+                },
+                "mediaType" : {
+                  "type" : "string"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

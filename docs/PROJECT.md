@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-08  
+**Last updated:** 2026-10-09  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -300,10 +300,11 @@ GHCR package must be made public. DEP-1 and DEP-2 are done and released in 2026.
 (automation options and Airflow examples) is merged (PR #60) and goes out with the next release; the
 KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. DEP-4 (external
 user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintainer review. DEP-5
-(async `/v1` job API and OpenAPI spec) is merged (PR #62). DEP-6 (service deployment: proxy names,
-token files, probes, SIGTERM drain, JSON logs, metrics, Compose and Kubernetes examples) is in review
-on `feature/dep-6-service-deployment`; its kind end-to-end job runs in `integrations.yml`. Next on
-the deployment track: DEP-7 (file exchange).
+(async `/v1` job API and OpenAPI spec) is merged (PR #62), and DEP-6 (service deployment: proxy names,
+token files, probes, SIGTERM drain, JSON logs, metrics, Compose and Kubernetes examples) is merged
+(PR #64). DEP-7 (file exchange: uploads, job workspaces, downloads) is in review on
+`feature/dep-7-file-exchange`. TEST-3's validation and SHACL generation groups are in review
+(PR #65). Next on the deployment track: DEP-9 (Python SDK); DEP-8 (parallel workers) is optional.
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
@@ -409,6 +410,26 @@ What makes `serve` deployable behind a proxy (`docs/guide/service.md`, `deploy/`
 - **Tests:** `ServeSignalIT` (failsafe, POSIX only) forks a JVM with `ServeSignalItMain` to test
   the drain. Failsafe needs `package`, so it doesn't run on this Windows machine while Claude
   Desktop locks the JAR.
+
+### `serve` file exchange (DEP-7)
+
+Uploads and downloads for callers without a shared file system (`docs/cli/serve.md`, *File exchange*):
+- **Extraction:** Core's `ZipExtractor` extracts an untrusted ZIP to a new folder.
+  - Names: `safeZipEntryName`, plus device names, trailing dots and blanks, and case-insensitive duplicates.
+  - Size: `ZipBudget` limits and a 100:1 ratio check.
+  - Writes: `CREATE_NEW`/`NOFOLLOW_LINKS` with a real-path check of each folder; the folder is removed on any failure.
+- **Path isolation:** `PathPolicy.Builder.exclude` refuses a folder inside the roots, unless a root itself lies inside it (the more specific root wins).
+  - The shared policy of `serve` excludes `--work-root`.
+  - The policy of an upload job (`RootOptions.jobPolicy`) reads its upload and the `--read-root`s, writes its `out/`, and excludes the rest of the work area.
+- **`WorkArea`** (CLI) owns `<work-root>/uploads` and `jobs/<jobId>/out`.
+  - It holds the in-memory metadata, the disk budget (reserved before streaming) and the upload TTL (not while a job uses the upload).
+  - A workspace is deleted when `JobManager` evicts its job (`onRemoved`). Both folders are emptied at start.
+- **ServeServer:**
+  - `POST /v1/uploads` is the only non-JSON POST.
+  - `inputUpload` gets a workspace prepared under a pre-allocated job id before the path check (`PathGuard.placeOutputs` puts relative or missing outputs under `out/`).
+  - The download path is split from the raw URI and each segment decoded on its own.
+  - Runners and checks get the workspace through default-method overloads, so existing callers are unchanged.
+- **Request time:** `--request-read-time` sets `sun.net.httpserver.maxReqTime` (JVM-wide, read once).
 
 ### `serve` uses single-threaded executor
 

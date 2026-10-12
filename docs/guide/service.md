@@ -18,7 +18,10 @@ client ──HTTPS──▶ reverse proxy / Ingress ──HTTP──▶ CimPal s
 - **TLS ends at the proxy** (decision D-7). CimPal speaks plain HTTP and should only be reachable from the proxy: an internal Docker network, or a ClusterIP Service.
 - **The public name** the clients use goes into `--allowed-host`, because `serve` refuses Host headers it doesn't know.
 - **The token** comes from a secret file (`CIMPAL_API_TOKEN_FILE`) that you manage. `serve` never writes it, accepts two tokens while you rotate, and picks up changes within a minute.
-- **Files** live on a volume mounted at `/data`. Paths in job configs are container paths under it. Upload and download through the API are planned (DEP-7); until then, fill the volume another way, e.g. a shared file system, `kubectl cp`, or a sync job.
+- **Files**, in one of two modes:
+  - **Shared volume:** the models are on a volume mounted at `/data`, and paths in job configs are container paths under it. Best for large model sets, and when the orchestrator and CimPal mount the same storage.
+  - **Upload and download:** the caller uploads a ZIP (`POST /v1/uploads`), runs jobs on it (`"inputUpload"`), and downloads the outputs (`/files`, `/archive`). No shared storage is needed. Details: [serve, file exchange](../cli/serve.md#file-exchange-uploads-and-downloads).
+  - **Both:** keep large, rarely changing inputs on the server under `--read-root`. Upload jobs can read those too, so for example the CGMES constraint sets need not be uploaded every time.
 
 ## Examples
 
@@ -40,6 +43,14 @@ client ──HTTPS──▶ reverse proxy / Ingress ──HTTP──▶ CimPal s
 | Memory limit | from [Sizing](sizing.md), request = limit | Out of memory ends `serve` with exit code 3; it never reports a clean result |
 | Grace period | `--shutdown-grace` 60 s, container stop timeout 90 s | A running command can finish its reports on SIGTERM |
 | Replicas | 1 per Deployment | Jobs are in memory and commands run one at a time; scale with more instances, each with its own name |
+| `--work-root` | on the data volume (the default `.cimpal-work` is in the first `--write-root` or `--root`) | Uploads and job outputs need disk; size the volume and `--work-max-bytes` for them |
+| `--request-read-time` | keep `PT60S` behind a proxy | The proxy buffers uploads; raise it only for large uploads sent directly |
+
+## Files from S3 and other object stores
+
+CimPal doesn't read `s3://` paths itself (decision D-6). With Airflow, either:
+- **Copy to the shared volume first:** an upstream task (e.g. `S3Hook.download_file`, or `aws s3 sync`) writes to the volume CimPal mounts, and the CimPal task names the files by their container paths; or
+- **Upload them:** a task downloads the objects, zips them, and posts the ZIP to `/v1/uploads`. The job runs with `inputUpload`, and the outputs come back from `/v1/jobs/<id>/archive` (and can go back to S3).
 
 ## Operating it
 

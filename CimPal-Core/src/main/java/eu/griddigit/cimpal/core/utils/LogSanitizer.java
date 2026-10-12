@@ -39,7 +39,7 @@ public final class LogSanitizer {
     }
 
     /** True when {@code value} holds a character {@link #forLog(String)} would neutralise. */
-    static boolean hasUnsafeCharacters(String value) {
+    public static boolean hasUnsafeCharacters(String value) {
         return value != null && UNSAFE.matcher(value).find();
     }
 }

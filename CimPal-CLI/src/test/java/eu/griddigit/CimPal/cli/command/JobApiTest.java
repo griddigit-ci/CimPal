@@ -751,7 +751,12 @@ class JobApiTest {
                     continue;
                 }
                 for (Map.Entry<String, JsonNode> response : op.getValue().path("responses").properties()) {
-                    expected.add(op.getKey().toUpperCase() + " " + path.getKey() + " " + response.getKey());
+                    String key = op.getKey().toUpperCase() + " " + path.getKey() + " " + response.getKey();
+                    // The file exchange routes (DEP-7) are FileExchangeApiTest's to check.
+                    if (!FileExchangeApiTest.ROUTES.contains(path.getKey())
+                            && !key.equals(FileExchangeApiTest.SUBMIT_UNKNOWN_UPLOAD)) {
+                        expected.add(key);
+                    }
                 }
             }
         }

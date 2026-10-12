@@ -40,7 +40,7 @@ This is the recommended way to automate CimPal.
   - **One command at a time:** jobs and synchronous requests wait in one short queue (`--queue-size`, default 4) and get HTTP 503 when it is full.
   - **Jobs live in memory:** they are lost when the server restarts.
   - **Plain HTTP, no TLS:** `--allow-remote` lets it listen on other interfaces, but the traffic is not encrypted. For network access, put a TLS proxy or Ingress in front and list its name with `--allowed-host`; see [Running CimPal as a service](service.md).
-  - **No upload or download:** files must already be in a folder the server can reach.
+  - **Files:** either in a folder the server can reach, or uploaded as a ZIP through the job API, with the outputs downloaded afterwards.
 
 Reference: [serve](../cli/serve.md). In a container: [docker.md, `serve`](../cli/docker.md#serve).
 
@@ -63,7 +63,6 @@ These are on the roadmap but **not available yet**:
 
 | Feature | Work package |
 |---|---|
-| File exchange: job workspaces, upload and download | DEP-7 |
 | Several jobs in parallel in one JVM (optional; the default answer is more replicas) | DEP-8 |
 | Python SDK (`cimpal-client`) | DEP-9 |
 | Airflow provider (operator, hook, sensor, deferrable trigger) | DEP-10 |

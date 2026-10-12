@@ -51,6 +51,86 @@ class PathPolicyTest {
     }
 
     @Test
+    void anExcludedFolderIsRefusedEvenInsideARoot() throws Exception {
+        // DEP-7: serve's work area lies inside a root but holds other callers' uploads and outputs.
+        Path work = Files.createDirectories(root.resolve(".cimpal-work/uploads/u1"));
+        Files.writeString(work.resolve("model.xml"), "x");
+        PathPolicy excluding = PathPolicy.builder().root(root).exclude(root.resolve(".cimpal-work")).build();
+
+        assertThat(excluding.checkRead(root.resolve("in.ttl"))).isEqualTo(realPath(root.resolve("in.ttl")));
+        assertThatThrownBy(() -> excluding.checkRead(work.resolve("model.xml")))
+                .isInstanceOf(PathNotAllowedException.class).hasMessageContaining("not available");
+        assertThatThrownBy(() -> excluding.checkRead(root.resolve("x/../.cimpal-work/uploads/u1/model.xml")))
+                .isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> excluding.checkWrite(root.resolve(".cimpal-work/jobs/j1/out/r.xlsx"), false))
+                .isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> excluding.checkWrite(root.resolve(".cimpal-work"), true))
+                .isInstanceOf(PathNotAllowedException.class);
+        PathPolicy.runWith(excluding, () -> {
+            assertThat(PathPolicy.mayReadIfActive(work.resolve("model.xml"))).isFalse();
+            assertThat(PathPolicy.mayReadIfActive(root.resolve("in.ttl"))).isTrue();
+            return null;
+        });
+    }
+
+    @Test
+    void aRootInsideAnExcludedFolderStaysUsableButNothingElseThere() throws Exception {
+        // A job's policy: its upload (read) and out/ (write) inside the excluded work area.
+        Path work = Files.createDirectories(root.resolve(".cimpal-work"));
+        Path upload = Files.createDirectories(work.resolve("uploads/mine"));
+        Path other = Files.createDirectories(work.resolve("uploads/theirs"));
+        Path out = Files.createDirectories(work.resolve("jobs/j1/out"));
+        Files.writeString(upload.resolve("eq.xml"), "x");
+        Files.writeString(other.resolve("eq.xml"), "x");
+        PathPolicy job = PathPolicy.builder().readRoot(upload).writeRoot(out).readRoot(root).exclude(work).build();
+
+        assertThat(job.checkRead(upload.resolve("eq.xml"))).isEqualTo(realPath(upload.resolve("eq.xml")));
+        assertThat(job.checkWrite(out.resolve("report.xlsx"), false).startsWith(realPath(out))).isTrue();
+        assertThat(job.checkRead(root.resolve("in.ttl"))).isEqualTo(realPath(root.resolve("in.ttl")));
+        assertThatThrownBy(() -> job.checkRead(other.resolve("eq.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> job.checkRead(upload.resolve("../theirs/eq.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> job.checkWrite(upload.resolve("new.xml"), false)).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> job.checkWrite(work.resolve("jobs/j2/out/x"), false)).isInstanceOf(PathNotAllowedException.class);
+    }
+
+    @Test
+    void aRootThatIsTheExcludedFolderItselfDoesNotReopenIt() throws Exception {
+        // serve --root D:\data --work-root D:\data must not expose the uploads to shared requests.
+        Path work = Files.createDirectories(root.resolve("uploads/u1"));
+        Files.writeString(work.resolve("eq.xml"), "x");
+        PathPolicy same = PathPolicy.builder().root(root).exclude(root).build();
+
+        assertThatThrownBy(() -> same.checkRead(work.resolve("eq.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> same.checkWrite(root.resolve("new.xml"), false)).isInstanceOf(PathNotAllowedException.class);
+    }
+
+    @Test
+    void anExcludedFolderIsRefusedThroughALinkToo() throws Exception {
+        Path work = Files.createDirectories(root.resolve(".cimpal-work"));
+        Files.writeString(work.resolve("other.xml"), "x");
+        Path link = root.resolve("shortcut");
+        try {
+            Files.createSymbolicLink(link, work);
+        } catch (Exception e) {
+            abort("symbolic links not available here: " + e.getMessage());
+        }
+        PathPolicy excluding = PathPolicy.builder().root(root).exclude(work).build();
+
+        assertThatThrownBy(() -> excluding.checkRead(link.resolve("other.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> excluding.checkWrite(link.resolve("new.xml"), false)).isInstanceOf(PathNotAllowedException.class);
+    }
+
+    @Test
+    void reservedNamesAreRecognised() {
+        assertThat(PathPolicy.isReservedName("CON")).isTrue();
+        assertThat(PathPolicy.isReservedName("nul.txt")).isTrue();
+        assertThat(PathPolicy.isReservedName("Com1.xml")).isTrue();
+        assertThat(PathPolicy.isReservedName("console.xml")).isFalse();
+        assertThat(PathPolicy.isReservedName("model.xml")).isFalse();
+        assertThat(PathPolicy.isReservedName(null)).isFalse();
+    }
+
+    @Test
     void traversalOutOfTheRootIsRefused() {
         Path sneaky = root.resolve("../outside/secret.ttl");
 

@@ -45,6 +45,10 @@ Direct use of the other commands from a shell is not restricted. The operating s
   - for a service, it is read from a secret file (`--token-from-file`, `CIMPAL_API_TOKEN_FILE`). That file holds up to two tokens for rotation and is never written or deleted.
 - **Network:** `serve` binds to localhost. `--allow-remote` is needed for any other address, and the traffic is plain HTTP. There is no TLS inside CimPal (decision D-7). For network access, put a TLS-terminating reverse proxy or Ingress in front and list its public name with `--allowed-host`. See [Running CimPal as a service](service.md).
 - **Logs:** tokens and the `Authorization` header are never logged; every logged value is sanitised. `--log-format json` gives one JSON object per line.
+- **Uploads and downloads (`/v1/uploads`, job outputs):**
+  - **Checked as a whole:** a ZIP is refused if any entry would leave its folder, has a reserved device name, or makes the archive expand too much. It is streamed to disk and size-capped.
+  - **Isolated:** a job on an upload reads only that upload and the server's `--read-root` folders, and writes only its own output folder. The work folder is out of reach of every request path, so callers can't see each other's files.
+  - **Downloads** never leave the job's output folder, and are sent as attachments with a fixed media type.
 - **Browsers:** a Host-header check (against DNS rebinding) and an Origin check (no CORS headers are sent; `--allow-origin` lists exceptions).
 - **Limits:** request bodies up to 1 MB, one command at a time with a queue of 4, and a 30-minute timeout per request. All are configurable.
 - **Shutdown:** `POST /shutdown` with the token, SIGTERM or Ctrl-C. Queued jobs are cancelled, and a running command gets `--shutdown-grace` (60 s) to finish.

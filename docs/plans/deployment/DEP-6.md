@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (PR into `devel`) |
+| Status | Done (PR #64, merged into `devel`) |
 | Phase | D1 |
 | Depends on | DEP-5, DEP-1 |
 | Size | M |
