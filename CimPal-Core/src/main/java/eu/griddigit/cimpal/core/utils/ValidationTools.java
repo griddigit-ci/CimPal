@@ -2259,7 +2259,7 @@ public class ValidationTools {
      * Expands a URL token (possibly containing a glob in the last segment) to a list of local Paths.
      *   No glob: downloads the single file to the local cache.
      *   Glob:    uses the GitHub Contents API to list the directory, filters by glob pattern,
-     *            then downloads each matching file.
+     *            then downloads each matching file. Any matched file that fails to download fails the token.
      */
     private static List<Path> expandUrlToken(String token) throws IOException {
         String norm = cleanToken(token).replace("\\", "/");
@@ -2301,19 +2301,48 @@ public class ValidationTools {
             return List.of();
         }
 
+        return downloadGlobMatches(entries, pattern, token, ValidationTools::downloadXmlToCache);
+    }
+
+    /** Fetches one remote XML file to a local path; {@link #downloadXmlToCache} in production. */
+    @FunctionalInterface
+    interface XmlDownloader {
+        Path download(String url) throws IOException;
+    }
+
+    /**
+     * Downloads every directory entry matching {@code pattern} and returns the local paths,
+     * sorted by file name.
+     * <p>
+     * Fails closed: if any matched file cannot be downloaded, the whole token fails with an
+     * {@link IOException}, which fails the mapping row. Previously the failed file was only
+     * logged and dropped, so the row validated a subset of its inputs and could report clean.
+     * The message names the failed files and URLs through {@link #urlForLog}, so a signed
+     * {@code download_url} never carries its token into the report.
+     */
+    static List<Path> downloadGlobMatches(List<GitHubApiEntry> entries, String pattern, String token,
+                                          XmlDownloader downloader) throws IOException {
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
 
         List<Path> matches = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
         for (GitHubApiEntry entry : entries) {
             if (entry.downloadUrl() == null || entry.downloadUrl().isBlank()) continue;
             if (!entry.name().toLowerCase(Locale.ROOT).endsWith(".xml")) continue;
             if (!matcher.matches(Paths.get(entry.name()))) continue;
             try {
-                matches.add(downloadXmlToCache(entry.downloadUrl()));
+                matches.add(downloader.download(entry.downloadUrl()));
                 dbg("expandUrlToken glob match name=" + forLog(entry.name()));
             } catch (IOException e) {
                 dbg("expandUrlToken glob download failed name=" + forLog(entry.name()) + " error=" + forLog(e.getMessage()));
+                failed.add(forLog(entry.name()) + " (" + urlForLog(entry.downloadUrl()) + ")");
             }
+        }
+
+        if (!failed.isEmpty()) {
+            throw new IOException(failed.size() + " of " + (failed.size() + matches.size())
+                    + " file(s) matched by " + urlForLog(token) + " could not be downloaded: "
+                    + String.join(", ", failed));
         }
 
         matches.sort(Comparator.comparing(p -> p.getFileName().toString()));
@@ -2594,7 +2623,7 @@ public class ValidationTools {
         }
     }
 
-    private record GitHubApiEntry(String name, String downloadUrl) {}
+    record GitHubApiEntry(String name, String downloadUrl) {}
 
     /**
      * Minimal JSON parser for the GitHub Contents API array response.
