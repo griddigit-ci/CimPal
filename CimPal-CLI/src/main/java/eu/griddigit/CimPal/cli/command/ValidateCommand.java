@@ -562,25 +562,17 @@ public class ValidateCommand implements Callable<Integer> {
                                 ValidationEngine validationEngine) throws Exception {
         boolean jsonOutput = "json".equalsIgnoreCase(format);
 
-        // For JSON mode: redirect System.out → System.err so validation progress
-        // messages from ValidationTools do not pollute the JSON output on stdout.
-        PrintStream origOut = System.out;
-        if (jsonOutput) {
-            System.setOut(System.err);
-        }
-
-        try {
-            return switch (workflow) {
-                case "mapping"     -> runMappingWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
-                case "timestamped" -> runTimestampedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
-                case "combined"    -> runCombinedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
-                default            -> ExitCode.INVALID_INPUT;
-            };
-        } finally {
-            if (jsonOutput) {
-                System.setOut(origOut);
-            }
-        }
+        // For JSON mode: System.out goes to stderr on this thread and those it starts, so
+        // validation progress messages from ValidationTools do not pollute the JSON on stdout.
+        // Only this run's threads are redirected (CliStreams), not the whole process (DEP-8).
+        PrintStream origOut = CliStreams.currentOut();
+        java.util.concurrent.Callable<Integer> run = () -> switch (workflow) {
+            case "mapping"     -> runMappingWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+            case "timestamped" -> runTimestampedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+            case "combined"    -> runCombinedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+            default            -> ExitCode.INVALID_INPUT;
+        };
+        return jsonOutput ? CliStreams.outToErr(run) : run.call();
     }
 
     // ---- mapping workflow ---------------------------------------------------
@@ -626,8 +618,7 @@ public class ValidateCommand implements Callable<Integer> {
             return ExitCode.INTERNAL_ERROR;
         }
         if (jsonOutput) {
-            System.setOut(origOut);
-            System.out.println(json);
+            origOut.println(json);
         } else {
             printTextSummary(summary);
             StatsJson.toStderr(runStats);
@@ -683,8 +674,7 @@ public class ValidateCommand implements Callable<Integer> {
             return ExitCode.INTERNAL_ERROR;
         }
         if (jsonOutput) {
-            System.setOut(origOut);
-            System.out.println(json);
+            origOut.println(json);
         } else {
             printTextSummaryTimestamped(summary);
             StatsJson.toStderr(runStats);
@@ -750,8 +740,7 @@ public class ValidateCommand implements Callable<Integer> {
             return ExitCode.INTERNAL_ERROR;
         }
         if (jsonOutput) {
-            System.setOut(origOut);
-            System.out.println(json);
+            origOut.println(json);
         } else {
             printTextSummaryCombined(report, written);
             StatsJson.toStderr(runStats);

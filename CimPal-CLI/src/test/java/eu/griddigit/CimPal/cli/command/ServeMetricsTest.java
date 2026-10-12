@@ -22,7 +22,7 @@ class ServeMetricsTest {
         metrics.jobFinished(JobStatus.FAILED, 9000);
         metrics.jobFinished(JobStatus.CANCELLED, -1);
 
-        String text = metrics.render("CimPal CLI 1", Map.of(JobStatus.SUCCEEDED, 2L), 3, true);
+        String text = metrics.render("CimPal CLI 1", Map.of(JobStatus.SUCCEEDED, 2L), 3, 2, 4);
 
         assertThat(text).contains(
                 "cimpal_job_duration_seconds_bucket{le=\"1\"} 1\n",
@@ -38,12 +38,14 @@ class ServeMetricsTest {
                 "cimpal_jobs{status=\"queued\"} 0\n",
                 "cimpal_queue_depth 3\n",
                 "cimpal_busy 1\n",
+                "cimpal_running 2\n",
+                "cimpal_workers 4\n",
                 "# TYPE cimpal_job_duration_seconds histogram\n");
     }
 
     @Test
     void labelValuesAreEscaped() {
         assertThat(ServeMetrics.escape("a\"b\\c\nd")).isEqualTo("a\\\"b\\\\c\\nd");
-        assertThat(new ServeMetrics().render("v\"1", Map.of(), 0, false)).contains("cimpal_info{version=\"v\\\"1\"} 1\n");
+        assertThat(new ServeMetrics().render("v\"1", Map.of(), 0, 0, 1)).contains("cimpal_info{version=\"v\\\"1\"} 1\n");
     }
 }

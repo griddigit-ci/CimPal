@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-09  
+**Last updated:** 2026-10-12  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -313,9 +313,10 @@ KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maint
 user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintainer review. DEP-5
 (async `/v1` job API and OpenAPI spec) is merged (PR #62), and DEP-6 (service deployment: proxy names,
 token files, probes, SIGTERM drain, JSON logs, metrics, Compose and Kubernetes examples) is merged
-(PR #64). DEP-7 (file exchange: uploads, job workspaces, downloads) is in review on
-`feature/dep-7-file-exchange`. TEST-3's validation and SHACL generation groups are in review
-(PR #65). Next on the deployment track: DEP-9 (Python SDK); DEP-8 (parallel workers) is optional.
+(PR #64). DEP-7 (file exchange: uploads, job workspaces, downloads) is merged (PR #66), and so are
+TEST-3's validation and SHACL generation groups (PR #65) and `validate --workflow combined` with
+folders (PR #67). DEP-8 (`serve --workers N`, concurrent commands in one JVM, decision D-8 yes) is in
+review on `feature/dep-8-concurrent-workers`. Next on the deployment track: DEP-9 (Python SDK).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -386,14 +387,15 @@ The Jackson `readTree()` + `.path("key")` pattern silently ignores unrecognized 
 
 ### `serve` job API (`/v1`, DEP-5)
 
-`POST /v1/jobs` queues a command on the same single worker and the same queue slots as the
+`POST /v1/jobs` queues a command on the same workers and the same queue slots as the
 synchronous endpoints, and answers 202 with a job id (random UUID). Classes in
 `eu.griddigit.CimPal.cli.command`:
 - `JobManager`: the in-memory store, with TTL and `--max-jobs` eviction and `--job-timeout`.
 - `Job`: synchronized state transitions, and the result, kept up to `--max-result-bytes`.
 - `JobLog`: a ring buffer of progress lines.
-- `StderrTee`: while a job runs, it copies `System.err` lines into the job's log. Lines from the
-  server's own threads are skipped. This is safe only because one command runs at a time.
+- `StderrTee`: the job's `System.err`, bound to the job's threads through `CliStreams` (DEP-8): it
+  copies their lines into the job's log and passes them on. Lines from the server's own threads are
+  skipped.
 - `Problem`: RFC 9457 problem+json bodies.
 - `CommandSchemas`: the per-command config schemas, shared by `mcp` and the OpenAPI document.
 
@@ -440,9 +442,14 @@ Uploads and downloads for callers without a shared file system (`docs/cli/serve.
   - Runners and checks get the workspace through default-method overloads, so existing callers are unchanged.
 - **Request time:** `--request-read-time` sets `sun.net.httpserver.maxReqTime` (JVM-wide, read once).
 
-### `serve` uses single-threaded executor
+### `serve` workers (DEP-8)
 
-Commands run on one worker thread (`ServeServer`), with a bounded queue and a pool of HTTP handler threads in front of it. This avoids races on `ValidationTools` static flags (`exportTurtleValidationReports`, `DEBUG`). A single validation run already saturates CPU via its own internal worker pool, so sequential requests is the right trade-off for local developer use. Any concurrent REST API implementation must address this differently — see REST API section below.
+Commands run on `--workers` threads (`ServeServer`, default 1), with a bounded queue and a pool of HTTP handler threads in front of it. What a command touches is per run, and the threads it starts inherit it (`InheritableThreadLocal`, closed when the run ends):
+- `PathPolicy.runWith`: the path policy. `serve` holds `PathPolicy.requireContext()`, so a check on a thread without a policy (or with an ended one) is refused rather than unrestricted.
+- `RunScope.runIn` (Core): the remote-import and XML download caches of `ValidationTools`; without a scope (GUI, plain CLI) the process-wide caches are used. Downloads go to a unique temp file per call, under a per-URL lock.
+- `CliStreams.bind` (CLI): `System.out`/`System.err` are routing streams installed once; a bound thread writes to its job's buffer and log. It replaced every `System.setOut`/`setErr` swap in `serve`, `mcp`, `run` and `validate --format json`. The label of the binding is the job id in the JSON log.
+- `AdmissionGate`: a command starts only while the estimated heap (10× input size, at least 64 MiB, `ServeCommand.estimateHeap`) of the running ones plus its own fits `--max-concurrent-heap-bytes`; FIFO; a command alone always starts.
+- `MutableStaticsTest` fails on any new non-final static field in Core or the CLI that isn't on its reviewed list; `ConcurrencyIT` (failsafe) compares 24 mixed jobs under four workers with one.
 
 ---
 
@@ -571,7 +578,7 @@ CimPal/
 
 **`serve` limits connection time, not connection count.** A local process that keeps opening slow connections can still slow the server down. Each one is closed after 60 s (`sun.net.httpserver.maxReqTime`).
 
-**`serve` serialises all requests.** The single-threaded executor prevents concurrent validation runs. For team use (multiple users sharing one server) this is a bottleneck. Addressed in the REST API plan below.
+**`serve --workers` shares one JVM.** An out-of-memory error ends every running command (exit 3), and `--stats` CPU, heap and GC figures cover all running commands. Replicas with one worker each stay the recommended production shape. Common-pool threads (`parallelStream` in `ModelFactory`) don't inherit a run's policy or output binding: their path checks are refused under `serve`, `mcp` and `run`, and their output goes to the process streams. Today they only parse in-memory streams.
 
 **The Docker image has no Python.** Only the `APACHE_JENA` engine works in the container; `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` need a local install.
 

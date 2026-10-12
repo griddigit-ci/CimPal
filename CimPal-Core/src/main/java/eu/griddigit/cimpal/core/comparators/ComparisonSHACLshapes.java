@@ -16,7 +16,16 @@ import org.apache.jena.vocabulary.RDF;
 import java.util.*;
 
 public class ComparisonSHACLshapes implements IRDFComparator {
+    /**
+     * Prefix map for the GUI path, which sets it before calling {@link #compareModels}. Not used
+     * while {@link #compare} runs: that keeps its own map per call, so concurrent comparisons
+     * (serve --workers, DEP-8) don't shorten values with each other's prefixes.
+     */
+    @Deprecated
     public static Map<String,String> modelsABPrefMap;
+
+    /** The prefix map of the {@link #compare} call on this thread. */
+    private static final ThreadLocal<Map<String, String>> CALL_PREFIXES = new ThreadLocal<>();
 
     public RDFCompareResult compare(Model modelA, Model modelB){
 
@@ -24,15 +33,19 @@ public class ComparisonSHACLshapes implements IRDFComparator {
         LinkedList<String> skiplist = new LinkedList<>();
         Map<String,String> modAprefMap = modelA.getNsPrefixMap();
         Map<String,String> modBprefMap = modelB.getNsPrefixMap();
-        modelsABPrefMap = new HashMap<>(modAprefMap);
-        modelsABPrefMap.putAll(modBprefMap);
-
-        //first run - this compared model A with model B. Identified common parts and reports differences. New
-        //classes in Model A that are not in Model B are reported
-        compareResults = compareModels(compareResults, modelA, modelB, 0,skiplist);
-        //second run - reverse run. Model B is compared to Model A. Only if there are new parts (classes, attributes, associations) in Model B that are not in Model A
-        //are reported
-        compareResults = compareModels(compareResults, modelB, modelA, 1,skiplist);
+        Map<String, String> prefixes = new HashMap<>(modAprefMap);
+        prefixes.putAll(modBprefMap);
+        CALL_PREFIXES.set(prefixes);
+        try {
+            //first run - this compared model A with model B. Identified common parts and reports differences. New
+            //classes in Model A that are not in Model B are reported
+            compareResults = compareModels(compareResults, modelA, modelB, 0,skiplist);
+            //second run - reverse run. Model B is compared to Model A. Only if there are new parts (classes, attributes, associations) in Model B that are not in Model A
+            //are reported
+            compareResults = compareModels(compareResults, modelB, modelA, 1,skiplist);
+        } finally {
+            CALL_PREFIXES.remove();
+        }
 
         return compareResults;
     }
@@ -314,7 +327,8 @@ public class ComparisonSHACLshapes implements IRDFComparator {
         if (valueModelA!=null && valueModelB!=null) {
             if (!valueModelA.isEmpty() && !valueModelB.isEmpty()) {
                 // replace namespaces with prefixes
-                for (Map.Entry<String,String> entry : modelsABPrefMap.entrySet()){
+                Map<String, String> prefixes = CALL_PREFIXES.get() != null ? CALL_PREFIXES.get() : modelsABPrefMap;
+                for (Map.Entry<String,String> entry : prefixes.entrySet()){
                     if (valueModelA.contains(entry.getValue())){
                         valueModelA = valueModelA.replace(entry.getValue(), entry.getKey()+":");
                     }

@@ -716,19 +716,17 @@ class JobApiTest {
     @Test
     void theStderrTeeStopsCopyingWhenClosed() throws Exception {
         JobLog log = new JobLog(10);
-        PrintStream original = System.err;
         PrintStream saved;
-        try (StderrTee.Capture ignored = StderrTee.capture(log)) {
-            saved = System.err;
+        try (StderrTee.Capture capture = StderrTee.capture(log)) {
+            saved = capture.stream();
             saved.println("during");
-            Thread dispatcher = new Thread(() -> System.err.println("server line"), "HTTP-Dispatcher");
+            Thread dispatcher = new Thread(() -> saved.println("server line"), "HTTP-Dispatcher");
             dispatcher.start();
             dispatcher.join();
         }
         // e.g. a logging handler that kept the stream it saw while the job ran
         saved.println("after");
 
-        assertThat(System.err).isSameAs(original);
         assertThat(log.read(0, 10).lines()).containsExactly("during");
     }
 

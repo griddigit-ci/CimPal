@@ -42,7 +42,7 @@ client ──HTTPS──▶ reverse proxy / Ingress ──HTTP──▶ CimPal s
 | Liveness `GET /health`, readiness `GET /ready` | with header `Host: localhost:7474` | Kubernetes sends the pod IP as Host otherwise, which is refused |
 | Memory limit | from [Sizing](sizing.md), request = limit | Out of memory ends `serve` with exit code 3; it never reports a clean result |
 | Grace period | `--shutdown-grace` 60 s, container stop timeout 90 s | A running command can finish its reports on SIGTERM |
-| Replicas | 1 per Deployment | Jobs are in memory and commands run one at a time; scale with more instances, each with its own name |
+| Replicas | 1 per Deployment | Jobs are in memory; scale with more instances, each with its own name. `--workers N` runs N commands in one instance, for many small jobs; see [Sizing](sizing.md#several-commands-in-one-server) |
 | `--work-root` | on the data volume (the default `.cimpal-work` is in the first `--write-root` or `--root`) | Uploads and job outputs need disk; size the volume and `--work-max-bytes` for them |
 | `--request-read-time` | keep `PT60S` behind a proxy | The proxy buffers uploads; raise it only for large uploads sent directly |
 

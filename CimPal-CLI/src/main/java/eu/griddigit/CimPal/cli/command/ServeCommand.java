@@ -9,6 +9,7 @@ import eu.griddigit.CimPal.cli.CimPalCli;
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
 import eu.griddigit.cimpal.core.utils.PathPolicy;
+import eu.griddigit.cimpal.core.utils.RunScope;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -30,7 +31,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -94,10 +94,12 @@ import java.util.function.Consumer;
  * {@code application/json} and at most {@code --max-body-bytes}. See {@link ServeServer}.
  *
  * <h2>Thread safety</h2>
- * <p>Commands run one at a time on a single worker thread, so requests are serialised.  This
- * avoids races on the static flags in {@code ValidationTools} (debug mode, turtle export).  At
- * most {@code --queue-size} requests wait; more get 503.  A request not finished within
- * {@code --request-timeout} gets 504.
+ * <p>Commands run on {@code --workers} threads, one by default (DEP-8). Each command has its own
+ * path policy, remote-import caches and output streams ({@link CliStreams}), so a command's
+ * results don't depend on what else runs. With more than one worker, a command starts only while
+ * the estimated heap of the running ones ({@link #estimateHeap}) plus its own fits
+ * {@code --max-concurrent-heap-bytes}. At most {@code --queue-size} requests wait; more get 503.
+ * A request not finished within {@code --request-timeout} gets 504.
  *
  * <h2>Exit codes</h2>
  * <ul>
@@ -175,8 +177,21 @@ public class ServeCommand implements Callable<Integer> {
 
     @Option(names = "--queue-size",
             defaultValue = "4",
-            description = "Requests that may wait while one runs (default: 4); more get 503.")
+            description = "Requests that may wait while the workers are busy (default: 4); more get 503.")
     private int queueSize;
+
+    @Option(names = "--workers",
+            defaultValue = "1",
+            description = "Commands that may run at once (default: 1, at most 64). More than the number of "
+                    + "processors rarely helps; see also --max-concurrent-heap-bytes.")
+    private int workers;
+
+    @Option(names = "--max-concurrent-heap-bytes",
+            description = "With --workers above 1: a command starts only while the estimated heap of the running "
+                    + "ones plus its own fits this (default: three quarters of the max heap). A command is estimated "
+                    + "at 10 times the size of its input files, at least 64 MiB; one with nothing else running "
+                    + "always starts.")
+    private Long maxConcurrentHeapBytes;
 
     @Option(names = "--request-timeout",
             defaultValue = "PT30M",
@@ -306,14 +321,9 @@ public class ServeCommand implements Callable<Integer> {
         // Every stderr line becomes a JSON object, also the commands' own output.
         PrintStream originalErr = System.err;
         ServeLog log = ServeLog.json(originalErr, clock);
-        AtomicReference<ServeServer> running = new AtomicReference<>();
-        PrintStream wrapped = log.stderr(() -> running.get() == null ? null : running.get().runningJobId());
+        // A line is attributed to the job whose thread wrote it (the label of its CliStreams binding).
+        PrintStream wrapped = CliStreams.routing(log.stderr(CliStreams::label), false);
         System.setErr(wrapped);
-        Consumer<ServeServer> started = onStarted;
-        onStarted = server -> {
-            running.set(server);
-            started.accept(server);
-        };
         try {
             return serve(log);
         } finally {
@@ -402,6 +412,8 @@ public class ServeCommand implements Callable<Integer> {
                 .allowRemote(allowRemote)
                 .maxBodyBytes(maxBodyBytes)
                 .queueSize(queueSize)
+                .workers(workers)
+                .sizeEstimator((command, body, workspace) -> estimateHeap(command, body))
                 .requestTimeout(requestTimeout)
                 .jobTimeout(jobTimeout)
                 .maxJobs(maxJobs)
@@ -410,6 +422,9 @@ public class ServeCommand implements Callable<Integer> {
                 .maxResultBytes(maxResultBytes);
         if (jobStoreBytes != null) {
             builder.jobStoreBytes(jobStoreBytes);
+        }
+        if (maxConcurrentHeapBytes != null) {
+            builder.maxConcurrentHeapBytes(maxConcurrentHeapBytes);
         }
 
         List<Path> defaultRoots = List.of(Path.of("").toAbsolutePath());
@@ -488,17 +503,25 @@ public class ServeCommand implements Callable<Integer> {
             }
         };
 
+        // While the server runs, a path check on a thread without a command's policy (e.g. a pool
+        // thread that didn't inherit it) is refused rather than unrestricted (DEP-8).
+        PathPolicy.Requirement policyRequired = PathPolicy.requireContext();
         ServeServer server;
         try {
             server = ServeServer.start(config, runner, check);
         } catch (IllegalArgumentException ex) {
+            policyRequired.close();
             System.err.println("[ERROR] " + ex.getMessage());
             deleteIfOurs(writtenTokenFile, token);
             return ExitCode.INVALID_INPUT;
         } catch (IOException ex) {
+            policyRequired.close();
             System.err.println("[ERROR] Could not bind to " + host + ":" + port + " - " + ex.getMessage());
             deleteIfOurs(writtenTokenFile, token);
             return ExitCode.INVALID_INPUT;
+        } catch (RuntimeException | Error ex) {
+            policyRequired.close();
+            throw ex;
         }
 
         Path tokenFileToDelete = writtenTokenFile;
@@ -556,7 +579,7 @@ public class ServeCommand implements Callable<Integer> {
                 if (!server.awaitWorker(shutdownGrace)) {
                     log.error("server.grace_exceeded", "A command was still running after "
                             + shutdownGrace.toSeconds() + " s (--shutdown-grace); it is cut off and its "
-                            + "output may be incomplete.", "jobId", server.runningJobId());
+                            + "output may be incomplete.", "jobId", String.join(",", server.runningJobIds()));
                     exit = ExitCode.INTERNAL_ERROR;
                 }
             } catch (InterruptedException ex) {
@@ -567,6 +590,7 @@ public class ServeCommand implements Callable<Integer> {
             } catch (IllegalStateException ignored) {
                 // the JVM is already shutting down and runs the hook itself
             }
+            policyRequired.close();
             log.info("server.stopped", "serve: stopped", "exitCode", exit);
         }
         return exit;
@@ -590,11 +614,6 @@ public class ServeCommand implements Callable<Integer> {
         }
     }
 
-    /**
-     * Runs the command with the path policy in force for paths Core resolves internally. The
-     * paths are checked again first: an earlier request in the queue may have created an output
-     * file, or the file system may have changed, since the request was accepted.
-     */
     /**
      * {@link #checkPaths} for a job that reads an upload (DEP-7): relative paths resolve against
      * the upload, relative or missing outputs go to the job's {@code out/}, and {@code policy}
@@ -621,6 +640,11 @@ public class ServeCommand implements Callable<Integer> {
         return runWithPolicy(policy, base, command, configFile, false);
     }
 
+    /**
+     * Runs the command with the path policy in force for paths Core resolves internally. The
+     * paths are checked again first: an earlier request in the queue may have created an output
+     * file, or the file system may have changed, since the request was accepted.
+     */
     private static ServeServer.CommandResult runWithPolicy(PathPolicy policy, Path base, String command,
                                                            Path configFile, boolean baseOnly) throws Exception {
         ObjectNode checked;
@@ -634,26 +658,154 @@ public class ServeCommand implements Callable<Integer> {
         return PathPolicy.runWith(policy, () -> runInProcess(command, configFile));
     }
 
-    /** Runs a subcommand in this JVM with JSON output and returns what it printed on stdout. */
-    private static ServeServer.CommandResult runInProcess(String command, Path configFile) {
-        // ValidateCommand redirects System.out→System.err for --format json internally,
-        // so we capture around that entire flow. Commands run one at a time (single worker).
+    /**
+     * Runs a subcommand in this JVM with JSON output and returns what it printed on stdout. Its
+     * stdout is bound to a buffer for this thread and the threads it starts ({@link CliStreams}),
+     * and its remote-import caches are its own ({@link RunScope}), so commands on other workers
+     * neither see nor disturb them (DEP-8).
+     */
+    private static ServeServer.CommandResult runInProcess(String command, Path configFile) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream captured = new PrintStream(baos, true, StandardCharsets.UTF_8);
-        PrintStream origOut = System.out;
-        System.setOut(captured);
-        int exitCode;
-        try {
-            // The --format flag in the request body is overridden by the inline flag.
-            // Only some commands have --format; adding it to the others fails as an unknown option.
-            String[] args = JSON_COMMANDS.contains(command)
-                    ? new String[] {command, "--config", configFile.toString(), "--format", "json"}
-                    : new String[] {command, "--config", configFile.toString()};
-            exitCode = CimPalCli.inProcess().execute(args);
-        } finally {
-            System.setOut(origOut);
-        }
+        // The --format flag in the request body is overridden by the inline flag.
+        // Only some commands have --format; adding it to the others fails as an unknown option.
+        String[] args = JSON_COMMANDS.contains(command)
+                ? new String[] {command, "--config", configFile.toString(), "--format", "json"}
+                : new String[] {command, "--config", configFile.toString()};
+        int exitCode = CliStreams.bind(captured, null, null,
+                () -> RunScope.runIn(() -> CimPalCli.inProcess().execute(args)));
         return new ServeServer.CommandResult(exitCode, baos.toString(StandardCharsets.UTF_8));
+    }
+
+    /** Heap per byte of input: the sizing guide measures about 9 times the RDF/XML size. */
+    static final long HEAP_PER_INPUT_BYTE = 10;
+    /** The least a command is estimated at, for its own working set. */
+    static final long MIN_HEAP_ESTIMATE = 64L << 20;
+    /**
+     * File system entries (files, folders, anything) one estimate may look at in total. Beyond
+     * that the command counts as too large to share memory: it runs alone.
+     */
+    static final int MAX_ESTIMATE_ENTRIES = 100_000;
+    /** How deep an input folder is searched. */
+    static final int MAX_ESTIMATE_DEPTH = 32;
+
+    /**
+     * The heap a checked command is estimated to need, for the admission of {@code --workers}
+     * (DEP-8): {@value #HEAP_PER_INPUT_BYTE} times the size of everything it reads (files, the
+     * files in folders, archives as they are), at least {@link #MIN_HEAP_ESTIMATE}. Paths in a
+     * checked body are absolute and allowed; a value that is no file (a preset name, an inline
+     * query) counts nothing. A path given twice counts once.
+     *
+     * <p>It runs on a worker before the command starts, outside the job timeout, so it is
+     * bounded: after {@value #MAX_ESTIMATE_ENTRIES} entries in total, or a folder it can't read,
+     * the estimate is {@link Long#MAX_VALUE} and the command runs alone. Links and other
+     * reparse points (Windows junctions) inside folders are not followed.
+     */
+    static long estimateHeap(String command, byte[] checkedBody) {
+        return estimateHeap(command, checkedBody, MAX_ESTIMATE_ENTRIES);
+    }
+
+    /** {@link #estimateHeap(String, byte[])} with at most {@code maxEntries} entries (tests). */
+    static long estimateHeap(String command, byte[] checkedBody, int maxEntries) {
+        JsonNode json = MAPPER.readTree(checkedBody);
+        java.util.Set<String> paths = new java.util.LinkedHashSet<>();
+        for (PathGuard.Field field : PathGuard.FIELDS.getOrDefault(command, List.of())) {
+            if (field.kind() == PathGuard.Kind.WRITE_FILE || field.kind() == PathGuard.Kind.WRITE_DIR) {
+                continue;
+            }
+            JsonNode value = json.get(field.key());
+            if (value != null && value.isArray()) {
+                value.forEach(v -> paths.add(v.asString().strip()));
+            } else if (value != null && value.isString()) {
+                for (String p : field.kind() == PathGuard.Kind.READ_LIST
+                        ? value.asString().split(",") : new String[] {value.asString()}) {
+                    paths.add(p.strip());
+                }
+            }
+        }
+        int[] entries = {0};
+        long input = 0;
+        for (String p : paths) {
+            if (entries[0] > maxEntries) {
+                return Long.MAX_VALUE;
+            }
+            long bytes = inputBytes(p, entries, maxEntries);
+            if (bytes == Long.MAX_VALUE) {
+                return Long.MAX_VALUE;
+            }
+            input = saturatedAdd(input, bytes);
+        }
+        long estimate = input > Long.MAX_VALUE / HEAP_PER_INPUT_BYTE ? Long.MAX_VALUE : input * HEAP_PER_INPUT_BYTE;
+        return Math.max(MIN_HEAP_ESTIMATE, estimate);
+    }
+
+    /** The bytes under {@code value}, or {@link Long#MAX_VALUE} when the budget ran out or a folder can't be read. */
+    private static long inputBytes(String value, int[] entries, int maxEntries) {
+        if (value.isEmpty()) {
+            return 0;
+        }
+        Path path;
+        try {
+            path = Path.of(value);
+        } catch (java.nio.file.InvalidPathException e) {
+            return 0; // text, not a path
+        }
+        if (++entries[0] > maxEntries) {
+            return Long.MAX_VALUE;
+        }
+        try {
+            if (Files.isRegularFile(path)) {
+                return Files.size(path);
+            }
+            if (!Files.isDirectory(path)) {
+                return 0;
+            }
+            long[] sum = {0};
+            boolean[] exhausted = {false};
+            // Without FOLLOW_LINKS: links inside the folder are visited as themselves, not followed.
+            Files.walkFileTree(path, java.util.EnumSet.noneOf(java.nio.file.FileVisitOption.class), MAX_ESTIMATE_DEPTH,
+                    new java.nio.file.SimpleFileVisitor<>() {
+                        @Override
+                        public java.nio.file.FileVisitResult preVisitDirectory(
+                                Path dir, java.nio.file.attribute.BasicFileAttributes attrs) {
+                            return count(attrs);
+                        }
+
+                        @Override
+                        public java.nio.file.FileVisitResult visitFile(
+                                Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
+                            java.nio.file.FileVisitResult next = count(attrs);
+                            if (next == java.nio.file.FileVisitResult.CONTINUE && attrs.isRegularFile()) {
+                                sum[0] = saturatedAdd(sum[0], attrs.size());
+                            }
+                            return next;
+                        }
+
+                        @Override
+                        public java.nio.file.FileVisitResult visitFileFailed(Path file, IOException e) throws IOException {
+                            throw e;
+                        }
+
+                        private java.nio.file.FileVisitResult count(java.nio.file.attribute.BasicFileAttributes attrs) {
+                            if (++entries[0] > maxEntries) {
+                                exhausted[0] = true;
+                                return java.nio.file.FileVisitResult.TERMINATE;
+                            }
+                            // A junction (Windows) is "other", not a link: its target is not searched.
+                            return attrs.isOther() || attrs.isSymbolicLink()
+                                    ? java.nio.file.FileVisitResult.SKIP_SUBTREE
+                                    : java.nio.file.FileVisitResult.CONTINUE;
+                        }
+                    });
+            return exhausted[0] ? Long.MAX_VALUE : sum[0];
+        } catch (IOException | RuntimeException e) {
+            return Long.MAX_VALUE; // can't be told: it runs alone
+        }
+    }
+
+    private static long saturatedAdd(long a, long b) {
+        long sum = a + b;
+        return sum < 0 ? Long.MAX_VALUE : sum;
     }
 
     /**

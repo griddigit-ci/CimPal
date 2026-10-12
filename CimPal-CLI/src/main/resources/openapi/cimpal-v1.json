@@ -986,7 +986,7 @@
       },
       "Health" : {
         "type" : "object",
-        "required" : [ "status", "version", "apiVersion", "busy", "stalled", "queued", "running" ],
+        "required" : [ "status", "version", "apiVersion", "busy", "stalled", "queued", "running", "workers" ],
         "properties" : {
           "status" : {
             "type" : "string",
@@ -1008,7 +1008,12 @@
             "type" : "integer"
           },
           "running" : {
-            "type" : "integer"
+            "type" : "integer",
+            "description" : "Commands running now, at most workers."
+          },
+          "workers" : {
+            "type" : "integer",
+            "description" : "Commands that may run at once (--workers)."
           }
         }
       },

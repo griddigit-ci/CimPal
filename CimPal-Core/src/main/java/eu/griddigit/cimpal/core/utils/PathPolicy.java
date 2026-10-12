@@ -46,9 +46,6 @@ public final class PathPolicy {
     private static final Pattern DEVICE_NAME = Pattern.compile(
             "(?i)(con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3]|conin\\$|conout\\$)");
 
-    /** The policy in force for the command currently running, if any (see {@link #runWith}). */
-    private static volatile PathPolicy active;
-
     private final List<Path> readRoots;
     private final List<Path> writeRoots;
     /** Every root as given and as its real path, for {@link #mayReadIfActive}'s lexical test. */
@@ -346,24 +343,89 @@ public final class PathPolicy {
 
     // ---- active policy -------------------------------------------------------------------
 
-    /** The policy in force for the running command, if any. */
-    public static Optional<PathPolicy> active() {
-        return Optional.ofNullable(active);
+    /** The policy of one {@link #runWith} call; closed when the call returns. */
+    private static final class Context {
+        final PathPolicy policy;
+        volatile boolean closed;
+
+        Context(PathPolicy policy) {
+            this.policy = policy;
+        }
     }
 
     /**
-     * Runs {@code action} with {@code policy} in force, then restores the previous state.
-     * {@code serve}, {@code mcp} and {@code run} run commands one at a time, so a single
-     * process-wide slot is enough and also covers worker threads a command starts.
+     * The policy in force on this thread. Inherited by the threads a command starts (Core
+     * creates its worker pools per run, inside {@link #runWith}), so concurrent commands each
+     * see their own policy (DEP-8).
+     */
+    private static final InheritableThreadLocal<Context> CONTEXT = new InheritableThreadLocal<>();
+
+    /** While positive, every check needs a policy on its thread ({@link #requireContext}). */
+    private static final java.util.concurrent.atomic.AtomicInteger REQUIRED = new java.util.concurrent.atomic.AtomicInteger();
+
+    /**
+     * The policy for this thread, or null when none applies (direct CLI and GUI use). Fails
+     * closed: a thread that inherited the policy of a command that has ended, or a thread without
+     * one while {@link #requireContext} is held, gets an exception instead of unchecked access.
+     */
+    private static PathPolicy current() {
+        Context context = CONTEXT.get();
+        if (context != null && !context.closed) {
+            return context.policy;
+        }
+        if (context != null || REQUIRED.get() > 0) {
+            throw new PathNotAllowedException("No path policy applies on this thread ("
+                    + Thread.currentThread().getName() + "); the file is refused.");
+        }
+        return null;
+    }
+
+    /** The policy in force for the running command on this thread, if any. */
+    public static Optional<PathPolicy> active() {
+        Context context = CONTEXT.get();
+        return context == null || context.closed ? Optional.empty() : Optional.of(context.policy);
+    }
+
+    /**
+     * Runs {@code action} with {@code policy} in force on this thread and on the threads it
+     * starts, then restores the previous state. Threads still running afterwards (or created
+     * then and reused later) see the policy as closed and are refused, never unrestricted.
      */
     public static <T> T runWith(PathPolicy policy, Callable<T> action) throws Exception {
-        PathPolicy previous = active;
-        active = policy;
+        Context previous = CONTEXT.get();
+        Context context = new Context(java.util.Objects.requireNonNull(policy, "policy"));
+        CONTEXT.set(context);
         try {
             return action.call();
         } finally {
-            active = previous;
+            context.closed = true;
+            if (previous == null) {
+                CONTEXT.remove();
+            } else {
+                CONTEXT.set(previous);
+            }
         }
+    }
+
+    /**
+     * Requires a policy on every thread that checks a path until the returned handle is closed:
+     * a check on a thread without one is refused. {@code serve} holds it while it runs commands
+     * concurrently, so no code path can fall back to unrestricted access.
+     */
+    public static Requirement requireContext() {
+        REQUIRED.incrementAndGet();
+        java.util.concurrent.atomic.AtomicBoolean released = new java.util.concurrent.atomic.AtomicBoolean();
+        return () -> {
+            if (released.compareAndSet(false, true)) {
+                REQUIRED.decrementAndGet();
+            }
+        };
+    }
+
+    /** Held by {@link #requireContext()}; closing it (once counts) ends the requirement. */
+    public interface Requirement extends AutoCloseable {
+        @Override
+        void close();
     }
 
     /**
@@ -372,7 +434,7 @@ public final class PathPolicy {
      * touching them.
      */
     public static Path checkReadIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         return policy == null ? path : policy.checkRead(path);
     }
 
@@ -384,7 +446,7 @@ public final class PathPolicy {
      * passes, following links.
      */
     public static boolean mayReadIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         if (policy == null) {
             return true;
         }
@@ -399,7 +461,7 @@ public final class PathPolicy {
      * without touching it; for paths that may legitimately not exist, before probing them.
      */
     public static void refuseNetworkPathIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         if (policy != null) {
             policy.rejectSpecial(path.toString());
         }
@@ -412,7 +474,7 @@ public final class PathPolicy {
      * on every run. The overwrite rule applies to output files named in the request.
      */
     public static Path checkWriteIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         return policy == null ? path : policy.checkWrite(path, true);
     }
 }

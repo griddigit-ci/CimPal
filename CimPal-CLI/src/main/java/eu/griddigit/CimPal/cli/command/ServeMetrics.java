@@ -63,7 +63,7 @@ final class ServeMetrics {
      * The exposition text. {@code jobsNow} counts the stored jobs by status; the gauges are read
      * when this is called.
      */
-    String render(String version, Map<JobStatus, Long> jobsNow, int queueDepth, boolean busy) {
+    String render(String version, Map<JobStatus, Long> jobsNow, int queueDepth, int running, int workers) {
         StringBuilder sb = new StringBuilder();
         help(sb, "cimpal_info", "gauge", "CimPal version.");
         sb.append("cimpal_info{version=\"").append(escape(version)).append("\"} 1\n");
@@ -98,10 +98,14 @@ final class ServeMetrics {
                     .append(escape(parts[1])).append("\"} ").append(e.getValue().get()).append('\n');
         }
 
-        help(sb, "cimpal_queue_depth", "gauge", "Commands and jobs waiting for the worker.");
+        help(sb, "cimpal_queue_depth", "gauge", "Commands and jobs waiting for a worker.");
         sb.append("cimpal_queue_depth ").append(queueDepth).append('\n');
         help(sb, "cimpal_busy", "gauge", "1 while a command runs.");
-        sb.append("cimpal_busy ").append(busy ? 1 : 0).append('\n');
+        sb.append("cimpal_busy ").append(running > 0 ? 1 : 0).append('\n');
+        help(sb, "cimpal_running", "gauge", "Commands running now.");
+        sb.append("cimpal_running ").append(running).append('\n');
+        help(sb, "cimpal_workers", "gauge", "Commands that may run at once (--workers).");
+        sb.append("cimpal_workers ").append(workers).append('\n');
 
         Runtime rt = Runtime.getRuntime();
         help(sb, "cimpal_jvm_heap_used_bytes", "gauge", "Heap in use.");
