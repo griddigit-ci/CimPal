@@ -14,8 +14,8 @@ CimPal is one program, `CimPal-CLI.jar`, that you can run in several ways. Pick 
 | **CLI** | `java -jar CimPal-CLI.jar <command> …` | People or scripts run a validation now and then; CI jobs | You need many small calls per minute (each run starts a JVM, ~1.5–2 s) |
 | **Container** | `docker run ghcr.io/griddigit-ci/cimpal:<version> <command> …` | No Java on the host; Kubernetes; scheduled pipelines (Airflow) | — |
 | **Pipeline** (`run`) | `run pipeline.json` | Several steps in a fixed order: validate, then compare, then convert… | Steps need to start servers (not allowed) |
-| **Local server** (`serve`) | `serve` | A tool on the same machine calls CimPal repeatedly and wants a warm JVM | Many parallel users (one command at a time) |
-| **Service** (`serve` behind a proxy) | Container behind a TLS reverse proxy or Kubernetes Ingress; [examples](service.md) | A team or an orchestrator (Airflow) submits jobs over the network | Many parallel users in one instance; run several instances instead |
+| **Local server** (`serve`) | `serve` | A tool on the same machine calls CimPal repeatedly and wants a warm JVM | Many parallel users (one command at a time by default; `--workers N` runs more) |
+| **Service** (`serve` behind a proxy) | Container behind a TLS reverse proxy or Kubernetes Ingress; [examples](service.md) | A team or an orchestrator (Airflow) submits jobs over the network, e.g. with the [Python SDK](python-sdk.md) | Many large jobs at once in one instance; run several instances instead |
 | **AI assistant** (`mcp`) | Started by Claude Desktop or another MCP client | Interactive analysis and shape development with an AI assistant | Unattended automation; use the CLI or container instead |
 
 ## CLI and container
@@ -63,8 +63,6 @@ These are on the roadmap but **not available yet**:
 
 | Feature | Work package |
 |---|---|
-| Several jobs in parallel in one JVM (optional; the default answer is more replicas) | DEP-8 |
-| Python SDK (`cimpal-client`) | DEP-9 |
 | Airflow provider (operator, hook, sensor, deferrable trigger) | DEP-10 |
 
 Until then, use the CLI or container per task. It works today with any scheduler, including Airflow: see [Airflow](airflow.md).
