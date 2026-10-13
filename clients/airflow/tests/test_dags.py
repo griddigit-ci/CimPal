@@ -17,7 +17,6 @@ import socket
 import subprocess
 import time
 from collections.abc import Iterator
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -131,52 +130,43 @@ def serve(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
         log.close()
 
 
+E2E_DAGS = Path(__file__).resolve().parent / "e2e_dags"
+
+
 @pytest.mark.integration
-@pytest.mark.parametrize("deferrable", [False, True])
+@pytest.mark.parametrize("deferrable", ["false", "true"])
 def test_a_dag_validates_an_upload_and_branches_on_the_result(
-    serve: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, deferrable: bool
+    serve: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, deferrable: str
 ) -> None:
-    from airflow.sdk import DAG, task
+    from airflow.configuration import conf
 
-    from cimpal_provider.operators.cimpal import CimPalValidateOperator
-
-    monkeypatch.setenv(
-        "AIRFLOW_CONN_CIMPAL_TEST",
-        json.dumps({"conn_type": "cimpal", "host": serve, "password": TOKEN, "extra": {"poll_interval": 1}}),
-    )
+    if Path(conf.get("core", "dags_folder")).resolve() != E2E_DAGS:
+        message = f"AIRFLOW__CORE__DAGS_FOLDER must be {E2E_DAGS}: dag.test() runs only DAGs of the DAGs folder"
+        if os.environ.get("CIMPAL_INTEGRATION_REQUIRED") == "1":
+            pytest.fail(message)
+        pytest.skip(message)
     inputs = tmp_path / "input"
     (inputs / "constraints").mkdir(parents=True)
     (inputs / "models").mkdir()
     (inputs / "constraints" / "shapes.ttl").write_text(SHAPES, encoding="utf-8")
     (inputs / "models" / "data.xml").write_text(DATA, encoding="utf-8")
-    seen = tmp_path / "seen.json"
+    connection = {"conn_type": "cimpal", "host": serve, "password": TOKEN, "extra": {"poll_interval": 1}}
+    monkeypatch.setenv("AIRFLOW_CONN_CIMPAL_TEST", json.dumps(connection))
+    monkeypatch.setenv("CIMPAL_E2E_INPUT", str(inputs))
+    monkeypatch.setenv("CIMPAL_E2E_REPORTS", str(tmp_path / "reports"))
+    monkeypatch.setenv("CIMPAL_E2E_SEEN", str(tmp_path / "seen"))
 
-    with DAG(dag_id=f"cimpal_e2e_{deferrable}", start_date=datetime(2026, 10, 1), schedule=None) as dag:
-        validate = CimPalValidateOperator(
-            task_id="validate",
-            cimpal_conn_id="cimpal_test",
-            upload_from=str(inputs),
-            config={
-                "workflow": "combined",
-                "constraintFiles": ["constraints/shapes.ttl"],
-                "dataFiles": ["models/data.xml"],
-                "xmlBase": "http://example.com/data",
-            },
-            download_outputs_to=str(tmp_path / "reports"),
-            deferrable=deferrable,
-        )
+    try:  # Airflow 3.1+ moved DagBag
+        from airflow.dag_processing.dagbag import DagBag
+    except ImportError:  # pragma: no cover
+        from airflow.models.dagbag import DagBag  # type: ignore[no-redef]
+    dagbag = DagBag(dag_folder=str(E2E_DAGS))
+    assert dagbag.import_errors == {}
+    run = dagbag.dags[f"cimpal_e2e_{deferrable}"].test()
 
-        @task
-        def record(summary: dict[str, Any]) -> None:
-            seen.write_text(json.dumps(summary), encoding="utf-8")
-
-        record(validate.output)  # type: ignore[arg-type]
-
-    run = dag.test()
-
-    assert str(run.state) in ("success", "DagRunState.SUCCESS"), run.state
-    summary = json.loads(seen.read_text(encoding="utf-8"))
+    assert "success" in str(run.state).lower(), run.state
+    summary = json.loads((tmp_path / "seen" / f"{deferrable}.json").read_text(encoding="utf-8"))
     assert summary["status"] == "succeeded" and summary["hasViolations"] is True
     assert summary["totals"]["violations"] == 1
     assert any(name.endswith(".xlsx") for name in summary["outputFiles"])
-    assert any(p.suffix == ".xlsx" for p in (tmp_path / "reports").rglob("*"))
+    assert any(p.suffix == ".xlsx" for p in (tmp_path / "reports" / deferrable).rglob("*"))

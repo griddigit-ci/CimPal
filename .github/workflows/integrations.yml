@@ -242,6 +242,8 @@ jobs:
       PYTHON_VERSION: '3.12'
       AIRFLOW_HOME: ${{ github.workspace }}/target/airflow-provider-home
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      # dag.test() serializes and runs only DAGs of the DAGs folder: the end-to-end test's DAGs.
+      AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/clients/airflow/tests/e2e_dags
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

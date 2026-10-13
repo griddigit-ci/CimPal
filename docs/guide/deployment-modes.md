@@ -57,12 +57,10 @@ Reference: [mcp](../cli/mcp.md).
 
 `run` executes a JSON list of steps (`validate`, `compare`, `convert`, …) in one process, with per-step control over stopping on errors or violations. Paths are checked against allowed folders like in `serve`. A pipeline can't start `serve`, `mcp` or another `run`. Reference: [run](../cli/run.md).
 
-## Planned
+## From Python and Airflow
 
-These are on the roadmap but **not available yet**:
+- **[Python SDK](python-sdk.md)** (`cimpal-client`): calls a CimPal server from Python.
+- **Airflow provider** (`airflow-provider-cimpal`): operators, a sensor and a deferrable trigger over the SDK.
+- **The CLI or container per task** works with any scheduler.
 
-| Feature | Work package |
-|---|---|
-| Airflow provider (operator, hook, sensor, deferrable trigger) | DEP-10 |
-
-Until then, use the CLI or container per task. It works today with any scheduler, including Airflow: see [Airflow](airflow.md).
+[Airflow](airflow.md) compares the three ways to run CimPal from Airflow.

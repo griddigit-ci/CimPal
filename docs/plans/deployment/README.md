@@ -131,7 +131,7 @@ These are also listed in the master README. Each WP names the decisions it needs
 | D-9 | Where the Python code lives | **Same repo** (maintainer, 2026-10-13): `clients/python/` and `clients/airflow/`, versioned with CimPal | DEP-9 |
 | D-10 | Python package names | **As recommended** (maintainer, 2026-10-13): `cimpal-client` (import `cimpal_client`) and `airflow-provider-cimpal` (import `cimpal_provider`). The `apache-airflow-providers-*` prefix is reserved for Apache community providers. | DEP-9 |
 | D-11 | Licence of the Python packages | **Apache-2.0 for `cimpal-client`** (maintainer, 2026-10-13): it holds no engine code and talks to the EUPL server over HTTP; an in-process wrapper of the engine would stay EUPL | DEP-9 |
-| D-12 | Supported Airflow versions | Airflow 3.x; add 2.10 only if a customer needs it | DEP-10 |
+| D-12 | Supported Airflow versions | **Airflow 3 only** (maintainer, 2026-10-13); the provider needs 3.2+ (declarative connection fields) and CI tests 3.2.2 and 3.3.2. The provider is Apache-2.0 like `cimpal-client` | DEP-10 |
 | D-13 | `/v1/openapi.json` without token? | Yes: the spec has no secrets and clients need it to bootstrap | DEP-5 |
 
 ## Glossary (for this track)
