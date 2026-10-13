@@ -54,7 +54,7 @@ def connection(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
         conn_type="cimpal",
         host=BASE,
         password=TOKEN,
-        extra=json.dumps({"poll_interval": 0.01, "retries": 0}),
+        extra=json.dumps({"poll_interval": 1, "retries": 0}),
     )
 
     def get_connection(cls: Any, conn_id: str) -> Any:
@@ -105,7 +105,7 @@ def test_the_hook_reads_the_connection(connection: Any) -> None:
     hook = CimPalHook()
     with hook.get_conn() as cp:
         assert cp.base_url == BASE
-    assert hook.poll_interval() == 0.01
+    assert hook.poll_interval() == 1.0
     assert hook.poll_interval(5) == 5.0
 
 
@@ -234,7 +234,7 @@ def test_deferrable_hands_waiting_to_the_trigger_and_resumes_with_the_result(
     trigger = deferred.value.trigger
     assert isinstance(trigger, CimPalJobTrigger)
     assert deferred.value.method_name == "execute_complete"
-    assert trigger.job_id == JOB_ID and trigger.poll_interval == 0.01
+    assert trigger.job_id == JOB_ID and trigger.poll_interval == 1.0
     assert trigger.deadline is not None and 590 < trigger.deadline - time.time() <= 600
 
     xcom = op.execute_complete(context(), {"status": "final", "job_id": JOB_ID, "job_status": "succeeded"})
@@ -244,9 +244,9 @@ def test_deferrable_hands_waiting_to_the_trigger_and_resumes_with_the_result(
 @pytest.mark.parametrize(
     ("event", "kind"),
     [
-        ({"status": "timeout", "job_id": JOB_ID, "message": "still running"}, "AirflowException"),
+        # The job may still run on the server: a retry would submit it twice, so none of these retry.
+        ({"status": "timeout", "job_id": JOB_ID, "message": "still running"}, "AirflowFailException"),
         ({"status": "error", "job_id": JOB_ID, "message": "401 token", "permanent": True}, "AirflowFailException"),
-        ({"status": "error", "job_id": JOB_ID, "message": "503 busy", "permanent": False}, "AirflowException"),
     ],
 )
 def test_execute_complete_turns_trigger_problems_into_failures(event: dict[str, Any], kind: str) -> None:
@@ -346,3 +346,142 @@ def test_the_sensor_fails_for_a_failed_job(respx_mock: respx.MockRouter, connect
     respx_mock.get(f"/v1/jobs/{JOB_ID}/result").respond(json={"error": "bad config"})
     with pytest.raises(AirflowFailException, match="bad config"):
         CimPalJobSensor(task_id="s", job_id=JOB_ID).poke(context())
+
+
+# ---- security review (DEP-10) ------------------------------------------------------------------------
+
+
+@respx.mock(base_url=BASE)
+def test_a_job_the_server_timed_out_fails_without_retries_and_without_asking_for_a_result(
+    respx_mock: respx.MockRouter, connection: Any
+) -> None:
+    respx_mock.get("/v1/health").respond(json=health_json())
+    respx_mock.post("/v1/jobs").respond(202, json=job_json("queued"))
+    respx_mock.get(f"/v1/jobs/{JOB_ID}").respond(json=job_json("timed_out"))
+    respx_mock.get(f"/v1/jobs/{JOB_ID}/log").respond(json=log_json())
+    # no /result route: asking for it would fail the test (respx refuses unmocked requests)
+    with pytest.raises(AirflowFailException, match="keeps running there"):
+        CimPalValidateOperator(task_id="v", config={}, deferrable=False).execute(context())
+
+
+@respx.mock(base_url=BASE)
+def test_a_cancelled_job_fails_without_retries(respx_mock: respx.MockRouter, connection: Any) -> None:
+    respx_mock.get("/v1/health").respond(json=health_json())
+    respx_mock.post("/v1/jobs").respond(202, json=job_json("queued"))
+    respx_mock.get(f"/v1/jobs/{JOB_ID}").respond(json=job_json("cancelled"))
+    respx_mock.get(f"/v1/jobs/{JOB_ID}/log").respond(json=log_json())
+    with pytest.raises(AirflowFailException, match="was cancelled"):
+        CimPalValidateOperator(task_id="v", config={}, deferrable=False).execute(context())
+
+
+@respx.mock(base_url=BASE)
+def test_running_out_of_time_fails_without_retries_and_submits_once(
+    respx_mock: respx.MockRouter, connection: Any
+) -> None:
+    respx_mock.get("/v1/health").respond(json=health_json())
+    submitted = respx_mock.post("/v1/jobs").respond(202, json=job_json("queued"))
+    respx_mock.get(f"/v1/jobs/{JOB_ID}").respond(json=job_json("running"))
+    op = CimPalValidateOperator(task_id="v", config={}, deferrable=False, job_timeout=0)
+    with pytest.raises(AirflowFailException, match="isn't submitted twice"):
+        op.execute(context())
+    assert submitted.call_count == 1
+
+
+@respx.mock(base_url=BASE)
+def test_an_error_while_waiting_fails_without_retries(respx_mock: respx.MockRouter, connection: Any) -> None:
+    respx_mock.get("/v1/health").respond(json=health_json())
+    respx_mock.post("/v1/jobs").respond(202, json=job_json("queued"))
+    respx_mock.get(f"/v1/jobs/{JOB_ID}").respond(500, json=problem(500, "boom"))
+    with pytest.raises(AirflowFailException, match="may still be running"):
+        CimPalValidateOperator(task_id="v", config={}, deferrable=False).execute(context())
+
+
+@respx.mock(base_url=BASE)
+def test_execute_complete_never_succeeds_for_a_job_that_is_not_finished(
+    respx_mock: respx.MockRouter, connection: Any
+) -> None:
+    respx_mock.get("/v1/health").respond(json=health_json())
+    respx_mock.get(f"/v1/jobs/{JOB_ID}").respond(json=job_json("running"))
+    op = CimPalValidateOperator(task_id="v", config={}, deferrable=True)
+    with pytest.raises(AirflowFailException, match="not finished"):
+        op.execute_complete(context(), {"status": "final", "job_id": JOB_ID, "job_status": "succeeded"})
+
+
+@respx.mock(base_url=BASE)
+def test_a_relative_download_folder_works(
+    respx_mock: respx.MockRouter, connection: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "in").mkdir()
+    (tmp_path / "in" / "d.xml").write_text("<x/>", encoding="utf-8")
+    server(respx_mock, job_json("succeeded", exit_code=0, has_violations=False), result={})
+    respx_mock.post("/v1/uploads").respond(201, json=upload_json())
+    respx_mock.get(f"/v1/jobs/{JOB_ID}/files").respond(
+        json={"jobId": JOB_ID, "files": [{"path": "r.xlsx", "size": 1, "mediaType": "x"}]}
+    )
+    respx_mock.get(f"/v1/jobs/{JOB_ID}/files/r.xlsx").respond(content=b"x")
+    op = CimPalValidateOperator(task_id="v", config={}, upload_from="in", download_outputs_to="out", deferrable=False)
+    assert op.execute(context())["outputFiles"] == ["r.xlsx"]
+
+
+@respx.mock(base_url=BASE)
+def test_the_copied_server_log_is_cleaned(
+    respx_mock: respx.MockRouter, connection: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    server(respx_mock, job_json("succeeded", exit_code=0, has_violations=False), result={})
+    escape = chr(27)
+    respx_mock.get(f"/v1/jobs/{JOB_ID}/log").respond(json=log_json(["ok" + escape + "[31m red", "y" * 5000]))
+    with caplog.at_level("INFO"):
+        CimPalValidateOperator(task_id="v", config={}, deferrable=False).execute(context())
+    copied = [r.getMessage() for r in caplog.records if "[cimpal]" in r.getMessage()]
+    assert copied and all(escape not in m and len(m) < 1100 for m in copied)
+
+
+def test_verify_off_spelled_another_way_fails_the_connection_test(connection: Any) -> None:
+    connection.extra = json.dumps({"verify": "off"})  # not a boolean: taken as a CA bundle path, which is missing
+    ok, _ = CimPalHook().test_connection()
+    assert not ok
+
+
+async def test_the_trigger_keeps_waiting_through_a_passing_error(connection: Any) -> None:
+    with respx.mock(base_url=BASE) as respx_mock:
+        respx_mock.get(f"/v1/jobs/{JOB_ID}").mock(
+            side_effect=[
+                httpx.Response(500, json=problem(500, "restarting")),
+                httpx.Response(200, json=job_json("succeeded", exit_code=0, has_violations=False)),
+            ]
+        )
+        events = await _events(CimPalJobTrigger(JOB_ID, "cimpal_default", 0.01))
+    assert [e.payload["status"] for e in events] == ["final"]
+
+
+@respx.mock(base_url=BASE)
+async def test_a_dropped_job_ends_the_trigger_as_permanent(respx_mock: respx.MockRouter, connection: Any) -> None:
+    respx_mock.get(f"/v1/jobs/{JOB_ID}").respond(404, json=problem(404, "No such job"))
+    [event] = await _events(CimPalJobTrigger(JOB_ID, "cimpal_default", 0.01))
+    assert event.payload["status"] == "error" and event.payload["permanent"] is True
+
+
+def test_the_trigger_holds_no_token() -> None:
+    _, kwargs = CimPalJobTrigger(JOB_ID, "cimpal_default", 1.0, None).serialize()
+    assert TOKEN not in json.dumps(kwargs)
+
+
+def test_the_sensor_defers_and_resumes(connection: Any) -> None:
+    with respx.mock(base_url=BASE) as respx_mock:
+        respx_mock.get("/v1/health").respond(json=health_json())
+        respx_mock.get(f"/v1/jobs/{JOB_ID}").mock(
+            side_effect=[
+                httpx.Response(200, json=job_json("running")),
+                httpx.Response(200, json=job_json("succeeded", exit_code=1, has_violations=True)),
+            ]
+        )
+        respx_mock.get(f"/v1/jobs/{JOB_ID}/result").respond(json={"totals": {"violations": 1}})
+        sensor = CimPalJobSensor(task_id="s", job_id=JOB_ID, deferrable=True, timeout=600, poke_interval=5)
+        with pytest.raises(TaskDeferred) as deferred:
+            sensor.execute(context())
+        assert isinstance(deferred.value.trigger, CimPalJobTrigger)
+        summary = sensor.execute_complete(context(), {"status": "final", "job_id": JOB_ID, "job_status": "x"})
+    assert summary["hasViolations"] is True
+    with pytest.raises(AirflowFailException):
+        sensor.execute_complete(context(), {"status": "error", "job_id": JOB_ID, "message": "x", "permanent": True})

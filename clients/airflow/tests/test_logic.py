@@ -61,13 +61,12 @@ def test_client_settings_take_the_token_from_the_password_and_the_extras_in_both
         "retries": 5,
         "allow_insecure_http": True,
     }
-    assert _logic.client_settings("h", None, None, None, {"verify": "/etc/ssl/ca.pem"})["verify"] == "/etc/ssl/ca.pem"
-    assert _logic.client_settings("h", None, None, "", {})["token"] is None
+    assert _logic.client_settings("h", None, None, "t", {"verify": "/etc/ssl/ca.pem"})["verify"] == "/etc/ssl/ca.pem"
 
 
 def test_a_flag_that_is_not_a_boolean_is_refused() -> None:
     with pytest.raises(ValueError, match="allow_insecure_http"):
-        _logic.client_settings("h", None, None, None, {"allow_insecure_http": "maybe"})
+        _logic.client_settings("h", None, None, "t", {"allow_insecure_http": "maybe"})
 
 
 def test_poll_interval_explicit_then_extra_then_default() -> None:
@@ -181,3 +180,33 @@ def test_the_provider_info_registers_the_connection_type_and_matches_airflows_sc
     schema_file = Path(next(iter(spec.submodule_search_locations))) / "provider_info.schema.json"
     jsonschema = pytest.importorskip("jsonschema")
     jsonschema.validate(info, json.loads(schema_file.read_text(encoding="utf-8")))
+
+
+# ---- security review (DEP-10) ---------------------------------------------------------------------
+
+
+def test_a_connection_without_a_token_never_uses_one_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CIMPAL_API_TOKEN", "ambient-secret-0123456789abcdef0123456789")
+    for password in (None, ""):
+        with pytest.raises(ValueError, match="no API token"):
+            _logic.client_settings("https://attacker.example", None, None, password, {})
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "0.5", "inf", "nan"])
+def test_a_poll_interval_that_would_hammer_or_park_is_refused(value: str) -> None:
+    with pytest.raises(ValueError, match="poll_interval"):
+        _logic.poll_interval({"poll_interval": value}, None)
+
+
+def test_server_text_is_cleaned_and_capped_for_airflows_logs() -> None:
+    text = _logic.clean("line\r\n[INFO] forged \x1b[31m" + "x" * 5000)
+    assert "\r" not in text and "\n" not in text and "\x1b" not in text
+    assert len(text) == _logic.MAX_TEXT + 1
+    failed = Job.from_dict(job_json("failed", exit_code=2))
+    assert "\n" not in _logic.failure_message(failed, {"error": "bad\nforged"})
+
+
+def test_dot_segments_are_left_to_the_servers_path_check() -> None:
+    """resolve_paths only joins; the server's allowed folders (PathGuard) are the boundary."""
+    resolved = _logic.resolve_paths("convert", {"input": "../other/x.xml"}, "/data/in")
+    assert resolved["input"] == "/data/in/../other/x.xml"

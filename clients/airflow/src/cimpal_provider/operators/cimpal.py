@@ -9,6 +9,7 @@ import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import timedelta
+from pathlib import Path
 from typing import Any, ClassVar
 
 import cimpal_client
@@ -35,6 +36,19 @@ def airflow_errors() -> Iterator[None]:
         if _logic.is_permanent(error):
             raise AirflowFailException(str(error)) from error
         raise AirflowException(str(error)) from error
+
+
+@contextmanager
+def submitted_job_errors(job_id: str) -> Iterator[None]:
+    """CimPal errors once a job is on the server: never retried by Airflow, because a retry submits
+    the job again while the first one may still run (the SDK has already retried its own reads)."""
+    try:
+        yield
+    except CimPalError as error:
+        raise AirflowFailException(
+            f"{error} (CimPal job {job_id} may still be running on the server; the task is not retried, "
+            "so it isn't submitted twice)"
+        ) from error
 
 
 class CimPalJobOperator(BaseOperator):
@@ -89,8 +103,8 @@ class CimPalJobOperator(BaseOperator):
             raise ValueError("Use either input_path (a shared volume) or upload_from (an upload), not both")
         if download_outputs_to and not upload_from:
             raise ValueError("download_outputs_to needs upload_from: only jobs on an upload have output files to fetch")
-        if poll_interval is not None and poll_interval <= 0:
-            raise ValueError("poll_interval must be positive")
+        if poll_interval is not None:
+            _logic.check_poll_interval(float(poll_interval))
         self.command = command
         self.config = dict(config or {})
         self.cimpal_conn_id = cimpal_conn_id
@@ -113,12 +127,15 @@ class CimPalJobOperator(BaseOperator):
         if self.input_path:
             config = _logic.resolve_paths(self.command, config, self.input_path)
         label = self.job_label or _logic.default_label(self.dag_id, self.task_id, context.get("run_id"))
-        with airflow_errors(), hook.get_conn() as cp:
-            upload = None
-            if self.upload_from:
-                upload = cp.upload(self.upload_from)
-                self.log.info("Uploaded %s as %s (%d bytes)", self.upload_from, upload.upload_id, upload.total_bytes)
-            job = cp.submit(self.command, config, input_upload=upload, label=label)
+        with hook.get_conn() as cp:
+            with airflow_errors():  # nothing submitted yet: Airflow's retries may try again
+                upload = None
+                if self.upload_from:
+                    upload = cp.upload(self.upload_from)
+                    self.log.info(
+                        "Uploaded %s as %s (%d bytes)", self.upload_from, upload.upload_id, upload.total_bytes
+                    )
+                job = cp.submit(self.command, config, input_upload=upload, label=label)
             self.job_id = str(job.job_id)
             self.log.info("Submitted CimPal job %s (%s) to %s", self.job_id, self.command, cp.base_url)
             context["ti"].xcom_push(key="job_id", value=self.job_id)
@@ -129,41 +146,57 @@ class CimPalJobOperator(BaseOperator):
                     trigger=CimPalJobTrigger(self.job_id, self.cimpal_conn_id, interval, deadline),
                     method_name="execute_complete",
                 )
-            try:
-                job = cp.wait(
-                    job, timeout=self.job_timeout, poll_interval=min(interval, 5.0), max_poll_interval=interval
-                )
-            except cimpal_client.TimeoutError as error:
-                if error.status is None:
-                    raise AirflowException(
-                        f"CimPal job {self.job_id} is still running after {self.job_timeout} s; "
-                        "it keeps running on the server"
-                    ) from error
-                raise
-            return self._finish(cp, job)
+            with submitted_job_errors(self.job_id):
+                try:
+                    job = cp.wait(
+                        job, timeout=self.job_timeout, poll_interval=min(interval, 5.0), max_poll_interval=interval
+                    )
+                except cimpal_client.TimeoutError as error:
+                    if error.job_id is not None and error.status is None:  # wait() ran out of time
+                        raise AirflowFailException(
+                            f"CimPal job {self.job_id} is still running after {self.job_timeout} s; it keeps "
+                            "running on the server (the task is not retried, so it isn't submitted twice)"
+                        ) from error
+                    raise
+                return self._finish(cp, job)
 
     def execute_complete(self, context: Context, event: dict[str, Any]) -> dict[str, Any]:
-        """Resumes after the trigger: fetches the finished job and its result on a worker."""
+        """Resumes after the trigger: fetches the finished job and its result on a worker.
+
+        The trigger already kept trying through passing errors, so whatever it reports now fails
+        the task without retries: a retry would submit the job a second time.
+        """
         self.job_id = event.get("job_id")
-        if event.get("status") == "timeout":
-            raise AirflowException(event.get("message", "CimPal job timed out"))
         if event.get("status") != "final":
-            message = event.get("message", "CimPal job could not be followed")
-            raise AirflowFailException(message) if event.get("permanent") else AirflowException(message)
-        with airflow_errors(), CimPalHook(self.cimpal_conn_id).get_conn() as cp:
-            return self._finish(cp, cp.job(str(self.job_id)))
+            raise AirflowFailException(event.get("message", "CimPal job could not be followed"))
+        with submitted_job_errors(str(self.job_id)), CimPalHook(self.cimpal_conn_id).get_conn() as cp:
+            job = cp.job(str(self.job_id))
+            if job.status not in (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.TIMED_OUT):
+                raise AirflowFailException(f"CimPal job {self.job_id} is {job.status}, not finished")
+            return self._finish(cp, job)
 
     def _finish(self, cp: CimPal, job: Job) -> dict[str, Any]:
         self._copy_log(cp, job)
-        result = cp.result(job) if job.status is not JobStatus.CANCELLED else None
         if job.status is not JobStatus.SUCCEEDED:
+            result = None
+            if job.status is JobStatus.FAILED:
+                try:  # its error detail, if the server kept it
+                    result = cp.result(job)
+                except CimPalError:
+                    result = None
             message = _logic.failure_message(job, result)
-            # Exit 2 is bad input (a wrong config, a refused path): another try fails the same way.
-            raise AirflowFailException(message) if job.exit_code == 2 else AirflowException(message)
+            # Only a job that ended with an internal error (exit 3) is worth another try. Bad input
+            # (exit 2) fails the same way again, and a cancelled or timed-out job may still be
+            # running (timed out) or was stopped on purpose.
+            if job.status is JobStatus.FAILED and job.exit_code not in (2, None):
+                raise AirflowException(message)
+            raise AirflowFailException(message)
+        result = cp.result(job)
         files = None
         if self.download_outputs_to:
             written = cp.download_outputs(job, self.download_outputs_to)
-            files = sorted(str(p.relative_to(self.download_outputs_to)).replace("\\", "/") for p in written)
+            root = Path(self.download_outputs_to).resolve()
+            files = sorted(p.resolve().relative_to(root).as_posix() for p in written)
             self.log.info("Downloaded %d output file(s) to %s", len(written), self.download_outputs_to)
         summary = _logic.summary(job, result, files)
         if self.fail_on_violations and job.has_violations:
@@ -171,14 +204,14 @@ class CimPalJobOperator(BaseOperator):
         return summary
 
     def _copy_log(self, cp: CimPal, job: Job) -> None:
-        """The job's progress lines into the task log (they were sanitised by the server)."""
+        """The job's progress lines into the task log, cleaned and capped like any server text."""
         try:
             page = cp.log(job)
         except CimPalError as error:
             self.log.warning("Could not read the log of CimPal job %s: %s", job.job_id, error)
             return
         for line in page.lines[:LOG_LINES]:
-            self.log.info("[cimpal] %s", line)
+            self.log.info("[cimpal] %s", _logic.clean(line))
 
     def on_kill(self) -> None:
         """Cancels the job while it is still queued; a running job can't be stopped and continues."""

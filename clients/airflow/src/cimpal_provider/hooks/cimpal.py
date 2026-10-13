@@ -31,11 +31,17 @@ class CimPalHook(BaseHook):
         super().__init__(**kwargs)
         self.cimpal_conn_id = cimpal_conn_id
 
-    @staticmethod
-    def _settings(connection: Any) -> dict[str, Any]:
-        return _logic.client_settings(
+    def _settings(self, connection: Any) -> dict[str, Any]:
+        settings = _logic.client_settings(
             connection.host, connection.port, connection.schema, connection.password, connection.extra_dejson
         )
+        if settings.get("verify") is False:
+            self.log.warning(
+                "TLS verification is off for the CimPal connection %s: the token goes to a server whose "
+                "certificate is not checked",
+                self.cimpal_conn_id,
+            )
+        return settings
 
     def get_conn(self) -> CimPal:
         """A synchronous client; close it (or use it in a ``with`` block) when done."""
@@ -58,6 +64,6 @@ class CimPalHook(BaseHook):
             with self.get_conn() as cp:
                 health = cp.health()
                 cp.list_jobs(limit=1)
-        except (CimPalError, ValueError) as error:
+        except (CimPalError, ValueError, OSError) as error:  # OSError: e.g. a missing CA bundle
             return False, str(error)
         return True, f"Connected to {health.version} (API version {health.api_version}); the token is accepted"

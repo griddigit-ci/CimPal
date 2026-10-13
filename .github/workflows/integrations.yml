@@ -270,7 +270,8 @@ jobs:
         run: |
           pip install "apache-airflow==${{ matrix.airflow }}" \
             --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow }}/constraints-${PYTHON_VERSION}.txt"
-          pip install -e clients/python -e "clients/airflow[dev]"
+          pip install -e clients/python -e "clients/airflow[dev]" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow }}/constraints-${PYTHON_VERSION}.txt"
 
       - name: Lint and types
         working-directory: clients/airflow

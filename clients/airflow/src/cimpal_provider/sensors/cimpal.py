@@ -12,7 +12,7 @@ from typing import Any
 from airflow.configuration import conf
 from airflow.sdk import BaseSensorOperator, Context, PokeReturnValue
 from airflow.sdk.exceptions import AirflowException, AirflowFailException
-from cimpal_client import CimPal, Job, JobStatus
+from cimpal_client import CimPal, CimPalError, Job, JobStatus
 
 from .. import _logic
 from ..hooks.cimpal import CimPalHook
@@ -69,15 +69,23 @@ class CimPalJobSensor(BaseSensorOperator):
         if event.get("status") == "timeout":
             raise AirflowException(event.get("message", "CimPal job timed out"))
         if event.get("status") != "final":
-            message = event.get("message", "CimPal job could not be followed")
-            raise AirflowFailException(message) if event.get("permanent") else AirflowException(message)
+            raise AirflowFailException(event.get("message", "CimPal job could not be followed"))
         with airflow_errors(), CimPalHook(self.cimpal_conn_id).get_conn() as cp:
-            return self._outcome(cp, cp.job(str(self.job_id)))
+            job = cp.job(str(self.job_id))
+            if job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                raise AirflowFailException(f"CimPal job {self.job_id} is {job.status}, not finished")
+            return self._outcome(cp, job)
 
     def _outcome(self, cp: CimPal, job: Job) -> dict[str, Any]:
-        result = cp.result(job) if job.status is not JobStatus.CANCELLED else None
         if job.status is not JobStatus.SUCCEEDED:
+            result = None
+            if job.status is JobStatus.FAILED:
+                try:  # its error detail, if the server kept it
+                    result = cp.result(job)
+                except CimPalError:
+                    result = None
             raise AirflowFailException(_logic.failure_message(job, result))
+        result = cp.result(job)
         if self.fail_on_violations and job.has_violations:
             raise AirflowFailException(_logic.violations_message(job, result))
         return _logic.summary(job, result)

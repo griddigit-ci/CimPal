@@ -9,6 +9,8 @@ Kept apart so they can be tested on any platform (Airflow itself runs on Linux a
 from __future__ import annotations
 
 import json
+import math
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -26,6 +28,10 @@ from cimpal_client import (
 CONN_TYPE = "cimpal"
 DEFAULT_CONN_ID = "cimpal_default"
 DEFAULT_POLL_INTERVAL = 30.0
+#: The shortest poll interval a connection or task may set (many deferred tasks poll one server).
+MIN_POLL_INTERVAL = 1.0
+#: Longest server text (a log line, an error detail) kept in Airflow's logs and exceptions.
+MAX_TEXT = 1000
 COMMANDS = (
     "validate",
     "sparql",
@@ -118,7 +124,11 @@ def client_settings(
     The password is the token. Extras: ``verify`` (true/false or a CA bundle path), ``timeout``
     (seconds per request), ``retries``, ``allow_insecure_http``.
     """
-    settings: dict[str, Any] = {"base_url": base_url(host, port, schema), "token": password or None}
+    if not password:
+        # Never fall back to a CIMPAL_API_TOKEN in the worker's environment: it would go to whatever
+        # host the connection names.
+        raise ValueError("The CimPal connection has no API token (password)")
+    settings: dict[str, Any] = {"base_url": base_url(host, port, schema), "token": password}
     verify = _extra(extra, "verify")
     if verify not in (None, ""):
         settings["verify"] = (
@@ -139,10 +149,25 @@ def client_settings(
 
 
 def poll_interval(extra: Mapping[str, Any], explicit: float | None) -> float:
-    if explicit is not None:
-        return float(explicit)
-    value = _extra(extra, "poll_interval")
-    return float(value) if value not in (None, "") else DEFAULT_POLL_INTERVAL
+    """``explicit``, else the ``poll_interval`` extra, else 30 s; finite and at least 1 s."""
+    value: Any = explicit if explicit is not None else _extra(extra, "poll_interval")
+    seconds = DEFAULT_POLL_INTERVAL if value in (None, "") else float(value)
+    check_poll_interval(seconds)
+    return seconds
+
+
+def check_poll_interval(seconds: float, minimum: float = MIN_POLL_INTERVAL) -> None:
+    if not math.isfinite(seconds) or seconds < minimum:
+        raise ValueError(f"poll_interval must be a number of seconds, at least {minimum}")
+
+
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def clean(text: str) -> str:
+    """Server text fit for Airflow's logs: control characters replaced, at most MAX_TEXT characters."""
+    text = _CONTROL.sub("\ufffd", text)
+    return text if len(text) <= MAX_TEXT else text[:MAX_TEXT] + "\u2026"
 
 
 # ---- config paths on a shared volume ---------------------------------------------------------------
@@ -213,6 +238,8 @@ def failure_message(job: Job, result: Mapping[str, Any] | None) -> str:
     if result:
         detail = result.get("error") or result.get("message")
     detail = detail or job.error
+    if detail is not None:
+        detail = clean(str(detail))
     reason = {
         JobStatus.FAILED: "failed",
         JobStatus.CANCELLED: "was cancelled",

@@ -128,11 +128,19 @@ validate = CimPalValidateOperator(
 | succeeded, no violations | succeeds |
 | succeeded, violations found | succeeds (violations are data); fails without retries with `fail_on_violations=True` |
 | failed with exit 2 (bad input) | fails without retries, with the server's message |
-| failed with exit 3, or the server was busy or unreachable | fails; Airflow's retries apply |
-| refused: 401 token, 403 path outside the allowed folders | fails without retries |
-| still running after `job_timeout` | fails; the job keeps running on the server |
+| failed with exit 3 (an internal error) | fails; Airflow's retries apply |
+| refused before it was submitted: 401 token, 403 path outside the allowed folders | fails without retries |
+| couldn't be submitted: server busy or unreachable (after the client's own retries) | fails; Airflow's retries apply |
+| cancelled, timed out on the server, or still running after `job_timeout` | fails without retries |
+| couldn't be followed after it was submitted (e.g. the server stayed unreachable) | fails without retries |
+
+**Why some failures don't retry:** a running job can't be stopped. An Airflow retry submits a new job, so retrying a job that may still be running would make two of them. The deferrable wait keeps trying through a busy or restarting server until `job_timeout`.
 
 **Killing a task** (`on_kill`): a job that is still queued is cancelled. A running one can't be stopped and finishes on the server.
+
+**Template with care:**
+- `upload_from` and `download_outputs_to` are paths on the worker. Don't fill them from `dag_run.conf` or `params` that users who may only trigger runs can set: the upload would send any worker file to the server, and the download would write into any folder.
+- The connection always needs its API token. The provider never falls back to a `CIMPAL_API_TOKEN` set on the workers.
 
 **Other classes:**
 - `CimPalJobOperator(command=...)` runs any of the ten commands;
