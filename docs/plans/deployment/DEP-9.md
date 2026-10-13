@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In review |
 | Phase | D2 |
 | Depends on | DEP-5, DEP-7 |
 | Size | M |
@@ -52,14 +52,14 @@ with CimPal("https://cimpal.example.com", token="...") as cp:
 
 ## Acceptance criteria (status checklist)
 
-- [ ] Generated layer reproducible from `cimpal-v1.json`; CI check for staleness
-- [ ] Facade methods above, sync and async, fully typed (`py.typed`, mypy strict clean)
-- [ ] Unit tests with mocked HTTP (respx) for every method and every error mapping, including `Retry-After`
-- [ ] Integration tests: pytest fixture starts `java -jar CimPal-CLI.jar serve` on a free port with `CIMPAL_API_TOKEN` and temp roots; upload → submit → wait → result → download on the synthetic fixture; skipped cleanly when Java or the JAR is absent
-- [ ] Version of the package = CimPal version; client sends `User-Agent: cimpal-client/<version>` and warns when the server's `apiVersion` is incompatible
-- [ ] Wheel and sdist build in CI; publishing to PyPI is a maintainer step, documented in `clients/python/README.md`
-- [ ] Licence header on every file (D-11), licence metadata in `pyproject.toml`
-- [ ] `docs/guide/python-sdk.md` with install, auth, the example above, errors, timeouts
+- [x] Generated layer reproducible from `cimpal-v1.json`; CI check for staleness — `scripts/regenerate.py --check`
+- [x] Facade methods above, sync and async, fully typed (`py.typed`, mypy strict clean) — the generated layer is excluded from `--strict` (see notes)
+- [x] Unit tests with mocked HTTP (respx) for every method and every error mapping, including `Retry-After`
+- [x] Integration tests: pytest fixture starts `java -jar CimPal-CLI.jar serve` on a free port with `CIMPAL_API_TOKEN` and temp roots; upload → submit → wait → result → download on the synthetic fixture; skipped cleanly when Java or the JAR is absent
+- [x] Version of the package = CimPal version; client sends `User-Agent: cimpal-client/<version>` and warns when the server's `apiVersion` is incompatible
+- [x] Wheel and sdist build in CI; publishing to PyPI is a maintainer step, documented in `clients/python/README.md`
+- [x] Licence header on every file (D-11), licence metadata in `pyproject.toml` — except the empty `py.typed` marker, whose content PEP 561 reserves
+- [x] `docs/guide/python-sdk.md` with install, auth, the example above, errors, timeouts
 
 ## Instructions for Claude Code
 
@@ -90,7 +90,58 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-13 | D-9: `clients/python/` in this repo; D-10: `cimpal-client` / `cimpal_client` | Maintainer |
+| 2026-10-13 | D-11: **Apache-2.0** for `cimpal-client`. It holds no engine code and talks to the EUPL server over HTTP; an in-process wrapper of the engine (e.g. JPype) would stay EUPL | Maintainer |
+| 2026-10-13 | The facade sends its own httpx requests and returns the generated models: the generator skips the `application/zip` routes (upload, archive), and one request path keeps errors, retries and streaming the same everywhere. A test checks that every facade route is in the OpenAPI document and every document route (but the spec itself) is in the facade | Claude Code |
+| 2026-10-13 | The package version is read from `<cimpal.version>` in the root `pom.xml` by hatchling, so the release script (which only changes the poms) needs no change; an sdist carries the version in PKG-INFO | Claude Code |
+| 2026-10-13 | Retries: 503 and requests that never reached the server; other transport errors only for GET, so `submit` is never sent twice. Retry-After is honoured up to 5 minutes | Claude Code |
+| 2026-10-13 | `LocalCimPal` (CLI subprocess) left out: the nice-to-have of this WP; the CLI's `--summary-file` already gives the same document | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+### Results
+
+- **Unit tests:** 117, against a mocked `/v1` (respx). They cover the sync and async facade, every error status, retries and `Retry-After`, token sources, safe output paths, upload zipping without following links, and the security-review regressions (`test_hardening.py`).
+- **Integration tests:** 3, against `java -jar CimPal-CLI.jar serve`:
+  - upload, submit, wait, result, file and archive download, log and list, sync and async;
+  - a path outside the allowed folders is refused (403 at submit).
+- **Checks:** ruff and `mypy --strict` are clean. The wheel and sdist build, and the wheel built from the sdist keeps the version.
+- **Not run locally:** Python 3.10–3.12 run only in CI; locally only 3.13 was available.
+- **Java:** no Java change, so `mvn -B verify` is unaffected.
+
+### Security review (2026-10-13)
+
+No High findings. Fixed, each with a regression test in `tests/test_hardening.py`:
+- **Medium:** a 3xx was treated as success, since redirects aren't followed. An `http`→`https` redirect could make `result()` return the redirect page, which reads as a clean result. Now any 3xx raises and names the target.
+- **Medium:** the token went over plain `http://` to any host. Now that is refused, except to loopback or with `allow_insecure_http=True`.
+- **Medium:** a Windows junction inside an uploaded folder was followed. Now every file must resolve inside the folder (tested with a real junction on Windows).
+- **Low:**
+  - `Retry-After: NaN`/`inf` is ignored;
+  - a non-JSON result is accepted only as `text/plain`/`application/json`, so an HTML page raises;
+  - a cancelled async upload deletes its temporary ZIP;
+  - server text in errors has control characters replaced and is capped at 1000 characters, and error bodies are read up to 64 KiB;
+  - a 503 to a POST is retried only when it is CimPal's (problem details or `Retry-After`);
+  - downloads go to a temporary file and replace the target only when complete;
+  - the generated client's token is kept out of `repr()`;
+  - `poll_interval` is validated.
+- **Info, also fixed:**
+  - a token that can't be a header is refused without echoing it;
+  - a `base_url` with a query or fragment is refused;
+  - dot segments are refused in `download_file`;
+  - Windows-reserved names and trailing dots or spaces are refused in output names;
+  - `regenerate.py` runs only the generator installed next to its Python;
+  - hatchling is pinned.
+
+Open: CI installs the dev tools with exact pins, but their transitive dependencies are unpinned and unhashed (CI has read-only permissions and no secrets). A hashed lock file would close that.
+
+### Findings
+
+- **The generator can't handle zip routes:** `openapi-python-client` 0.26.1 doesn't support `application/zip`, so `POST /v1/uploads` and the archive's 200 response are missing from `_generated`. The facade covers both.
+- **Text results labelled as JSON:** a job whose command prints text instead of JSON (e.g. `convert`) gets that text as its `/v1` result, served as `application/json`. The SDK returns it as `{"output": text}`. The server should wrap it like `mcp` does; this is a separate task.
+- **Stale spec text:** the OpenAPI document's description still says the server runs one command at a time (written before DEP-8).
+
+### Open
+
+- `LocalCimPal` (run the CLI as a subprocess without a server): left out, as the WP allows.
+- Publishing to PyPI: a maintainer step after a release.
+- **Install from git:** the guide's "install from git" line has not been tried outside this repository.

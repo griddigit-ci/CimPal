@@ -182,7 +182,7 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 The job API runs a command asynchronously.
 - **Submit:** `POST /v1/jobs` answers within milliseconds with a job id.
 - **Follow up:** you poll the job's status, then fetch its result and its progress lines.
-- **Spec:** the OpenAPI 3.1 description is served at `GET /v1/openapi.json`, and the planned Python SDK (DEP-9) is generated from it.
+- **Spec:** the OpenAPI 3.1 description is served at `GET /v1/openapi.json`. The [Python SDK](../guide/python-sdk.md) (`cimpal-client`) is generated from it.
 
 | Endpoint | Method | Description |
 |---|---|---|

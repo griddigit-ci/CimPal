@@ -4,7 +4,7 @@
     "title" : "CimPal serve job API",
     "version" : "1",
     "summary" : "Asynchronous CimPal jobs: submit, poll, fetch the result.",
-    "description" : "The job API of `cimpal serve` (DEP-5). A job runs one CimPal command with a config object; the server runs one command at a time and keeps finished jobs in memory (lost on restart). Every request needs `Authorization: Bearer <token>` except `GET /v1/health` and `GET /v1/openapi.json`. Requests must also pass the server's Host and Origin checks; a refused Host or Origin is answered with 403 on any route. Paths in a job's config must lie under the server's allowed folders (`--root`). Errors are RFC 9457 problem details.",
+    "description" : "The job API of `cimpal serve` (DEP-5). A job runs one CimPal command with a config object; the server runs up to `--workers` commands at once (one by default) and keeps finished jobs in memory (lost on restart). Every request needs `Authorization: Bearer <token>` except `GET /v1/health` and `GET /v1/openapi.json`. Requests must also pass the server's Host and Origin checks; a refused Host or Origin is answered with 403 on any route. Paths in a job's config must lie under the server's allowed folders (`--root`). Errors are RFC 9457 problem details.",
     "license" : {
       "name" : "EUPL-1.2",
       "identifier" : "EUPL-1.2"

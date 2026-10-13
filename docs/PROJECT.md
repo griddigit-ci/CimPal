@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-12  
+**Last updated:** 2026-10-13  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -315,8 +315,9 @@ user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintai
 token files, probes, SIGTERM drain, JSON logs, metrics, Compose and Kubernetes examples) is merged
 (PR #64). DEP-7 (file exchange: uploads, job workspaces, downloads) is merged (PR #66), and so are
 TEST-3's validation and SHACL generation groups (PR #65) and `validate --workflow combined` with
-folders (PR #67). DEP-8 (`serve --workers N`, concurrent commands in one JVM, decision D-8 yes) is in
-review on `feature/dep-8-concurrent-workers`. Next on the deployment track: DEP-9 (Python SDK).
+folders (PR #67). DEP-8 (`serve --workers N`, concurrent commands in one JVM, decision D-8 yes) is
+merged (PR #69). DEP-9 (Python SDK `cimpal-client` in `clients/python/`, Apache-2.0 per D-11) is in
+review on `feature/dep-9-python-sdk`. Next on the deployment track: DEP-10 (Airflow provider).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -339,6 +340,13 @@ with SEC-2 path checks and a JSON summary, is open.
 | 9 | `mcp` | MCP 2024-11-05 stdio server, 10 typed tools |
 
 All 13 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25. Each release also publishes that JAR as the Docker image `ghcr.io/griddigit-ci/cimpal` (see `docs/cli/docker.md`).
+
+### Python SDK (`clients/python/`, DEP-9)
+
+`cimpal-client` (import `cimpal_client`, Python 3.10+, **Apache-2.0**, unlike the EUPL engine) calls the `/v1` API. Its version is `<cimpal.version>` from the root `pom.xml`, read by hatchling at build time.
+- `_generated/`: generated from `cimpal-v1.json` by a pinned `openapi-python-client` (`scripts/regenerate.py`; CI runs `--check`). The generator can't do `application/zip`, so uploads and the archive download are missing there.
+- `CimPal` / `AsyncCimPal` (facade): their own httpx requests, returning the generated models. One place for problem-details errors, retries (503 and never-sent requests; other transport errors only for GET, so a job is never submitted twice) and streaming downloads (output names checked to stay in the target folder).
+- Tests: respx unit tests, and integration tests that start `java -jar CimPal-CLI.jar serve`. CI: the `python-sdk*` jobs in `integrations.yml`. Publishing to PyPI is a maintainer step (`clients/python/README.md`).
 
 ### How `serve` and `mcp` execute commands (shared mechanism)
 
