@@ -13,6 +13,10 @@
 # Python SDK (DEP-9, clients/python): lint, strict types, the generated layer matching the OpenAPI
 # document, unit tests on Python 3.10-3.13, a wheel and sdist build (never published here), and
 # integration tests against a CLI JAR built from this commit.
+#
+# Airflow provider (DEP-10, clients/airflow): on each supported Airflow 3 line (D-12), lint and
+# strict types, unit tests with a mocked server, the example DAGs, and dag.test() runs (polling and
+# deferrable) against serve from a CLI JAR built from this commit.
 name: Integrations
 
 on:
@@ -225,3 +229,67 @@ jobs:
         env:
           CIMPAL_INTEGRATION_REQUIRED: '1'
         run: pytest -m integration -v
+
+  airflow-provider:
+    name: Airflow provider (Airflow ${{ matrix.airflow }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        airflow: ['3.2.2', '3.3.2']
+    env:
+      PYTHON_VERSION: '3.12'
+      AIRFLOW_HOME: ${{ github.workspace }}/target/airflow-provider-home
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the CLI JAR
+        run: mvn -B -pl CimPal-CLI -am package -DskipTests
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Airflow with its official constraints file, then the SDK and the provider from this commit.
+      - name: Install Airflow, cimpal-client and the provider
+        run: |
+          pip install "apache-airflow==${{ matrix.airflow }}" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow }}/constraints-${PYTHON_VERSION}.txt"
+          pip install -e clients/python -e "clients/airflow[dev]"
+
+      - name: Lint and types
+        working-directory: clients/airflow
+        run: |
+          ruff check src tests example_dags hatch_build.py
+          ruff format --check src tests example_dags hatch_build.py
+          mypy
+
+      - name: Create the Airflow metadata database
+        run: airflow db migrate
+
+      - name: Tests (unit, example DAGs, dag.test against serve)
+        working-directory: clients/airflow
+        env:
+          CIMPAL_JAR: ${{ github.workspace }}/CimPal-CLI/target/CimPal-CLI.jar
+          CIMPAL_INTEGRATION_REQUIRED: '1'
+        run: pytest -v
+
+      - name: Build the wheel and sdist (not published)
+        if: matrix.airflow == '3.3.2'
+        working-directory: clients/airflow
+        run: |
+          python -m build
+          ls -l dist
