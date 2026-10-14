@@ -55,13 +55,35 @@ The generator can't handle `application/zip`, so uploads and the archive downloa
 
 ## Releasing (maintainers)
 
-CI builds the wheel and sdist but never publishes them. Publishing to PyPI is a manual step after a CimPal release, from the tagged commit:
+Both Python packages, this one and [`airflow-provider-cimpal`](../airflow/README.md), go to PyPI with every CimPal release. No token is stored anywhere: the release workflow publishes through PyPI's *trusted publishing* (GitHub OIDC), and a maintainer approves each upload.
 
-```bash
-cd clients/python
-python -m build                        # dist/cimpal_client-<version>.tar.gz and .whl
-python -m twine check dist/*
-python -m twine upload dist/*          # needs the PyPI token of the cimpal-client project
-```
+**What a release does** (`.github/workflows/release.yml`, after `scripts/New-ReleaseTag.ps1` pushes the tag):
+1. **`python-dists`** (`python-dists.yml`) builds both packages from the tagged commit and checks them:
+   - the tagged commit must be on `master`;
+   - the pom version must equal the tag;
+   - the build tools come from a hash-locked list (`.github/python-build-requirements.txt`) and build without isolation, so nothing unpinned makes the wheels;
+   - `twine check --strict` passes;
+   - the provider pins `cimpal-client==<version>`.
+2. **`pypi`** waits in the GitHub environment `pypi` until a maintainer clicks *Review deployments › Approve*. Before approving, check that the run belongs to the release you just cut. The job then uploads `cimpal-client`, then the provider, with signed provenance (attestations), and checks that PyPI holds byte for byte the files that were built. An upload can't be replaced, only yanked, so approve only a release you mean to ship.
+3. **If it fails half-way,** re-run only the failed job: it reuses the same built files, versions already on PyPI are skipped, and the byte check still applies. Don't use *Re-run all jobs*: it rebuilds the files, and the byte check would then fail against what is already on PyPI.
 
-The version comes from `<cimpal.version>` in the repository's root `pom.xml`, so build from the release tag.
+**The TestPyPI rehearsal** (Actions › *TestPyPI rehearsal* › Run workflow, from `devel` or a branch):
+- builds both packages as `<pom version>.dev<run number>`;
+- publishes them to test.pypi.org after the `testpypi` approval;
+- installs them back to check the versions and the pin.
+
+Run it before the first real release, and after changing the packaging.
+
+**One-time setup** (maintainers; needs the PyPI account and the repository admin):
+1. **PyPI:** on pypi.org (an account with 2FA, preferably the gridDigIt organization), go to *Your projects › Publishing › Add a new pending publisher*. Add one for `cimpal-client` and one for `airflow-provider-cimpal`, each with:
+   - owner `griddigit-ci`, repository `CimPal`;
+   - workflow `release.yml`, environment `pypi`.
+
+   **A pending publisher does not reserve a name:** the first upload does. If someone registers a name first, the pending publisher stops working, so cut the first release soon after this setup.
+2. **TestPyPI:** the same on test.pypi.org, with workflow `testpypi.yml` and environment `testpypi`.
+3. **GitHub, release tags** (*Settings › Rules › Rulesets*, target tags `20*`): only the maintainers may create, update or delete them. PyPI trusts the workflow file of whatever commit is tagged, so whoever can push a release tag could otherwise publish their own workflow.
+4. **GitHub, environments** (*Settings › Environments*):
+   - `pypi`: the maintainer(s) as required reviewers, *Prevent self-review* on, *Allow administrators to bypass* off, deployment refs limited to tags `20*`;
+   - `testpypi`: required reviewers and *Prevent self-review* as well, with deployment branches limited to `devel`.
+
+**By hand,** if the workflow can't be used: build from the release tag with `python -m build` in both folders. Then run `twine upload`, `cimpal-client` first, with a project-scoped API token.

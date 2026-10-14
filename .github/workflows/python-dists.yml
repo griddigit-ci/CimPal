@@ -1,0 +1,140 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Builds the Python packages cimpal-client (clients/python) and airflow-provider-cimpal
+# (clients/airflow) and checks them; it never publishes. Called by release.yml (PyPI) and
+# testpypi.yml (the rehearsal), which publish the artifacts in their own job: PyPI's trusted
+# publishing matches the top-level workflow, so the job that uploads must live there.
+#
+# Both packages take their version from <cimpal.version> in pom.xml, and the provider pins
+# cimpal-client to the same version. For a release tag that version must equal the tag; a
+# version-suffix (e.g. .dev12 for TestPyPI) is applied to the pom on the runner only.
+name: Python packages
+
+on:
+  workflow_call:
+    inputs:
+      version-suffix:
+        description: 'Appended to the pom version, e.g. .dev12 (empty for a release)'
+        type: string
+        default: ''
+    outputs:
+      version:
+        description: 'The version both packages were built with'
+        value: ${{ jobs.build.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # The whole history, so a release tag can be checked to lie on master.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      # Hash-locked, with the builds below run --no-isolation: nothing unpinned makes the wheels.
+      - name: Install the build tools
+        run: |
+          pip install --require-hashes --only-binary :all: -r .github/python-build-requirements.txt
+
+      # Releases are cut from master; a tag on any other commit (a branch, an edited workflow) is
+      # refused before anything is built, whoever approves the publish later.
+      - name: A release tag must lie on master
+        if: github.ref_type == 'tag'
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::The tagged commit $GITHUB_SHA is not on master; nothing is published"
+            exit 1
+          fi
+
+      # The tag check runs before anything is built: a release whose pom doesn't carry its tag's
+      # version must not publish packages of another version.
+      - name: Version
+        id: version
+        env:
+          SUFFIX: ${{ inputs.version-suffix }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'EOF'
+          import os, re, pathlib
+          pom = pathlib.Path("pom.xml")
+          text = pom.read_text(encoding="utf-8")
+          match = re.search(r"<cimpal\.version>([^<]+)</cimpal\.version>", text)
+          if not match:
+              raise SystemExit("No <cimpal.version> in pom.xml")
+          base = match.group(1)
+          if os.environ["REF_TYPE"] == "tag" and os.environ["REF_NAME"] != base:
+              raise SystemExit(f"The pom version {base} is not the tag {os.environ['REF_NAME']}")
+          suffix = os.environ["SUFFIX"]
+          if suffix and not re.fullmatch(r"\.dev[0-9]+", suffix):
+              raise SystemExit(f"Unexpected version suffix {suffix!r}")
+          version = base + suffix
+          # On this runner only (never committed): both packages read their version from here.
+          pom.write_text(text.replace(match.group(0), f"<cimpal.version>{version}</cimpal.version>", 1), encoding="utf-8")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"version={version}\n")
+          print(f"Building version {version}")
+          EOF
+
+      - name: Build cimpal-client
+        working-directory: clients/python
+        run: python -m build --no-isolation
+
+      - name: Build airflow-provider-cimpal
+        working-directory: clients/airflow
+        run: python -m build --no-isolation
+
+      - name: Check the distributions
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          twine check --strict clients/python/dist/* clients/airflow/dist/*
+          python - <<'EOF'
+          import os, pathlib, zipfile
+          version = os.environ["VERSION"]
+          expected = {
+              "clients/python/dist": "cimpal_client",
+              "clients/airflow/dist": "airflow_provider_cimpal",
+          }
+          for folder, name in expected.items():
+              files = sorted(p.name for p in pathlib.Path(folder).iterdir())
+              wanted = [f"{name}-{version}-py3-none-any.whl", f"{name}-{version}.tar.gz"]
+              if files != sorted(wanted):
+                  raise SystemExit(f"{folder}: expected {wanted}, found {files}")
+          wheel = pathlib.Path("clients/airflow/dist") / f"airflow_provider_cimpal-{version}-py3-none-any.whl"
+          with zipfile.ZipFile(wheel) as z:
+              metadata = z.read(f"airflow_provider_cimpal-{version}.dist-info/METADATA").decode()
+          if f"Requires-Dist: cimpal-client=={version}" not in metadata.splitlines():
+              raise SystemExit(f"The provider does not pin cimpal-client=={version}")
+          print(f"Both packages are {version}; the provider pins cimpal-client=={version}")
+          EOF
+
+      - name: Upload cimpal-client
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-client
+          path: clients/python/dist/
+          if-no-files-found: error
+
+      - name: Upload airflow-provider-cimpal
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-provider
+          path: clients/airflow/dist/
+          if-no-files-found: error

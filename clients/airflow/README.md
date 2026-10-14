@@ -55,4 +55,4 @@ The file options that `input_path` resolves mirror the CLI's `PathGuard`; `tests
 
 ## Releasing (maintainers)
 
-As for `cimpal-client` ([clients/python/README.md](../python/README.md#releasing-maintainers)): after a CimPal release, from the tagged commit, `python -m build` and `twine upload`. Publish `cimpal-client` first, since the provider requires it at the same version.
+Published together with `cimpal-client` by the release workflow, after a maintainer's approval: see [clients/python/README.md](../python/README.md#releasing-maintainers). That section also covers the TestPyPI rehearsal and the one-time PyPI and GitHub setup. `cimpal-client` goes first, since the provider requires it at the same version.
