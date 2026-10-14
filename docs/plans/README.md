@@ -52,8 +52,8 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 | D1 | [DEP-6](deployment/DEP-6.md) | Service deployment: proxy, tokens, probes, SIGTERM, logs, manifests | DEP-5, DEP-1 | M | Done (PR #64) |
 | D1 | [DEP-7](deployment/DEP-7.md) | File exchange: job workspaces, upload and download | DEP-5 | M–L | Done (PR #66) |
 | D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | Done (PR #69) |
-| D2 | [DEP-9](deployment/DEP-9.md) | Python SDK `cimpal-client` | DEP-5, DEP-7 | M | In review |
-| D2 | [DEP-10](deployment/DEP-10.md) | Airflow provider | DEP-9, DEP-3 | M | Not started |
+| D2 | [DEP-9](deployment/DEP-9.md) | Python SDK `cimpal-client` | DEP-5, DEP-7 | M | Done (PR #70) |
+| D2 | [DEP-10](deployment/DEP-10.md) | Airflow provider | DEP-9, DEP-3 | M | In review |
 
 ## Security gaps referenced by the WPs
 
