@@ -400,7 +400,6 @@ def test_an_error_while_waiting_fails_without_retries(respx_mock: respx.MockRout
 def test_execute_complete_never_succeeds_for_a_job_that_is_not_finished(
     respx_mock: respx.MockRouter, connection: Any
 ) -> None:
-    respx_mock.get("/v1/health").respond(json=health_json())
     respx_mock.get(f"/v1/jobs/{JOB_ID}").respond(json=job_json("running"))
     op = CimPalValidateOperator(task_id="v", config={}, deferrable=True)
     with pytest.raises(AirflowFailException, match="not finished"):
@@ -425,16 +424,16 @@ def test_a_relative_download_folder_works(
 
 
 @respx.mock(base_url=BASE)
-def test_the_copied_server_log_is_cleaned(
-    respx_mock: respx.MockRouter, connection: Any, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_the_copied_server_log_is_cleaned(respx_mock: respx.MockRouter, connection: Any) -> None:
     server(respx_mock, job_json("succeeded", exit_code=0, has_violations=False), result={})
     escape = chr(27)
     respx_mock.get(f"/v1/jobs/{JOB_ID}/log").respond(json=log_json(["ok" + escape + "[31m red", "y" * 5000]))
-    with caplog.at_level("INFO"):
+    logger = mock.MagicMock()
+    with mock.patch.object(CimPalValidateOperator, "log", new_callable=mock.PropertyMock, return_value=logger):
         CimPalValidateOperator(task_id="v", config={}, deferrable=False).execute(context())
-    copied = [r.getMessage() for r in caplog.records if "[cimpal]" in r.getMessage()]
-    assert copied and all(escape not in m and len(m) < 1100 for m in copied)
+    copied = [c.args[1] for c in logger.info.call_args_list if c.args and c.args[0] == "[cimpal] %s"]
+    assert len(copied) == 2
+    assert all(escape not in line and len(line) < 1100 for line in copied)
 
 
 def test_verify_off_spelled_another_way_fails_the_connection_test(connection: Any) -> None:
@@ -469,7 +468,6 @@ def test_the_trigger_holds_no_token() -> None:
 
 def test_the_sensor_defers_and_resumes(connection: Any) -> None:
     with respx.mock(base_url=BASE) as respx_mock:
-        respx_mock.get("/v1/health").respond(json=health_json())
         respx_mock.get(f"/v1/jobs/{JOB_ID}").mock(
             side_effect=[
                 httpx.Response(200, json=job_json("running")),
