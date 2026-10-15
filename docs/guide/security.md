@@ -42,7 +42,8 @@ Direct use of the other commands from a shell is not restricted. The operating s
 - **Token:** every request except the health, readiness and spec endpoints needs `Authorization: Bearer <token>`. Treat it like a password. There are three sources:
   - by default the token is new on every start and written to a file only your user can read;
   - it can be taken from `CIMPAL_API_TOKEN`;
-  - for a service, it is read from a secret file (`--token-from-file`, `CIMPAL_API_TOKEN_FILE`). That file holds up to two tokens for rotation and is never written or deleted.
+  - for a service, it is read from a secret file (`--token-from-file`, `CIMPAL_API_TOKEN_FILE`). That file is never written or deleted. It holds one or two bare tokens (for rotation), or named tokens `name:role:token` for several clients.
+- **Clients:** with named tokens, jobs and uploads belong to the client that created them. A `client` token sees only its own: another client's job or upload answers 404, exactly like one that doesn't exist, so ids don't reveal what exists. An `admin` token sees everything and is the only one that may call `/shutdown` and `/metrics`. Per-client quotas (`--client-quotas`) bound each client's queued and running jobs, uploads, work-area share and request rate (429 with `Retry-After`).
 - **Network:** `serve` binds to localhost. `--allow-remote` is needed for any other address, and the traffic is plain HTTP. There is no TLS inside CimPal (decision D-7). For network access, put a TLS-terminating reverse proxy or Ingress in front and list its public name with `--allowed-host`. See [Running CimPal as a service](service.md).
 - **Logs:** tokens and the `Authorization` header are never logged; every logged value is sanitised. `--log-format json` gives one JSON object per line.
 - **Uploads and downloads (`/v1/uploads`, job outputs):**
@@ -51,7 +52,7 @@ Direct use of the other commands from a shell is not restricted. The operating s
   - **Downloads** never leave the job's output folder, and are sent as attachments with a fixed media type.
 - **Browsers:** a Host-header check (against DNS rebinding) and an Origin check (no CORS headers are sent; `--allow-origin` lists exceptions).
 - **Limits:** request bodies up to 1 MB, one command at a time with a queue of 4, and a 30-minute timeout per request. All are configurable.
-- **Shutdown:** `POST /shutdown` with the token, SIGTERM or Ctrl-C. Queued jobs are cancelled, and a running command gets `--shutdown-grace` (60 s) to finish.
+- **Shutdown:** `POST /shutdown` with an admin token, SIGTERM or Ctrl-C. Queued jobs are cancelled, and a running command gets `--shutdown-grace` (60 s) to finish.
 
 ## Container
 

@@ -75,6 +75,38 @@ class MutableStaticsTest {
                 .isSubsetOf(found);
     }
 
+    /**
+     * A thread a job creates inherits its output binding and path policy ({@code CliStreams},
+     * {@code PathPolicy}). Core's pools are created per call and shut down with it, so their
+     * threads never outlive the job. A static executor, thread, timer or HTTP client would keep
+     * threads created during one job and run another job's work on them, with the first job's
+     * streams and policy: another client's log and files (DEP-13). None may exist unreviewed.
+     */
+    @Test
+    void noStaticFieldHoldsThreadsThatOutliveAJob() throws Exception {
+        List<Class<?>> threadOwners = List.of(java.util.concurrent.Executor.class, Thread.class,
+                java.util.Timer.class, java.net.http.HttpClient.class, ThreadGroup.class);
+        TreeSet<String> found = new TreeSet<>();
+        for (Path location : List.of(location(PathPolicy.class), location(ServeServer.class))) {
+            for (String className : classNames(location)) {
+                Field[] fields;
+                try {
+                    fields = Class.forName(className, false, MutableStaticsTest.class.getClassLoader())
+                            .getDeclaredFields();
+                } catch (ClassNotFoundException | LinkageError e) {
+                    continue;
+                }
+                for (Field field : fields) {
+                    if (Modifier.isStatic(field.getModifiers())
+                            && threadOwners.stream().anyMatch(t -> t.isAssignableFrom(field.getType()))) {
+                        found.add(className + "#" + field.getName());
+                    }
+                }
+            }
+        }
+        assertThat(found).as("static fields holding threads shared across serve jobs").isEmpty();
+    }
+
     private static Path location(Class<?> type) throws URISyntaxException {
         return Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI());
     }

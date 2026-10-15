@@ -9,6 +9,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import eu.griddigit.CimPal.cli.CliVersion;
 import eu.griddigit.CimPal.cli.OutOfMemoryExit;
+import eu.griddigit.CimPal.cli.command.TokenSource.Client;
 import eu.griddigit.cimpal.core.utils.LogSanitizer;
 import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
 
@@ -87,6 +88,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@code GET /ready} (no token) is 200 while the server takes work and 503 when it is shutting
  * down or its queue is full. With {@code --metrics}, {@code GET /metrics} (token) serves
  * Prometheus text. Server events go to a {@link ServeLog}, as text or JSON lines.
+ *
+ * <h2>Clients (DEP-13)</h2>
+ * <p>Each token stands for a {@link Client}. Jobs and uploads belong to the client that created
+ * them: a client sees, lists, reads, downloads and cancels only its own, and anything else answers
+ * 404 as if it didn't exist; an admin sees everything. {@code /shutdown} and {@code /metrics} need
+ * an admin. {@link ClientQuotas} limit each client's queued and running jobs (429), uploads (413),
+ * share of the work area (507) and requests per minute (429), and {@link JobScheduler} lets other
+ * clients' jobs overtake those of a client at its {@code maxRunning}. Logs and metrics carry the
+ * client's name, never its token.
  */
 final class ServeServer implements AutoCloseable {
 
@@ -151,6 +161,8 @@ final class ServeServer implements AutoCloseable {
     private static final Pattern UUID_TEXT =
             Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** The exchange attribute that holds the authenticated client's name, for the log. */
+    private static final String CLIENT_ATTRIBUTE = "cimpal.client";
 
     /** What a command printed on stdout (its JSON) and its exit code. */
     record CommandResult(int exitCode, String stdout) {
@@ -214,7 +226,8 @@ final class ServeServer implements AutoCloseable {
                   Duration jobTimeout, int maxJobs, Duration jobTtl, int jobLogLines, long maxResultBytes,
                   long jobStoreBytes, Set<String> allowedHosts, boolean metrics, ServeLog log,
                   Path workRoot, long maxUploadBytes, Duration uploadTtl, long workMaxBytes, Duration requestReadTime,
-                  int workers, long maxConcurrentHeapBytes, SizeEstimator sizeEstimator) {
+                  int workers, long maxConcurrentHeapBytes, SizeEstimator sizeEstimator,
+                  ClientQuotas.Settings clientQuotas) {
 
         static Builder builder() {
             return new Builder();
@@ -250,6 +263,8 @@ final class ServeServer implements AutoCloseable {
             /** By default three quarters of the heap. */
             private long maxConcurrentHeapBytes = Runtime.getRuntime().maxMemory() / 4 * 3;
             private SizeEstimator sizeEstimator = SizeEstimator.NONE;
+            /** Per-client limits (DEP-13); by default every client gets the server's limits. */
+            private ClientQuotas.Settings clientQuotas = ClientQuotas.Settings.NONE;
 
             Builder host(String host) { this.host = host; return this; }
             Builder port(int port) { this.port = port; return this; }
@@ -279,6 +294,7 @@ final class ServeServer implements AutoCloseable {
             Builder workers(int workers) { this.workers = workers; return this; }
             Builder maxConcurrentHeapBytes(long bytes) { this.maxConcurrentHeapBytes = bytes; return this; }
             Builder sizeEstimator(SizeEstimator sizeEstimator) { this.sizeEstimator = sizeEstimator; return this; }
+            Builder clientQuotas(ClientQuotas.Settings clientQuotas) { this.clientQuotas = clientQuotas; return this; }
 
             Config build() {
                 TokenSource source = tokens != null ? tokens
@@ -286,7 +302,7 @@ final class ServeServer implements AutoCloseable {
                 return new Config(host, port, source, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
                         requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes,
                         allowedHosts, metrics, log, workRoot, maxUploadBytes, uploadTtl, workMaxBytes, requestReadTime,
-                        workers, maxConcurrentHeapBytes, sizeEstimator);
+                        workers, maxConcurrentHeapBytes, sizeEstimator, clientQuotas);
             }
         }
     }
@@ -317,6 +333,12 @@ final class ServeServer implements AutoCloseable {
     private WorkArea workArea;
     /** The workspace of each job that uses an upload. */
     private final Map<UUID, WorkArea.JobWorkspace> workspaces = new ConcurrentHashMap<>();
+    /** Each client's limits (DEP-13). */
+    private final ClientQuotas quotas;
+    /** Which queued job runs next. */
+    private final JobScheduler scheduler;
+    /** Held while a submit checks its client's quota and queues the job, so two can't both pass. */
+    private final Object submitLock = new Object();
 
     private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck, Runnable onOutOfMemory,
                         InstantSource clock) {
@@ -339,6 +361,10 @@ final class ServeServer implements AutoCloseable {
         this.worker = new ThreadPoolExecutor(config.workers(), config.workers(), 0, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(), daemonThreads("cimpal-serve-worker"));
         this.admission = new AdmissionGate(config.maxConcurrentHeapBytes());
+        // maxQueued: no limit of a client's own unless the file sets one; the queue bounds it anyway.
+        this.quotas = new ClientQuotas(config.clientQuotas(), new ClientQuotas.Limits(ClientQuotas.NO_QUEUE_LIMIT,
+                config.workers(), config.maxUploadBytes(), config.workMaxBytes(), 0), clock);
+        this.scheduler = new JobScheduler(owner -> quotas.limits(owner).maxRunning());
     }
 
     /** A running command: its job (null for a synchronous request) and when it started (System.nanoTime). */
@@ -455,6 +481,9 @@ final class ServeServer implements AutoCloseable {
         if (config.sizeEstimator() == null) {
             throw new IllegalArgumentException("A size estimator is required.");
         }
+        if (config.clientQuotas() == null) {
+            throw new IllegalArgumentException("Client quotas are required (ClientQuotas.Settings.NONE for none).");
+        }
         if (config.requestTimeout() == null || config.requestTimeout().isNegative()
                 || config.requestTimeout().isZero()) {
             throw new IllegalArgumentException("--request-timeout must be positive.");
@@ -506,6 +535,11 @@ final class ServeServer implements AutoCloseable {
     /** The job store (tests). */
     JobManager jobsForTest() {
         return jobs;
+    }
+
+    /** The job queue (tests). */
+    JobScheduler schedulerForTest() {
+        return scheduler;
     }
 
     /** Tasks waiting in the worker's queue (tests: a cancelled job must not stay there). */
@@ -598,17 +632,17 @@ final class ServeServer implements AutoCloseable {
                 case "/metrics" -> {
                     if (!config.metrics()) {
                         reject(exchange, 404, "Not found (start serve with --metrics)", method, path);
-                    } else if (requireMethod(exchange, method, "GET", path) && requireToken(exchange, method, path)) {
+                    } else if (requireMethod(exchange, method, "GET", path) && requireAdmin(exchange, method, path) != null) {
                         respond(exchange, 200, metricsText(), ServeMetrics.CONTENT_TYPE);
                     }
                 }
                 case "/commands" -> {
-                    if (requireMethod(exchange, method, "GET", path) && requireToken(exchange, method, path)) {
+                    if (requireMethod(exchange, method, "GET", path) && requireClient(exchange, method, path) != null) {
                         respond(exchange, 200, commandsJson());
                     }
                 }
                 case "/shutdown" -> {
-                    if (requireMethod(exchange, method, "POST", path) && requireToken(exchange, method, path)
+                    if (requireMethod(exchange, method, "POST", path) && requireAdmin(exchange, method, path) != null
                             && readJsonBody(exchange, method, path) != null) {
                         respond(exchange, 200, "{\"status\":\"shutting down\"}");
                         Thread stopper = new Thread(this::close, "cimpal-serve-stop");
@@ -619,10 +653,11 @@ final class ServeServer implements AutoCloseable {
                 default -> {
                     if (command == null) {
                         reject(exchange, 404, "Not found", method, path);
-                    } else if (requireMethod(exchange, method, "POST", path) && requireToken(exchange, method, path)) {
-                        byte[] body = readJsonBody(exchange, method, path);
+                    } else if (requireMethod(exchange, method, "POST", path)) {
+                        Client client = requireClient(exchange, method, path);
+                        byte[] body = client == null ? null : readJsonBody(exchange, method, path);
                         if (body != null) {
-                            runCommand(exchange, command, body);
+                            runCommand(exchange, command, body, client);
                         }
                     }
                 }
@@ -648,13 +683,37 @@ final class ServeServer implements AutoCloseable {
         return false;
     }
 
-    private boolean requireToken(HttpExchange exchange, String method, String path) throws IOException {
-        if (config.tokens().matches(exchange.getRequestHeaders().getFirst("Authorization"))) {
-            return true;
+    /**
+     * The client whose bearer token the request carries; null after answering 401 (no valid
+     * token) or 429 (the client's {@code requestsPerMinute} is used up).
+     */
+    private Client requireClient(HttpExchange exchange, String method, String path) throws IOException {
+        Client client = config.tokens().authenticate(exchange.getRequestHeaders().getFirst("Authorization"));
+        if (client == null) {
+            exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
+            reject(exchange, 401, "Missing or invalid bearer token", method, path);
+            return null;
         }
-        exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
-        reject(exchange, 401, "Missing or invalid bearer token", method, path);
-        return false;
+        exchange.setAttribute(CLIENT_ATTRIBUTE, client.name());
+        long wait = quotas.acquireRequest(client.name());
+        if (wait > 0) {
+            metrics.quotaRefused(client.name(), "requests_per_minute");
+            exchange.getResponseHeaders().set("Retry-After", Long.toString(wait));
+            reject(exchange, 429, "Too many requests: this client may send "
+                    + quotas.limits(client.name()).requestsPerMinute() + " per minute", method, path);
+            return null;
+        }
+        return client;
+    }
+
+    /** As {@link #requireClient}, and 403 (null) unless the client is an admin. */
+    private Client requireAdmin(HttpExchange exchange, String method, String path) throws IOException {
+        Client client = requireClient(exchange, method, path);
+        if (client != null && !client.admin()) {
+            reject(exchange, 403, "This needs an admin token", method, path);
+            return null;
+        }
+        return client;
     }
 
     /** The request body, or null after answering 415 or 413. An empty body becomes {@code {}}. */
@@ -707,21 +766,24 @@ final class ServeServer implements AutoCloseable {
                 }
             }
             case "/v1/jobs" -> {
-                if (allowMethods(exchange, method, path, "GET", "POST") && requireToken(exchange, method, path)) {
+                Client client = allowMethods(exchange, method, path, "GET", "POST")
+                        ? requireClient(exchange, method, path) : null;
+                if (client != null) {
                     if (method.equals("POST")) {
                         byte[] body = readJsonBody(exchange, method, path);
                         if (body != null) {
-                            submitJob(exchange, body);
+                            submitJob(exchange, body, client);
                         }
                     } else {
-                        listJobs(exchange, path);
+                        listJobs(exchange, path, client);
                     }
                 }
             }
             case "/v1/uploads" -> {
-                if (allowMethods(exchange, method, path, "POST") && requireToken(exchange, method, path)
-                        && requireWorkArea(exchange, method, path)) {
-                    receiveUpload(exchange, path);
+                Client client = allowMethods(exchange, method, path, "POST")
+                        ? requireClient(exchange, method, path) : null;
+                if (client != null && requireWorkArea(exchange, method, path)) {
+                    receiveUpload(exchange, path, client);
                 }
             }
             default -> {
@@ -753,12 +815,14 @@ final class ServeServer implements AutoCloseable {
         boolean allowed = sub.isEmpty()
                 ? allowMethods(exchange, method, path, "GET", "DELETE")
                 : allowMethods(exchange, method, path, "GET");
-        if (!allowed || !requireToken(exchange, method, path)) {
+        Client client = allowed ? requireClient(exchange, method, path) : null;
+        if (client == null) {
             return;
         }
         // Only the canonical lower-case form: anything else is simply not a job of this server.
         Job job = UUID_TEXT.matcher(idText).matches() ? jobs.get(UUID.fromString(idText)) : null;
-        if (job == null) {
+        // Another client's job answers exactly as one that doesn't exist (DEP-13).
+        if (job == null || !client.sees(job.owner())) {
             reject(exchange, 404, "No such job", method, path);
             return;
         }
@@ -778,7 +842,7 @@ final class ServeServer implements AutoCloseable {
         }
     }
 
-    private void submitJob(HttpExchange exchange, byte[] requestBody) throws IOException {
+    private void submitJob(HttpExchange exchange, byte[] requestBody, Client client) throws IOException {
         String path = "/v1/jobs";
         JsonNode request;
         try {
@@ -820,6 +884,7 @@ final class ServeServer implements AutoCloseable {
             label = labelNode.asString();
         }
         UUID jobId = jobs.newId();
+        ClientQuotas.Limits limits = quotas.limits(client.name());
         WorkArea.JobWorkspace workspace = null;
         JsonNode uploadNode = request.get("inputUpload");
         if (uploadNode != null && !uploadNode.isNull()) {
@@ -831,10 +896,17 @@ final class ServeServer implements AutoCloseable {
                 return;
             }
             workArea.evict();
+            // Its outputs will count against the client's share: none is left for them.
+            if (workArea.usedBytes(client.name()) >= limits.maxWorkBytes()) {
+                reject(exchange, 507, "This client's share of the work area is full (maxWorkBytes "
+                        + limits.maxWorkBytes() + "); delete uploads or wait for old jobs to expire", "POST", path);
+                return;
+            }
             String uploadText = uploadNode.asString();
             try {
+                // Only the client's own upload (DEP-13); another client's is "no such upload".
                 workspace = UUID_TEXT.matcher(uploadText).matches()
-                        ? workArea.prepare(jobId, UUID.fromString(uploadText)) : null;
+                        ? workArea.prepare(jobId, UUID.fromString(uploadText), client.name()) : null;
             } catch (IOException | RuntimeException e) {
                 log.error("job.workspace", "serve: could not prepare a job workspace: " + e.getClass().getSimpleName());
                 reject(exchange, 500, "Could not prepare the job's workspace", "POST", path);
@@ -868,33 +940,83 @@ final class ServeServer implements AutoCloseable {
             reject(exchange, 503, "Server is shutting down", "POST", path);
             return;
         }
-        if (!slots.tryAcquire()) {
+        Job job = null;
+        int unfinished = 0;
+        boolean busy = false;
+        synchronized (submitLock) {
+            unfinished = scheduler.unfinished(client.name());
+            if (unfinished < limits.maxQueued() + limits.maxRunning()) {
+                busy = !slots.tryAcquire();
+                if (!busy) {
+                    job = jobs.create(jobId, command, label, client.name());
+                    if (job == null) { // newId() rules this out; never keep the slot
+                        slots.release();
+                        busy = true;
+                    }
+                }
+                if (job != null) {
+                    if (workspace != null) {
+                        workspaces.put(jobId, workspace);
+                    }
+                    scheduler.add(job, body);
+                }
+            }
+        }
+        if (job == null) {
             discardWorkspace(jobId, workspace);
             exchange.getResponseHeaders().set("Retry-After", "30");
-            reject(exchange, 503, "Server busy: " + config().queueSize() + " requests already waiting", "POST", path);
+            if (busy) {
+                reject(exchange, 503, "Server busy: " + config().queueSize() + " requests already waiting", "POST", path);
+            } else {
+                metrics.quotaRefused(client.name(), "max_queued");
+                reject(exchange, 429, "Too many jobs: this client has " + unfinished + " queued or running (maxQueued "
+                        + limits.maxQueued() + ", maxRunning " + limits.maxRunning() + ")", "POST", path);
+            }
             return;
         }
-        Job job = jobs.create(jobId, command, label);
-        if (workspace != null) {
-            workspaces.put(jobId, workspace);
-        }
         log.info("job.queued", "serve: job " + job.id() + " (" + command + ") queued", "jobId", job.id().toString(),
-                "command", command, "remote", remote(exchange));
+                "command", command, "client", client.name(), "remote", remote(exchange));
         try {
-            queuedTasks.put(job.id(), worker.submit(() -> runJob(job, body)));
+            queuedTasks.put(job.id(), worker.submit(this::jobTurn));
         } catch (RejectedExecutionException e) {
             if (job.cancel(jobs.now(), "Server shut down before the job started")) {
+                dropQueuedTask(job);
                 slots.release();
                 jobCancelled(job);
             }
             reject(exchange, 503, "Server is shutting down", "POST", path);
             return;
         }
-        if (job.snapshot().status() == JobStatus.CANCELLED) {
+        JobStatus now = job.snapshot().status();
+        if (now == JobStatus.CANCELLED) {
             dropQueuedTask(job); // Cancelled (listed and deleted) before its task was recorded.
+        } else if (now != JobStatus.QUEUED) {
+            queuedTasks.remove(job.id()); // Another turn ran it already; its own turn is a spare.
         }
         exchange.getResponseHeaders().set("Location", "/v1/jobs/" + job.id());
         respond(exchange, 202, jobJson(job.snapshot()));
+    }
+
+    /**
+     * On a worker: one turn of the job queue. It runs the job {@link JobScheduler} picks, which
+     * need not be the one it was queued for; with none it parks (or its job was cancelled).
+     */
+    private void jobTurn() {
+        JobScheduler.Entry next = scheduler.next();
+        if (next == null) {
+            return;
+        }
+        try {
+            runJob(next.job(), next.body());
+        } finally {
+            if (scheduler.finished(next.job().owner())) {
+                try {
+                    worker.submit(this::jobTurn); // a parked turn: a queued job may run now
+                } catch (RejectedExecutionException e) {
+                    // Shutting down: close() cancels what is still queued.
+                }
+            }
+        }
     }
 
     /** On the worker. The job owns its queue slot from submit until this returns (or a cancel). */
@@ -940,7 +1062,7 @@ final class ServeServer implements AutoCloseable {
         }
         long started = System.nanoTime();
         log.info("job.started", "serve: job " + job.id() + " (" + job.command() + ") started",
-                "jobId", job.id().toString(), "command", job.command());
+                "jobId", job.id().toString(), "command", job.command(), "client", job.owner());
         Object key = new Object();
         running.put(key, new Running(job, started));
         try {
@@ -958,7 +1080,8 @@ final class ServeServer implements AutoCloseable {
                 return;
             }
             log.error("job.error", "serve: job " + job.id() + " (" + job.command() + ") failed: "
-                    + t.getClass().getSimpleName(), "jobId", job.id().toString(), "command", job.command());
+                    + t.getClass().getSimpleName(), "jobId", job.id().toString(), "command", job.command(),
+                    "client", job.owner());
             job.fail(jobs.now(), "Internal error while running " + job.command());
         } finally {
             running.remove(key);
@@ -969,10 +1092,10 @@ final class ServeServer implements AutoCloseable {
             }
             long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
             Job.Snapshot s = job.snapshot();
-            metrics.jobFinished(s.status(), millis / 1000.0);
+            metrics.jobFinished(job.owner(), s.status(), millis / 1000.0);
             log.info("job.finished", "serve: job " + job.id() + " (" + job.command() + ") " + s.status().apiName(),
-                    "jobId", job.id().toString(), "command", job.command(), "status", s.status().apiName(),
-                    "exitCode", s.exitCode(), "durationMs", millis);
+                    "jobId", job.id().toString(), "command", job.command(), "client", job.owner(),
+                    "status", s.status().apiName(), "exitCode", s.exitCode(), "durationMs", millis);
         }
         jobs.evict(); // Keep the store within --job-store-bytes as results arrive.
     }
@@ -981,9 +1104,10 @@ final class ServeServer implements AutoCloseable {
         if (workArea != null && workspaces.containsKey(job.id())) {
             workArea.jobEnded(job.id()); // its upload is free to expire again
         }
-        metrics.jobFinished(JobStatus.CANCELLED, -1);
+        metrics.jobFinished(job.owner(), JobStatus.CANCELLED, -1);
         log.info("job.finished", "serve: job " + job.id() + " (" + job.command() + ") cancelled",
-                "jobId", job.id().toString(), "command", job.command(), "status", JobStatus.CANCELLED.apiName());
+                "jobId", job.id().toString(), "command", job.command(), "client", job.owner(),
+                "status", JobStatus.CANCELLED.apiName());
     }
 
     /** The ids of the jobs running now (synchronous requests have none). */
@@ -1003,8 +1127,12 @@ final class ServeServer implements AutoCloseable {
         }
     }
 
-    /** Takes a cancelled job's task out of the worker's queue, so its request body is freed now. */
+    /**
+     * Takes a cancelled job out of the queue, so its request body is freed now, and one turn out
+     * of the worker's queue (turns are interchangeable).
+     */
     private void dropQueuedTask(Job job) {
+        scheduler.remove(job.id());
         Future<?> task = queuedTasks.remove(job.id());
         if (task instanceof Runnable runnable) {
             worker.remove(runnable);
@@ -1043,8 +1171,8 @@ final class ServeServer implements AutoCloseable {
         }
     }
 
-    /** {@code POST /v1/uploads}: a ZIP body, streamed to disk and extracted. */
-    private void receiveUpload(HttpExchange exchange, String path) throws IOException {
+    /** {@code POST /v1/uploads}: a ZIP body, streamed to disk and extracted; it belongs to {@code client}. */
+    private void receiveUpload(HttpExchange exchange, String path, Client client) throws IOException {
         String type = exchange.getRequestHeaders().getFirst("Content-Type");
         String mediaType = type == null ? "" : type.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
         if (!mediaType.equals(ZIP)) {
@@ -1063,8 +1191,10 @@ final class ServeServer implements AutoCloseable {
             }
         }
         WorkArea.Upload upload;
+        ClientQuotas.Limits limits = quotas.limits(client.name());
         try {
-            upload = workArea.receive(exchange.getRequestBody(), declared);
+            upload = workArea.receive(exchange.getRequestBody(), declared, client.name(), limits.maxUploadBytes(),
+                    limits.maxWorkBytes());
         } catch (WorkArea.Refused e) {
             if (e.status() == 413) {
                 exchange.getResponseHeaders().set("Connection", "close");
@@ -1073,7 +1203,8 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         log.info("upload.received", "serve: upload " + upload.id + " (" + upload.files.size() + " files, "
-                + upload.totalBytes + " bytes)", "uploadId", upload.id.toString(), "remote", remote(exchange));
+                + upload.totalBytes + " bytes)", "uploadId", upload.id.toString(), "client", client.name(),
+                "remote", remote(exchange));
         exchange.getResponseHeaders().set("Location", "/v1/uploads/" + upload.id);
         respond(exchange, 201, JSON.writeValueAsString(uploadNode(upload)));
     }
@@ -1085,14 +1216,16 @@ final class ServeServer implements AutoCloseable {
             reject(exchange, 404, "Not found", method, path);
             return;
         }
-        if (!allowMethods(exchange, method, path, "GET", "DELETE") || !requireToken(exchange, method, path)
-                || !requireWorkArea(exchange, method, path)) {
+        Client client = allowMethods(exchange, method, path, "GET", "DELETE")
+                ? requireClient(exchange, method, path) : null;
+        if (client == null || !requireWorkArea(exchange, method, path)) {
             return;
         }
         workArea.evict();
         UUID id = UUID_TEXT.matcher(idText).matches() ? UUID.fromString(idText) : null;
         WorkArea.Upload upload = id == null ? null : workArea.upload(id);
-        if (upload == null) {
+        // Another client's upload answers exactly as one that doesn't exist (DEP-13).
+        if (upload == null || !client.sees(upload.owner)) {
             reject(exchange, 404, "No such upload", method, path);
             return;
         }
@@ -1329,11 +1462,20 @@ final class ServeServer implements AutoCloseable {
         respond(exchange, 200, JSON.writeValueAsString(node));
     }
 
-    private void listJobs(HttpExchange exchange, String path) throws IOException {
+    /** A client lists its own jobs; an admin every client's, or one client's with {@code ?owner=}. */
+    private void listJobs(HttpExchange exchange, String path, Client client) throws IOException {
         Map<String, String> query = query(exchange);
         if (query == null) {
             reject(exchange, 400, "Malformed query string", "GET", path);
             return;
+        }
+        String owner = client.admin() ? null : client.name();
+        if (query.containsKey("owner")) {
+            if (!client.sees(query.get("owner"))) {
+                reject(exchange, 403, "Only an admin token may list other clients' jobs", "GET", path);
+                return;
+            }
+            owner = query.get("owner");
         }
         JobStatus status = null;
         if (query.containsKey("status")) {
@@ -1358,7 +1500,7 @@ final class ServeServer implements AutoCloseable {
         }
         ObjectNode node = JSON.createObjectNode();
         ArrayNode list = node.putArray("jobs");
-        for (Job job : jobs.list(status, limit)) {
+        for (Job job : jobs.list(status, owner, limit)) {
             list.add(jobNode(job.snapshot()));
         }
         respond(exchange, 200, JSON.writeValueAsString(node));
@@ -1374,6 +1516,7 @@ final class ServeServer implements AutoCloseable {
         node.put("jobId", s.id().toString());
         node.put("command", s.command());
         node.put("label", s.label());
+        node.put("owner", s.owner());
         node.put("status", s.status().apiName());
         node.put("createdAt", s.createdAt().toString());
         node.put("startedAt", s.startedAt() == null ? null : s.startedAt().toString());
@@ -1471,7 +1614,8 @@ final class ServeServer implements AutoCloseable {
     // Synchronous command endpoints
     // -------------------------------------------------------------------------
 
-    private void runCommand(HttpExchange exchange, String command, byte[] requestBody) throws IOException {
+    private void runCommand(HttpExchange exchange, String command, byte[] requestBody, Client client)
+            throws IOException {
         long received = System.nanoTime();
         byte[] body;
         try {
@@ -1481,7 +1625,7 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         if (!slots.tryAcquire()) {
-            metrics.request(command, "busy");
+            metrics.request(client.name(), command, "busy");
             exchange.getResponseHeaders().set("Retry-After", "30");
             reject(exchange, 503, "Server busy: " + config.queueSize() + " requests already waiting",
                     "POST", "/" + command);
@@ -1541,7 +1685,7 @@ final class ServeServer implements AutoCloseable {
                 // Don't interrupt: a command cut off mid-write could leave truncated reports.
                 future.cancel(false);
             }
-            metrics.request(command, "timeout");
+            metrics.request(client.name(), command, "timeout");
             reject(exchange, 504, "Command did not finish within " + config.requestTimeout(), "POST", "/" + command);
             return;
         } catch (ExecutionException e) {
@@ -1556,9 +1700,9 @@ final class ServeServer implements AutoCloseable {
                 onOutOfMemory.run();
                 return;
             }
-            metrics.request(command, "error");
+            metrics.request(client.name(), command, "error");
             log.error("command.failed", "serve: /" + command + " failed: " + e.getCause().getClass().getSimpleName(),
-                    "command", command, "remote", remote(exchange));
+                    "command", command, "client", client.name(), "remote", remote(exchange));
             respond(exchange, 500, error("Internal error while running " + command));
             return;
         } catch (InterruptedException e) {
@@ -1577,9 +1721,9 @@ final class ServeServer implements AutoCloseable {
         }
         // Exit 0 and 1 (violations) are results; 2 is bad input; anything else is an error.
         int status = result.exitCode() <= 1 ? 200 : (result.exitCode() == 2 ? 400 : 500);
-        metrics.request(command, ServeMetrics.outcome(result.exitCode()));
+        metrics.request(client.name(), command, ServeMetrics.outcome(result.exitCode()));
         log.info("command.finished", "serve: /" + command + " exit " + result.exitCode(), "command", command,
-                "exitCode", result.exitCode(), "status", status,
+                "client", client.name(), "exitCode", result.exitCode(), "status", status,
                 "durationMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - received), "remote", remote(exchange));
         respond(exchange, status, responseBody);
     }
@@ -1667,7 +1811,7 @@ final class ServeServer implements AutoCloseable {
         log.warn("request.rejected", "serve: " + status + " " + LogSanitizer.forLog(method) + " "
                         + LogSanitizer.forLog(path) + " - " + LogSanitizer.forLog(message),
                 "status", status, "method", method, "path", path, "remote", remote(exchange),
-                "jobId", jobId == null ? null : jobId.toString());
+                "client", exchange.getAttribute(CLIENT_ATTRIBUTE), "jobId", jobId == null ? null : jobId.toString());
     }
 
     /** The client's address (the proxy's, behind one); never a header the client chose. */

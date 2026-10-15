@@ -124,7 +124,7 @@ Every error is a `CimPalError` with `status`, `title`, `detail` and `job_id` fro
 | `NotFoundError` | 404: no such job, upload or file (finished jobs are dropped after `--job-ttl`) |
 | `ConflictError` | 409: e.g. the result of a job that hasn't finished, or cancelling a running job |
 | `GoneError` | 410: the result was larger than `--max-result-bytes` and wasn't kept |
-| `BusyError` | 503: the queue is full; `retry_after` says how long to wait |
+| `BusyError` | 503: the queue is full; or 429: this client's quota is used up (too many queued jobs or requests). `retry_after` says how long to wait |
 | `TimeoutError` | 504, a request without an answer in time, or `wait()` ran out of time |
 | `ServerError` | other 5xx (507: the server's work area is full) |
 
@@ -132,9 +132,9 @@ Every error is a `CimPalError` with `status`, `title`, `detail` and `job_id` fro
 
 ## Retries and timeouts
 
-- **Busy server:** a 503 is retried up to `retries` times (default 3). The wait is the server's `Retry-After` (at most 5 minutes), or else `backoff` × 2ⁿ seconds (1, 2, 4 … up to 30).
+- **Busy server:** a 503 or 429 is retried up to `retries` times (default 3). The wait is the server's `Retry-After` (at most 5 minutes), or else `backoff` × 2ⁿ seconds (1, 2, 4 … up to 30).
 - **Unreachable server:** a request that never reached it (connection refused, DNS) is retried the same way.
-- **A 503 to a `submit` or `upload`:** retried only when CimPal sent it (problem details or `Retry-After`), because CimPal then refused the request before accepting it. A proxy's 503 may come after the server got the request, so it raises `BusyError` instead.
+- **A 503 or 429 to a `submit` or `upload`:** retried only when CimPal sent it (problem details or `Retry-After`), because CimPal then refused the request before accepting it. A proxy's 503 may come after the server got the request, so it raises `BusyError` instead.
 - **Answer lost on the way back:** such a request (a read timeout, a dropped connection) is retried only when it is a `GET`. A `submit` is therefore never sent twice: if it fails that way, check `list_jobs()` before submitting again.
 - **Request timeout:** `timeout` bounds each request, not the job; use `wait(timeout=)` for the job.
 

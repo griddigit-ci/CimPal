@@ -18,6 +18,7 @@ client ──HTTPS──▶ reverse proxy / Ingress ──HTTP──▶ CimPal s
 - **TLS ends at the proxy** (decision D-7). CimPal speaks plain HTTP and should only be reachable from the proxy: an internal Docker network, or a ClusterIP Service.
 - **The public name** the clients use goes into `--allowed-host`, because `serve` refuses Host headers it doesn't know.
 - **The token** comes from a secret file (`CIMPAL_API_TOKEN_FILE`) that you manage. `serve` never writes it, accepts two tokens while you rotate, and picks up changes within a minute.
+- **Several clients** (teams, pipelines, organisations) each get a named token (`name:client:token`) in that file, and optionally quotas (`--client-quotas`). Each sees only its own jobs and uploads, and none can fill the queue or the disk for the others; see [Clients and quotas](../cli/serve.md#clients-and-quotas).
 - **Files**, in one of two modes:
   - **Shared volume:** the models are on a volume mounted at `/data`, and paths in job configs are container paths under it. Best for large model sets, and when the orchestrator and CimPal mount the same storage.
   - **Upload and download:** the caller uploads a ZIP (`POST /v1/uploads`), runs jobs on it (`"inputUpload"`), and downloads the outputs (`/files`, `/archive`). No shared storage is needed. Details: [serve, file exchange](../cli/serve.md#file-exchange-uploads-and-downloads).
@@ -38,7 +39,8 @@ client ──HTTPS──▶ reverse proxy / Ingress ──HTTP──▶ CimPal s
 | `--allowed-host <public name>` | the name in the clients' URLs | The Host check (DNS-rebinding defence) refuses other names |
 | `CIMPAL_API_TOKEN_FILE` | the mounted secret | Read-only, rotation without a restart |
 | `--log-format json` | for log collectors | One JSON object per line; tokens never logged |
-| `--metrics` | if you run Prometheus | `GET /metrics` with the token |
+| `--metrics` | if you run Prometheus | `GET /metrics` with an admin token; job and request counters carry a `client` label |
+| `--client-quotas <file>` | with several clients | Per-client `maxQueued`, `maxRunning`, `maxUploadBytes`, `maxWorkBytes`, `requestsPerMinute` |
 | Liveness `GET /health`, readiness `GET /ready` | with header `Host: localhost:7474` | Kubernetes sends the pod IP as Host otherwise, which is refused |
 | Memory limit | from [Sizing](sizing.md), request = limit | Out of memory ends `serve` with exit code 3; it never reports a clean result |
 | Grace period | `--shutdown-grace` 60 s, container stop timeout 90 s | A running command can finish its reports on SIGTERM |
@@ -64,12 +66,12 @@ CimPal doesn't read `s3://` paths itself (decision D-6). With Airflow, either:
   3. remove the old line.
 - **Logs:** `job.finished` events carry `jobId`, `status`, `exitCode` and `durationMs`. `request.rejected` events show refused requests (401, 403, 503) with the proxy's address as `remote`.
 - **Metrics:**
-  - `cimpal_jobs_finished_total{status="failed"}` and `cimpal_requests_total{outcome="error"}` are worth an alert.
+  - `sum(cimpal_jobs_finished_total{status="failed"})` and `sum(cimpal_requests_total{outcome="error"})` are worth an alert (`by (client)` to see who).
   - So is `cimpal_jvm_heap_used_bytes` close to `cimpal_jvm_heap_max_bytes`.
 
 ## Limits
 
 - **One command at a time** per instance. A queue of `--queue-size` (default 4) waits; more get 503 with `Retry-After`. Several jobs in parallel in one JVM are planned as an option (DEP-8).
-- **No built-in TLS, users or roles:** a token holder can run every command on the files under the allowed folders. Use one instance (and token) per team or purpose where that matters.
+- **No built-in TLS or identity provider:** clients are the names in the token file, with two roles (`client`, `admin`). Every client can run every command on the files under the allowed folders, and in shared-folder mode (no upload) all clients read and write the same folders. Ownership separates jobs, uploads and their outputs, not the shared folders: give clients that must not see each other's files uploads only, or separate instances. OIDC/JWT tokens from an organisation's identity provider are a possible later option.
 - **Remote address:** `remote` in the log is the proxy's address. `serve` doesn't trust `X-Forwarded-For`, so the proxy's own access log identifies clients.
 - **Public probes:** `/health`, `/ready`, `/v1/health` and `/v1/openapi.json` need no token, so through the proxy they show anyone the version and whether the server is busy. If that matters, block those paths at the proxy for outside clients; the orchestrator's probes reach the pod directly.

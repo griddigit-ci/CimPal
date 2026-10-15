@@ -58,7 +58,8 @@ class GoneError(CimPalError):
 
 
 class BusyError(CimPalError):
-    """503: the queue is full or the server is shutting down. ``retry_after`` is in seconds."""
+    """503: the queue is full or the server is shutting down; or 429: this client's quota is used up
+    (too many queued jobs, or requests per minute). ``retry_after`` is in seconds."""
 
     def __init__(
         self,

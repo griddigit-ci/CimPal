@@ -42,8 +42,8 @@ import java.util.stream.Stream;
  * empty and has no marker is refused, so a mistyped {@code --work-root} never deletes anything.
  *
  * <p>The area is excluded from every job's path policy, so no request <em>path</em> reaches
- * another caller's files. Callers that hold the token can still list and download any job's
- * outputs through the API: {@code serve} has one trust domain (its token).
+ * another caller's files. Uploads and job outputs belong to a client (DEP-13): through the API a
+ * client reaches only its own, an admin everyone's.
  *
  * <p>Disk use is bounded by {@code --work-max-bytes}: an upload reserves its declared size (or
  * the upload limit) before it is read, and the room it may extract into before extracting, so
@@ -68,9 +68,13 @@ final class WorkArea {
         }
     }
 
-    /** One upload: its files, size and lifetime; {@code users} counts queued and running jobs. */
+    /**
+     * One upload: its files, size, lifetime and owner (the client that sent it, DEP-13);
+     * {@code users} counts queued and running jobs.
+     */
     static final class Upload {
         final UUID id;
+        final String owner;
         final Path dir;
         final List<ZipExtractor.Entry> files;
         final long totalBytes;
@@ -79,8 +83,9 @@ final class WorkArea {
         final Instant expiresAt;
         private int users;
 
-        Upload(UUID id, Path dir, ZipExtractor.Result result, Instant createdAt, Instant expiresAt) {
+        Upload(UUID id, String owner, Path dir, ZipExtractor.Result result, Instant createdAt, Instant expiresAt) {
             this.id = id;
+            this.owner = owner;
             this.dir = dir;
             this.files = result.files();
             this.totalBytes = result.files().stream().mapToLong(ZipExtractor.Entry::size).sum();
@@ -116,8 +121,13 @@ final class WorkArea {
     private final Map<UUID, UUID> jobUpload = new HashMap<>();
     /** Job id → bytes its outputs take, once it ended. */
     private final Map<UUID, Long> jobBytes = new HashMap<>();
+    /** Job id → the client whose share its outputs count against (DEP-13). */
+    private final Map<UUID, String> jobOwner = new HashMap<>();
     private long usedBytes;
     private long reservedBytes;
+    /** Per client: the bytes its uploads and job outputs take, and those reserved for its uploads now. */
+    private final Map<String, Long> ownerUsed = new HashMap<>();
+    private final Map<String, Long> ownerReserved = new HashMap<>();
 
     /**
      * Opens (or creates) the work area and empties what an earlier run left.
@@ -165,24 +175,39 @@ final class WorkArea {
      * @throws Refused 413 (too large), 507 (work area full) or 400 (not a usable ZIP)
      */
     Upload receive(InputStream body, long declaredLength) throws Refused, IOException {
-        if (declaredLength > maxUploadBytes) {
-            throw new Refused(413, "Upload larger than --max-upload-bytes (" + maxUploadBytes + " bytes)");
+        return receive(body, declaredLength, TokenSource.Client.DEFAULT.name(), maxUploadBytes, maxBytes);
+    }
+
+    /**
+     * {@link #receive(InputStream, long)} for client {@code owner} (DEP-13), whose uploads may be
+     * at most {@code ownerMaxUpload} bytes and whose uploads and job outputs may take at most
+     * {@code ownerMaxBytes} of the work area.
+     *
+     * @throws Refused 413 (too large), 507 (work area or the client's share full) or 400 (not a usable ZIP)
+     */
+    Upload receive(InputStream body, long declaredLength, String owner, long ownerMaxUpload, long ownerMaxBytes)
+            throws Refused, IOException {
+        long maxUpload = Math.min(maxUploadBytes, ownerMaxUpload);
+        if (declaredLength > maxUpload) {
+            throw tooLarge(maxUpload);
         }
-        long reserve = declaredLength >= 0 ? declaredLength : maxUploadBytes;
-        reserve(reserve);
+        long reserve = declaredLength >= 0 ? declaredLength : maxUpload;
+        reserve(reserve, owner, ownerMaxBytes);
         UUID id = UUID.randomUUID();
         Path zip = incoming.resolve(id + ".zip");
         Path dir = uploads.resolve(id.toString());
         long allowance = 0;
         try {
-            copyBounded(body, zip);
+            copyBounded(body, zip, maxUpload);
             // The room the extracted files may take, reserved now so a concurrent upload can't
             // count on it too. The archive itself is deleted right after.
             ZipExtractor.Limits limits = ZipExtractor.Limits.defaults();
             synchronized (this) {
                 long room = Math.max(0, maxBytes - usedBytes - reservedBytes + reserve);
-                allowance = Math.min(limits.maxTotalBytes(), room);
+                long ownerRoom = Math.max(0, ownerMaxBytes - ownerBytes(owner) + reserve);
+                allowance = Math.min(limits.maxTotalBytes(), Math.min(room, ownerRoom));
                 reservedBytes += allowance;
+                ownerReserved.merge(owner, allowance, Long::sum);
             }
             if (allowance < limits.maxTotalBytes()) {
                 limits = limits.withMaxTotalBytes(allowance);
@@ -194,15 +219,22 @@ final class WorkArea {
                 throw new Refused(400, "Not a usable ZIP archive: " + e.getMessage());
             }
             Instant now = clock.instant();
-            Upload upload = new Upload(id, dir, result, now, now.plus(uploadTtl));
+            Upload upload = new Upload(id, owner, dir, result, now, now.plus(uploadTtl));
             synchronized (this) {
                 uploadsById.put(id, upload);
                 usedBytes += upload.chargedBytes;
+                charge(owner, upload.chargedBytes);
             }
             return upload;
         } finally {
             synchronized (this) {
                 reservedBytes -= reserve + allowance;
+                long left = ownerReserved.getOrDefault(owner, 0L) - (reserve + allowance);
+                if (left == 0) {
+                    ownerReserved.remove(owner);
+                } else {
+                    ownerReserved.put(owner, left);
+                }
             }
             try {
                 Files.deleteIfExists(zip);
@@ -212,25 +244,53 @@ final class WorkArea {
         }
     }
 
-    private synchronized void reserve(long bytes) throws Refused {
+    private synchronized void reserve(long bytes, String owner, long ownerMaxBytes) throws Refused {
         evictLocked();
         if (usedBytes + reservedBytes + bytes > maxBytes) {
             throw new Refused(507, "The server's work area is full (--work-max-bytes " + maxBytes
                     + "); delete uploads or wait for old jobs to expire");
         }
+        if (ownerBytes(owner) + bytes > ownerMaxBytes) {
+            throw new Refused(507, "This client's share of the work area is full (maxWorkBytes " + ownerMaxBytes
+                    + "); delete uploads or wait for old jobs to expire");
+        }
         reservedBytes += bytes;
+        ownerReserved.merge(owner, bytes, Long::sum);
     }
 
-    /** Copies at most {@code maxUploadBytes}; more is refused with 413 and nothing is kept. */
-    private void copyBounded(InputStream body, Path target) throws Refused, IOException {
+    /** Under this lock: what {@code owner} takes and has reserved. */
+    private long ownerBytes(String owner) {
+        return ownerUsed.getOrDefault(owner, 0L) + ownerReserved.getOrDefault(owner, 0L);
+    }
+
+    /** Under this lock: {@code bytes} more (or, negative, fewer) for {@code owner}. */
+    private void charge(String owner, long bytes) {
+        if (owner != null) {
+            long now = ownerUsed.getOrDefault(owner, 0L) + bytes;
+            if (now == 0) {
+                ownerUsed.remove(owner);
+            } else {
+                ownerUsed.put(owner, now);
+            }
+        }
+    }
+
+    private Refused tooLarge(long maxUpload) {
+        return new Refused(413, maxUpload < maxUploadBytes
+                ? "Upload larger than this client's maxUploadBytes (" + maxUpload + " bytes)"
+                : "Upload larger than --max-upload-bytes (" + maxUploadBytes + " bytes)");
+    }
+
+    /** Copies at most {@code maxUpload} bytes; more is refused with 413 and nothing is kept. */
+    private void copyBounded(InputStream body, Path target, long maxUpload) throws Refused, IOException {
         long total = 0;
         byte[] buffer = new byte[64 * 1024];
         try (OutputStream out = Files.newOutputStream(target, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE,
                 LinkOption.NOFOLLOW_LINKS)) {
             for (int n = body.read(buffer); n >= 0; n = body.read(buffer)) {
                 total += n;
-                if (total > maxUploadBytes) {
-                    throw new Refused(413, "Upload larger than --max-upload-bytes (" + maxUploadBytes + " bytes)");
+                if (total > maxUpload) {
+                    throw tooLarge(maxUpload);
                 }
                 out.write(buffer, 0, n);
             }
@@ -259,6 +319,7 @@ final class WorkArea {
             }
             uploadsById.remove(id);
             usedBytes -= upload.chargedBytes;
+            charge(upload.owner, -upload.chargedBytes);
         }
         ZipExtractor.deleteTree(upload.dir);
         return true;
@@ -267,22 +328,24 @@ final class WorkArea {
     // ---- job workspaces ------------------------------------------------------------------
 
     /**
-     * Prepares the workspace of a job that reads {@code uploadId}: its {@code out/} folder, and
-     * the upload marked as in use until {@link #jobEnded} (or {@link #deleteWorkspace}).
+     * Prepares the workspace of a job of client {@code owner} that reads {@code uploadId}: its
+     * {@code out/} folder, and the upload marked as in use until {@link #jobEnded} (or
+     * {@link #deleteWorkspace}). The job's outputs count against {@code owner}'s share.
      *
-     * @return null when there is no such upload
+     * @return null when there is no such upload, or it isn't {@code owner}'s (DEP-13)
      */
-    JobWorkspace prepare(UUID jobId, UUID uploadId) throws IOException {
+    JobWorkspace prepare(UUID jobId, UUID uploadId, String owner) throws IOException {
         Upload upload;
         synchronized (this) {
             upload = uploadsById.get(uploadId);
-            if (upload == null) {
+            if (upload == null || !upload.owner.equals(owner)) {
                 return null;
             }
             synchronized (upload) {
                 upload.users++;
             }
             jobUpload.put(jobId, uploadId);
+            jobOwner.put(jobId, owner);
         }
         Path out = jobs.resolve(jobId.toString()).resolve("out");
         try {
@@ -304,6 +367,7 @@ final class WorkArea {
             release(jobUpload.put(jobId, null));
             Long before = jobBytes.put(jobId, bytes);
             usedBytes += bytes - (before == null ? 0 : before);
+            charge(jobOwner.get(jobId), bytes - (before == null ? 0 : before));
         }
     }
 
@@ -316,6 +380,7 @@ final class WorkArea {
             release(jobUpload.remove(jobId));
             Long bytes = jobBytes.remove(jobId);
             usedBytes -= bytes == null ? 0 : bytes;
+            charge(jobOwner.remove(jobId), -(bytes == null ? 0 : bytes));
         }
         ZipExtractor.deleteTree(jobs.resolve(jobId.toString()));
     }
@@ -402,6 +467,7 @@ final class WorkArea {
         for (Upload u : expired) {
             uploadsById.remove(u.id);
             usedBytes -= u.chargedBytes;
+            charge(u.owner, -u.chargedBytes);
         }
         expired.forEach(u -> ZipExtractor.deleteTree(u.dir));
         return expired;
@@ -409,6 +475,11 @@ final class WorkArea {
 
     synchronized long usedBytes() {
         return usedBytes;
+    }
+
+    /** What {@code owner}'s uploads and job outputs take (tests). */
+    synchronized long usedBytes(String owner) {
+        return ownerUsed.getOrDefault(owner, 0L);
     }
 
     private static long size(Path dir) {

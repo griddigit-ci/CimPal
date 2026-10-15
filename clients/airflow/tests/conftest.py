@@ -43,6 +43,7 @@ def job_json(
         "jobId": JOB_ID,
         "command": command,
         "label": None,
+        "owner": "default",
         "status": status,
         "createdAt": "2026-10-13T08:00:00Z",
         "startedAt": None if status == "queued" else "2026-10-13T08:00:01Z",

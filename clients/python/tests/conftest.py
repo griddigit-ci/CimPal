@@ -24,6 +24,7 @@ def job_json(status: str = "queued", **overrides: Any) -> dict[str, Any]:
         "jobId": JOB_ID,
         "command": "validate",
         "label": None,
+        "owner": "default",
         "status": status,
         "createdAt": "2026-10-13T08:00:00Z",
         "startedAt": None if status == "queued" else "2026-10-13T08:00:01Z",

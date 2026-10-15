@@ -323,7 +323,9 @@ PR #70). DEP-10 (Airflow provider `airflow-provider-cimpal` in `clients/airflow/
 is merged (PR #71); PyPI publishing for both Python packages is in PR #72. Next: phase D3, making the REST
 service (option 2) a shared production service: `docs/plans/deployment/OPTION-2-ROADMAP.md` lists the gaps
 and the order (a release first, then DEP-13 client identity, DEP-11 durable job store, DEP-14 idempotency and
-webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job isolation).
+webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job isolation). DEP-13 (named tokens,
+job and upload ownership, per-client quotas, D-17) is in review (PR #75), not yet
+merged; next is DEP-11.
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -477,7 +479,15 @@ Commands run on `--workers` threads (`ServeServer`, default 1), with a bounded q
 - `RunScope.runIn` (Core): the remote-import and XML download caches of `ValidationTools`; without a scope (GUI, plain CLI) the process-wide caches are used. Downloads go to a unique temp file per call, under a per-URL lock.
 - `CliStreams.bind` (CLI): `System.out`/`System.err` are routing streams installed once; a bound thread writes to its job's buffer and log. It replaced every `System.setOut`/`setErr` swap in `serve`, `mcp`, `run` and `validate --format json`. The label of the binding is the job id in the JSON log.
 - `AdmissionGate`: a command starts only while the estimated heap (10× input size, at least 64 MiB, `ServeCommand.estimateHeap`) of the running ones plus its own fits `--max-concurrent-heap-bytes`; FIFO; a command alone always starts.
-- `MutableStaticsTest` fails on any new non-final static field in Core or the CLI that isn't on its reviewed list; `ConcurrencyIT` (failsafe) compares 24 mixed jobs under four workers with one.
+- `MutableStaticsTest` fails on any new non-final static field in Core or the CLI that isn't on its reviewed list, and on any static field holding threads (executor, thread, timer, `HttpClient`): such threads would outlive the job that created them and carry its streams and path policy into another job (DEP-13); `ConcurrencyIT` (failsafe) compares 24 mixed jobs under four workers with one.
+
+### `serve` clients (DEP-13)
+
+Every token stands for a client (`TokenSource.Client`: a name and admin or not). A fixed token, `CIMPAL_API_TOKEN` and a bare token line are client `default`, an admin, so single-token setups behave as before. A token file line `name:role:token` names a client (D-17).
+- **Ownership:** `Job.owner` and `WorkArea.Upload.owner`. `ServeServer.requireClient` authenticates every request and stores the name on the exchange for the log. Every `/v1/jobs/{id}…` and `/v1/uploads/{id}` route answers the same 404 for another client's object as for a missing one; `WorkArea.prepare(jobId, uploadId, owner)` refuses another client's upload. `/shutdown` and `/metrics` need an admin; `GET /v1/jobs` lists the caller's jobs, or any client's for an admin (`?owner=`).
+- **Quotas:** `ClientQuotas` (`--client-quotas` JSON, read at start): `maxQueued` (429), `maxRunning`, `maxUploadBytes` (413), `maxWorkBytes` (507, counted per owner in `WorkArea`), `requestsPerMinute` (429, token bucket). Defaults are the server's flags, and `maxQueued` has none of its own, so without a file nothing changes.
+- **Fairness:** `JobScheduler`. Each submit queues one interchangeable *turn* on the workers; a turn runs the oldest queued job whose owner is under `maxRunning`, or parks without holding a worker, and a finished job re-queues one parked turn. Decided: oldest eligible, not round-robin.
+- **Attribution:** JSON logs carry `client`; `cimpal_jobs_finished_total` and `cimpal_requests_total` gain a `client` label, and `cimpal_quota_refused_total` counts 429s. Tests: `ClientIsolationTest` (the cross-client 404 matrix, quotas, and a scan of logs and metrics for tokens), `JobSchedulerTest`, `ClientQuotasTest`, `TokenSourceTest`.
 
 ---
 
@@ -555,6 +565,10 @@ CimPal/
 ---
 
 ## Known issues and limitations
+
+**`serve` clients share the folders (DEP-13).** Ownership separates `/v1` jobs, uploads and their outputs. In shared-folder mode (a job without `inputUpload`) every client reads and writes the same `--root` folders, so clients that must not see each other's files should use uploads only, or separate instances. Quotas are read at start only (the token file reloads, `--client-quotas` doesn't). OIDC/JWT tokens are a possible follow-up.
+
+**`AdmissionGateTest.aCommandThatDoesNotFitWaitsAndSmallerOnesBehindItDoNotOvertake` is flaky (seen 2026-10-15).** Each waiting thread appends to the order list only after `acquire` returns, so the second thread admitted can append first. The gate itself is FIFO; the test needs to record the order inside the gate (or wait for each ticket in turn).
 
 **Findings reported by TEST-2, fixed by SEC-5** (details in `docs/plans/testing/TEST-2.md` and `SEC-5.md`):
 - An unresolvable or refused `owl:imports` now fails the row or validation instead of warning.

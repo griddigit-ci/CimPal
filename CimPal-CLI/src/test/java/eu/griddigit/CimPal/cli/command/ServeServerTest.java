@@ -623,8 +623,8 @@ class ServeServerTest {
     void readyIs503WhileNoTokenCanBeAccepted() throws Exception {
         start(config().tokens(new TokenSource() {
             @Override
-            public boolean matches(String authorization) {
-                return false;
+            public Client authenticate(String authorization) {
+                return null;
             }
 
             @Override
@@ -678,9 +678,9 @@ class ServeServerTest {
         assertThat(metrics.statusCode()).isEqualTo(200);
         assertThat(metrics.headers().firstValue("Content-Type")).hasValue(ServeMetrics.CONTENT_TYPE);
         String text = metrics.body();
-        assertThat(text).contains("cimpal_requests_total{command=\"sparql\",outcome=\"ok\"} 1\n",
-                "cimpal_requests_total{command=\"convert\",outcome=\"bad_input\"} 1\n",
-                "cimpal_jobs_finished_total{status=\"succeeded\"} 1\n",
+        assertThat(text).contains("cimpal_requests_total{client=\"default\",command=\"sparql\",outcome=\"ok\"} 1\n",
+                "cimpal_requests_total{client=\"default\",command=\"convert\",outcome=\"bad_input\"} 1\n",
+                "cimpal_jobs_finished_total{client=\"default\",status=\"succeeded\"} 1\n",
                 "cimpal_jobs{status=\"succeeded\"} 1\n",
                 "cimpal_job_duration_seconds_count 1\n",
                 "cimpal_job_duration_seconds_bucket{le=\"+Inf\"} 1\n",

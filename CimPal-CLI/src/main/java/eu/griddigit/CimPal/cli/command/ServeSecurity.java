@@ -104,16 +104,26 @@ final class ServeSecurity {
      * so the comparison takes the same time whatever the length or content of the guess.
      */
     static boolean tokenMatches(String expected, String authorization) {
-        if (expected == null || authorization == null) {
-            return false;
-        }
+        byte[] presented = presentedDigest(authorization);
+        return expected != null && presented != null && MessageDigest.isEqual(tokenDigest(expected), presented);
+    }
+
+    /**
+     * The SHA-256 of the token in {@code Bearer <token>}, or null when {@code authorization} isn't
+     * one. Hashed once per request, however many tokens it is compared with (DEP-13).
+     */
+    static byte[] presentedDigest(String authorization) {
         String prefix = "bearer ";
-        if (authorization.length() <= prefix.length()
+        if (authorization == null || authorization.length() <= prefix.length()
                 || !authorization.regionMatches(true, 0, prefix, 0, prefix.length())) {
-            return false;
+            return null;
         }
-        String presented = authorization.substring(prefix.length()).strip();
-        return MessageDigest.isEqual(sha256(expected), sha256(presented));
+        return sha256(authorization.substring(prefix.length()).strip());
+    }
+
+    /** The SHA-256 of an accepted token, to compare with {@link #presentedDigest} in constant time. */
+    static byte[] tokenDigest(String token) {
+        return sha256(token);
     }
 
     private static byte[] sha256(String value) {

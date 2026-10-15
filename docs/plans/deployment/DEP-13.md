@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In review ([PR #75](https://github.com/griddigit-ci/CimPal/pull/75)) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | DEP-5, DEP-6, DEP-7; decision D-17. Works with the in-memory store; DEP-11 adds the `owner` column. |
 | Size | M |
@@ -85,13 +85,13 @@ ops:admin:9d02...
 
 ## Acceptance criteria (status checklist)
 
-- [ ] The existing token file and `CIMPAL_API_TOKEN` keep working (a bare token is client `default`, role admin): all existing tests green.
-- [ ] For each `/v1` route, a regression test that client B gets **404** for client A's job, result, log, file, archive, upload and cancel; admin gets 200.
-- [ ] `GET /v1/jobs` as a client lists only that client's jobs.
-- [ ] A job can't use another client's upload (404 at submit).
-- [ ] Quotas: client A at `maxQueued` gets 429 while client B still submits. `maxRunning` lets B's job start while A's wait. Per-client upload and work limits hold.
-- [ ] Logs and metrics carry the client name, never a token (a test scans them).
-- [ ] OpenAPI updated (429, owner filter); SDK maps 429; docs updated; `/security-review` clean.
+- [x] The existing token file and `CIMPAL_API_TOKEN` keep working (a bare token is client `default`, role admin): all existing tests green.
+- [x] For each `/v1` route, a regression test that client B gets **404** for client A's job, result, log, file, archive, upload and cancel; admin gets 200.
+- [x] `GET /v1/jobs` as a client lists only that client's jobs.
+- [x] A job can't use another client's upload (404 at submit).
+- [x] Quotas: client A at `maxQueued` gets 429 while client B still submits. `maxRunning` lets B's job start while A's wait. Per-client upload and work limits hold.
+- [x] Logs and metrics carry the client name, never a token (a test scans them).
+- [x] OpenAPI updated (429, owner filter); SDK maps 429; docs updated; `/security-review` clean (no High; both Medium findings fixed, see the notes).
 
 ## Instructions for Claude Code
 
@@ -120,7 +120,35 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-15 | D-17 confirmed: named tokens `name:role:token` in the token file; a bare token (and `CIMPAL_API_TOKEN`, a generated token) is client `default`, role admin. OIDC/JWT stays a later option. | Maintainer |
+| 2026-10-15 | Fairness: the oldest queued job whose client is under its `maxRunning` runs next; no round-robin. | Maintainer |
+| 2026-10-15 | Quotas in a separate `--client-quotas` JSON file (read at start), not in the token file, so the secret holds only tokens. | Maintainer |
+| 2026-10-15 | `/shutdown` and `/metrics` need an admin token (metrics carry client names). A bare token is admin, so existing setups keep working. | Maintainer |
+| 2026-10-15 | `maxQueued` has no default of its own (the server's `--queue-size` bounds it); with the plan's default (`--queue-size`) a single client hit 429 where the full queue answered 503 before. A client is refused once its queued and running jobs reach `maxQueued + maxRunning`, which mirrors the server's `--queue-size + --workers`. | Claude Code |
+| 2026-10-15 | `requestsPerMinute` counts every request with the client's token, polling included; a token bucket that refills evenly. A client's `?owner=` other than itself is 403 (it names no object, so it leaks nothing). | Claude Code |
+| 2026-10-15 | An upload can only be used by a job of the same client, admins included. | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+**2026-10-15 (Claude Code).**
+- **What changed:** `TokenSource` (`Client`, named lines, up to 256 tokens, 64 KiB file), `Job`/`JobManager` (`owner`), `WorkArea` (upload owner, per-owner bytes), `ServeServer` (`requireClient`/`requireAdmin`, ownership on every route, quotas, job turns), new `ClientQuotas` and `JobScheduler`, `ServeMetrics` (`client` label, `cimpal_quota_refused_total`), `ServeCommand --client-quotas`, OpenAPI (`owner`, `?owner=`, 429 on every route with a token), SDK (429 → `BusyError`, retried; generated layer regenerated), docs (`serve.md` *Clients and quotas*, service, security, SDK guides).
+- **Tests:** baseline CLI 283 (5 skipped), now 312 (after the review fixes). New: `JobManagerTest` (3, eviction across clients), `ClientIsolationTest` (12: the 404 matrix over every job and upload route compared byte for byte with a missing id, admin 200, list and `?owner=`, admin-only routes, `maxQueued`, `maxRunning` overtaking, per-client upload and work limits, `requestsPerMinute`, 429 on every route with a token, a scan of logs and metrics for tokens), `ClientQuotasTest` (4), `JobSchedulerTest` (3), `TokenSourceTest` (+7). The OpenAPI response coverage of 429 and the owner 403 is checked by `ClientIsolationTest`. The tests were written against the new API, so they don't compile on `devel`; they don't show "failing before" by themselves.
+- **SDK:** 119 passed (+2 for 429); the Airflow provider's tests pass with `owner` in the fixture.
+- **Metrics change:** `cimpal_jobs_finished_total` and `cimpal_requests_total` have a `client` label now; a dashboard that matched the exact series must aggregate (`sum by (status)`).
+- **Open:**
+  - Shared-folder mode: every client reads and writes the same `--root` folders; ownership covers `/v1` jobs, uploads and outputs only (documented in `service.md` and `PROJECT.md`).
+  - `--client-quotas` is read at start only; the token file reloads.
+  - Synchronous endpoints count against `requestsPerMinute` and the server queue, not `maxQueued`.
+  - The `owner` field is required in the OpenAPI `Job`, so this SDK needs a server with DEP-13 (no released server has `/v1` yet).
+  - DEP-11 must store `owner` with the job.
+- **Security review (2026-10-15, `security-reviewer` agent):** no Critical or High findings; no route lets a client read, download, cancel or delete another client's job or upload, or learn that it exists. Fixed in this WP:
+  - (Medium) store eviction was global, so one client's flood could evict another client's finished jobs and outputs. `JobManager.evict` now drops the oldest finished job of the client holding the most jobs (then bytes) first (`JobManagerTest`).
+  - (Medium) `maxWorkBytes` didn't bound job outputs: a client could keep submitting jobs on one upload. A submit with an upload is now refused with 507 while the client's share is full (`ClientIsolationTest.jobOutputsCountAgainstMaxWorkBytes`). A single job's outputs are still not bounded while it runs.
+  - (Low) every request hashed the presented token once per accepted token (256 now): the presented token is hashed once and compared with precomputed digests.
+  - (Low) a bare token with colons may read as a named line: documented and pinned (`TokenSourceTest`); the "two roles" error no longer echoes the name.
+  - (Info) a slot leak if `jobs.create` returned null; a `queuedTasks` entry left when another turn ran the job; the stale `WorkArea` Javadoc.
+  - Tests added for 404 (not 409) on another client's queued and running job and in-use upload.
+  - A temporary revert of `Client.sees()` makes 5 isolation tests fail (and the class's spec check), so the matrix is a real regression test.
+- **Cross-job output through `CliStreams` (review Info, checked 2026-10-15): no leak.** A job's binding (and its `PathPolicy`) is inherited by the threads it starts. Core's own pools are created per call and shut down with it; `HttpClient`s are per request; slf4j-simple writes on the calling thread. The one shared pool, the common `ForkJoinPool` behind `parallelStream()` in `ModelFactory`, has innocuous workers on JDK 25 that inherit nothing, so their lines go to the server's stderr, not to any job. Pinned by `CliStreamsTest.commonPoolWorkersNeverCarryAJobsStreams` and the new `MutableStaticsTest.noStaticFieldHoldsThreadsThatOutliveAJob`, which fails on any static executor, thread, timer, thread group or `HttpClient` in Core or the CLI (checked to fail with a probe field).
+- **Left open from the review:** without `--client-quotas` one client can still fill the queue (documented: set `default.maxQueued`); synchronous endpoints bypass `maxQueued`/`maxRunning`; `/health` shows server-wide counts without a token (unchanged).
+

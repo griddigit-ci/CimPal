@@ -25,6 +25,7 @@ def _get_kwargs(
     *,
     status: Union[Unset, JobStatus] = UNSET,
     limit: Union[Unset, int] = 50,
+    owner: Union[Unset, str] = UNSET,
 
 ) -> dict[str, Any]:
     
@@ -40,6 +41,8 @@ def _get_kwargs(
     params["status"] = json_status
 
     params["limit"] = limit
+
+    params["owner"] = owner
 
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
@@ -78,6 +81,20 @@ def _parse_response(*, client: Union[AuthenticatedClient, Client], response: htt
 
         return response_401
 
+    if response.status_code == 403:
+        response_403 = Problem.from_dict(response.json())
+
+
+
+        return response_403
+
+    if response.status_code == 429:
+        response_429 = Problem.from_dict(response.json())
+
+
+
+        return response_429
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -98,15 +115,17 @@ def sync_detailed(
     client: Union[AuthenticatedClient, Client],
     status: Union[Unset, JobStatus] = UNSET,
     limit: Union[Unset, int] = 50,
+    owner: Union[Unset, str] = UNSET,
 
 ) -> Response[Union[JobList, Problem]]:
-    """ Recent jobs, newest first.
+    """ Recent jobs, newest first: the client's own, or every client's for an admin.
 
     Args:
         status (Union[Unset, JobStatus]): `succeeded` covers exit 0 and 1 (see `hasViolations`);
             `failed` exit 2, 3 or an exception; `timed_out` a job running longer than `--job-timeout`
             (not interrupted; a later result is kept).
         limit (Union[Unset, int]):  Default: 50.
+        owner (Union[Unset, str]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -120,6 +139,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         status=status,
 limit=limit,
+owner=owner,
 
     )
 
@@ -134,15 +154,17 @@ def sync(
     client: Union[AuthenticatedClient, Client],
     status: Union[Unset, JobStatus] = UNSET,
     limit: Union[Unset, int] = 50,
+    owner: Union[Unset, str] = UNSET,
 
 ) -> Optional[Union[JobList, Problem]]:
-    """ Recent jobs, newest first.
+    """ Recent jobs, newest first: the client's own, or every client's for an admin.
 
     Args:
         status (Union[Unset, JobStatus]): `succeeded` covers exit 0 and 1 (see `hasViolations`);
             `failed` exit 2, 3 or an exception; `timed_out` a job running longer than `--job-timeout`
             (not interrupted; a later result is kept).
         limit (Union[Unset, int]):  Default: 50.
+        owner (Union[Unset, str]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -157,6 +179,7 @@ def sync(
         client=client,
 status=status,
 limit=limit,
+owner=owner,
 
     ).parsed
 
@@ -165,15 +188,17 @@ async def asyncio_detailed(
     client: Union[AuthenticatedClient, Client],
     status: Union[Unset, JobStatus] = UNSET,
     limit: Union[Unset, int] = 50,
+    owner: Union[Unset, str] = UNSET,
 
 ) -> Response[Union[JobList, Problem]]:
-    """ Recent jobs, newest first.
+    """ Recent jobs, newest first: the client's own, or every client's for an admin.
 
     Args:
         status (Union[Unset, JobStatus]): `succeeded` covers exit 0 and 1 (see `hasViolations`);
             `failed` exit 2, 3 or an exception; `timed_out` a job running longer than `--job-timeout`
             (not interrupted; a later result is kept).
         limit (Union[Unset, int]):  Default: 50.
+        owner (Union[Unset, str]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -187,6 +212,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         status=status,
 limit=limit,
+owner=owner,
 
     )
 
@@ -201,15 +227,17 @@ async def asyncio(
     client: Union[AuthenticatedClient, Client],
     status: Union[Unset, JobStatus] = UNSET,
     limit: Union[Unset, int] = 50,
+    owner: Union[Unset, str] = UNSET,
 
 ) -> Optional[Union[JobList, Problem]]:
-    """ Recent jobs, newest first.
+    """ Recent jobs, newest first: the client's own, or every client's for an admin.
 
     Args:
         status (Union[Unset, JobStatus]): `succeeded` covers exit 0 and 1 (see `hasViolations`);
             `failed` exit 2, 3 or an exception; `timed_out` a job running longer than `--job-timeout`
             (not interrupted; a later result is kept).
         limit (Union[Unset, int]):  Default: 50.
+        owner (Union[Unset, str]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -224,5 +252,6 @@ async def asyncio(
         client=client,
 status=status,
 limit=limit,
+owner=owner,
 
     )).parsed

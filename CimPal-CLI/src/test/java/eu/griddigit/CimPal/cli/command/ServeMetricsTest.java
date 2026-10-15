@@ -17,10 +17,10 @@ class ServeMetricsTest {
     @Test
     void theHistogramIsCumulativeAndCancelledJobsHaveNoDuration() {
         ServeMetrics metrics = new ServeMetrics();
-        metrics.jobFinished(JobStatus.SUCCEEDED, 0.5);
-        metrics.jobFinished(JobStatus.SUCCEEDED, 45);
-        metrics.jobFinished(JobStatus.FAILED, 9000);
-        metrics.jobFinished(JobStatus.CANCELLED, -1);
+        metrics.jobFinished("default", JobStatus.SUCCEEDED, 0.5);
+        metrics.jobFinished("default", JobStatus.SUCCEEDED, 45);
+        metrics.jobFinished("default", JobStatus.FAILED, 9000);
+        metrics.jobFinished("default", JobStatus.CANCELLED, -1);
 
         String text = metrics.render("CimPal CLI 1", Map.of(JobStatus.SUCCEEDED, 2L), 3, 2, 4);
 
@@ -32,8 +32,8 @@ class ServeMetricsTest {
                 "cimpal_job_duration_seconds_bucket{le=\"+Inf\"} 3\n",
                 "cimpal_job_duration_seconds_count 3\n",
                 "cimpal_job_duration_seconds_sum 9045.5\n",
-                "cimpal_jobs_finished_total{status=\"cancelled\"} 1\n",
-                "cimpal_jobs_finished_total{status=\"failed\"} 1\n",
+                "cimpal_jobs_finished_total{client=\"default\",status=\"cancelled\"} 1\n",
+                "cimpal_jobs_finished_total{client=\"default\",status=\"failed\"} 1\n",
                 "cimpal_jobs{status=\"succeeded\"} 2\n",
                 "cimpal_jobs{status=\"queued\"} 0\n",
                 "cimpal_queue_depth 3\n",
