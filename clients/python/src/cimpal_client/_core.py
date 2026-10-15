@@ -199,7 +199,7 @@ def error_from_response(response: httpx.Response) -> errors.CimPalError:
             "Use the final URL (e.g. https://) as base_url.",
             status=status,
         )
-    if status == 503:
+    if status in (429, 503):
         return errors.BusyError(
             message, retry_after=parse_retry_after(response.headers.get("Retry-After")), status=status, **fields
         )
@@ -237,7 +237,7 @@ def transport_error(exc: httpx.TransportError, method: str, url: str) -> errors.
 
 @dataclass(frozen=True)
 class RetryPolicy:
-    """Retries of 503 answers and of requests that never reached the server.
+    """Retries of 503 and 429 answers and of requests that never reached the server.
 
     A request that may have reached the server (a read timeout, a dropped connection) is retried
     only when it is a GET, so a job is never submitted twice.
@@ -263,7 +263,7 @@ class RetryPolicy:
 
     @staticmethod
     def may_retry_busy(response: httpx.Response, method: str) -> bool:
-        """A 503 to a POST is retried only when CimPal sent it (it then refused the request before
+        """A 503 or 429 to a POST is retried only when CimPal sent it (it then refused the request before
         accepting it); a proxy's 503 may come after the server got the request."""
         if method == "GET":
             return True

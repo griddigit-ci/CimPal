@@ -122,6 +122,33 @@ def test_a_proxys_503_to_a_submit_is_not_retried(respx_mock: respx.MockRouter, c
 
 
 @respx.mock(base_url=BASE)
+def test_a_client_quota_429_to_a_submit_is_retried_after_retry_after(
+    respx_mock: respx.MockRouter, cp: CimPal, sleeps: Sleeps
+) -> None:
+    route = respx_mock.post("/v1/jobs").mock(
+        side_effect=[
+            httpx.Response(429, json=problem(429, "Too many jobs"), headers={"Retry-After": "12"}),
+            httpx.Response(202, json=job_json()),
+        ]
+    )
+    cp.submit("validate", {})
+    assert route.call_count == 2
+    assert sleeps == [12.0]
+
+
+@respx.mock(base_url=BASE)
+def test_a_429_after_the_last_retry_raises_busy_error(respx_mock: respx.MockRouter, sleeps: Sleeps) -> None:
+    respx_mock.get("/v1/jobs").respond(429, json=problem(429, "Too many requests"), headers={"Retry-After": "60"})
+    with CimPal(BASE, token=TOKEN, retries=1, check_api_version=False) as cp:
+        cp._sleep = sleeps
+        with pytest.raises(BusyError) as raised:
+            cp.list_jobs()
+    assert raised.value.status == 429
+    assert raised.value.retry_after == 60.0
+    assert sleeps == [60.0]
+
+
+@respx.mock(base_url=BASE)
 def test_cimpals_own_503_to_a_submit_is_retried(respx_mock: respx.MockRouter, cp: CimPal) -> None:
     route = respx_mock.post("/v1/jobs").mock(
         side_effect=[

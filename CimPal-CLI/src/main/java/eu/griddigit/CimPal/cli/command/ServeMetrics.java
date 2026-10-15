@@ -15,7 +15,8 @@ import java.util.concurrent.atomic.DoubleAdder;
 /**
  * The counters behind {@code GET /metrics} (DEP-6, {@code --metrics}), written as Prometheus text
  * format 0.0.4 by hand. Labels only ever hold values from fixed sets (job statuses, command names,
- * outcomes), never request input.
+ * outcomes, quotas) or a client name from the token file (DEP-13), never request input, so their
+ * cardinality is bounded by the token file.
  */
 final class ServeMetrics {
 
@@ -24,15 +25,19 @@ final class ServeMetrics {
     /** Upper bounds of the job duration histogram, in seconds. */
     static final double[] DURATION_BUCKETS = {1, 10, 60, 300, 900, 1800, 3600, 7200};
 
-    private final Map<JobStatus, AtomicLong> jobsFinished = new ConcurrentHashMap<>();
+    /** Keyed by client and status, joined with NUL (neither can contain one). */
+    private final Map<String, AtomicLong> jobsFinished = new ConcurrentHashMap<>();
+    /** Keyed by client, command and outcome. */
     private final Map<String, AtomicLong> requests = new ConcurrentHashMap<>();
+    /** Keyed by client and quota. */
+    private final Map<String, AtomicLong> quotaRefusals = new ConcurrentHashMap<>();
     private final AtomicLongArray durationBuckets = new AtomicLongArray(DURATION_BUCKETS.length);
     private final AtomicLong durationCount = new AtomicLong();
     private final DoubleAdder durationSum = new DoubleAdder();
 
-    /** A job reached a final status after running {@code seconds} (negative: it never ran). */
-    void jobFinished(JobStatus status, double seconds) {
-        jobsFinished.computeIfAbsent(status, s -> new AtomicLong()).incrementAndGet();
+    /** A job of {@code client} reached a final status after running {@code seconds} (negative: it never ran). */
+    void jobFinished(String client, JobStatus status, double seconds) {
+        count(jobsFinished, client, status.apiName());
         if (seconds >= 0) {
             for (int i = 0; i < DURATION_BUCKETS.length; i++) {
                 if (seconds <= DURATION_BUCKETS[i]) {
@@ -45,8 +50,29 @@ final class ServeMetrics {
     }
 
     /** A synchronous command request ended: {@code outcome} is ok, violations, bad_input, error, timeout or busy. */
-    void request(String command, String outcome) {
-        requests.computeIfAbsent(command + "\u0000" + outcome, k -> new AtomicLong()).incrementAndGet();
+    void request(String client, String command, String outcome) {
+        count(requests, client, command, outcome);
+    }
+
+    /** A request of {@code client} was refused by its {@code quota}: max_queued or requests_per_minute. */
+    void quotaRefused(String client, String quota) {
+        count(quotaRefusals, client, quota);
+    }
+
+    private static void count(Map<String, AtomicLong> counters, String... labels) {
+        counters.computeIfAbsent(String.join("\u0000", labels), k -> new AtomicLong()).incrementAndGet();
+    }
+
+    /** One line per counter, sorted, with {@code names} as the labels of its key. */
+    private static void counters(StringBuilder sb, String metric, Map<String, AtomicLong> counters, String... names) {
+        for (Map.Entry<String, AtomicLong> e : new TreeMap<>(counters).entrySet()) {
+            String[] values = e.getKey().split("\u0000", names.length);
+            sb.append(metric).append('{');
+            for (int i = 0; i < names.length; i++) {
+                sb.append(i == 0 ? "" : ",").append(names[i]).append("=\"").append(escape(values[i])).append('"');
+            }
+            sb.append("} ").append(e.getValue().get()).append('\n');
+        }
     }
 
     /** Synchronous outcome label for an exit code. */
@@ -73,15 +99,8 @@ final class ServeMetrics {
             sb.append("cimpal_jobs{status=\"").append(status.apiName()).append("\"} ")
                     .append(jobsNow.getOrDefault(status, 0L)).append('\n');
         }
-        help(sb, "cimpal_jobs_finished_total", "counter", "Jobs that reached a final status since start.");
-        for (JobStatus status : JobStatus.values()) {
-            if (status == JobStatus.QUEUED || status == JobStatus.RUNNING) {
-                continue;
-            }
-            AtomicLong n = jobsFinished.get(status);
-            sb.append("cimpal_jobs_finished_total{status=\"").append(status.apiName()).append("\"} ")
-                    .append(n == null ? 0 : n.get()).append('\n');
-        }
+        help(sb, "cimpal_jobs_finished_total", "counter", "Jobs that reached a final status since start, by client.");
+        counters(sb, "cimpal_jobs_finished_total", jobsFinished, "client", "status");
         help(sb, "cimpal_job_duration_seconds", "histogram", "Run time of finished jobs.");
         for (int i = 0; i < DURATION_BUCKETS.length; i++) {
             sb.append("cimpal_job_duration_seconds_bucket{le=\"").append(number(DURATION_BUCKETS[i])).append("\"} ")
@@ -91,12 +110,10 @@ final class ServeMetrics {
         sb.append("cimpal_job_duration_seconds_sum ").append(durationSum.sum()).append('\n');
         sb.append("cimpal_job_duration_seconds_count ").append(durationCount.get()).append('\n');
 
-        help(sb, "cimpal_requests_total", "counter", "Synchronous command requests by command and outcome.");
-        for (Map.Entry<String, AtomicLong> e : new TreeMap<>(requests).entrySet()) {
-            String[] parts = e.getKey().split("\u0000", 2);
-            sb.append("cimpal_requests_total{command=\"").append(escape(parts[0])).append("\",outcome=\"")
-                    .append(escape(parts[1])).append("\"} ").append(e.getValue().get()).append('\n');
-        }
+        help(sb, "cimpal_requests_total", "counter", "Synchronous command requests by client, command and outcome.");
+        counters(sb, "cimpal_requests_total", requests, "client", "command", "outcome");
+        help(sb, "cimpal_quota_refused_total", "counter", "Requests refused with 429 by a client's quota.");
+        counters(sb, "cimpal_quota_refused_total", quotaRefusals, "client", "quota");
 
         help(sb, "cimpal_queue_depth", "gauge", "Commands and jobs waiting for a worker.");
         sb.append("cimpal_queue_depth ").append(queueDepth).append('\n');

@@ -37,6 +37,8 @@ class Job:
             job_id (UUID):
             command (JobCommand):
             label (Union[None, str]):
+            owner (str): The client that submitted the job (its name in the server's token file; `default` for a single
+                shared token).
             status (JobStatus): `succeeded` covers exit 0 and 1 (see `hasViolations`); `failed` exit 2, 3 or an exception;
                 `timed_out` a job running longer than `--job-timeout` (not interrupted; a later result is kept).
             created_at (datetime.datetime):
@@ -51,6 +53,7 @@ class Job:
     job_id: UUID
     command: JobCommand
     label: Union[None, str]
+    owner: str
     status: JobStatus
     created_at: datetime.datetime
     started_at: Union[None, datetime.datetime]
@@ -73,6 +76,8 @@ class Job:
 
         label: Union[None, str]
         label = self.label
+
+        owner = self.owner
 
         status = self.status.value
 
@@ -108,6 +113,7 @@ class Job:
             "jobId": job_id,
             "command": command,
             "label": label,
+            "owner": owner,
             "status": status,
             "createdAt": created_at,
             "startedAt": started_at,
@@ -143,6 +149,8 @@ class Job:
 
         label = _parse_label(d.pop("label"))
 
+
+        owner = d.pop("owner")
 
         status = JobStatus(d.pop("status"))
 
@@ -223,6 +231,7 @@ class Job:
             job_id=job_id,
             command=command,
             label=label,
+            owner=owner,
             status=status,
             created_at=created_at,
             started_at=started_at,

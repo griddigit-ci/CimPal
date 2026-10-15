@@ -4,7 +4,7 @@
     "title" : "CimPal serve job API",
     "version" : "1",
     "summary" : "Asynchronous CimPal jobs: submit, poll, fetch the result.",
-    "description" : "The job API of `cimpal serve` (DEP-5). A job runs one CimPal command with a config object; the server runs up to `--workers` commands at once (one by default) and keeps finished jobs in memory (lost on restart). Every request needs `Authorization: Bearer <token>` except `GET /v1/health` and `GET /v1/openapi.json`. Requests must also pass the server's Host and Origin checks; a refused Host or Origin is answered with 403 on any route. Paths in a job's config must lie under the server's allowed folders (`--root`). Errors are RFC 9457 problem details.",
+    "description" : "The job API of `cimpal serve` (DEP-5). A job runs one CimPal command with a config object; the server runs up to `--workers` commands at once (one by default) and keeps finished jobs in memory (lost on restart). Every request needs `Authorization: Bearer <token>` except `GET /v1/health` and `GET /v1/openapi.json`. Requests must also pass the server's Host and Origin checks; a refused Host or Origin is answered with 403 on any route. Paths in a job's config must lie under the server's allowed folders (`--root`). Errors are RFC 9457 problem details. Each token stands for a client (DEP-13): jobs and uploads belong to the client that created them, a client sees only its own (another client's answer 404, exactly as ids that don't exist), and an admin token sees all of them. Per-client quotas answer 429 (with `Retry-After`), 413 or 507.",
     "license" : {
       "name" : "EUPL-1.2",
       "identifier" : "EUPL-1.2"
@@ -170,7 +170,25 @@
             }
           },
           "404" : {
-            "description" : "`inputUpload` names no upload (or it expired).",
+            "description" : "`inputUpload` names no upload of this client (none, expired, or another client's).",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "This client's quota is used up: it has `maxQueued` + `maxRunning` jobs queued or running, or its `requestsPerMinute` is used up. Other clients may still submit.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -184,7 +202,7 @@
       "get" : {
         "tags" : [ "jobs" ],
         "operationId" : "listJobs",
-        "summary" : "Recent jobs, newest first.",
+        "summary" : "Recent jobs, newest first: the client's own, or every client's for an admin.",
         "parameters" : [ {
           "name" : "status",
           "in" : "query",
@@ -203,6 +221,15 @@
             "minimum" : 1,
             "maximum" : 1000,
             "default" : 50
+          }
+        }, {
+          "name" : "owner",
+          "in" : "query",
+          "required" : false,
+          "description" : "Only this client's jobs. A client token may name only itself; an admin token any client.",
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9._-]{1,64}$"
           }
         } ],
         "responses" : {
@@ -228,6 +255,34 @@
           },
           "401" : {
             "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "`owner` names another client, and the token is not an admin's.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -276,7 +331,25 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -313,7 +386,7 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -324,6 +397,24 @@
           },
           "409" : {
             "description" : "The job is running or finished.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -372,7 +463,7 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -393,6 +484,24 @@
           },
           "410" : {
             "description" : "The result was larger than `--max-result-bytes` and was not kept.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -462,7 +571,25 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -531,7 +658,7 @@
             }
           },
           "413" : {
-            "description" : "Larger than `--max-upload-bytes`.",
+            "description" : "Larger than `--max-upload-bytes` (or this client's `maxUploadBytes`).",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -551,7 +678,25 @@
             }
           },
           "507" : {
-            "description" : "The work area is full (`--work-max-bytes`).",
+            "description" : "The work area is full (`--work-max-bytes`) (or this client's `maxWorkBytes`).",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -600,7 +745,25 @@
             }
           },
           "404" : {
-            "description" : "No such upload (or it expired).",
+            "description" : "No such upload (or it expired), or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -630,7 +793,7 @@
             }
           },
           "404" : {
-            "description" : "No such upload.",
+            "description" : "No such upload, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -641,6 +804,24 @@
           },
           "409" : {
             "description" : "A queued or running job uses it.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -689,7 +870,7 @@
             }
           },
           "404" : {
-            "description" : "No such job, or the job used shared paths and has no output folder here.",
+            "description" : "No such job, or the job used shared paths and has no output folder here, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -700,6 +881,24 @@
           },
           "409" : {
             "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -765,7 +964,7 @@
             }
           },
           "404" : {
-            "description" : "No such job or file, or the job has no output folder here.",
+            "description" : "No such job or file, or the job has no output folder here, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -776,6 +975,24 @@
           },
           "409" : {
             "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -825,7 +1042,7 @@
             }
           },
           "404" : {
-            "description" : "No such job, or the job has no output folder here.",
+            "description" : "No such job, or the job has no output folder here, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -836,6 +1053,24 @@
           },
           "409" : {
             "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -889,7 +1124,7 @@
       },
       "Job" : {
         "type" : "object",
-        "required" : [ "jobId", "command", "label", "status", "createdAt", "startedAt", "finishedAt", "exitCode", "hasViolations", "error", "links" ],
+        "required" : [ "jobId", "command", "label", "owner", "status", "createdAt", "startedAt", "finishedAt", "exitCode", "hasViolations", "error", "links" ],
         "properties" : {
           "jobId" : {
             "type" : "string",
@@ -901,6 +1136,10 @@
           },
           "label" : {
             "type" : [ "string", "null" ]
+          },
+          "owner" : {
+            "type" : "string",
+            "description" : "The client that submitted the job (its name in the server's token file; `default` for a single shared token)."
           },
           "status" : {
             "$ref" : "#/components/schemas/JobStatus"

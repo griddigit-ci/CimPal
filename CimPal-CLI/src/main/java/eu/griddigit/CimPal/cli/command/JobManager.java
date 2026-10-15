@@ -49,11 +49,11 @@ final class JobManager {
         this.onRemoved = listener;
     }
 
-    /** A new queued job with a random (SecureRandom-based) id. */
+    /** A new queued job of client {@code default} with a random (SecureRandom-based) id (tests). */
     Job create(String command, String label) {
         Job job;
         do {
-            job = create(UUID.randomUUID(), command, label);
+            job = create(UUID.randomUUID(), command, label, TokenSource.Client.DEFAULT.name());
         } while (job == null);
         return job;
     }
@@ -67,9 +67,9 @@ final class JobManager {
         return id;
     }
 
-    /** A new queued job with the given id, or null if a job already has it. */
-    Job create(UUID id, String command, String label) {
-        Job job = new Job(id, command, label, now(), logLines);
+    /** A new queued job of {@code owner} with the given id, or null if a job already has it. */
+    Job create(UUID id, String command, String label, String owner) {
+        Job job = new Job(id, command, label, owner, now(), logLines);
         return jobs.putIfAbsent(id, job) == null ? job : null;
     }
 
@@ -82,11 +82,12 @@ final class JobManager {
         return job;
     }
 
-    /** Newest first, optionally only one status. */
-    List<Job> list(JobStatus status, int limit) {
+    /** Newest first, optionally only one status and only one owner's (DEP-13). */
+    List<Job> list(JobStatus status, String owner, int limit) {
         evict();
         Instant now = now();
         return jobs.values().stream()
+                .filter(job -> owner == null || job.owner().equals(owner))
                 .peek(job -> job.checkTimeout(now, timeout))
                 .filter(job -> status == null || job.snapshot().status() == status)
                 .sorted(Comparator.comparing(Job::createdAt).reversed().thenComparing(Job::id))
@@ -95,9 +96,11 @@ final class JobManager {
     }
 
     /**
-     * Drops finished jobs past the TTL, then the oldest finished ones beyond {@code maxJobs}, then
-     * the oldest finished ones until their results and logs fit in {@code --job-store-bytes} (the
-     * most recently finished job is always kept, so its result can be fetched).
+     * Drops finished jobs past the TTL, then finished ones beyond {@code maxJobs}, then finished
+     * ones until their results and logs fit in {@code --job-store-bytes} (the most recently finished
+     * job is always kept, so its result can be fetched). Beyond the TTL, the oldest finished job of
+     * the client that holds the most (jobs, then bytes) goes first, so one client's many jobs can't
+     * push out another client's results (DEP-13); with one client this is simply oldest first.
      */
     void evict() {
         List<UUID> removed = new java.util.ArrayList<>();
@@ -117,29 +120,65 @@ final class JobManager {
             }
             return expired;
         });
-        int excess = jobs.size() - maxJobs;
-        if (excess > 0) {
-            jobs.values().stream()
-                    .map(Job::snapshot)
-                    .filter(Job.Snapshot::finished)
-                    .sorted(Comparator.comparing(Job.Snapshot::finishedAt).thenComparing(Job.Snapshot::id))
-                    .limit(excess)
-                    .forEach(s -> {
-                        jobs.remove(s.id());
-                        removed.add(s.id());
-                    });
-        }
         List<Job> finished = jobs.values().stream()
                 .filter(job -> job.snapshot().finished())
                 .sorted(Comparator.comparing((Job job) -> job.snapshot().finishedAt()).thenComparing(Job::id))
                 .toList();
-        long retained = jobs.values().stream().mapToLong(Job::retainedBytes).sum();
-        for (int i = 0; i < finished.size() - 1 && retained > storeBytes; i++) {
-            Job job = finished.get(i);
-            retained -= job.retainedBytes();
-            jobs.remove(job.id());
-            removed.add(job.id());
+        // Per client: its finished jobs, oldest first, and the bytes they hold.
+        Map<String, java.util.ArrayDeque<Job>> byOwner = new java.util.TreeMap<>();
+        Map<String, Long> ownerBytes = new java.util.HashMap<>();
+        for (Job job : finished) {
+            byOwner.computeIfAbsent(job.owner(), o -> new java.util.ArrayDeque<>()).add(job);
+            ownerBytes.merge(job.owner(), job.retainedBytes(), Long::sum);
         }
+        while (jobs.size() > maxJobs) {
+            Job victim = oldestOfHeaviest(byOwner, ownerBytes, false);
+            if (victim == null) {
+                break;
+            }
+            drop(victim, byOwner, ownerBytes, removed);
+        }
+        // The most recently finished job stays, so its result can be fetched.
+        Job newest = finished.isEmpty() ? null : finished.getLast();
+        if (newest != null && jobs.containsKey(newest.id())) {
+            byOwner.get(newest.owner()).remove(newest);
+            ownerBytes.merge(newest.owner(), -newest.retainedBytes(), Long::sum);
+        }
+        long retained = jobs.values().stream().mapToLong(Job::retainedBytes).sum();
+        while (retained > storeBytes) {
+            Job victim = oldestOfHeaviest(byOwner, ownerBytes, true);
+            if (victim == null) {
+                break;
+            }
+            retained -= victim.retainedBytes();
+            drop(victim, byOwner, ownerBytes, removed);
+        }
+    }
+
+    /** The oldest finished job of the client with the most finished jobs (or bytes); null when none is left. */
+    private static Job oldestOfHeaviest(Map<String, java.util.ArrayDeque<Job>> byOwner, Map<String, Long> ownerBytes,
+                                        boolean byBytes) {
+        String heaviest = null;
+        long most = -1;
+        for (Map.Entry<String, java.util.ArrayDeque<Job>> e : byOwner.entrySet()) {
+            if (e.getValue().isEmpty()) {
+                continue;
+            }
+            long weight = byBytes ? ownerBytes.getOrDefault(e.getKey(), 0L) : e.getValue().size();
+            if (weight > most) {
+                most = weight;
+                heaviest = e.getKey();
+            }
+        }
+        return heaviest == null ? null : byOwner.get(heaviest).peekFirst();
+    }
+
+    private void drop(Job job, Map<String, java.util.ArrayDeque<Job>> byOwner, Map<String, Long> ownerBytes,
+                      List<UUID> removed) {
+        byOwner.get(job.owner()).remove(job);
+        ownerBytes.merge(job.owner(), -job.retainedBytes(), Long::sum);
+        jobs.remove(job.id());
+        removed.add(job.id());
     }
 
     /** True when {@code job} has run past {@code --job-timeout} (it is marked timed out first). */

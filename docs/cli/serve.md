@@ -75,7 +75,8 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--job-store-bytes` | integer | a quarter of the maximum heap | Memory for the results and logs of all finished jobs together (at least 1048576). Beyond it the oldest finished jobs are dropped; the most recent one is always kept. |
 | `--shutdown-grace` | ISO-8601 duration | `PT60S` | On SIGTERM, Ctrl-C or `POST /shutdown`: how long to wait for a running command. If it is still running then, `serve` exits with 3. |
 | `--log-format` | `text` or `json` | `text` | `json`: one JSON object per line on stderr, nothing on stdout. See [Logs](#logs). |
-| `--metrics` | flag | off | Serve Prometheus metrics at `GET /metrics` (needs the token). |
+| `--metrics` | flag | off | Serve Prometheus metrics at `GET /metrics` (needs an admin token). |
+| `--client-quotas` | path | none | JSON file of per-client limits, read at start. See [Clients and quotas](#clients-and-quotas). |
 | `--work-root` | path | `.cimpal-work` in the first `--write-root`, else in the first `--root` | Folder for [uploads and job outputs](#file-exchange-uploads-and-downloads). No request path may point into it.<br>**Start:** it is emptied at every start, but only if it carries `serve`'s `.cimpal-work` marker. A folder that is not empty and has no marker is refused.<br>**Refused:** a work folder that is, or contains, a `--root`/`--read-root`/`--write-root`.<br>**Read-only data folder:** if the default can't be created (e.g. a read-only `/data` in a container), `serve` starts without file exchange and logs a warning. |
 | `--no-file-exchange` | flag | off | Turn uploads and downloads off: no work folder, and those routes answer 404. |
 | `--max-upload-bytes` | integer | `2147483648` (2 GiB, at most 16 GiB) | Largest upload. |
@@ -171,9 +172,9 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 |---|---|---|
 | `/health` | `GET` | Returns `{"status":"ok","version":"...","busy":false,"stalled":false,"queued":0}`. `busy` means a command is running, and `queued` is the number waiting. `status` becomes `"stalled"` (and `stalled` true) when a running command has taken longer than `--request-timeout`: it can't be stopped, so restart the server if it doesn't return. `GET /v1/health` also gives `running` and `workers`. The only endpoint that needs no token. |
 | `/ready` | `GET` | Readiness probe: 200 `{"status":"ready"}`; 503 with `"shutting down"`, or `"no usable token"` while the token file is broken. A full queue still answers 200, so a single instance stays reachable for polling and cancelling. No token needed. |
-| `/metrics` | `GET` | Only with `--metrics`: Prometheus text, see [Metrics](#metrics). Needs the token. |
+| `/metrics` | `GET` | Only with `--metrics`: Prometheus text, see [Metrics](#metrics). Needs an admin token. |
 | `/commands` | `GET` | Lists all available command and utility endpoints. Needs the token. |
-| `/shutdown` | `POST` | Stops the server gracefully. Needs the token and `Content-Type: application/json`. |
+| `/shutdown` | `POST` | Stops the server gracefully. Needs an admin token and `Content-Type: application/json`. |
 
 `run`, `serve` and `mcp` aren't exposed as endpoints.
 
@@ -299,7 +300,7 @@ For callers that share no file system with the server: Airflow on another machin
 
 Nested ZIPs are kept as files, not expanded, and link entries become plain files. The upload is streamed to disk and never held in memory. Concurrent uploads reserve their room in `--work-max-bytes` before extracting, so together they can't overshoot it.
 
-**Trust model:** `serve` has one trust domain, its token. Request paths can't reach another caller's upload or outputs, but anyone holding the token can list jobs and download their outputs. Run one instance per team or purpose where that matters.
+**Trust model:** request paths can't reach another caller's upload or outputs. Uploads and jobs belong to the client whose token created them: with [named tokens](#clients-and-quotas) each client sees only its own, and only an admin sees everyone's. With a single shared token, everyone who holds it is the same client (`default`, an admin) and sees everything.
 
 **Lifetime:**
 - **Uploads:** kept for `--upload-ttl` after creation, but never while a queued or running job uses them.
@@ -327,11 +328,12 @@ curl -s -H "Authorization: Bearer $token" -o outputs.zip http://localhost:7474/v
 | 200 | Command ran successfully (including when violations were found — exit 0 or 1; a `violationsExitCode` in the request is ignored) |
 | 400 | Bad request — invalid input, missing required field (exit 2) |
 | 401 | Missing or wrong bearer token |
-| 403 | Host or Origin header not allowed, or a file path outside the allowed folders / an existing output without `"overwrite": true` |
-| 404 | No such endpoint |
+| 403 | Host or Origin header not allowed, a file path outside the allowed folders / an existing output without `"overwrite": true`, or a route that needs an admin token (`/shutdown`, `/metrics`, `GET /v1/jobs?owner=` another client) |
+| 404 | No such endpoint; under `/v1` also a job or upload that doesn't exist **or belongs to another client** (the two answers are identical) |
 | 405 | Method not allowed — wrong HTTP verb for the endpoint |
 | 413 | Request body larger than `--max-body-bytes` |
 | 415 | POST without `Content-Type: application/json` |
+| 429 | The client's quota is used up: too many queued jobs (`maxQueued`) or requests (`requestsPerMinute`). `Retry-After` says when to try again; other clients are not affected |
 | 500 | Internal error — command crashed (exit 3). Out of memory: the body is `{"exitCode":3,...,"error":"Out of memory; the server stops..."}` and the server then exits with 3; restart it with more memory ([sizing guide](../guide/sizing.md)) |
 | 409 | `/v1`: the job hasn't finished (result), or isn't queued any more (cancel) |
 | 410 | `/v1`: the job's result was larger than `--max-result-bytes` and wasn't kept |
@@ -477,12 +479,14 @@ Names are compared without case and without DNS lookups. No scheme, path or wild
 ### Token file for services
 
 `--token-from-file <path>` (or `CIMPAL_API_TOKEN_FILE=<path>`) reads the tokens from a file that `serve` never writes or deletes, such as a Kubernetes or Docker secret:
-- **Contents:** one token per line, at most two (two while you rotate), each at least 32 characters. Blank lines and lines starting with `#` are ignored.
+- **Contents:** one token per line, each at least 32 characters. Blank lines and lines starting with `#` are ignored. A line is either
+  - `name:role:token`: a token of a named client, see [Clients and quotas](#clients-and-quotas); at most 256 tokens; or
+  - a bare token: the client `default`, an admin. At most two (two while you rotate).
 - **Reload:** the file is read every `--token-reload` (60 s), and the tokens change when its content does.
   - **No token** (empty, or only comments): every token is revoked at once.
   - **Broken file** (can't be read, or invalid): the tokens read before stay for one more check, which bridges a secret being replaced. If it is still broken then, every request is refused and `/ready` answers 503 until it is fixed. Each check logs a warning.
   - **At start:** any of these stops `serve` with exit code 2.
-  - **Regular file only:** at most 4 KiB. Replace it in one step (write a new file, then rename) so it is never read half-written.
+  - **Regular file only:** at most 64 KiB. Replace it in one step (write a new file, then rename) so it is never read half-written.
 - **Rotate:**
   1. write the old and the new token;
   2. switch the clients to the new one;
@@ -490,6 +494,52 @@ Names are compared without case and without DNS lookups. No scheme, path or wild
   No restart is needed.
 - **Permissions:** on Linux and macOS, a file any user can read gives a warning. Kubernetes: `defaultMode: 0440` with `fsGroup`.
 - **Conflicts:** a token file together with `CIMPAL_API_TOKEN`, or together with `--token-file` (where a generated token is written), refuses to start (exit 2) rather than guessing.
+
+### Clients and quotas
+
+A shared service used by several independent clients (teams, pipelines, organisations) keeps them apart with **named tokens** in the token file:
+
+```text
+# name:role:token     (role: client or admin; a bare token line is client "default", role admin)
+etl-airflow:client:3f9c...
+etl-airflow:client:8b21...     # rotation: two tokens of one client
+team-b:client:a71e...
+ops:admin:9d02...
+```
+
+- **Name:** 1 to 64 letters, digits, `.`, `_` or `-`. It is an identifier, not a secret: it appears in logs, metrics and the job's `owner` field. One name has one role; one token belongs to one name.
+- **Bare tokens with colons:** a line shaped `word:client:…` or `word:admin:…` is always read as a named line. Generated tokens never contain `:`; replace a hand-made bare token that does.
+- **Ownership:** jobs and uploads belong to the client that created them.
+  - A `client` sees only its own: `GET /v1/jobs` lists them, and every route of another client's job (result, log, files, archive, cancel) or upload answers **404, exactly as for an id that doesn't exist**. A job can only read an upload of the same client (`inputUpload`).
+  - An `admin` sees everything, and filters the list with `GET /v1/jobs?owner=<name>`. Only an admin may call `/shutdown` and `/metrics`.
+- **Synchronous endpoints** (`POST /validate` and the others) are attributed to the client in logs and metrics too.
+
+**Quotas** (`--client-quotas quotas.json`) stop one client from filling the queue or the disk for everyone:
+
+```json
+{
+  "_comment": "Read at start. A client's entry wins over default, which wins over the server's flags.",
+  "default": { "maxQueued": 2, "requestsPerMinute": 600 },
+  "clients": {
+    "etl-airflow": { "maxQueued": 8, "maxRunning": 2 },
+    "team-b": { "maxUploadBytes": 1073741824, "maxWorkBytes": 5368709120 }
+  }
+}
+```
+
+| Quota | Default | When it is used up |
+|---|---|---|
+| `maxQueued` | none of its own (the server's `--queue-size` bounds it) | A submit is refused with **429** and `Retry-After` once the client has `maxQueued` + `maxRunning` jobs queued or running. Other clients still submit. |
+| `maxRunning` | `--workers` | The client's further jobs wait, and other clients' jobs may start before them: the next job to run is the oldest one whose client is under its `maxRunning`. |
+| `maxUploadBytes` | `--max-upload-bytes` | **413** for a larger upload. |
+| `maxWorkBytes` | `--work-max-bytes` | **507** once the client's uploads and job outputs take that much of the work area. |
+| `requestsPerMinute` | 0 (no limit) | **429** with `Retry-After` for any request with the client's token; the budget refills evenly over a minute. |
+
+**With several clients, set `default.maxQueued`**: without it one client can take the whole queue, and the others get 503 until its jobs finish. Synchronous endpoints (`POST /validate` …) count against `requestsPerMinute` and the server's queue, not against `maxQueued` or `maxRunning`; give such clients the `/v1` API.
+
+Finished jobs are dropped (beyond `--max-jobs` or `--job-store-bytes`) from the client that holds the most first, so one client's many jobs don't push out another's results. A job with an upload is refused with 507 while its client's share of the work area is already full, since its outputs would count there too.
+
+The server's own flags stay the limits of the whole server: a client's `maxRunning`, `maxUploadBytes` or `maxWorkBytes` above them is lowered to them. A quota for a name that has no token logs a warning at start. Keys starting with `_` are comments.
 
 ### Shutdown
 
@@ -508,12 +558,14 @@ With `--log-format json`, stderr carries one JSON object per line and stdout sta
 |---|---|
 | `ts`, `level` (`info`, `warn`, `error`), `event`, `message` | always |
 | `jobId`, `command`, `status`, `exitCode`, `durationMs` | job and command events |
+| `client` | events of a request or job with a token: the client's name from the token file (`default` for a single shared token), never the token |
 | `remote`, `method`, `path` | request events (`remote` is the direct peer, i.e. the proxy behind one) |
 
 **Events:**
 - **Server:** `server.started` (with `tokenSource`, where the token comes from), `server.stopping`, `server.stopped`, `server.grace_exceeded`;
 - **Jobs and commands:** `job.queued`, `job.started`, `job.finished`, `command.finished`;
-- **Problems:** `request.rejected`, `stall`, `token.file`;
+- **Uploads:** `upload.received`;
+- **Problems:** `request.rejected`, `stall`, `token.file`, `quota.unknown`;
 - **Output:** `output`, which is every line the commands themselves write, e.g. `[INFO] Loading …`, tagged with the `jobId` of the job whose thread wrote it. Its level comes only from the line's start (`[WARN]`, `[ERROR]`, or a logger's `[thread] WARN`).
 
 **Safety:**
@@ -524,19 +576,20 @@ The default `text` format keeps the familiar `[WARN] serve: …` lines.
 
 ### Metrics
 
-With `--metrics`, `GET /metrics` (token required) returns Prometheus text format 0.0.4:
+With `--metrics`, `GET /metrics` (admin token required) returns Prometheus text format 0.0.4:
 
 | Metric | Type | Labels |
 |---|---|---|
 | `cimpal_info` | gauge | `version` |
 | `cimpal_jobs` | gauge, stored jobs | `status` |
-| `cimpal_jobs_finished_total` | counter | `status` |
+| `cimpal_jobs_finished_total` | counter | `client`, `status` |
 | `cimpal_job_duration_seconds` | histogram (1 s … 2 h) | — |
-| `cimpal_requests_total` | counter, synchronous endpoints | `command`, `outcome` (`ok`, `violations`, `bad_input`, `error`, `timeout`, `busy`) |
+| `cimpal_requests_total` | counter, synchronous endpoints | `client`, `command`, `outcome` (`ok`, `violations`, `bad_input`, `error`, `timeout`, `busy`) |
+| `cimpal_quota_refused_total` | counter, 429 answers | `client`, `quota` (`max_queued`, `requests_per_minute`) |
 | `cimpal_queue_depth`, `cimpal_busy`, `cimpal_running`, `cimpal_workers` | gauge | — |
 | `cimpal_jvm_heap_used_bytes`, `cimpal_jvm_heap_max_bytes` | gauge | — |
 
-The counters start at zero on every start.
+The counters start at zero on every start; a counter appears once it has counted something. The `client` label holds names from the token file only, so the number of series stays bounded.
 
 ---
 

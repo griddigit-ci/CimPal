@@ -17,7 +17,7 @@ import java.util.UUID;
 final class Job {
 
     /** A consistent view of the job for the API. */
-    record Snapshot(UUID id, String command, String label, JobStatus status, Instant createdAt,
+    record Snapshot(UUID id, String command, String label, String owner, JobStatus status, Instant createdAt,
                     Instant startedAt, Instant finishedAt, Integer exitCode, String error,
                     boolean finished, boolean hasResult, boolean resultDropped) {
 
@@ -30,6 +30,8 @@ final class Job {
     private final UUID id;
     private final String command;
     private final String label;
+    /** The client that submitted it (DEP-13); only that client and admins see it. */
+    private final String owner;
     private final Instant createdAt;
     private final JobLog log;
 
@@ -41,10 +43,11 @@ final class Job {
     private boolean resultDropped;
     private String error;
 
-    Job(UUID id, String command, String label, Instant createdAt, int logLines) {
+    Job(UUID id, String command, String label, String owner, Instant createdAt, int logLines) {
         this.id = id;
         this.command = command;
         this.label = label;
+        this.owner = owner;
         this.createdAt = createdAt;
         this.log = new JobLog(logLines);
     }
@@ -55,6 +58,10 @@ final class Job {
 
     String command() {
         return command;
+    }
+
+    String owner() {
+        return owner;
     }
 
     Instant createdAt() {
@@ -158,7 +165,7 @@ final class Job {
     }
 
     synchronized Snapshot snapshot() {
-        return new Snapshot(id, command, label, status, createdAt, startedAt, finishedAt, exitCode, error,
+        return new Snapshot(id, command, label, owner, status, createdAt, startedAt, finishedAt, exitCode, error,
                 finishedAt != null, result != null, resultDropped);
     }
 }

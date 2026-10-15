@@ -197,4 +197,87 @@ class TokenSourceTest {
         assertThat(TokenSource.fixed(A).matches(bearer(B))).isFalse();
         assertThatThrownBy(() -> TokenSource.fixed(" ")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    // ---- named clients (DEP-13) ----------------------------------------------------------------
+
+    @Test
+    void aFixedOrBareTokenIsTheAdminClientDefault() throws Exception {
+        assertThat(TokenSource.fixed(A).authenticate(bearer(A))).isEqualTo(TokenSource.Client.DEFAULT);
+        TokenSource.FileTokens tokens = open(write(tempDir.resolve("token"), A + "\n" + B + "\n", 0));
+
+        TokenSource.Client client = tokens.authenticate(bearer(B));
+        assertThat(client.name()).isEqualTo("default");
+        assertThat(client.admin()).isTrue();
+        assertThat(tokens.clientNames()).containsExactly("default");
+    }
+
+    @Test
+    void namedLinesMapEachTokenToItsClientAndRole() throws Exception {
+        TokenSource.FileTokens tokens = open(write(tempDir.resolve("token"), "# name:role:token\n"
+                + "etl-airflow:client:" + A + "\n"
+                + "etl-airflow:client:" + B + "\n" // rotation: two tokens of one client
+                + "ops:admin:" + C + "\n", 0));
+
+        assertThat(tokens.authenticate(bearer(A))).isEqualTo(new TokenSource.Client("etl-airflow", false));
+        assertThat(tokens.authenticate(bearer(B))).isEqualTo(new TokenSource.Client("etl-airflow", false));
+        assertThat(tokens.authenticate(bearer(C))).isEqualTo(new TokenSource.Client("ops", true));
+        assertThat(tokens.authenticate(bearer("etl-airflow:client:" + A))).isNull();
+        assertThat(tokens.clientNames()).containsExactlyInAnyOrder("etl-airflow", "ops");
+        assertThat(tokens.count()).isEqualTo(3);
+    }
+
+    @Test
+    void namedTokensBeyondTwoAreAcceptedBareOnesAreNot() throws Exception {
+        StringBuilder content = new StringBuilder();
+        for (int i = 0; i < 10; i++) {
+            content.append("client-").append(i).append(":client:").append(A, 0, 30).append(i).append("xx\n");
+        }
+        TokenSource.FileTokens tokens = open(write(tempDir.resolve("token"), content.toString(), 0));
+
+        assertThat(tokens.count()).isEqualTo(10);
+        assertThat(tokens.authenticate(bearer(A.substring(0, 30) + "7xx")).name()).isEqualTo("client-7");
+    }
+
+    @Test
+    void invalidNamedLinesAreRefusedWithoutShowingAToken() throws Exception {
+        for (String content : new String[] {
+                "a:owner:" + A + "\n", // unknown role
+                "a:client:" + A + "\na:admin:" + B + "\n", // one name, two roles
+                A + "\ndefault:client:" + B + "\n", // a bare token is default/admin
+                "a:client:" + A + "\nb:client:" + A + "\n", // one token, two clients
+                "a:client:short\n"}) {
+            Path file = Files.writeString(tempDir.resolve("bad"), content);
+            assertThatThrownBy(() -> open(file)).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Token file").hasMessageNotContaining(A).hasMessageNotContaining(B)
+                    .hasMessageNotContaining("short");
+        }
+    }
+
+    @Test
+    void aBareTokenShapedLikeANamedLineIsReadAsOne() throws Exception {
+        // Generated tokens have no ':'; a hand-made one shaped name:client:rest is a named line.
+        TokenSource.FileTokens tokens = open(write(tempDir.resolve("token"), "x:client:" + A + "\n", 0));
+
+        assertThat(tokens.authenticate(bearer("x:client:" + A))).isNull();
+        assertThat(tokens.authenticate(bearer(A))).isEqualTo(new TokenSource.Client("x", false));
+    }
+
+    @Test
+    void theTwoRolesErrorDoesNotNameTheClient() throws Exception {
+        Path file = Files.writeString(tempDir.resolve("bad"), "secretish:client:" + A + "\nsecretish:admin:" + B + "\n");
+        assertThatThrownBy(() -> open(file)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("line 2").hasMessageNotContaining("secretish");
+    }
+
+    @Test
+    void aReloadCanAddAClientAndRevokeAnother() throws Exception {
+        Path file = write(tempDir.resolve("token"), "a:client:" + A + "\nb:client:" + B + "\n", 0);
+        TokenSource.FileTokens tokens = open(file);
+        write(file, "a:client:" + A + "\nc:client:" + C + "\n", 1);
+        clock.advance(Duration.ofSeconds(61));
+
+        assertThat(tokens.authenticate(bearer(B))).isNull();
+        assertThat(tokens.authenticate(bearer(C)).name()).isEqualTo("c");
+        assertThat(tokens.authenticate(bearer(A)).name()).isEqualTo("a");
+    }
 }

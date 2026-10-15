@@ -750,9 +750,11 @@ class JobApiTest {
                 }
                 for (Map.Entry<String, JsonNode> response : op.getValue().path("responses").properties()) {
                     String key = op.getKey().toUpperCase() + " " + path.getKey() + " " + response.getKey();
-                    // The file exchange routes (DEP-7) are FileExchangeApiTest's to check.
+                    // The file exchange routes (DEP-7) are FileExchangeApiTest's to check, the
+                    // client quotas and filters (DEP-13) ClientIsolationTest's.
                     if (!FileExchangeApiTest.ROUTES.contains(path.getKey())
-                            && !key.equals(FileExchangeApiTest.SUBMIT_UNKNOWN_UPLOAD)) {
+                            && !key.equals(FileExchangeApiTest.SUBMIT_UNKNOWN_UPLOAD)
+                            && !ClientIsolationTest.covers(key)) {
                         expected.add(key);
                     }
                 }

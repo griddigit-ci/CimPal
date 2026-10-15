@@ -83,6 +83,44 @@ class CliStreamsTest {
         assertThat(text(processOut)).isEmpty();
     }
 
+    /**
+     * The common pool is shared by every job ({@code parallelStream()} in Core's ModelFactory),
+     * and its workers are created lazily, maybe while one job runs. They must not carry that job's
+     * streams, or another job's lines would land in its log, which belongs to another client
+     * (DEP-13). On JDK 25 they are innocuous threads that inherit nothing: their lines go to the
+     * default stream, never to a job.
+     */
+    @Test
+    void commonPoolWorkersNeverCarryAJobsStreams() throws Exception {
+        ByteArrayOutputStream a = new ByteArrayOutputStream();
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        CountDownLatch aRunning = new CountDownLatch(1);
+        CountDownLatch bDone = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> fa = pool.submit(() -> CliStreams.bind(null, stream(a), "A", () -> {
+                // Job A creates (or reuses) common-pool workers, then stays running.
+                java.util.stream.IntStream.range(0, 2000).parallel()
+                        .forEach(i -> assertThat(CliStreams.label()).isIn("A", null));
+                aRunning.countDown();
+                bDone.await(10, TimeUnit.SECONDS);
+                return null;
+            }));
+            Future<?> fb = pool.submit(() -> CliStreams.bind(null, stream(b), "B", () -> {
+                aRunning.await(10, TimeUnit.SECONDS);
+                java.util.stream.IntStream.range(0, 2000).parallel().forEach(i -> System.err.println("b" + i));
+                bDone.countDown();
+                return null;
+            }));
+            fa.get(10, TimeUnit.SECONDS);
+            fb.get(10, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(text(a)).as("job A's log").isEmpty();
+        assertThat(text(b).lines().count() + text(processErr).lines().count()).isEqualTo(2000);
+    }
+
     @Test
     void threadsStartedInsideABindingInheritIt() throws Exception {
         ByteArrayOutputStream job = new ByteArrayOutputStream();

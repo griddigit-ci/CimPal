@@ -146,8 +146,9 @@ public class ServeCommand implements Callable<Integer> {
     private Path tokenFile;
 
     @Option(names = "--token-from-file",
-            description = "Read the accepted bearer token(s) from this file instead: one or two tokens "
-                    + "(two while rotating), one per line, each at least 32 characters. The file is never "
+            description = "Read the accepted bearer token(s) from this file instead, one per line, each at "
+                    + "least 32 characters: name:role:token for a named client (role client or admin), or "
+                    + "one or two bare tokens (client 'default', admin). The file is never "
                     + "written or deleted and is read again when it changes (see --token-reload). Same as "
                     + "the CIMPAL_API_TOKEN_FILE environment variable. Can't be combined with "
                     + "CIMPAL_API_TOKEN or --token-file.")
@@ -246,8 +247,14 @@ public class ServeCommand implements Callable<Integer> {
     private String logFormat;
 
     @Option(names = "--metrics",
-            description = "Serve Prometheus metrics at GET /metrics (needs the token).")
+            description = "Serve Prometheus metrics at GET /metrics (needs an admin token).")
     private boolean metrics;
+
+    @Option(names = "--client-quotas",
+            description = "JSON file of per-client limits (maxQueued, maxRunning, maxUploadBytes, maxWorkBytes, "
+                    + "requestsPerMinute) under \"default\" and \"clients\": {name: {...}}; read at start. "
+                    + "Without it each client may use the server's whole limits.")
+    private Path clientQuotas;
 
     @Option(names = "--work-root",
             description = "Folder for uploads and job outputs of the /v1 file exchange (default: .cimpal-work "
@@ -387,12 +394,24 @@ public class ServeCommand implements Callable<Integer> {
         }
 
         Set<String> allowedHosts = new LinkedHashSet<>();
+        ClientQuotas.Settings quotaSettings = ClientQuotas.Settings.NONE;
         try {
             for (String name : allowedHostNames) {
                 allowedHosts.add(ServeSecurity.allowedHostEntry(name));
             }
             if (shutdownGrace.isNegative() || shutdownGrace.isZero()) {
                 throw new IllegalArgumentException("--shutdown-grace must be positive.");
+            }
+            if (clientQuotas != null) {
+                quotaSettings = ClientQuotas.read(clientQuotas);
+                Set<String> known = tokenSource != null ? tokenSource.clientNames()
+                        : Set.of(TokenSource.Client.DEFAULT.name());
+                for (String name : new java.util.TreeSet<>(quotaSettings.clients().keySet())) {
+                    if (!known.contains(name)) {
+                        log.warn("quota.unknown", "serve: --client-quotas names client '" + name
+                                + "', which has no token (yet)", "client", name);
+                    }
+                }
             }
         } catch (IllegalArgumentException ex) {
             System.err.println("[ERROR] " + ex.getMessage());
@@ -414,6 +433,7 @@ public class ServeCommand implements Callable<Integer> {
                 .queueSize(queueSize)
                 .workers(workers)
                 .sizeEstimator((command, body, workspace) -> estimateHeap(command, body))
+                .clientQuotas(quotaSettings)
                 .requestTimeout(requestTimeout)
                 .jobTimeout(jobTimeout)
                 .maxJobs(maxJobs)
