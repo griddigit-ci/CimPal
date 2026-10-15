@@ -24,7 +24,7 @@ Check the change against:
 2. `SECURITY-SELF-ATTESTATION.md` §4: does the diff reintroduce any fixed finding (credential
    disclosure, SSRF, command construction, CSV injection, path traversal, shared temp dirs, zip
    bombs, log injection, hardcoded paths, error exposure, AI knowledge-source SSRF)?
-3. Open gaps G1–G9 in `docs/plans/README.md`: does the diff widen one, or claim to close one without
+3. Open gaps G1–G9 in `docs/plans/security/README.md`: does the diff widen one, or claim to close one without
    a test?
 4. Tests: does every security-relevant change have a regression test that would fail without it?
 

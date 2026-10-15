@@ -31,7 +31,7 @@ Every GUI tab loads and runs its main action headlessly, and GUI-only logic is l
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/TEST-6.md` (in plan mode).
+Start a session with: `Execute docs/plans/testing/TEST-6.md` (in plan mode).
 
 ```text
 Add TestFX with Monocle (headless) to CimPal-Main. For every tab in CimPalGui.fxml: load it, fill inputs with fixture paths, trigger the main action, and assert the result appears (table rows, output file, status label) without an exception. Keep these as smoke tests: the logic should already be covered in Core. Where a tab's logic still lives only in Main (task wizard tasks, RDFS union, visualisation, datatype mapping, export RDFS descriptions), list it in this file as a candidate for extraction to Core, with an estimated size. Make the suite run headless on ubuntu-latest in ci.yml (smoke subset) and in full in nightly.

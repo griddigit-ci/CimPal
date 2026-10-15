@@ -36,7 +36,7 @@ Close G2 (unrestricted file paths in serve/mcp/run) and G3 (SPARQL SERVICE bypas
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/SEC-2.md` (in plan mode).
+Start a session with: `Execute docs/plans/security/SEC-2.md` (in plan mode).
 
 ```text
 Implement gaps G2 and G3.

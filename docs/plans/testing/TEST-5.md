@@ -35,7 +35,7 @@ Find what PR tests can't: crashes on malformed input, engine disagreements, perf
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/TEST-5.md` (in plan mode).
+Start a session with: `Execute docs/plans/testing/TEST-5.md` (in plan mode).
 
 ```text
 1. Jazzer (jazzer-junit) fuzz targets for: zip/archive extraction, RDF/XML and Turtle model loading through ModelFactory, Excel import (ExcelTools), config JSON parsing, SHACL shape loading. Each target asserts: no uncaught exception other than the documented input-error types, no file written outside @TempDir, finishes within the time limit. Seed corpora from the fixtures. Run 10 minutes per target in nightly.yml; save crashes as artifacts and turn each into a regression test.

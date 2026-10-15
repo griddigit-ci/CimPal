@@ -36,7 +36,7 @@ Shared test infrastructure so every later work package can write fast, network-f
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/TEST-1.md` (in plan mode).
+Start a session with: `Execute docs/plans/testing/TEST-1.md` (in plan mode).
 
 ```text
 Build the shared test infrastructure. No production behaviour changes.

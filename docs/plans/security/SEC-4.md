@@ -31,7 +31,7 @@ Close G8: a disclosure policy and an attestation that matches the current archit
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/SEC-4.md` (in plan mode).
+Start a session with: `Execute docs/plans/security/SEC-4.md` (in plan mode).
 
 ```text
 1. Create SECURITY.md: supported versions, how to report privately (GitHub private vulnerability reporting + a security contact address I will confirm), response targets by severity, disclosure policy.

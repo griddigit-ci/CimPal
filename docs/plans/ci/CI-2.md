@@ -35,7 +35,7 @@ Close G7: automated dependency and code scanning, pinned actions, and verifiable
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/CI-2.md` (in plan mode).
+Start a session with: `Execute docs/plans/ci/CI-2.md` (in plan mode).
 
 ```text
 1. .github/dependabot.yml for maven (weekly, grouped minor/patch) and github-actions.

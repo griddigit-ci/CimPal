@@ -65,7 +65,7 @@ Each has an `@Disabled` test that asserts the correct behaviour and fails today 
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/TEST-3.md` (in plan mode).
+Start a session with: `Execute docs/plans/testing/TEST-3.md` (in plan mode).
 
 ```text
 Feature group for this session: <validation | rdfs2shacl + excel2shacl + organize | convert | comparisons | sparql | gen-instances + manifest | kgcl>.

@@ -14,7 +14,7 @@ disable-model-invocation: true
 Re-read the *Standard footer* section of `docs/plans/README.md`; it is the source of truth if it
 differs from this list. Then work through it as a checklist and report each item's state:
 
-- [ ] Read `CLAUDE.md`, `docs/PROJECT.md` and `docs/plans/$ARGUMENTS.md`. Don't redo full codebase
+- [ ] Read `CLAUDE.md`, `docs/PROJECT.md` and `docs/plans/<track>/$ARGUMENTS.md` (track folder from the ID's prefix: `A`, `DOC` → `workspace/`; `CI` → `ci/`; `SEC` → `security/`; `TEST` → `testing/`; `DEP` → `deployment/`). Don't redo full codebase
       discovery.
 - [ ] Plan mode: propose the plan, list the files to touch, and wait for approval.
 - [ ] Branch `feature/<wp-id>-<short-name>` off `devel`. No push, tag or PR unless asked.

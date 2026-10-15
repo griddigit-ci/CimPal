@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Regression tests for the CimPal-Main remediations in SECURITY-SELF-ATTESTATION.md §4 (TEST-2),
  * named {@code F<n>_...} / {@code H1_...} after their finding. Core findings are in
- * {@code SecurityRegressionTest}; the finding to test map is in docs/plans/TEST-2.md.
+ * {@code SecurityRegressionTest}; the finding to test map is in docs/plans/testing/TEST-2.md.
  */
 class SecurityRegressionMainTest {
 

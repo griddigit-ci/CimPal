@@ -11,7 +11,7 @@ Guidance for Claude Code when working in this repository.
 ## Current work
 
 - Work is planned in Claude Desktop and handed over as work packages in `docs/plans/`. **Start with `docs/plans/README.md`**: order, status, open decisions and the standard footer.
-- A session usually begins with `Execute docs/plans/<ID>.md` in plan mode. Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
+- A session usually begins with `Execute docs/plans/<track>/<ID>.md` in plan mode (tracks: `workspace` for A/DOC, `ci`, `security`, `testing`, `deployment`). Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
 - Shared tooling in `.claude/`:
   - Path-scoped rules: `rules/security.md` for security-sensitive code, `rules/testing.md` for `src/test`.
   - Skills: `/add-regression-test`, `/security-check-change`.

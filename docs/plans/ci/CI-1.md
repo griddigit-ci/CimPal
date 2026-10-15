@@ -32,7 +32,7 @@ Run the full build and all tests on every push and PR to `devel` and `master`, o
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/CI-1.md` (in plan mode).
+Start a session with: `Execute docs/plans/ci/CI-1.md` (in plan mode).
 
 ```text
 Add .github/workflows/ci.yml: on push and pull_request to devel and master. Matrix windows-latest and ubuntu-latest, Temurin JDK 25, Maven cache. Steps: mvn -B verify; upload surefire/failsafe reports as artifacts; publish a test summary. Set top-level `permissions: contents: read`. Pin every action by full commit SHA with a version comment.
