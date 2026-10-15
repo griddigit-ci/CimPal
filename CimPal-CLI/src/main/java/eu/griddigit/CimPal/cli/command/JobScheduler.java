@@ -28,7 +28,7 @@ import java.util.function.ToIntFunction;
 final class JobScheduler {
 
     /** A queued job and its checked request body. */
-    record Entry(Job job, byte[] body) {
+    record Entry(Job.Snapshot job, byte[] body) {
     }
 
     private final ToIntFunction<String> maxRunning;
@@ -45,7 +45,7 @@ final class JobScheduler {
     }
 
     /** A job was queued; one turn must be queued for it too. */
-    synchronized void add(Job job, byte[] body) {
+    synchronized void add(Job.Snapshot job, byte[] body) {
         pending.add(new Entry(job, body));
     }
 

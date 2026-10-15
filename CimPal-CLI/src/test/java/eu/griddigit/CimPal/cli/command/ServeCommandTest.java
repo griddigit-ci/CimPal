@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Token lifecycle of the {@code serve} command itself (SEC-1, gap G1). */
 class ServeCommandTest {
@@ -482,5 +483,87 @@ class ServeCommandTest {
         assertThat(server.workAreaForTest().root()).isEqualTo(root.resolve(".cimpal-work").toRealPath());
         assertThat(shutdown(server, token).statusCode()).isEqualTo(200);
         assertThat(exit.get(10, TimeUnit.SECONDS)).isEqualTo(ExitCode.OK);
+    }
+
+    // ---- --job-store (DEP-11) -----------------------------------------------------------------
+
+    private static final String DB_SECRET = "s3cret-db-password-0123456789";
+
+    @Test
+    void theInMemoryStoreIsTheDefaultAndRefusesDatabaseOptions() {
+        assertThat(ServeCommand.jobStoreSettings(null, null, null, null, null, 1, false, Map.of())).isNull();
+        assertThat(runToExit(Map.of(), "--port", "0", "--job-store-url", "jdbc:postgresql://db/cimpal"))
+                .isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(output()).contains("need --job-store jdbc");
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("redis", null, null, null, null, 1, false, Map.of()))
+                .hasMessageContaining("memory or jdbc");
+    }
+
+    @Test
+    void aJdbcStoreNeedsAPostgresUrlWithoutThePassword() {
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("jdbc", null, null, null, null, 1, false, Map.of()))
+                .hasMessageContaining("--job-store-url");
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("jdbc", "jdbc:h2:mem:x;INIT=RUNSCRIPT FROM 'x'", null,
+                null, null, 1, false, Map.of())).hasMessageContaining("PostgreSQL");
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("jdbc", "jdbc:postgresql://db/c?user=u&password="
+                + DB_SECRET, null, null, null, 1, false, Map.of()))
+                .hasMessageContaining("must not hold the password").hasMessageNotContaining(DB_SECRET);
+    }
+
+    @Test
+    void thePasswordComesFromAFileOrTheEnvironmentNeverBoth() throws Exception {
+        Path file = Files.writeString(tempDir.resolve("db-password"), DB_SECRET + System.lineSeparator());
+        ServeCommand.StoreSettings fromFile = ServeCommand.jobStoreSettings("jdbc", "jdbc:postgresql://db/cimpal?ssl=true",
+                "cimpal", file, null, 2, false, Map.of());
+        assertThat(fromFile.password()).isEqualTo(DB_SECRET);
+        assertThat(fromFile.pool()).isEqualTo(6);
+        assertThat(fromFile.displayUrl()).isEqualTo("jdbc:postgresql://db/cimpal");
+        assertThat(fromFile.toString()).doesNotContain(DB_SECRET);
+
+        ServeCommand.StoreSettings fromEnv = ServeCommand.jobStoreSettings("JDBC", null, null, null, 3, 1, true,
+                Map.of(ServeCommand.STORE_URL_ENV, "jdbc:postgresql://db/cimpal", ServeCommand.STORE_USER_ENV, "svc",
+                        ServeCommand.STORE_PASSWORD_ENV, DB_SECRET));
+        assertThat(fromEnv.user()).isEqualTo("svc");
+        assertThat(fromEnv.password()).isEqualTo(DB_SECRET);
+        assertThat(fromEnv.pool()).isEqualTo(3);
+
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("jdbc", "jdbc:postgresql://db/c", null, file, null, 1,
+                false, Map.of(ServeCommand.STORE_PASSWORD_ENV, DB_SECRET))).hasMessageContaining("not both");
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("jdbc", "jdbc:postgresql://db/c", null, null, 0, 1,
+                false, Map.of())).hasMessageContaining("--job-store-pool");
+    }
+
+    @Test
+    void anUnreachableDatabaseStopsTheStartWithoutShowingThePassword() throws Exception {
+        Path file = Files.writeString(tempDir.resolve("db-password"), DB_SECRET);
+        // Port 1 on loopback: nothing listens, the connection is refused at once.
+        int exit = runToExit(Map.of(), "--port", "0", "--job-store", "jdbc",
+                "--job-store-url", "jdbc:postgresql://127.0.0.1:1/cimpal?connectTimeout=2",
+                "--job-store-user", "cimpal", "--job-store-password-file", file.toString());
+
+        assertThat(exit).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(output()).contains("Cannot open the job store").doesNotContain(DB_SECRET);
+    }
+
+    @Test
+    void urlParametersThatLoadClassesWriteFilesOrHoldSecretsAreRefused() {
+        for (String parameter : new String[] {"sslfactory=org.postgresql.ssl.NonValidatingFactory",
+                "socketFactory=x.Y", "sslpassword=" + DB_SECRET, "loggerFile=/tmp/x.log",
+                "authenticationPluginClassName=x.Y", "sslhostnameverifier=x.Y"}) {
+            assertThatThrownBy(() -> ServeCommand.jobStoreSettings("jdbc", "jdbc:postgresql://db/c?ssl=true&" + parameter,
+                    null, null, null, 1, false, Map.of())).as(parameter).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageNotContaining(DB_SECRET);
+        }
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("jdbc", "jdbc:postgresql://u:" + DB_SECRET + "@db/c",
+                null, null, null, 1, false, Map.of())).hasMessageContaining("user information")
+                .hasMessageNotContaining(DB_SECRET);
+        assertThat(ServeCommand.jobStoreSettings("jdbc", "jdbc:postgresql://db/c?sslmode=verify-full&ApplicationName=cimpal",
+                null, null, null, 1, false, Map.of())).isNotNull();
+    }
+
+    @Test
+    void aDatabaseSetUpInTheEnvironmentButNotChosenIsRefused() {
+        assertThatThrownBy(() -> ServeCommand.jobStoreSettings("memory", null, null, null, null, 1, false,
+                Map.of(ServeCommand.STORE_URL_ENV, "jdbc:postgresql://db/c"))).hasMessageContaining("CIMPAL_JOB_STORE=jdbc");
     }
 }

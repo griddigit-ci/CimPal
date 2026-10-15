@@ -324,8 +324,9 @@ is merged (PR #71); PyPI publishing for both Python packages is in PR #72. Next:
 service (option 2) a shared production service: `docs/plans/deployment/OPTION-2-ROADMAP.md` lists the gaps
 and the order (a release first, then DEP-13 client identity, DEP-11 durable job store, DEP-14 idempotency and
 webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job isolation). DEP-13 (named tokens,
-job and upload ownership, per-client quotas, D-17) is in review (PR #75), not yet
-merged; next is DEP-11.
+job and upload ownership, per-client quotas, D-17) is merged (PR #75). DEP-11 (durable job store in PostgreSQL,
+D-14, D-18) is implemented on `feature/dep-11-durable-job-store`, not yet committed; its PostgreSQL ITs run only
+where Docker is available (CI). Then, in the roadmap's order: DEP-14, DEP-16, DEP-12.
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -481,6 +482,17 @@ Commands run on `--workers` threads (`ServeServer`, default 1), with a bounded q
 - `AdmissionGate`: a command starts only while the estimated heap (10× input size, at least 64 MiB, `ServeCommand.estimateHeap`) of the running ones plus its own fits `--max-concurrent-heap-bytes`; FIFO; a command alone always starts.
 - `MutableStaticsTest` fails on any new non-final static field in Core or the CLI that isn't on its reviewed list, and on any static field holding threads (executor, thread, timer, `HttpClient`): such threads would outlive the job that created them and carry its streams and path policy into another job (DEP-13); `ConcurrencyIT` (failsafe) compares 24 mixed jobs under four workers with one.
 
+### `serve` job store (DEP-11)
+
+`ServeServer` keeps `/v1` jobs in a `JobStore`: `MemoryJobStore` (the default, the former `JobManager`) or `JdbcJobStore` (`--job-store jdbc`, PostgreSQL, D-14). The store is the source of truth for a job's status; `JobScheduler` (in memory, per process) still decides which queued job runs next.
+- **Transitions** are single conditional `UPDATE`s (`… WHERE id = ? AND status = 'queued'`); every SQL text is fixed and prepared (`JdbcJobStoreTest.everyStatementIsPreparedFromFixedText`).
+- **Schema:** `db/V1__jobs.sql`, applied by `JdbcMigrator` (`cimpal_schema_version`; a newer schema is refused). Tables `cimpal_jobs` (with `owner`, `config`, `upload_id`, and `node`/`lease_until` for DEP-12), `cimpal_job_log`, `cimpal_uploads`. Plain SQL that H2 in PostgreSQL mode also runs (the unit tests).
+- **Connections:** `JdbcPool`, a small fixed pool; the password only ever goes to the driver (`--job-store-password-file` or `CIMPAL_JOB_STORE_PASSWORD[_FILE]`, never the command line; a URL with `password=` is refused).
+- **Restart (D-18):** `recover()` fails running jobs as "Interrupted" (or requeues them with `--requeue-interrupted`) and returns the queued ones, which `ServeServer.requeue` hands to the workers. `WorkArea` is not emptied in durable mode: `restore()` matches upload and job folders with the database (deletes what has no record, forgets records without folders, answers 410 for lost outputs). A durable `close()` leaves queued jobs queued.
+- **Failures:** `JobStore.Unavailable` → 503 + `Retry-After` (`ServeServer.route`/`storeUnavailable`), `/ready` 503 while `usable()` is false, `cimpal_job_store_errors_total`.
+- **Logs** go to an in-memory ring while a job runs (read from there) and to the database in batches of 64 and at the end.
+- **Tests:** `JobApiTest`, `FileExchangeApiTest` and `ClientIsolationTest` run on both stores (`@ParameterizedClass` over `TestStores`, H2); `JdbcJobStoreTest`, `JobStoreRestartTest`, `JobStoreOutageTest`; `JdbcJobStorePostgresIT` and `JobStoreRestartPostgresIT` repeat the store and restart tests on PostgreSQL 17 via Testcontainers (skipped without Docker).
+
 ### `serve` clients (DEP-13)
 
 Every token stands for a client (`TokenSource.Client`: a name and admin or not). A fixed token, `CIMPAL_API_TOKEN` and a bare token line are client `default`, an admin, so single-token setups behave as before. A token file line `name:role:token` names a client (D-17).
@@ -565,6 +577,8 @@ CimPal/
 ---
 
 ## Known issues and limitations
+
+**`serve` job store limits (DEP-11).** One instance per database until DEP-12 (two `serve` on one database would each run the queued jobs they loaded at start). After a crash the last (up to 63) log lines of a running job may be missing. A job that couldn't start because the database failed stays queued in the database and runs only after the next start. The PostgreSQL ITs only run where Docker is available (CI on Ubuntu; not on the maintainer's Windows machine yet).
 
 **`serve` clients share the folders (DEP-13).** Ownership separates `/v1` jobs, uploads and their outputs. In shared-folder mode (a job without `inputUpload`) every client reads and writes the same `--root` folders, so clients that must not see each other's files should use uploads only, or separate instances. Quotas are read at start only (the token file reloads, `--client-quotas` doesn't). OIDC/JWT tokens are a possible follow-up.
 

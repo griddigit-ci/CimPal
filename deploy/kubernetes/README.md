@@ -68,9 +68,17 @@ Kubernetes takes up to about a minute to update a mounted secret; no restart is 
 - **Revoke:** a secret with no token (empty, or only `#` comments) revokes every token at the next check.
 - **Broken file:** a file that can't be read or is invalid is bridged for one check. After that every request is refused and `/ready` turns 503 until it is fixed, so a broken secret can't leave a revoked token valid.
 
+## Jobs that survive a restart
+
+With the default in-memory store a rollout or a crash loses the queue and every result. `job-store.example.yaml` points `serve` at your PostgreSQL instead (DEP-11):
+1. `kubectl -n cimpal create secret generic cimpal-db --from-file=password=db-password`
+2. Add the file as a patch in `kustomization.yaml`, with your database's host and name, and apply.
+
+`serve` creates its tables at start (`cimpal_*`, version in `cimpal_schema_version`). After a restart queued jobs run, finished ones can still be fetched (their output files are on the `cimpal-data` volume), and a job that was running ends as `failed` ("Interrupted"). `/ready` turns 503 while the database can't be reached. Back up the database and the volume together.
+
 ## Why one replica
 
-`serve` runs one command at a time and keeps its jobs in memory. Two replicas behind one Service would each see only half of the jobs, so a poll could hit the replica that doesn't know the job. For more throughput, run more Deployments, each with its own name, data and token, and spread the work between them. Several jobs in parallel inside one JVM are planned in DEP-8.
+`serve` runs one command at a time and keeps its jobs in memory (or, with the job store above, one queue per instance). Two replicas behind one Service would each see only half of the jobs, so a poll could hit the replica that doesn't know the job. For more throughput, run more Deployments, each with its own name, data and token, and spread the work between them. Several jobs in parallel inside one JVM are planned in DEP-8.
 
 ## Try it on kind or Docker Desktop
 

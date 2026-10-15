@@ -132,6 +132,13 @@ final class ServeMetrics {
         return sb.toString();
     }
 
+    /** The job store's failures (DEP-11); always 0 for the in-memory store. */
+    static String storeErrors(long errors) {
+        StringBuilder sb = new StringBuilder();
+        help(sb, "cimpal_job_store_errors_total", "counter", "Failed job store operations since start.");
+        return sb.append("cimpal_job_store_errors_total ").append(errors).append('\n').toString();
+    }
+
     private static void help(StringBuilder sb, String name, String type, String help) {
         sb.append("# HELP ").append(name).append(' ').append(help).append('\n');
         sb.append("# TYPE ").append(name).append(' ').append(type).append('\n');

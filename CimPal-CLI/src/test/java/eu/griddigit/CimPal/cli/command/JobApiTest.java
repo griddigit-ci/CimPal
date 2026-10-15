@@ -8,6 +8,9 @@ package eu.griddigit.CimPal.cli.command;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -46,8 +49,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * and a clock the tests move. Every (method, route, status) these tests see is recorded, and
  * {@link #everyResponseInTheSpecIsExercised()} checks that the OpenAPI document lists nothing
  * that isn't tested.
+ *
+ * <p>Runs on every {@link TestStores job store} (DEP-11).
  */
+@ParameterizedClass
+@EnumSource(TestStores.class)
 class JobApiTest {
+
+    /** The job store the server runs on (DEP-11): every test runs on each. */
+    @Parameter
+    TestStores store;
 
     private static final String TOKEN = "test-token-0123456789abcdef0123456789abcdef";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -81,6 +92,9 @@ class JobApiTest {
         if (server != null) {
             server.close();
         }
+        if (server != null && server.jobsForTest() instanceof JdbcJobStore jdbc) {
+            jdbc.close();
+        }
     }
 
     private static ServeServer.Config.Builder config() {
@@ -99,7 +113,7 @@ class JobApiTest {
 
     private void start(ServeServer.Config.Builder config, ServeServer.CommandRunner runner,
                        ServeServer.RequestCheck check) throws Exception {
-        server = ServeServer.start(config.build(), runner, check, () -> { }, clock);
+        server = ServeServer.start(store.apply(config, clock).build(), runner, check, () -> { }, clock);
     }
 
     /** A runner that answers at once with a small JSON document naming the command. */
@@ -321,8 +335,10 @@ class JobApiTest {
         assertThat(s.awaitWorker(Duration.ofSeconds(10))).isTrue();
 
         assertThat(runs.get()).isEqualTo(1);
-        assertThat(s.jobsForTest().get(UUID.fromString(queued)).snapshot().status()).isEqualTo(JobStatus.CANCELLED);
-        assertThat(s.jobsForTest().get(UUID.fromString(running)).snapshot().status()).isEqualTo(JobStatus.SUCCEEDED);
+        // In memory a queued job would be lost anyway; a durable store keeps it for the next start (DEP-11).
+        assertThat(s.jobsForTest().get(UUID.fromString(queued)).status())
+                .isEqualTo(store == TestStores.MEMORY ? JobStatus.CANCELLED : JobStatus.QUEUED);
+        assertThat(s.jobsForTest().get(UUID.fromString(running)).status()).isEqualTo(JobStatus.SUCCEEDED);
     }
 
     // ---- store limits ------------------------------------------------------------------------
@@ -378,7 +394,7 @@ class JobApiTest {
         assertThat(health.path("status").asString()).isEqualTo("stalled");
 
         release.countDown();
-        waitUntil(() -> server.jobsForTest().get(UUID.fromString(id)).snapshot().finished());
+        waitUntil(() -> server.jobsForTest().get(UUID.fromString(id)).finished());
         assertThat(status(id)).as("stays timed_out").isEqualTo("timed_out");
         assertThat(job("GET", id, "result").statusCode()).as("the late result is kept").isEqualTo(200);
         assertThat(json(call("GET", "/v1/health", "/v1/health", null, false)).path("stalled").asBoolean()).isFalse();
@@ -533,7 +549,7 @@ class JobApiTest {
 
     @Test
     void jobIdsAreRandomVersion4Uuids() {
-        JobManager jobs = new JobManager(1000, Duration.ofHours(1), Duration.ofHours(1), 10, Long.MAX_VALUE, InstantSource.system());
+        MemoryJobStore jobs = new MemoryJobStore(1000, Duration.ofHours(1), Duration.ofHours(1), 10, Long.MAX_VALUE, InstantSource.system());
         Set<UUID> ids = new HashSet<>();
         UUID previous = null;
         int adjacent = 0;
@@ -586,6 +602,8 @@ class JobApiTest {
 
     @Test
     void finishedJobsAreDroppedOldestFirstBeyondTheJobStoreBytes() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(store == TestStores.MEMORY,
+                "--job-store-bytes bounds results held in the heap; a JDBC store keeps them in the database");
         // About 600 kB per result (two bytes per character), 1 MiB for all of them: one fits.
         String big = "{\"rows\":\"" + "x".repeat(300_000) + "\"}";
         start(config().jobStoreBytes(ServeServer.MIN_JOB_STORE_BYTES),
@@ -606,7 +624,7 @@ class JobApiTest {
     @Test
     void aJobRunningOutOfMemoryFailsAndStopsTheServer() throws Exception {
         AtomicInteger oom = new AtomicInteger();
-        server = ServeServer.start(config().build(), (command, configFile) -> {
+        server = ServeServer.start(store.apply(config(), clock).build(), (command, configFile) -> {
             throw new OutOfMemoryError("Java heap space");
         }, ServeServer.RequestCheck.NONE, oom::incrementAndGet, clock);
 
@@ -737,7 +755,7 @@ class JobApiTest {
         long tests = java.util.Arrays.stream(JobApiTest.class.getDeclaredMethods())
                 .filter(m -> m.isAnnotationPresent(Test.class)).count();
         // Only meaningful when the whole class ran, not for a single selected test.
-        org.junit.jupiter.api.Assumptions.assumeTrue(FINISHED.get() == tests, "not all tests of the class ran");
+        org.junit.jupiter.api.Assumptions.assumeTrue(FINISHED.get() == tests * TestStores.values().length, "not all tests of the class ran");
         JsonNode spec;
         try (InputStream in = JobApiTest.class.getResourceAsStream("/openapi/cimpal-v1.json")) {
             spec = JSON.readTree(in);

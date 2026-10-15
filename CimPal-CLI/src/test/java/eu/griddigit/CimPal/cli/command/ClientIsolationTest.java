@@ -9,6 +9,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -46,8 +49,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link ServeServer} with a named token file: a client never sees another client's jobs or
  * uploads (404, exactly as for an id that doesn't exist), an admin sees all of them, and each
  * client's quotas hold without holding back the others.
+ *
+ * <p>Runs on every {@link TestStores job store} (DEP-11).
  */
+@ParameterizedClass
+@EnumSource(TestStores.class)
 class ClientIsolationTest {
+
+    /** The job store the server runs on (DEP-11): every test runs on each. */
+    @Parameter
+    TestStores store;
 
     private static final String ALICE = "alice-token-0123456789abcdef0123456789abcdef";
     private static final String BOB = "bob-token-0123456789abcdef0123456789abcdef012";
@@ -81,6 +92,9 @@ class ClientIsolationTest {
         if (server != null) {
             server.close();
         }
+        if (server != null && server.jobsForTest() instanceof JdbcJobStore jdbc) {
+            jdbc.close();
+        }
     }
 
     // ---- set-up ------------------------------------------------------------------------------
@@ -93,7 +107,8 @@ class ClientIsolationTest {
                 .tokens(new TokenSource.FileTokens(tokens, Duration.ofSeconds(60), clock, warning -> { }))
                 .maxBodyBytes(4096).queueSize(4).requestTimeout(Duration.ofSeconds(30)).workRoot(work)
                 .metrics(true).log(ServeLog.json(new PrintStream(logBytes, true, StandardCharsets.UTF_8), clock));
-        server = ServeServer.start(settings.apply(config).build(), runner(), ServeServer.RequestCheck.NONE, () -> { },
+        server = ServeServer.start(store.apply(settings.apply(config), clock).build(), runner(),
+                ServeServer.RequestCheck.NONE, () -> { },
                 clock);
     }
 
@@ -488,7 +503,7 @@ class ClientIsolationTest {
         long tests = java.util.Arrays.stream(ClientIsolationTest.class.getDeclaredMethods())
                 .filter(m -> m.isAnnotationPresent(Test.class)).count();
         // Only meaningful when the whole class ran, not for a single selected test.
-        org.junit.jupiter.api.Assumptions.assumeTrue(FINISHED.get() == tests, "not all tests of the class ran");
+        org.junit.jupiter.api.Assumptions.assumeTrue(FINISHED.get() == tests * TestStores.values().length, "not all tests of the class ran");
         JsonNode spec;
         try (InputStream in = ClientIsolationTest.class.getResourceAsStream("/openapi/cimpal-v1.json")) {
             spec = JSON.readTree(in);

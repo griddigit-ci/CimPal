@@ -44,7 +44,8 @@ client ──HTTPS──▶ reverse proxy / Ingress ──HTTP──▶ CimPal s
 | Liveness `GET /health`, readiness `GET /ready` | with header `Host: localhost:7474` | Kubernetes sends the pod IP as Host otherwise, which is refused |
 | Memory limit | from [Sizing](sizing.md), request = limit | Out of memory ends `serve` with exit code 3; it never reports a clean result |
 | Grace period | `--shutdown-grace` 60 s, container stop timeout 90 s | A running command can finish its reports on SIGTERM |
-| Replicas | 1 per Deployment | Jobs are in memory; scale with more instances, each with its own name. `--workers N` runs N commands in one instance, for many small jobs; see [Sizing](sizing.md#several-commands-in-one-server) |
+| Job store | `--job-store jdbc` with your PostgreSQL | Jobs, results and logs survive a restart or redeploy; without it they are in memory and lost. See [Jobs that survive a restart](../cli/serve.md#jobs-that-survive-a-restart) |
+| Replicas | 1 per Deployment | One queue per instance (in memory or in its database); scale with more instances, each with its own name and database. `--workers N` runs N commands in one instance, for many small jobs; see [Sizing](sizing.md#several-commands-in-one-server) |
 | `--work-root` | on the data volume (the default `.cimpal-work` is in the first `--write-root` or `--root`) | Uploads and job outputs need disk; size the volume and `--work-max-bytes` for them |
 | `--request-read-time` | keep `PT60S` behind a proxy | The proxy buffers uploads; raise it only for large uploads sent directly |
 
@@ -58,8 +59,9 @@ CimPal doesn't read `s3://` paths itself (decision D-6). With Airflow, either:
 
 - **Health:**
   - `GET /health` reports `stalled` when a command runs longer than its timeout. Restart the instance if that persists.
-  - `GET /ready` turns 503 while the server is stopping, or when its token file is broken. A full queue doesn't count: a single instance must stay reachable for polling and cancelling. New jobs are then answered 503 with `Retry-After`.
-- **Jobs:** they are kept in memory and lost on a restart or redeploy. Clients should resubmit a job that comes back 404 after a restart.
+  - `GET /ready` turns 503 while the server is stopping, when its token file is broken, or while its job store database can't be reached. A full queue doesn't count: a single instance must stay reachable for polling and cancelling. New jobs are then answered 503 with `Retry-After`.
+- **Jobs:** in memory they are lost on a restart or redeploy, and clients should resubmit a job that comes back 404. With `--job-store jdbc` they survive it: queued jobs run, finished ones stay, and a job that was running ends as `failed` ("Interrupted"), which clients should resubmit.
+- **Backups (with `--job-store jdbc`):** back up the database and the work volume together; a job's record is in one, its output files in the other. The database holds the checked configs (paths), results and logs of jobs, never tokens. Its size is roughly `--max-jobs` × (result + `--job-log-lines` lines).
 - **Token rotation:**
   1. put the new token on a second line of the secret;
   2. switch the clients;

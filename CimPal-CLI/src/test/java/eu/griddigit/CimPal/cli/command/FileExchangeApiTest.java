@@ -10,6 +10,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -46,8 +49,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The file exchange of the {@code /v1} API (DEP-7): uploads, jobs that read them, and downloads
  * of their outputs, on a real {@link ServeServer} with the real per-job path policy
  * ({@link RootOptions#jobPolicy}, {@link ServeCommand#checkUploadPaths}) and a stub command.
+ *
+ * <p>Runs on every {@link TestStores job store} (DEP-11).
  */
+@ParameterizedClass
+@EnumSource(TestStores.class)
 class FileExchangeApiTest {
+
+    /** The job store the server runs on (DEP-11): every test runs on each. */
+    @Parameter
+    TestStores store;
 
     private static final String TOKEN = "test-token-0123456789abcdef0123456789abcdef";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -79,6 +90,9 @@ class FileExchangeApiTest {
         release.countDown();
         if (server != null) {
             server.close();
+        }
+        if (server != null && server.jobsForTest() instanceof JdbcJobStore jdbc) {
+            jdbc.close();
         }
     }
 
@@ -146,7 +160,7 @@ class FileExchangeApiTest {
 
     private void start(ServeServer.Config.Builder config, ServeServer.CommandRunner runner) throws Exception {
         Files.createDirectories(work);
-        server = ServeServer.start(config.build(), runner, realCheck(), () -> { }, clock);
+        server = ServeServer.start(store.apply(config, clock).build(), runner, realCheck(), () -> { }, clock);
     }
 
     // ---- HTTP helpers ------------------------------------------------------------------------
@@ -662,7 +676,7 @@ class FileExchangeApiTest {
     static void everyFileExchangeResponseInTheSpecIsExercised() throws Exception {
         long tests = java.util.Arrays.stream(FileExchangeApiTest.class.getDeclaredMethods())
                 .filter(m -> m.isAnnotationPresent(Test.class)).count();
-        org.junit.jupiter.api.Assumptions.assumeTrue(FINISHED.get() == tests, "not all tests of the class ran");
+        org.junit.jupiter.api.Assumptions.assumeTrue(FINISHED.get() == tests * TestStores.values().length, "not all tests of the class ran");
         JsonNode spec;
         try (InputStream in = FileExchangeApiTest.class.getResourceAsStream("/openapi/cimpal-v1.json")) {
             spec = JSON.readTree(in);
