@@ -82,6 +82,12 @@ Required inputs: same as mapping, plus `--previous-comparison` (optional)
 
 Use this when model files are named with a date/time stamp and you want trend tracking across runs.
 
+The comparison workbook (`validation_comparison__<timestamp>.xlsx`) has one sheet per run (named after the month), a **Charts** sheet and a **Compliance basis** sheet. Every number on Charts is an Excel formula, so clicking a cell shows how it is calculated, and each table has a description row:
+- **Per-region and Combined blocks:** warnings + violations per dataset, summed over all timestamps of the run (`SUMIFS` over the run sheet); each dataset's share of the total in %; and the delta to the previous run.
+- **Compliance rates:** the share of datasets with no hits in a run, as (clean datasets ÷ validated datasets) × 100, counted with `COUNTIFS` on the Compliance basis sheet. There are three variants: warnings and violations, violations only, and warnings only. *Combined* counts every region–dataset pair, so it is not the average of the regions. Infos never count.
+
+Pass this workbook as `--previous-comparison` on the next run to carry the history forward.
+
 ### `combined`
 
 Validates one dataset without a mapping CSV: the GUI's *Validate selected files together*. All the data files are merged into one dataset, so references between them (SSH to EQ, or to the boundary set) resolve, and the dataset is validated against all the constraint files at once.

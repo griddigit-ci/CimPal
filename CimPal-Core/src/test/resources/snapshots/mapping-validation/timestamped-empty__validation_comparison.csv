@@ -1,4 +1,6 @@
 ## <TIMESTAMP>
 Region,Timestamp,Dataset,Warnings,Infos,Violations,Total
 ## Charts
+How to read this sheet
+"Every run has its own sheet (named after the month, e.g. ""May 2060"") with one row per region, timestamp and dataset. A hit is one SHACL result. Only Warnings and Violations count; Infos are ignored. A dataset's hits are added up over all timestamps of that run.\nEvery number on this sheet is a formula: click a cell to see how it is calculated. Hover over a column header for its description."
 No comparison data available.
