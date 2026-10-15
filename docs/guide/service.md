@@ -66,7 +66,7 @@ CimPal doesn't read `s3://` paths itself (decision D-6). With Airflow, either:
   3. remove the old line.
 - **Logs:** `job.finished` events carry `jobId`, `status`, `exitCode` and `durationMs`. `request.rejected` events show refused requests (401, 403, 503) with the proxy's address as `remote`.
 - **Metrics:**
-  - `cimpal_jobs_finished_total{status="failed"}` and `cimpal_requests_total{outcome="error"}` are worth an alert.
+  - `sum(cimpal_jobs_finished_total{status="failed"})` and `sum(cimpal_requests_total{outcome="error"})` are worth an alert (`by (client)` to see who).
   - So is `cimpal_jvm_heap_used_bytes` close to `cimpal_jvm_heap_max_bytes`.
 
 ## Limits

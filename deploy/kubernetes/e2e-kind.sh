@@ -106,7 +106,7 @@ test "$status" = succeeded
 result=$(c "${auth[@]}" "https://$HOST/v1/jobs/$id/result")
 echo "result: $result"
 printf '%s' "$result" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["rows"]==[{"o":"x"}], r'
-c "${auth[@]}" "https://$HOST/metrics" | grep -q 'cimpal_jobs_finished_total{status="succeeded"} 1'
+c "${auth[@]}" "https://$HOST/metrics" | grep -q 'cimpal_jobs_finished_total{client="default",status="succeeded"} 1'
 
 echo "== JSON log lines, and no token in them"
 logs=$(kubectl -n cimpal logs "$pod")
