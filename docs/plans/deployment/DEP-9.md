@@ -143,5 +143,5 @@ Open: CI installs the dev tools with exact pins, but their transitive dependenci
 ### Open
 
 - `LocalCimPal` (run the CLI as a subprocess without a server): left out, as the WP allows.
-- Publishing to PyPI: a maintainer step after a release.
+- Publishing to PyPI: automated with each release (trusted publishing, maintainer approval; branch `feature/pypi-publishing`). The one-time PyPI and GitHub setup is the maintainer's.
 - **Install from git:** the guide's "install from git" line has not been tried outside this repository.

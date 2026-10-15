@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-13  
+**Last updated:** 2026-10-14  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -318,7 +318,10 @@ TEST-3's validation and SHACL generation groups (PR #65) and `validate --workflo
 folders (PR #67). DEP-8 (`serve --workers N`, concurrent commands in one JVM, decision D-8 yes) is
 merged (PR #69), and so is DEP-9 (Python SDK `cimpal-client` in `clients/python/`, Apache-2.0 per D-11,
 PR #70). DEP-10 (Airflow provider `airflow-provider-cimpal` in `clients/airflow/`, Airflow 3.2+ per D-12)
-is in review on `feature/dep-10-airflow-provider`; it is the last work package of the deployment track.
+is merged too (PR #71), which completes the deployment track. Publishing both packages to PyPI with
+each release (trusted publishing, approved through the GitHub environment `pypi`; a TestPyPI rehearsal
+workflow) is in review on `feature/pypi-publishing`; the PyPI and GitHub one-time setup is the
+maintainer's (`clients/python/README.md`, Releasing).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -347,7 +350,8 @@ All 13 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no ext
 `cimpal-client` (import `cimpal_client`, Python 3.10+, **Apache-2.0**, unlike the EUPL engine) calls the `/v1` API. Its version is `<cimpal.version>` from the root `pom.xml`, read by hatchling at build time.
 - `_generated/`: generated from `cimpal-v1.json` by a pinned `openapi-python-client` (`scripts/regenerate.py`; CI runs `--check`). The generator can't do `application/zip`, so uploads and the archive download are missing there.
 - `CimPal` / `AsyncCimPal` (facade): their own httpx requests, returning the generated models. One place for problem-details errors, retries (503 and never-sent requests; other transport errors only for GET, so a job is never submitted twice) and streaming downloads (output names checked to stay in the target folder).
-- Tests: respx unit tests, and integration tests that start `java -jar CimPal-CLI.jar serve`. CI: the `python-sdk*` jobs in `integrations.yml`. Publishing to PyPI is a maintainer step (`clients/python/README.md`).
+- Tests: respx unit tests, and integration tests that start `java -jar CimPal-CLI.jar serve`. CI: the `python-sdk*` jobs in `integrations.yml`.
+- Publishing: `release.yml` builds both Python packages through the reusable `python-dists.yml`: the tagged commit must be on master and the pom version must equal the tag; the toolchain is hash-locked (`.github/python-build-requirements.txt`, builds without isolation); `twine check --strict` and the provider's pin are checked. After the upload, the job checks that PyPI holds exactly the built files. It publishes them in its `pypi` job with PyPI trusted publishing, after a maintainer approves the `pypi` environment. `testpypi.yml` is a manual rehearsal with `.dev<run>` versions. Both trusted publishers must be registered on (Test)PyPI once (`clients/python/README.md`, Releasing).
 
 ### Airflow provider (`clients/airflow/`, DEP-10)
 

@@ -132,5 +132,5 @@ No High findings. Fixed, with regression tests:
 
 ### Open
 
-- **PyPI:** publishing `cimpal-client` and `airflow-provider-cimpal` is a maintainer step. Until the names are registered, install both from the same git ref; a squatter could otherwise publish `cimpal-client` at the pinned version.
+- **PyPI:** both packages are published by the release workflow (trusted publishing, maintainer approval; branch `feature/pypi-publishing`). Until the maintainer registers the two pending publishers on PyPI, the names stay unreserved: a squatter could publish `cimpal-client` at the pinned version, so do that setup soon.
 - **Connection form:** the Airflow UI was not tried by hand (the provider-info schema check and the CI install stand in for it).

@@ -12,8 +12,8 @@
 ## Install
 
 ```bash
-pip install cimpal-client                          # once published; until then, from a release tag:
-pip install "git+https://github.com/griddigit-ci/CimPal.git@<tag>#subdirectory=clients/python"
+pip install cimpal-client                          # will be on PyPI from the first release after 2026.10.6.1
+pip install "git+https://github.com/griddigit-ci/CimPal.git@<ref>#subdirectory=clients/python"   # a version not released yet
 ```
 
 It needs Python 3.10 or later. Its version is the CimPal version it was built with; a client works with any server of the same API version (`apiVersion` `1`), and warns (`CompatibilityWarning`) when the server reports another one.

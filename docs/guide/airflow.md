@@ -83,9 +83,10 @@ Give the pod or container the memory the model needs. The [sizing guide](sizing.
 `airflow-provider-cimpal` (Apache-2.0, in [`clients/airflow/`](../../clients/airflow/README.md)) adds a `cimpal` connection type, a hook, operators, a deferrable trigger and a sensor. It uses the [Python SDK](python-sdk.md) and needs Airflow 3.2 or later and a running CimPal server ([`serve`](../cli/serve.md), see [Running CimPal as a service](service.md)).
 
 ```bash
-pip install "git+https://github.com/griddigit-ci/CimPal.git@<tag>#subdirectory=clients/python" \
-            "git+https://github.com/griddigit-ci/CimPal.git@<tag>#subdirectory=clients/airflow"
+pip install airflow-provider-cimpal      # brings cimpal-client at the same version
 ```
+
+It will be on PyPI from the first CimPal release after 2026.10.6.1. Until then, or for a version that isn't released yet, install both from the same git ref: `pip install "git+https://github.com/griddigit-ci/CimPal.git@<ref>#subdirectory=clients/python" "git+https://github.com/griddigit-ci/CimPal.git@<ref>#subdirectory=clients/airflow"`.
 
 **The connection** (Admin › Connections, type *CimPal*, id `cimpal_default`):
 - **Host:** `cimpal.example.com`, or a full URL;
