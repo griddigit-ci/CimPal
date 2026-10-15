@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (implemented on `feature/dep-13-client-identity`; not committed) |
+| Status | In review ([PR #75](https://github.com/griddigit-ci/CimPal/pull/75)) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | DEP-5, DEP-6, DEP-7; decision D-17. Works with the in-memory store; DEP-11 adds the `owner` column. |
 | Size | M |

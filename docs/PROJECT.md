@@ -324,8 +324,8 @@ is merged (PR #71); PyPI publishing for both Python packages is in PR #72. Next:
 service (option 2) a shared production service: `docs/plans/deployment/OPTION-2-ROADMAP.md` lists the gaps
 and the order (a release first, then DEP-13 client identity, DEP-11 durable job store, DEP-14 idempotency and
 webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job isolation). DEP-13 (named tokens,
-job and upload ownership, per-client quotas, D-17) is implemented on `feature/dep-13-client-identity`, not yet
-committed or reviewed; next is DEP-11.
+job and upload ownership, per-client quotas, D-17) is in review (PR #75), not yet
+merged; next is DEP-11.
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
