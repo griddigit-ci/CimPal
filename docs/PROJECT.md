@@ -265,7 +265,7 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - The RDFS inputs are two synthetic profiles in `fixtures/shacl-generation/` (RDFS 2020 with CIM100, RDFS 2019 with CIM16).
 - The Core test-jar now also carries `fixtures/**`, which `RdfsToShaclCommandTest` in the CLI uses.
 
-**Docker image** (added by CI-3, `docs/plans/CI-3.md`):
+**Docker image** (added by CI-3, `docs/plans/ci/CI-3.md`):
 - `CimPal-CLI/docker/Dockerfile` copies the built `CimPal-CLI.jar` onto `eclipse-temurin:25-jre-noble`
   (pinned by digest). Maven never runs inside Docker.
 - The image runs as `10001:10001` (`cimpal`) in `/data`, which is also the default root for `mcp`
@@ -320,10 +320,10 @@ TEST-3's validation and SHACL generation groups (PR #65) and `validate --workflo
 folders (PR #67). DEP-8 (`serve --workers N`, concurrent commands in one JVM, decision D-8 yes) is
 merged (PR #69), and so is DEP-9 (Python SDK `cimpal-client` in `clients/python/`, Apache-2.0 per D-11,
 PR #70). DEP-10 (Airflow provider `airflow-provider-cimpal` in `clients/airflow/`, Airflow 3.2+ per D-12)
-is merged too (PR #71), which completes the deployment track. Publishing both packages to PyPI with
-each release (trusted publishing, approved through the GitHub environment `pypi`; a TestPyPI rehearsal
-workflow) is in review on `feature/pypi-publishing`; the PyPI and GitHub one-time setup is the
-maintainer's (`clients/python/README.md`, Releasing).
+is merged (PR #71); PyPI publishing for both Python packages is in PR #72. Next: phase D3, making the REST
+service (option 2) a shared production service: `docs/plans/deployment/OPTION-2-ROADMAP.md` lists the gaps
+and the order (a release first, then DEP-13 client identity, DEP-11 durable job store, DEP-14 idempotency and
+webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job isolation).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -556,7 +556,7 @@ CimPal/
 
 ## Known issues and limitations
 
-**Findings reported by TEST-2, fixed by SEC-5** (details in `docs/plans/TEST-2.md` and `SEC-5.md`):
+**Findings reported by TEST-2, fixed by SEC-5** (details in `docs/plans/testing/TEST-2.md` and `SEC-5.md`):
 - An unresolvable or refused `owl:imports` now fails the row or validation instead of warning.
 - All CLI CSV output uses `CsvCells.escape`.
 - Zip limits are counted while reading, with a per-entry cap, and also apply in `modelLoadPerFiles`.
@@ -572,7 +572,7 @@ CimPal/
 - Fixed 2026-10-07, when the CLI's combined workflow wired `SHACLValidator` into `serve`/`mcp`/`run`: it now checks every shape and data file against an active `PathPolicy` before touching it, and `PathGuard` checks `constraintFiles` and `dataFiles` element by element. An `owl:imports` candidate outside the roots is no longer probed: `PathPolicy.mayReadIfActive` tests it without touching the file system, so an import outside the roots fails the same way whether or not the file exists.
 - Open from the CLI combined-workflow review (2026-10-07): Jena's JSON-LD reader may fetch a remote `@context` outside the egress gate (`.jsonld` inputs to `convert`, `sparql` and now `validate --workflow combined`); to verify and, if so, block while a `PathPolicy` is active. The `clearRemoteCaches()` call at the start of a combined run has no test: the egress gate only allows GitHub hosts, so no local stub can serve an import.
 
-**SHACL generation suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test; the details are in `docs/plans/TEST-3.md`:
+**SHACL generation suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test; the details are in `docs/plans/testing/TEST-3.md`:
 - `SHACLFromRDF` references an undeclared `…CardinalityIO` group.
 - The `rdfs2shacl` `--io-uri` default puts the IdentifiedObject shapes in the CIM namespace.
 - excel2shacl writes length limits as `"32.0"^^xsd:integer`.

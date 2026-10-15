@@ -33,7 +33,7 @@ Close G5 (untrusted text flowing into agent context) and G9 (external engines re
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/SEC-3.md` (in plan mode).
+Start a session with: `Execute docs/plans/security/SEC-3.md` (in plan mode).
 
 ```text
 G5: in McpCommand (and serve), cap the size of any value copied from input data into tool results (IRIs, literals, messages; e.g. 300 chars), strip control characters, and put sample values in clearly labelled data fields. Add a note to docs/cli/mcp.md that tool results contain untrusted data and that write tools (convert, gen_instances, organize, rdfs_to_shacl, excel_to_shacl, manifest) should stay behind approval in the MCP client. Add a test with a model whose literal contains an instruction-like string and CR/LF: the output is truncated/escaped.

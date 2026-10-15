@@ -38,7 +38,7 @@ Close gaps G1, G4 and G6: `serve` must not be callable by browser pages or other
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/SEC-1.md` (in plan mode).
+Start a session with: `Execute docs/plans/security/SEC-1.md` (in plan mode).
 
 ```text
 Harden ServeCommand (gaps G1, G4, G6). Write the failing security tests first (CLI module, using the TEST-1 harness), then fix.

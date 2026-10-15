@@ -8,11 +8,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | Done (2026-10-15, with the phase D3 plans) |
 | Phase | 0 (run before the next WP) |
 | Depends on | — (no open PRs as of 2026-10-02) |
 | Size | S |
-| Branch | `docs/doc-1-plans-restructure` |
+| Branch | `docs/option2-roadmap` |
 
 ## Goal
 

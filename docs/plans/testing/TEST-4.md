@@ -33,13 +33,13 @@ Prove each of the 13 CLI commands honours its contract (exit codes, JSON output,
 
 ## Instructions for Claude Code
 
-Start a session with: `Execute docs/plans/TEST-4.md` (in plan mode).
+Start a session with: `Execute docs/plans/testing/TEST-4.md` (in plan mode).
 
 ```text
 1. CLI contract (in-process picocli), one test class per command, all 13: --help exits 0; missing required input exits 2 with a message on stderr; violations exit 1; forced internal error exits 3; in --format json stdout is exactly one JSON document and validates against a JSON Schema checked into src/test/resources/schemas/; config keys starting with _ are ignored; config file and CLI flags give identical results.
 2. Packaged smoke (maven-failsafe, after shade): run `java -jar CimPal-CLI.jar <cmd>` as a real process for each command on fixtures; assert exit code and outputs. This runs on both CI OSes.
 3. Protocol: serve (every endpoint, happy + error paths, with the SEC-1 token) and mcp (spawn `mcp` over stdio: initialize, tools/list returns 10 tools whose inputSchema matches the checked-in schema, tools/call for each tool on fixtures, malformed JSON-RPC returns a proper error).
-The JSON Schemas become the published contract: document them in docs/cli/README.md. Tick the L3/L5 columns in docs/plans/TEST-3.md.
+The JSON Schemas become the published contract: document them in docs/cli/README.md. Tick the L3/L5 columns in docs/plans/testing/TEST-3.md.
 ```
 
 Standard footer (applies to every work package):

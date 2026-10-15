@@ -18,7 +18,7 @@ Added 2026-10-02 by Claude Code, on the maintainer's instruction to fix the TEST
 
 ## Goal
 
-Close the four findings TEST-2 reported in `docs/plans/TEST-2.md`, where a remediation in `SECURITY-SELF-ATTESTATION.md` §4 was incomplete or has regressed in code added since.
+Close the four findings TEST-2 reported in `docs/plans/testing/TEST-2.md`, where a remediation in `SECURITY-SELF-ATTESTATION.md` §4 was incomplete or has regressed in code added since.
 
 ## Scope
 

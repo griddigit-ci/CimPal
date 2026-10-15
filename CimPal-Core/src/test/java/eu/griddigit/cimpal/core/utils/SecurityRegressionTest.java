@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * Regression tests for the remediated findings in SECURITY-SELF-ATTESTATION.md §4 (TEST-2). Each
  * test is named {@code F<n>_...} after its finding and fails if that remediation is reverted.
- * The finding to test map is in docs/plans/TEST-2.md. The remediation helpers are private, so
+ * The finding to test map is in docs/plans/testing/TEST-2.md. The remediation helpers are private, so
  * they are reached by reflection rather than widened for testing.
  */
 class SecurityRegressionTest {
