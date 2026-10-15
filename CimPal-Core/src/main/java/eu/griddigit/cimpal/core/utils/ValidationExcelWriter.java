@@ -6,12 +6,25 @@
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
+import org.apache.poi.openxml4j.exceptions.OpenXML4JException;
+import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.openxml4j.opc.PackageAccess;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.util.XMLHelper;
+import org.apache.poi.xssf.eventusermodel.ReadOnlySharedStringsTable;
+import org.apache.poi.xssf.eventusermodel.XSSFReader;
+import org.apache.poi.xssf.eventusermodel.XSSFSheetXMLHandler;
+import org.apache.poi.xssf.usermodel.XSSFComment;
 import org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -655,21 +668,12 @@ public class ValidationExcelWriter implements Closeable {
      */
     public static List<TimestampOverviewRow> readTimestampOverview(Path summaryXlsx) throws IOException {
         List<TimestampOverviewRow> rows = new ArrayList<>();
-        try (InputStream is = Files.newInputStream(summaryXlsx);
-             Workbook wb = WorkbookFactory.create(is)) {
-            Sheet sheet = wb.getSheet(TIMESTAMP_OVERVIEW_SHEET_NAME);
-            if (sheet == null) {
-                return rows;
-            }
-            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
-                Row row = sheet.getRow(r);
-                if (row == null) continue;
-                String country    = cellStr(row, 0);
-                String timestamp  = cellStr(row, 1);
-                String reportFile = cellStr(row, 2);
-                if (country.isBlank() && timestamp.isBlank()) continue;
-                rows.add(new TimestampOverviewRow(country, timestamp, reportFile));
-            }
+        for (Map<Integer, String> row : readSheetRows(summaryXlsx, TIMESTAMP_OVERVIEW_SHEET_NAME)) {
+            String country    = cellStr(row, 0);
+            String timestamp  = cellStr(row, 1);
+            String reportFile = cellStr(row, 2);
+            if (country.isBlank() && timestamp.isBlank()) continue;
+            rows.add(new TimestampOverviewRow(country, timestamp, reportFile));
         }
         return rows;
     }
@@ -681,45 +685,88 @@ public class ValidationExcelWriter implements Closeable {
      */
     public static List<StatisticsRow> readStatisticsSheet(Path reportXlsx) throws IOException {
         List<StatisticsRow> rows = new ArrayList<>();
-        try (InputStream is = Files.newInputStream(reportXlsx);
-             Workbook wb = WorkbookFactory.create(is)) {
-            Sheet sheet = wb.getSheet(STATISTICS_SHEET_NAME);
-            if (sheet == null) {
-                return rows;
-            }
-            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
-                Row row = sheet.getRow(r);
-                if (row == null) continue;
-                String chartName = cellStr(row, 10);
-                String dataset   = cellStr(row, 0);
-                String label = chartName.isBlank() ? dataset : chartName;
-                if (label.isBlank()) continue;
-                int warnings   = (int) Math.round(cellNum(row, 4));
-                int infos      = (int) Math.round(cellNum(row, 5));
-                int violations = (int) Math.round(cellNum(row, 6));
-                rows.add(new StatisticsRow(label, warnings, infos, violations));
-            }
+        for (Map<Integer, String> row : readSheetRows(reportXlsx, STATISTICS_SHEET_NAME)) {
+            String chartName = cellStr(row, 10);
+            String dataset   = cellStr(row, 0);
+            String label = chartName.isBlank() ? dataset : chartName;
+            if (label.isBlank()) continue;
+            int warnings   = (int) Math.round(cellNum(row, 4));
+            int infos      = (int) Math.round(cellNum(row, 5));
+            int violations = (int) Math.round(cellNum(row, 6));
+            rows.add(new StatisticsRow(label, warnings, infos, violations));
         }
         return rows;
     }
 
-    private static String cellStr(Row row, int col) {
-        Cell cell = row.getCell(col);
-        if (cell == null) return "";
-        if (cell.getCellType() == CellType.STRING) return safe(cell.getStringCellValue());
-        if (cell.getCellType() == CellType.NUMERIC) return String.valueOf(cell.getNumericCellValue());
-        return "";
+    /**
+     * The data rows (every row after the first) of one sheet, as column index -> cell text, or an
+     * empty list when the sheet does not exist. Only that sheet is parsed, as a stream: a report's
+     * Validation results sheet can be far larger than POI lets {@code WorkbookFactory} hold in
+     * memory (100 MB per part). Numbers come back as {@link Double#toString}, as
+     * {@code getNumericCellValue()} did; formulas give their cached result.
+     */
+    static List<Map<Integer, String>> readSheetRows(Path xlsx, String sheetName) throws IOException {
+        List<Map<Integer, String>> rows = new ArrayList<>();
+        try (OPCPackage pkg = OPCPackage.open(xlsx.toFile(), PackageAccess.READ)) {
+            XSSFReader reader = new XSSFReader(pkg);
+            XSSFReader.SheetIterator sheets = (XSSFReader.SheetIterator) reader.getSheetsData();
+            while (sheets.hasNext()) {
+                try (InputStream sheetXml = sheets.next()) {
+                    if (!sheetName.equals(sheets.getSheetName())) {
+                        continue;
+                    }
+                    DataFormatter rawNumbers = new DataFormatter() {
+                        @Override
+                        public String formatRawCellContents(double value, int formatIndex, String formatString) {
+                            return Double.toString(value);
+                        }
+                    };
+                    XMLReader parser = XMLHelper.newXMLReader();
+                    parser.setContentHandler(new XSSFSheetXMLHandler(reader.getStylesTable(),
+                            new ReadOnlySharedStringsTable(pkg), new RowCollector(rows), rawNumbers, false));
+                    parser.parse(new InputSource(sheetXml));
+                    return rows;
+                }
+            }
+        } catch (OpenXML4JException | SAXException | ParserConfigurationException e) {
+            throw new IOException("Cannot read sheet '" + sheetName + "' of " + xlsx.getFileName() + ": "
+                    + e.getMessage(), e);
+        }
+        return rows;
     }
 
-    private static double cellNum(Row row, int col) {
-        Cell cell = row.getCell(col);
-        if (cell == null) return 0;
-        if (cell.getCellType() == CellType.NUMERIC) return cell.getNumericCellValue();
-        if (cell.getCellType() == CellType.STRING) {
-            try { return Double.parseDouble(cell.getStringCellValue()); }
-            catch (NumberFormatException ignore) { return 0; }
+    /** Collects the cells of every row after the first. */
+    private record RowCollector(List<Map<Integer, String>> rows)
+            implements XSSFSheetXMLHandler.SheetContentsHandler {
+        @Override
+        public void startRow(int rowNum) {
+            rows.add(new HashMap<>());
         }
-        return 0;
+
+        @Override
+        public void endRow(int rowNum) {
+            if (rowNum == 0) {
+                rows.remove(rows.size() - 1);
+            }
+        }
+
+        @Override
+        public void cell(String cellReference, String formattedValue, XSSFComment comment) {
+            if (cellReference != null && formattedValue != null) {
+                rows.get(rows.size() - 1).put((int) new CellReference(cellReference).getCol(), formattedValue);
+            }
+        }
+    }
+
+    private static String cellStr(Map<Integer, String> row, int col) {
+        return safe(row.get(col));
+    }
+
+    private static double cellNum(Map<Integer, String> row, int col) {
+        String value = row.get(col);
+        if (value == null) return 0;
+        try { return Double.parseDouble(value); }
+        catch (NumberFormatException ignore) { return 0; }
     }
 
     private static void autosize(Sheet sheet, int columnCount) {
