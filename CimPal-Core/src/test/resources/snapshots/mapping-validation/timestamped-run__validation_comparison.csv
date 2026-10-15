@@ -2,18 +2,29 @@
 Region,Timestamp,Dataset,Warnings,Infos,Violations,Total
 IGM_Test,<TIMESTAMP>,Thing check,0,0,1,1
 ## Charts
+How to read this sheet
+"Every run has its own sheet (named after the month, e.g. ""May 2060"") with one row per region, timestamp and dataset. A hit is one SHACL result. Only Warnings and Violations count; Infos are ignored. A dataset's hits are added up over all timestamps of that run.\nEvery number on this sheet is a formula: click a cell to see how it is calculated. Hover over a column header for its description."
 IGM_Test
+"Shows which datasets cause the warnings and violations in this region. ""%"" is the dataset's share of the region's total, so each % column adds up to 100 %."
 Dataset,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %,January 2026 Warnings,January 2026 Warnings %,January 2026 Violations,January 2026 Violations %
-Thing check,1,=B3/SUM($B$3:$B$3)*100,0,=D3/SUM($D$3:$D$3)*100,1,=F3/SUM($F$3:$F$3)*100
+Thing check,=D7+F7,"=IF(SUM($B$7:$B$7)=0,0,B7/SUM($B$7:$B$7)*100)","=SUMIFS('January 2026'!$D$2:$D$2,'January 2026'!$A$2:$A$2,""IGM_Test"",'January 2026'!$C$2:$C$2,""Thing check"")","=IF(SUM($D$7:$D$7)=0,0,D7/SUM($D$7:$D$7)*100)","=SUMIFS('January 2026'!$F$2:$F$2,'January 2026'!$A$2:$A$2,""IGM_Test"",'January 2026'!$C$2:$C$2,""Thing check"")","=IF(SUM($F$7:$F$7)=0,0,F7/SUM($F$7:$F$7)*100)"
 Combined (all regions)
+"The same as the per-region blocks, with all regions added together."
 Dataset,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %
-Thing check,1,=B27/SUM($B$27:$B$27)*100
+Thing check,"=SUMIFS('January 2026'!$D$2:$D$2,'January 2026'!$C$2:$C$2,""Thing check"")+SUMIFS('January 2026'!$F$2:$F$2,'January 2026'!$C$2:$C$2,""Thing check"")","=IF(SUM($B$31:$B$31)=0,0,B31/SUM($B$31:$B$31)*100)"
 Compliance Rate (Warnings and Violations) by Region
+"Compliance rate = the percentage of datasets that are completely clean in a run: no warnings and no violations (summed over all timestamps). Only datasets that were validated for that region in that run are counted. Combined counts every region–dataset pair together, so it is not the average of the region columns.\nFormula: compliance rate = (number of clean datasets ÷ number of validated datasets) × 100. Example: 8 clean datasets out of 21 → 8 ÷ 21 × 100 = 38.10 %. The datasets are counted on the ""Compliance basis"" sheet."
 Run,IGM_Test,Combined
-January 2026,0,0
+January 2026,"=IF(COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"",'Compliance basis'!$F$3:$F$3,0)/COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$F$3:$F$3,0)/COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"")*100)"
 Violations Compliance Rate (Violations) by Region
+"Same as above, but a dataset is clean when it has no violations. Warnings are ignored here."
 Run,IGM_Test,Combined
-January 2026,0,0
+January 2026,"=IF(COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"",'Compliance basis'!$E$3:$E$3,0)/COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$E$3:$E$3,0)/COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"")*100)"
 Warnings Compliance Rate (Warnings) by Region
+"Same as above, but a dataset is clean when it has no warnings. Violations are ignored here."
 Run,IGM_Test,Combined
-January 2026,100,100
+January 2026,"=IF(COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"",'Compliance basis'!$D$3:$D$3,0)/COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$B$3:$B$3,""IGM_Test"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"",'Compliance basis'!$D$3:$D$3,0)/COUNTIFS('Compliance basis'!$A$3:$A$3,""January 2026"")*100)"
+## Compliance basis
+"One row per run, region and dataset, with that dataset's warnings and violations for the run (summed over all timestamps). The compliance rates on the Charts sheet count the rows where the value is 0."
+Run,Region,Dataset,Warnings,Violations,Warnings+Violations
+January 2026,IGM_Test,Thing check,"=SUMIFS('January 2026'!$D$2:$D$2,'January 2026'!$A$2:$A$2,""IGM_Test"",'January 2026'!$C$2:$C$2,""Thing check"")","=SUMIFS('January 2026'!$F$2:$F$2,'January 2026'!$A$2:$A$2,""IGM_Test"",'January 2026'!$C$2:$C$2,""Thing check"")",=D3+E3

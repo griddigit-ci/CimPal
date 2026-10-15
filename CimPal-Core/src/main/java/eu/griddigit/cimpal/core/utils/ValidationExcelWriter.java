@@ -6,10 +6,25 @@
 package eu.griddigit.cimpal.core.utils;
 
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
+import org.apache.poi.openxml4j.exceptions.OpenXML4JException;
+import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.openxml4j.opc.PackageAccess;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.util.XMLHelper;
+import org.apache.poi.xssf.eventusermodel.ReadOnlySharedStringsTable;
+import org.apache.poi.xssf.eventusermodel.XSSFReader;
+import org.apache.poi.xssf.eventusermodel.XSSFSheetXMLHandler;
+import org.apache.poi.xssf.usermodel.XSSFComment;
+import org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -653,21 +668,12 @@ public class ValidationExcelWriter implements Closeable {
      */
     public static List<TimestampOverviewRow> readTimestampOverview(Path summaryXlsx) throws IOException {
         List<TimestampOverviewRow> rows = new ArrayList<>();
-        try (InputStream is = Files.newInputStream(summaryXlsx);
-             Workbook wb = WorkbookFactory.create(is)) {
-            Sheet sheet = wb.getSheet(TIMESTAMP_OVERVIEW_SHEET_NAME);
-            if (sheet == null) {
-                return rows;
-            }
-            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
-                Row row = sheet.getRow(r);
-                if (row == null) continue;
-                String country    = cellStr(row, 0);
-                String timestamp  = cellStr(row, 1);
-                String reportFile = cellStr(row, 2);
-                if (country.isBlank() && timestamp.isBlank()) continue;
-                rows.add(new TimestampOverviewRow(country, timestamp, reportFile));
-            }
+        for (Map<Integer, String> row : readSheetRows(summaryXlsx, TIMESTAMP_OVERVIEW_SHEET_NAME)) {
+            String country    = cellStr(row, 0);
+            String timestamp  = cellStr(row, 1);
+            String reportFile = cellStr(row, 2);
+            if (country.isBlank() && timestamp.isBlank()) continue;
+            rows.add(new TimestampOverviewRow(country, timestamp, reportFile));
         }
         return rows;
     }
@@ -679,45 +685,88 @@ public class ValidationExcelWriter implements Closeable {
      */
     public static List<StatisticsRow> readStatisticsSheet(Path reportXlsx) throws IOException {
         List<StatisticsRow> rows = new ArrayList<>();
-        try (InputStream is = Files.newInputStream(reportXlsx);
-             Workbook wb = WorkbookFactory.create(is)) {
-            Sheet sheet = wb.getSheet(STATISTICS_SHEET_NAME);
-            if (sheet == null) {
-                return rows;
-            }
-            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
-                Row row = sheet.getRow(r);
-                if (row == null) continue;
-                String chartName = cellStr(row, 10);
-                String dataset   = cellStr(row, 0);
-                String label = chartName.isBlank() ? dataset : chartName;
-                if (label.isBlank()) continue;
-                int warnings   = (int) Math.round(cellNum(row, 4));
-                int infos      = (int) Math.round(cellNum(row, 5));
-                int violations = (int) Math.round(cellNum(row, 6));
-                rows.add(new StatisticsRow(label, warnings, infos, violations));
-            }
+        for (Map<Integer, String> row : readSheetRows(reportXlsx, STATISTICS_SHEET_NAME)) {
+            String chartName = cellStr(row, 10);
+            String dataset   = cellStr(row, 0);
+            String label = chartName.isBlank() ? dataset : chartName;
+            if (label.isBlank()) continue;
+            int warnings   = (int) Math.round(cellNum(row, 4));
+            int infos      = (int) Math.round(cellNum(row, 5));
+            int violations = (int) Math.round(cellNum(row, 6));
+            rows.add(new StatisticsRow(label, warnings, infos, violations));
         }
         return rows;
     }
 
-    private static String cellStr(Row row, int col) {
-        Cell cell = row.getCell(col);
-        if (cell == null) return "";
-        if (cell.getCellType() == CellType.STRING) return safe(cell.getStringCellValue());
-        if (cell.getCellType() == CellType.NUMERIC) return String.valueOf(cell.getNumericCellValue());
-        return "";
+    /**
+     * The data rows (every row after the first) of one sheet, as column index -> cell text, or an
+     * empty list when the sheet does not exist. Only that sheet is parsed, as a stream: a report's
+     * Validation results sheet can be far larger than POI lets {@code WorkbookFactory} hold in
+     * memory (100 MB per part). Numbers come back as {@link Double#toString}, as
+     * {@code getNumericCellValue()} did; formulas give their cached result.
+     */
+    static List<Map<Integer, String>> readSheetRows(Path xlsx, String sheetName) throws IOException {
+        List<Map<Integer, String>> rows = new ArrayList<>();
+        try (OPCPackage pkg = OPCPackage.open(xlsx.toFile(), PackageAccess.READ)) {
+            XSSFReader reader = new XSSFReader(pkg);
+            XSSFReader.SheetIterator sheets = (XSSFReader.SheetIterator) reader.getSheetsData();
+            while (sheets.hasNext()) {
+                try (InputStream sheetXml = sheets.next()) {
+                    if (!sheetName.equals(sheets.getSheetName())) {
+                        continue;
+                    }
+                    DataFormatter rawNumbers = new DataFormatter() {
+                        @Override
+                        public String formatRawCellContents(double value, int formatIndex, String formatString) {
+                            return Double.toString(value);
+                        }
+                    };
+                    XMLReader parser = XMLHelper.newXMLReader();
+                    parser.setContentHandler(new XSSFSheetXMLHandler(reader.getStylesTable(),
+                            new ReadOnlySharedStringsTable(pkg), new RowCollector(rows), rawNumbers, false));
+                    parser.parse(new InputSource(sheetXml));
+                    return rows;
+                }
+            }
+        } catch (OpenXML4JException | SAXException | ParserConfigurationException e) {
+            throw new IOException("Cannot read sheet '" + sheetName + "' of " + xlsx.getFileName() + ": "
+                    + e.getMessage(), e);
+        }
+        return rows;
     }
 
-    private static double cellNum(Row row, int col) {
-        Cell cell = row.getCell(col);
-        if (cell == null) return 0;
-        if (cell.getCellType() == CellType.NUMERIC) return cell.getNumericCellValue();
-        if (cell.getCellType() == CellType.STRING) {
-            try { return Double.parseDouble(cell.getStringCellValue()); }
-            catch (NumberFormatException ignore) { return 0; }
+    /** Collects the cells of every row after the first. */
+    private record RowCollector(List<Map<Integer, String>> rows)
+            implements XSSFSheetXMLHandler.SheetContentsHandler {
+        @Override
+        public void startRow(int rowNum) {
+            rows.add(new HashMap<>());
         }
-        return 0;
+
+        @Override
+        public void endRow(int rowNum) {
+            if (rowNum == 0) {
+                rows.remove(rows.size() - 1);
+            }
+        }
+
+        @Override
+        public void cell(String cellReference, String formattedValue, XSSFComment comment) {
+            if (cellReference != null && formattedValue != null) {
+                rows.get(rows.size() - 1).put((int) new CellReference(cellReference).getCol(), formattedValue);
+            }
+        }
+    }
+
+    private static String cellStr(Map<Integer, String> row, int col) {
+        return safe(row.get(col));
+    }
+
+    private static double cellNum(Map<Integer, String> row, int col) {
+        String value = row.get(col);
+        if (value == null) return 0;
+        try { return Double.parseDouble(value); }
+        catch (NumberFormatException ignore) { return 0; }
     }
 
     private static void autosize(Sheet sheet, int columnCount) {
@@ -1443,18 +1492,58 @@ public class ValidationExcelWriter implements Closeable {
 
     /**
      * Produces a separate "comparison" workbook:
-     *   - one sheet per region (a.k.a. TSO / input group) holding the per-timestamp data
-     *     used for the comparison (Warnings / Infos / Violations / Total per dataset);
-     *   - a "Charts" sheet holding, for each region, the comparison table
-     *     (Chart dataset | previous total | current total | delta) plus a Delta bar chart.
+     *   - one sheet per run (named after the run's month), one row per region, timestamp and
+     *     dataset (Warnings / Infos / Violations / Total); earlier runs are carried over from
+     *     the previous comparison XLSX;
+     *   - a "Charts" sheet with, per region and combined, the dataset distribution and the delta
+     *     to the previous run, then the compliance rates of every run, each table with a
+     *     description row;
+     *   - a "Compliance basis" sheet: per run, region and dataset, the counts the compliance
+     *     rates are taken from.
      *
-     * The previous run's totals are read from the previous comparison XLSX produced by an
-     * earlier run. Each region sheet (sheet name = region) provides the dataset and total
-     * columns (Dataset = col 1, Total = col 5). The Charts sheet is skipped.
+     * Every number on the Charts and Compliance basis sheets is an Excel formula over the run
+     * sheets, so users can see how it is calculated. The Charts and Compliance basis sheets are
+     * skipped when a previous XLSX is read; older files with one sheet per region (legacy) are
+     * still read.
      */
     public static final class ComparisonExcelWriter implements Closeable {
 
         private static final String CHARTS_SHEET_NAME = "Charts";
+        private static final String BASIS_SHEET_NAME = "Compliance basis";
+        private static final String COMBINED = "Combined";
+
+        // Description rows on the Charts and Compliance basis sheets.
+        private static final String DESC_INTRO =
+                "Every run has its own sheet (named after the month, e.g. \"May 2060\") with one row per region, "
+                + "timestamp and dataset. A hit is one SHACL result. Only Warnings and Violations count; Infos are "
+                + "ignored. A dataset's hits are added up over all timestamps of that run.\n"
+                + "Every number on this sheet is a formula: click a cell to see how it is calculated. "
+                + "Hover over a column header for its description.";
+        private static final String DESC_REGION =
+                "Shows which datasets cause the warnings and violations in this region. \"%\" is the dataset's "
+                + "share of the region's total, so each % column adds up to 100 %.";
+        private static final String DESC_DELTA =
+                "Delta is the change in the number of warnings + violations since the previous run: "
+                + "below zero is an improvement.";
+        private static final String DESC_COMBINED =
+                "The same as the per-region blocks, with all regions added together.";
+        private static final String DESC_COMPLIANCE =
+                "Compliance rate = the percentage of datasets that are completely clean in a run: no warnings and "
+                + "no violations (summed over all timestamps). Only datasets that were validated for that region "
+                + "in that run are counted. Combined counts every region–dataset pair together, so it is not the "
+                + "average of the region columns.\n"
+                + "Formula: compliance rate = (number of clean datasets ÷ number of validated datasets) × 100. "
+                + "Example: 8 clean datasets out of 21 → 8 ÷ 21 × 100 = 38.10 %. "
+                + "The datasets are counted on the \"Compliance basis\" sheet.";
+        private static final String DESC_COMPLIANCE_VIOLATIONS =
+                "Same as above, but a dataset is clean when it has no violations. Warnings are ignored here.";
+        private static final String DESC_COMPLIANCE_WARNINGS =
+                "Same as above, but a dataset is clean when it has no warnings. Violations are ignored here.";
+        private static final String DESC_BASIS =
+                "One row per run, region and dataset, with that dataset's warnings and violations for the run "
+                + "(summed over all timestamps). The compliance rates on the Charts sheet count the rows where "
+                + "the value is 0.";
+
         private static final Pattern DATE_TIME_SHEET_PATTERN = Pattern.compile("\\d{8}_\\d{6}");
 
         private static final byte[] COLOR_WARNINGS   = new byte[]{(byte) 0x44, (byte) 0x72, (byte) 0xC4};
@@ -1529,9 +1618,12 @@ public class ValidationExcelWriter implements Closeable {
                 CellStyle hStyle = createHeaderStyle(wb);
 
                 // Write historical run sheets first (oldest → newest).
+                List<RunSheet> runs = new ArrayList<>();
                 for (Map.Entry<String, List<Rec>> entry : historicalSheets.entrySet()) {
-                    writeRunSheet(wb, hStyle, entry.getKey(), entry.getValue());
+                    String name = writeRunSheet(wb, hStyle, entry.getKey(), entry.getValue());
+                    runs.add(new RunSheet(entry.getKey(), name, entry.getValue()));
                 }
+                RunSheet previousRun = runs.isEmpty() ? null : runs.get(runs.size() - 1);
 
                 // Write the current run. Use month label as sheet name (e.g. "July 2026"),
                 // falling back to the creation datetime only if label was never set.
@@ -1545,17 +1637,29 @@ public class ValidationExcelWriter implements Closeable {
                 while (wb.getSheet(sanitizeSheetName(uniqueLabel)) != null) {
                     uniqueLabel = sheetLabel + " (" + dupIdx++ + ")";
                 }
-                writeRunSheet(wb, hStyle, uniqueLabel, currentRecs);
+                RunSheet currentRun = new RunSheet(uniqueLabel,
+                        writeRunSheet(wb, hStyle, uniqueLabel, currentRecs), currentRecs);
+                if (!currentRecs.isEmpty()) {
+                    runs.add(currentRun);
+                }
 
                 // Build region list for charts (current first, then previous-only regions).
                 LinkedHashSet<String> regions = new LinkedHashSet<>(currentRaw.keySet());
                 regions.addAll(previousTotals.keySet());
 
-                writeChartsSheet(wb, hStyle, regions, uniqueLabel);
+                writeChartsSheet(wb, hStyle, regions, currentRun, previousRun, runs);
 
                 if (wb.getNumberOfSheets() == 0) {
                     wb.createSheet("Comparison");
                 }
+
+                // Cache the formula results so previews that do not recalculate still show numbers.
+                try {
+                    XSSFFormulaEvaluator.evaluateAllFormulaCells(wb);
+                } catch (RuntimeException ignore) {
+                    // Excel recalculates on open anyway (see below).
+                }
+                wb.setForceFormulaRecalculation(true);
 
                 try (OutputStream os = Files.newOutputStream(out)) {
                     wb.write(os);
@@ -1571,10 +1675,11 @@ public class ValidationExcelWriter implements Closeable {
 
         // ---- single run sheet (date-time named, one row per region/timestamp/dataset) ----
 
-        private static void writeRunSheet(XSSFWorkbook wb,
-                                          CellStyle hStyle,
-                                          String dateTimeLabel,
-                                          List<Rec> recs) {
+        /** Writes one run sheet and returns its name. Rows follow {@link RunSheet}'s layout. */
+        private static String writeRunSheet(XSSFWorkbook wb,
+                                            CellStyle hStyle,
+                                            String dateTimeLabel,
+                                            List<Rec> recs) {
             Sheet sheet = wb.createSheet(sanitizeSheetName(dateTimeLabel));
 
             String[] header = {"Region", "Timestamp", "Dataset",
@@ -1612,39 +1717,34 @@ public class ValidationExcelWriter implements Closeable {
                 } catch (Exception ignore) {
                 }
             }
+            return sheet.getSheetName();
         }
 
         // ---- charts sheet: per region distribution + delta, then compliance rate ----
 
+        /**
+         * Every number on the Charts sheet is a formula over the run sheets (counts via SUMIFS) or the
+         * "Compliance basis" sheet (compliance rates via COUNTIFS), so a user can trace it by clicking
+         * the cell. Each table gets a description row and header comments.
+         */
         private void writeChartsSheet(XSSFWorkbook wb,
                                       CellStyle hStyle,
                                       Collection<String> regions,
-                                      String currentTs) {
+                                      RunSheet currentRun,
+                                      RunSheet previousRun,
+                                      List<RunSheet> runs) {
             XSSFSheet sheet = (XSSFSheet) wb.createSheet(CHARTS_SHEET_NAME);
+            CellStyle descStyle = createDescriptionStyle(wb);
+            CellStyle numStyle = wb.createCellStyle();
+            numStyle.setDataFormat(wb.createDataFormat().getFormat("0.00"));
 
-            // Pre-compute compliance rates (per-region + combined) for every run.
-            LinkedHashMap<String, Map<String, Double>> allRunCompliance     = new LinkedHashMap<>(); // W+V=0
-            LinkedHashMap<String, Map<String, Double>> allRunViolCompliance = new LinkedHashMap<>(); // V=0
-            LinkedHashMap<String, Map<String, Double>> allRunWarnCompliance = new LinkedHashMap<>(); // W=0
+            Row introTitle = sheet.createRow(0);
+            Cell introTitleCell = introTitle.createCell(0);
+            introTitleCell.setCellValue("How to read this sheet");
+            introTitleCell.setCellStyle(hStyle);
+            writeDescription(sheet, descStyle, 1, 9, DESC_INTRO);
 
-            java.util.function.ToIntFunction<Rec> totalMetric = r -> r.warnings + r.violations;
-            java.util.function.ToIntFunction<Rec> violMetric  = r -> r.violations;
-            java.util.function.ToIntFunction<Rec> warnMetric  = r -> r.warnings;
-
-            for (Map.Entry<String, List<Rec>> entry : historicalSheets.entrySet()) {
-                List<Rec> runRecs = entry.getValue();
-                populateCompliance(allRunCompliance,     entry.getKey(), runRecs, totalMetric);
-                populateCompliance(allRunViolCompliance, entry.getKey(), runRecs, violMetric);
-                populateCompliance(allRunWarnCompliance, entry.getKey(), runRecs, warnMetric);
-            }
-            List<Rec> currentAll = currentRaw.values().stream().flatMap(List::stream).toList();
-            if (!currentAll.isEmpty()) {
-                populateCompliance(allRunCompliance,     currentTs, currentAll, totalMetric);
-                populateCompliance(allRunViolCompliance, currentTs, currentAll, violMetric);
-                populateCompliance(allRunWarnCompliance, currentTs, currentAll, warnMetric);
-            }
-
-            int blockTop = 0;
+            int blockTop = 3;
             boolean anyData = false;
 
             for (String region : regions) {
@@ -1668,61 +1768,64 @@ public class ValidationExcelWriter implements Closeable {
                 sorted.sort(Comparator.naturalOrder());
 
                 anyData = true;
-                boolean hasPrev = !prevByDs.isEmpty();
+                boolean hasPrev = !prevByDs.isEmpty() && previousRun != null;
 
                 // Title row.
                 Row titleRow = sheet.createRow(blockTop);
                 Cell titleCell = titleRow.createCell(0);
                 titleCell.setCellValue(region);
                 titleCell.setCellStyle(hStyle);
+                writeDescription(sheet, descStyle, blockTop + 1, 9,
+                        hasPrev ? DESC_REGION + " " + DESC_DELTA : DESC_REGION);
 
                 // Header row: 10 columns.
-                int headerRow = blockTop + 1;
+                int headerRow = blockTop + 2;
                 Row hdrRow = sheet.createRow(headerRow);
                 setCellHdr(hdrRow, hStyle, 0, "Dataset");
-                setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total");
-                setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %");
-                setCellHdr(hdrRow, hStyle, 3, currentLabel + " Warnings");
-                setCellHdr(hdrRow, hStyle, 4, currentLabel + " Warnings %");
-                setCellHdr(hdrRow, hStyle, 5, currentLabel + " Violations");
-                setCellHdr(hdrRow, hStyle, 6, currentLabel + " Violations %");
+                setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total",
+                        "Warnings + violations for this dataset in this region, summed over all timestamps of the run.");
+                setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %",
+                        "This dataset's share of all warnings + violations in the region. The column adds up to 100 %.");
+                setCellHdr(hdrRow, hStyle, 3, currentLabel + " Warnings",
+                        "Warnings for this dataset in this region, summed over all timestamps of the run.");
+                setCellHdr(hdrRow, hStyle, 4, currentLabel + " Warnings %",
+                        "This dataset's share of all warnings in the region. The column adds up to 100 %.");
+                setCellHdr(hdrRow, hStyle, 5, currentLabel + " Violations",
+                        "Violations for this dataset in this region, summed over all timestamps of the run.");
+                setCellHdr(hdrRow, hStyle, 6, currentLabel + " Violations %",
+                        "This dataset's share of all violations in the region. The column adds up to 100 %.");
                 if (hasPrev) {
-                    setCellHdr(hdrRow, hStyle, 7, previousLabel + " Warnings+Violations total");
-                    setCellHdr(hdrRow, hStyle, 8, previousLabel + " Warnings+Violations %");
-                    setCellHdr(hdrRow, hStyle, 9, "Delta (cur−prev)");
+                    setCellHdr(hdrRow, hStyle, 7, previousLabel + " Warnings+Violations total",
+                            "Warnings + violations for this dataset in this region in the previous run.");
+                    setCellHdr(hdrRow, hStyle, 8, previousLabel + " Warnings+Violations %",
+                            "This dataset's share of all warnings + violations in the region in the previous run.");
+                    setCellHdr(hdrRow, hStyle, 9, "Delta (cur−prev)",
+                            "Change in warnings + violations since the previous run. Negative = fewer problems.");
                 }
 
                 int firstDataRow = headerRow + 1;
                 int lastDataRow  = firstDataRow + sorted.size() - 1;
 
-                Map<String, Integer> prevWarnByDs = previousWarnings.getOrDefault(region, Map.of());
-                Map<String, Integer> prevViolByDs = previousViolations.getOrDefault(region, Map.of());
-
                 int r = firstDataRow;
 
                 for (String ds : sorted) {
-                    int[] m  = curMetrics.getOrDefault(ds, new int[]{0, 0, 0});
-                    int cur  = m[0] + m[2];   // W+V
-                    int curW = m[0];           // warnings
-                    int curV = m[2];           // violations
-                    int prev = prevByDs.getOrDefault(ds, 0);
-
                     Row row = sheet.createRow(r);
+                    int rowNum = r + 1; // 1-based, for formulas
 
                     row.createCell(0).setCellValue(ds);
-                    row.createCell(1).setCellValue(cur);
-                    row.createCell(3).setCellValue(curW);
-                    row.createCell(5).setCellValue(curV);
+                    setFormula(row, 1, "D" + rowNum + "+F" + rowNum, null);
+                    setFormula(row, 3, currentRun.sumIfs(3, region, ds), null);
+                    setFormula(row, 5, currentRun.sumIfs(5, region, ds), null);
                     if (hasPrev) {
-                        row.createCell(7).setCellValue(prev);
+                        setFormula(row, 7, previousRun.sumIfs(3, region, ds)
+                                + "+" + previousRun.sumIfs(5, region, ds), null);
                     }
 
-                    // Formula cells (use 1-based row number = r+1)
-                    writePctFormula(row, 2, 1, firstDataRow, lastDataRow);
-                    writePctFormula(row, 4, 3, firstDataRow, lastDataRow);
-                    writePctFormula(row, 6, 5, firstDataRow, lastDataRow);
+                    writePctFormula(row, 2, 1, firstDataRow, lastDataRow, numStyle);
+                    writePctFormula(row, 4, 3, firstDataRow, lastDataRow, numStyle);
+                    writePctFormula(row, 6, 5, firstDataRow, lastDataRow, numStyle);
                     if (hasPrev) {
-                        writePctFormula(row, 8, 7, firstDataRow, lastDataRow);
+                        writePctFormula(row, 8, 7, firstDataRow, lastDataRow, numStyle);
                         writeDeltaFormula(row, 9, 1, 7);
                     }
 
@@ -1758,23 +1861,22 @@ public class ValidationExcelWriter implements Closeable {
             }
 
             // Combined section (all regions aggregated into one set of charts).
-            blockTop = writeCombinedSection(sheet, hStyle, blockTop) + 2;
+            blockTop = writeCombinedSection(sheet, hStyle, descStyle, numStyle, blockTop,
+                    currentRun, previousRun) + 2;
 
-            // Compliance rate section: per-region lines + Combined line.
-            if (!allRunCompliance.isEmpty()) {
-                LinkedHashSet<String> compRegions = new LinkedHashSet<>();
-                for (Map<String, Double> m : allRunCompliance.values()) compRegions.addAll(m.keySet());
+            // Compliance rate section: per-region lines + Combined line, over the "Compliance basis" sheet.
+            if (!runs.isEmpty()) {
                 // Real regions alphabetically, Combined always last.
-                List<String> sortedCompRegions = compRegions.stream()
-                        .filter(r -> !r.equals("Combined"))
+                List<String> sortedCompRegions = runs.stream()
+                        .flatMap(run -> run.recs().stream())
+                        .map(rec -> rec.region)
+                        .distinct()
                         .sorted()
                         .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-                if (compRegions.contains("Combined")) sortedCompRegions.add("Combined");
-                if (!sortedCompRegions.isEmpty()) {
-                    writeComplianceSection(sheet, hStyle, blockTop,
-                            allRunCompliance, allRunViolCompliance, allRunWarnCompliance, sortedCompRegions);
-                    anyData = true;
-                }
+                sortedCompRegions.add(COMBINED);
+                BasisSheet basis = writeBasisSheet(wb, hStyle, descStyle, runs);
+                writeComplianceSection(sheet, hStyle, descStyle, numStyle, blockTop, basis, runs, sortedCompRegions);
+                anyData = true;
             }
 
             for (int c = 0; c <= 9; c++) {
@@ -1783,9 +1885,10 @@ public class ValidationExcelWriter implements Closeable {
                 } catch (Exception ignore) {
                 }
             }
+            fitDescriptionRows(sheet, descStyle);
 
             if (!anyData) {
-                sheet.createRow(0).createCell(0).setCellValue("No comparison data available.");
+                sheet.createRow(3).createCell(0).setCellValue("No comparison data available.");
             }
         }
 
@@ -1795,30 +1898,164 @@ public class ValidationExcelWriter implements Closeable {
             cell.setCellStyle(hStyle);
         }
 
+        /** Header cell with a hover comment that explains the column. */
+        private static void setCellHdr(Row row, CellStyle hStyle, int col, String value, String note) {
+            setCellHdr(row, hStyle, col, value);
+            Sheet sheet = row.getSheet();
+            CreationHelper factory = sheet.getWorkbook().getCreationHelper();
+            ClientAnchor anchor = factory.createClientAnchor();
+            anchor.setCol1(col);
+            anchor.setCol2(col + 3);
+            anchor.setRow1(row.getRowNum());
+            anchor.setRow2(row.getRowNum() + 4);
+            Comment comment = sheet.createDrawingPatriarch().createCellComment(anchor);
+            comment.setString(factory.createRichTextString(note));
+            row.getCell(col).setCellComment(comment);
+        }
+
+        private static void setFormula(Row row, int col, String formula, CellStyle style) {
+            Cell cell = row.createCell(col);
+            cell.setCellFormula(formula);
+            if (style != null) {
+                cell.setCellStyle(style);
+            }
+        }
+
+        /** Share of the column total in %, 0 when the column adds up to 0. */
         private static void writePctFormula(Row row, int pctCol, int rawCol,
-                                            int firstDataRow, int lastDataRow) {
-            String rawColStr = org.apache.poi.ss.util.CellReference.convertNumToColString(rawCol);
+                                            int firstDataRow, int lastDataRow, CellStyle style) {
+            String rawColStr = CellReference.convertNumToColString(rawCol);
             int rowNum = row.getRowNum() + 1; // 1-based
-            String formula = rawColStr + rowNum
-                    + "/SUM($" + rawColStr + "$" + (firstDataRow + 1)
-                    + ":$" + rawColStr + "$" + (lastDataRow + 1) + ")*100";
-            row.createCell(pctCol).setCellFormula(formula);
+            String sum = "SUM($" + rawColStr + "$" + (firstDataRow + 1)
+                    + ":$" + rawColStr + "$" + (lastDataRow + 1) + ")";
+            setFormula(row, pctCol, "IF(" + sum + "=0,0," + rawColStr + rowNum + "/" + sum + "*100)", style);
         }
 
         private static void writeDeltaFormula(Row row, int deltaCol, int curCol, int prevCol) {
             int rowNum = row.getRowNum() + 1;
-            String formula = org.apache.poi.ss.util.CellReference.convertNumToColString(curCol) + rowNum
+            String formula = CellReference.convertNumToColString(curCol) + rowNum
                     + "-"
-                    + org.apache.poi.ss.util.CellReference.convertNumToColString(prevCol) + rowNum;
+                    + CellReference.convertNumToColString(prevCol) + rowNum;
             row.createCell(deltaCol).setCellFormula(formula);
         }
 
-        private void populateCompliance(LinkedHashMap<String, Map<String, Double>> map,
-                                        String runKey, List<Rec> recs,
-                                        java.util.function.ToIntFunction<Rec> metric) {
-            Map<String, Double> rates = computeComplianceRates(recs, metric);
-            rates.put("Combined", computeCombinedComplianceRate(recs, metric));
-            map.put(runKey, rates);
+        // ---- description rows ----
+
+        private static CellStyle createDescriptionStyle(Workbook wb) {
+            CellStyle style = wb.createCellStyle();
+            Font font = wb.createFont();
+            font.setItalic(true);
+            style.setFont(font);
+            style.setWrapText(true);
+            style.setVerticalAlignment(VerticalAlignment.TOP);
+            return style;
+        }
+
+        /** An italic, wrapped text row merged over columns 0..lastCol. Its height is set by {@link #fitDescriptionRows}. */
+        private static void writeDescription(Sheet sheet, CellStyle descStyle, int rowIdx, int lastCol, String text) {
+            Row row = sheet.getRow(rowIdx) != null ? sheet.getRow(rowIdx) : sheet.createRow(rowIdx);
+            Cell cell = row.createCell(0);
+            cell.setCellValue(text);
+            cell.setCellStyle(descStyle);
+            if (lastCol > 0) {
+                sheet.addMergedRegion(new CellRangeAddress(rowIdx, rowIdx, 0, lastCol));
+            }
+        }
+
+        /**
+         * Excel does not grow merged wrapped rows by itself, so estimate the line count from the merged
+         * width (call after the columns are sized).
+         */
+        private static void fitDescriptionRows(Sheet sheet, CellStyle descStyle) {
+            float lineHeight = sheet.getDefaultRowHeightInPoints();
+            for (CellRangeAddress region : sheet.getMergedRegions()) {
+                Row row = sheet.getRow(region.getFirstRow());
+                Cell cell = row == null ? null : row.getCell(region.getFirstColumn());
+                if (cell == null || cell.getCellStyle().getIndex() != descStyle.getIndex()) {
+                    continue;
+                }
+                int widthChars = 0;
+                for (int c = region.getFirstColumn(); c <= region.getLastColumn(); c++) {
+                    widthChars += sheet.getColumnWidth(c) / 256;
+                }
+                int lines = 0;
+                for (String paragraph : cell.getStringCellValue().split("\n")) {
+                    lines += Math.max(1, (int) Math.ceil(paragraph.length() / (double) Math.max(20, widthChars)));
+                }
+                row.setHeightInPoints(lines * lineHeight + 2);
+            }
+        }
+
+        // ---- compliance basis sheet ----
+
+        /** Where the per run/region/dataset counts are: data rows 3..lastRow (1-based). */
+        private record BasisSheet(String sheetName, int lastRow) {
+            String range(int col) {
+                return absRange(sheetName, col, 3, lastRow);
+            }
+        }
+
+        /** One row per run, region and dataset: warnings, violations and both, each a SUMIFS over the run sheet. */
+        private static BasisSheet writeBasisSheet(XSSFWorkbook wb, CellStyle hStyle, CellStyle descStyle,
+                                                  List<RunSheet> runs) {
+            Sheet sheet = wb.createSheet(BASIS_SHEET_NAME);
+            String[] header = {"Run", "Region", "Dataset", "Warnings", "Violations", "Warnings+Violations"};
+            writeDescription(sheet, descStyle, 0, header.length - 1, DESC_BASIS);
+            Row hdr = sheet.createRow(1);
+            for (int c = 0; c < header.length; c++) {
+                setCellHdr(hdr, hStyle, c, header[c]);
+            }
+            sheet.createFreezePane(0, 2);
+
+            int r = 2;
+            for (RunSheet run : runs) {
+                TreeMap<String, TreeSet<String>> datasetsByRegion = new TreeMap<>();
+                for (Rec rec : run.recs()) {
+                    datasetsByRegion.computeIfAbsent(rec.region, k -> new TreeSet<>()).add(rec.dataset);
+                }
+                for (Map.Entry<String, TreeSet<String>> e : datasetsByRegion.entrySet()) {
+                    for (String ds : e.getValue()) {
+                        Row row = sheet.createRow(r);
+                        int rowNum = r + 1;
+                        row.createCell(0).setCellValue(run.sheetName());
+                        row.createCell(1).setCellValue(e.getKey());
+                        row.createCell(2).setCellValue(ds);
+                        setFormula(row, 3, run.sumIfs(3, e.getKey(), ds), null);
+                        setFormula(row, 4, run.sumIfs(5, e.getKey(), ds), null);
+                        setFormula(row, 5, "D" + rowNum + "+E" + rowNum, null);
+                        r++;
+                    }
+                }
+            }
+            sheet.setAutoFilter(new CellRangeAddress(1, Math.max(1, r - 1), 0, header.length - 1));
+            for (int c = 0; c < header.length; c++) {
+                try {
+                    sheet.autoSizeColumn(c);
+                } catch (Exception ignore) {
+                }
+            }
+            fitDescriptionRows(sheet, descStyle);
+            return new BasisSheet(sheet.getSheetName(), Math.max(3, r));
+        }
+
+        // ---- formula text helpers ----
+
+        /** {@code 'Sheet'!$C$from:$C$to} with the sheet name quoted for Excel. */
+        private static String absRange(String sheetName, int col, int fromRow, int toRow) {
+            String c = CellReference.convertNumToColString(col);
+            return "'" + sheetName.replace("'", "''") + "'!$" + c + "$" + fromRow + ":$" + c + "$" + toRow;
+        }
+
+        /**
+         * A SUMIFS/COUNTIFS criterion that matches {@code value} literally: wildcards and a leading
+         * comparison operator are escaped, and the result is a quoted Excel string.
+         */
+        private static String criterion(String value) {
+            String s = value.replace("~", "~~").replace("*", "~*").replace("?", "~?");
+            if (s.startsWith("=") || s.startsWith("<") || s.startsWith(">")) {
+                s = "=" + s;
+            }
+            return "\"" + s.replace("\"", "\"\"") + "\"";
         }
 
         /** Single-series distribution bar chart. {@code dataCol} is 2 for current, 4 for previous. */
@@ -1889,7 +2126,7 @@ public class ValidationExcelWriter implements Closeable {
             XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
             bottomAxis.setTitle("Dataset");
             XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
-            leftAxis.setTitle("Violation count difference (current − previous)");
+            leftAxis.setTitle("Warnings + violations difference (current − previous)");
             leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
 
             // Categories at col 0, delta at deltaCol.
@@ -1914,7 +2151,8 @@ public class ValidationExcelWriter implements Closeable {
 
         // ---- combined (all-regions) section ----
 
-        private int writeCombinedSection(XSSFSheet sheet, CellStyle hStyle, int blockTop) {
+        private int writeCombinedSection(XSSFSheet sheet, CellStyle hStyle, CellStyle descStyle, CellStyle numStyle,
+                                         int blockTop, RunSheet currentRun, RunSheet previousRun) {
             // Aggregate current metrics across all regions.
             Map<String, int[]> combinedCurMetrics = new LinkedHashMap<>();
             for (Rec rec : currentRaw.values().stream().flatMap(List::stream).toList()) {
@@ -1938,24 +2176,30 @@ public class ValidationExcelWriter implements Closeable {
             List<String> sorted = new ArrayList<>(dsSet);
             sorted.sort(Comparator.naturalOrder());
 
-            boolean hasPrev = !combinedPrevTotals.isEmpty();
+            boolean hasPrev = !combinedPrevTotals.isEmpty() && previousRun != null;
 
             // Title row.
             Row titleRow = sheet.createRow(blockTop);
             Cell titleCell = titleRow.createCell(0);
             titleCell.setCellValue("Combined (all regions)");
             titleCell.setCellStyle(hStyle);
+            writeDescription(sheet, descStyle, blockTop + 1, 5, DESC_COMBINED);
 
             // Header: Dataset | Cur W+V total | Cur W+V% | Prev W+V total | Prev W+V% | Delta
-            int headerRow = blockTop + 1;
+            int headerRow = blockTop + 2;
             Row hdrRow = sheet.createRow(headerRow);
             setCellHdr(hdrRow, hStyle, 0, "Dataset");
-            setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total");
-            setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %");
+            setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total",
+                    "Warnings + violations for this dataset in all regions, summed over all timestamps of the run.");
+            setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %",
+                    "This dataset's share of all warnings + violations. The column adds up to 100 %.");
             if (hasPrev) {
-                setCellHdr(hdrRow, hStyle, 3, previousLabel + " Warnings+Violations total");
-                setCellHdr(hdrRow, hStyle, 4, previousLabel + " Warnings+Violations %");
-                setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)");
+                setCellHdr(hdrRow, hStyle, 3, previousLabel + " Warnings+Violations total",
+                        "Warnings + violations for this dataset in all regions in the previous run.");
+                setCellHdr(hdrRow, hStyle, 4, previousLabel + " Warnings+Violations %",
+                        "This dataset's share of all warnings + violations in the previous run.");
+                setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)",
+                        "Change in warnings + violations since the previous run. Negative = fewer problems.");
             }
 
             int firstDataRow = headerRow + 1;
@@ -1963,20 +2207,16 @@ public class ValidationExcelWriter implements Closeable {
             int r = firstDataRow;
 
             for (String ds : sorted) {
-                int[] m  = combinedCurMetrics.getOrDefault(ds, new int[]{0, 0, 0});
-                int cur  = m[0] + m[2];   // W+V
-                int prev = combinedPrevTotals.getOrDefault(ds, 0);
-
                 Row row = sheet.createRow(r);
                 row.createCell(0).setCellValue(ds);
-                row.createCell(1).setCellValue(cur);
+                setFormula(row, 1, currentRun.sumIfs(3, null, ds) + "+" + currentRun.sumIfs(5, null, ds), null);
                 if (hasPrev) {
-                    row.createCell(3).setCellValue(prev);
+                    setFormula(row, 3, previousRun.sumIfs(3, null, ds) + "+" + previousRun.sumIfs(5, null, ds), null);
                 }
 
-                writePctFormula(row, 2, 1, firstDataRow, lastDataRow);
+                writePctFormula(row, 2, 1, firstDataRow, lastDataRow, numStyle);
                 if (hasPrev) {
-                    writePctFormula(row, 4, 3, firstDataRow, lastDataRow);
+                    writePctFormula(row, 4, 3, firstDataRow, lastDataRow, numStyle);
                     writeDeltaFormula(row, 5, 1, 3);
                 }
 
@@ -2014,33 +2254,48 @@ public class ValidationExcelWriter implements Closeable {
 
         private static void writeComplianceSection(XSSFSheet sheet,
                                                    CellStyle hStyle,
+                                                   CellStyle descStyle,
+                                                   CellStyle numStyle,
                                                    int blockTop,
-                                                   LinkedHashMap<String, Map<String, Double>> allRunCompliance,
-                                                   LinkedHashMap<String, Map<String, Double>> allRunViolCompliance,
-                                                   LinkedHashMap<String, Map<String, Double>> allRunWarnCompliance,
+                                                   BasisSheet basis,
+                                                   List<RunSheet> runs,
                                                    List<String> sortedRegions) {
-            int bp = writeOneComplianceBlock(sheet, hStyle, blockTop, allRunCompliance, sortedRegions,
-                    "Compliance Rate (Warnings and Violations) by Region");
-            bp = writeOneComplianceBlock(sheet, hStyle, bp + 2, allRunViolCompliance, sortedRegions,
-                    "Violations Compliance Rate (Violations) by Region");
-            writeOneComplianceBlock(sheet, hStyle, bp + 2, allRunWarnCompliance, sortedRegions,
-                    "Warnings Compliance Rate (Warnings) by Region");
+            // Basis columns: 5 = Warnings+Violations, 4 = Violations, 3 = Warnings.
+            int bp = writeOneComplianceBlock(sheet, hStyle, descStyle, numStyle, blockTop, basis, 5, runs,
+                    sortedRegions, "Compliance Rate (Warnings and Violations) by Region", DESC_COMPLIANCE);
+            bp = writeOneComplianceBlock(sheet, hStyle, descStyle, numStyle, bp + 2, basis, 4, runs,
+                    sortedRegions, "Violations Compliance Rate (Violations) by Region", DESC_COMPLIANCE_VIOLATIONS);
+            writeOneComplianceBlock(sheet, hStyle, descStyle, numStyle, bp + 2, basis, 3, runs,
+                    sortedRegions, "Warnings Compliance Rate (Warnings) by Region", DESC_COMPLIANCE_WARNINGS);
         }
 
+        /**
+         * Compliance rate = clean datasets / validated datasets × 100, counted on the basis sheet:
+         * {@code COUNTIFS(run, region, metric = 0) / COUNTIFS(run, region) * 100}, 0 when the region has
+         * no datasets in that run. Combined drops the region condition.
+         */
         private static int writeOneComplianceBlock(XSSFSheet sheet,
                                                    CellStyle hStyle,
+                                                   CellStyle descStyle,
+                                                   CellStyle numStyle,
                                                    int blockTop,
-                                                   LinkedHashMap<String, Map<String, Double>> data,
+                                                   BasisSheet basis,
+                                                   int metricCol,
+                                                   List<RunSheet> runs,
                                                    List<String> sortedRegions,
-                                                   String title) {
+                                                   String title,
+                                                   String description) {
+            int descLastCol = Math.max(sortedRegions.size(), 9);
+
             // Title.
             Row titleRow = sheet.createRow(blockTop);
             Cell titleCell = titleRow.createCell(0);
             titleCell.setCellValue(title);
             titleCell.setCellStyle(hStyle);
+            writeDescription(sheet, descStyle, blockTop + 1, descLastCol, description);
 
             // Header row: Run | R1 | R2 | R3 ...
-            int headerRow = blockTop + 1;
+            int headerRow = blockTop + 2;
             Row hdr = sheet.createRow(headerRow);
             Cell runHdr = hdr.createCell(0); runHdr.setCellValue("Run"); runHdr.setCellStyle(hStyle);
             for (int c = 0; c < sortedRegions.size(); c++) {
@@ -2052,19 +2307,26 @@ public class ValidationExcelWriter implements Closeable {
             int firstDataRow = headerRow + 1;
             int r = firstDataRow;
 
-            for (Map.Entry<String, Map<String, Double>> entry : data.entrySet()) {
+            for (RunSheet run : runs) {
                 Row row = sheet.createRow(r++);
-                row.createCell(0).setCellValue(dateTimeToMonthLabel(entry.getKey()));
+                row.createCell(0).setCellValue(dateTimeToMonthLabel(run.key()));
                 for (int c = 0; c < sortedRegions.size(); c++) {
-                    double rate = entry.getValue().getOrDefault(sortedRegions.get(c), 0.0);
-                    row.createCell(1 + c).setCellValue(rate);
+                    String region = sortedRegions.get(c);
+                    String scope = basis.range(0) + "," + criterion(run.sheetName());
+                    if (!COMBINED.equals(region)) {
+                        scope += "," + basis.range(1) + "," + criterion(region);
+                    }
+                    String validated = "COUNTIFS(" + scope + ")";
+                    String clean = "COUNTIFS(" + scope + "," + basis.range(metricCol) + ",0)";
+                    setFormula(row, 1 + c,
+                            "IF(" + validated + "=0,0," + clean + "/" + validated + "*100)", numStyle);
                 }
             }
 
             int lastDataRow = r - 1;
-            int numRuns = data.size();
-            int chartBot = blockTop + Math.max(25, numRuns + 6);
-            int chartStartCol = sortedRegions.size() + 2;
+            int numRuns = runs.size();
+            int chartBot = blockTop + Math.max(25, numRuns + 7);
+            int chartStartCol = descLastCol + 2;
 
             createComplianceLineChart(sheet,
                     title + " (%)",
@@ -2144,35 +2406,6 @@ public class ValidationExcelWriter implements Closeable {
             }
         }
 
-        // ---- compliance rate helpers ----
-
-        private static Map<String, Double> computeComplianceRates(
-                List<Rec> recs, java.util.function.ToIntFunction<Rec> metric) {
-            Map<String, Map<String, Integer>> regionDatasetCount = new LinkedHashMap<>();
-            for (Rec rec : recs) {
-                regionDatasetCount.computeIfAbsent(rec.region, k -> new LinkedHashMap<>())
-                        .merge(rec.dataset, metric.applyAsInt(rec), Integer::sum);
-            }
-            Map<String, Double> compliance = new LinkedHashMap<>();
-            for (Map.Entry<String, Map<String, Integer>> entry : regionDatasetCount.entrySet()) {
-                long good  = entry.getValue().values().stream().filter(v -> v == 0).count();
-                long total = entry.getValue().size();
-                compliance.put(entry.getKey(), total > 0 ? good * 100.0 / total : 0.0);
-            }
-            return compliance;
-        }
-
-        private static double computeCombinedComplianceRate(
-                List<Rec> recs, java.util.function.ToIntFunction<Rec> metric) {
-            Map<String, Integer> countPerCombo = new LinkedHashMap<>();
-            for (Rec rec : recs) {
-                countPerCombo.merge(rec.region + "\0" + rec.dataset, metric.applyAsInt(rec), Integer::sum);
-            }
-            long good  = countPerCombo.values().stream().filter(v -> v == 0).count();
-            long total = countPerCombo.size();
-            return total > 0 ? good * 100.0 / total : 0.0;
-        }
-
         private static String dateTimeToMonthLabel(String dt) {
             if (dt == null || dt.length() < 15) return safe(dt);
             try {
@@ -2196,7 +2429,7 @@ public class ValidationExcelWriter implements Closeable {
                 for (int i = 0; i < prevWb.getNumberOfSheets(); i++) {
                     Sheet sh = prevWb.getSheetAt(i);
                     String name = sh.getSheetName();
-                    if (CHARTS_SHEET_NAME.equalsIgnoreCase(name)) {
+                    if (CHARTS_SHEET_NAME.equalsIgnoreCase(name) || BASIS_SHEET_NAME.equalsIgnoreCase(name)) {
                         continue;
                     }
                     Row hdr = sh.getRow(0);
@@ -2455,6 +2688,25 @@ public class ValidationExcelWriter implements Closeable {
 
             int total() {
                 return warnings + infos + violations;
+            }
+        }
+
+        /**
+         * A run sheet written by {@link #writeRunSheet}: header in row 1, data in rows 2..recs+1, columns
+         * Region=A, Timestamp=B, Dataset=C, Warnings=D, Infos=E, Violations=F, Total=G.
+         *
+         * @param key       the run's label (month label or {@code yyyyMMdd_HHmmss})
+         * @param sheetName the sheet's name in the workbook
+         */
+        private record RunSheet(String key, String sheetName, List<Rec> recs) {
+            /** {@code SUMIFS} of column {@code valueCol} for one dataset, in one region or (null) all regions. */
+            String sumIfs(int valueCol, String region, String dataset) {
+                int lastRow = Math.max(2, recs.size() + 1);
+                String f = "SUMIFS(" + absRange(sheetName, valueCol, 2, lastRow);
+                if (region != null) {
+                    f += "," + absRange(sheetName, 0, 2, lastRow) + "," + criterion(region);
+                }
+                return f + "," + absRange(sheetName, 2, 2, lastRow) + "," + criterion(dataset) + ")";
             }
         }
     }
