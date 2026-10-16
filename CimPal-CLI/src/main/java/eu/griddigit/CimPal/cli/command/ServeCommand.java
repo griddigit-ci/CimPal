@@ -250,6 +250,36 @@ public class ServeCommand implements Callable<Integer> {
             description = "Serve Prometheus metrics at GET /metrics (needs an admin token).")
     private boolean metrics;
 
+    @Option(names = "--job-store",
+            defaultValue = "${env:CIMPAL_JOB_STORE:-memory}",
+            description = "memory (default, or CIMPAL_JOB_STORE): jobs are lost on restart; or jdbc: jobs, results, logs and the uploads'"
+                    + " bookkeeping in PostgreSQL (--job-store-url), so queued jobs run after a restart and"
+                    + " finished ones can still be fetched. A job running when serve stopped ends as interrupted.")
+    private String jobStoreKind;
+
+    @Option(names = "--job-store-url",
+            description = "JDBC URL of the PostgreSQL database, e.g. jdbc:postgresql://db:5432/cimpal?sslmode=verify-full"
+                    + " (or CIMPAL_JOB_STORE_URL). It must not hold the password.")
+    private String jobStoreUrl;
+
+    @Option(names = "--job-store-user",
+            description = "Database user (or CIMPAL_JOB_STORE_USER).")
+    private String jobStoreUser;
+
+    @Option(names = "--job-store-password-file",
+            description = "File holding the database password, e.g. a mounted secret (or CIMPAL_JOB_STORE_PASSWORD_FILE,"
+                    + " or the password itself in CIMPAL_JOB_STORE_PASSWORD). Never given on the command line.")
+    private Path jobStorePasswordFile;
+
+    @Option(names = "--job-store-pool",
+            description = "Database connections (default: --workers + 4, at most 64).")
+    private Integer jobStorePool;
+
+    @Option(names = "--requeue-interrupted",
+            description = "With --job-store jdbc: after a restart, run the jobs that were running again instead of"
+                    + " failing them as interrupted. Only safe when a job's outputs are simply overwritten.")
+    private boolean requeueInterrupted;
+
     @Option(names = "--client-quotas",
             description = "JSON file of per-client limits (maxQueued, maxRunning, maxUploadBytes, maxWorkBytes, "
                     + "requestsPerMinute) under \"default\" and \"clients\": {name: {...}}; read at start. "
@@ -395,12 +425,19 @@ public class ServeCommand implements Callable<Integer> {
 
         Set<String> allowedHosts = new LinkedHashSet<>();
         ClientQuotas.Settings quotaSettings = ClientQuotas.Settings.NONE;
+        StoreSettings storeSettings = null;
         try {
             for (String name : allowedHostNames) {
                 allowedHosts.add(ServeSecurity.allowedHostEntry(name));
             }
             if (shutdownGrace.isNegative() || shutdownGrace.isZero()) {
                 throw new IllegalArgumentException("--shutdown-grace must be positive.");
+            }
+            storeSettings = jobStoreSettings(jobStoreKind, jobStoreUrl, jobStoreUser, jobStorePasswordFile,
+                    jobStorePool, workers, requeueInterrupted, environment);
+            if (storeSettings != null && WEAK_SSLMODE.matcher(storeSettings.url()).find()) {
+                log.warn("store.tls", "serve: --job-store-url turns certificate checks off (sslmode disable, allow or"
+                        + " prefer); use sslmode=verify-full unless the database is on a private network");
             }
             if (clientQuotas != null) {
                 quotaSettings = ClientQuotas.read(clientQuotas);
@@ -434,6 +471,7 @@ public class ServeCommand implements Callable<Integer> {
                 .workers(workers)
                 .sizeEstimator((command, body, workspace) -> estimateHeap(command, body))
                 .clientQuotas(quotaSettings)
+                .requeueInterrupted(requeueInterrupted)
                 .requestTimeout(requestTimeout)
                 .jobTimeout(jobTimeout)
                 .maxJobs(maxJobs)
@@ -489,7 +527,7 @@ public class ServeCommand implements Callable<Integer> {
             return ExitCode.INVALID_INPUT;
         }
         Path base = rootOptions.base(defaultRoots);
-        ServeServer.Config config = builder
+        ServeServer.Config builtConfig = builder
                 .workRoot(work)
                 .maxUploadBytes(maxUploadBytes)
                 .uploadTtl(uploadTtl)
@@ -497,6 +535,7 @@ public class ServeCommand implements Callable<Integer> {
                 .requestReadTime(requestReadTime)
                 .build();
         Path workArea = work;
+        ServeServer.Config config = builtConfig;
         ServeServer.CommandRunner runner = runnerForTest != null ? runnerForTest : new ServeServer.CommandRunner() {
             @Override
             public ServeServer.CommandResult run(String command, Path configFile) throws Exception {
@@ -525,24 +564,41 @@ public class ServeCommand implements Callable<Integer> {
 
         // While the server runs, a path check on a thread without a command's policy (e.g. a pool
         // thread that didn't inherit it) is refused rather than unrestricted (DEP-8).
+        JobStore store = null;
+        if (storeSettings != null) {
+            try {
+                store = new JdbcJobStore(new JdbcPool(storeSettings.url(), storeSettings.user(), storeSettings.password(),
+                        storeSettings.pool()), maxJobs, jobTtl, jobTimeout, jobLogLines, clock);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                System.err.println("[ERROR] " + ex.getMessage());
+                deleteIfOurs(writtenTokenFile, token);
+                return ExitCode.INVALID_INPUT;
+            }
+            config = builder.jobStore(store).build();
+        }
         PathPolicy.Requirement policyRequired = PathPolicy.requireContext();
         ServeServer server;
         try {
             server = ServeServer.start(config, runner, check);
         } catch (IllegalArgumentException ex) {
             policyRequired.close();
+            closeQuietly(store);
             System.err.println("[ERROR] " + ex.getMessage());
             deleteIfOurs(writtenTokenFile, token);
             return ExitCode.INVALID_INPUT;
         } catch (IOException ex) {
             policyRequired.close();
+            closeQuietly(store);
             System.err.println("[ERROR] Could not bind to " + host + ":" + port + " - " + ex.getMessage());
             deleteIfOurs(writtenTokenFile, token);
             return ExitCode.INVALID_INPUT;
         } catch (RuntimeException | Error ex) {
             policyRequired.close();
+            closeQuietly(store);
             throw ex;
         }
+        String storeOrigin = storeSettings == null ? "memory (jobs are lost on restart)"
+                : "PostgreSQL at " + storeSettings.displayUrl() + " (jobs survive a restart)";
 
         Path tokenFileToDelete = writtenTokenFile;
         String ownToken = token;
@@ -569,7 +625,7 @@ public class ServeCommand implements Callable<Integer> {
                     "host", host, "port", server.port(), "version", ServeServer.VERSION,
                     "tokenSource", tokenOrigin, "allowedHosts", String.join(",", allowedHosts),
                     "readRoots", policy.readRoots().toString(), "writeRoots", policy.writeRoots().toString(),
-                    "metrics", metrics, "sigterm", termHandled);
+                    "metrics", metrics, "sigterm", termHandled, "jobStore", storeOrigin);
         } else {
             System.out.println("[INFO] CimPal daemon listening on http://" + host + ":" + server.port());
             System.out.println("[INFO] Bearer token " + tokenOrigin + " (send it as 'Authorization: Bearer <token>')");
@@ -577,6 +633,7 @@ public class ServeCommand implements Callable<Integer> {
                 System.out.println("[INFO] Also accepted as Host: " + String.join(", ", allowedHosts));
             }
             System.out.println("[INFO] Allowed roots: read " + policy.readRoots() + ", write " + policy.writeRoots());
+            System.out.println("[INFO] Job store: " + storeOrigin);
             System.out.println("[INFO] Endpoints: " + ServeServer.COMMANDS.stream().map(c -> "/" + c)
                     .reduce((a, b) -> a + "  " + b).orElse(""));
             System.out.println("[INFO] GET /health  GET /ready  GET /commands  POST /shutdown"
@@ -611,9 +668,136 @@ public class ServeCommand implements Callable<Integer> {
                 // the JVM is already shutting down and runs the hook itself
             }
             policyRequired.close();
+            closeQuietly(store); // after the running jobs wrote their results
             log.info("server.stopped", "serve: stopped", "exitCode", exit);
         }
         return exit;
+    }
+
+    private static void closeQuietly(JobStore store) {
+        if (store != null) {
+            try {
+                store.close();
+            } catch (RuntimeException ignored) {
+                // stopping anyway
+            }
+        }
+    }
+
+    /** {@code --job-store jdbc}: where the database is and how to log in. {@link #toString()} hides the password. */
+    record StoreSettings(String url, String user, String password, int pool) {
+
+        /** The URL without its query (which may name the user or other settings). */
+        String displayUrl() {
+            int q = url.indexOf('?');
+            return q < 0 ? url : url.substring(0, q);
+        }
+
+        @Override
+        public String toString() {
+            return "StoreSettings[" + displayUrl() + ", user " + user + ", pool " + pool + "]";
+        }
+    }
+
+    static final String STORE_URL_ENV = "CIMPAL_JOB_STORE_URL";
+    static final String STORE_USER_ENV = "CIMPAL_JOB_STORE_USER";
+    static final String STORE_PASSWORD_ENV = "CIMPAL_JOB_STORE_PASSWORD";
+    static final String STORE_PASSWORD_FILE_ENV = "CIMPAL_JOB_STORE_PASSWORD_FILE";
+    private static final java.util.regex.Pattern PASSWORD_IN_URL =
+            java.util.regex.Pattern.compile("(?i)[?&;]password=");
+    /**
+     * pgjdbc parameters a URL must not carry: secrets on a command line, or class names the driver
+     * would load and run (socket and SSL factories, callbacks, plugins), or a log file it would write.
+     */
+    private static final java.util.regex.Pattern REFUSED_URL_PARAMETER = java.util.regex.Pattern.compile(
+            "(?i)[?&;](sslpassword|sslfactory|sslfactoryarg|socketfactory|socketfactoryarg|sslhostnameverifier"
+                    + "|sslpasswordcallback|authenticationpluginclassname|loggerfile|loggerlevel|sslresponsetimeout"
+                    + "|gssencmode|jaasapplicationname|kerberosservername)=");
+    private static final java.util.regex.Pattern WEAK_SSLMODE =
+            java.util.regex.Pattern.compile("(?i)[?&;]sslmode=(disable|allow|prefer)(?=$|[&;])");
+
+    /**
+     * Checks the {@code --job-store} options (DEP-11) without connecting: null for the in-memory
+     * store, the settings for {@code jdbc}.
+     *
+     * @throws IllegalArgumentException with a message that never holds the password
+     */
+    static StoreSettings jobStoreSettings(String kind, String url, String user, Path passwordFile, Integer pool,
+                                          int workers, boolean requeue, java.util.Map<String, String> env) {
+        String k = kind == null ? "memory" : kind.strip().toLowerCase(java.util.Locale.ROOT);
+        String envUrl = env.get(STORE_URL_ENV);
+        String envUser = env.get(STORE_USER_ENV);
+        String envPassword = env.get(STORE_PASSWORD_ENV);
+        String envPasswordFile = env.get(STORE_PASSWORD_FILE_ENV);
+        switch (k) {
+            case "memory" -> {
+                if (url != null || user != null || passwordFile != null || pool != null || requeue) {
+                    throw new IllegalArgumentException("--job-store-url, --job-store-user, --job-store-password-file,"
+                            + " --job-store-pool and --requeue-interrupted need --job-store jdbc.");
+                }
+                if (envUrl != null || envPassword != null || envPasswordFile != null) {
+                    // Set up for a database but not told to use it: jobs would be lost on every restart.
+                    throw new IllegalArgumentException(STORE_URL_ENV + " or the database password is set, but the"
+                            + " job store is memory; set CIMPAL_JOB_STORE=jdbc (or --job-store jdbc), or unset them.");
+                }
+                return null;
+            }
+            case "jdbc" -> {
+                // below
+            }
+            default -> throw new IllegalArgumentException("--job-store must be memory or jdbc.");
+        }
+        String u = url != null ? url.strip() : envUrl == null ? null : envUrl.strip();
+        if (u == null || u.isEmpty()) {
+            throw new IllegalArgumentException("--job-store jdbc needs --job-store-url (or " + STORE_URL_ENV + ").");
+        }
+        if (!u.startsWith("jdbc:postgresql:")) {
+            throw new IllegalArgumentException("--job-store-url must be a PostgreSQL JDBC URL (jdbc:postgresql://...).");
+        }
+        if (PASSWORD_IN_URL.matcher(u).find()) {
+            throw new IllegalArgumentException("--job-store-url must not hold the password; use"
+                    + " --job-store-password-file or " + STORE_PASSWORD_ENV + ".");
+        }
+        java.util.regex.Matcher refused = REFUSED_URL_PARAMETER.matcher(u);
+        if (refused.find()) {
+            throw new IllegalArgumentException("--job-store-url must not set " + refused.group(1)
+                    + " (a secret, a class to load, or a file to write).");
+        }
+        if (u.contains("@")) {
+            throw new IllegalArgumentException("--job-store-url must not hold user information (user@host);"
+                    + " use --job-store-user.");
+        }
+        Path file = passwordFile != null ? passwordFile
+                : envPasswordFile == null || envPasswordFile.isBlank() ? null : Path.of(envPasswordFile.strip());
+        if (file != null && envPassword != null) {
+            throw new IllegalArgumentException("Give the database password either in a file or in "
+                    + STORE_PASSWORD_ENV + ", not both.");
+        }
+        String password = envPassword;
+        if (file != null) {
+            try {
+                if (!Files.isRegularFile(file)) {
+                    throw new IllegalArgumentException("The database password file " + file + " is not a regular file.");
+                }
+                byte[] bytes;
+                try (java.io.InputStream in = Files.newInputStream(file)) {
+                    bytes = in.readNBytes(4097);
+                }
+                if (bytes.length > 4096) {
+                    throw new IllegalArgumentException("The database password file " + file + " is larger than 4 KiB.");
+                }
+                password = new String(bytes, java.nio.charset.StandardCharsets.UTF_8).strip();
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Cannot read the database password file " + file + ": "
+                        + e.getClass().getSimpleName());
+            }
+        }
+        int size = pool != null ? pool : Math.min(64, workers + 4);
+        if (size < 1 || size > 64) {
+            throw new IllegalArgumentException("--job-store-pool must be between 1 and 64.");
+        }
+        String usr = user != null ? user : envUser;
+        return new StoreSettings(u, usr == null || usr.isBlank() ? null : usr.strip(), password, size);
     }
 
     /**

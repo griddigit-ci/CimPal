@@ -68,11 +68,17 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--max-concurrent-heap-bytes` | integer | three quarters of the maximum heap | With `--workers` above 1: a command starts only while the estimated heap of the running commands plus its own fits this. A command alone always starts. |
 | `--request-timeout` | ISO-8601 duration | `PT30M` | Time a request may take, including time spent waiting in the queue. Longer gets 504. |
 | `--job-timeout` | ISO-8601 duration | `PT2H` | A [`/v1` job](#job-api-v1) running longer than this is marked `timed_out` and `/v1/health` reports `stalled`. It is not interrupted. |
-| `--max-jobs` | integer | `1000` | Jobs kept in memory (100–100000). Beyond this, the oldest finished jobs are dropped. |
+| `--max-jobs` | integer | `1000` | Jobs kept (100–100000), in memory or in the job store. Beyond this, the oldest finished jobs are dropped. |
 | `--job-ttl` | ISO-8601 duration | `PT24H` | How long a finished job is kept. |
 | `--job-log-lines` | integer | `5000` | Progress lines kept per job (1–100000); older lines are dropped. |
-| `--max-result-bytes` | integer | `16777216` (16 MiB) | Largest job result kept in memory. A larger result is answered with 410; write such results to a file. |
-| `--job-store-bytes` | integer | a quarter of the maximum heap | Memory for the results and logs of all finished jobs together (at least 1048576). Beyond it the oldest finished jobs are dropped; the most recent one is always kept. |
+| `--max-result-bytes` | integer | `16777216` (16 MiB) | Largest job result kept. A larger result is answered with 410; write such results to a file. |
+| `--job-store-bytes` | integer | a quarter of the maximum heap | Memory for the results and logs of all finished jobs together (at least 1048576). Beyond it the oldest finished jobs are dropped; the most recent one is always kept. Not used with `--job-store jdbc`, which keeps them in the database. |
+| `--job-store` | `memory` or `jdbc` | `memory` (or `CIMPAL_JOB_STORE`) | Where jobs live. `jdbc`: in PostgreSQL, so they survive a restart; see [Jobs that survive a restart](#jobs-that-survive-a-restart). |
+| `--job-store-url` | JDBC URL | none (or `CIMPAL_JOB_STORE_URL`) | `jdbc:postgresql://host:5432/db?sslmode=verify-full`. Must not hold the password. |
+| `--job-store-user` | string | none (or `CIMPAL_JOB_STORE_USER`) | Database user. |
+| `--job-store-password-file` | path | none (or `CIMPAL_JOB_STORE_PASSWORD_FILE`) | File with the database password, e.g. a mounted secret. `CIMPAL_JOB_STORE_PASSWORD` holds it directly. Never on the command line. |
+| `--job-store-pool` | integer | `--workers` + 4 (at most 64) | Database connections. |
+| `--requeue-interrupted` | flag | off | With `jdbc`: after a restart, run jobs that were running again instead of failing them. Only for commands whose outputs are simply overwritten. |
 | `--shutdown-grace` | ISO-8601 duration | `PT60S` | On SIGTERM, Ctrl-C or `POST /shutdown`: how long to wait for a running command. If it is still running then, `serve` exits with 3. |
 | `--log-format` | `text` or `json` | `text` | `json`: one JSON object per line on stderr, nothing on stdout. See [Logs](#logs). |
 | `--metrics` | flag | off | Serve Prometheus metrics at `GET /metrics` (needs an admin token). |
@@ -209,11 +215,11 @@ The job API runs a command asynchronously.
 
 **Errors** under `/v1` are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`: `{"type", "title", "status", "detail", "jobId"?}`. The older endpoints keep `{"error": "..."}`.
 
-**Jobs live in memory.**
-- **Restart:** they are lost on restart.
-- **Storage limits:** finished jobs are dropped after `--job-ttl`, then the oldest ones beyond `--max-jobs` or beyond `--job-store-bytes`.
+**Where jobs live:** in memory by default, or in PostgreSQL with `--job-store jdbc` ([Jobs that survive a restart](#jobs-that-survive-a-restart)).
+- **Restart:** in memory they are lost on restart; with `jdbc` they survive it.
+- **Storage limits:** finished jobs are dropped after `--job-ttl`, then the oldest ones beyond `--max-jobs` or (in memory) beyond `--job-store-bytes`.
 - **Cancelled jobs:** a cancelled job leaves the queue at once, so its slot and its request body are freed.
-- **Shutdown:** `POST /shutdown` (or stopping the process) cancels queued jobs, and lets the running one finish.
+- **Shutdown:** `POST /shutdown` (or stopping the process) lets the running job finish. In memory it cancels queued jobs; with `jdbc` they stay queued and run after the next start.
 
 #### Example: submit, poll, fetch (bash)
 
@@ -305,7 +311,7 @@ Nested ZIPs are kept as files, not expanded, and link entries become plain files
 **Lifetime:**
 - **Uploads:** kept for `--upload-ttl` after creation, but never while a queued or running job uses them.
 - **Job outputs:** kept as long as the job (`--job-ttl`).
-- **Restart:** everything is in memory, as the jobs are, and the work folder is emptied when `serve` starts.
+- **Restart:** in memory, the work folder is emptied when `serve` starts, as the jobs are gone. With `--job-store jdbc` it is kept and matched with the database: uploads and outputs whose records survived stay, the rest is deleted, and a job whose output folder is gone answers 410 on its files routes.
 
 **Request time:** a large upload has to arrive within `--request-read-time` (60 s). A reverse proxy such as ingress-nginx or Caddy receives the upload first and forwards it fast; without one, raise the limit.
 
@@ -541,10 +547,31 @@ Finished jobs are dropped (beyond `--max-jobs` or `--job-store-bytes`) from the 
 
 The server's own flags stay the limits of the whole server: a client's `maxRunning`, `maxUploadBytes` or `maxWorkBytes` above them is lowered to them. A quota for a name that has no token logs a warning at start. Keys starting with `_` are comments.
 
+### Jobs that survive a restart
+
+`--job-store jdbc` keeps the `/v1` jobs (status, checked config, result, log) and the uploads' bookkeeping in PostgreSQL (DEP-11, decision D-14):
+
+```bash
+CIMPAL_JOB_STORE_PASSWORD_FILE=/run/secrets/db-password \
+cimpal serve --job-store jdbc --job-store-url 'jdbc:postgresql://db:5432/cimpal?sslmode=verify-full' \
+  --job-store-user cimpal --host 0.0.0.0 --allow-remote --token-from-file /run/secrets/token
+```
+
+- **Schema:** `serve` creates its tables at start (`cimpal_jobs`, `cimpal_job_log`, `cimpal_uploads`; the version is in `cimpal_schema_version`). A database newer than this CimPal is refused. The user needs `CREATE` on the schema the first time, and `SELECT`, `INSERT`, `UPDATE`, `DELETE` afterwards.
+- **After a restart, a redeploy or a crash:**
+  - queued jobs run, oldest first;
+  - finished jobs, their results, logs and output files can still be fetched;
+  - a job that was running ends as `failed` with "Interrupted: the server stopped while the job ran" (decision D-18). `--requeue-interrupted` queues it again instead.
+- **Logs:** a running job's lines are written to the database in batches of 64 and at its end; after a crash its last lines may be missing.
+- **Limits:** results are in the database, not the heap, so `--job-store-bytes` doesn't apply. `--max-result-bytes`, `--max-jobs` and `--job-ttl` do.
+- **The database down:** a request that needs it is answered 503 with `Retry-After`, and `/ready` answers 503 until it is back. `cimpal_job_store_errors_total` counts the failures. Messages never show the URL's credentials or the password.
+- **Work area:** the same `--work-root` must be mounted again; back it up with the database.
+- **One instance per database** for now: several replicas on one database come with DEP-12.
+
 ### Shutdown
 
 SIGTERM (`docker stop`, Kubernetes) does what `POST /shutdown` does:
-- **Stop:** the server stops taking work (`/ready` answers 503) and cancels queued jobs.
+- **Stop:** the server stops taking work (`/ready` answers 503) and cancels queued jobs (with `--job-store jdbc` they stay queued for the next start).
 - **Drain:** running commands get up to `--shutdown-grace` to finish, so their reports aren't cut off.
 - **Exit:** with 0, or with 3 and an error log line (naming the running jobs) if a command was still running.
 
@@ -565,7 +592,8 @@ With `--log-format json`, stderr carries one JSON object per line and stdout sta
 - **Server:** `server.started` (with `tokenSource`, where the token comes from), `server.stopping`, `server.stopped`, `server.grace_exceeded`;
 - **Jobs and commands:** `job.queued`, `job.started`, `job.finished`, `command.finished`;
 - **Uploads:** `upload.received`;
-- **Problems:** `request.rejected`, `stall`, `token.file`, `quota.unknown`;
+- **Problems:** `request.rejected`, `stall`, `token.file`, `quota.unknown`, `store.error`;
+- **Restart:** `jobs.recovered` (with `--job-store jdbc`: queued jobs from before the restart resume);
 - **Output:** `output`, which is every line the commands themselves write, e.g. `[INFO] Loading …`, tagged with the `jobId` of the job whose thread wrote it. Its level comes only from the line's start (`[WARN]`, `[ERROR]`, or a logger's `[thread] WARN`).
 
 **Safety:**
@@ -588,6 +616,7 @@ With `--metrics`, `GET /metrics` (admin token required) returns Prometheus text 
 | `cimpal_quota_refused_total` | counter, 429 answers | `client`, `quota` (`max_queued`, `requests_per_minute`) |
 | `cimpal_queue_depth`, `cimpal_busy`, `cimpal_running`, `cimpal_workers` | gauge | — |
 | `cimpal_jvm_heap_used_bytes`, `cimpal_jvm_heap_max_bytes` | gauge | — |
+| `cimpal_job_store_errors_total` | counter, failed job store operations (always 0 in memory) | — |
 
 The counters start at zero on every start; a counter appears once it has counted something. The `client` label holds names from the token file only, so the number of series stays bounded.
 

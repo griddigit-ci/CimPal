@@ -49,10 +49,26 @@ Paths in a job's config are container paths under `/data`, which is `./data` her
 
 No restart is needed. An empty file (or one with only `#` comments) revokes every token. A file that can't be read is bridged for one check and then refused as well, so `/ready` turns 503. Replace the file in one step (write a new file, then `mv`) rather than writing into it, so `serve` never reads half a token.
 
+## Jobs that survive a restart
+
+By default `serve` keeps its jobs in memory: `docker compose down` or a crash loses the queue and every result. `compose.postgres.yaml` adds a PostgreSQL service and keeps them there (DEP-11):
+
+```bash
+(umask 077 && openssl rand -hex 32 > secrets/db-password)
+chmod 644 secrets/db-password   # the postgres image reads it as its own user
+docker compose -f compose.yaml -f compose.postgres.yaml up -d
+```
+
+- **After a restart:** queued jobs run, finished ones (results, logs, output files) can still be fetched, and a job that was running ends as `failed` ("Interrupted"); `--requeue-interrupted` runs it again instead.
+- **Backups:** the `postgres-data` volume and `./data` belong together: a job's record is in the database, its output files in `./data/.cimpal-work`.
+- **Password:** read from `./secrets/db-password` by both containers, never put on a command line. The folder is not reachable from outside the host.
+- **Least privilege:** in this example `serve` connects as the database's owner, which the postgres image makes a superuser. For anything shared, create a role that owns only the `cimpal_*` tables (it needs `CREATE` on its schema the first time) and give `serve` that one.
+- **Plain connection:** the two containers talk over the internal Compose network without TLS. With a database elsewhere, use `sslmode=verify-full`; `serve` warns about `sslmode=disable`, `allow` or `prefer`.
+
 ## Stop
 
 `docker compose down` sends SIGTERM:
-- `serve` stops taking work and cancels queued jobs;
+- `serve` stops taking work and cancels queued jobs (with `compose.postgres.yaml` they stay queued and run after the next start);
 - it gives a running command up to `--shutdown-grace` (60 s) to finish, and then exits.
 
 `stop_grace_period: 90s` gives it that time before Docker kills the container.

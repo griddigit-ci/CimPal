@@ -15,19 +15,19 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Which finished jobs the store drops when it is full (DEP-13: one client can't push out another's). */
-class JobManagerTest {
+class MemoryJobStoreTest {
 
     private final JobApiTest.MovableClock clock = new JobApiTest.MovableClock();
 
-    private Job finishedJob(JobManager jobs, String owner, String result) {
-        Job job = jobs.create(UUID.randomUUID(), "validate", null, owner);
-        job.start(clock.instant());
+    private Job.Snapshot finishedJob(MemoryJobStore jobs, String owner, String result) {
+        Job.Snapshot job = jobs.create(UUID.randomUUID(), "validate", null, owner, null, null);
+        jobs.start(job.id());
         clock.advance(Duration.ofSeconds(1));
-        job.finish(clock.instant(), 0, result, Long.MAX_VALUE);
+        jobs.finish(job.id(), 0, result, Long.MAX_VALUE);
         return job;
     }
 
-    private static List<String> owners(JobManager jobs) {
+    private static List<String> owners(MemoryJobStore jobs) {
         List<String> owners = new ArrayList<>();
         jobs.list(null, null, 1000).forEach(job -> owners.add(job.owner()));
         return owners;
@@ -35,9 +35,9 @@ class JobManagerTest {
 
     @Test
     void beyondMaxJobsTheClientWithTheMostJobsLosesItsOldestFirst() {
-        JobManager jobs = new JobManager(3, Duration.ofDays(1), Duration.ofHours(1), 10, Long.MAX_VALUE, clock);
-        Job bobs = finishedJob(jobs, "bob", "{}");
-        List<Job> alices = new ArrayList<>();
+        MemoryJobStore jobs = new MemoryJobStore(3, Duration.ofDays(1), Duration.ofHours(1), 10, Long.MAX_VALUE, clock);
+        Job.Snapshot bobs = finishedJob(jobs, "bob", "{}");
+        List<Job.Snapshot> alices = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             alices.add(finishedJob(jobs, "alice", "{}"));
         }
@@ -53,8 +53,8 @@ class JobManagerTest {
     @Test
     void beyondTheStoreBytesTheClientHoldingTheMostLosesItsOldestFirst() {
         String large = "x".repeat(10_000);
-        JobManager jobs = new JobManager(1000, Duration.ofDays(1), Duration.ofHours(1), 10, 50_000, clock);
-        Job bobs = finishedJob(jobs, "bob", large);
+        MemoryJobStore jobs = new MemoryJobStore(1000, Duration.ofDays(1), Duration.ofHours(1), 10, 50_000, clock);
+        Job.Snapshot bobs = finishedJob(jobs, "bob", large);
         for (int i = 0; i < 3; i++) {
             finishedJob(jobs, "alice", large);
         }
@@ -67,9 +67,9 @@ class JobManagerTest {
 
     @Test
     void withOneClientTheOldestGoFirstAndTheNewestIsKept() {
-        JobManager jobs = new JobManager(1000, Duration.ofDays(1), Duration.ofHours(1), 10, 1, clock);
+        MemoryJobStore jobs = new MemoryJobStore(1000, Duration.ofDays(1), Duration.ofHours(1), 10, 1, clock);
         finishedJob(jobs, "default", "{\"a\":1}");
-        Job newest = finishedJob(jobs, "default", "{\"a\":2}");
+        Job.Snapshot newest = finishedJob(jobs, "default", "{\"a\":2}");
 
         jobs.evict();
 

@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In progress (implemented on `feature/dep-11-durable-job-store`; not committed) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | DEP-5, DEP-7, DEP-8; decisions D-14, D-18 |
 | Size | L |
@@ -125,18 +125,18 @@ Indexes: `jobs(status, created_at)` for the queue and `jobs(finished_at)` for ev
 
 ## Acceptance criteria (status checklist)
 
-- [ ] `--job-store memory` (the default) behaves exactly as before: the existing `ServeServerTest`, `JobApiTest`, `FileExchangeApiTest`, `ServeWorkersTest` and `ConcurrencyIT` pass unchanged.
-- [ ] The same API tests run against `JdbcJobStore`, parameterised over both stores, using an embedded test database (H2 in PostgreSQL mode for unit tests) and a real PostgreSQL in a failsafe IT on Ubuntu (Testcontainers; skipped cleanly without Docker).
-- [ ] Restart test (IT):
+- [x] `--job-store memory` (the default) behaves exactly as before: the existing `ServeServerTest`, `JobApiTest`, `FileExchangeApiTest`, `ServeWorkersTest` and `ConcurrencyIT` pass unchanged.
+- [x] The same API tests run against `JdbcJobStore`, parameterised over both stores, using an embedded test database (H2 in PostgreSQL mode for unit tests) and a real PostgreSQL in a failsafe IT on Ubuntu (Testcontainers; skipped cleanly without Docker).
+- [x] Restart test (IT):
   - submit 3 jobs and stop the server while one runs and two wait;
   - start it again on the same DB and work root;
   - the running one is `failed` ("interrupted"), the two queued ones run, and every result and output from before the stop can still be fetched.
-- [ ] Every state transition is a single conditional `UPDATE`: a cancel racing a start never ends with both succeeding (a concurrency test with many threads).
-- [ ] Queue limits: `--queue-size` counts queued rows; a full queue still answers 503 + `Retry-After`.
-- [ ] The password is never logged, never in `/v1/health` or metrics, and not accepted as a plain command-line option.
-- [ ] All SQL uses prepared statements (a test asserts there is no string-built SQL with request data).
-- [ ] `/ready` is 503 while the database is unreachable, and it recovers.
-- [ ] Docs updated; `/security-review` clean.
+- [x] Every state transition is a single conditional `UPDATE`: a cancel racing a start never ends with both succeeding (a concurrency test with many threads).
+- [x] Queue limits: `--queue-size` counts queued rows; a full queue still answers 503 + `Retry-After`. (One instance per database: the in-process slots equal the queued rows; DEP-12 counts rows across replicas.)
+- [x] The password is never logged, never in `/v1/health` or metrics, and not accepted as a plain command-line option.
+- [x] All SQL uses prepared statements (a test asserts there is no string-built SQL with request data).
+- [x] `/ready` is 503 while the database is unreachable, and it recovers.
+- [x] Docs updated; `/security-review` clean (no High; all six Medium and eleven of fourteen Low findings fixed, see the notes).
 
 ## Instructions for Claude Code
 
@@ -168,7 +168,31 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-15 | D-14 confirmed: PostgreSQL through JDBC; the in-memory store stays the default. D-18 confirmed: running jobs end as `failed` "Interrupted" after a restart; `--requeue-interrupted` opts in to re-running them. | Maintainer |
+| 2026-10-15 | New dependencies approved: `org.postgresql:postgresql` 42.7.7 (CLI runtime), `com.h2database:h2` 2.3.232 and `org.testcontainers` 1.21.3 (test). | Maintainer |
+| 2026-10-15 | The store is the source of truth for status (DEP-12 builds on it); which queued job runs next stays in `JobScheduler`, in process, until DEP-12's `SKIP LOCKED` claims. | Claude Code |
+| 2026-10-15 | `config` and `files` are `TEXT`, not `jsonb`: the store never queries inside them, and H2 runs the same SQL. Tables are prefixed `cimpal_` so a shared database stays readable. | Claude Code |
+| 2026-10-15 | A durable `close()` (SIGTERM, `POST /shutdown`) leaves queued jobs queued for the next start instead of cancelling them. | Claude Code |
+| 2026-10-15 | `--job-store-url` must be `jdbc:postgresql:` (an H2 URL could run scripts) and must not hold `password=`. The kind of store can also come from `CIMPAL_JOB_STORE`, so Compose and Kubernetes switch it by environment only. | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+**2026-10-15 (Claude Code).**
+- **Baseline:** CLI 314 unit tests (5 skipped) after DEP-13. **Now:** 402 unit tests (6 skipped: one needs symbolic links, which Windows refuses); integration tests 21, of which the 18 PostgreSQL ones skip without Docker (they run in CI on Ubuntu). Core 450 (one new).
+- **Refactor first:** `JobManager` became `MemoryJobStore` behind `JobStore`, and `ServeServer` works with ids and snapshots; the full CLI suite was green and unchanged before any JDBC code.
+- **On H2:** the job API, file exchange and client isolation tests pass on both stores. Two behave differently by design and say so in the test: `--job-store-bytes` eviction (memory only) and shutdown (queued jobs stay queued in a durable store).
+- **Found while testing:** the first `JdbcPool` waited for a new-connection permit while returned connections sat idle (a 10 s stall under load); a store failure inside `create` kept the queue slot; the 503 for a store outage was written after try-with-resources had closed the exchange. All fixed, with tests.
+- **Security review (2026-10-15, `security-reviewer` agent):** no SQL injection, no credential leak, DEP-13 ownership intact; no High findings. Fixed, each with a test where one is practical:
+  - (M1) `--requeue-interrupted` kept the old log rows, so the re-run's first batch hit a duplicate key: the requeue clears them.
+  - (M2) a failed log write threw out of the command's own `System.err` call: it is kept pending and counted (`logWriteFailures`), never thrown.
+  - (M3) a store failure while a job waited to start leaked its queue slot: `statusOrQueued` and `cancelHeld` free it exactly once. Found the same way: a submit whose post-queue status read failed answered 503 for a job that was queued (a resubmit would duplicate it); it now answers 202.
+  - (M4) no socket timeout (pgjdbc waits forever): `connectTimeout` 10 s, `socketTimeout` 60 s, `loginTimeout` 10 s unless the URL sets them.
+  - (M5) a NUL in a label made PostgreSQL fail and turned `/ready` 503: labels with control characters are 400, and only connection failures (SQL state 08, 57P, or none) make the store unusable.
+  - (M6) `/health` queried the store for each running job: the stall check uses the clock only.
+  - (Low) dangerous pgjdbc URL parameters (factories, callbacks, plugins, `loggerFile`, `sslpassword`) and `user@host` refused; a weak `sslmode` warns; a database URL or password in the environment with the memory store is refused; an unknown command from the database is cancelled at requeue; links in the work area are removed, never followed, and workspaces must lie inside it; start-up logs what the work area and the database disagreed on; upload records are removed before memory changes; log rows are numbered when taken and written under their own lock; a failed start frees the upload; a failed requeue shuts down what started; `/metrics` answers during an outage; a failed open closes its pool; the Python validator's child process no longer inherits `CIMPAL_API_TOKEN`, `CIMPAL_JOB_STORE_PASSWORD` and `GITHUB_TOKEN`.
+  - **Not done:** one instance per database is documented but not enforced (L11): DEP-12 takes it up, since it allows several. A blackholed-database test (M4) needs a stub server; the timeouts are set but untested. The Compose example still connects as the database owner (documented, L12).
+- **Open:**
+  - The PostgreSQL ITs have not run yet (no Docker on the dev machine): the first CI run is their first run.
+  - DEP-12: claims across replicas, leases, a sweeper, global limits, `LISTEN/NOTIFY`.
+  - Log lines are written in batches: after a crash a running job's last lines may be missing.
+

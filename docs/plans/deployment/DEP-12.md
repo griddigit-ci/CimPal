@@ -83,6 +83,8 @@ That is the externals' "queuing mechanism" for a central service with many clien
 
 ## Scope
 
+- **From DEP-11's security review (L11):** until replicas share the queue, nothing stops a second `serve` on the same database from failing the first one's running jobs as interrupted at its start. DEP-12's leases replace the start-up recovery with lease expiry; a start-up check (for example an advisory lock held per node) should make that safe.
+
 - **Code:**
   - `JdbcJobStore` claim, lease, sweeper and notify;
   - `ServeServer` worker loop and shutdown;

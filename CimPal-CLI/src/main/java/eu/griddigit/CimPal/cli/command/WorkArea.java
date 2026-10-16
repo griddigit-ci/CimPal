@@ -103,6 +103,36 @@ final class WorkArea {
     record JobWorkspace(UUID jobId, Path uploadDir, Path outDir) {
     }
 
+    /** An upload as a durable store keeps it (DEP-11), to find it again after a restart. */
+    record UploadRecord(UUID id, String owner, Instant createdAt, Instant expiresAt, long chargedBytes,
+                        List<ZipExtractor.Entry> files) {
+    }
+
+    /** What {@link #restore} changed: folders deleted, upload records dropped, jobs whose outputs were gone. */
+    record Restored(int deleted, int forgotten, int lost) {
+    }
+
+    /** A job that used an upload, as the store knows it after a restart; {@code active} while queued. */
+    record JobRef(UUID jobId, String owner, UUID uploadId, boolean active) {
+    }
+
+    /** Remembers uploads across restarts (DEP-11). {@link #NONE} without a durable store. */
+    interface UploadIndex {
+        void saved(UploadRecord upload);
+
+        void removed(UUID uploadId);
+
+        UploadIndex NONE = new UploadIndex() {
+            @Override
+            public void saved(UploadRecord upload) {
+            }
+
+            @Override
+            public void removed(UUID uploadId) {
+            }
+        };
+    }
+
     /** A file in a job's {@code out/}: its {@code /}-separated path there and size. */
     record OutputFile(String path, long size) {
     }
@@ -128,6 +158,9 @@ final class WorkArea {
     /** Per client: the bytes its uploads and job outputs take, and those reserved for its uploads now. */
     private final Map<String, Long> ownerUsed = new HashMap<>();
     private final Map<String, Long> ownerReserved = new HashMap<>();
+    private final UploadIndex index;
+    /** Jobs whose outputs were gone after a restart (their files routes answer 410). */
+    private final java.util.Set<UUID> lostOutputs = new java.util.HashSet<>();
 
     /**
      * Opens (or creates) the work area and empties what an earlier run left.
@@ -135,6 +168,16 @@ final class WorkArea {
      * @throws IOException when the folder is not empty and isn't a work area of {@code serve}
      */
     WorkArea(Path root, long maxUploadBytes, long maxBytes, Duration uploadTtl, InstantSource clock) throws IOException {
+        this(root, maxUploadBytes, maxBytes, uploadTtl, clock, false, UploadIndex.NONE);
+    }
+
+    /**
+     * As above; with {@code keep} (a durable job store, DEP-11) what an earlier run left stays, to be
+     * matched with the store by {@link #restore}, and {@code index} records every upload.
+     */
+    WorkArea(Path root, long maxUploadBytes, long maxBytes, Duration uploadTtl, InstantSource clock, boolean keep,
+             UploadIndex index) throws IOException {
+        this.index = Objects.requireNonNull(index);
         this.maxUploadBytes = maxUploadBytes;
         this.maxBytes = maxBytes;
         this.uploadTtl = Objects.requireNonNull(uploadTtl);
@@ -149,16 +192,132 @@ final class WorkArea {
                             + " marker); choose an empty or new folder");
                 }
             }
-            Files.writeString(marker, "Work area of cimpal serve (uploads and job outputs). Emptied at every start.\n");
+            Files.writeString(marker, "Work area of cimpal serve (uploads and job outputs). Emptied at every start"
+                    + " unless serve keeps its jobs in a database.\n");
         }
         this.uploads = this.root.resolve("uploads");
         this.incoming = uploads.resolve(".incoming");
         this.jobs = this.root.resolve("jobs");
-        // Left over from an earlier run: nothing in memory refers to them any more.
-        ZipExtractor.deleteTree(uploads);
-        ZipExtractor.deleteTree(jobs);
+        if (keep) {
+            ZipExtractor.deleteTree(incoming); // half-received uploads never got a record
+        } else {
+            // Left over from an earlier run: nothing in memory refers to them any more.
+            ZipExtractor.deleteTree(uploads);
+            ZipExtractor.deleteTree(jobs);
+        }
         Files.createDirectories(incoming);
         Files.createDirectories(jobs);
+    }
+
+    /**
+     * After a restart with a durable store (DEP-11): takes back the uploads and job workspaces the
+     * store still knows and whose folders are still here, and deletes the rest.
+     * <ul>
+     *   <li>An upload record without its folder is dropped from the store; a folder without a
+     *       record is deleted.</li>
+     *   <li>A job folder whose job the store no longer has is deleted. A job of the store whose
+     *       folder is gone has lost its outputs: its files routes answer 410.</li>
+     *   <li>A job still queued holds its upload again, and gets an empty {@code out/} if needed.</li>
+     * </ul>
+     * Call before the server takes requests.
+     */
+    synchronized Restored restore(List<UploadRecord> records, List<JobRef> refs) throws IOException {
+        int deleted = 0;
+        int forgotten = 0;
+        java.util.Set<UUID> kept = new java.util.HashSet<>();
+        for (UploadRecord r : records) {
+            Path dir = uploads.resolve(r.id().toString());
+            if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) { // a link is not an upload folder
+                index.removed(r.id());
+                forgotten++;
+                continue;
+            }
+            Upload upload = new Upload(r.id(), r.owner(), dir, new ZipExtractor.Result(r.files(), r.chargedBytes()),
+                    r.createdAt(), r.expiresAt());
+            uploadsById.put(r.id(), upload);
+            usedBytes += upload.chargedBytes;
+            charge(r.owner(), upload.chargedBytes);
+            kept.add(r.id());
+        }
+        try (DirectoryStream<Path> dirs = Files.newDirectoryStream(uploads)) {
+            for (Path d : dirs) {
+                if (!d.equals(incoming) && !kept.contains(parseId(d))) {
+                    ZipExtractor.deleteTree(d); // a link is removed, never followed
+                    deleted++;
+                }
+            }
+        }
+        Map<UUID, JobRef> byJob = new HashMap<>();
+        refs.forEach(r -> byJob.put(r.jobId(), r));
+        try (DirectoryStream<Path> dirs = Files.newDirectoryStream(jobs)) {
+            for (Path d : dirs) {
+                UUID id = parseId(d);
+                // Only real folders: a link here could point a job's outputs anywhere.
+                if (id == null || !byJob.containsKey(id) || !Files.isDirectory(d, LinkOption.NOFOLLOW_LINKS)) {
+                    ZipExtractor.deleteTree(d);
+                    deleted++;
+                }
+            }
+        }
+        int lost = 0;
+        for (JobRef ref : refs) {
+            Path dir = jobs.resolve(ref.jobId().toString());
+            boolean present = Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)
+                    && Files.isDirectory(dir.resolve("out"), LinkOption.NOFOLLOW_LINKS);
+            Upload upload = uploadsById.get(ref.uploadId());
+            if (ref.active()) {
+                if (upload == null) {
+                    continue; // its upload is gone: the job fails when it runs (no workspace)
+                }
+                synchronized (upload) {
+                    upload.users++;
+                }
+                jobUpload.put(ref.jobId(), ref.uploadId());
+                jobOwner.put(ref.jobId(), ref.owner());
+                if (!present) {
+                    ZipExtractor.deleteTree(dir); // whatever is there (a link, a file) goes first
+                    Files.createDirectories(dir.resolve("out"));
+                }
+            } else if (present) {
+                long bytes = size(dir);
+                jobUpload.put(ref.jobId(), null);
+                jobBytes.put(ref.jobId(), bytes);
+                jobOwner.put(ref.jobId(), ref.owner());
+                usedBytes += bytes;
+                charge(ref.owner(), bytes);
+            } else {
+                lostOutputs.add(ref.jobId());
+                lost++;
+            }
+        }
+        return new Restored(deleted, forgotten, lost);
+    }
+
+    private static UUID parseId(Path dir) {
+        try {
+            return UUID.fromString(dir.getFileName().toString());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** The workspace of a job still queued after {@link #restore}, or null. */
+    synchronized JobWorkspace workspace(UUID jobId) throws IOException {
+        UUID uploadId = jobUpload.get(jobId);
+        Upload upload = uploadId == null ? null : uploadsById.get(uploadId);
+        if (upload == null) {
+            return null;
+        }
+        Path out = jobs.resolve(jobId.toString()).resolve("out").toRealPath();
+        if (!out.startsWith(jobs.toRealPath()) || !upload.dir.toRealPath().startsWith(uploads.toRealPath())) {
+            return null; // never a workspace outside the work area
+        }
+        return new JobWorkspace(jobId, upload.dir, out);
+    }
+
+    /** True when a job's outputs were gone after a restart. */
+    synchronized boolean outputsLost(UUID jobId) {
+        return lostOutputs.contains(jobId);
     }
 
     Path root() {
@@ -220,6 +379,14 @@ final class WorkArea {
             }
             Instant now = clock.instant();
             Upload upload = new Upload(id, owner, dir, result, now, now.plus(uploadTtl));
+            // Recorded before it is answered (and before it counts), so a restart finds it.
+            try {
+                index.saved(new UploadRecord(id, owner, upload.createdAt, upload.expiresAt, upload.chargedBytes,
+                        upload.files));
+            } catch (RuntimeException e) {
+                ZipExtractor.deleteTree(dir); // never an upload on disk that nothing knows
+                throw e;
+            }
             synchronized (this) {
                 uploadsById.put(id, upload);
                 usedBytes += upload.chargedBytes;
@@ -317,6 +484,7 @@ final class WorkArea {
             if (upload.users() > 0) {
                 throw new Refused(409, "A queued or running job uses this upload");
             }
+            index.removed(id); // first: when the store fails, nothing has changed
             uploadsById.remove(id);
             usedBytes -= upload.chargedBytes;
             charge(upload.owner, -upload.chargedBytes);
@@ -464,11 +632,19 @@ final class WorkArea {
                 expired.add(u);
             }
         }
+        List<Upload> gone = new ArrayList<>();
         for (Upload u : expired) {
+            try {
+                index.removed(u.id); // first: an upload the store still lists stays, and counts
+            } catch (RuntimeException e) {
+                break; // the store is down: the rest expire at the next check
+            }
             uploadsById.remove(u.id);
             usedBytes -= u.chargedBytes;
             charge(u.owner, -u.chargedBytes);
+            gone.add(u);
         }
+        expired.retainAll(gone);
         expired.forEach(u -> ZipExtractor.deleteTree(u.dir));
         return expired;
     }

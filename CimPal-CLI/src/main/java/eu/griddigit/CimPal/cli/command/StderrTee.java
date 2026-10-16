@@ -45,12 +45,12 @@ final class StderrTee extends OutputStream {
     }
 
     private final PrintStream original;
-    private final JobLog log;
+    private final LogSink log;
     private final Map<Thread, ByteArrayOutputStream> partial = new ConcurrentHashMap<>();
     /** Set on close: a stream saved while the tee was installed must not feed this job's log afterwards. */
     private volatile boolean closed;
 
-    private StderrTee(PrintStream original, JobLog log) {
+    private StderrTee(PrintStream original, LogSink log) {
         this.original = original;
         this.log = log;
     }
@@ -59,7 +59,7 @@ final class StderrTee extends OutputStream {
      * A stream that copies into {@code log} what it is given, and passes everything on to the
      * stderr that applies on this thread now.
      */
-    static Capture capture(JobLog log) {
+    static Capture capture(LogSink log) {
         StderrTee tee = new StderrTee(CliStreams.currentErr(), log);
         PrintStream stream = new PrintStream(tee, true, StandardCharsets.UTF_8);
         return new Capture() {
