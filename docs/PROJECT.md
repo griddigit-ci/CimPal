@@ -65,6 +65,8 @@ Key dependency versions:
 - SLF4J 2.0.18 (logging)
 - JUnit Jupiter 5.13.1 (tests)
 
+Main and CLI are fat JARs: `maven-shade-plugin` (`shadedArtifactAttached=false`) overwrites `CimPal.jar` / `CimPal-CLI.jar` with the shaded jar, and launch4j wraps `CimPal.jar` into `CimPal.exe`. Both modules set `maven-jar-plugin` `forceCreation` (2026-10-19). Without it, a build without `clean` kept the previous fat jar as "up to date" and shaded it again, so the old Core classes inside it won. Seen after merging PR #78: the rebuilt GUI still had the old comparison wording, and `original-CimPal.jar` was 212 MB instead of 2.3 MB. Release CI builds from a fresh checkout and was not affected.
+
 ### Module dependency graph
 
 ```
