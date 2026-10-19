@@ -87,6 +87,7 @@ class CimPal:
         content: Callable[[], Iterator[bytes]] | None = None,
         extra_headers: Mapping[str, str] | None = None,
         stream: bool = False,
+        idempotent: bool = False,
     ) -> httpx.Response:
         """Sends a request with retries; returns a successful response or raises the matching error."""
         url = self.base_url + path
@@ -103,7 +104,7 @@ class CimPal:
             try:
                 response = self._http.send(request, stream=True)
             except httpx.TransportError as exc:
-                if attempt < self._retry.retries and self._retry.may_retry(exc, method):
+                if attempt < self._retry.retries and self._retry.may_retry(exc, method, idempotent):
                     self._sleep(self._retry.delay(attempt))
                     attempt += 1
                     continue
@@ -114,10 +115,14 @@ class CimPal:
                 return response
             error = _core.error_from_response(_core.read_error_body(response))
             response.close()
+            if attempt < self._retry.retries and self._retry.may_retry_in_progress(response, idempotent):
+                self._sleep(self._retry.delay(attempt, _core.parse_retry_after(response.headers.get("Retry-After"))))
+                attempt += 1
+                continue
             if (
                 isinstance(error, errors.BusyError)
                 and attempt < self._retry.retries
-                and self._retry.may_retry_busy(response, method)
+                and self._retry.may_retry_busy(response, method, idempotent)
             ):
                 self._sleep(self._retry.delay(attempt, error.retry_after))
                 attempt += 1
@@ -139,8 +144,13 @@ class CimPal:
 
     # ---- uploads --------------------------------------------------------------------------------
 
-    def upload(self, path: str | os.PathLike[str]) -> Upload:
-        """Uploads a ``.zip``, or a folder or file zipped on the fly, for jobs to run on (``input_upload``)."""
+    def upload(self, path: str | os.PathLike[str], *, idempotency_key: str | None = None) -> Upload:
+        """Uploads a ``.zip``, or a folder or file zipped on the fly, for jobs to run on (``input_upload``).
+
+        Sent with an ``Idempotency-Key`` (``idempotency_key``, or a fresh one), so a lost answer is retried
+        safely: the server answers the same upload again.
+        """
+        key = _core.idempotency_key(idempotency_key)
         self._ensure_compatible()
         source = _core.zip_source(path)
         try:
@@ -154,7 +164,12 @@ class CimPal:
                 "POST",
                 "/v1/uploads",
                 content=chunks,
-                extra_headers={"Content-Type": "application/zip", "Content-Length": str(source.size())},
+                extra_headers={
+                    "Content-Type": "application/zip",
+                    "Content-Length": str(source.size()),
+                    "Idempotency-Key": key,
+                },
+                idempotent=True,
             )
             return Upload.from_dict(response.json())
         finally:
@@ -176,11 +191,23 @@ class CimPal:
         *,
         input_upload: Upload | str | None = None,
         label: str | None = None,
+        idempotency_key: str | None = None,
+        callback_url: str | None = None,
     ) -> Job:
-        """Queues ``command`` with ``config`` (as in a ``--config`` file) and returns the queued job at once."""
+        """Queues ``command`` with ``config`` (as in a ``--config`` file) and returns the queued job at once.
+
+        Sent with an ``Idempotency-Key`` (``idempotency_key``, or a fresh one per call), so a lost answer is
+        retried safely: the server answers the same job, never a second one. Pass your own key to make a
+        submit safe to repeat across calls (e.g. after a crash of your program).
+
+        ``callback_url`` asks the server to ``POST`` the job's outcome there when it ends (it must be under
+        your client's allowed prefixes); check it with :func:`cimpal_client.verify_callback`.
+        """
+        key = _core.idempotency_key(idempotency_key)
         self._ensure_compatible()
-        body = _core.submit_body(command, config, input_upload, label)
-        return Job.from_dict(self._send("POST", "/v1/jobs", json=body).json())
+        body = _core.submit_body(command, config, input_upload, label, callback_url)
+        response = self._send("POST", "/v1/jobs", json=body, extra_headers={"Idempotency-Key": key}, idempotent=True)
+        return Job.from_dict(response.json())
 
     def job(self, job: _core.JobRef) -> Job:
         """The job's current state."""

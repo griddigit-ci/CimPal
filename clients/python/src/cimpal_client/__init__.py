@@ -18,6 +18,7 @@ from ._generated.models.job_status import JobStatus
 from ._generated.models.upload import Upload
 from ._version import __version__
 from .aio import AsyncCimPal
+from .callbacks import InvalidCallbackError, verify_callback
 from .client import CimPal
 from .errors import (
     AuthError,
@@ -44,6 +45,7 @@ __all__ = [
     "ConflictError",
     "FileList",
     "ForbiddenError",
+    "InvalidCallbackError",
     "GoneError",
     "Health",
     "Job",
@@ -54,4 +56,5 @@ __all__ = [
     "TimeoutError",
     "Upload",
     "__version__",
+    "verify_callback",
 ]

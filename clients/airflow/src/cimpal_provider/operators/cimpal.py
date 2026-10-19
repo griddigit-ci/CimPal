@@ -127,15 +127,25 @@ class CimPalJobOperator(BaseOperator):
         if self.input_path:
             config = _logic.resolve_paths(self.command, config, self.input_path)
         label = self.job_label or _logic.default_label(self.dag_id, self.task_id, context.get("run_id"))
+        ti = context["ti"]
+        identity = (self.dag_id, self.task_id, context.get("run_id"), getattr(ti, "try_number", None),
+                    getattr(ti, "map_index", -1))
         with hook.get_conn() as cp:
             with airflow_errors():  # nothing submitted yet: Airflow's retries may try again
                 upload = None
                 if self.upload_from:
-                    upload = cp.upload(self.upload_from)
+                    # One key per task try (DEP-14): a lost answer within this try gives the same upload.
+                    upload = cp.upload(self.upload_from, idempotency_key=_logic.idempotency_key("upload", *identity))
                     self.log.info(
                         "Uploaded %s as %s (%d bytes)", self.upload_from, upload.upload_id, upload.total_bytes
                     )
-                job = cp.submit(self.command, config, input_upload=upload, label=label)
+                job = cp.submit(
+                    self.command,
+                    config,
+                    input_upload=upload,
+                    label=label,
+                    idempotency_key=_logic.idempotency_key("job", *identity),
+                )
             self.job_id = str(job.job_id)
             self.log.info("Submitted CimPal job %s (%s) to %s", self.job_id, self.command, cp.base_url)
             context["ti"].xcom_push(key="job_id", value=self.job_id)

@@ -210,3 +210,16 @@ def test_dot_segments_are_left_to_the_servers_path_check() -> None:
     """resolve_paths only joins; the server's allowed folders (PathGuard) are the boundary."""
     resolved = _logic.resolve_paths("convert", {"input": "../other/x.xml"}, "/data/in")
     assert resolved["input"] == "/data/in/../other/x.xml"
+
+
+# ---- idempotency keys (DEP-14) ----------------------------------------------------------------------
+
+
+def test_one_task_try_has_one_key_per_kind_and_a_new_try_a_new_one() -> None:
+    first = _logic.idempotency_key("job", "dag", "validate", "manual__2026-10-16", 1, -1)
+
+    assert first == _logic.idempotency_key("job", "dag", "validate", "manual__2026-10-16", 1, -1)
+    assert first != _logic.idempotency_key("job", "dag", "validate", "manual__2026-10-16", 2, -1)  # Airflow retry
+    assert first != _logic.idempotency_key("upload", "dag", "validate", "manual__2026-10-16", 1, -1)
+    assert first != _logic.idempotency_key("job", "dag", "validate", "manual__2026-10-16", 1, 3)  # mapped task
+    assert re.fullmatch(r"airflow-job-[0-9a-f]{64}", first)

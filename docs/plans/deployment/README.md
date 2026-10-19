@@ -152,7 +152,7 @@ These are also listed in the master README. Each WP names the decisions it needs
 | D-16 | Shared files across replicas | **An RWX volume at `--work-root`** (maintainer, 2026-10-15); S3-compatible storage only if no RWX volume is available | DEP-12 |
 | D-17 | Client identity | **Named tokens** (maintainer, 2026-10-15): `name:role:token` in the token file, a bare token is client `default` (admin); quotas in a separate `--client-quotas` file; oldest-eligible fairness; OIDC/JWT later if a customer asks | DEP-13 |
 | D-18 | A job running when its node died | **Fail it** ("interrupted", maintainer, 2026-10-15); `--requeue-interrupted` as an opt-in | DEP-11, DEP-12 |
-| D-19 | Completion webhooks | Yes, opt-in, allowlisted per client, HMAC-signed | DEP-14 |
+| D-19 | Completion webhooks | **Yes, opt-in, allowlisted per client, HMAC-signed** (maintainer, 2026-10-16): `callbackAllow` in `--client-quotas`, secrets in `--callback-secrets` | DEP-14 |
 
 ## Glossary (for this track)
 

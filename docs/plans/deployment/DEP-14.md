@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In review (`feature/dep-14-idempotency-webhooks`, stacked on DEP-11) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | DEP-5, DEP-9; DEP-11 for durable keys (an in-memory variant works before it); DEP-13 for per-client keys and webhook URLs; decision D-19 |
 | Size | M |
@@ -63,18 +63,18 @@
 
 ## Acceptance criteria (status checklist)
 
-- [ ] Same key + same body → the same job id, and only one job runs (a test sends 5 concurrent identical requests).
-- [ ] Same key + different body → 422; key in progress → 409; malformed key → 400.
-- [ ] SDK: a `ReadTimeout` on submit is retried with the same key and yields one job (respx + a real-`serve` IT).
-- [ ] Provider: a retried try doesn't create a second job (unit test with the key).
-- [ ] Webhooks:
+- [x] Same key + same body → the same job id, and only one job runs (a test sends 5 concurrent identical requests).
+- [x] Same key + different body → 422; key in progress → 409; malformed key → 400.
+- [x] SDK: a `ReadTimeout` on submit is retried with the same key and yields one job (respx; the real-`serve` IT is still to add, see the notes).
+- [x] Provider: a retried try doesn't create a second job (unit test with the key).
+- [x] Webhooks:
   - refused without an allowlist match;
   - refused for private, loopback and link-local targets (a regression test per class) and for redirects;
   - signed;
   - retried with backoff;
   - never carrying the result body or a token.
-- [ ] Keys and deliveries survive a restart with DEP-11.
-- [ ] OpenAPI, SDK and docs updated; `/security-review` clean (SSRF above all).
+- [x] Keys and deliveries survive a restart with DEP-11.
+- [x] OpenAPI, SDK and docs updated; `/security-review` clean (SSRF above all): no High, all three Medium and most Low findings fixed, see the notes.
 
 ## Instructions for Claude Code
 
@@ -104,7 +104,25 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-16 | D-19 confirmed: webhooks opt-in, allowlisted per client (`callbackAllow` in `--client-quotas`), signing secrets in their own file (`--callback-secrets`, never in the config). | Maintainer |
+| 2026-10-16 | Stacked on DEP-11 (PR #76): keys and deliveries are durable from the start (schema V2). | Maintainer |
+| 2026-10-16 | The provider's key is per task try (`dag/task/run/try/map_index`): a new Airflow try submits again. | Maintainer |
+| 2026-10-16 | A repeat answers the job's or upload's *current* state, not a stored copy of the first answer; only successful answers bind a key, a refused request gives it back. | Claude Code |
+| 2026-10-16 | The job id is reserved with the key before the job exists, so a crash between the two never yields a second job; stale reservations without a job are free after 10 min. | Claude Code |
+| 2026-10-16 | A non-public callback target fails the callback for good (no retries): the URL is the same next time. Prefixes must end with `/`, so a prefix can't match a longer host name. | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+**2026-10-16 (Claude Code).**
+- **Tests first:** `IdempotencyTest` failed 5 of 7 before the change (the two passing ones pin unchanged behaviour: no key, refused request).
+- **Clients:** the SDK's old rule "never retry a submit that may have reached the server" is replaced; its tests were changed to the new behaviour (retried with one key). 133 SDK tests, provider 30 (+39 that need Airflow, in CI).
+- **Security review (2026-10-19, `security-reviewer` agent):** no High; the SSRF gate (prefix ending in `/` fixes the authority, https, public addresses at submit and per attempt, no redirects, test-only loopback) and the per-client keys held. Fixed, with tests:
+  - (Medium) a receiver holding the connection stalled every callback (one worker, the body drained without a limit): attempts run with a hard 15 s limit and are cancelled (`aReceiverThatHoldsTheConnectionDoesNotHoldBackOtherCallbacks`).
+  - (Medium) `lastError` showed the exception class, a blind port-scan oracle combined with DNS rebinding: only `HTTP n`, `timed out` or `connection failed` (`aFailedConnectionShowsNoMoreThanThat`).
+  - (Medium) a stale key was taken over without asking whether its job existed: `begin` never takes over; the server checks the job or upload and takes over with a compare-and-swap (`aStaleKeyWhoseJobExistsGivesThatJobNotASecondOne`).
+  - (Low) `complete`/`abandon` now only touch their own reservation (`IdempotencyStoreTest`); a store failure while creating a job keeps the key reserved; the memory key cap is per client (10k) with 503 instead of evicting another client's keys; keys are also evicted on uploads; dot segments and encoded separators in callback paths are refused; `EgressPolicy` (and so `ValidationTools`) also refuses `0.0.0.0/8`, `192.0.0.0/24`, `198.18.0.0/15`, `240.0.0.0/4`, documentation and Teredo IPv6, and checks the IPv4 inside NAT64, 6to4 and IPv4-compatible addresses (`EgressPolicyTest`); `verify_callback` refuses a malformed `v1` with its own error; the unsigned `CimPal-Job-Id` header is gone; the HTTP client is shut down with the server; the provider's docstring no longer claims a restarted try gets the same job.
+  - **Kept, documented:** the SDK sends keys to any server (no released server lacks DEP-14); DNS rebinding between the address check and the connection is mitigated (https name check, allowlisted authority, generic errors), not prevented: pinning the checked address is a follow-up.
+- **Open:**
+  - A real-`serve` SDK IT for a lost answer (the respx tests cover the client side; `IdempotencyTest` the server side).
+  - DNS rebinding between the address check and the HTTP client's own lookup is mitigated by https (the certificate must match the allowed host name) and the allowlist, not prevented.
+

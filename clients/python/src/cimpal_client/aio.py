@@ -84,6 +84,7 @@ class AsyncCimPal:
         content: Callable[[], AsyncIterator[bytes]] | None = None,
         extra_headers: Mapping[str, str] | None = None,
         stream: bool = False,
+        idempotent: bool = False,
     ) -> httpx.Response:
         url = self.base_url + path
         attempt = 0
@@ -99,7 +100,7 @@ class AsyncCimPal:
             try:
                 response = await self._http.send(request, stream=True)
             except httpx.TransportError as exc:
-                if attempt < self._retry.retries and self._retry.may_retry(exc, method):
+                if attempt < self._retry.retries and self._retry.may_retry(exc, method, idempotent):
                     await self._sleep(self._retry.delay(attempt))
                     attempt += 1
                     continue
@@ -110,10 +111,14 @@ class AsyncCimPal:
                 return response
             error = _core.error_from_response(await _core.read_error_body_async(response))
             await response.aclose()
+            if attempt < self._retry.retries and self._retry.may_retry_in_progress(response, idempotent):
+                await self._sleep(self._retry.delay(attempt, _core.parse_retry_after(response.headers.get("Retry-After"))))
+                attempt += 1
+                continue
             if (
                 isinstance(error, errors.BusyError)
                 and attempt < self._retry.retries
-                and self._retry.may_retry_busy(response, method)
+                and self._retry.may_retry_busy(response, method, idempotent)
             ):
                 await self._sleep(self._retry.delay(attempt, error.retry_after))
                 attempt += 1
@@ -134,7 +139,8 @@ class AsyncCimPal:
 
     # ---- uploads --------------------------------------------------------------------------------
 
-    async def upload(self, path: str | os.PathLike[str]) -> Upload:
+    async def upload(self, path: str | os.PathLike[str], *, idempotency_key: str | None = None) -> Upload:
+        key = _core.idempotency_key(idempotency_key)
         await self._ensure_compatible()
         zipping = asyncio.ensure_future(asyncio.to_thread(_core.zip_source, path))
         try:
@@ -154,7 +160,12 @@ class AsyncCimPal:
                 "POST",
                 "/v1/uploads",
                 content=chunks,
-                extra_headers={"Content-Type": "application/zip", "Content-Length": str(source.size())},
+                extra_headers={
+                    "Content-Type": "application/zip",
+                    "Content-Length": str(source.size()),
+                    "Idempotency-Key": key,
+                },
+                idempotent=True,
             )
             return Upload.from_dict(response.json())
         finally:
@@ -175,10 +186,16 @@ class AsyncCimPal:
         *,
         input_upload: Upload | str | None = None,
         label: str | None = None,
+        idempotency_key: str | None = None,
+        callback_url: str | None = None,
     ) -> Job:
+        key = _core.idempotency_key(idempotency_key)
         await self._ensure_compatible()
-        body = _core.submit_body(command, config, input_upload, label)
-        return Job.from_dict((await self._send("POST", "/v1/jobs", json=body)).json())
+        body = _core.submit_body(command, config, input_upload, label, callback_url)
+        response = await self._send(
+            "POST", "/v1/jobs", json=body, extra_headers={"Idempotency-Key": key}, idempotent=True
+        )
+        return Job.from_dict(response.json())
 
     async def job(self, job: _core.JobRef) -> Job:
         return Job.from_dict((await self._send("GET", f"/v1/jobs/{_core.job_id(job)}")).json())

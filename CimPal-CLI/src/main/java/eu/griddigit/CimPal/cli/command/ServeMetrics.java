@@ -31,6 +31,8 @@ final class ServeMetrics {
     private final Map<String, AtomicLong> requests = new ConcurrentHashMap<>();
     /** Keyed by client and quota. */
     private final Map<String, AtomicLong> quotaRefusals = new ConcurrentHashMap<>();
+    /** Keyed by outcome. */
+    private final Map<String, AtomicLong> callbacks = new ConcurrentHashMap<>();
     private final AtomicLongArray durationBuckets = new AtomicLongArray(DURATION_BUCKETS.length);
     private final AtomicLong durationCount = new AtomicLong();
     private final DoubleAdder durationSum = new DoubleAdder();
@@ -57,6 +59,11 @@ final class ServeMetrics {
     /** A request of {@code client} was refused by its {@code quota}: max_queued or requests_per_minute. */
     void quotaRefused(String client, String quota) {
         count(quotaRefusals, client, quota);
+    }
+
+    /** A callback attempt (DEP-14) ended: delivered, retry, failed or refused. */
+    void callback(String outcome) {
+        count(callbacks, outcome);
     }
 
     private static void count(Map<String, AtomicLong> counters, String... labels) {
@@ -114,6 +121,8 @@ final class ServeMetrics {
         counters(sb, "cimpal_requests_total", requests, "client", "command", "outcome");
         help(sb, "cimpal_quota_refused_total", "counter", "Requests refused with 429 by a client's quota.");
         counters(sb, "cimpal_quota_refused_total", quotaRefusals, "client", "quota");
+        help(sb, "cimpal_callbacks_total", "counter", "Job callback attempts by outcome.");
+        counters(sb, "cimpal_callbacks_total", callbacks, "outcome");
 
         help(sb, "cimpal_queue_depth", "gauge", "Commands and jobs waiting for a worker.");
         sb.append("cimpal_queue_depth ").append(queueDepth).append('\n');

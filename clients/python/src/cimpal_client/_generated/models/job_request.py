@@ -14,11 +14,13 @@ from ..types import UNSET, Unset
 from ..models.job_request_command import JobRequestCommand
 from ..types import UNSET, Unset
 from typing import cast
+from typing import cast, Union
 from typing import Union
 from uuid import UUID
 
 if TYPE_CHECKING:
   from ..models.job_request_config import JobRequestConfig
+  from ..models.job_request_callback_type_0 import JobRequestCallbackType0
 
 
 
@@ -40,12 +42,18 @@ class JobRequest:
             input_upload (Union[Unset, UUID]): Run on an upload (`POST /v1/uploads`) instead of shared paths: relative paths
                 in `config` resolve inside the upload, outputs go to the job's own folder (relative or missing output paths are
                 placed there), and the outputs are fetched with `/files` and `/archive`.
+            callback (Union['JobRequestCallbackType0', None, Unset]): Opt-in completion callback (DEP-14): when the job
+                ends, the server POSTs its status and links (never its result) to url, signed with the client's secret in
+                CimPal-Signature (t=<unix seconds>,v1=<hex HMAC-SHA256(secret, t + "." + body)>). The url must be https, under
+                one of the client's allowed prefixes (callbackAllow), and resolve to public addresses only; otherwise 400.
+                Delivered at least once, retried for 24 h.
      """
 
     command: JobRequestCommand
     config: Union[Unset, 'JobRequestConfig'] = UNSET
     label: Union[Unset, str] = UNSET
     input_upload: Union[Unset, UUID] = UNSET
+    callback: Union['JobRequestCallbackType0', None, Unset] = UNSET
 
 
 
@@ -53,6 +61,7 @@ class JobRequest:
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.job_request_config import JobRequestConfig
+        from ..models.job_request_callback_type_0 import JobRequestCallbackType0
         command = self.command.value
 
         config: Union[Unset, dict[str, Any]] = UNSET
@@ -64,6 +73,14 @@ class JobRequest:
         input_upload: Union[Unset, str] = UNSET
         if not isinstance(self.input_upload, Unset):
             input_upload = str(self.input_upload)
+
+        callback: Union[None, Unset, dict[str, Any]]
+        if isinstance(self.callback, Unset):
+            callback = UNSET
+        elif isinstance(self.callback, JobRequestCallbackType0):
+            callback = self.callback.to_dict()
+        else:
+            callback = self.callback
 
 
         field_dict: dict[str, Any] = {}
@@ -77,6 +94,8 @@ class JobRequest:
             field_dict["label"] = label
         if input_upload is not UNSET:
             field_dict["inputUpload"] = input_upload
+        if callback is not UNSET:
+            field_dict["callback"] = callback
 
         return field_dict
 
@@ -85,6 +104,7 @@ class JobRequest:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.job_request_config import JobRequestConfig
+        from ..models.job_request_callback_type_0 import JobRequestCallbackType0
         d = dict(src_dict)
         command = JobRequestCommand(d.pop("command"))
 
@@ -113,11 +133,32 @@ class JobRequest:
 
 
 
+        def _parse_callback(data: object) -> Union['JobRequestCallbackType0', None, Unset]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                callback_type_0 = JobRequestCallbackType0.from_dict(data)
+
+
+
+                return callback_type_0
+            except: # noqa: E722
+                pass
+            return cast(Union['JobRequestCallbackType0', None, Unset], data)
+
+        callback = _parse_callback(d.pop("callback", UNSET))
+
+
         job_request = cls(
             command=command,
             config=config,
             label=label,
             input_upload=input_upload,
+            callback=callback,
         )
 
         return job_request

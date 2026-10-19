@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -33,7 +34,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *       overtake them ({@link JobScheduler});</li>
  *   <li>{@code maxUploadBytes}: the largest upload (413);</li>
  *   <li>{@code maxWorkBytes}: what its uploads and job outputs may take in the work area (507);</li>
- *   <li>{@code requestsPerMinute}: authenticated requests per minute, 0 for no limit (429).</li>
+ *   <li>{@code requestsPerMinute}: authenticated requests per minute, 0 for no limit (429);</li>
+ *   <li>{@code callbackAllow} (DEP-14): the URL prefixes its jobs' completion callbacks may go to,
+ *       none by default (then a job with a callback is refused, 400). Each prefix is an https URL
+ *       whose path ends with {@code /}; http only to a loopback host, for local testing.</li>
  * </ul>
  * The server's flags ({@code --queue-size}, {@code --workers}, {@code --max-upload-bytes},
  * {@code --work-max-bytes}) stay the limits of the whole server, and are each client's defaults
@@ -53,7 +57,17 @@ final class ClientQuotas {
     static final int NO_QUEUE_LIMIT = 1_000_000;
 
     /** One client's limits. */
-    record Limits(int maxQueued, int maxRunning, long maxUploadBytes, long maxWorkBytes, int requestsPerMinute) {
+    record Limits(int maxQueued, int maxRunning, long maxUploadBytes, long maxWorkBytes, int requestsPerMinute,
+                  List<String> callbackAllow) {
+
+        Limits {
+            callbackAllow = List.copyOf(callbackAllow);
+        }
+
+        /** Without callbacks. */
+        Limits(int maxQueued, int maxRunning, long maxUploadBytes, long maxWorkBytes, int requestsPerMinute) {
+            this(maxQueued, maxRunning, maxUploadBytes, maxWorkBytes, requestsPerMinute, List.of());
+        }
     }
 
     /** The parsed file: overrides only (null fields fall back). */
@@ -70,22 +84,23 @@ final class ClientQuotas {
 
     /** The limits one entry sets; null where it sets none. */
     record Values(Integer maxQueued, Integer maxRunning, Long maxUploadBytes, Long maxWorkBytes,
-                    Integer requestsPerMinute) {
+                    Integer requestsPerMinute, List<String> callbackAllow) {
 
-        static final Values NONE = new Values(null, null, null, null, null);
+        static final Values NONE = new Values(null, null, null, null, null, null);
 
         Limits over(Limits base) {
             return new Limits(maxQueued != null ? maxQueued : base.maxQueued(),
                     maxRunning != null ? maxRunning : base.maxRunning(),
                     maxUploadBytes != null ? maxUploadBytes : base.maxUploadBytes(),
                     maxWorkBytes != null ? maxWorkBytes : base.maxWorkBytes(),
-                    requestsPerMinute != null ? requestsPerMinute : base.requestsPerMinute());
+                    requestsPerMinute != null ? requestsPerMinute : base.requestsPerMinute(),
+                    callbackAllow != null ? callbackAllow : base.callbackAllow());
         }
     }
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> KEYS =
-            Set.of("maxQueued", "maxRunning", "maxUploadBytes", "maxWorkBytes", "requestsPerMinute");
+            Set.of("maxQueued", "maxRunning", "maxUploadBytes", "maxWorkBytes", "requestsPerMinute", "callbackAllow");
 
     private final Limits defaults;
     private final Map<String, Limits> perClient = new HashMap<>();
@@ -106,7 +121,7 @@ final class ClientQuotas {
     private static Limits cap(Limits l, Limits server) {
         return new Limits(l.maxQueued(), Math.min(l.maxRunning(), server.maxRunning()),
                 Math.min(l.maxUploadBytes(), server.maxUploadBytes()), Math.min(l.maxWorkBytes(), server.maxWorkBytes()),
-                l.requestsPerMinute());
+                l.requestsPerMinute(), l.callbackAllow());
     }
 
     Limits limits(String client) {
@@ -228,6 +243,7 @@ final class ClientQuotas {
         Long maxUploadBytes = null;
         Long maxWorkBytes = null;
         Integer perMinute = null;
+        List<String> callbackAllow = null;
         for (Map.Entry<String, JsonNode> e : node.properties()) {
             String key = e.getKey();
             if (key.startsWith("_")) {
@@ -238,6 +254,10 @@ final class ClientQuotas {
                         + "'; allowed: " + String.join(", ", KEYS.stream().sorted().toList()));
             }
             JsonNode v = e.getValue();
+            if (key.equals("callbackAllow")) {
+                callbackAllow = callbackAllow(where, v);
+                continue;
+            }
             if (!v.isIntegralNumber() || !v.canConvertToLong()) {
                 throw new IllegalArgumentException("'" + where + "." + key + "' must be a whole number");
             }
@@ -250,7 +270,39 @@ final class ClientQuotas {
                 default -> perMinute = (int) range(where, key, n, 0, 1_000_000);
             }
         }
-        return new Values(maxQueued, maxRunning, maxUploadBytes, maxWorkBytes, perMinute);
+        return new Values(maxQueued, maxRunning, maxUploadBytes, maxWorkBytes, perMinute, callbackAllow);
+    }
+
+    /** {@code callbackAllow}: URL prefixes, each https (http only to loopback) with a path ending in {@code /}. */
+    private static List<String> callbackAllow(String where, JsonNode node) {
+        if (!node.isArray()) {
+            throw new IllegalArgumentException("'" + where + ".callbackAllow' must be a list of URL prefixes");
+        }
+        List<String> prefixes = new java.util.ArrayList<>();
+        for (JsonNode p : node) {
+            String prefix = p.isString() ? p.asString() : null;
+            if (prefix == null || !validCallbackPrefix(prefix)) {
+                throw new IllegalArgumentException("'" + where + ".callbackAllow' entries must be https URLs whose"
+                        + " path ends with '/' (no user, query or fragment): "
+                        + LogSanitizer.forLog(String.valueOf(prefix)));
+            }
+            prefixes.add(prefix);
+        }
+        return List.copyOf(prefixes);
+    }
+
+    static boolean validCallbackPrefix(String prefix) {
+        try {
+            java.net.URI uri = new java.net.URI(prefix);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme();
+            boolean loopback = uri.getHost() != null && ServeSecurity.isLoopback(uri.getHost());
+            return (scheme.equals("https") || (scheme.equals("http") && loopback))
+                    && uri.getHost() != null && uri.getUserInfo() == null && uri.getRawQuery() == null
+                    && uri.getRawFragment() == null && uri.getRawPath() != null && uri.getRawPath().endsWith("/")
+                    && prefix.equals(uri.toString()) && prefix.length() <= 2048;
+        } catch (java.net.URISyntaxException e) {
+            return false;
+        }
     }
 
     private static long range(String where, String key, long n, long min, long max) {

@@ -84,7 +84,7 @@
         },
         "responses" : {
           "202" : {
-            "description" : "Queued. `Location` is the job's URL.",
+            "description" : "Queued. `Location` is the job's URL. A repeat with the same Idempotency-Key answers the same job.",
             "headers" : {
               "Location" : {
                 "description" : "The job's URL.",
@@ -102,7 +102,7 @@
             }
           },
           "400" : {
-            "description" : "Not valid JSON, an unknown field, an unknown command, or a bad config.",
+            "description" : "Not valid JSON, an unknown field, an unknown command, or a bad config, or a malformed Idempotency-Key, or a callback that isn't allowed.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -170,7 +170,7 @@
             }
           },
           "404" : {
-            "description" : "`inputUpload` names no upload of this client (none, expired, or another client's).",
+            "description" : "`inputUpload` names no upload of this client (none, expired, or another client's); or the job made with this Idempotency-Key no longer exists.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -196,8 +196,39 @@
                 }
               }
             }
+          },
+          "409" : {
+            "description" : "A request with this Idempotency-Key is still being processed; repeat it after Retry-After.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "This Idempotency-Key was used with a different request.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ]
       },
       "get" : {
         "tags" : [ "jobs" ],
@@ -620,7 +651,7 @@
         },
         "responses" : {
           "201" : {
-            "description" : "The upload; `Location` is its URL.",
+            "description" : "The upload; `Location` is its URL. A repeat with the same Idempotency-Key answers the same upload.",
             "headers" : {
               "Location" : {
                 "schema" : {
@@ -638,7 +669,7 @@
             }
           },
           "400" : {
-            "description" : "Not a usable ZIP: unreadable, an unsafe entry name, too many entries, or too large once extracted.",
+            "description" : "Not a usable ZIP: unreadable, an unsafe entry name, too many entries, or too large once extracted, or a malformed Idempotency-Key.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -704,8 +735,49 @@
                 }
               }
             }
+          },
+          "409" : {
+            "description" : "A request with this Idempotency-Key is still being processed; repeat it after Retry-After.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "This Idempotency-Key was used with a different request.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "The upload made with this Idempotency-Key no longer exists.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ]
       }
     },
     "/v1/uploads/{uploadId}" : {
@@ -1119,6 +1191,19 @@
             "type" : "string",
             "format" : "uuid",
             "description" : "Run on an upload (`POST /v1/uploads`) instead of shared paths: relative paths in `config` resolve inside the upload, outputs go to the job's own folder (relative or missing output paths are placed there), and the outputs are fetched with `/files` and `/archive`."
+          },
+          "callback" : {
+            "type" : [ "object", "null" ],
+            "description" : "Opt-in completion callback (DEP-14): when the job ends, the server POSTs its status and links (never its result) to url, signed with the client's secret in CimPal-Signature (t=<unix seconds>,v1=<hex HMAC-SHA256(secret, t + \".\" + body)>). The url must be https, under one of the client's allowed prefixes (callbackAllow), and resolve to public addresses only; otherwise 400. Delivered at least once, retried for 24 h.",
+            "required" : [ "url" ],
+            "additionalProperties" : false,
+            "properties" : {
+              "url" : {
+                "type" : "string",
+                "format" : "uri",
+                "maxLength" : 2048
+              }
+            }
           }
         }
       },
@@ -1180,6 +1265,10 @@
                 "type" : "string"
               }
             }
+          },
+          "callback" : {
+            "$ref" : "#/components/schemas/CallbackState",
+            "description" : "Present only when the job asked for a callback."
           }
         }
       },
@@ -1669,6 +1758,48 @@
               }
             }
           }
+        }
+      },
+      "CallbackState" : {
+        "type" : "object",
+        "description" : "The job's callback: waiting while it runs, pending until delivered, then delivered or failed.",
+        "required" : [ "url", "state", "attempts", "lastStatus", "lastAttemptAt", "lastError" ],
+        "properties" : {
+          "url" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string",
+            "enum" : [ "waiting", "pending", "delivered", "failed" ]
+          },
+          "attempts" : {
+            "type" : "integer"
+          },
+          "lastStatus" : {
+            "type" : [ "integer", "null" ],
+            "description" : "The receiver's HTTP status of the last attempt."
+          },
+          "lastAttemptAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "lastError" : {
+            "type" : [ "string", "null" ]
+          }
+        }
+      }
+    },
+    "parameters" : {
+      "IdempotencyKey" : {
+        "name" : "Idempotency-Key",
+        "in" : "header",
+        "required" : false,
+        "description" : "Makes the request safe to repeat (DEP-14): the same key with the same request gives the same job or upload again, never a second one, for --idempotency-ttl (24 h). Keys are per client. 1 to 255 visible ASCII characters, e.g. a UUID per logical request, reused for its retries.",
+        "schema" : {
+          "type" : "string",
+          "minLength" : 1,
+          "maxLength" : 255,
+          "pattern" : "^[\\x21-\\x7E]+$"
         }
       }
     }

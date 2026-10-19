@@ -15,5 +15,6 @@ module CimPal.CLI {
     requires jdk.httpserver;
     requires jdk.unsupported;
     requires java.sql;
+    requires java.net.http;
     requires org.postgresql.jdbc;
 }

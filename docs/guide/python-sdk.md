@@ -124,6 +124,7 @@ Every error is a `CimPalError` with `status`, `title`, `detail` and `job_id` fro
 | `NotFoundError` | 404: no such job, upload or file (finished jobs are dropped after `--job-ttl`) |
 | `ConflictError` | 409: e.g. the result of a job that hasn't finished, or cancelling a running job |
 | `GoneError` | 410: the result was larger than `--max-result-bytes` and wasn't kept |
+| `InvalidCallbackError` | `verify_callback()`: the callback's signature is missing, wrong or too old |
 | `BusyError` | 503: the queue is full; or 429: this client's quota is used up (too many queued jobs or requests). `retry_after` says how long to wait |
 | `TimeoutError` | 504, a request without an answer in time, or `wait()` ran out of time |
 | `ServerError` | other 5xx (507: the server's work area is full) |
@@ -134,8 +135,8 @@ Every error is a `CimPalError` with `status`, `title`, `detail` and `job_id` fro
 
 - **Busy server:** a 503 or 429 is retried up to `retries` times (default 3). The wait is the server's `Retry-After` (at most 5 minutes), or else `backoff` × 2ⁿ seconds (1, 2, 4 … up to 30).
 - **Unreachable server:** a request that never reached it (connection refused, DNS) is retried the same way.
-- **A 503 or 429 to a `submit` or `upload`:** retried only when CimPal sent it (problem details or `Retry-After`), because CimPal then refused the request before accepting it. A proxy's 503 may come after the server got the request, so it raises `BusyError` instead.
-- **Answer lost on the way back:** such a request (a read timeout, a dropped connection) is retried only when it is a `GET`. A `submit` is therefore never sent twice: if it fails that way, check `list_jobs()` before submitting again.
+- **Submits and uploads are safe to retry:** each `submit()` and `upload()` sends an `Idempotency-Key` (a fresh UUID per call, reused for that call's retries), so the server answers the same job or upload to a repeat, never a second one. They are therefore retried like a `GET`: after a read timeout, a dropped connection, any 503 or 429, and a 409 "still being processed". Pass `idempotency_key=` to make a submit safe to repeat across calls too, e.g. after your program crashed. This needs a server with DEP-14, which every released CimPal with the `/v1` API is; an older development build would ignore the key and could run a retried submit twice.
+- **Answer lost on the way back:** other requests (a read timeout, a dropped connection) are retried only when they are a `GET`.
 - **Request timeout:** `timeout` bounds each request, not the job; use `wait(timeout=)` for the job.
 
 ## See also
@@ -143,3 +144,19 @@ Every error is a `CimPalError` with `status`, `title`, `detail` and `job_id` fro
 - [`serve`](../cli/serve.md): starting the server, tokens, allowed folders, the `/v1` API.
 - [Running CimPal as a service](service.md): the server behind a proxy, in Kubernetes.
 - [`clients/python/README.md`](../../clients/python/README.md): development, the generated layer, releasing.
+
+## Completion callbacks
+
+`cp.submit(..., callback_url="https://hooks.example.com/cimpal/done")` asks the server to `POST` the job's outcome there when it ends ([how it works](../cli/serve.md#completion-callbacks)). The receiving service checks the signature before trusting the body:
+
+```python
+from cimpal_client import InvalidCallbackError, verify_callback
+
+def handle(request_headers, raw_body):          # e.g. in a Flask or FastAPI handler
+    try:
+        event = verify_callback(SECRET, request_headers, raw_body)   # also refuses old timestamps
+    except InvalidCallbackError:
+        return 401
+    job_id = event["jobId"]                     # fetch the result with your token: cp.result(job_id)
+```
+

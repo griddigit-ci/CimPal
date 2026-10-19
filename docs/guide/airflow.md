@@ -135,7 +135,9 @@ validate = CimPalValidateOperator(
 | cancelled, timed out on the server, or still running after `job_timeout` | fails without retries |
 | couldn't be followed after it was submitted (e.g. the server stayed unreachable) | fails without retries |
 
-**Why some failures don't retry:** a running job can't be stopped. An Airflow retry submits a new job, so retrying a job that may still be running would make two of them. The deferrable wait keeps trying through a busy or restarting server until `job_timeout`.
+**Why some failures don't retry:** a running job can't be stopped. An Airflow retry (a new try) submits a new job, so retrying a job that may still be running would make two of them. The deferrable wait keeps trying through a busy or restarting server until `job_timeout`.
+
+**Within one try, a submit is never doubled:** the operator sends an `Idempotency-Key` derived from the DAG, task, run, try and map index (DEP-14). If the answer to the upload or submit gets lost, or the worker dies before it sees it, the same try gets the same upload and job back from the server.
 
 **Killing a task** (`on_kill`): a job that is still queued is cancelled. A running one can't be stopped and finishes on the server.
 

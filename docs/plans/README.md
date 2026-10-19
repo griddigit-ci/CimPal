@@ -55,10 +55,10 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 | D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | Done (PR #69) |
 | D2 | [DEP-9](deployment/DEP-9.md) | Python SDK `cimpal-client` | DEP-5, DEP-7 | M | Done (PR #70) |
 | D2 | [DEP-10](deployment/DEP-10.md) | Airflow provider | DEP-9, DEP-3 | M | Done (PR #71; PyPI publishing in PR #72) |
-| D3 | [DEP-11](deployment/DEP-11.md) | Durable job store (PostgreSQL) | DEP-5, DEP-7, DEP-8; D-14, D-18 | L | In progress (implemented, not committed) |
+| D3 | [DEP-11](deployment/DEP-11.md) | Durable job store (PostgreSQL) | DEP-5, DEP-7, DEP-8; D-14, D-18 | L | In review (PR #76) |
 | D3 | [DEP-12](deployment/DEP-12.md) | Shared queue across replicas (horizontal scale-out) | DEP-11; D-15, D-16 | L | Not started |
 | D3 | [DEP-13](deployment/DEP-13.md) | Client identity, job ownership and quotas | DEP-6; D-17 | M | Done ([PR #75](https://github.com/griddigit-ci/CimPal/pull/75)) |
-| D3 | [DEP-14](deployment/DEP-14.md) | Idempotent submission and completion webhooks | DEP-11 (soft), DEP-13 (soft); D-19 | M | Not started |
+| D3 | [DEP-14](deployment/DEP-14.md) | Idempotent submission and completion webhooks | DEP-11 (soft), DEP-13 (soft); D-19 | M | In review (stacked on DEP-11) |
 | D3 | [DEP-15](deployment/DEP-15.md) | Job isolation: one child process per job | DEP-8 | M–L | Not started |
 | D3 | [DEP-16](deployment/DEP-16.md) | Load tests, capacity model and SLOs | DEP-2, DEP-9 | M | Not started |
 

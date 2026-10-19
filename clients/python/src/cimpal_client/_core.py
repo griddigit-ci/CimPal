@@ -225,6 +225,15 @@ def error_from_response(response: httpx.Response) -> errors.CimPalError:
     return kind(message, status=status, **fields)
 
 
+def idempotency_key(key: str | None) -> str:
+    """The key of one submit or upload: the caller's, or a fresh UUID (reused for that call's retries)."""
+    if key is None:
+        return str(uuid.uuid4())
+    if not 1 <= len(key) <= 255 or any(not 0x21 <= ord(c) <= 0x7E for c in key):
+        raise ValueError("idempotency_key must be 1 to 255 visible ASCII characters")
+    return key
+
+
 def transport_error(exc: httpx.TransportError, method: str, url: str) -> errors.CimPalError:
     path = urlsplit(url).path
     if isinstance(exc, httpx.TimeoutException):
@@ -257,15 +266,22 @@ class RetryPolicy:
         return float(min(self.max_backoff, self.backoff * (2**attempt)))
 
     @staticmethod
-    def may_retry(exc: httpx.TransportError, method: str) -> bool:
+    def may_retry(exc: httpx.TransportError, method: str, idempotent: bool = False) -> bool:
+        """A request that may have reached the server is retried only when repeating it is safe: a GET,
+        or a POST with an ``Idempotency-Key`` (the server then answers the same job or upload)."""
         never_sent = isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout))
-        return never_sent or method == "GET"
+        return never_sent or method == "GET" or idempotent
 
     @staticmethod
-    def may_retry_busy(response: httpx.Response, method: str) -> bool:
+    def may_retry_in_progress(response: httpx.Response, idempotent: bool) -> bool:
+        """409 with Retry-After to a keyed POST: the first request with that key is still being processed."""
+        return idempotent and response.status_code == 409 and "Retry-After" in response.headers
+
+    @staticmethod
+    def may_retry_busy(response: httpx.Response, method: str, idempotent: bool = False) -> bool:
         """A 503 or 429 to a POST is retried only when CimPal sent it (it then refused the request before
         accepting it); a proxy's 503 may come after the server got the request."""
-        if method == "GET":
+        if method == "GET" or idempotent:
             return True
         content_type = response.headers.get("Content-Type", "")
         return content_type.startswith("application/problem+json") or "Retry-After" in response.headers
@@ -389,12 +405,20 @@ def check_poll_interval(poll_interval: float, max_poll_interval: float) -> None:
         raise ValueError("poll_interval must be positive and at most max_poll_interval")
 
 
-def submit_body(command: str, config: Mapping[str, Any] | None, input_upload: Any, label: str | None) -> dict[str, Any]:
+def submit_body(
+    command: str,
+    config: Mapping[str, Any] | None,
+    input_upload: Any,
+    label: str | None,
+    callback_url: str | None = None,
+) -> dict[str, Any]:
     body: dict[str, Any] = {"command": command, "config": dict(config or {})}
     if label is not None:
         body["label"] = label
     if input_upload is not None:
         body["inputUpload"] = upload_id(input_upload)
+    if callback_url is not None:
+        body["callback"] = {"url": callback_url}
     return body
 
 
