@@ -1,0 +1,44 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Jobs that survive a restart (DEP-11): serve keeps its jobs, results, logs and the uploads'
+# bookkeeping in PostgreSQL. Add this file to compose.yaml:
+#
+#   docker compose -f compose.yaml -f compose.postgres.yaml up -d
+#
+# Needs ./secrets/db-password (see README.md). The database is reachable on the internal network
+# only. Back up the "postgres-data" volume and ./data together: a job's outputs are files in
+# ./data/.cimpal-work, its record is in the database.
+services:
+  cimpal:
+    environment:
+      CIMPAL_JOB_STORE: jdbc
+      CIMPAL_JOB_STORE_URL: jdbc:postgresql://postgres:5432/cimpal
+      CIMPAL_JOB_STORE_USER: cimpal
+      CIMPAL_JOB_STORE_PASSWORD_FILE: /run/secrets/cimpal/db-password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    environment:
+      POSTGRES_DB: cimpal
+      POSTGRES_USER: cimpal
+      POSTGRES_PASSWORD_FILE: /run/secrets/db/db-password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./secrets/db-password:/run/secrets/db/db-password:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "cimpal", "-d", "cimpal"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    stop_grace_period: 30s
+    networks:
+      - internal
+
+volumes:
+  postgres-data:

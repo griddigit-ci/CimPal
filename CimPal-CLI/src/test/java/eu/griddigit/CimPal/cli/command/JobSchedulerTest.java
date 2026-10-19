@@ -20,16 +20,16 @@ class JobSchedulerTest {
 
     private int next = 0;
 
-    private Job job(String owner) {
-        return new Job(UUID.randomUUID(), "validate", null, owner, Instant.EPOCH.plusSeconds(next++), 10);
+    private Job.Snapshot job(String owner) {
+        return new Job(UUID.randomUUID(), "validate", null, owner, Instant.EPOCH.plusSeconds(next++), 10).snapshot();
     }
 
     @Test
     void withoutLimitsItIsFirstComeFirstServed() {
         JobScheduler scheduler = new JobScheduler(owner -> 64);
-        Job a1 = job("a");
-        Job b1 = job("b");
-        Job a2 = job("a");
+        Job.Snapshot a1 = job("a");
+        Job.Snapshot b1 = job("b");
+        Job.Snapshot a2 = job("a");
         scheduler.add(a1, BODY);
         scheduler.add(b1, BODY);
         scheduler.add(a2, BODY);
@@ -44,11 +44,11 @@ class JobSchedulerTest {
     @Test
     void aClientAtItsLimitIsOvertakenAndAParkedTurnWakesWhenItsJobEnds() {
         JobScheduler scheduler = new JobScheduler(Map.of("a", 1, "b", 1)::get);
-        Job a1 = job("a");
-        Job a2 = job("a");
-        Job a3 = job("a");
-        Job b1 = job("b");
-        for (Job job : new Job[] {a1, a2, a3, b1}) {
+        Job.Snapshot a1 = job("a");
+        Job.Snapshot a2 = job("a");
+        Job.Snapshot a3 = job("a");
+        Job.Snapshot b1 = job("b");
+        for (Job.Snapshot job : new Job.Snapshot[] {a1, a2, a3, b1}) {
             scheduler.add(job, BODY);
         }
 
@@ -71,8 +71,8 @@ class JobSchedulerTest {
     @Test
     void cancellingTheLastQueuedJobClearsParkedTurns() {
         JobScheduler scheduler = new JobScheduler(owner -> 1);
-        Job a1 = job("a");
-        Job a2 = job("a");
+        Job.Snapshot a1 = job("a");
+        Job.Snapshot a2 = job("a");
         scheduler.add(a1, BODY);
         scheduler.add(a2, BODY);
         scheduler.next();
