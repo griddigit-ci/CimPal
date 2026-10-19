@@ -463,6 +463,15 @@ class ServeServerTest {
         HttpResponse<String> timedOut = send(authorizedPost("/validate", "{}"));
         assertThat(timedOut.statusCode()).isEqualTo(504);
 
+        // The 504 is timed from the request's arrival, the stall from the command's start a moment
+        // later: health may need a few more milliseconds to see it.
+        waitUntil(() -> {
+            try {
+                return send(HttpRequest.newBuilder(uri("/health")).GET()).body().contains("\"stalled\":true");
+            } catch (Exception e) {
+                return false;
+            }
+        });
         assertThat(send(HttpRequest.newBuilder(uri("/health")).GET()).body())
                 .contains("\"busy\":true", "\"stalled\":true", "\"status\":\"stalled\"");
         release.countDown();

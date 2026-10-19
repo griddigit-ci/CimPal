@@ -271,7 +271,12 @@ class IdempotencyTest {
         assertThat(field(again, "uploadId")).isEqualTo(field(first, "uploadId"));
         assertThat(other.statusCode()).as(other.body()).isEqualTo(422);
         // The repeat's and the refused one's copies are dropped (their folders go too, or at the
-        // next start if Windows still holds a file).
+        // next start if Windows still holds a file). That happens just after the answer is sent,
+        // so a fast client can look before it.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (server.workAreaForTest().uploadCount() > 1 && System.nanoTime() < deadline) {
+            Thread.sleep(20);
+        }
         assertThat(server.workAreaForTest().uploadCount()).isEqualTo(1);
     }
 
