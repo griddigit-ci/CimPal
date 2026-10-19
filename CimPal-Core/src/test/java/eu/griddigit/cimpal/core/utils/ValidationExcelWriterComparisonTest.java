@@ -86,6 +86,15 @@ class ValidationExcelWriterComparisonTest {
                             "April 2060", List.of(200.0 / 3, 100.0, 80.0),
                             "May 2060", List.of(60.0, 200.0 / 3, 62.5)),
                     table(charts, ev, "Warnings Compliance Rate (Warnings) by Region"));
+
+            // The region columns carry their unit; the header follows the title and description rows.
+            int title = 0;
+            while (!"Compliance Rate (Warnings and Violations) by Region".equals(text(charts.getRow(title), 0))) {
+                title++;
+            }
+            Row header = charts.getRow(title + 2);
+            assertEquals(List.of("Run", "REE (%)", "REN (%)", "Combined (%)"),
+                    List.of(text(header, 0), text(header, 1), text(header, 2), text(header, 3)));
         }
     }
 
@@ -156,7 +165,7 @@ class ValidationExcelWriterComparisonTest {
 
     /**
      * Reads the table under the title row whose first cell is {@code title}: the header is the next
-     * row starting with "Dataset" or "Run"; data rows run until the first row with an empty first cell.
+     * row starting with "Sets of data" or "Run"; data rows run until the first row with an empty first cell.
      * Returns first-cell label -> evaluated numeric values of the other header columns, which must be formulas.
      */
     private static Map<String, List<Double>> table(Sheet sheet, FormulaEvaluator ev, String title) {
@@ -165,7 +174,7 @@ class ValidationExcelWriterComparisonTest {
             r++;
         }
         assertNotNull(sheet.getRow(r), () -> "no table titled " + title);
-        while (!List.of("Dataset", "Run").contains(text(sheet.getRow(r), 0))) {
+        while (!List.of("Sets of data", "Run").contains(text(sheet.getRow(r), 0))) {
             r++;
         }
         Row header = sheet.getRow(r);

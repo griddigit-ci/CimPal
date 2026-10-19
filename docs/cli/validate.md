@@ -83,8 +83,9 @@ Required inputs: same as mapping, plus `--previous-comparison` (optional)
 Use this when model files are named with a date/time stamp and you want trend tracking across runs.
 
 The comparison workbook (`validation_comparison__<timestamp>.xlsx`) has one sheet per run (named after the month), a **Charts** sheet and a **Compliance basis** sheet. Every number on Charts is an Excel formula, so clicking a cell shows how it is calculated, and each table has a description row:
-- **Per-region and Combined blocks:** warnings + violations per dataset, summed over all timestamps of the run (`SUMIFS` over the run sheet); each dataset's share of the total in %; and the delta to the previous run.
-- **Compliance rates:** the share of datasets with no hits in a run, as (clean datasets ÷ validated datasets) × 100, counted with `COUNTIFS` on the Compliance basis sheet. There are three variants: warnings and violations, violations only, and warnings only. *Combined* counts every region–dataset pair, so it is not the average of the regions. Infos never count.
+The workbook calls each row of the mapping file (model files validated together against one set of constraints) **sets of data**.
+- **Per-region and Combined blocks:** warnings + violations of the sets of data, summed over all timestamps of the run (`SUMIFS` over the run sheet); the share of the sets of data in the total, in %; and the delta to the previous run.
+- **Compliance rates:** the share of sets of data with no hits in a run, as (clean sets of data ÷ validated sets of data) × 100, counted with `COUNTIFS` on the Compliance basis sheet. The region columns are headed `<region> (%)`. There are three variants: warnings and violations, violations only, and warnings only. *Combined* counts the sets of data of all regions together, so it is not the average of the regions. Infos never count.
 
 Pass this workbook as `--previous-comparison` on the next run to carry the history forward.
 
