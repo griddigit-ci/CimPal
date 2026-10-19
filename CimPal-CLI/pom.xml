@@ -106,6 +106,18 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- The shade plugin below overwrites CimPal-CLI.jar with the fat jar. Without
+                 forceCreation the next build (no clean) sees that jar as newer than the classes,
+                 keeps it, and shades it again, so the old Core classes inside it win over the new
+                 Core jar. Always rebuild the plain jar first. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <forceCreation>true</forceCreation>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
