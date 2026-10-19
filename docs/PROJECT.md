@@ -327,7 +327,9 @@ webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job iso
 job and upload ownership, per-client quotas, D-17) is merged (PR #75). DEP-11 (durable job store in PostgreSQL,
 D-14, D-18) is in review (PR #76); its PostgreSQL ITs run only where Docker is available (CI). DEP-14
 (idempotent submits and uploads, signed completion callbacks, D-19) is in review on
-`feature/dep-14-idempotency-webhooks`, stacked on DEP-11. Then, in the roadmap's order: DEP-16, DEP-12.
+`feature/dep-14-idempotency-webhooks`, stacked on DEP-11. DEP-16 (load tests, SLOs, alert rules) is in progress
+on `feature/dep-16-load-tests-v2`, stacked on DEP-14: the tooling is done, the full capacity runs are open (with
+Docker on the measuring laptop). Then DEP-12.
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -500,6 +502,12 @@ Commands run on `--workers` threads (`ServeServer`, default 1), with a bounded q
 - **Clients:** the SDK sends a fresh key per `submit()`/`upload()` call (or `idempotency_key=`) and then retries those POSTs like a GET (`RetryPolicy` with `idempotent`), including 409 + Retry-After. The Airflow provider's key is a hash of DAG, task, run, try and map index (per try, as decided).
 - **Callbacks (D-19):** `Callbacks` validates `callback.url` at submit (https, no user or fragment, under the client's `callbackAllow` prefixes from `--client-quotas`, a signing secret from `--callback-secrets`, public addresses only via Core's `EgressPolicy`, which `ValidationTools` now uses too). A worker thread arms callbacks of jobs that became final, delivers due ones (signed `CimPal-Signature: t=…,v1=HMAC-SHA256(secret, t.body)`, `Redirect.NEVER`, the address check again before every attempt), and retries 10 s doubling to 1 h for 24 h. `CallbackStore` (memory, or `cimpal_callbacks`) records attempts; `GET /v1/jobs/{id}` shows `callback`; `cimpal_callbacks_total{outcome}`. The SDK's `verify_callback()` checks signatures; a shared test vector keeps both sides in step.
 - **Tests:** `IdempotencyTest` and `CallbackTest` (both stores), additions to `ClientIsolationTest`, `JobStoreRestartTest`, `ClientQuotasTest`; SDK `test_callbacks.py` and retry tests; provider key tests.
+
+### `serve` load tests and SLOs (DEP-16)
+
+- **Load tool** (`scripts/bench/load/`): `run.py` drives `/v1` with `AsyncCimPal` (open Poisson or closed load; scenarios small/medium validation, SPARQL, upload round trip), probes `GET /v1/health` and `/v1/jobs/{id}`, samples `/metrics`, and writes CSVs, `summary.json` and `report.md`; `--start-server` launches the JAR pinned to N CPUs. `sweep.py` runs the capacity experiments and publishes to `docs/guide/sizing-data/`.
+- **Metrics added to `ServeMetrics`:** `cimpal_http_responses_total{code}` (429/503 apart), `cimpal_http_request_duration_seconds{kind=api|transfer|command}` (in `ServeServer.handle`), `cimpal_job_queue_wait_seconds`, `cimpal_queue_size`, `cimpal_stalled`, `cimpal_work_used_bytes`/`_max_bytes`.
+- **SLOs** (`docs/guide/service.md`, Service levels) and **alert rules** (`deploy/monitoring/`, promtool-tested in `integrations.yml`). **Nightly** (`nightly.yml`): a one-minute load smoke with `--fail-on-slo`.
 
 ### `serve` clients (DEP-13)
 

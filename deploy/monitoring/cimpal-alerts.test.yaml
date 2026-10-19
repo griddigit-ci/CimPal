@@ -1,0 +1,103 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# promtool test rules deploy/monitoring/cimpal-alerts.test.yaml (DEP-16; CI: integrations.yml, alert-rules)
+
+rule_files:
+  - cimpal-alerts.yaml
+
+evaluation_interval: 30s
+
+tests:
+  - interval: 30s
+    input_series:
+      - series: 'up{job="cimpal",instance="a:7474"}'
+        values: '1x4 0x20'
+      - series: 'cimpal_stalled{job="cimpal",instance="a:7474"}'
+        values: '0x4 1x20'
+      - series: 'cimpal_queue_depth{job="cimpal",instance="a:7474"}'
+        values: '4x40'
+      - series: 'cimpal_queue_size{job="cimpal",instance="a:7474"}'
+        values: '4x40'
+      - series: 'cimpal_jvm_heap_used_bytes{job="cimpal",instance="a:7474"}'
+        values: '950x60'
+      - series: 'cimpal_jvm_heap_max_bytes{job="cimpal",instance="a:7474"}'
+        values: '1000x60'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: CimPalDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: CimPalDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: cimpal, instance: "a:7474"}
+            exp_annotations:
+              summary: "CimPal a:7474 can't be scraped"
+              description: "The metrics endpoint hasn't answered for 2 minutes: the process is down or unreachable."
+      - eval_time: 9m
+        alertname: CimPalJobStalled
+        exp_alerts:
+          - exp_labels: {severity: critical, job: cimpal, instance: "a:7474"}
+            exp_annotations:
+              summary: "A CimPal command has run past its timeout on a:7474"
+              description: "Its worker is blocked until it returns. Restart the instance if this persists (GET /health reports stalled)."
+      - eval_time: 15m
+        alertname: CimPalQueueNearFull
+        exp_alerts:
+          - exp_labels: {severity: warning, job: cimpal, instance: "a:7474"}
+            exp_annotations:
+              summary: "CimPal's queue is 4 deep, near --queue-size"
+              description: "New jobs will soon get 503. Clients retry, but sustained, this means too little capacity."
+      - eval_time: 20m
+        alertname: CimPalHeapHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, job: cimpal, instance: "a:7474"}
+            exp_annotations:
+              summary: "CimPal's heap stays above 90 % on a:7474"
+              description: "Out-of-memory is close: raise -Xmx (or the container memory) or lower --workers / --max-concurrent-heap-bytes."
+
+  # Half the answers fail: the fast burn fires; 503 alone (a full queue) does not count as failing.
+  - interval: 30s
+    input_series:
+      - series: 'cimpal_http_responses_total{job="cimpal",instance="a:7474",code="2xx"}'
+        values: '0+10x60'
+      - series: 'cimpal_http_responses_total{job="cimpal",instance="a:7474",code="5xx"}'
+        values: '0+10x60'
+      - series: 'cimpal_http_responses_total{job="cimpal",instance="b:7474",code="2xx"}'
+        values: '0+10x60'
+      - series: 'cimpal_http_responses_total{job="cimpal",instance="b:7474",code="503"}'
+        values: '0+10x60'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CimPalErrorBudgetBurnFast
+        exp_alerts:
+          - exp_labels: {severity: critical, job: cimpal}
+            exp_annotations:
+              summary: "CimPal is failing requests fast (over 7 % in the last hour)"
+              description: "At this rate the month's error budget of the 99.5 % availability SLO is gone in about 2 days. See the serve log's request.failed and job.finished events."
+    promql_expr_test:
+      - expr: cimpal:http_errors:ratio_rate5m
+        eval_time: 10m
+        exp_samples:
+          - labels: 'cimpal:http_errors:ratio_rate5m{job="cimpal"}'
+            value: 0.25
+
+  # Healthy: nothing fires.
+  - interval: 30s
+    input_series:
+      - series: 'up{job="cimpal",instance="a:7474"}'
+        values: '1x60'
+      - series: 'cimpal_stalled{job="cimpal",instance="a:7474"}'
+        values: '0x60'
+      - series: 'cimpal_queue_depth{job="cimpal",instance="a:7474"}'
+        values: '1x60'
+      - series: 'cimpal_queue_size{job="cimpal",instance="a:7474"}'
+        values: '4x60'
+      - series: 'cimpal_http_responses_total{job="cimpal",instance="a:7474",code="2xx"}'
+        values: '0+100x60'
+    alert_rule_test:
+      - {eval_time: 25m, alertname: CimPalDown, exp_alerts: []}
+      - {eval_time: 25m, alertname: CimPalJobStalled, exp_alerts: []}
+      - {eval_time: 25m, alertname: CimPalQueueNearFull, exp_alerts: []}
+      - {eval_time: 25m, alertname: CimPalErrorBudgetBurnFast, exp_alerts: []}

@@ -658,8 +658,14 @@ With `--metrics`, `GET /metrics` (admin token required) returns Prometheus text 
 | `cimpal_queue_depth`, `cimpal_busy`, `cimpal_running`, `cimpal_workers` | gauge | — |
 | `cimpal_jvm_heap_used_bytes`, `cimpal_jvm_heap_max_bytes` | gauge | — |
 | `cimpal_job_store_errors_total` | counter, failed job store operations (always 0 in memory) | — |
+| `cimpal_http_responses_total` | counter, every answer | `code`: `2xx` … `5xx`, with `429` and `503` on their own, or `none` (the connection broke first) |
+| `cimpal_http_request_duration_seconds` | histogram (5 ms … 10 s) | `kind`: `api`, `transfer` (uploads, file and archive downloads) or `command` (synchronous endpoints) |
+| `cimpal_job_queue_wait_seconds` | histogram (1 s … 1 h), time from submit to start | — |
+| `cimpal_queue_size` | gauge, `--queue-size` | — |
+| `cimpal_stalled` | gauge, 1 while a command has run past its timeout | — |
+| `cimpal_work_used_bytes`, `cimpal_work_max_bytes` | gauge, the work area (only with file exchange) | — |
 
-The counters start at zero on every start; a counter appears once it has counted something. The `client` label holds names from the token file only, so the number of series stays bounded.
+The counters start at zero on every start; a counter appears once it has counted something. The `client` label holds names from the token file only, so the number of series stays bounded. Alert rules built on these, and the service levels they watch, are in [`deploy/monitoring/`](../../deploy/monitoring/README.md).
 
 ---
 

@@ -67,9 +67,22 @@ CimPal doesn't read `s3://` paths itself (decision D-6). With Airflow, either:
   2. switch the clients;
   3. remove the old line.
 - **Logs:** `job.finished` events carry `jobId`, `status`, `exitCode` and `durationMs`. `request.rejected` events show refused requests (401, 403, 503) with the proxy's address as `remote`.
-- **Metrics:**
-  - `sum(cimpal_jobs_finished_total{status="failed"})` and `sum(cimpal_requests_total{outcome="error"})` are worth an alert (`by (client)` to see who).
-  - So is `cimpal_jvm_heap_used_bytes` close to `cimpal_jvm_heap_max_bytes`.
+- **Metrics and alerts:** [`deploy/monitoring/`](../../deploy/monitoring/README.md) has Prometheus rules for the service levels below and for what usually goes wrong first: a queue that stays full, a stalled command, a heap above 90 %, a work area above 80 %, a failing job store, failing jobs (`by (client)` on `cimpal_jobs_finished_total` shows who).
+
+## Service levels
+
+What a CimPal service should promise its users, and what the alert rules watch (decided for DEP-16, measured with the [load tests](../../scripts/bench/load/README.md)):
+
+| Service level | Target | Measured from |
+|---|---|---|
+| **Availability** | 99.5 % of requests answered without a server error, per 30 days (an error budget of about 3.6 hours) | `cimpal_http_responses_total`: `5xx` counts against it; `503` (queue full) and `429` (quota) don't, since clients retry those, nor does `none` (a connection that broke before the answer, usually a client giving up) |
+| **API latency** | p95 under 200 ms for status, polling and listing requests, also while every worker is busy | `cimpal_http_request_duration_seconds{kind="api"}` |
+| **Submit latency** | p95 under 500 ms for `POST /v1/jobs` | the load tests (the API histogram includes it) |
+| **Queue wait** | p95 under 5 minutes at the load the service is sized for | `cimpal_job_queue_wait_seconds` |
+
+- **What it doesn't promise:** how long a job *runs*. That depends on the model and the rules, see [sizing](sizing.md).
+- **Sizing for the queue wait:** keep the planned load below about 80 % of an instance's throughput limit for your job mix. Near 100 %, waits grow without bound, and clients see 503 once the queue is full.
+- **Your own targets:** these suit jobs of seconds to minutes. With hour-long jobs, raise the queue wait target and the `CimPalQueueWaitHigh` threshold together.
 
 ## Limits
 

@@ -60,7 +60,7 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 | D3 | [DEP-13](deployment/DEP-13.md) | Client identity, job ownership and quotas | DEP-6; D-17 | M | Done ([PR #75](https://github.com/griddigit-ci/CimPal/pull/75)) |
 | D3 | [DEP-14](deployment/DEP-14.md) | Idempotent submission and completion webhooks | DEP-11 (soft), DEP-13 (soft); D-19 | M | In review (stacked on DEP-11) |
 | D3 | [DEP-15](deployment/DEP-15.md) | Job isolation: one child process per job | DEP-8 | M–L | Not started |
-| D3 | [DEP-16](deployment/DEP-16.md) | Load tests, capacity model and SLOs | DEP-2, DEP-9 | M | Not started |
+| D3 | [DEP-16](deployment/DEP-16.md) | Load tests, capacity model and SLOs | DEP-2, DEP-9 | M | In progress (tooling done; full runs open) |
 
 Recommended order for phase D3 (see the roadmap): a release first, then DEP-13 → DEP-11 → DEP-14 → DEP-16 → DEP-12 → DEP-15.
 
