@@ -128,8 +128,13 @@ class CimPalJobOperator(BaseOperator):
             config = _logic.resolve_paths(self.command, config, self.input_path)
         label = self.job_label or _logic.default_label(self.dag_id, self.task_id, context.get("run_id"))
         ti = context["ti"]
-        identity = (self.dag_id, self.task_id, context.get("run_id"), getattr(ti, "try_number", None),
-                    getattr(ti, "map_index", -1))
+        identity = (
+            self.dag_id,
+            self.task_id,
+            context.get("run_id"),
+            getattr(ti, "try_number", None),
+            getattr(ti, "map_index", -1),
+        )
         with hook.get_conn() as cp:
             with airflow_errors():  # nothing submitted yet: Airflow's retries may try again
                 upload = None

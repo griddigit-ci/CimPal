@@ -48,8 +48,9 @@ def test_anything_else_is_refused(headers: dict[str, str], body: bytes, now: flo
 
 def test_a_signature_from_another_secret_is_refused() -> None:
     with pytest.raises(InvalidCallbackError):
-        verify_callback("another-secret-0123456789abcdef0123456", {"CimPal-Signature": f"t={T},v1={VECTOR}"}, BODY,
-                        now=T)
+        verify_callback(
+            "another-secret-0123456789abcdef0123456", {"CimPal-Signature": f"t={T},v1={VECTOR}"}, BODY, now=T
+        )
 
 
 @respx.mock(base_url=BASE)

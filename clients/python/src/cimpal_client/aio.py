@@ -112,7 +112,9 @@ class AsyncCimPal:
             error = _core.error_from_response(await _core.read_error_body_async(response))
             await response.aclose()
             if attempt < self._retry.retries and self._retry.may_retry_in_progress(response, idempotent):
-                await self._sleep(self._retry.delay(attempt, _core.parse_retry_after(response.headers.get("Retry-After"))))
+                await self._sleep(
+                    self._retry.delay(attempt, _core.parse_retry_after(response.headers.get("Retry-After")))
+                )
                 attempt += 1
                 continue
             if (

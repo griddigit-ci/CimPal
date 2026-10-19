@@ -259,8 +259,9 @@ def violations_message(job: Job, result: Mapping[str, Any] | None) -> str:
     )
 
 
-def idempotency_key(kind: str, dag_id: str | None, task_id: str | None, run_id: str | None, try_number: object,
-                    map_index: object) -> str:
+def idempotency_key(
+    kind: str, dag_id: str | None, task_id: str | None, run_id: str | None, try_number: object, map_index: object
+) -> str:
     """The ``Idempotency-Key`` of one task try's upload or submit (DEP-14).
 
     Within one try (the client's own retries of a lost answer) the same job or upload comes back; a new
