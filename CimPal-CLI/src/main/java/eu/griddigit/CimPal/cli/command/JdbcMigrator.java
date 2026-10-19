@@ -28,7 +28,7 @@ import java.util.List;
 final class JdbcMigrator {
 
     /** Every migration, oldest first: version and resource. Append only. */
-    static final List<String> MIGRATIONS = List.of("/db/V1__jobs.sql");
+    static final List<String> MIGRATIONS = List.of("/db/V1__jobs.sql", "/db/V2__idempotency_callbacks.sql");
 
     private JdbcMigrator() {
     }

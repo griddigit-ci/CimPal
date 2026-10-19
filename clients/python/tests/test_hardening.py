@@ -114,10 +114,28 @@ def test_a_retry_after_that_is_not_a_finite_number_is_ignored(value: str) -> Non
 
 
 @respx.mock(base_url=BASE)
-def test_a_proxys_503_to_a_submit_is_not_retried(respx_mock: respx.MockRouter, cp: CimPal) -> None:
-    route = respx_mock.post("/v1/jobs").respond(503, text="upstream connect error or disconnect/reset before headers")
+def test_a_proxys_503_to_a_submit_is_retried_with_the_same_key(
+    respx_mock: respx.MockRouter, cp: CimPal, sleeps: Sleeps
+) -> None:
+    # The server may have got the request before the proxy failed; the Idempotency-Key (DEP-14)
+    # makes the repeat give that job back rather than a second one.
+    route = respx_mock.post("/v1/jobs").mock(
+        side_effect=[
+            httpx.Response(503, text="upstream connect error or disconnect/reset before headers"),
+            httpx.Response(202, json=job_json()),
+        ]
+    )
+    cp.submit("validate", {})
+    assert route.call_count == 2
+    assert len({call.request.headers["Idempotency-Key"] for call in route.calls}) == 1
+
+
+@respx.mock(base_url=BASE)
+def test_a_proxys_503_to_another_post_is_not_retried(respx_mock: respx.MockRouter, cp: CimPal) -> None:
+    # A POST without a key (a cancel is a DELETE; this is the rule for any future unkeyed POST).
+    route = respx_mock.post("/v1/jobs").respond(503, text="upstream connect error")
     with pytest.raises(BusyError):
-        cp.submit("validate", {})
+        cp._send("POST", "/v1/jobs", json={})
     assert route.call_count == 1
 
 

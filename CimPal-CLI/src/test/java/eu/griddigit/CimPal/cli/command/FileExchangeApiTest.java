@@ -690,7 +690,7 @@ class FileExchangeApiTest {
                 for (Map.Entry<String, JsonNode> response : op.getValue().path("responses").properties()) {
                     String key = op.getKey().toUpperCase() + " " + path.getKey() + " " + response.getKey();
                     if ((ROUTES.contains(path.getKey()) || key.equals(SUBMIT_UNKNOWN_UPLOAD))
-                            && !ClientIsolationTest.covers(key)) {
+                            && !ClientIsolationTest.covers(key) && !IdempotencyTest.covers(key)) {
                         expected.add(key);
                     }
                 }

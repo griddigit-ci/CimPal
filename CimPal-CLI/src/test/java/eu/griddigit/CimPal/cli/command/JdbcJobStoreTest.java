@@ -283,7 +283,8 @@ class JdbcJobStoreTest {
         while (m.find()) {
             found++;
             String expression = m.group(1).replaceAll("\"(?:[^\"\\\\]|\\\\.)*\"", "").replaceAll("[\\s+()]", "");
-            assertThat(expression).as("SQL text of: %s", m.group(1)).matches("(COLUMNS|sql)?");
+            // Only the store's own constant column lists (COLUMNS, CALLBACK_COLUMNS) or a fixed `sql` local.
+            assertThat(expression).as("SQL text of: %s", m.group(1)).matches("(COLUMNS|CALLBACK_COLUMNS|sql)?");
         }
         assertThat(found).isGreaterThan(15);
         Matcher dynamic = Pattern.compile("String sql = ([^;]*);", Pattern.DOTALL).matcher(source);

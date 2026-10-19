@@ -483,3 +483,24 @@ def test_the_sensor_defers_and_resumes(connection: Any) -> None:
     assert summary["hasViolations"] is True
     with pytest.raises(AirflowFailException):
         sensor.execute_complete(context(), {"status": "error", "job_id": JOB_ID, "message": "x", "permanent": True})
+
+
+@respx.mock(base_url=BASE)
+def test_the_same_task_try_sends_the_same_key_and_a_new_try_a_new_one(
+    respx_mock: respx.MockRouter, connection: Any
+) -> None:
+    done = job_json("succeeded", exit_code=0)
+    submitted = server(respx_mock, done, done, done)
+
+    def run(try_number: int) -> str:
+        ctx = context()
+        ctx["ti"].try_number = try_number
+        ctx["ti"].map_index = -1
+        CimPalValidateOperator(task_id="validate", config={}, deferrable=False).execute(ctx)
+        return submitted.calls.last.request.headers["Idempotency-Key"]
+
+    first, again, retry = run(1), run(1), run(2)
+
+    assert first == again  # e.g. a worker that died before it saw the answer: the same job comes back
+    assert retry != first  # Airflow's retries submit again
+    assert first.startswith("airflow-job-")

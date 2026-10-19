@@ -92,6 +92,8 @@ class JobStoreOutageTest {
         @Override public long count(JobStatus status) { return call(() -> inner.count(status)); }
         @Override public int size() { return call(inner::size); }
         @Override public boolean usable() { return !down; }
+        @Override public IdempotencyStore idempotency() { return inner.idempotency(); }
+        @Override public CallbackStore callbacks() { return inner.callbacks(); }
     }
 
     private HttpResponse<String> get(String path) throws Exception {

@@ -227,7 +227,9 @@ final class ServeServer implements AutoCloseable {
                   long jobStoreBytes, Set<String> allowedHosts, boolean metrics, ServeLog log,
                   Path workRoot, long maxUploadBytes, Duration uploadTtl, long workMaxBytes, Duration requestReadTime,
                   int workers, long maxConcurrentHeapBytes, SizeEstimator sizeEstimator,
-                  ClientQuotas.Settings clientQuotas, JobStore jobStore, boolean requeueInterrupted) {
+                  ClientQuotas.Settings clientQuotas, JobStore jobStore, boolean requeueInterrupted,
+                  Duration idempotencyTtl, CallbackSecrets callbackSecrets, boolean callbackLoopback,
+                  Duration callbackTick, Duration callbackAttemptTimeout) {
 
         static Builder builder() {
             return new Builder();
@@ -268,6 +270,14 @@ final class ServeServer implements AutoCloseable {
             /** Null: jobs in memory ({@link MemoryJobStore}, lost on restart). Closed by whoever made it. */
             private JobStore jobStore;
             private boolean requeueInterrupted;
+            /** How long an Idempotency-Key is remembered (DEP-14). */
+            private Duration idempotencyTtl = Duration.ofHours(24);
+            /** Who may ask for job callbacks, and how they are signed (DEP-14); nobody by default. */
+            private CallbackSecrets callbackSecrets = CallbackSecrets.NONE;
+            /** Tests only: callbacks to http on loopback, without the public-address check. */
+            private boolean callbackLoopback;
+            private Duration callbackTick = Duration.ofSeconds(1);
+            private Duration callbackAttemptTimeout = Duration.ofSeconds(15);
 
             Builder host(String host) { this.host = host; return this; }
             Builder port(int port) { this.port = port; return this; }
@@ -302,6 +312,12 @@ final class ServeServer implements AutoCloseable {
             Builder jobStore(JobStore jobStore) { this.jobStore = jobStore; return this; }
             /** D-18: after a restart, run interrupted jobs again instead of failing them. */
             Builder requeueInterrupted(boolean requeue) { this.requeueInterrupted = requeue; return this; }
+            Builder idempotencyTtl(Duration ttl) { this.idempotencyTtl = ttl; return this; }
+            Builder callbackSecrets(CallbackSecrets secrets) { this.callbackSecrets = secrets; return this; }
+            /** Tests only (no command-line option): loopback callbacks, checked every {@code tick}. */
+            Builder callbacksForTests(Duration tick) { this.callbackLoopback = true; this.callbackTick = tick; return this; }
+            /** Tests only: how long one callback attempt may take (default 15 s). */
+            Builder callbackAttemptTimeout(Duration timeout) { this.callbackAttemptTimeout = timeout; return this; }
 
             Config build() {
                 TokenSource source = tokens != null ? tokens
@@ -309,7 +325,8 @@ final class ServeServer implements AutoCloseable {
                 return new Config(host, port, source, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
                         requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes,
                         allowedHosts, metrics, log, workRoot, maxUploadBytes, uploadTtl, workMaxBytes, requestReadTime,
-                        workers, maxConcurrentHeapBytes, sizeEstimator, clientQuotas, jobStore, requeueInterrupted);
+                        workers, maxConcurrentHeapBytes, sizeEstimator, clientQuotas, jobStore, requeueInterrupted,
+                        idempotencyTtl, callbackSecrets, callbackLoopback, callbackTick, callbackAttemptTimeout);
             }
         }
     }
@@ -346,6 +363,8 @@ final class ServeServer implements AutoCloseable {
     private final JobScheduler scheduler;
     /** Held while a submit checks its client's quota and queues the job, so two can't both pass. */
     private final Object submitLock = new Object();
+    /** Completion callbacks (DEP-14). */
+    private final Callbacks callbacks;
 
     private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck, Runnable onOutOfMemory,
                         InstantSource clock) {
@@ -373,6 +392,10 @@ final class ServeServer implements AutoCloseable {
         this.quotas = new ClientQuotas(config.clientQuotas(), new ClientQuotas.Limits(ClientQuotas.NO_QUEUE_LIMIT,
                 config.workers(), config.maxUploadBytes(), config.workMaxBytes(), 0), clock);
         this.scheduler = new JobScheduler(owner -> quotas.limits(owner).maxRunning());
+        this.callbacks = new Callbacks(jobs, config.callbackSecrets() == null ? CallbackSecrets.NONE
+                : config.callbackSecrets(), quotas, log, metrics, config.callbackLoopback(),
+                config.callbackTick() == null ? Duration.ofSeconds(1) : config.callbackTick(),
+                config.callbackAttemptTimeout() == null ? Duration.ofSeconds(15) : config.callbackAttemptTimeout());
     }
 
     /**
@@ -476,6 +499,7 @@ final class ServeServer implements AutoCloseable {
         server.http.setExecutor(server.handlers);
         server.http.createContext("/", server::handle);
         server.http.start();
+        server.callbacks.start();
         return server;
     }
 
@@ -520,6 +544,10 @@ final class ServeServer implements AutoCloseable {
         }
         if (config.sizeEstimator() == null) {
             throw new IllegalArgumentException("A size estimator is required.");
+        }
+        if (config.idempotencyTtl() == null || config.idempotencyTtl().compareTo(Duration.ofMinutes(1)) < 0
+                || config.idempotencyTtl().compareTo(Duration.ofDays(30)) > 0) {
+            throw new IllegalArgumentException("--idempotency-ttl must be between PT1M and P30D.");
         }
         if (config.clientQuotas() == null) {
             throw new IllegalArgumentException("Client quotas are required (ClientQuotas.Settings.NONE for none).");
@@ -679,6 +707,7 @@ final class ServeServer implements AutoCloseable {
             }
         }
         http.stop(0);
+        callbacks.close(); // pending callbacks stay in a durable store for the next start
         worker.shutdown();
         handlers.shutdownNow();
         stopped.countDown();
@@ -890,7 +919,7 @@ final class ServeServer implements AutoCloseable {
                     if (method.equals("POST")) {
                         byte[] body = readJsonBody(exchange, method, path);
                         if (body != null) {
-                            submitJob(exchange, body, client);
+                            submitOnce(exchange, body, client);
                         }
                     } else {
                         listJobs(exchange, path, client);
@@ -960,7 +989,157 @@ final class ServeServer implements AutoCloseable {
         }
     }
 
-    private void submitJob(HttpExchange exchange, byte[] requestBody, Client client) throws IOException {
+    /** The value of an Idempotency-Key header that isn't one; the request was answered 400. */
+    private static final String MALFORMED_KEY = new String("malformed");
+
+    /**
+     * The request's {@code Idempotency-Key} (DEP-14): null without one, {@link #MALFORMED_KEY}
+     * after answering 400. 1 to 255 visible ASCII characters (a UUID, typically).
+     */
+    private String idempotencyKey(HttpExchange exchange, String path) throws IOException {
+        String key = exchange.getRequestHeaders().getFirst("Idempotency-Key");
+        if (key == null) {
+            return null;
+        }
+        if (!validIdempotencyKey(key)) {
+            reject(exchange, 400, "Idempotency-Key must be 1 to 255 visible ASCII characters", "POST", path);
+            return MALFORMED_KEY;
+        }
+        return key;
+    }
+
+    /** 1 to 255 visible ASCII characters. */
+    static boolean validIdempotencyKey(String key) {
+        return !key.isEmpty() && key.length() <= 255 && key.chars().allMatch(c -> c >= 0x21 && c <= 0x7e);
+    }
+
+    /** SHA-256 of what identifies a request, in hex. */
+    static String fingerprint(byte[]... parts) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            for (byte[] part : parts) {
+                md.update(part);
+                md.update((byte) 0);
+            }
+            return java.util.HexFormat.of().formatHex(md.digest());
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * {@code POST /v1/jobs} with an optional {@code Idempotency-Key} (DEP-14). The key is reserved
+     * with the id the job will get before anything else happens, and completed once the job is
+     * queued; a refused request gives it back. A repeat finds the key: the same request gets the
+     * same job (202), even when the first answer was lost or the server restarted in between,
+     * another request 422, and one still in progress 409.
+     */
+    private void submitOnce(HttpExchange exchange, byte[] body, Client client) throws IOException {
+        String path = "/v1/jobs";
+        String key = idempotencyKey(exchange, path);
+        if (key == MALFORMED_KEY) {
+            return;
+        }
+        UUID jobId = jobs.newId();
+        if (key == null) {
+            submitJob(exchange, body, client, jobId);
+            return;
+        }
+        String fingerprint = fingerprint("POST".getBytes(StandardCharsets.UTF_8),
+                path.getBytes(StandardCharsets.UTF_8), body);
+        boolean reserved = reserve(exchange, client, key, fingerprint, jobId, path,
+                id -> {
+                    Job.Snapshot j = jobs.get(id);
+                    return j != null && client.sees(j.owner());
+                },
+                id -> {
+                    exchange.getResponseHeaders().set("Location", "/v1/jobs/" + id);
+                    respond(exchange, 202, jobJson(jobs.get(id)));
+                });
+        if (!reserved) {
+            return;
+        }
+        IdempotencyStore keys = jobs.idempotency();
+        boolean queued = false;
+        boolean storeFailed = false;
+        try {
+            submitJob(exchange, body, client, jobId);
+            queued = exchange.getResponseCode() == 202;
+        } catch (JobStore.Unavailable e) {
+            // The job may exist after all (a commit whose answer was lost): the key stays reserved,
+            // so a repeat finds it, or the key goes stale (IdempotencyStore.STALE) if it doesn't.
+            storeFailed = true;
+            throw e;
+        } finally {
+            try {
+                if (queued) {
+                    keys.complete(client.name(), key, jobId);
+                } else if (!storeFailed) {
+                    keys.abandon(client.name(), key, jobId);
+                }
+            } catch (JobStore.Unavailable e) {
+                // An unfinished key whose job exists is completed by the next repeat.
+                log.error("store.error", "serve: " + e.getMessage());
+            }
+        }
+    }
+
+    /** Answers a repeat with the job or upload its key made. */
+    @FunctionalInterface
+    private interface Replay {
+        void answer(UUID resourceId) throws IOException;
+    }
+
+    /**
+     * Reserves {@code key} for a request that will make {@code resourceId}: true when the caller
+     * goes ahead. Otherwise the request is answered here: the same request gets what the key made
+     * ({@code replay}), another request 422, one whose first is still in progress 409, one whose
+     * job or upload is gone 404. A key is only taken over when it has expired, or when its request
+     * died (stale) without making anything: whether it did is asked of the job store or work area,
+     * never assumed, so a lost completion can't lead to a second job.
+     */
+    private boolean reserve(HttpExchange exchange, Client client, String key, String fingerprint, UUID resourceId,
+                            String path, java.util.function.Predicate<UUID> exists, Replay replay)
+            throws IOException {
+        IdempotencyStore keys = jobs.idempotency();
+        Instant now = jobs.now();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            IdempotencyStore.Entry earlier = keys.begin(client.name(), key, fingerprint, resourceId, now);
+            if (earlier == null) {
+                return true;
+            }
+            boolean made = exists.test(earlier.resourceId());
+            if (earlier.expired(now, config.idempotencyTtl()) || (earlier.stale(now) && !made)) {
+                if (keys.retake(client.name(), key, earlier, fingerprint, resourceId, now)) {
+                    return true;
+                }
+                continue; // changed meanwhile: look again
+            }
+            if (!earlier.fingerprint().equals(fingerprint)) {
+                reject(exchange, 422, "Idempotency-Key reused with a different request", "POST", path);
+                return false;
+            }
+            if (made) {
+                if (!earlier.done()) {
+                    keys.complete(client.name(), key, earlier.resourceId()); // made before a lost completion
+                }
+                replay.answer(earlier.resourceId());
+                return false;
+            }
+            if (!earlier.done()) {
+                exchange.getResponseHeaders().set("Retry-After", "1");
+                reject(exchange, 409, "A request with this Idempotency-Key is still being processed", "POST", path);
+                return false;
+            }
+            reject(exchange, 404, "What this Idempotency-Key made no longer exists (past its TTL)", "POST", path);
+            return false;
+        }
+        exchange.getResponseHeaders().set("Retry-After", "1");
+        reject(exchange, 409, "A request with this Idempotency-Key is still being processed", "POST", path);
+        return false;
+    }
+
+    private void submitJob(HttpExchange exchange, byte[] requestBody, Client client, UUID jobId) throws IOException {
         String path = "/v1/jobs";
         JsonNode request;
         try {
@@ -974,9 +1153,10 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         for (String key : request.propertyNames()) {
-            if (!key.equals("command") && !key.equals("config") && !key.equals("label") && !key.equals("inputUpload")) {
+            if (!key.equals("command") && !key.equals("config") && !key.equals("label") && !key.equals("inputUpload")
+                    && !key.equals("callback")) {
                 reject(exchange, 400, "Unknown field '" + LogSanitizer.forLog(key)
-                        + "'; allowed: command, config, label, inputUpload", "POST", path);
+                        + "'; allowed: command, config, label, inputUpload, callback", "POST", path);
                 return;
             }
         }
@@ -1002,8 +1182,17 @@ final class ServeServer implements AutoCloseable {
             }
             label = labelNode.asString();
         }
-        UUID jobId = jobs.newId();
         ClientQuotas.Limits limits = quotas.limits(client.name());
+        java.net.URI callbackUrl = null;
+        JsonNode callbackNode = request.get("callback");
+        if (callbackNode != null && !callbackNode.isNull()) {
+            try {
+                callbackUrl = callbacks.accept(client.name(), callbackNode);
+            } catch (Rejected e) {
+                reject(exchange, e.status(), e.getMessage(), "POST", path);
+                return;
+            }
+        }
         WorkArea.JobWorkspace workspace = null;
         UUID uploadId = null;
         JsonNode uploadNode = request.get("inputUpload");
@@ -1055,10 +1244,20 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         jobs.evict();
+        jobs.idempotency().evict(jobs.now().minus(config().idempotencyTtl()));
         if (closing.get()) {
             discardWorkspace(jobId, workspace);
             reject(exchange, 503, "Server is shutting down", "POST", path);
             return;
+        }
+        if (callbackUrl != null) {
+            // Before the job exists, so it can't end unnoticed; dropped again if the job isn't made.
+            try {
+                jobs.callbacks().register(jobId, client.name(), callbackUrl, jobs.now());
+            } catch (JobStore.Unavailable e) {
+                discardWorkspace(jobId, workspace);
+                throw e;
+            }
         }
         Job.Snapshot job = null;
         int unfinished = 0;
@@ -1090,6 +1289,13 @@ final class ServeServer implements AutoCloseable {
         }
         if (job == null) {
             discardWorkspace(jobId, workspace);
+            if (callbackUrl != null) {
+                try {
+                    jobs.callbacks().remove(jobId);
+                } catch (JobStore.Unavailable e) {
+                    log.error("store.error", "serve: " + e.getMessage()); // a callback without a job never fires
+                }
+            }
             exchange.getResponseHeaders().set("Retry-After", "30");
             if (busy) {
                 reject(exchange, 503, "Server busy: " + config().queueSize() + " requests already waiting", "POST", path);
@@ -1394,11 +1600,22 @@ final class ServeServer implements AutoCloseable {
                 return;
             }
         }
+        String key = idempotencyKey(exchange, path);
+        if (key == MALFORMED_KEY) {
+            exchange.getResponseHeaders().set("Connection", "close"); // the body was not read
+            return;
+        }
         WorkArea.Upload upload;
         ClientQuotas.Limits limits = quotas.limits(client.name());
+        java.security.MessageDigest digest;
         try {
-            upload = workArea.receive(exchange.getRequestBody(), declared, client.name(), limits.maxUploadBytes(),
-                    limits.maxWorkBytes());
+            digest = java.security.MessageDigest.getInstance("SHA-256");
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        try {
+            upload = workArea.receive(new java.security.DigestInputStream(exchange.getRequestBody(), digest), declared,
+                    client.name(), limits.maxUploadBytes(), limits.maxWorkBytes());
         } catch (WorkArea.Refused e) {
             if (e.status() == 413) {
                 exchange.getResponseHeaders().set("Connection", "close");
@@ -1406,11 +1623,50 @@ final class ServeServer implements AutoCloseable {
             reject(exchange, e.status(), e.getMessage(), "POST", path);
             return;
         }
+        if (key != null) {
+            // Only now is the request's fingerprint known: the SHA-256 of its bytes.
+            String fingerprint = fingerprint("POST".getBytes(StandardCharsets.UTF_8),
+                    path.getBytes(StandardCharsets.UTF_8), digest.digest());
+            boolean reserved;
+            try {
+                jobs.idempotency().evict(jobs.now().minus(config.idempotencyTtl()));
+                reserved = reserve(exchange, client, key, fingerprint, upload.id, path,
+                        id -> {
+                            WorkArea.Upload u = workArea.upload(id);
+                            return u != null && client.sees(u.owner);
+                        },
+                        id -> {
+                            exchange.getResponseHeaders().set("Location", "/v1/uploads/" + id);
+                            respond(exchange, 201, JSON.writeValueAsString(uploadNode(workArea.upload(id))));
+                        });
+            } catch (JobStore.Unavailable e) {
+                dropUpload(upload.id);
+                throw e;
+            }
+            if (!reserved) {
+                dropUpload(upload.id); // a repeat (or refused): the one received now is not kept
+                return;
+            }
+            try {
+                jobs.idempotency().complete(client.name(), key, upload.id);
+            } catch (JobStore.Unavailable e) {
+                log.error("store.error", "serve: " + e.getMessage()); // a repeat completes it
+            }
+        }
         log.info("upload.received", "serve: upload " + upload.id + " (" + upload.files.size() + " files, "
                 + upload.totalBytes + " bytes)", "uploadId", upload.id.toString(), "client", client.name(),
                 "remote", remote(exchange));
         exchange.getResponseHeaders().set("Location", "/v1/uploads/" + upload.id);
         respond(exchange, 201, JSON.writeValueAsString(uploadNode(upload)));
+    }
+
+    /** Deletes an upload that is not answered with (a repeat, or a failed key). */
+    private void dropUpload(UUID id) {
+        try {
+            workArea.deleteUpload(id);
+        } catch (WorkArea.Refused | RuntimeException e) {
+            log.warn("upload.drop", "serve: could not drop upload " + id + ": " + e.getClass().getSimpleName());
+        }
     }
 
     /** {@code GET} and {@code DELETE /v1/uploads/{uploadId}}. */
@@ -1715,8 +1971,18 @@ final class ServeServer implements AutoCloseable {
         respond(exchange, 200, JSON.writeValueAsString(node));
     }
 
-    private static String jobJson(Job.Snapshot s) {
-        return JSON.writeValueAsString(jobNode(s));
+    /** One job as the API shows it, with its callback (DEP-14) when it has one. */
+    private String jobJson(Job.Snapshot s) {
+        ObjectNode node = jobNode(s);
+        try {
+            ObjectNode callback = Callbacks.view(jobs.callbacks().get(s.id()));
+            if (callback != null) {
+                node.set("callback", callback);
+            }
+        } catch (JobStore.Unavailable e) {
+            // the job itself is known; its callback state is shown when the store is back
+        }
+        return JSON.writeValueAsString(node);
     }
 
     private static ObjectNode jobNode(Job.Snapshot s) {

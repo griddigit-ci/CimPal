@@ -149,11 +149,17 @@ async def test_busy_retries_with_retry_after_then_raises(respx_mock: respx.MockR
 
 
 @respx.mock(base_url=BASE)
-async def test_a_submit_that_may_have_arrived_is_not_retried(respx_mock: respx.MockRouter, acp: AsyncCimPal) -> None:
-    route = respx_mock.post("/v1/jobs").mock(side_effect=httpx.RemoteProtocolError("dropped"))
-    with pytest.raises(CimPalError):
-        await acp.submit("validate", {})
-    assert route.call_count == 1
+async def test_a_submit_that_may_have_arrived_is_retried_with_the_same_key(
+    respx_mock: respx.MockRouter, acp: AsyncCimPal, sleeps: Sleeps
+) -> None:
+    # DEP-14: the Idempotency-Key makes the server answer the same job to the repeat.
+    route = respx_mock.post("/v1/jobs").mock(
+        side_effect=[httpx.RemoteProtocolError("dropped"), httpx.Response(202, json=job_json())]
+    )
+    await acp.submit("validate", {})
+    assert route.call_count == 2
+    keys = {call.request.headers["Idempotency-Key"] for call in route.calls}
+    assert len(keys) == 1
 
 
 @respx.mock(base_url=BASE)

@@ -653,6 +653,11 @@ final class WorkArea {
         return usedBytes;
     }
 
+    /** Uploads registered now (tests). */
+    synchronized int uploadCount() {
+        return uploadsById.size();
+    }
+
     /** What {@code owner}'s uploads and job outputs take (tests). */
     synchronized long usedBytes(String owner) {
         return ownerUsed.getOrDefault(owner, 0L);

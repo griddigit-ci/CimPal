@@ -31,6 +31,8 @@ final class MemoryJobStore implements JobStore {
     private final long storeBytes;
     private final InstantSource clock;
     private volatile Consumer<UUID> onRemoved = id -> { };
+    private final IdempotencyStore idempotency = new IdempotencyStore.Memory();
+    private final CallbackStore callbacks = new CallbackStore.Memory();
 
     MemoryJobStore(int maxJobs, Duration ttl, Duration timeout, int logLines, long storeBytes, InstantSource clock) {
         this.maxJobs = maxJobs;
@@ -178,6 +180,7 @@ final class MemoryJobStore implements JobStore {
             }
             removed = JobEviction.victims(finished, jobs.size(), retained, now(), ttl, maxJobs, storeBytes);
             removed.forEach(jobs::remove);
+            removed.forEach(callbacks::remove);
         }
         removed.forEach(onRemoved);
     }
@@ -189,6 +192,16 @@ final class MemoryJobStore implements JobStore {
                 .filter(s -> s.status() == JobStatus.QUEUED)
                 .sorted(Comparator.comparing(Job.Snapshot::createdAt))
                 .toList();
+    }
+
+    @Override
+    public IdempotencyStore idempotency() {
+        return idempotency;
+    }
+
+    @Override
+    public CallbackStore callbacks() {
+        return callbacks;
     }
 
     @Override

@@ -278,4 +278,27 @@ class JobStoreRestartTest {
             assertThat(files.toList()).as("nothing written through the link").isEmpty();
         }
     }
+
+    @Test
+    void anIdempotencyKeySurvivesARestart() throws Exception {
+        String url = newDatabase();
+        ServeServer before = start(open(url));
+        String body = "{\"command\":\"convert\"}";
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + before.port() + "/v1/jobs"))
+                .header("Authorization", "Bearer " + TOKEN).header("Content-Type", "application/json")
+                .header("Idempotency-Key", "nightly-1").POST(HttpRequest.BodyPublishers.ofString(body));
+        String id = JSON.readTree(HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString()).body())
+                .path("jobId").asString();
+        before.close();
+
+        ServeServer after = start(open(url));
+        HttpResponse<String> again = HTTP.send(HttpRequest.newBuilder(
+                        URI.create("http://127.0.0.1:" + after.port() + "/v1/jobs"))
+                .header("Authorization", "Bearer " + TOKEN).header("Content-Type", "application/json")
+                .header("Idempotency-Key", "nightly-1").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(again.statusCode()).isEqualTo(202);
+        assertThat(JSON.readTree(again.body()).path("jobId").asString()).isEqualTo(id);
+    }
 }
