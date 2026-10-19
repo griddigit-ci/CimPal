@@ -1,0 +1,139 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Prometheus recording and alert rules for `cimpal serve --metrics` (DEP-16).
+# SLOs and how to tune these: docs/guide/service.md (Service levels) and deploy/monitoring/README.md.
+# Check: promtool check rules deploy/monitoring/cimpal-alerts.yaml
+#        promtool test rules deploy/monitoring/cimpal-alerts.test.yaml
+#
+# Scrape job: the rules expect the CimPal targets under job="cimpal"; change the `job` matchers if
+# yours is named differently.
+
+groups:
+  - name: cimpal-slo
+    interval: 30s
+    rules:
+      # Failed answers: server errors. 503 (full queue) and 429 (a client's quota) are the server
+      # working as meant and have their own alert below; `none` (the connection broke before an
+      # answer) is mostly a client giving up, e.g. a cancelled upload, so it isn't counted either.
+      - record: cimpal:http_errors:ratio_rate5m
+        expr: |
+          sum by (job) (rate(cimpal_http_responses_total{job="cimpal",code="5xx"}[5m]))
+            / clamp_min(sum by (job) (rate(cimpal_http_responses_total{job="cimpal"}[5m])), 1e-9)
+      - record: cimpal:http_errors:ratio_rate1h
+        expr: |
+          sum by (job) (rate(cimpal_http_responses_total{job="cimpal",code="5xx"}[1h]))
+            / clamp_min(sum by (job) (rate(cimpal_http_responses_total{job="cimpal"}[1h])), 1e-9)
+      - record: cimpal:http_errors:ratio_rate6h
+        expr: |
+          sum by (job) (rate(cimpal_http_responses_total{job="cimpal",code="5xx"}[6h]))
+            / clamp_min(sum by (job) (rate(cimpal_http_responses_total{job="cimpal"}[6h])), 1e-9)
+      - record: cimpal:http_api_duration_seconds:p95_5m
+        expr: |
+          histogram_quantile(0.95, sum by (job, le) (
+            rate(cimpal_http_request_duration_seconds_bucket{job="cimpal",kind="api"}[5m])))
+      - record: cimpal:job_queue_wait_seconds:p95_30m
+        expr: |
+          histogram_quantile(0.95, sum by (job, le) (rate(cimpal_job_queue_wait_seconds_bucket{job="cimpal"}[30m])))
+
+  - name: cimpal-alerts
+    rules:
+      - alert: CimPalDown
+        expr: up{job="cimpal"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "CimPal {{ $labels.instance }} can't be scraped"
+          description: "The metrics endpoint hasn't answered for 2 minutes: the process is down or unreachable."
+
+      # Availability SLO 99.5 % (error budget 0.5 %), multi-window burn rates.
+      - alert: CimPalErrorBudgetBurnFast
+        expr: cimpal:http_errors:ratio_rate1h > (14.4 * 0.005) and cimpal:http_errors:ratio_rate5m > (14.4 * 0.005)
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "CimPal is failing requests fast (over 7 % in the last hour)"
+          description: "At this rate the month's error budget of the 99.5 % availability SLO is gone in about 2 days. See the serve log's request.failed and job.finished events."
+      - alert: CimPalErrorBudgetBurnSlow
+        expr: cimpal:http_errors:ratio_rate6h > (6 * 0.005) and cimpal:http_errors:ratio_rate1h > (6 * 0.005)
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "CimPal is failing over 3 % of requests (6 hours)"
+          description: "At this rate the month's error budget of the 99.5 % availability SLO is gone in about 5 days."
+
+      - alert: CimPalApiSlow
+        expr: cimpal:http_api_duration_seconds:p95_5m > 0.2
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "CimPal API p95 is {{ $value | humanizeDuration }} (SLO 200 ms)"
+          description: "Polling and status requests are slow: usually a full heap (GC) or a slow job store database."
+
+      - alert: CimPalQueueWaitHigh
+        expr: cimpal:job_queue_wait_seconds:p95_30m > 300
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Jobs wait {{ $value | humanizeDuration }} before they start (p95, SLO 5 min)"
+          description: "Demand is above what the workers handle: add workers (and heap) or replicas, see docs/guide/sizing.md."
+
+      - alert: CimPalQueueNearFull
+        expr: cimpal_queue_depth{job="cimpal"} >= 0.8 * cimpal_queue_size{job="cimpal"} and cimpal_queue_size{job="cimpal"} > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "CimPal's queue is {{ $value }} deep, near --queue-size"
+          description: "New jobs will soon get 503. Clients retry, but sustained, this means too little capacity."
+      - alert: CimPalRefusingJobs
+        expr: sum by (job, instance) (rate(cimpal_http_responses_total{job="cimpal",code="503"}[10m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "CimPal has answered 503 (queue full) for 10 minutes"
+          description: "The queue stays full; see CimPalQueueNearFull and the sizing guide."
+
+      - alert: CimPalJobStalled
+        expr: cimpal_stalled{job="cimpal"} == 1
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "A CimPal command has run past its timeout on {{ $labels.instance }}"
+          description: "Its worker is blocked until it returns. Restart the instance if this persists (GET /health reports stalled)."
+
+      - alert: CimPalHeapHigh
+        # The lowest use over 10 minutes is what survives garbage collection.
+        expr: min_over_time(cimpal_jvm_heap_used_bytes{job="cimpal"}[10m]) / cimpal_jvm_heap_max_bytes{job="cimpal"} > 0.9
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "CimPal's heap stays above 90 % on {{ $labels.instance }}"
+          description: "Out-of-memory is close: raise -Xmx (or the container memory) or lower --workers / --max-concurrent-heap-bytes."
+
+      - alert: CimPalWorkAreaFull
+        expr: cimpal_work_used_bytes{job="cimpal"} / cimpal_work_max_bytes{job="cimpal"} > 0.8
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "CimPal's work area is {{ $value | humanizePercentage }} full"
+          description: "Uploads will soon get 507: shorten --upload-ttl / --job-ttl or raise --work-max-bytes (and the volume)."
+
+      - alert: CimPalJobStoreErrors
+        expr: increase(cimpal_job_store_errors_total{job="cimpal"}[5m]) > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "CimPal can't reach its job store database"
+          description: "Requests that need it get 503 and /ready is 503 (--job-store jdbc)."
+
+      - alert: CimPalJobsFailing
+        expr: |
+          sum by (job) (increase(cimpal_jobs_finished_total{job="cimpal",status=~"failed|timed_out"}[1h]))
+            / clamp_min(sum by (job) (increase(cimpal_jobs_finished_total{job="cimpal"}[1h])), 1) > 0.1
+          and sum by (job) (increase(cimpal_jobs_finished_total{job="cimpal"}[1h])) >= 10
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Over 10 % of CimPal jobs failed or timed out in the last hour"
+          description: "Check the failing jobs' logs (GET /v1/jobs/{id}/log); by client: cimpal_jobs_finished_total by (client)."

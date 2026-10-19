@@ -718,6 +718,8 @@ final class ServeServer implements AutoCloseable {
     // -------------------------------------------------------------------------
 
     private void handle(HttpExchange exchange) {
+        long began = System.nanoTime();
+        boolean outOfMemory = false;
         try (exchange) {
             try {
                 route(exchange);
@@ -731,8 +733,30 @@ final class ServeServer implements AutoCloseable {
             log.error("request.failed", "serve: request failed: " + e.getClass().getSimpleName());
         } catch (OutOfMemoryError e) {
             // As for a command: the heap is exhausted and this JVM can't be trusted any more (DEP-2).
+            outOfMemory = true;
             onOutOfMemory.run();
+        } finally {
+            if (!outOfMemory) { // nothing that allocates once the heap is gone
+                metrics.response(requestKind(exchange.getRequestMethod(), exchange.getRequestURI().getPath()),
+                        exchange.getResponseCode(), (System.nanoTime() - began) / 1e9);
+            }
         }
+    }
+
+    /** Downloads of a job's files or archive (DEP-16 request kinds). */
+    private static final java.util.regex.Pattern TRANSFER_PATH =
+            java.util.regex.Pattern.compile("/v1/jobs/[^/]+/(files/.+|archive)", java.util.regex.Pattern.DOTALL);
+
+    /** The kind of a request, for its duration (DEP-16): api, transfer or command. */
+    static String requestKind(String method, String path) {
+        if (path == null) {
+            return "api";
+        }
+        if (path.startsWith("/v1/uploads") && "POST".equalsIgnoreCase(method)
+                || TRANSFER_PATH.matcher(path).matches()) {
+            return "transfer";
+        }
+        return path.length() > 1 && COMMANDS.contains(path.substring(1)) ? "command" : "api";
     }
 
     /** Every request: the checks of the pipeline, then its route. */
@@ -1460,6 +1484,9 @@ final class ServeServer implements AutoCloseable {
         r.startedAt = jobs.now();
         running.put(key, r);
         try {
+            if (job.createdAt() != null) {
+                metrics.jobStarted(Duration.between(job.createdAt(), r.startedAt).toMillis() / 1000.0);
+            }
             CommandResult result;
             // The job's stderr (its log) and its id for the JSON log, on this thread and those it starts.
             try (StderrTee.Capture capture = StderrTee.capture(jobs.logSink(job.id()))) {
@@ -2323,7 +2350,9 @@ final class ServeServer implements AutoCloseable {
         }
         int runningNow = running.size();
         return metrics.render(VERSION, byStatus, Math.max(0, inFlight() - runningNow), runningNow, config.workers())
-                + ServeMetrics.storeErrors(jobs.errors());
+                + ServeMetrics.storeErrors(jobs.errors())
+                + ServeMetrics.capacity(config.queueSize(), stalled(),
+                        workArea == null ? 0 : workArea.usedBytes(), workArea == null ? 0 : config.workMaxBytes());
     }
 
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {

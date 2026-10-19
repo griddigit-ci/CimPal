@@ -33,6 +33,57 @@ final class ServeMetrics {
     private final Map<String, AtomicLong> quotaRefusals = new ConcurrentHashMap<>();
     /** Keyed by outcome. */
     private final Map<String, AtomicLong> callbacks = new ConcurrentHashMap<>();
+    /**
+     * Keyed by status class: 2xx … 5xx, but 429 and 503 on their own (a quota or a full queue, the
+     * server working as meant), or none when no answer was sent (DEP-16).
+     */
+    private final Map<String, AtomicLong> responses = new ConcurrentHashMap<>();
+
+    /** Upper bounds of the queue wait histogram, in seconds (DEP-16). */
+    static final double[] WAIT_BUCKETS = {1, 10, 30, 60, 120, 300, 600, 1800, 3600};
+    /** Upper bounds of the request duration histogram, in seconds (DEP-16). */
+    static final double[] REQUEST_BUCKETS = {0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2.5, 5, 10};
+    /** Request kinds: the API itself, file transfers, and synchronous commands. */
+    static final String[] REQUEST_KINDS = {"api", "transfer", "command"};
+
+    private final Histogram queueWait = new Histogram(WAIT_BUCKETS);
+    private final Histogram[] requestDuration = {
+            new Histogram(REQUEST_BUCKETS), new Histogram(REQUEST_BUCKETS), new Histogram(REQUEST_BUCKETS)};
+
+    /** A cumulative histogram: counts per upper bound, a count and a sum. */
+    private static final class Histogram {
+        final double[] bounds;
+        final AtomicLongArray buckets;
+        final AtomicLong count = new AtomicLong();
+        final DoubleAdder sum = new DoubleAdder();
+
+        Histogram(double[] bounds) {
+            this.bounds = bounds;
+            this.buckets = new AtomicLongArray(bounds.length);
+        }
+
+        void observe(double value) {
+            for (int i = 0; i < bounds.length; i++) {
+                if (value <= bounds[i]) {
+                    buckets.incrementAndGet(i);
+                }
+            }
+            count.incrementAndGet();
+            sum.add(value);
+        }
+
+        void render(StringBuilder sb, String metric, String labels) {
+            String prefix = labels.isEmpty() ? "" : labels + ",";
+            for (int i = 0; i < bounds.length; i++) {
+                sb.append(metric).append("_bucket{").append(prefix).append("le=\"").append(number(bounds[i]))
+                        .append("\"} ").append(buckets.get(i)).append('\n');
+            }
+            sb.append(metric).append("_bucket{").append(prefix).append("le=\"+Inf\"} ").append(count.get()).append('\n');
+            String braces = labels.isEmpty() ? "" : "{" + labels + "}";
+            sb.append(metric).append("_sum").append(braces).append(' ').append(sum.sum()).append('\n');
+            sb.append(metric).append("_count").append(braces).append(' ').append(count.get()).append('\n');
+        }
+    }
     private final AtomicLongArray durationBuckets = new AtomicLongArray(DURATION_BUCKETS.length);
     private final AtomicLong durationCount = new AtomicLong();
     private final DoubleAdder durationSum = new DoubleAdder();
@@ -64,6 +115,26 @@ final class ServeMetrics {
     /** A callback attempt (DEP-14) ended: delivered, retry, failed or refused. */
     void callback(String outcome) {
         count(callbacks, outcome);
+    }
+
+    /**
+     * A request of {@code kind} (one of {@link #REQUEST_KINDS}) ended with HTTP {@code status}
+     * after {@code seconds}; the status is negative when no answer was sent (the connection broke).
+     */
+    void response(String kind, int status, double seconds) {
+        String code = status == 429 || status == 503 ? Integer.toString(status)
+                : status >= 100 && status < 600 ? (status / 100) + "xx" : "none";
+        count(responses, code);
+        for (int i = 0; i < REQUEST_KINDS.length; i++) {
+            if (REQUEST_KINDS[i].equals(kind)) {
+                requestDuration[i].observe(seconds);
+            }
+        }
+    }
+
+    /** A job started after waiting {@code seconds} in the queue. */
+    void jobStarted(double seconds) {
+        queueWait.observe(Math.max(0, seconds));
     }
 
     private static void count(Map<String, AtomicLong> counters, String... labels) {
@@ -123,6 +194,16 @@ final class ServeMetrics {
         counters(sb, "cimpal_quota_refused_total", quotaRefusals, "client", "quota");
         help(sb, "cimpal_callbacks_total", "counter", "Job callback attempts by outcome.");
         counters(sb, "cimpal_callbacks_total", callbacks, "outcome");
+        help(sb, "cimpal_http_responses_total", "counter",
+                "HTTP answers by status class, 429 and 503 apart (none: the connection broke first).");
+        counters(sb, "cimpal_http_responses_total", responses, "code");
+        help(sb, "cimpal_http_request_duration_seconds", "histogram",
+                "Time to answer a request, by kind: api, transfer (uploads, downloads) or command (synchronous).");
+        for (int i = 0; i < REQUEST_KINDS.length; i++) {
+            requestDuration[i].render(sb, "cimpal_http_request_duration_seconds", "kind=\"" + REQUEST_KINDS[i] + "\"");
+        }
+        help(sb, "cimpal_job_queue_wait_seconds", "histogram", "Time jobs waited in the queue before they started.");
+        queueWait.render(sb, "cimpal_job_queue_wait_seconds", "");
 
         help(sb, "cimpal_queue_depth", "gauge", "Commands and jobs waiting for a worker.");
         sb.append("cimpal_queue_depth ").append(queueDepth).append('\n');
@@ -146,6 +227,25 @@ final class ServeMetrics {
         StringBuilder sb = new StringBuilder();
         help(sb, "cimpal_job_store_errors_total", "counter", "Failed job store operations since start.");
         return sb.append("cimpal_job_store_errors_total ").append(errors).append('\n').toString();
+    }
+
+    /**
+     * The gauges the alert rules compare against (DEP-16): the queue's size, whether a command
+     * has run past its timeout, and the work area's use; {@code workMaxBytes} 0 means no work area.
+     */
+    static String capacity(int queueSize, boolean stalled, long workUsedBytes, long workMaxBytes) {
+        StringBuilder sb = new StringBuilder();
+        help(sb, "cimpal_queue_size", "gauge", "Commands and jobs that may wait for a worker (--queue-size).");
+        sb.append("cimpal_queue_size ").append(queueSize).append('\n');
+        help(sb, "cimpal_stalled", "gauge", "1 while a running command has exceeded its timeout.");
+        sb.append("cimpal_stalled ").append(stalled ? 1 : 0).append('\n');
+        if (workMaxBytes > 0) {
+            help(sb, "cimpal_work_used_bytes", "gauge", "Disk space used by uploads and job outputs.");
+            sb.append("cimpal_work_used_bytes ").append(workUsedBytes).append('\n');
+            help(sb, "cimpal_work_max_bytes", "gauge", "Disk space allowed for uploads and job outputs (--work-max-bytes).");
+            sb.append("cimpal_work_max_bytes ").append(workMaxBytes).append('\n');
+        }
+        return sb.toString();
     }
 
     private static void help(StringBuilder sb, String name, String type, String help) {
