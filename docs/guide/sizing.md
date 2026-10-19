@@ -115,6 +115,20 @@ The smallest heap grows by about 0.26 GB per million triples above a base of abo
 - **10M triples or more:** it doesn't fit this 16 GB laptop with room to spare. By the rule of thumb, 10M needs about 6 GB of heap and an 8 GB container.
 - **Real CGMES conformity models:** that needs decision D-4 on the ENTSO-E model licence.
 
+## Running as a service: capacity
+
+What one `serve` instance handles (DEP-16), measured with the [load tests](../../scripts/bench/load/README.md). **These are preliminary:** a 30-second set-up check on the laptop above (`sweep.py --quick`). The full runs, in containers with real `--cpus` limits and the PostgreSQL job store, will replace them.
+
+| Jobs | One worker | Two workers, 4 cores |
+|---|---|---|
+| Validation of 100k triples | ~4,500 per hour (0.5 s each) | ~1.4× as many |
+| Validation of 1M triples | ~390 per hour (8–13 s each) | ~1.4× as many |
+
+- **A warm server is faster than the CLI:** the CLI's ~3 s for 100k triples above is mostly JVM start; in `serve` the same validation takes about 0.5 s.
+- **Heap per worker:** about what one run of the model needs (table above). Two 1M validations at once peaked at about 3 GB of heap.
+- **Cores for the API:** with only 2 cores, status requests slowed to 170–200 ms (p95) while 1M validations ran. Give the instance at least one core more than `--workers`, so the API stays within its [200 ms service level](service.md#service-levels).
+- **Planning:** keep the expected load below about 80 % of these rates. Near 100 % the queue wait grows without bound.
+
 ## Re-running
 
 ```bash
