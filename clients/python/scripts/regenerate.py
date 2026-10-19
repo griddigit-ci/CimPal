@@ -13,6 +13,7 @@ file gets the package's licence header. Never edit the generated files by hand.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -55,7 +56,10 @@ def generate(into: Path) -> None:
     ]
     # The generator warns that the application/zip routes are skipped; the facade covers them, so
     # its output is shown only when it fails.
-    done = subprocess.run(command, capture_output=True, text=True)  # noqa: S603 (fixed arguments)
+    # The generator orders some imports by set iteration, which follows string hashing: a fixed seed
+    # makes its output the same on every run, so --check is stable.
+    env = dict(os.environ, PYTHONHASHSEED="0")
+    done = subprocess.run(command, capture_output=True, text=True, env=env)  # noqa: S603 (fixed arguments)
     if done.returncode != 0:
         sys.stderr.write(done.stdout + done.stderr)
         raise SystemExit(done.returncode)

@@ -19,8 +19,8 @@ from typing import Union
 from uuid import UUID
 
 if TYPE_CHECKING:
-  from ..models.job_request_config import JobRequestConfig
   from ..models.job_request_callback_type_0 import JobRequestCallbackType0
+  from ..models.job_request_config import JobRequestConfig
 
 
 
@@ -60,8 +60,8 @@ class JobRequest:
 
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.job_request_config import JobRequestConfig
         from ..models.job_request_callback_type_0 import JobRequestCallbackType0
+        from ..models.job_request_config import JobRequestConfig
         command = self.command.value
 
         config: Union[Unset, dict[str, Any]] = UNSET
@@ -103,8 +103,8 @@ class JobRequest:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.job_request_config import JobRequestConfig
         from ..models.job_request_callback_type_0 import JobRequestCallbackType0
+        from ..models.job_request_config import JobRequestConfig
         d = dict(src_dict)
         command = JobRequestCommand(d.pop("command"))
 
