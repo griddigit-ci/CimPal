@@ -1,37 +1,37 @@
 ## January 2026
-Region,Timestamp,Dataset,Warnings,Infos,Violations,Total
+Region,Timestamp,Sets of data,Warnings,Infos,Violations,Total
 RegionA,<TIMESTAMP>,Thing check,0,0,1,1
 RegionA,<TIMESTAMP>,Thing check,0,0,0,0
 RegionB,<TIMESTAMP>,Thing check,0,0,0,0
 ## Charts
 How to read this sheet
-"Every run has its own sheet (named after the month, e.g. ""May 2060"") with one row per region, timestamp and dataset. A hit is one SHACL result. Only Warnings and Violations count; Infos are ignored. A dataset's hits are added up over all timestamps of that run.\nEvery number on this sheet is a formula: click a cell to see how it is calculated. Hover over a column header for its description."
+"Every run has its own sheet (named after the month, e.g. ""May 2026"") with one row per region, timestamp and sets of data. Sets of data are the rows of the mapping file: model files (e.g. EQ + SSH) validated together against one set of constraints. A hit is one SHACL result. Only Warnings and Violations count; Infos are ignored. The hits of the sets of data are added up over all timestamps of that run.\nEvery number on this sheet is a formula: click a cell to see how it is calculated. Hover over a column header for its description."
 RegionA
-"Shows which datasets cause the warnings and violations in this region. ""%"" is the dataset's share of the region's total, so each % column adds up to 100 %."
-Dataset,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %,January 2026 Warnings,January 2026 Warnings %,January 2026 Violations,January 2026 Violations %
+"Shows which sets of data cause the warnings and violations in this region. ""%"" is the share of the sets of data in the region's total, so each % column adds up to 100 %."
+Sets of data,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %,January 2026 Warnings,January 2026 Warnings %,January 2026 Violations,January 2026 Violations %
 Thing check,=D7+F7,"=IF(SUM($B$7:$B$7)=0,0,B7/SUM($B$7:$B$7)*100)","=SUMIFS('January 2026'!$D$2:$D$4,'January 2026'!$A$2:$A$4,""RegionA"",'January 2026'!$C$2:$C$4,""Thing check"")","=IF(SUM($D$7:$D$7)=0,0,D7/SUM($D$7:$D$7)*100)","=SUMIFS('January 2026'!$F$2:$F$4,'January 2026'!$A$2:$A$4,""RegionA"",'January 2026'!$C$2:$C$4,""Thing check"")","=IF(SUM($F$7:$F$7)=0,0,F7/SUM($F$7:$F$7)*100)"
 RegionB
-"Shows which datasets cause the warnings and violations in this region. ""%"" is the dataset's share of the region's total, so each % column adds up to 100 %."
-Dataset,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %,January 2026 Warnings,January 2026 Warnings %,January 2026 Violations,January 2026 Violations %
+"Shows which sets of data cause the warnings and violations in this region. ""%"" is the share of the sets of data in the region's total, so each % column adds up to 100 %."
+Sets of data,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %,January 2026 Warnings,January 2026 Warnings %,January 2026 Violations,January 2026 Violations %
 Thing check,=D31+F31,"=IF(SUM($B$31:$B$31)=0,0,B31/SUM($B$31:$B$31)*100)","=SUMIFS('January 2026'!$D$2:$D$4,'January 2026'!$A$2:$A$4,""RegionB"",'January 2026'!$C$2:$C$4,""Thing check"")","=IF(SUM($D$31:$D$31)=0,0,D31/SUM($D$31:$D$31)*100)","=SUMIFS('January 2026'!$F$2:$F$4,'January 2026'!$A$2:$A$4,""RegionB"",'January 2026'!$C$2:$C$4,""Thing check"")","=IF(SUM($F$31:$F$31)=0,0,F31/SUM($F$31:$F$31)*100)"
 Combined (all regions)
 "The same as the per-region blocks, with all regions added together."
-Dataset,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %
+Sets of data,January 2026 Warnings+Violations total,January 2026 Warnings+Violations %
 Thing check,"=SUMIFS('January 2026'!$D$2:$D$4,'January 2026'!$C$2:$C$4,""Thing check"")+SUMIFS('January 2026'!$F$2:$F$4,'January 2026'!$C$2:$C$4,""Thing check"")","=IF(SUM($B$55:$B$55)=0,0,B55/SUM($B$55:$B$55)*100)"
 Compliance Rate (Warnings and Violations) by Region
-"Compliance rate = the percentage of datasets that are completely clean in a run: no warnings and no violations (summed over all timestamps). Only datasets that were validated for that region in that run are counted. Combined counts every region–dataset pair together, so it is not the average of the region columns.\nFormula: compliance rate = (number of clean datasets ÷ number of validated datasets) × 100. Example: 8 clean datasets out of 21 → 8 ÷ 21 × 100 = 38.10 %. The datasets are counted on the ""Compliance basis"" sheet."
-Run,RegionA,RegionB,Combined
+"Compliance rate = the percentage of sets of data that are completely clean in a run: no warnings and no violations (summed over all timestamps). Only the sets of data validated for that region in that run are counted. Combined counts the sets of data of all regions together, so it is not the average of the region columns.\nFormula: compliance rate = (clean sets of data ÷ validated sets of data) × 100. Example: 8 clean sets of data out of 21 → 8 ÷ 21 × 100 = 38.10 %. The sets of data are counted on the ""Compliance basis"" sheet."
+Run,RegionA (%),RegionB (%),Combined (%)
 January 2026,"=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"",'Compliance basis'!$F$3:$F$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"",'Compliance basis'!$F$3:$F$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$F$3:$F$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"")*100)"
 Violations Compliance Rate (Violations) by Region
-"Same as above, but a dataset is clean when it has no violations. Warnings are ignored here."
-Run,RegionA,RegionB,Combined
+"Same as above, but sets of data are clean when they have no violations. Warnings are ignored here."
+Run,RegionA (%),RegionB (%),Combined (%)
 January 2026,"=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"",'Compliance basis'!$E$3:$E$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"",'Compliance basis'!$E$3:$E$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$E$3:$E$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"")*100)"
 Warnings Compliance Rate (Warnings) by Region
-"Same as above, but a dataset is clean when it has no warnings. Violations are ignored here."
-Run,RegionA,RegionB,Combined
+"Same as above, but sets of data are clean when they have no warnings. Violations are ignored here."
+Run,RegionA (%),RegionB (%),Combined (%)
 January 2026,"=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"",'Compliance basis'!$D$3:$D$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionA"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"",'Compliance basis'!$D$3:$D$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$B$3:$B$4,""RegionB"")*100)","=IF(COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"")=0,0,COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"",'Compliance basis'!$D$3:$D$4,0)/COUNTIFS('Compliance basis'!$A$3:$A$4,""January 2026"")*100)"
 ## Compliance basis
-"One row per run, region and dataset, with that dataset's warnings and violations for the run (summed over all timestamps). The compliance rates on the Charts sheet count the rows where the value is 0."
-Run,Region,Dataset,Warnings,Violations,Warnings+Violations
+"One row per run, region and sets of data, with their warnings and violations for the run (summed over all timestamps). The compliance rates on the Charts sheet count the rows where the value is 0."
+Run,Region,Sets of data,Warnings,Violations,Warnings+Violations
 January 2026,RegionA,Thing check,"=SUMIFS('January 2026'!$D$2:$D$4,'January 2026'!$A$2:$A$4,""RegionA"",'January 2026'!$C$2:$C$4,""Thing check"")","=SUMIFS('January 2026'!$F$2:$F$4,'January 2026'!$A$2:$A$4,""RegionA"",'January 2026'!$C$2:$C$4,""Thing check"")",=D3+E3
 January 2026,RegionB,Thing check,"=SUMIFS('January 2026'!$D$2:$D$4,'January 2026'!$A$2:$A$4,""RegionB"",'January 2026'!$C$2:$C$4,""Thing check"")","=SUMIFS('January 2026'!$F$2:$F$4,'January 2026'!$A$2:$A$4,""RegionB"",'January 2026'!$C$2:$C$4,""Thing check"")",=D4+E4

@@ -1493,12 +1493,12 @@ public class ValidationExcelWriter implements Closeable {
     /**
      * Produces a separate "comparison" workbook:
      *   - one sheet per run (named after the run's month), one row per region, timestamp and
-     *     dataset (Warnings / Infos / Violations / Total); earlier runs are carried over from
-     *     the previous comparison XLSX;
-     *   - a "Charts" sheet with, per region and combined, the dataset distribution and the delta
-     *     to the previous run, then the compliance rates of every run, each table with a
-     *     description row;
-     *   - a "Compliance basis" sheet: per run, region and dataset, the counts the compliance
+     *     sets of data, i.e. mapping row (Warnings / Infos / Violations / Total); earlier runs
+     *     are carried over from the previous comparison XLSX;
+     *   - a "Charts" sheet with, per region and combined, the distribution over the sets of data
+     *     and the delta to the previous run, then the compliance rates of every run, each table
+     *     with a description row;
+     *   - a "Compliance basis" sheet: per run, region and sets of data, the counts the compliance
      *     rates are taken from.
      *
      * Every number on the Charts and Compliance basis sheets is an Excel formula over the run
@@ -1514,35 +1514,38 @@ public class ValidationExcelWriter implements Closeable {
 
         // Description rows on the Charts and Compliance basis sheets.
         private static final String DESC_INTRO =
-                "Every run has its own sheet (named after the month, e.g. \"May 2060\") with one row per region, "
-                + "timestamp and dataset. A hit is one SHACL result. Only Warnings and Violations count; Infos are "
-                + "ignored. A dataset's hits are added up over all timestamps of that run.\n"
+                "Every run has its own sheet (named after the month, e.g. \"May 2026\") with one row per region, "
+                + "timestamp and sets of data. Sets of data are the rows of the mapping file: model files "
+                + "(e.g. EQ + SSH) validated together against one set of constraints. A hit is one SHACL result. "
+                + "Only Warnings and Violations count; Infos are ignored. The hits of the sets of data are added "
+                + "up over all timestamps of that run.\n"
                 + "Every number on this sheet is a formula: click a cell to see how it is calculated. "
                 + "Hover over a column header for its description.";
         private static final String DESC_REGION =
-                "Shows which datasets cause the warnings and violations in this region. \"%\" is the dataset's "
-                + "share of the region's total, so each % column adds up to 100 %.";
+                "Shows which sets of data cause the warnings and violations in this region. \"%\" is the share "
+                + "of the sets of data in the region's total, so each % column adds up to 100 %.";
         private static final String DESC_DELTA =
                 "Delta is the change in the number of warnings + violations since the previous run: "
                 + "below zero is an improvement.";
         private static final String DESC_COMBINED =
                 "The same as the per-region blocks, with all regions added together.";
         private static final String DESC_COMPLIANCE =
-                "Compliance rate = the percentage of datasets that are completely clean in a run: no warnings and "
-                + "no violations (summed over all timestamps). Only datasets that were validated for that region "
-                + "in that run are counted. Combined counts every region–dataset pair together, so it is not the "
-                + "average of the region columns.\n"
-                + "Formula: compliance rate = (number of clean datasets ÷ number of validated datasets) × 100. "
-                + "Example: 8 clean datasets out of 21 → 8 ÷ 21 × 100 = 38.10 %. "
-                + "The datasets are counted on the \"Compliance basis\" sheet.";
+                "Compliance rate = the percentage of sets of data that are completely clean in a run: no warnings "
+                + "and no violations (summed over all timestamps). Only the sets of data validated for that region "
+                + "in that run are counted. Combined counts the sets of data of all regions together, so it is not "
+                + "the average of the region columns.\n"
+                + "Formula: compliance rate = (clean sets of data ÷ validated sets of data) × 100. "
+                + "Example: 8 clean sets of data out of 21 → 8 ÷ 21 × 100 = 38.10 %. "
+                + "The sets of data are counted on the \"Compliance basis\" sheet.";
         private static final String DESC_COMPLIANCE_VIOLATIONS =
-                "Same as above, but a dataset is clean when it has no violations. Warnings are ignored here.";
+                "Same as above, but sets of data are clean when they have no violations. Warnings are ignored here.";
         private static final String DESC_COMPLIANCE_WARNINGS =
-                "Same as above, but a dataset is clean when it has no warnings. Violations are ignored here.";
+                "Same as above, but sets of data are clean when they have no warnings. Violations are ignored here.";
         private static final String DESC_BASIS =
-                "One row per run, region and dataset, with that dataset's warnings and violations for the run "
+                "One row per run, region and sets of data, with their warnings and violations for the run "
                 + "(summed over all timestamps). The compliance rates on the Charts sheet count the rows where "
                 + "the value is 0.";
+        private static final String SETS_OF_DATA = "Sets of data";
 
         private static final Pattern DATE_TIME_SHEET_PATTERN = Pattern.compile("\\d{8}_\\d{6}");
 
@@ -1682,7 +1685,7 @@ public class ValidationExcelWriter implements Closeable {
                                             List<Rec> recs) {
             Sheet sheet = wb.createSheet(sanitizeSheetName(dateTimeLabel));
 
-            String[] header = {"Region", "Timestamp", "Dataset",
+            String[] header = {"Region", "Timestamp", SETS_OF_DATA,
                                "Warnings", "Infos", "Violations", "Total"};
             Row hdr = sheet.createRow(0);
             for (int c = 0; c < header.length; c++) {
@@ -1781,24 +1784,24 @@ public class ValidationExcelWriter implements Closeable {
                 // Header row: 10 columns.
                 int headerRow = blockTop + 2;
                 Row hdrRow = sheet.createRow(headerRow);
-                setCellHdr(hdrRow, hStyle, 0, "Dataset");
+                setCellHdr(hdrRow, hStyle, 0, SETS_OF_DATA);
                 setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total",
-                        "Warnings + violations for this dataset in this region, summed over all timestamps of the run.");
+                        "Warnings + violations of these sets of data in this region, summed over all timestamps of the run.");
                 setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %",
-                        "This dataset's share of all warnings + violations in the region. The column adds up to 100 %.");
+                        "Share of these sets of data in all warnings + violations of the region. The column adds up to 100 %.");
                 setCellHdr(hdrRow, hStyle, 3, currentLabel + " Warnings",
-                        "Warnings for this dataset in this region, summed over all timestamps of the run.");
+                        "Warnings of these sets of data in this region, summed over all timestamps of the run.");
                 setCellHdr(hdrRow, hStyle, 4, currentLabel + " Warnings %",
-                        "This dataset's share of all warnings in the region. The column adds up to 100 %.");
+                        "Share of these sets of data in all warnings of the region. The column adds up to 100 %.");
                 setCellHdr(hdrRow, hStyle, 5, currentLabel + " Violations",
-                        "Violations for this dataset in this region, summed over all timestamps of the run.");
+                        "Violations of these sets of data in this region, summed over all timestamps of the run.");
                 setCellHdr(hdrRow, hStyle, 6, currentLabel + " Violations %",
-                        "This dataset's share of all violations in the region. The column adds up to 100 %.");
+                        "Share of these sets of data in all violations of the region. The column adds up to 100 %.");
                 if (hasPrev) {
                     setCellHdr(hdrRow, hStyle, 7, previousLabel + " Warnings+Violations total",
-                            "Warnings + violations for this dataset in this region in the previous run.");
+                            "Warnings + violations of these sets of data in this region in the previous run.");
                     setCellHdr(hdrRow, hStyle, 8, previousLabel + " Warnings+Violations %",
-                            "This dataset's share of all warnings + violations in the region in the previous run.");
+                            "Share of these sets of data in all warnings + violations of the region in the previous run.");
                     setCellHdr(hdrRow, hStyle, 9, "Delta (cur−prev)",
                             "Change in warnings + violations since the previous run. Negative = fewer problems.");
                 }
@@ -1999,7 +2002,7 @@ public class ValidationExcelWriter implements Closeable {
         private static BasisSheet writeBasisSheet(XSSFWorkbook wb, CellStyle hStyle, CellStyle descStyle,
                                                   List<RunSheet> runs) {
             Sheet sheet = wb.createSheet(BASIS_SHEET_NAME);
-            String[] header = {"Run", "Region", "Dataset", "Warnings", "Violations", "Warnings+Violations"};
+            String[] header = {"Run", "Region", SETS_OF_DATA, "Warnings", "Violations", "Warnings+Violations"};
             writeDescription(sheet, descStyle, 0, header.length - 1, DESC_BASIS);
             Row hdr = sheet.createRow(1);
             for (int c = 0; c < header.length; c++) {
@@ -2079,7 +2082,7 @@ public class ValidationExcelWriter implements Closeable {
             // No legend — single series, title is self-explanatory.
 
             XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
-            bottomAxis.setTitle("Dataset");
+            bottomAxis.setTitle(SETS_OF_DATA);
             XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
             leftAxis.setTitle("% of total hits (all profiles = 100%)");
             leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
@@ -2124,7 +2127,7 @@ public class ValidationExcelWriter implements Closeable {
             // No legend — single series.
 
             XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
-            bottomAxis.setTitle("Dataset");
+            bottomAxis.setTitle(SETS_OF_DATA);
             XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
             leftAxis.setTitle("Warnings + violations difference (current − previous)");
             leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
@@ -2185,19 +2188,19 @@ public class ValidationExcelWriter implements Closeable {
             titleCell.setCellStyle(hStyle);
             writeDescription(sheet, descStyle, blockTop + 1, 5, DESC_COMBINED);
 
-            // Header: Dataset | Cur W+V total | Cur W+V% | Prev W+V total | Prev W+V% | Delta
+            // Header: Sets of data | Cur W+V total | Cur W+V% | Prev W+V total | Prev W+V% | Delta
             int headerRow = blockTop + 2;
             Row hdrRow = sheet.createRow(headerRow);
-            setCellHdr(hdrRow, hStyle, 0, "Dataset");
+            setCellHdr(hdrRow, hStyle, 0, SETS_OF_DATA);
             setCellHdr(hdrRow, hStyle, 1, currentLabel + " Warnings+Violations total",
-                    "Warnings + violations for this dataset in all regions, summed over all timestamps of the run.");
+                    "Warnings + violations of these sets of data in all regions, summed over all timestamps of the run.");
             setCellHdr(hdrRow, hStyle, 2, currentLabel + " Warnings+Violations %",
-                    "This dataset's share of all warnings + violations. The column adds up to 100 %.");
+                    "Share of these sets of data in all warnings + violations. The column adds up to 100 %.");
             if (hasPrev) {
                 setCellHdr(hdrRow, hStyle, 3, previousLabel + " Warnings+Violations total",
-                        "Warnings + violations for this dataset in all regions in the previous run.");
+                        "Warnings + violations of these sets of data in all regions in the previous run.");
                 setCellHdr(hdrRow, hStyle, 4, previousLabel + " Warnings+Violations %",
-                        "This dataset's share of all warnings + violations in the previous run.");
+                        "Share of these sets of data in all warnings + violations in the previous run.");
                 setCellHdr(hdrRow, hStyle, 5, "Delta (cur − prev)",
                         "Change in warnings + violations since the previous run. Negative = fewer problems.");
             }
@@ -2270,9 +2273,9 @@ public class ValidationExcelWriter implements Closeable {
         }
 
         /**
-         * Compliance rate = clean datasets / validated datasets × 100, counted on the basis sheet:
+         * Compliance rate = clean sets of data / validated sets of data × 100, counted on the basis sheet:
          * {@code COUNTIFS(run, region, metric = 0) / COUNTIFS(run, region) * 100}, 0 when the region has
-         * no datasets in that run. Combined drops the region condition.
+         * no sets of data in that run. Combined drops the region condition. Headers carry " (%)".
          */
         private static int writeOneComplianceBlock(XSSFSheet sheet,
                                                    CellStyle hStyle,
@@ -2300,7 +2303,7 @@ public class ValidationExcelWriter implements Closeable {
             Cell runHdr = hdr.createCell(0); runHdr.setCellValue("Run"); runHdr.setCellStyle(hStyle);
             for (int c = 0; c < sortedRegions.size(); c++) {
                 Cell cell = hdr.createCell(1 + c);
-                cell.setCellValue(sortedRegions.get(c));
+                cell.setCellValue(sortedRegions.get(c) + " (%)");
                 cell.setCellStyle(hStyle);
             }
 
