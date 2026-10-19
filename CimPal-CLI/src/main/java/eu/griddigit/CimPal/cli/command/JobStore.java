@@ -114,6 +114,12 @@ interface JobStore extends AutoCloseable {
         return List.of();
     }
 
+    /** The {@code Idempotency-Key}s of submits and uploads (DEP-14), kept as long as the jobs are. */
+    IdempotencyStore idempotency();
+
+    /** The jobs' completion callbacks (DEP-14), kept as long as the jobs are. */
+    CallbackStore callbacks();
+
     /** False while the store can't be reached; {@code /ready} then answers 503. */
     default boolean usable() {
         return true;

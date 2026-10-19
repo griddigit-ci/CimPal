@@ -463,6 +463,15 @@ class ServeServerTest {
         HttpResponse<String> timedOut = send(authorizedPost("/validate", "{}"));
         assertThat(timedOut.statusCode()).isEqualTo(504);
 
+        // The 504 is timed from the request's arrival, the stall from the command's start a moment
+        // later: health may need a few more milliseconds to see it.
+        waitUntil(() -> {
+            try {
+                return send(HttpRequest.newBuilder(uri("/health")).GET()).body().contains("\"stalled\":true");
+            } catch (Exception e) {
+                return false;
+            }
+        });
         assertThat(send(HttpRequest.newBuilder(uri("/health")).GET()).body())
                 .contains("\"busy\":true", "\"stalled\":true", "\"status\":\"stalled\"");
         release.countDown();
@@ -684,7 +693,14 @@ class ServeServerTest {
                 "cimpal_jobs{status=\"succeeded\"} 1\n",
                 "cimpal_job_duration_seconds_count 1\n",
                 "cimpal_job_duration_seconds_bucket{le=\"+Inf\"} 1\n",
-                "cimpal_queue_depth 0\n");
+                "cimpal_queue_depth 0\n",
+                // DEP-16: what the alert rules compare against.
+                "cimpal_http_responses_total{code=\"4xx\"} 1\n",
+                "cimpal_job_queue_wait_seconds_count 1\n",
+                "cimpal_http_request_duration_seconds_count{kind=\"command\"} 2\n",
+                "cimpal_stalled 0\n",
+                "cimpal_queue_size ");
+        assertThat(text).containsPattern("cimpal_http_responses_total\\{code=\"2xx\"} [1-9]");
         for (String line : text.split("\n")) {
             assertThat(line).as("exposition line").matches(
                     "# (HELP|TYPE) [a-z_]+ .+|[a-z_]+(\\{[a-z_]+=\"[^\"]*\"(,[a-z_]+=\"[^\"]*\")*})? -?[0-9.E+-]+");

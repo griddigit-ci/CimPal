@@ -275,6 +275,18 @@ public class ServeCommand implements Callable<Integer> {
             description = "Database connections (default: --workers + 4, at most 64).")
     private Integer jobStorePool;
 
+    @Option(names = "--idempotency-ttl",
+            defaultValue = "PT24H",
+            description = "How long an Idempotency-Key of POST /v1/jobs and /v1/uploads is remembered (ISO-8601"
+                    + " duration, default: PT24H, PT1M to P30D): a repeat within it gets the same job or upload.")
+    private Duration idempotencyTtl;
+
+    @Option(names = "--callback-secrets",
+            description = "File of name:secret lines that sign each client's job callbacks (DEP-14), e.g. a mounted"
+                    + " secret; a client also needs callbackAllow prefixes in --client-quotas. Without it, jobs"
+                    + " with a callback are refused.")
+    private Path callbackSecrets;
+
     @Option(names = "--requeue-interrupted",
             description = "With --job-store jdbc: after a restart, run the jobs that were running again instead of"
                     + " failing them as interrupted. Only safe when a job's outputs are simply overwritten.")
@@ -426,6 +438,7 @@ public class ServeCommand implements Callable<Integer> {
         Set<String> allowedHosts = new LinkedHashSet<>();
         ClientQuotas.Settings quotaSettings = ClientQuotas.Settings.NONE;
         StoreSettings storeSettings = null;
+        CallbackSecrets callbackSecretsRead = CallbackSecrets.NONE;
         try {
             for (String name : allowedHostNames) {
                 allowedHosts.add(ServeSecurity.allowedHostEntry(name));
@@ -438,6 +451,9 @@ public class ServeCommand implements Callable<Integer> {
             if (storeSettings != null && WEAK_SSLMODE.matcher(storeSettings.url()).find()) {
                 log.warn("store.tls", "serve: --job-store-url turns certificate checks off (sslmode disable, allow or"
                         + " prefer); use sslmode=verify-full unless the database is on a private network");
+            }
+            if (callbackSecrets != null) {
+                callbackSecretsRead = CallbackSecrets.read(callbackSecrets);
             }
             if (clientQuotas != null) {
                 quotaSettings = ClientQuotas.read(clientQuotas);
@@ -472,6 +488,8 @@ public class ServeCommand implements Callable<Integer> {
                 .sizeEstimator((command, body, workspace) -> estimateHeap(command, body))
                 .clientQuotas(quotaSettings)
                 .requeueInterrupted(requeueInterrupted)
+                .idempotencyTtl(idempotencyTtl)
+                .callbackSecrets(callbackSecretsRead)
                 .requestTimeout(requestTimeout)
                 .jobTimeout(jobTimeout)
                 .maxJobs(maxJobs)

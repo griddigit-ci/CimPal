@@ -78,6 +78,8 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--job-store-user` | string | none (or `CIMPAL_JOB_STORE_USER`) | Database user. |
 | `--job-store-password-file` | path | none (or `CIMPAL_JOB_STORE_PASSWORD_FILE`) | File with the database password, e.g. a mounted secret. `CIMPAL_JOB_STORE_PASSWORD` holds it directly. Never on the command line. |
 | `--job-store-pool` | integer | `--workers` + 4 (at most 64) | Database connections. |
+| `--idempotency-ttl` | ISO-8601 duration | `PT24H` (PT1M to P30D) | How long an `Idempotency-Key` is remembered. See [Safe retries](#safe-retries-idempotency-key). |
+| `--callback-secrets` | path | none | `name:secret` file that signs each client's job callbacks. Without it, a job with a callback is refused. See [Completion callbacks](#completion-callbacks). |
 | `--requeue-interrupted` | flag | off | With `jdbc`: after a restart, run jobs that were running again instead of failing them. Only for commands whose outputs are simply overwritten. |
 | `--shutdown-grace` | ISO-8601 duration | `PT60S` | On SIGTERM, Ctrl-C or `POST /shutdown`: how long to wait for a running command. If it is still running then, `serve` exits with 3. |
 | `--log-format` | `text` or `json` | `text` | `json`: one JSON object per line on stderr, nothing on stdout. See [Logs](#logs). |
@@ -339,6 +341,8 @@ curl -s -H "Authorization: Bearer $token" -o outputs.zip http://localhost:7474/v
 | 405 | Method not allowed — wrong HTTP verb for the endpoint |
 | 413 | Request body larger than `--max-body-bytes` |
 | 415 | POST without `Content-Type: application/json` |
+| 409 | Under `/v1`: a request with this `Idempotency-Key` is still being processed (`Retry-After: 1`); or a job in the wrong state |
+| 422 | The `Idempotency-Key` was used with a different request |
 | 429 | The client's quota is used up: too many queued jobs (`maxQueued`) or requests (`requestsPerMinute`). `Retry-After` says when to try again; other clients are not affected |
 | 500 | Internal error — command crashed (exit 3). Out of memory: the body is `{"exitCode":3,...,"error":"Out of memory; the server stops..."}` and the server then exits with 3; restart it with more memory ([sizing guide](../guide/sizing.md)) |
 | 409 | `/v1`: the job hasn't finished (result), or isn't queued any more (cancel) |
@@ -540,12 +544,47 @@ ops:admin:9d02...
 | `maxUploadBytes` | `--max-upload-bytes` | **413** for a larger upload. |
 | `maxWorkBytes` | `--work-max-bytes` | **507** once the client's uploads and job outputs take that much of the work area. |
 | `requestsPerMinute` | 0 (no limit) | **429** with `Retry-After` for any request with the client's token; the budget refills evenly over a minute. |
+| `callbackAllow` | none | The URL prefixes the client's [completion callbacks](#completion-callbacks) may go to, e.g. `["https://hooks.example.com/cimpal/"]`. Each is https with a path ending in `/`. Without one, a job with a callback is refused (400). |
 
 **With several clients, set `default.maxQueued`**: without it one client can take the whole queue, and the others get 503 until its jobs finish. Synchronous endpoints (`POST /validate` …) count against `requestsPerMinute` and the server's queue, not against `maxQueued` or `maxRunning`; give such clients the `/v1` API.
 
 Finished jobs are dropped (beyond `--max-jobs` or `--job-store-bytes`) from the client that holds the most first, so one client's many jobs don't push out another's results. A job with an upload is refused with 507 while its client's share of the work area is already full, since its outputs would count there too.
 
 The server's own flags stay the limits of the whole server: a client's `maxRunning`, `maxUploadBytes` or `maxWorkBytes` above them is lowered to them. A quota for a name that has no token logs a warning at start. Keys starting with `_` are comments.
+
+### Safe retries (`Idempotency-Key`)
+
+A client whose answer to `POST /v1/jobs` or `POST /v1/uploads` got lost (a timeout, a dropped connection) can send the same request again with the same `Idempotency-Key` header and gets the **same** job or upload, never a second one (DEP-14):
+
+| The key… | Answer |
+|---|---|
+| is new | the request is processed as usual |
+| was used with the same request (same body; for an upload, the same bytes) | the same job (202) or upload (201) again, even after a restart with `--job-store jdbc` |
+| was used with a different request | **422** |
+| belongs to a request still being processed | **409** with `Retry-After: 1` |
+| belongs to a job or upload that has expired since | **404** |
+
+- **Format:** 1 to 255 visible ASCII characters, e.g. a UUID per logical request reused for its retries; anything else is 400.
+- **Scope:** per client ([named tokens](#clients-and-quotas)); two clients' keys never meet.
+- **Lifetime:** `--idempotency-ttl` (24 h) after first use. A refused request (4xx, 503) doesn't use up its key.
+- **Exactly once:** the job's id is reserved with the key before the job is made, so a crash between the two can't lead to a second job: the repeat finds the job. A key is only taken over when it has expired, or when its request died (after 10 min) without making anything.
+- **Memory store:** at most 10,000 keys per client and 100,000 in all; a client's own oldest finished keys make room, and a client whose keys are all unfinished gets 503 rather than pushing out another client's.
+- The Python SDK sends a key with every `submit()` and `upload()`, and the Airflow provider one per task try.
+
+### Completion callbacks
+
+Instead of polling, a job can ask to be called back when it ends (DEP-14, D-19, opt-in):
+
+```json
+{"command": "validate", "config": {...}, "callback": {"url": "https://hooks.example.com/cimpal/done"}}
+```
+
+- **Who may:** a client with a signing secret in `--callback-secrets` (`name:secret` lines, like the token file) and `callbackAllow` prefixes in `--client-quotas`. Anything else is 400 at submit.
+- **Where to (SSRF):** the URL must be https without user or fragment, start with one of the client's allowed prefixes (no `.`/`..` segments or encoded separators in its path), and its host must resolve to public addresses only: no loopback, private, link-local (cloud metadata), carrier-grade NAT, unique-local or reserved addresses, nor IPv6 forms that carry one (NAT64, 6to4). This is checked at submit and again before every attempt. Redirects are never followed, and an attempt is cut off after 15 s, so a slow receiver can't hold up other callbacks.
+- **What the client sees of a failure:** `lastError` is only `HTTP <status>`, `timed out` or `connection failed`, never the kind of network error (the server's log has it).
+- **What:** `POST` with `Content-Type: application/json` and the body `{"event": "job.finished", "jobId", "command", "status", "exitCode", "hasViolations", "finishedAt", "links"}`. Never the result, the log or a token: fetch the result with your token.
+- **Signature:** `CimPal-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, t + "." + body)>`. Check it, and that `t` is recent (replay); the SDK's `verify_callback()` does both. Act on the signed body's `jobId` once: delivery is at least once.
+- **Delivery:** at least once, whenever the job ends (also when it is cancelled or interrupted by a restart). A 2xx answer delivers it; anything else is retried after 10 s, doubling up to 1 h, for 24 h after the job ended. With `--job-store jdbc` pending callbacks survive a restart. `GET /v1/jobs/{id}` shows `callback.state` (`waiting`, `pending`, `delivered`, `failed`), `attempts`, `lastStatus` and `lastError`; `cimpal_callbacks_total{outcome}` counts the attempts.
 
 ### Jobs that survive a restart
 
@@ -593,6 +632,7 @@ With `--log-format json`, stderr carries one JSON object per line and stdout sta
 - **Jobs and commands:** `job.queued`, `job.started`, `job.finished`, `command.finished`;
 - **Uploads:** `upload.received`;
 - **Problems:** `request.rejected`, `stall`, `token.file`, `quota.unknown`, `store.error`;
+- **Callbacks:** `callback.delivered`, `callback.retry`, `callback.failed`, `callback.refused`;
 - **Restart:** `jobs.recovered` (with `--job-store jdbc`: queued jobs from before the restart resume);
 - **Output:** `output`, which is every line the commands themselves write, e.g. `[INFO] Loading …`, tagged with the `jobId` of the job whose thread wrote it. Its level comes only from the line's start (`[WARN]`, `[ERROR]`, or a logger's `[thread] WARN`).
 
@@ -614,11 +654,18 @@ With `--metrics`, `GET /metrics` (admin token required) returns Prometheus text 
 | `cimpal_job_duration_seconds` | histogram (1 s … 2 h) | — |
 | `cimpal_requests_total` | counter, synchronous endpoints | `client`, `command`, `outcome` (`ok`, `violations`, `bad_input`, `error`, `timeout`, `busy`) |
 | `cimpal_quota_refused_total` | counter, 429 answers | `client`, `quota` (`max_queued`, `requests_per_minute`) |
+| `cimpal_callbacks_total` | counter, callback attempts | `outcome` (`delivered`, `retry`, `failed`, `refused`) |
 | `cimpal_queue_depth`, `cimpal_busy`, `cimpal_running`, `cimpal_workers` | gauge | — |
 | `cimpal_jvm_heap_used_bytes`, `cimpal_jvm_heap_max_bytes` | gauge | — |
 | `cimpal_job_store_errors_total` | counter, failed job store operations (always 0 in memory) | — |
+| `cimpal_http_responses_total` | counter, every answer | `code`: `2xx` … `5xx`, with `429` and `503` on their own, or `none` (the connection broke first) |
+| `cimpal_http_request_duration_seconds` | histogram (5 ms … 10 s) | `kind`: `api`, `transfer` (uploads, file and archive downloads) or `command` (synchronous endpoints) |
+| `cimpal_job_queue_wait_seconds` | histogram (1 s … 1 h), time from submit to start | — |
+| `cimpal_queue_size` | gauge, `--queue-size` | — |
+| `cimpal_stalled` | gauge, 1 while a command has run past its timeout | — |
+| `cimpal_work_used_bytes`, `cimpal_work_max_bytes` | gauge, the work area (only with file exchange) | — |
 
-The counters start at zero on every start; a counter appears once it has counted something. The `client` label holds names from the token file only, so the number of series stays bounded.
+The counters start at zero on every start; a counter appears once it has counted something. The `client` label holds names from the token file only, so the number of series stays bounded. Alert rules built on these, and the service levels they watch, are in [`deploy/monitoring/`](../../deploy/monitoring/README.md).
 
 ---
 

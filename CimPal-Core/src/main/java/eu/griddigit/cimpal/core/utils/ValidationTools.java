@@ -2167,20 +2167,9 @@ public class ValidationTools {
         }
     }
 
-    /**
-     * Loopback, link-local, private, wildcard and multicast addresses, plus two ranges Java's
-     * checks miss (SEC-5): IPv6 unique-local {@code fc00::/7} ({@code isSiteLocalAddress} only
-     * covers the deprecated {@code fec0::/10}) and carrier-grade NAT {@code 100.64.0.0/10}.
-     */
+    /** The address rule, shared with serve's job callbacks (DEP-14): see {@link EgressPolicy}. */
     static boolean isNonPublicAddress(InetAddress addr) {
-        if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()
-                || addr.isAnyLocalAddress() || addr.isMulticastAddress()) {
-            return true;
-        }
-        byte[] b = addr.getAddress();
-        boolean uniqueLocal = b.length == 16 && (b[0] & 0xfe) == 0xfc;
-        boolean carrierGradeNat = b.length == 4 && (b[0] & 0xff) == 100 && (b[1] & 0xc0) == 64;
-        return uniqueLocal || carrierGradeNat;
+        return EgressPolicy.isNonPublicAddress(addr);
     }
 
     /** Applies both egress policy tiers. Use at the point a request is about to be issued. */

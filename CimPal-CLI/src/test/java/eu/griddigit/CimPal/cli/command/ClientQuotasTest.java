@@ -78,4 +78,33 @@ class ClientQuotasTest {
         assertThatThrownBy(() -> ClientQuotas.read(tempDir.resolve("missing.json")))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("file not found");
     }
+
+    @Test
+    void callbackPrefixesMustBeHttpsWithAPathEndingInASlash() throws Exception {
+        ClientQuotas quotas = quotas("{\"clients\": {\"a\": {\"callbackAllow\": [\"https://hooks.example.com/cimpal/\","
+                + " \"http://127.0.0.1:8080/hooks/\"]}}}");
+        assertThat(quotas.limits("a").callbackAllow()).containsExactly("https://hooks.example.com/cimpal/",
+                "http://127.0.0.1:8080/hooks/");
+        assertThat(quotas.limits("b").callbackAllow()).isEmpty();
+        for (String bad : new String[] {"https://hooks.example.com", "https://hooks.example.com/cimpal",
+                "http://hooks.example.com/cimpal/", "https://u:p@hooks.example.com/", "https://h.example.com/?q=1/",
+                "ftp://hooks.example.com/"}) {
+            assertThatThrownBy(() -> quotas("{\"default\": {\"callbackAllow\": [\"" + bad + "\"]}}")).as(bad)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void callbackSecretsAreReadPerClientAndNeverShown() throws Exception {
+        String secret = "s".repeat(40);
+        String nl = System.lineSeparator();
+        CallbackSecrets secrets = CallbackSecrets.read(Files.writeString(tempDir.resolve("cb"),
+                "# signing secrets" + nl + "etl:" + secret + nl));
+        assertThat(new String(secrets.secret("etl"), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo(secret);
+        assertThat(secrets.secret("other")).isNull();
+        for (String bad : new String[] {"etl:short" + nl, secret + nl, "etl:" + secret + nl + "etl:" + secret + nl}) {
+            assertThatThrownBy(() -> CallbackSecrets.read(Files.writeString(tempDir.resolve("bad"), bad)))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageNotContaining(secret);
+        }
+    }
 }

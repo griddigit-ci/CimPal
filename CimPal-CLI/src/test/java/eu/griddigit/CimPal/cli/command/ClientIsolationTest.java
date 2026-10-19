@@ -522,4 +522,24 @@ class ClientIsolationTest {
         assertThat(expected).isNotEmpty();
         assertThat(SEEN).as("every client response in the OpenAPI document is exercised").containsAll(expected);
     }
+
+    @Test
+    void idempotencyKeysArePerClient() throws Exception {
+        start(config -> config);
+        String body = "{\"command\":\"validate\"}";
+        HttpResponse<String> alice = HTTP.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port()
+                        + "/v1/jobs")).header("Authorization", "Bearer " + ALICE).header("Content-Type", "application/json")
+                .header("Idempotency-Key", "same").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> bob = HTTP.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port()
+                        + "/v1/jobs")).header("Authorization", "Bearer " + BOB).header("Content-Type", "application/json")
+                .header("Idempotency-Key", "same").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(alice.statusCode()).isEqualTo(202);
+        assertThat(bob.statusCode()).as("bob's key is his own: a new job, never alice's").isEqualTo(202);
+        assertThat(JSON.readTree(bob.body()).path("jobId").asString())
+                .isNotEqualTo(JSON.readTree(alice.body()).path("jobId").asString());
+        assertThat(JSON.readTree(bob.body()).path("owner").asString()).isEqualTo("bob");
+    }
 }

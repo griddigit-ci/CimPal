@@ -5,6 +5,8 @@
 # Do not edit: run clients/python/scripts/regenerate.py.
 """ Contains all the data models used in inputs/outputs """
 
+from .callback_state import CallbackState
+from .callback_state_state import CallbackStateState
 from .compare_config import CompareConfig
 from .compare_instances_config import CompareInstancesConfig
 from .convert_config import ConvertConfig
@@ -22,6 +24,7 @@ from .job_links import JobLinks
 from .job_list import JobList
 from .job_log import JobLog
 from .job_request import JobRequest
+from .job_request_callback_type_0 import JobRequestCallbackType0
 from .job_request_command import JobRequestCommand
 from .job_request_config import JobRequestConfig
 from .job_status import JobStatus
@@ -35,6 +38,8 @@ from .upload_files_item import UploadFilesItem
 from .validate_config import ValidateConfig
 
 __all__ = (
+    "CallbackState",
+    "CallbackStateState",
     "CompareConfig",
     "CompareInstancesConfig",
     "ConvertConfig",
@@ -52,6 +57,7 @@ __all__ = (
     "JobList",
     "JobLog",
     "JobRequest",
+    "JobRequestCallbackType0",
     "JobRequestCommand",
     "JobRequestConfig",
     "JobStatus",

@@ -772,7 +772,7 @@ class JobApiTest {
                     // client quotas and filters (DEP-13) ClientIsolationTest's.
                     if (!FileExchangeApiTest.ROUTES.contains(path.getKey())
                             && !key.equals(FileExchangeApiTest.SUBMIT_UNKNOWN_UPLOAD)
-                            && !ClientIsolationTest.covers(key)) {
+                            && !ClientIsolationTest.covers(key) && !IdempotencyTest.covers(key)) {
                         expected.add(key);
                     }
                 }

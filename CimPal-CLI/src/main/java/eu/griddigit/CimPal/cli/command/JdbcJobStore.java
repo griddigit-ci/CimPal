@@ -573,6 +573,10 @@ final class JdbcJobStore implements JobStore, WorkArea.UploadIndex {
                     ps.setObject(1, id);
                     ps.executeUpdate();
                 }
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM cimpal_callbacks WHERE job_id = ?")) {
+                    ps.setObject(1, id);
+                    ps.executeUpdate();
+                }
                 try (PreparedStatement ps = c.prepareStatement("DELETE FROM cimpal_jobs WHERE id = ?")) {
                     ps.setObject(1, id);
                     ps.executeUpdate();
@@ -666,6 +670,235 @@ final class JdbcJobStore implements JobStore, WorkArea.UploadIndex {
             }
             return out;
         });
+    }
+
+    // ---- idempotency keys (DEP-14) ------------------------------------------------------------
+
+    private final IdempotencyStore idempotency = new IdempotencyStore() {
+
+        private IdempotencyStore.Entry read(Connection c, String client, String key) throws SQLException {
+            try (PreparedStatement ps = c.prepareStatement("SELECT fingerprint, resource_id, done, created_at"
+                    + " FROM cimpal_idempotency WHERE client = ? AND idem_key = ?")) {
+                ps.setString(1, client);
+                ps.setString(2, key);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? new IdempotencyStore.Entry(rs.getString("fingerprint"),
+                            rs.getObject("resource_id", UUID.class), rs.getBoolean("done"),
+                            instant(rs, "created_at")) : null;
+                }
+            }
+        }
+
+        @Override
+        public IdempotencyStore.Entry begin(String client, String key, String fingerprint, UUID resourceId,
+                                            Instant now) {
+            return sql(c -> {
+                for (int attempt = 0; attempt < 3; attempt++) {
+                    try (PreparedStatement ps = c.prepareStatement("INSERT INTO cimpal_idempotency (client, idem_key,"
+                            + " fingerprint, resource_id, done, created_at) VALUES (?, ?, ?, ?, FALSE, ?)")) {
+                        ps.setString(1, client);
+                        ps.setString(2, key);
+                        ps.setString(3, fingerprint);
+                        ps.setObject(4, resourceId);
+                        ps.setObject(5, ts(now));
+                        ps.executeUpdate();
+                        return null; // reserved
+                    } catch (SQLException e) {
+                        if (e.getSQLState() == null || !e.getSQLState().startsWith("23")) {
+                            throw e;
+                        }
+                    }
+                    IdempotencyStore.Entry existing = read(c, client, key);
+                    if (existing != null) {
+                        return existing; // the caller decides, knowing whether its job or upload exists
+                    }
+                    // given back meanwhile: try the insert again
+                }
+                throw new SQLException("Idempotency-Key kept changing", "40001");
+            });
+        }
+
+        @Override
+        public boolean retake(String client, String key, IdempotencyStore.Entry seen, String fingerprint,
+                              UUID resourceId, Instant now) {
+            return sql(c -> {
+                // Only as it was read: of two requests, one wins.
+                try (PreparedStatement ps = c.prepareStatement("UPDATE cimpal_idempotency SET fingerprint = ?,"
+                        + " resource_id = ?, done = FALSE, created_at = ? WHERE client = ? AND idem_key = ?"
+                        + " AND resource_id = ? AND created_at = ?")) {
+                    ps.setString(1, fingerprint);
+                    ps.setObject(2, resourceId);
+                    ps.setObject(3, ts(now));
+                    ps.setString(4, client);
+                    ps.setString(5, key);
+                    ps.setObject(6, seen.resourceId());
+                    ps.setObject(7, ts(seen.createdAt()));
+                    return ps.executeUpdate() == 1;
+                }
+            });
+        }
+
+        @Override
+        public void complete(String client, String key, UUID resourceId) {
+            sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("UPDATE cimpal_idempotency SET done = TRUE"
+                        + " WHERE client = ? AND idem_key = ? AND resource_id = ?")) {
+                    ps.setString(1, client);
+                    ps.setString(2, key);
+                    ps.setObject(3, resourceId);
+                    ps.executeUpdate();
+                    return null;
+                }
+            });
+        }
+
+        @Override
+        public void abandon(String client, String key, UUID resourceId) {
+            sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM cimpal_idempotency"
+                        + " WHERE client = ? AND idem_key = ? AND resource_id = ? AND done = FALSE")) {
+                    ps.setString(1, client);
+                    ps.setString(2, key);
+                    ps.setObject(3, resourceId);
+                    ps.executeUpdate();
+                    return null;
+                }
+            });
+        }
+
+        @Override
+        public void evict(Instant before) {
+            sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM cimpal_idempotency WHERE created_at < ?")) {
+                    ps.setObject(1, ts(before));
+                    ps.executeUpdate();
+                    return null;
+                }
+            });
+        }
+    };
+
+    @Override
+    public IdempotencyStore idempotency() {
+        return idempotency;
+    }
+
+    // ---- completion callbacks (DEP-14) --------------------------------------------------------
+
+    private final CallbackStore callbacks = new CallbackStore() {
+
+        private static final String CALLBACK_COLUMNS = "job_id, client, url, state, attempts, next_attempt_at,"
+                + " last_attempt_at, last_status, last_error, created_at";
+
+        private CallbackStore.Delivery delivery(ResultSet rs) throws SQLException {
+            int status = rs.getInt("last_status");
+            Integer lastStatus = rs.wasNull() ? null : status;
+            return new CallbackStore.Delivery(rs.getObject("job_id", UUID.class), rs.getString("client"),
+                    java.net.URI.create(rs.getString("url")),
+                    CallbackStore.State.valueOf(rs.getString("state").toUpperCase(java.util.Locale.ROOT)),
+                    rs.getInt("attempts"), instant(rs, "next_attempt_at"), instant(rs, "last_attempt_at"), lastStatus,
+                    rs.getString("last_error"), instant(rs, "created_at"));
+        }
+
+        @Override
+        public void register(UUID jobId, String client, java.net.URI url, Instant now) {
+            sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("INSERT INTO cimpal_callbacks (job_id, client, url,"
+                        + " state, attempts, created_at) VALUES (?, ?, ?, 'waiting', 0, ?)")) {
+                    ps.setObject(1, jobId);
+                    ps.setString(2, client);
+                    ps.setString(3, url.toString());
+                    ps.setObject(4, ts(now));
+                    ps.executeUpdate();
+                    return null;
+                }
+            });
+        }
+
+        @Override
+        public CallbackStore.Delivery get(UUID jobId) {
+            return sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("SELECT " + CALLBACK_COLUMNS
+                        + " FROM cimpal_callbacks WHERE job_id = ?")) {
+                    ps.setObject(1, jobId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next() ? delivery(rs) : null;
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void arm(java.util.function.Predicate<UUID> finished, Instant now) {
+            // In the database a job is final once it has finished_at (whatever ended it, even a restart).
+            sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("UPDATE cimpal_callbacks SET state = 'pending',"
+                        + " next_attempt_at = ? WHERE state = 'waiting' AND job_id IN"
+                        + " (SELECT id FROM cimpal_jobs WHERE finished_at IS NOT NULL)")) {
+                    ps.setObject(1, ts(now));
+                    ps.executeUpdate();
+                    return null;
+                }
+            });
+        }
+
+        @Override
+        public List<CallbackStore.Delivery> due(Instant now, int limit) {
+            return sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("SELECT " + CALLBACK_COLUMNS + " FROM cimpal_callbacks"
+                        + " WHERE state = 'pending' AND next_attempt_at <= ? ORDER BY next_attempt_at, job_id LIMIT ?")) {
+                    ps.setObject(1, ts(now));
+                    ps.setInt(2, limit);
+                    List<CallbackStore.Delivery> out = new ArrayList<>();
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            out.add(delivery(rs));
+                        }
+                    }
+                    return out;
+                }
+            });
+        }
+
+        @Override
+        public void attempted(UUID jobId, Instant at, Integer status, String error, boolean delivered,
+                              Instant nextAttemptAt) {
+            String state = delivered ? "delivered" : nextAttemptAt == null ? "failed" : "pending";
+            sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("UPDATE cimpal_callbacks SET state = ?,"
+                        + " attempts = attempts + 1, next_attempt_at = ?, last_attempt_at = ?, last_status = ?,"
+                        + " last_error = ? WHERE job_id = ?")) {
+                    ps.setString(1, state);
+                    ps.setObject(2, delivered ? null : ts(nextAttemptAt));
+                    ps.setObject(3, ts(at));
+                    if (status == null) {
+                        ps.setNull(4, java.sql.Types.INTEGER);
+                    } else {
+                        ps.setInt(4, status);
+                    }
+                    ps.setString(5, error == null ? null : error.substring(0, Math.min(200, error.length())));
+                    ps.setObject(6, jobId);
+                    ps.executeUpdate();
+                    return null;
+                }
+            });
+        }
+
+        @Override
+        public void remove(UUID jobId) {
+            sql(c -> {
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM cimpal_callbacks WHERE job_id = ?")) {
+                    ps.setObject(1, jobId);
+                    ps.executeUpdate();
+                    return null;
+                }
+            });
+        }
+    };
+
+    @Override
+    public CallbackStore callbacks() {
+        return callbacks;
     }
 
     // ---- uploads (DEP-7 bookkeeping across restarts) ---------------------------------------------

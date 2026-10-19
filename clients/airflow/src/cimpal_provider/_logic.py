@@ -8,6 +8,7 @@ Kept apart so they can be tested on any platform (Airflow itself runs on Linux a
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -256,6 +257,19 @@ def violations_message(job: Job, result: Mapping[str, Any] | None) -> str:
     return f"CimPal job {job.job_id} ({job.command}) found violations" + (
         f": {json.dumps(totals, sort_keys=True)}" if totals else ""
     )
+
+
+def idempotency_key(
+    kind: str, dag_id: str | None, task_id: str | None, run_id: str | None, try_number: object, map_index: object
+) -> str:
+    """The ``Idempotency-Key`` of one task try's upload or submit (DEP-14).
+
+    Within one try (the client's own retries of a lost answer) the same job or upload comes back; a new
+    try of the task submits again, and so does a try Airflow restarts after a dead worker (it gets a new
+    ``try_number``). Hashed, so it is always short, visible ASCII.
+    """
+    identity = json.dumps([kind, dag_id, task_id, run_id, try_number, map_index], default=str)
+    return f"airflow-{kind}-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
 def default_label(dag_id: str | None, task_id: str | None, run_id: str | None) -> str:

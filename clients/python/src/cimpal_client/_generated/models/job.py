@@ -13,13 +13,16 @@ from ..types import UNSET, Unset
 
 from ..models.job_command import JobCommand
 from ..models.job_status import JobStatus
+from ..types import UNSET, Unset
 from dateutil.parser import isoparse
 from typing import cast
 from typing import cast, Union
+from typing import Union
 from uuid import UUID
 import datetime
 
 if TYPE_CHECKING:
+  from ..models.callback_state import CallbackState
   from ..models.job_links import JobLinks
 
 
@@ -48,6 +51,8 @@ class Job:
             has_violations (Union[None, bool]):
             error (Union[None, str]):
             links (JobLinks):
+            callback (Union[Unset, CallbackState]): The job's callback: waiting while it runs, pending until delivered, then
+                delivered or failed.
      """
 
     job_id: UUID
@@ -62,6 +67,7 @@ class Job:
     has_violations: Union[None, bool]
     error: Union[None, str]
     links: 'JobLinks'
+    callback: Union[Unset, 'CallbackState'] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -69,6 +75,7 @@ class Job:
 
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.callback_state import CallbackState
         from ..models.job_links import JobLinks
         job_id = str(self.job_id)
 
@@ -106,6 +113,10 @@ class Job:
 
         links = self.links.to_dict()
 
+        callback: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.callback, Unset):
+            callback = self.callback.to_dict()
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -123,6 +134,8 @@ class Job:
             "error": error,
             "links": links,
         })
+        if callback is not UNSET:
+            field_dict["callback"] = callback
 
         return field_dict
 
@@ -130,6 +143,7 @@ class Job:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.callback_state import CallbackState
         from ..models.job_links import JobLinks
         d = dict(src_dict)
         job_id = UUID(d.pop("jobId"))
@@ -227,6 +241,16 @@ class Job:
 
 
 
+        _callback = d.pop("callback", UNSET)
+        callback: Union[Unset, CallbackState]
+        if isinstance(_callback,  Unset):
+            callback = UNSET
+        else:
+            callback = CallbackState.from_dict(_callback)
+
+
+
+
         job = cls(
             job_id=job_id,
             command=command,
@@ -240,6 +264,7 @@ class Job:
             has_violations=has_violations,
             error=error,
             links=links,
+            callback=callback,
         )
 
 

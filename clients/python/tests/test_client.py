@@ -331,11 +331,66 @@ def test_busy_after_the_last_retry_raises_with_retry_after(respx_mock: respx.Moc
 
 
 @respx.mock(base_url=BASE)
-def test_a_submit_that_may_have_reached_the_server_is_never_retried(respx_mock: respx.MockRouter, cp: CimPal) -> None:
-    route = respx_mock.post("/v1/jobs").mock(side_effect=httpx.ReadTimeout("no answer"))
-    with pytest.raises(cimpal_client.TimeoutError):
-        cp.submit("validate", {})
-    assert route.call_count == 1
+def test_a_submit_that_may_have_reached_the_server_is_retried_with_the_same_key(
+    respx_mock: respx.MockRouter, cp: CimPal, sleeps: Sleeps
+) -> None:
+    # DEP-14: a lost answer is retried with the same Idempotency-Key, so the server answers the same job.
+    route = respx_mock.post("/v1/jobs").mock(
+        side_effect=[httpx.ReadTimeout("no answer"), httpx.Response(202, json=job_json())]
+    )
+    cp.submit("validate", {})
+    assert route.call_count == 2
+    keys = {call.request.headers["Idempotency-Key"] for call in route.calls}
+    assert len(keys) == 1 and len(keys.pop()) == 36  # one fresh UUID for the call's retries
+
+
+@respx.mock(base_url=BASE)
+def test_every_submit_call_gets_its_own_key_unless_given_one(respx_mock: respx.MockRouter, cp: CimPal) -> None:
+    route = respx_mock.post("/v1/jobs").respond(202, json=job_json())
+    cp.submit("validate", {})
+    cp.submit("validate", {})
+    cp.submit("validate", {}, idempotency_key="nightly-2026-10-19")
+    keys = [call.request.headers["Idempotency-Key"] for call in route.calls]
+    assert keys[0] != keys[1]
+    assert keys[2] == "nightly-2026-10-19"
+    with pytest.raises(ValueError, match="visible ASCII"):
+        cp.submit("validate", {}, idempotency_key="with space")
+
+
+@respx.mock(base_url=BASE)
+def test_a_key_still_in_progress_is_retried_after_retry_after(
+    respx_mock: respx.MockRouter, cp: CimPal, sleeps: Sleeps
+) -> None:
+    route = respx_mock.post("/v1/jobs").mock(
+        side_effect=[
+            httpx.Response(409, json=problem(409, "still being processed"), headers={"Retry-After": "1"}),
+            httpx.Response(202, json=job_json()),
+        ]
+    )
+    cp.submit("validate", {})
+    assert route.call_count == 2
+    assert sleeps == [1.0]
+
+
+@respx.mock(base_url=BASE)
+def test_a_conflict_without_retry_after_is_not_retried(respx_mock: respx.MockRouter, cp: CimPal) -> None:
+    respx_mock.post("/v1/jobs").respond(422, json=problem(422, "Idempotency-Key reused with a different request"))
+    with pytest.raises(CimPalError, match="different request"):
+        cp.submit("validate", {}, idempotency_key="k")
+
+
+@respx.mock(base_url=BASE)
+def test_an_upload_carries_a_key_and_is_retried_with_it(
+    respx_mock: respx.MockRouter, cp: CimPal, sleeps: Sleeps, tmp_path: Path
+) -> None:
+    archive = tmp_path / "in.zip"
+    archive.write_bytes(b"PK\x05\x06" + b"\x00" * 18)  # an empty ZIP
+    route = respx_mock.post("/v1/uploads").mock(
+        side_effect=[httpx.ReadTimeout("no answer"), httpx.Response(201, json=upload_json())]
+    )
+    cp.upload(archive)
+    assert route.call_count == 2
+    assert len({call.request.headers["Idempotency-Key"] for call in route.calls}) == 1
 
 
 @respx.mock(base_url=BASE)

@@ -15,16 +15,22 @@ from ... import errors
 from ...models.job import Job
 from ...models.job_request import JobRequest
 from ...models.problem import Problem
+from ...types import UNSET, Unset
 from typing import cast
+from typing import Union
 
 
 
 def _get_kwargs(
     *,
     body: JobRequest,
+    idempotency_key: Union[Unset, str] = UNSET,
 
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(idempotency_key, Unset):
+        headers["Idempotency-Key"] = idempotency_key
+
 
 
     
@@ -82,6 +88,13 @@ def _parse_response(*, client: Union[AuthenticatedClient, Client], response: htt
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+
+
+        return response_409
+
     if response.status_code == 413:
         response_413 = Problem.from_dict(response.json())
 
@@ -95,6 +108,13 @@ def _parse_response(*, client: Union[AuthenticatedClient, Client], response: htt
 
 
         return response_415
+
+    if response.status_code == 422:
+        response_422 = Problem.from_dict(response.json())
+
+
+
+        return response_422
 
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
@@ -129,11 +149,13 @@ def sync_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
     body: JobRequest,
+    idempotency_key: Union[Unset, str] = UNSET,
 
 ) -> Response[Union[Job, Problem]]:
     """ Queue a command as a job.
 
     Args:
+        idempotency_key (Union[Unset, str]):
         body (JobRequest):
 
     Raises:
@@ -147,6 +169,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+idempotency_key=idempotency_key,
 
     )
 
@@ -160,11 +183,13 @@ def sync(
     *,
     client: Union[AuthenticatedClient, Client],
     body: JobRequest,
+    idempotency_key: Union[Unset, str] = UNSET,
 
 ) -> Optional[Union[Job, Problem]]:
     """ Queue a command as a job.
 
     Args:
+        idempotency_key (Union[Unset, str]):
         body (JobRequest):
 
     Raises:
@@ -179,6 +204,7 @@ def sync(
     return sync_detailed(
         client=client,
 body=body,
+idempotency_key=idempotency_key,
 
     ).parsed
 
@@ -186,11 +212,13 @@ async def asyncio_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
     body: JobRequest,
+    idempotency_key: Union[Unset, str] = UNSET,
 
 ) -> Response[Union[Job, Problem]]:
     """ Queue a command as a job.
 
     Args:
+        idempotency_key (Union[Unset, str]):
         body (JobRequest):
 
     Raises:
@@ -204,6 +232,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+idempotency_key=idempotency_key,
 
     )
 
@@ -217,11 +246,13 @@ async def asyncio(
     *,
     client: Union[AuthenticatedClient, Client],
     body: JobRequest,
+    idempotency_key: Union[Unset, str] = UNSET,
 
 ) -> Optional[Union[Job, Problem]]:
     """ Queue a command as a job.
 
     Args:
+        idempotency_key (Union[Unset, str]):
         body (JobRequest):
 
     Raises:
@@ -236,5 +267,6 @@ async def asyncio(
     return (await asyncio_detailed(
         client=client,
 body=body,
+idempotency_key=idempotency_key,
 
     )).parsed
