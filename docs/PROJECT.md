@@ -5,8 +5,8 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-19  
-**Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
+**Last updated:** 2026-10-20 (Desktop: change log, known issues from the CLI check)  
+**Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
 
@@ -327,11 +327,10 @@ service (option 2) a shared production service: `docs/plans/deployment/OPTION-2-
 and the order (a release first, then DEP-13 client identity, DEP-11 durable job store, DEP-14 idempotency and
 webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job isolation). DEP-13 (named tokens,
 job and upload ownership, per-client quotas, D-17) is merged (PR #75). DEP-11 (durable job store in PostgreSQL,
-D-14, D-18) is in review (PR #76); its PostgreSQL ITs run only where Docker is available (CI). DEP-14
-(idempotent submits and uploads, signed completion callbacks, D-19) is in review on
-`feature/dep-14-idempotency-webhooks`, stacked on DEP-11. DEP-16 (load tests, SLOs, alert rules) is in progress
-on `feature/dep-16-load-tests-v2`, stacked on DEP-14: the tooling is done, the full capacity runs are open (with
-Docker on the measuring laptop). Then DEP-12.
+D-14, D-18) is merged (PR #76); its PostgreSQL ITs run only where Docker is available (CI). DEP-14
+(idempotent submits and uploads, signed completion callbacks, D-19) and DEP-16 (load tests, SLOs, alert rules;
+tooling done, the full capacity runs still open, they need Docker on the measuring laptop) are merged (PR #79,
+DEP-16 via #81). DEP-12 (shared queue across replicas) is in progress.
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -396,6 +395,26 @@ When `validate --format json --samples N` (default N=3 in JSON mode):
 - Aggregated per (sourceShape, sourceConstraintComponent): count + bounded focus nodes
 - Included in JSON as `"shapes": [...]`, sorted by count descending
 - Source: `ValidateCommand.extractShapeGroups()` — all logic in the CLI, zero Core changes
+
+---
+
+## Change log
+
+One row per bigger implementation, newest first (CLAUDE.md, *After every implementation*). `Skill` = yes when the change affects how CimPal is run or explained; the cimpal skill (`Claude_contents\CimPal\cimpal-skill`) and the Desktop project notes are refreshed from these rows. Rows before 2026-10-20 were seeded from the WP files.
+
+| Date | WP / PR | What changed for users | Docs | Skill |
+|---|---|---|---|---|
+| 2026-10-20 | Desktop (no code) | Change log introduced; drift found while running CLI 2026.10.6.1 recorded under *Known issues*; DOC-2 written | PROJECT.md, CLAUDE.md, plans | yes |
+| 2026-10-19 | DEP-16 (PR #81 → #79) | `/metrics` adds `cimpal_http_responses_total{code}`, `cimpal_http_request_duration_seconds{kind}`, `cimpal_job_queue_wait_seconds`, `cimpal_queue_size`, `cimpal_stalled`, `cimpal_work_used_bytes`/`_max_bytes`; service levels (99.5 % availability, API p95 < 200 ms, queue wait p95 < 5 min); Prometheus alert rules in `deploy/monitoring/`; load tool `scripts/bench/load/`; preliminary service capacity figures | cli/serve.md, guide/service.md, guide/sizing.md, deploy/monitoring | yes |
+| 2026-10-19 | DEP-14 (PR #79) | `Idempotency-Key` on `POST /v1/jobs` and `/v1/uploads` (`--idempotency-ttl`); opt-in HMAC-signed completion callbacks (`callback.url`, `--callback-secrets`, `callbackAllow` in `--client-quotas`); SDK `verify_callback()`, automatic keys in SDK and Airflow provider | cli/serve.md, guide/python-sdk.md, guide/airflow.md, guide/security.md | yes |
+| ≤ 2026-10-19 | DEP-13 (PR #75) | Named clients `name:role:token` in `--token-from-file`; per-client ownership of jobs/uploads (404 for others); `--client-quotas` (maxQueued, maxRunning, maxUploadBytes, maxWorkBytes, requestsPerMinute → 429/413/507); admin-only `/shutdown`, `/metrics`, `?owner=` | cli/serve.md, guide/service.md | yes |
+| 2026-10-19 | DEP-11 (PR #76) | `--job-store jdbc` PostgreSQL (`--job-store-url/-user/-password-file/-pool`, `CIMPAL_JOB_STORE*`); jobs, results, logs, uploads survive restarts; a job that was running ends `failed` with the error "Interrupted: …" unless `--requeue-interrupted` queues it again; one instance per database | cli/serve.md, guide/configuration.md | yes |
+| ≤ 2026-10-19 | DEP-10 (PR #71, #72) | `airflow-provider-cimpal` (Airflow 3.2+): connection type, hook, `CimPalJobOperator`, `CimPalValidateOperator`, trigger, sensor; PyPI publishing | guide/airflow.md | yes |
+| ≤ 2026-10-19 | DEP-9 (PR #70) | Python SDK `cimpal-client` (`CimPal`, `AsyncCimPal`: upload, submit, wait, result, log, cancel, downloads) generated from the OpenAPI document | guide/python-sdk.md | yes |
+| ≤ 2026-10-19 | DEP-8 (PR #69) | `serve --workers N` (≤64) with heap admission `--max-concurrent-heap-bytes`; per-job path policy, caches and output | cli/serve.md, guide/sizing.md | yes |
+| ≤ 2026-10-19 | DEP-7 (PR #66) | File exchange: `POST /v1/uploads` (ZIP), `inputUpload` jobs, `/v1/jobs/{id}/files`, `/archive`; `--work-root`, `--no-file-exchange`, `--max-upload-bytes`, `--upload-ttl`, `--work-max-bytes`, `--request-read-time` | cli/serve.md | yes |
+| ≤ 2026-10-19 | DEP-6 (PR #64) | Service deployment: `--allowed-host`, `--token-from-file` with reload, `/ready`, SIGTERM drain `--shutdown-grace`, `--log-format json`, `--metrics`, Compose/Kubernetes examples in `deploy/` | guide/service.md, cli/serve.md | yes |
+| ≤ 2026-10-19 | DEP-5 (PR #62) | Async `/v1` job API (`POST/GET /v1/jobs`, result, log, cancel), OpenAPI 3.1 at `/v1/openapi.json`, RFC 9457 errors, `--job-timeout`, `--max-jobs`, `--job-ttl`, `--job-log-lines`, `--max-result-bytes` | cli/serve.md | yes |
 
 ---
 
@@ -595,6 +614,17 @@ CimPal/
 ---
 
 ## Known issues and limitations
+
+**Doc and behaviour drift found 2026-10-20 (Desktop, running CLI 2026.10.6.1; fixes planned in DOC-2).**
+- `manifest` through `mcp` returns `{"exitCode":2,"status":"INVALID_INPUT"}` (no `--config`), but `tools/list` still advertises it.
+- The MCP tool input schemas list only a subset of each command's keys (e.g. no `stats`, `summaryFile`, `overwrite`, `constraintFiles` for some tools), although every config key is accepted.
+- `docs/cli/mcp.md` (*The validation agent loop*) still says "call `validate` in manual mode"; that workflow was removed.
+- `docs/cli/README.md` *Available commands* lists only validate, sparql and manifest, and its *Template configs* table only four templates.
+- `docs/cli/serve.md` shows `"version":"CimPal CLI 2026.9.10.1"` in the `/health` example; the root `README.md` feature list is the old GUI list.
+- `--stats` for `validate --workflow combined` reports a `report` phase; `docs/cli/README.md` lists only `validate` and `shapeDetail`.
+- `compare --compare-type shacl` reports absence as `N/A` with "New property: …" text; `docs/cli/compare.md` documents `(not present)`.
+- `validate --dry-run` doesn't print `incrementalTimestamps`.
+- The mapping CSV accepts `|` or comma between columns; only the config template says so, not `validate --help` or `cli/validate.md` (which shows a `|` example under "three columns").
 
 **`serve` job store limits (DEP-11).** One instance per database until DEP-12 (two `serve` on one database would each run the queued jobs they loaded at start). After a crash the last (up to 63) log lines of a running job may be missing. A job that couldn't start because the database failed stays queued in the database and runs only after the next start. The PostgreSQL ITs only run where Docker is available (CI on Ubuntu; not on the maintainer's Windows machine yet).
 

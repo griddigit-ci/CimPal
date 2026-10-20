@@ -98,7 +98,17 @@ Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Bef
 - **Never run `scripts/New-ReleaseTag.ps1`** or push version tags unless explicitly asked. A pushed `YYYY.MM.DD.N` tag triggers `.github/workflows/release.yml`, which publishes a GitHub release.
 - Versions live in all six `pom.xml` files (including `CimPal-Coverage`) plus `<cimpal.version>`; only the release script changes them.
 
-## End of session
+## After every implementation (mandatory)
 
-- Update `docs/PROJECT.md` (date, *Implementation status*, *Known issues*, *Next steps*) when the change affects them.
-- When a CLI command's flags or behaviour change, update its page under `docs/cli/`.
+A "bigger implementation" is any finished WP or feature branch, and any change to a command, flag, config key, endpoint, exit code, JSON field, output file or default. After each one, before you report back, keep the docs in step with the code:
+
+1. **`docs/PROJECT.md`** — always:
+   - *Last updated* date;
+   - *Implementation status*, *Technical decisions* (new classes, design choices), *Known issues* (add new ones, remove fixed ones) and *Next steps*;
+   - one new row at the top of the *Change log* table: date, WP/PR, what changed for users (commands, flags, endpoints, behaviour), docs touched, and `skill: yes` when the change affects how CimPal is run or explained (the cimpal skill and the Desktop project notes are refreshed from these rows).
+2. **`docs/cli/<command>.md`** when a command's flags, output or exit codes changed; **`docs/guide/*`** when install, deployment, security, sizing or integration changed; **`CimPal-CLI/configs/*.json`** templates when config keys changed.
+3. **Machine-readable contracts** that must match the code: `CommandSchemas` / the MCP tool schemas, `openapi/cimpal-v1.json`, `PathGuard.FIELDS` (mirrored by the Airflow provider).
+4. **The WP file and `docs/plans/README.md`** status (see `/end-session`).
+5. Say in your summary which of these you updated, and which you deliberately left unchanged.
+
+If you find docs that disagree with the code, fix them in the same change or add them to *Known issues*; never leave a known drift unrecorded.

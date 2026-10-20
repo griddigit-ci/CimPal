@@ -11,3 +11,4 @@ WP prefix `A` and `DOC`: how the repo, the plans and the Claude Code setup are o
 | --- | --- | --- |
 | [A1](A1.md) | Claude Code workspace setup | Plan-driven work: Claude Desktop plans, Claude Code implements, `docs/plans/` is the handoff |
 | [DOC-1](DOC-1.md) | Plans folder restructure | Move WPs into track subfolders with `git mv` and align every reference |
+| [DOC-2](DOC-2.md) | Docs/CLI consistency fixes | Fix the doc drift and small CLI/MCP gaps found while building the cimpal skill; keep docs in step after every implementation |

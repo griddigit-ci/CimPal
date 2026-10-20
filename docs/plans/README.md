@@ -28,6 +28,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | 1 | [TEST-1](testing/TEST-1.md) | Test harness | CI-1 | M | Done ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
 | 1 | [SEC-1](security/SEC-1.md) | Harden serve | TEST-1 | M | In review ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) |
 | 1 | [SEC-2](security/SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | In review ([PR #45](https://github.com/griddigit-ci/CimPal/pull/45), stacked on SEC-1) |
+| 2 | [DOC-2](workspace/DOC-2.md) | Docs/CLI consistency fixes found on 2026-10-20 | — | S | Not started |
 | 2 | [TEST-2](testing/TEST-2.md) | Regression tests for past security findings | TEST-1 | M | In review ([PR #46](https://github.com/griddigit-ci/CimPal/pull/46); 4 findings reported) |
 | 2 | [SEC-5](security/SEC-5.md) | Fix the findings reported by TEST-2 | TEST-2, SEC-2 | S | In review (PR #49) |
 | 2 | [TEST-3](testing/TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | In progress (validation and SHACL generation groups done; other groups open) |
@@ -86,4 +87,4 @@ The open gaps G1–G9 and the WPs that close them are listed in [`security/READM
 - Follow CLAUDE.md conventions (license header, package case, JPMS requires, logic in Core).
 - Tests first where possible. Finish with `mvn -B verify` green and report the test count before and after.
 - Run /security-review on the diff if the change touches I/O, network, processes, parsing or serve/mcp/run.
-- At the end: tick this file's checklist, add to its decisions log, update docs/PROJECT.md (date, status, known issues, next steps) and docs/cli/* if CLI behaviour changed. Summarise what changed and what is left open.
+- At the end: tick this file's checklist, add to its decisions log, update docs/PROJECT.md (date, status, technical decisions, known issues, next steps, and a new *Change log* row) and docs/cli/*, docs/guide/*, config templates and MCP/OpenAPI schemas if behaviour changed (CLAUDE.md, *After every implementation*). Summarise what changed and what is left open.
