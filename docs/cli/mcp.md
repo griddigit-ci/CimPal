@@ -75,7 +75,7 @@ Claude Desktop starts the server in its own folder, so **always pass `--root`** 
 
 ## How tool arguments work
 
-Each tool accepts a JSON object with the same keys as the command's config file. Everything documented in the command's `--help` and in `docs/cli/<command>.md` applies directly to the tool arguments.
+Each tool accepts a JSON object with the same keys as the command's config file. Everything documented in the command's `--help` and in `docs/cli/<command>.md` applies directly to the tool arguments. `tools/list` lists every key each command reads (they come from one source with the job API's OpenAPI document, and a test keeps them equal to what the commands read). `manifest` takes `dir` or `files`, `accessUrl` and `output`, like `cimpal manifest --config`.
 
 **Example — validate tool:**
 ```json
@@ -187,7 +187,7 @@ The MCP tools are designed to support the closed-loop agent described in the pro
 2. **Inspect** — call `sparql` to look up the focus nodes in the actual model data
 3. **Compare** — call `compare` to diff profile versions and understand what changed
 4. **Fix** — edit the SHACL `.ttl` or RDFS `.rdf` file
-5. **Test** — call `gen_instances` to generate fixtures, call `validate` in manual mode
+5. **Test** — call `gen_instances` to generate pass/fail fixtures, then `validate` with `workflow: "combined"` (the fixtures as `dataFiles`, the changed shapes as `constraintFiles`) and check that each fixture gives the findings it should. The GUI's *Test SHACL rules* does the same for a whole rule set (there is no `manual` workflow any more).
 6. **Promote** — once fixtures pass, run `validate` in mapping mode against real data
 
 Each iteration is a sequence of MCP tool calls. The agent reads the `shapes` array from the `validate` response to know which shapes to diagnose next.

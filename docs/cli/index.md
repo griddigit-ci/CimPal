@@ -54,6 +54,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `excel2shacl.json` | Excel-to-SHACL shape generation |
 | `organize.json` | SHACL organizer / canonical restructuring |
 | `gen-instances.json` | Instance data generation from Excel template |
+| `manifest.json` | DCAT/CGMES manifest of a folder or a list of model files |
 | `pipeline-full-validation.json` | Pipeline: convert to Turtle then validate |
 | `pipeline-profile-migration.json` | Pipeline: diff profiles then generate fresh shapes |
 

@@ -35,14 +35,32 @@ class CompareConfig:
                 (detect from extension, default).
             normalize_cim_version (Union[Unset, bool]): Rename the 'cim' namespace in fileB to match fileA before comparing.
                 Use when comparing across CIM version boundaries.
+            normalize_profile_ns (Union[Unset, bool]): Rename the profile namespace in fileB to match fileA before
+                comparing.
+            ns_prefix (Union[Unset, str]): The namespace prefix to rename with normalizeProfileNs (default: empty).
             output (Union[Unset, str]): Absolute path for the diff report (.xlsx or .csv).
+            format_ (Union[Unset, str]): Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a
+                job's JSON result.
+            stats (Union[Unset, bool]): Report the run's resource use (time, peak heap, GC, triples loaded).
+            summary_file (Union[Unset, str]): Absolute path to also write the JSON result to, atomically, creating parent
+                folders.
+            violations_exit_code (Union[Unset, int]): Exit code when differences are found (default 1, 0..255); 0 lets a
+                scheduler treat them as data.
+            overwrite (Union[Unset, bool]): Replace an output file that already exists (default false: refused).
      """
 
     file_a: str
     file_b: str
     compare_type: Union[Unset, str] = UNSET
     normalize_cim_version: Union[Unset, bool] = UNSET
+    normalize_profile_ns: Union[Unset, bool] = UNSET
+    ns_prefix: Union[Unset, str] = UNSET
     output: Union[Unset, str] = UNSET
+    format_: Union[Unset, str] = UNSET
+    stats: Union[Unset, bool] = UNSET
+    summary_file: Union[Unset, str] = UNSET
+    violations_exit_code: Union[Unset, int] = UNSET
+    overwrite: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -58,7 +76,21 @@ class CompareConfig:
 
         normalize_cim_version = self.normalize_cim_version
 
+        normalize_profile_ns = self.normalize_profile_ns
+
+        ns_prefix = self.ns_prefix
+
         output = self.output
+
+        format_ = self.format_
+
+        stats = self.stats
+
+        summary_file = self.summary_file
+
+        violations_exit_code = self.violations_exit_code
+
+        overwrite = self.overwrite
 
 
         field_dict: dict[str, Any] = {}
@@ -71,8 +103,22 @@ class CompareConfig:
             field_dict["compareType"] = compare_type
         if normalize_cim_version is not UNSET:
             field_dict["normalizeCimVersion"] = normalize_cim_version
+        if normalize_profile_ns is not UNSET:
+            field_dict["normalizeProfileNs"] = normalize_profile_ns
+        if ns_prefix is not UNSET:
+            field_dict["nsPrefix"] = ns_prefix
         if output is not UNSET:
             field_dict["output"] = output
+        if format_ is not UNSET:
+            field_dict["format"] = format_
+        if stats is not UNSET:
+            field_dict["stats"] = stats
+        if summary_file is not UNSET:
+            field_dict["summaryFile"] = summary_file
+        if violations_exit_code is not UNSET:
+            field_dict["violationsExitCode"] = violations_exit_code
+        if overwrite is not UNSET:
+            field_dict["overwrite"] = overwrite
 
         return field_dict
 
@@ -89,14 +135,35 @@ class CompareConfig:
 
         normalize_cim_version = d.pop("normalizeCimVersion", UNSET)
 
+        normalize_profile_ns = d.pop("normalizeProfileNs", UNSET)
+
+        ns_prefix = d.pop("nsPrefix", UNSET)
+
         output = d.pop("output", UNSET)
+
+        format_ = d.pop("format", UNSET)
+
+        stats = d.pop("stats", UNSET)
+
+        summary_file = d.pop("summaryFile", UNSET)
+
+        violations_exit_code = d.pop("violationsExitCode", UNSET)
+
+        overwrite = d.pop("overwrite", UNSET)
 
         compare_config = cls(
             file_a=file_a,
             file_b=file_b,
             compare_type=compare_type,
             normalize_cim_version=normalize_cim_version,
+            normalize_profile_ns=normalize_profile_ns,
+            ns_prefix=ns_prefix,
             output=output,
+            format_=format_,
+            stats=stats,
+            summary_file=summary_file,
+            violations_exit_code=violations_exit_code,
+            overwrite=overwrite,
         )
 
 

@@ -23,7 +23,7 @@ The server starts on `localhost:7474`. It creates a new bearer token on every st
 Check that it's alive (no token needed):
 ```
 curl http://localhost:7474/health
-# {"status":"ok","version":"CimPal CLI 2026.9.10.1"}
+# {"status":"ok","version":"CimPal CLI <version>",...}
 ```
 
 The version is the release version of the JAR.

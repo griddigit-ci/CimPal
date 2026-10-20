@@ -35,6 +35,15 @@ class Rdfs2ShaclConfig:
             closed_shapes (Union[Unset, bool]): Generate sh:closed shapes (very strict - rejects undeclared properties).
             split_datatypes (Union[Unset, bool]): Write a separate datatype constraint file alongside the main shapes.
             validate_shapes (Union[Unset, bool]): Run SHACL-SHACL validation on generated shapes and report results.
+            export_inherit_tree (Union[Unset, bool]): Write an inheritance model file per profile.
+            cims_namespace (Union[Unset, str]): CIMS extensions namespace URI (default: http://iec.ch/TC57/1999/rdf-schema-
+                extensions-19990926#).
+            io_prefix (Union[Unset, str]): IdentifiedObject mRID property local name (default: mRID).
+            io_uri (Union[Unset, str]): IdentifiedObject mRID property URI (default:
+                http://iec.ch/TC57/CIM100#IdentifiedObject.mRID).
+            shapes_base_uri (Union[Unset, str]): Base URI of the generated shape graphs (default: empty).
+            shapes_ns_prefix (Union[Unset, str]): Prefix of the SHACL shapes namespace (default: empty).
+            shapes_ns_uri (Union[Unset, str]): URI of the SHACL shapes namespace (default: empty).
      """
 
     rdfs_files: list[str]
@@ -43,6 +52,13 @@ class Rdfs2ShaclConfig:
     closed_shapes: Union[Unset, bool] = UNSET
     split_datatypes: Union[Unset, bool] = UNSET
     validate_shapes: Union[Unset, bool] = UNSET
+    export_inherit_tree: Union[Unset, bool] = UNSET
+    cims_namespace: Union[Unset, str] = UNSET
+    io_prefix: Union[Unset, str] = UNSET
+    io_uri: Union[Unset, str] = UNSET
+    shapes_base_uri: Union[Unset, str] = UNSET
+    shapes_ns_prefix: Union[Unset, str] = UNSET
+    shapes_ns_uri: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -64,6 +80,20 @@ class Rdfs2ShaclConfig:
 
         validate_shapes = self.validate_shapes
 
+        export_inherit_tree = self.export_inherit_tree
+
+        cims_namespace = self.cims_namespace
+
+        io_prefix = self.io_prefix
+
+        io_uri = self.io_uri
+
+        shapes_base_uri = self.shapes_base_uri
+
+        shapes_ns_prefix = self.shapes_ns_prefix
+
+        shapes_ns_uri = self.shapes_ns_uri
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -79,6 +109,20 @@ class Rdfs2ShaclConfig:
             field_dict["splitDatatypes"] = split_datatypes
         if validate_shapes is not UNSET:
             field_dict["validateShapes"] = validate_shapes
+        if export_inherit_tree is not UNSET:
+            field_dict["exportInheritTree"] = export_inherit_tree
+        if cims_namespace is not UNSET:
+            field_dict["cimsNamespace"] = cims_namespace
+        if io_prefix is not UNSET:
+            field_dict["ioPrefix"] = io_prefix
+        if io_uri is not UNSET:
+            field_dict["ioUri"] = io_uri
+        if shapes_base_uri is not UNSET:
+            field_dict["shapesBaseUri"] = shapes_base_uri
+        if shapes_ns_prefix is not UNSET:
+            field_dict["shapesNsPrefix"] = shapes_ns_prefix
+        if shapes_ns_uri is not UNSET:
+            field_dict["shapesNsUri"] = shapes_ns_uri
 
         return field_dict
 
@@ -100,6 +144,20 @@ class Rdfs2ShaclConfig:
 
         validate_shapes = d.pop("validateShapes", UNSET)
 
+        export_inherit_tree = d.pop("exportInheritTree", UNSET)
+
+        cims_namespace = d.pop("cimsNamespace", UNSET)
+
+        io_prefix = d.pop("ioPrefix", UNSET)
+
+        io_uri = d.pop("ioUri", UNSET)
+
+        shapes_base_uri = d.pop("shapesBaseUri", UNSET)
+
+        shapes_ns_prefix = d.pop("shapesNsPrefix", UNSET)
+
+        shapes_ns_uri = d.pop("shapesNsUri", UNSET)
+
         rdfs_2_shacl_config = cls(
             rdfs_files=rdfs_files,
             output_dir=output_dir,
@@ -107,6 +165,13 @@ class Rdfs2ShaclConfig:
             closed_shapes=closed_shapes,
             split_datatypes=split_datatypes,
             validate_shapes=validate_shapes,
+            export_inherit_tree=export_inherit_tree,
+            cims_namespace=cims_namespace,
+            io_prefix=io_prefix,
+            io_uri=io_uri,
+            shapes_base_uri=shapes_base_uri,
+            shapes_ns_prefix=shapes_ns_prefix,
+            shapes_ns_uri=shapes_ns_uri,
         )
 
 

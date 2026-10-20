@@ -67,6 +67,32 @@ class ValidateCommandTest {
         }
     }
 
+    /** DOC-2: incremental timestamps can come from a config (mcp, serve, run) and the dry run shows them. */
+    @Test
+    void dryRunShowsIncrementalTimestampsFromTheConfigOrTheFlag() throws Exception {
+        Path config = Files.writeString(tempDir.resolve("validate.json"), """
+                {"workflow": "timestamped", "incrementalTimestamps": true}
+                """);
+
+        assertThat(dryRun("--config", config.toString())).containsPattern("incrementalTimestamps\\s*: true");
+        assertThat(dryRun("--workflow", "timestamped")).containsPattern("incrementalTimestamps\\s*: false");
+        assertThat(dryRun("--workflow", "timestamped", "--incremental-timestamps"))
+                .containsPattern("incrementalTimestamps\\s*: true");
+    }
+
+    private static String dryRun(String... options) {
+        PrintStream original = System.out;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+            String[] args = Stream.concat(Stream.of("validate", "--dry-run"), Stream.of(options)).toArray(String[]::new);
+            assertThat(new CommandLine(new CimPalCli()).execute(args)).isEqualTo(ExitCode.OK);
+        } finally {
+            System.setOut(original);
+        }
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
     @Test
     void shaclFilesOptionIsGone() {
         CommandLine validate = new CommandLine(new CimPalCli()).getSubcommands().get("validate");

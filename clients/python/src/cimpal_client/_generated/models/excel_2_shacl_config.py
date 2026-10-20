@@ -33,6 +33,10 @@ class Excel2ShaclConfig:
             output (str): Absolute path for the generated .ttl shape file.
             ns_prefix (Union[Unset, str]): Namespace prefix for generated shapes.
             ns_uri (Union[Unset, str]): Namespace URI for generated shapes.
+            cim_namespace (Union[Unset, str]): CIM namespace URI (default: http://iec.ch/TC57/CIM100#).
+            cims_namespace (Union[Unset, str]): CIMS namespace URI (default: http://iec.ch/TC57/1999/rdf-schema-
+                extensions-19990926#).
+            overwrite (Union[Unset, bool]): Replace an output file that already exists (default false: refused).
      """
 
     rdfs_file: str
@@ -40,6 +44,9 @@ class Excel2ShaclConfig:
     output: str
     ns_prefix: Union[Unset, str] = UNSET
     ns_uri: Union[Unset, str] = UNSET
+    cim_namespace: Union[Unset, str] = UNSET
+    cims_namespace: Union[Unset, str] = UNSET
+    overwrite: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -57,6 +64,12 @@ class Excel2ShaclConfig:
 
         ns_uri = self.ns_uri
 
+        cim_namespace = self.cim_namespace
+
+        cims_namespace = self.cims_namespace
+
+        overwrite = self.overwrite
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -69,6 +82,12 @@ class Excel2ShaclConfig:
             field_dict["nsPrefix"] = ns_prefix
         if ns_uri is not UNSET:
             field_dict["nsUri"] = ns_uri
+        if cim_namespace is not UNSET:
+            field_dict["cimNamespace"] = cim_namespace
+        if cims_namespace is not UNSET:
+            field_dict["cimsNamespace"] = cims_namespace
+        if overwrite is not UNSET:
+            field_dict["overwrite"] = overwrite
 
         return field_dict
 
@@ -87,12 +106,21 @@ class Excel2ShaclConfig:
 
         ns_uri = d.pop("nsUri", UNSET)
 
+        cim_namespace = d.pop("cimNamespace", UNSET)
+
+        cims_namespace = d.pop("cimsNamespace", UNSET)
+
+        overwrite = d.pop("overwrite", UNSET)
+
         excel_2_shacl_config = cls(
             rdfs_file=rdfs_file,
             excel_file=excel_file,
             output=output,
             ns_prefix=ns_prefix,
             ns_uri=ns_uri,
+            cim_namespace=cim_namespace,
+            cims_namespace=cims_namespace,
+            overwrite=overwrite,
         )
 
 

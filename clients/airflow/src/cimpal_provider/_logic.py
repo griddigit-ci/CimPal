@@ -76,7 +76,7 @@ PATH_FIELDS: dict[str, dict[str, str]] = {
     "organize": {"shaclFiles": READ, "templateXlsx": READ, "outputDir": WRITE_DIR},
     "excel2shacl": {"rdfsFile": READ, "excelFile": READ, "output": WRITE_FILE},
     "gen-instances": {"templateXlsx": READ, "output": WRITE_FILE},
-    "manifest": {"dir": READ, "files": READ, "output": WRITE_FILE},
+    "manifest": {"dir": READ, "files": READ_LIST, "output": WRITE_FILE},
 }
 
 

@@ -38,6 +38,11 @@ class ConvertConfig:
             xml_base (Union[Unset, str]): Base URI for parsing RDF/XML files.
             sort (Union[Unset, bool]): Sort triples for deterministic, diffable output.
             rdf_format (Union[Unset, str]): RDF/XML sub-format: RDFXML_PLAIN (default), RDFXML_ABBREV, CIMXML, RDFS_CIMXML.
+            source_format (Union[Unset, str]): Source format: RDFXML, TURTLE, JSONLD (default: from the input's extension).
+            target_format (Union[Unset, str]): Target format: RDFXML, TURTLE, JSONLD (default: from the output's extension).
+            sort_by_prefix (Union[Unset, bool]): Sort by namespace prefix (with 'sort').
+            strip_prefixes (Union[Unset, bool]): Leave out namespace prefix declarations.
+            overwrite (Union[Unset, bool]): Replace an output file that already exists (default false: refused).
      """
 
     output: str
@@ -46,6 +51,11 @@ class ConvertConfig:
     xml_base: Union[Unset, str] = UNSET
     sort: Union[Unset, bool] = UNSET
     rdf_format: Union[Unset, str] = UNSET
+    source_format: Union[Unset, str] = UNSET
+    target_format: Union[Unset, str] = UNSET
+    sort_by_prefix: Union[Unset, bool] = UNSET
+    strip_prefixes: Union[Unset, bool] = UNSET
+    overwrite: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -69,6 +79,16 @@ class ConvertConfig:
 
         rdf_format = self.rdf_format
 
+        source_format = self.source_format
+
+        target_format = self.target_format
+
+        sort_by_prefix = self.sort_by_prefix
+
+        strip_prefixes = self.strip_prefixes
+
+        overwrite = self.overwrite
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -85,6 +105,16 @@ class ConvertConfig:
             field_dict["sort"] = sort
         if rdf_format is not UNSET:
             field_dict["rdfFormat"] = rdf_format
+        if source_format is not UNSET:
+            field_dict["sourceFormat"] = source_format
+        if target_format is not UNSET:
+            field_dict["targetFormat"] = target_format
+        if sort_by_prefix is not UNSET:
+            field_dict["sortByPrefix"] = sort_by_prefix
+        if strip_prefixes is not UNSET:
+            field_dict["stripPrefixes"] = strip_prefixes
+        if overwrite is not UNSET:
+            field_dict["overwrite"] = overwrite
 
         return field_dict
 
@@ -106,6 +136,16 @@ class ConvertConfig:
 
         rdf_format = d.pop("rdfFormat", UNSET)
 
+        source_format = d.pop("sourceFormat", UNSET)
+
+        target_format = d.pop("targetFormat", UNSET)
+
+        sort_by_prefix = d.pop("sortByPrefix", UNSET)
+
+        strip_prefixes = d.pop("stripPrefixes", UNSET)
+
+        overwrite = d.pop("overwrite", UNSET)
+
         convert_config = cls(
             output=output,
             input_=input_,
@@ -113,6 +153,11 @@ class ConvertConfig:
             xml_base=xml_base,
             sort=sort,
             rdf_format=rdf_format,
+            source_format=source_format,
+            target_format=target_format,
+            sort_by_prefix=sort_by_prefix,
+            strip_prefixes=strip_prefixes,
+            overwrite=overwrite,
         )
 
 
