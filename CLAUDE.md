@@ -89,13 +89,6 @@ Core tests run on the classpath (`useModulePath=false`) so they can reach packag
 
 Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Before refactoring Core behaviour, add characterisation tests that capture the current output. Build small synthetic RDF/SHACL fixtures under `@TempDir`, and don't depend on files outside the repo. `MappingValidatorTest` is the reference example.
 
-- **Test support** lives in Core's `eu.griddigit.cimpal.core.testsupport` (test scope). CLI and Main get it through the Core `test-jar` (`<type>test-jar</type>`, test scope). It holds:
-  - `TestModels`: synthetic EQ/SSH models and SHACL shapes.
-  - `Fixtures`: `src/test/resources/fixtures/<feature>/`.
-  - `Snapshots`: golden files under `src/test/resources/snapshots/<feature>/`. RDF is compared by isomorphism, workbooks as CSV, JSON with sorted keys.
-  - `Normalizer`: timestamps, paths, blank-node labels.
-  - `StubHttpServer`: a loopback HTTP stub.
-- **Snapshots** are only rewritten with `-Dsnapshot.update=true`. Otherwise a mismatch fails with a line diff. Review the diff before committing.
 - **Coverage ratchet:** `mvn verify` runs JaCoCo in every module, with the aggregate report in `CimPal-Coverage/target/site/jacoco-aggregate/`. It fails if a module drops below the floors in its `coverage-baseline.properties`, which are the measured value minus 0.5 pp. After coverage rises, run `scripts/Update-CoverageBaseline.ps1` and commit the updated files. Floors only go up unless `-AllowDecrease` is given, and that commit must say why.
 
 ## Git and releases
