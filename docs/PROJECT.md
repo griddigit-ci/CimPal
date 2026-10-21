@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-21 (SEC-3: MCP output hygiene and the Python interpreter; TEST-3 convert and sparql; ID mapping, `id-map`)  
+**Last updated:** 2026-10-21 (SEC-3: MCP output hygiene and the Python interpreter; TEST-6: GUI smoke tests and the `GuiDialogs` seam; TEST-3 convert/sparql tests; ID mapping, `id-map`)  
 **Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
