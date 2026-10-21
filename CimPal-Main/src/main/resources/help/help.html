@@ -387,6 +387,7 @@ table.gloss td:first-child { white-space: nowrap; font-weight: 600; }
   <a class="sub" href="#tab-rdfs-union">RDFS Union</a>
   <div class="subgroup">Dataset</div>
   <a class="sub" href="#tab-instance-data-comparison">Comparison</a>
+  <a class="sub" href="#tab-id-mapping">ID Mapping</a>
   <a class="sub" href="#tab-generate-instance-data">Generate</a>
   <a class="sub" href="#tab-task-wizard">Task Wizard</a>
   <a class="sub" href="#tab-validation-by-mapping">SHACL Validation</a>
@@ -1508,6 +1509,83 @@ read, it can report instance counts per class instead.</p>
 </div>
 </details>
 
+<details class="fn" id="tab-id-mapping">
+<summary><span class="kind">Tab</span> Dataset Operations &#9656; ID Mapping</summary>
+<div class="fn-body">
+
+<h4>Business logic</h4>
+<p>Two CIM/CGMES models of the same grid often use different IDs, for example two EQ files from
+one tool and one merged EQ built by another. ID Mapping finds which object in <em>model 1</em> is
+which object in <em>model 2</em> and writes a workbook with the mapping and with everything it
+could not map, so a person can finish the job.</p>
+<p>It works from the network structure, not from names alone. Lines between substations are
+matched first (sections chained through line-internal nodes count as one line, also when the
+Line container is missing); then substations, from their names and from the lines between them;
+then everything inside each matched substation by its place in the topology (busbars, switches,
+transformers, loads, machines, nodes); then terminals, transformer ends, containers, tap changers,
+limits and similar objects that follow. A substation that only joins line sections (a
+PowerFactory <code>Term_</code> point, a cable sealing end) is treated as part of the line, and
+substations joined by a transformer or switch count as one station, so a model that keeps each
+voltage level as a substation of its own still matches.</p>
+<p>Nothing is guessed: when two candidates are equally good, both objects go to the Unmatched
+sheet with the candidates. Each match is graded <em>certain</em> (the evidence leaves no other
+reading) or <em>probable</em> (check it; the Note says why). The models are read through SPARQL
+queries bundled with CimPal, which can also be run on their own.</p>
+
+<h4>Inputs</h4>
+<table class="io">
+<tr><th>Control</th><th>Type</th><th>Meaning</th></tr>
+<tr><td>Model 1 files</td><td>files, required</td>
+    <td>The model whose IDs are mapped (one or more EQ files, or ZIPs of them); its IDs fill the
+        Model1_ID column. Several files are read as one model.</td></tr>
+<tr><td>Model 2 files</td><td>files, required</td>
+    <td>The model the IDs are mapped to; its IDs fill Model2_ID.</td></tr>
+<tr><td>Common files</td><td>files, optional</td>
+    <td>Loaded into both models and not mapped: the boundary set (its nodes anchor the tie lines)
+        and the file with the BaseVoltages (EQ boundary for CGMES 2.4.15, common data for CGMES
+        3.0).</td></tr>
+<tr><td>Name aliases</td><td>file, optional</td>
+    <td>CSV for substations named differently in the two models: one substation per line, its
+        names separated by <code>;</code> or <code>,</code> (e.g. a station code and the full
+        name).</td></tr>
+<tr><td>Output workbook</td><td>file, required</td>
+    <td>Where to save the mapping (<code>.xlsx</code>, or <code>.xls</code> for the old
+        format).</td></tr>
+<tr><td>Matching options</td><td>checkboxes</td>
+    <td>Start from substations with the same name; match objects with the same ID first; treat
+        line-junction substations as part of the line; treat substations joined by a transformer or
+        switch as one station. All on by default.</td></tr>
+<tr><td>Mapped objects</td><td>checkboxes</td>
+    <td>Whether terminals, connectivity nodes, dependent objects (tap changers, limits, controls,
+        units) and other objects (limit types, regions, load groups) are mapped and reported.</td></tr>
+<tr><td>Tolerances</td><td>numbers</td>
+    <td>Line r, x, bch and length agree within the parameter tolerance (%), voltages within the kV
+        tolerance. They tell parallel lines apart; a difference is reported in the Note, not a
+        reason to reject a line the topology identifies.</td></tr>
+<tr><td>Model2_2nd_name from</td><td>choice</td>
+    <td>Which name of the model 2 object to report: name, shortName or description. A line
+        section gets its Line's name, with its own name in brackets.</td></tr>
+</table>
+
+<h4>Outputs</h4>
+<ul>
+  <li><em>Matched</em> sheet: Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence,
+      Model1_name, Model2_type, Method, Note.</li>
+  <li><em>Unmatched</em> sheet: the objects of either model left unmapped, with the reason and the
+      candidates. Classes only one model has (for example measurements) are counted in the
+      Summary, not listed.</li>
+  <li><em>Summary</em> sheet: for each model, the share of objects matched with certainty, probably,
+      and not matched; counts per class and per method; model statistics.</li>
+  <li>Progress in the Output window and the percentages in the message shown at the end.</li>
+</ul>
+<p>The same function runs headless as <code>java -jar CimPal-CLI.jar id-map --model1 &hellip;
+--model2 &hellip; --output &hellip;</code>.</p>
+
+<p class="src">Source: <code>IdMappingController.actionRun()</code>,
+<code>eu.griddigit.cimpal.core.idmapping.IdMapper</code></p>
+</div>
+</details>
+
 <details class="fn" id="tab-generate-instance-data">
 <summary><span class="kind">Tab</span> Dataset Operations &#9656; Generate</summary>
 <div class="fn-body">
@@ -2624,7 +2702,7 @@ are written and run. See that tab for inputs and outputs.</p>
 <code>CimPal-CLI.jar</code> distribution: the desktop application neither installs nor starts it.
 Use a CLI release compatible with your CimPal Core version. The historical CLI command set covers
 <code>validate</code>, <code>sparql</code>, <code>convert</code>, <code>compare</code>,
-<code>compare-instances</code>, <code>rdfs2shacl</code>, <code>excel2shacl</code>,
+<code>compare-instances</code>, <code>id-map</code>, <code>rdfs2shacl</code>, <code>excel2shacl</code>,
 <code>organize</code>, <code>gen-instances</code>, <code>manifest</code>, <code>run</code>,
 <code>serve</code> and <code>mcp</code>. Confirm the commands in your JAR:</p>
 <pre><code>java -jar CimPal-CLI.jar --help

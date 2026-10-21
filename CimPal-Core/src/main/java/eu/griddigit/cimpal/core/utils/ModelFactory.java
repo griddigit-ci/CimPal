@@ -436,7 +436,7 @@ public class ModelFactory {
 
     /** Receives one file entry of an archive walked by {@link #forEachZipEntry(Path, ZipEntryConsumer)}. */
     @FunctionalInterface
-    interface ZipEntryConsumer {
+    public interface ZipEntryConsumer {
         /**
          * @param name the entry's path in the archive, normalised to {@code /} separators. An entry
          *             of a nested archive is named {@code <nested archive's name>/<entry>}.
@@ -455,7 +455,7 @@ public class ModelFactory {
      * @throws IOException if the archive cannot be read, exceeds a limit, or has an entry whose
      *                     path is absolute or climbs out of the archive
      */
-    static void forEachZipEntry(Path zip, ZipEntryConsumer consumer) throws IOException {
+    public static void forEachZipEntry(Path zip, ZipEntryConsumer consumer) throws IOException {
         forEachZipEntry(zip, new ZipBudget(), consumer);
     }
 
