@@ -1,0 +1,4 @@
+## SPARQL Results
+s,value,flag,count,when,label,node
+ex:a,1.5,true,3,2026-01-01T00:00:00Z,Alpha,_:<BNODE>
+ex:b,2.5,,,,Beta

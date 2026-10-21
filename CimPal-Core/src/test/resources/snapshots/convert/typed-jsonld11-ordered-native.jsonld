@@ -1,0 +1,13 @@
+{
+    "@id": "http://example.com/data#_gen1",
+    "ex:note": "typed values",
+    "cim:SynchronousMachine.referencePriority": 2,
+    "cim:Equipment.aggregate": false,
+    "cim:RotatingMachine.ratedS": 100.0,
+    "@context": {
+        "xsd": "http://www.w3.org/2001/XMLSchema#",
+        "dcterms": "http://purl.org/dc/terms/",
+        "ex": "urn:test:typed#",
+        "cim": "http://iec.ch/TC57/CIM100#"
+    }
+}

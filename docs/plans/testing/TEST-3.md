@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (validation and SHACL generation groups merged into devel 2026-10-09; other groups not started) |
+| Status | In progress (validation and SHACL generation groups merged into devel 2026-10-09; convert and sparql groups written 2026-10-21 on `feature/test-3-convert-sparql`; comparisons, gen-instances + manifest and kgcl not started) |
 | Phase | 2 |
 | Depends on | TEST-1 |
 | Size | L (one session per feature group) |
@@ -38,10 +38,10 @@ Capture the current behaviour of every Core feature with golden-output tests, so
 | RDFS → SHACL (2019, 2020, closed, split datatypes) | `SHACLFromRDF` | [x] | [ ] `rdfs2shacl` | [ ] |
 | Excel → SHACL | `ShaclFromXls` | [x] | [ ] `excel2shacl` | [ ] |
 | SHACL organise | `ShaclOrganizer` | [x] | [ ] `organize` | [ ] |
-| RDF convert (XML, Turtle, JSON-LD, CIMXML, sort, union) | `RDFConverter` | [ ] | [ ] `convert` | [ ] |
+| RDF convert (XML, Turtle, JSON-LD, CIMXML, sort, union) | `RDFConverter` | [x] | [ ] `convert` | [ ] |
 | Compare RDFS / SHACL / CIMTool | `Comparison*` | [ ] | [ ] `compare` | [ ] |
 | Compare instances (DL/SV/TP ignores) | `ComparisonInstanceData` | [ ] | [ ] `compare-instances` | [ ] |
-| SPARQL SELECT + Excel/CSV export | `SparqlTools` | [ ] | [ ] `sparql` | [ ] |
+| SPARQL SELECT + Excel/CSV export | `SparqlTools` | [x] (Excel; the CSV export is in the CLI, for TEST-4) | [ ] `sparql` | [ ] |
 | Instance generation from Excel | `InstanceDataBuilder/Writer` | [ ] | [ ] `gen-instances` | [ ] |
 | Manifest generation | `ManifestGenerator` | [ ] | [ ] `manifest` | [ ] |
 | Pipelines | `RunCommand` | — | [ ] `run` | — |
@@ -62,6 +62,8 @@ Each has an `@Disabled` test that asserts the correct behaviour and fails today 
 | G2 | CLI `rdfs2shacl` | `--io-uri` defaults to the mRID property URI (`cim:IdentifiedObject.mRID`) and is documented as such. The converter uses it as the namespace of the shared IdentifiedObject shapes (the GUI passes `http://iec.ch/TC57/ns/CIM/IdentifiedObject/constraints/3.0#`), so the CLI writes shapes like `cim:IdentifiedObject.mRIDIdentifiedObject.mRID-datatype` into the CIM namespace. | CLI `RdfsToShaclCommandTest.defaultsKeepGeneratedShapesOutOfTheCimNamespace` |
 | G3 | `ShaclFromXls` | Numeric Excel cells are read as doubles, so `sh:minLength`/`sh:maxLength` are written as ill-formed literals such as `"32.0"^^xsd:integer`. | `ShaclFromXlsTest.lengthLimitsAreValidIntegers` |
 | G4 | `ExcelTools.importXLSX` | A missing or unreadable workbook is reported on stderr and gives no rows, so excel2shacl writes a shapes model with only the group in it, without an error. The CLI checks that the file exists first; the Core API doesn't. | `ShaclFromXlsTest.missingWorkbookIsAnError` |
+| C1 | `RDFConverter` (detailed union) | For an enumeration in the deletion package, the members typed with `rdf:type` lose only that triple: the loop collects the class's own statements again instead of the member's, so the member's label (and anything else) stays as an orphan. Members found by the `Enum.member` naming convention are removed fully. | `RDFConverterTest.detailedUnionRemovesEveryStatementOfADeletedEnumerationsMembers` |
+| C2 | `RDFConverter` (JSON-LD 1.1) | `jsonLdOrdered` (the GUI's "Ordered" checkbox) is set on the Titanium options, but the output is the same with and without it: the keys of a node are not sorted. Native types, by contrast, do take effect. | `RDFConverterTest.orderedJsonLdSortsTheKeysOfEachNode` |
 
 ## Instructions for Claude Code
 
@@ -96,6 +98,10 @@ Standard footer (applies to every work package):
 | 2026-10-02 | rdfs2shacl, excel2shacl and organize branch off `devel`; none of them depends on SEC-5. | Claude Code |
 | 2026-10-02 | The RDFS inputs are two synthetic profiles written for the tests (`fixtures/shacl-generation/`), in the CimSyntaxGen layout: RDFS 2020 with the CIM100 namespace (CGMES 3.0) and RDFS 2019 with the CIM16 namespace (CGMES 2.4.15). The real profiles bundled in CimPal-Main are not used. | Claude Code |
 | 2026-10-02 | The Core test-jar now also carries `fixtures/**`, so CLI and Main tests can share the synthetic fixtures. | Claude Code |
+| 2026-10-21 | convert and sparql in one session, branched off `devel` (69321d1). Instance inputs are built in code (`TestModels.eq()`; CGMES 2.4 by swapping in the CIM16 namespace and profile); RDFS paths reuse `fixtures/shacl-generation/` plus a small Turtle delta and a JSON-LD SSH file in `fixtures/convert/`. | Maintainer |
+| 2026-10-21 | Turtle and JSON-LD outputs are compared by isomorphism only; RDF/XML, CIMXML and RDFS CIMXML also by text, because ordering and layout are what sort, sort-by-prefix and the writers do. The CIMXML text was identical over three runs (and a regeneration gave no diff), so no isomorphism-only fallback was needed. The ordered JSON-LD output is a text snapshot too (stable; see C2). | Maintainer / Claude Code |
+| 2026-10-21 | SPARQL results are snapshotted as tab-separated text (columns, then rows) with an ORDER BY in every query; Excel exports go through `assertExcelEquals`; blank-node labels are normalised. | Maintainer |
+| 2026-10-21 | CimPal-CustomWriter has no coverage ratchet baseline; none added here (follow-up). | Maintainer |
 
 ## Notes and results
 
@@ -144,3 +150,33 @@ Findings (current behaviour, pinned, not bugs):
 - **excel2shacl literals built from Java doubles compare equal to the Turtle output only after a round trip**, so those snapshots compare the model as written.
 
 Left open: the convert, comparisons, sparql, gen-instances + manifest and kgcl groups (validation merged into devel on 2026-10-09).
+
+### convert + sparql, 2026-10-21
+
+- **Tests:** Core 484 → 528 (skipped 8 → 10: C1 and C2); Main 65 and CLI unchanged. Core coverage: line 54.7% → 58.1%, branch 40.4% → 43.9% (`mvn clean verify`; floors 0.5763 / 0.4336). The CLI (79.0% line) and Main (7.7%) measured above their floors too, but their floors were left alone: several CLI tests are gated by assumptions (OS, sockets, Docker), so a 0.5 pp margin measured on Windows could fail on CI. `RDFConverter` lines 166/509 → 469/509 (branch 246/298); `SparqlTools` 6/115 → 114/115.
+- **`RDFConverterTest`** (10 kept, +33, of which 2 disabled):
+  - CGMES 3.0 and 2.4 instance data to the legacy Turtle and JSON-LD targets, JSON-LD 1.1 default, and ordered with native types (typed literals).
+  - Jena RDF/XML plain, abbrev and pretty; CIMXML unsorted, sorted, sorted by prefix and sorted as instance data; RDFS CIMXML sorted (RDFS 2020) and unsorted (RDFS 2019).
+  - A union of RDF/XML, JSON-LD and Turtle files; the detailed union with the "notDefined" stereotype found automatically and the package fixed from `dcat:keyword`, and with stereotype, package and ontology URI configured as prefixed names (written as RDFS CIMXML); an unknown prefix (`IllegalArgumentException`).
+  - Inheritance only, inheritance list (all and concrete), add OWL, strip prefixes (prefix map as text), dropping ontology headers (one with `sh:declare` stays), `removeDuplicateShDeclareBlankNodes`.
+  - Empty Turtle (empty model, only `dcterms` declared), empty RDF/XML and malformed Turtle (`RiotException`), missing sources (`IllegalStateException` from the builder), writing before `convert()`.
+- **`SparqlToolsTest`** (new, 11): SELECT on CGMES 3.0 (in-memory model) and 2.4 (`loadModelFromXML`), value rendering (decimal, double, boolean, integer, dateTime, language tag, blank node, unbound), an empty result, both Excel exports (same cells), non-SELECT, blank query, empty or null model, null query file, malformed query (`QueryParseException`), `loadModelFromXML` with `.ttl` and `.XML`.
+- **Snapshots:** 26 in `snapshots/convert/` (14 `.ttl`, 10 `.xml`, 1 `.jsonld`, 1 `.txt`), 6 in `snapshots/sparql/`. Generated with `-Dsnapshot.update=true`; three normal runs passed, and regenerating gave no diff. No `file:` IRI or temp path leaks into any output (asserted).
+- **Deliberate breaks** (local only, each reverted):
+  1. `jsonLd.setOrdered(!...)`: **stayed green**, which is how C2 was found.
+  2. `properties.put("sortRDF", ...)` removed: 5 red (every sorted CIMXML and RDFS CIMXML text snapshot).
+  3. `stripPrefixes` skipped: 1 red (`goldenStripPrefixes`).
+  4. The `cims:stereotype` deletion filter disabled: 2 red (both detailed-union snapshot tests).
+  5. SPARQL rows reversed before returning: 4 red (every multi-row SELECT snapshot).
+  6. One triple of `snapshots/convert/eq30-turtle.ttl` hand-edited: 1 red (isomorphism mismatch).
+- The two `@Disabled` tests fail when run with `-Djunit.jupiter.conditions.deactivate=org.junit.*DisabledCondition`.
+
+Findings (current behaviour, pinned, not bugs):
+- **`SparqlTools.loadModelFromXML` reads against the CIM16 schema URI**, so `rdf:ID` objects become IRIs in the cim namespace (also for CGMES 3.0 files) and are shown as `cim:_t1`.
+- **CIMXML writes `rdf:about="#_x"` for objects that had `rdf:ID`**, also for EQ data, with the CLI's settings (`relativeURIs=same-document`).
+- **Every output declares `dcterms`**, used or not (`normaliseDctermsPrefix`); the inheritance list keeps the source's `dct` prefix because it is written from a separate model.
+- **The detailed union keeps the ontology header with the most statements** (the last one on a tie) and drops the others' statements.
+- **Native JSON-LD types are lossy**: `xsd:float` comes back as `xsd:double`.
+- **`convert()`'s own "No source file(s)" check is unreachable** through the builder, which refuses the options first.
+
+Left open: the comparisons, gen-instances + manifest and kgcl groups; a coverage baseline for CimPal-CustomWriter.

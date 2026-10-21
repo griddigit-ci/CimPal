@@ -1,0 +1,37 @@
+PREFIX cim:     <http://iec.ch/TC57/2013/CIM-schema-cim16#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX md:      <http://iec.ch/TC57/61970-552/ModelDescription/1#>
+PREFIX rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+<http://example.com/data#_t2>
+        rdf:type                   cim:Terminal;
+        cim:ACDCTerminal.sequenceNumber
+                "2";
+        cim:IdentifiedObject.name  "T2";
+        cim:Terminal.ConductingEquipment
+                <http://example.com/data#_line1> .
+
+<urn:uuid:00000000-0000-0000-0000-000000000001>
+        rdf:type               md:FullModel;
+        md:Model.profile       "http://entsoe.eu/CIM/EquipmentCore/3/1";
+        md:Model.scenarioTime  "2026-01-01T00:00:00Z" .
+
+<http://example.com/data#_line1>
+        rdf:type                   cim:ACLineSegment;
+        cim:ACLineSegment.r        "0.5";
+        cim:ACLineSegment.x        "4.25";
+        cim:Equipment.EquipmentContainer
+                <http://example.com/data#_area1>;
+        cim:IdentifiedObject.name  "Line 1" .
+
+<http://example.com/data#_t1>
+        rdf:type                   cim:Terminal;
+        cim:ACDCTerminal.sequenceNumber
+                "1";
+        cim:IdentifiedObject.name  "T1";
+        cim:Terminal.ConductingEquipment
+                <http://example.com/data#_line1> .
+
+<http://example.com/data#_area1>
+        rdf:type                   cim:GeographicalRegion;
+        cim:IdentifiedObject.name  "Area & <1>" .

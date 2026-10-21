@@ -1,0 +1,189 @@
+PREFIX cim:     <http://iec.ch/TC57/CIM100#>
+PREFIX cims:    <http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#>
+PREFIX dcat:    <http://www.w3.org/ns/dcat#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX mdl:     <http://example.com/ns/MiniDelta-EU#>
+PREFIX meq:     <http://example.com/ns/MiniEquipment-EU#>
+PREFIX owl:     <http://www.w3.org/2002/07/owl#>
+PREFIX rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX unused:  <http://example.com/ns/Unused#>
+
+cim:Float  rdf:type             rdfs:Class;
+        rdfs:label              "Float"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         "Primitive" .
+
+cim:ACLineSegment  rdf:type     rdfs:Class;
+        rdfs:label              "ACLineSegment"@en;
+        rdfs:subClassOf         cim:ConductingEquipment;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         <http://iec.ch/TC57/NonStandard/UML#concrete> .
+
+cim:Terminal.phases  rdf:type  rdf:Property;
+        rdfs:domain        cim:Terminal;
+        rdfs:label         "phases"@en;
+        rdfs:range         cim:PhaseCode;
+        cims:multiplicity  cims:M:0..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+cim:PhaseCode.A  rdf:type  cim:PhaseCode;
+        rdfs:label       "A"@en;
+        cims:stereotype  "enum" .
+
+cim:Equipment  rdf:type         rdfs:Class;
+        rdfs:label              "Equipment"@en;
+        rdfs:subClassOf         cim:IdentifiedObject;
+        cims:belongsToCategory  mdl:Package_MDProfile .
+
+cim:Resistance  rdf:type        rdfs:Class;
+        rdfs:label              "Resistance"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         "CIMDatatype" .
+
+cim:Terminal.ConductingEquipment
+        rdf:type              rdf:Property;
+        rdfs:domain           cim:Terminal;
+        rdfs:label            "ConductingEquipment"@en;
+        rdfs:range            cim:ConductingEquipment;
+        cims:AssociationUsed  "Yes";
+        cims:inverseRoleName  cim:ConductingEquipment.Terminals;
+        cims:multiplicity     cims:M:1 .
+
+cim:IdentifiedObject.mRID
+        rdf:type           rdf:Property;
+        rdfs:domain        cim:IdentifiedObject;
+        rdfs:label         "mRID"@en;
+        cims:dataType      cim:String;
+        cims:multiplicity  cims:M:0..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+cim:ObsoleteKind.typed
+        rdfs:label  "typed"@en .
+
+cim:Resistance.multiplier
+        rdf:type           rdf:Property;
+        rdfs:domain        cim:Resistance;
+        rdfs:label         "multiplier"@en;
+        rdfs:range         cim:UnitMultiplier;
+        cims:isFixed       "none";
+        cims:multiplicity  cims:M:0..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+cim:ConductingEquipment
+        rdf:type                rdfs:Class;
+        rdfs:label              "ConductingEquipment"@en;
+        rdfs:subClassOf         cim:Equipment;
+        cims:belongsToCategory  mdl:Package_MDProfile .
+
+cim:Boolean  rdf:type           rdfs:Class;
+        rdfs:label              "Boolean"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         "Primitive" .
+
+cim:Resistance.value  rdf:type  rdf:Property;
+        rdfs:domain        cim:Resistance;
+        rdfs:label         "value"@en;
+        cims:dataType      cim:Float;
+        cims:multiplicity  cims:M:0..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+cim:ACLineSegment.r  rdf:type  rdf:Property;
+        rdfs:domain        cim:ACLineSegment;
+        rdfs:label         "r"@en;
+        cims:dataType      cim:Resistance;
+        cims:multiplicity  cims:M:0..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+cim:String  rdf:type            rdfs:Class;
+        rdfs:label              "String"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         "Primitive" .
+
+cim:UnitMultiplier  rdf:type    rdfs:Class;
+        rdfs:label              "UnitMultiplier"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         <http://iec.ch/TC57/NonStandard/UML#enumeration> .
+
+cim:IdentifiedObject  rdf:type  rdfs:Class;
+        rdfs:label              "IdentifiedObject"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile .
+
+cim:Equipment.aggregate
+        rdf:type           rdf:Property;
+        rdfs:domain        cim:Equipment;
+        rdfs:label         "aggregate"@en;
+        cims:dataType      cim:Boolean;
+        cims:multiplicity  cims:M:0..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+cim:PhaseCode.ABC  rdf:type  cim:PhaseCode;
+        rdfs:label       "ABC"@en;
+        cims:stereotype  "enum" .
+
+cim:Breaker  rdf:type           rdfs:Class;
+        rdfs:label              "Breaker"@en;
+        rdfs:subClassOf         cim:ConductingEquipment;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         <http://iec.ch/TC57/NonStandard/UML#concrete> .
+
+cim:PhaseCode  rdf:type         rdfs:Class;
+        rdfs:label              "PhaseCode"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         <http://iec.ch/TC57/NonStandard/UML#enumeration> .
+
+cim:UnitSymbol  rdf:type        rdfs:Class;
+        rdfs:label              "UnitSymbol"@en;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         <http://iec.ch/TC57/NonStandard/UML#enumeration> .
+
+cim:UnitMultiplier.none
+        rdf:type         cim:UnitMultiplier;
+        rdfs:label       "none"@en;
+        cims:stereotype  "enum" .
+
+cim:Terminal  rdf:type          rdfs:Class;
+        rdfs:label              "Terminal"@en;
+        rdfs:subClassOf         cim:IdentifiedObject;
+        cims:belongsToCategory  mdl:Package_MDProfile;
+        cims:stereotype         <http://iec.ch/TC57/NonStandard/UML#concrete> .
+
+mdl:Package_MDProfile
+        rdf:type      cims:ClassCategory;
+        rdfs:comment  "This is a package for the MD profile.";
+        rdfs:label    "MDProfile"@en .
+
+cim:UnitSymbol.ohm  rdf:type  cim:UnitSymbol;
+        rdfs:label       "ohm"@en;
+        cims:stereotype  "enum" .
+
+cim:ConductingEquipment.Terminals
+        rdf:type              rdf:Property;
+        rdfs:domain           cim:ConductingEquipment;
+        rdfs:label            "Terminals"@en;
+        rdfs:range            cim:Terminal;
+        cims:AssociationUsed  "No";
+        cims:inverseRoleName  cim:Terminal.ConductingEquipment;
+        cims:multiplicity     cims:M:0..n .
+
+cim:Resistance.unit  rdf:type  rdf:Property;
+        rdfs:domain        cim:Resistance;
+        rdfs:label         "unit"@en;
+        rdfs:range         cim:UnitSymbol;
+        cims:isFixed       "ohm";
+        cims:multiplicity  cims:M:0..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+cim:IdentifiedObject.name
+        rdf:type           rdf:Property;
+        rdfs:domain        cim:IdentifiedObject;
+        rdfs:label         "name"@en;
+        cims:dataType      cim:String;
+        cims:multiplicity  cims:M:1..1;
+        cims:stereotype    <http://iec.ch/TC57/NonStandard/UML#attribute> .
+
+mdl:Ontology  rdf:type   owl:Ontology;
+        dcterms:title    "Mini Delta Vocabulary"@en;
+        owl:versionIRI   <http://example.com/ns/MiniDelta-EU/3.0>;
+        owl:versionInfo  "3.0.1"@en;
+        dcat:keyword     "MD" .

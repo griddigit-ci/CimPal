@@ -1,0 +1,4 @@
+terminal	name	sequence	equipment
+cim:_t1	T1	1	cim:_line1
+cim:_t2	T2	2	cim:_line1
+cim:_t3	T3		cim:_line1
