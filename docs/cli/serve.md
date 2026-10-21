@@ -92,9 +92,12 @@ Or press `Ctrl-C`. The token file is removed when the server stops.
 | `--work-max-bytes` | integer | `21474836480` (20 GiB) | Disk space for uploads and job outputs together; an upload that doesn't fit gets 507. |
 | `--request-read-time` | ISO-8601 duration | `PT60S` (at most `PT2H`) | Time a client has to send a whole request, body included. It protects against slow clients; raise it for large uploads sent without a buffering proxy (a proxy receives the upload first and forwards it fast). |
 
+| `--python-executable` | path | `CIMPAL_PYTHON_EXECUTABLE`, else `python` / `py -3` on `PATH` | Absolute path of the Python interpreter for the `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` engines. A relative or missing path, or a UNC (network) or device path, ends `serve` at start with exit 2. No request can choose the interpreter. See [validate](validate.md#validation-engines). |
+
 | Environment variable | Description |
 |---|---|
 | `CIMPAL_API_TOKEN` | Use this token instead of generating one (at least 32 characters). No token file is written. Useful when a supervisor starts the server and hands the token to the agent. |
+| `CIMPAL_PYTHON_EXECUTABLE` | Absolute path of the Python interpreter when `--python-executable` isn't given; checked at start like the flag. |
 
 ---
 
@@ -150,6 +153,8 @@ Limits that protect the server itself:
 - A request (headers and body) must arrive within 60 seconds, so a client can't hold a connection open by sending slowly. Commands that run longer than that are not affected. This is the JDK setting `sun.net.httpserver.maxReqTime`; set `-Dsun.net.httpserver.maxReqTime=<seconds>` to change it. It applies to the whole JVM, and a body that takes longer than this to upload (e.g. a large body over a slow `--allow-remote` link) is dropped.
 - This bounds how long one connection is held, not how many a client opens. A local process that keeps opening slow connections can still slow the server down. That is a limit of this design, and it needs local access unless `--allow-remote` is used.
 - `--queue-size` and `--workers` can be at most 64, and `--max-body-bytes` at most 64 MB.
+
+Results carry text from the input files (IRIs, literals, messages, file names) unchanged; unlike [`mcp`](mcp.md#untrusted-data-in-tool-results), `serve` doesn't cut or rewrite them, because its clients are programs that parse the JSON. If an AI agent reads `serve` results, treat them as untrusted data, not as instructions.
 
 ---
 

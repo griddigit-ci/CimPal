@@ -33,7 +33,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | 2 | [SEC-5](security/SEC-5.md) | Fix the findings reported by TEST-2 | TEST-2, SEC-2 | S | In review (PR #49) |
 | 2 | [TEST-3](testing/TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | In progress (validation and SHACL generation groups merged; convert and sparql groups on `feature/test-3-convert-sparql`; comparisons, gen-instances + manifest and kgcl open) |
 | 2 | [TEST-4](testing/TEST-4.md) | CLI contract, packaged JAR and protocol tests | TEST-1 | M | Not started |
-| 3 | [SEC-3](security/SEC-3.md) | MCP output hygiene and external engines | SEC-2 | S | Not started |
+| 3 | [SEC-3](security/SEC-3.md) | MCP output hygiene and external engines | SEC-2 | S | In review (branch `feature/sec-3-mcp-hygiene`, not pushed) |
 | 3 | [CI-2](ci/CI-2.md) | Supply chain and release integrity | CI-1 | M | Not started |
 | 3 | [CI-3](ci/CI-3.md) | Docker image | CI-1, SEC-1 | M | In review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) |
 | 3 | [SEC-4](security/SEC-4.md) | Governance and re-attestation | SEC-1, SEC-2, SEC-3 | S (maintainer signs) | Not started |

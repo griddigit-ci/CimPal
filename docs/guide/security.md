@@ -56,6 +56,16 @@ Direct use of the other commands from a shell is not restricted. The operating s
 - **Limits:** request bodies up to 1 MB, one command at a time with a queue of 4, and a 30-minute timeout per request. All are configurable.
 - **Shutdown:** `POST /shutdown` with an admin token, SIGTERM or Ctrl-C. Queued jobs are cancelled, and a running command gets `--shutdown-grace` (60 s) to finish.
 
+## `mcp` and AI agents
+
+- **Untrusted text:** tool results carry text from the input files, which may be written to look like instructions. Every string in a result is cut at 300 characters, control characters and line breaks are replaced, and each result comes with a notice that it is untrusted data. See [mcp](../cli/mcp.md#untrusted-data-in-tool-results).
+- **Approval:** keep the tools that write files (`convert`, `gen_instances`, `organize`, `rdfs_to_shacl`, `excel_to_shacl`, `manifest`) behind approval in the MCP client.
+- `serve` results are not rewritten; an agent that reads them should treat them as untrusted too.
+
+## Python engines
+
+The experimental `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` engines start a Python process. Name the interpreter by its absolute path with `--python-executable` (on `validate`, `serve`, `mcp`) or `CIMPAL_PYTHON_EXECUTABLE`; a relative name is refused. Without one, the `python` found on `PATH` is resolved to its absolute path, and that is what runs and what the `[ENGINE]` log line names. No request or tool call can choose the interpreter. The process gets no token or database password from the environment, and the worker script runs from a private temporary folder. See [validate](../cli/validate.md#validation-engines).
+
 ## Container
 
 - **User:** UID 10001, not root.

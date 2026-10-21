@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-21 (TEST-3: convert and sparql golden-master tests; ID mapping, `id-map`)  
+**Last updated:** 2026-10-21 (SEC-3: MCP output hygiene and the Python interpreter; TEST-3 convert and sparql; ID mapping, `id-map`)  
 **Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -325,6 +325,30 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - Pages: index, capability statement, install, quickstart, deployment modes, sizing, Airflow, security, configuration, troubleshooting, versioning and support (draft, for maintainer review), glossary.
 - Linked from the root `README.md`. `scripts/check_doc_links.py` checks the links in `.github/workflows/docs.yml`.
 
+**MCP output hygiene and the Python interpreter** (SEC-3, `docs/plans/security/SEC-3.md`, gaps G5 and G9):
+- Every `mcp` tool result passes through `McpCommand.forAgent`: each string value and field name of the
+  command's JSON (or of the envelope for commands without JSON output, and of refused-path errors) goes
+  through Core `UntrustedText.forAgent` (C0/C1 controls, NEL/LS/PS, invisible format characters such as
+  bidi overrides and tag characters, variation selectors and Hangul fillers → U+241E, cut at 300 chars with
+  `...`, no split surrogate pairs). A second content item carries a fixed untrusted-data notice;
+  `content[0].text` is still the result JSON. JSON-RPC error messages are capped the same way.
+- `sparql`, `compare`, `compare-instances` and `run` escape every control character in their JSON
+  output (they share `ValidateCommand.jsonStr`); a literal with an ESC character made `sparql --format json`
+  print invalid JSON before.
+- The Python engines' interpreter: `--python-executable` on `validate`, `serve` and `mcp` (CLI mixin
+  `PythonOptions`), `-Dcimpal.python.executable` or `CIMPAL_PYTHON_EXECUTABLE`, in that order, always an
+  absolute path of an existing local file, checked after normalising and returned as checked; UNC and
+  device paths are refused before any file system call (Core `PythonExecutable`; otherwise exit 2). No
+  config key, request field or tool argument sets it. Without one, CimPal finds `python` / `py` in the
+  absolute `PATH` folders itself (`PythonShaclValidator.searchDirs`/`findProgram`, so Windows never
+  searches the working directory), probes it with a 10 s timeout, and runs the absolute `sys.executable`
+  it prints. One `[ENGINE]` stderr line names the interpreter and its source.
+  The worker script lives in a private `Files.createTempDirectory` folder, which is also the working
+  directory of the probe and the worker, and is removed after the run (also after a failure). Python's
+  stderr is read in fixed-size chunks (at most 64 KiB kept) and reaches exception messages only as its
+  last 500 chars through `LogSanitizer.forLog`, also when Python stopped reading its input (broken pipe).
+  `mcp`'s own stderr lines quote parser messages through `forLog`.
+
 **Deployment track** (`docs/plans/deployment/`, DEP-1 to DEP-10): container, sizing, CLI automation
 options, an async `/v1` API, a Python SDK and an Airflow provider for external users. It supersedes
 the ordering of the *REST API — discovery and implementation plan* section below.
@@ -352,10 +376,11 @@ job and upload ownership, per-client quotas, D-17) is merged (PR #75). DEP-11 (d
 D-14, D-18) is merged (PR #76); its PostgreSQL ITs run only where Docker is available (CI). DEP-14
 (idempotent submits and uploads, signed completion callbacks, D-19) and DEP-16 (load tests, SLOs, alert rules;
 tooling done, the full capacity runs still open, they need Docker on the measuring laptop) are merged (PR #79,
-DEP-16 via #81). DEP-12 (shared queue across replicas) is in progress.
-TEST-3's convert and sparql groups are written (branch `feature/test-3-convert-sparql`, not pushed); the
-comparisons, gen-instances + manifest and kgcl groups are next. CimPal-CustomWriter has no coverage ratchet
-baseline yet (follow-up).
+DEP-16 via #81). DEP-12 (shared queue across replicas) is in progress. SEC-3 (MCP output hygiene, the
+Python interpreter by absolute path) is in review on `feature/sec-3-mcp-hygiene`; SEC-4 (re-attestation)
+can follow once SEC-1 to SEC-3 are merged.
+TEST-3's convert and sparql groups are merged (PR #84); the comparisons, gen-instances + manifest and kgcl
+groups are next. CimPal-CustomWriter has no coverage ratchet baseline yet (follow-up).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -431,6 +456,7 @@ One row per bigger implementation, newest first (CLAUDE.md, *After every impleme
 
 | Date | WP / PR | What changed for users | Docs | Skill |
 |---|---|---|---|---|
+| 2026-10-21 | SEC-3 | `mcp` tool results: every string value is cut at 300 characters (ending in `...`) and control characters and line breaks show as `␞`; a second content item says the result is untrusted data (`content[0].text` is still the JSON). New `--python-executable PATH` on `validate`, `serve` and `mcp` (also `CIMPAL_PYTHON_EXECUTABLE`, `-Dcimpal.python.executable`): an absolute path of an existing local file (UNC and device paths refused), else exit 2; never a config key or tool argument. Without it, the `python`/`py -3` found on PATH is resolved to its absolute `sys.executable`, and a `[ENGINE]` stderr line names the interpreter. The worker script runs from a private temp folder removed afterwards; Python stderr in errors is cut to its last 500 chars on one line. `sparql`, `compare`, `compare-instances` and `run` JSON output now escapes every control character (an ESC in a literal made invalid JSON) | cli/mcp.md, cli/validate.md, cli/serve.md, guide/security.md, PROJECT.md, plans | yes |
 | 2026-10-21 | TEST-3 (convert + sparql) | No behaviour change: golden-master tests for `RDFConverter` and `SparqlTools` (snapshots `convert/`, `sparql/`), two suspected bugs recorded as `@Disabled` tests (C1 orphan enum member labels in the detailed union, C2 JSON-LD "ordered" ignored) | PROJECT.md, plans/testing/TEST-3.md, plans/README.md | no |
 | 2026-10-21 | ID mapping (branch `feature/id-mapping`) | New `id-map` command and GUI tab **Dataset ▸ ID Mapping**: maps the IDs of model 1 onto model 2 of the same grid and writes Matched (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, …), Unmatched and Summary sheets with certain / probable / not matched percentages; SPARQL query library in `CimPal-Core/src/main/resources/idmapping/queries`; config template `configs/id-map.json`; not exposed through serve/mcp/run | cli/id-map.md, cli/index.md, configs/id-map.json | yes |
 | 2026-10-20 | DOC-2 | `manifest --config` (keys `dir`, `files`, `accessUrl`, `output`), so `manifest` works through `mcp`, `serve` and `run`; MCP tool schemas and the OpenAPI document list every key each command reads, plus `overwrite` where a command writes a file (a test keeps them equal to the commands' config loaders); `validate` takes `incrementalTimestamps` from a config and `--dry-run` shows it; through serve/mcp/run, `manifest`'s files, scanned files and default output are checked against the allowed roots (security review), and file names in `dcat:accessURL` are percent-encoded. Docs: the mapping CSV format is commas between columns and `;` inside them (the `|` example was wrong), all 13 commands and every template listed, compare's `N/A` wording, the MCP agent loop without the manual workflow, a new root README feature list | cli/README.md, cli/index.md, cli/manifest.md, cli/mcp.md, cli/validate.md, cli/compare.md, cli/serve.md, cli/ci-pipeline.md, README.md, configs/manifest.json, configs/validate-mapping-cgmes30.json | yes |
@@ -701,7 +727,9 @@ CimPal/
 
 **`run` step `config` key is ignored (found in SEC-2).** No command reads a `config` key, so a step's `config` file has no effect. `run.md` documents this; it needs a fix.
 
-**`manifest` can't run through `serve`, `mcp` or `run`** (no `--config` option), although `mcp` advertises the tool.
+**`mcp` results are capped per string (SEC-3).** A value longer than 300 characters, a file path included, reaches the agent cut and ending in `...`; the full value is in the command's output files (or run the CLI). `serve` payloads are not capped or rewritten (decision D6): its clients are programs that parse the JSON, and its `/v1` results are documented byte-for-byte. An agent that reads `serve` results should treat them as untrusted data too. The cap is per value only (part of G5, decided in SEC-3): there is no cap on a result's total size or on how many elements an array has, so a query or validation with many rows still puts all of them (each value capped) into the agent's context. Use `LIMIT`, `samples` or `maxResults` to bound it.
+
+**The Python interpreter can be changed only at start (SEC-3).** `--python-executable`, `CIMPAL_PYTHON_EXECUTABLE` and `-Dcimpal.python.executable` are read when `validate`, `serve` or `mcp` starts; there is deliberately no config key or per-request field. The interpreter's own `import` path (site-packages, `PYTHONPATH` in the environment) is not restricted. The `[ENGINE]` line names the interpreter's absolute path and goes to stderr, so under `serve` it is in the job log that `GET /v1/jobs/{id}/log` returns to the job's client (accepted in the SEC-3 review: Low, the server's Python install path).
 
 **`mcp`/`serve` with Claude Desktop need `--root`.** After SEC-2, the CimPal MCP server only accepts paths under its working directory unless `--root` is given. Update `claude_desktop_config.json`; see `CimPal-CLI/configs/claude-desktop-config.json`.
 
