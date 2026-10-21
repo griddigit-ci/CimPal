@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+
+  Two named lines. Source of the Convert and SPARQL Query smoke tests.
+-->
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:cim="http://iec.ch/TC57/CIM100#">
+  <cim:ACLineSegment rdf:about="urn:uuid:line-1">
+    <cim:IdentifiedObject.name>Line 1</cim:IdentifiedObject.name>
+  </cim:ACLineSegment>
+  <cim:ACLineSegment rdf:about="urn:uuid:line-2">
+    <cim:IdentifiedObject.name>Line 2</cim:IdentifiedObject.name>
+  </cim:ACLineSegment>
+</rdf:RDF>
