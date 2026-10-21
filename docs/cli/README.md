@@ -44,6 +44,7 @@ java -jar CimPal-CLI.jar manifest --help
 | [`sparql`](sparql.md) | Execute a SPARQL SELECT query against RDF model files |
 | [`compare`](compare.md) | Compare two RDFS profiles or SHACL shape sets |
 | [`compare-instances`](compare-instances.md) | Compare two sets of CGMES instance data |
+| [`id-map`](id-map.md) | Map the IDs of one model onto another model of the same grid (not available through `run`, `serve` or `mcp`) |
 | [`convert`](convert.md) | Convert RDF files between RDF/XML, Turtle and JSON-LD |
 | [`rdfs2shacl`](rdfs2shacl.md) | Generate SHACL shapes from RDFS profiles |
 | [`excel2shacl`](excel2shacl.md) | Generate SHACL shapes from an Excel sheet and an RDFS profile |

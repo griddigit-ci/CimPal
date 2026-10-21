@@ -1,0 +1,34 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap08_References - objects outside the topology that other objects point to: limit types,
+# load groups and areas, regions, control areas, base voltages, ...
+# Such an object is matched when the matched objects that refer to it (through the same property)
+# mostly refer to one object in the other model, and that object's referrers point back to it.
+# This tells apart objects that share a name, e.g. the "PATL" limit type of each model part.
+# Add a property to the VALUES list to map more referenced classes.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+
+SELECT ?referrer ?property ?target
+WHERE {
+  VALUES ?p {
+    cim:OperationalLimit.OperationalLimitType
+    cim:ConformLoad.LoadGroup
+    cim:NonConformLoad.LoadGroup
+    cim:EnergyConsumer.LoadResponse
+    cim:LoadGroup.SubLoadArea
+    cim:SubLoadArea.LoadArea
+    cim:Substation.Region
+    cim:SubGeographicalRegion.Region
+    cim:ControlAreaGeneratingUnit.ControlArea
+    cim:TieFlow.ControlArea
+    cim:ConductingEquipment.BaseVoltage
+    cim:VoltageLevel.BaseVoltage
+    cim:EquivalentEquipment.EquivalentNetwork
+    cim:DCBaseTerminal.DCNode
+  }
+  ?referrer ?p ?target .
+  FILTER(isIRI(?target))
+  BIND(STRAFTER(STR(?p), STR(cim:)) AS ?property)
+}
