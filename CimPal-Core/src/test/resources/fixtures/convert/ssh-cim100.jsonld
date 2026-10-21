@@ -1,0 +1,21 @@
+{
+  "@context": {
+    "cim": "http://iec.ch/TC57/CIM100#",
+    "md": "http://iec.ch/TC57/61970-552/ModelDescription/1#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
+  },
+  "@graph": [
+    {
+      "@id": "urn:uuid:00000000-0000-0000-0000-000000000002",
+      "@type": "md:FullModel",
+      "md:Model.scenarioTime": "2026-01-01T00:00:00Z",
+      "md:Model.profile": "http://iec.ch/TC57/ns/CIM/SteadyStateHypothesis-EU/3.0"
+    },
+    {
+      "@id": "#_gen1",
+      "@type": "cim:SynchronousMachine",
+      "cim:RegulatingCondEq.controlEnabled": { "@value": "true", "@type": "xsd:boolean" },
+      "cim:RotatingMachine.p": { "@value": "12.5", "@type": "xsd:float" }
+    }
+  ]
+}

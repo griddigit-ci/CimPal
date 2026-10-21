@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-21 (ID mapping, `id-map`)  
+**Last updated:** 2026-10-21 (TEST-3: convert and sparql golden-master tests; ID mapping, `id-map`)  
 **Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -284,6 +284,11 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - The RDFS inputs are two synthetic profiles in `fixtures/shacl-generation/` (RDFS 2020 with CIM100, RDFS 2019 with CIM16).
 - The Core test-jar now also carries `fixtures/**`, which `RdfsToShaclCommandTest` in the CLI uses.
 
+**Characterisation tests, convert + sparql** (TEST-3, written 2026-10-21, branch `feature/test-3-convert-sparql`):
+- `RDFConverterTest` (+33 golden tests next to its 10 base-URI tests) pins `RDFConverter` for CGMES 2.4 and 3.0 instance data to Turtle, JSON-LD (legacy and 1.1), RDF/XML plain/abbrev/pretty, CIMXML (unsorted, sorted, by prefix, as instance data) and RDFS CIMXML; the mixed-syntax union; the detailed union (deletion stereotype, package fix, configured URIs); inheritance only/list; add OWL; strip prefixes; ontology headers; `removeDuplicateShDeclareBlankNodes`; empty, malformed and missing input. Snapshots in `snapshots/convert/`: Turtle/JSON-LD by isomorphism, RDF/XML and CIMXML also as text.
+- `SparqlToolsTest` (new, 11) pins SELECT results on CGMES 2.4 and 3.0, value rendering, empty results, the two Excel exports and the refusals. Snapshots in `snapshots/sparql/`.
+- New fixtures in `fixtures/convert/`: an RDFS 2020 delta in Turtle and an SSH file in JSON-LD (inline context).
+
 **Docker image** (added by CI-3, `docs/plans/ci/CI-3.md`):
 - `CimPal-CLI/docker/Dockerfile` copies the built `CimPal-CLI.jar` onto `eclipse-temurin:25-jre-noble`
   (pinned by digest). Maven never runs inside Docker.
@@ -348,6 +353,9 @@ D-14, D-18) is merged (PR #76); its PostgreSQL ITs run only where Docker is avai
 (idempotent submits and uploads, signed completion callbacks, D-19) and DEP-16 (load tests, SLOs, alert rules;
 tooling done, the full capacity runs still open, they need Docker on the measuring laptop) are merged (PR #79,
 DEP-16 via #81). DEP-12 (shared queue across replicas) is in progress.
+TEST-3's convert and sparql groups are written (branch `feature/test-3-convert-sparql`, not pushed); the
+comparisons, gen-instances + manifest and kgcl groups are next. CimPal-CustomWriter has no coverage ratchet
+baseline yet (follow-up).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -423,6 +431,7 @@ One row per bigger implementation, newest first (CLAUDE.md, *After every impleme
 
 | Date | WP / PR | What changed for users | Docs | Skill |
 |---|---|---|---|---|
+| 2026-10-21 | TEST-3 (convert + sparql) | No behaviour change: golden-master tests for `RDFConverter` and `SparqlTools` (snapshots `convert/`, `sparql/`), two suspected bugs recorded as `@Disabled` tests (C1 orphan enum member labels in the detailed union, C2 JSON-LD "ordered" ignored) | PROJECT.md, plans/testing/TEST-3.md, plans/README.md | no |
 | 2026-10-21 | ID mapping (branch `feature/id-mapping`) | New `id-map` command and GUI tab **Dataset ▸ ID Mapping**: maps the IDs of model 1 onto model 2 of the same grid and writes Matched (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, …), Unmatched and Summary sheets with certain / probable / not matched percentages; SPARQL query library in `CimPal-Core/src/main/resources/idmapping/queries`; config template `configs/id-map.json`; not exposed through serve/mcp/run | cli/id-map.md, cli/index.md, configs/id-map.json | yes |
 | 2026-10-20 | DOC-2 | `manifest --config` (keys `dir`, `files`, `accessUrl`, `output`), so `manifest` works through `mcp`, `serve` and `run`; MCP tool schemas and the OpenAPI document list every key each command reads, plus `overwrite` where a command writes a file (a test keeps them equal to the commands' config loaders); `validate` takes `incrementalTimestamps` from a config and `--dry-run` shows it; through serve/mcp/run, `manifest`'s files, scanned files and default output are checked against the allowed roots (security review), and file names in `dcat:accessURL` are percent-encoded. Docs: the mapping CSV format is commas between columns and `;` inside them (the `|` example was wrong), all 13 commands and every template listed, compare's `N/A` wording, the MCP agent loop without the manual workflow, a new root README feature list | cli/README.md, cli/index.md, cli/manifest.md, cli/mcp.md, cli/validate.md, cli/compare.md, cli/serve.md, cli/ci-pipeline.md, README.md, configs/manifest.json, configs/validate-mapping-cgmes30.json | yes |
 | 2026-10-20 | Desktop (no code) | Change log introduced; drift found while running CLI 2026.10.6.1 recorded under *Known issues*; DOC-2 written | PROJECT.md, CLAUDE.md, plans | yes |
@@ -666,9 +675,15 @@ CimPal/
 - excel2shacl writes length limits as `"32.0"^^xsd:integer`.
 - An unreadable workbook gives empty shapes instead of an error.
 
+**Convert suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test in `RDFConverterTest`; details in `docs/plans/testing/TEST-3.md`:
+- C1: the detailed union removes only the `rdf:type` of a deleted enumeration's typed members, so their labels stay as orphans.
+- C2: the JSON-LD "ordered" option (GUI) is passed to Jena but does not change the output.
+
+**`SparqlTools.loadModelFromXML` reads files against the CIM16 schema URI** (`http://iec.ch/TC57/2013/CIM-schema-cim16`), so `rdf:ID` objects become `cim:_id` IRIs in the CIM namespace (CGMES 3.0 files too), and results show them as `cim:_t1`. Pinned by `SparqlToolsTest`; maintainer to confirm it is intended.
+
 **`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%; the convert and sparql groups raise it to 58.1% / 43.9% (2026-10-21). CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
 **Timestamped report times are snapped to minute 30 of the hour (by design, maintainer to confirm).** `ValidationTools.normalizeTimestampToReportTime` sets every report time to `HH:30:00Z`, so `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. It looks like the market-time-unit convention (the middle of the hour). The TEST-3 snapshots pin it.
 
