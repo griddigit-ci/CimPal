@@ -1,0 +1,16 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Model A of the RDF Comparison smoke test: shapes-b.ttl changes the minCount and adds a message.
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix cim: <http://iec.ch/TC57/CIM100#> .
+@prefix ex: <http://example.org/shapes#> .
+
+ex:LineShape a sh:NodeShape ;
+    sh:targetClass cim:ACLineSegment ;
+    sh:property ex:LineName .
+
+ex:LineName a sh:PropertyShape ;
+    sh:path cim:IdentifiedObject.name ;
+    sh:minCount 1 .

@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.main.application.controllers.sparql;
 import eu.griddigit.cimpal.core.utils.SparqlTools;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.GuiDialogs;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.gui.BaseUriPresets;
 import eu.griddigit.cimpal.main.util.ModelFactory;
@@ -172,7 +173,7 @@ public class SparqlQueryTabController implements Initializable {
         if (choices.isEmpty()) {
             String message = "There are no reusable models in workspace memory. Load files in SPARQL or Visualisation first, or use Workspace artifacts → Restore.";
             setStatus(message);
-            new Alert(Alert.AlertType.INFORMATION, message, ButtonType.OK).showAndWait();
+            GuiDialogs.alert(new Alert(Alert.AlertType.INFORMATION, message, ButtonType.OK));
             return;
         }
         javafx.scene.control.Dialog<ButtonType> dialog = new javafx.scene.control.Dialog<>();
@@ -213,7 +214,7 @@ public class SparqlQueryTabController implements Initializable {
 
         PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
 
-        File queryFile = chooser.showOpenDialog(txtSparqlQuery.getScene().getWindow());
+        File queryFile = GuiDialogs.open(chooser, ownerWindow());
         if (queryFile == null) {
             return;
         }
@@ -246,7 +247,7 @@ public class SparqlQueryTabController implements Initializable {
                         new FileChooser.ExtensionFilter("All files", "*.*")
                 );
                 PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
-                targetFile = chooser.showSaveDialog(txtSparqlQuery.getScene().getWindow());
+                targetFile = GuiDialogs.save(chooser, ownerWindow());
                 if (targetFile == null) {
                     return;
                 }
@@ -286,7 +287,7 @@ public class SparqlQueryTabController implements Initializable {
                     new FileChooser.ExtensionFilter("All files", "*.*")
             );
             PathMemory.prepare(chooser, "dialog.sparqlQueryFile");
-            File targetFile = chooser.showSaveDialog(txtSparqlQuery.getScene().getWindow());
+            File targetFile = GuiDialogs.save(chooser, ownerWindow());
             if (targetFile == null) {
                 return;
             }
@@ -348,7 +349,7 @@ public class SparqlQueryTabController implements Initializable {
             if (parsedQuery.isSelectType() && parsedQuery.getLimit() < 0 && combinedModel.size() > 100_000) {
                 Alert warning = new Alert(Alert.AlertType.CONFIRMATION, "This SELECT has no LIMIT and will run against " + combinedModel.size() + " triples. It may return a very large result set.\n\nRun it anyway?", ButtonType.OK, ButtonType.CANCEL);
                 warning.setTitle("Large SPARQL result risk"); warning.setHeaderText("Consider adding LIMIT before running");
-                if (warning.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) { resetProgressBar(); setStatus("SPARQL query cancelled before execution."); return; }
+                if (!GuiDialogs.confirm(warning)) { resetProgressBar(); setStatus("SPARQL query cancelled before execution."); return; }
             }
             setStatus("Running SPARQL query..."); SparqlTools.QueryResults results = SparqlTools.executeSparqlQuery(queryText, combinedModel);
             setStatus("SPARQL query completed: " + results.rows.size() + " result(s)."); completeProgressBar(); showResultsWindow(results);
@@ -379,6 +380,11 @@ public class SparqlQueryTabController implements Initializable {
         }
     }
 
+    /** The window file dialogs are owned by; null while the tab is not in a window. */
+    private javafx.stage.Window ownerWindow() {
+        return txtSparqlQuery.getScene() == null ? null : txtSparqlQuery.getScene().getWindow();
+    }
+
     private void setCurrentQueryFile(File file) {
         currentQueryFile = file;
     }
@@ -391,7 +397,7 @@ public class SparqlQueryTabController implements Initializable {
                 ButtonType.OK, ButtonType.CANCEL);
         confirm.setTitle("Run SPARQL repair");
         confirm.setHeaderText("Review-approved repair required");
-        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+        if (!GuiDialogs.confirm(confirm)) {
             resetProgressBar();
             setStatus("SPARQL repair cancelled. No model data was changed.");
             return;
@@ -407,7 +413,7 @@ public class SparqlQueryTabController implements Initializable {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(outputFormat.description, "*" + outputFormat.extension));
         PathMemory.prepare(chooser, "dialog.sparqlRepairOutput");
         if (repairOutputRepository != null && repairOutputRepository.isDirectory()) chooser.setInitialDirectory(repairOutputRepository);
-        File target = chooser.showSaveDialog(txtSparqlQuery.getScene().getWindow());
+        File target = GuiDialogs.save(chooser, ownerWindow());
         if (target == null) {
             setStatus("Repair ran only in memory; output was not saved. Original model files were not changed.");
             return;
@@ -426,7 +432,7 @@ public class SparqlQueryTabController implements Initializable {
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Select local Git repository for repaired output");
         if (repairOutputRepository != null && repairOutputRepository.isDirectory()) chooser.setInitialDirectory(repairOutputRepository);
-        File selected = chooser.showDialog(txtSparqlQuery.getScene().getWindow());
+        File selected = GuiDialogs.directory(chooser, ownerWindow());
         if (selected == null) return;
         if (!isGitRepository(selected)) {
             GUIhelper.showUserFriendlyError("Not a Git repository", "Choose the root folder of a local cloned Git repository (a folder containing .git).", null);
@@ -466,7 +472,7 @@ public class SparqlQueryTabController implements Initializable {
                         + "\nFile: " + relativePath,
                 ButtonType.OK, ButtonType.CANCEL);
         confirm.setTitle("Confirm Git commit");
-        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+        if (!GuiDialogs.confirm(confirm)) return;
         try {
             runGit(List.of("git", "-C", repositoryPath.toString(), "add", "--", relativePath));
             runGit(List.of("git", "-C", repositoryPath.toString(), "commit", "-m", entered.get().trim(), "--", relativePath));
