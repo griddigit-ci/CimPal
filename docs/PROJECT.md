@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-07  
+**Last updated:** 2026-10-13  
 **Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -154,6 +154,23 @@ Checked on the real suites (copies; the tester writes into the suite): *SHACLTes
 | `eu.griddigit.cimpal.core.comparators.ComparisonInstanceData` | Core | CIM instance data diff (extracted from Main in Phase 4). |
 | `eu.griddigit.cimpal.core.interfaces.IRDFComparator` | Core | `compare(Model a, Model b) → RDFCompareResult` |
 | `eu.griddigit.cimpal.core.models.RDFCompareResult` | Core | List of `RDFCompareResultEntry`. **Warning:** `hasDifference()` returns true when entries list is EMPTY — naming is inverted. Use `getEntries().isEmpty()` for clarity. |
+
+### ID mapping (branch `feature/id-mapping`, 2026-10-08 to 2026-10-13)
+
+Maps the IDs of one model (model 1, e.g. two EQ files) onto another model of the same grid (model 2, e.g. one merged EQ) and writes a workbook: `Matched` (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, Model1_name, Model2_type, Method, Note), `Unmatched` (reason and candidates) and `Summary` (certain / probable / not matched percentages per model, counts per class). GUI: **Dataset ▸ ID Mapping** (`IdMappingTab.fxml`, `IdMappingController`); CLI: `id-map` (`docs/cli/id-map.md`), not exposed through `serve`/`mcp`/`run`.
+
+| Class | Module | What it does |
+|---|---|---|
+| `eu.griddigit.cimpal.core.idmapping.IdMapper` + `IdMappingOptions` | Core | Builder-style entry point: `new IdMapper(options, log).run()` → `IdMappingResult` (`writeExcel(path)`, `getPfOverview()`). |
+| `QueryLibrary` + `resources/idmapping/queries/IdMap01..08_*.rq` | Core | All CIM knowledge is in these SPARQL SELECT queries (roles of classes incl. `breaker`, containment, parameters, dependents with a key, references); the Java matcher only sees their result tables (`GridData`). `--query-folder` overrides single files; `SERVICE` is refused. |
+| `CimModelLoader` | Core | Reads RDF/XML, Turtle and N-Triples files or ZIPs (via `ModelFactory.forEachZipEntry`, now public), rewriting cim16 and ucaiug namespaces to CIM100. JSON-LD is refused (remote `@context`). |
+| `Network`, `LogicalLine` | Core | Node → substation resolution; substations joined by a transformer or switch grouped into one station; junction substations (only line ends, switches, ≤ 1 busbar section, fewer breakers than line ends: PowerFactory `Term_` points) collapsed into the line; series elements chained through line-interior nodes into logical lines. |
+| `SubstationLineMatcher` | Core | Stations by name, lines between matched stations, stations from matched lines and from matched neighbours; lines by parameters only as proposals that two lines must confirm. |
+| `TopologyMatcher` + `Refinement` | Core | Seeded colour refinement inside each matched station pair and along matched lines, deepest agreement first; name-contradiction veto; class changes only at full depth; a pair is certain only if a graph anchored by trusted matches alone pins it down; partly confirmed line ends are matched last. |
+| `MatchContext.promote()` | Core | After matching: a station whose lines all match one to one and whose inside is ≥ 90 % confirmed becomes certain, then the matches that waited for it. |
+| `DerivedMatcher` | Core | Same IDs; terminals, nodes, transformer ends, containers by vote, dependents under matched owners, referenced objects by vote, others by unique name; certainty follows the source. |
+
+Precision first: every rule needs a unique answer on both sides, and a match is `certain` only when the evidence leaves no other reading (`Names.similar` lets a station code such as `AGANYGAL` confirm `Agannygal`). Checked on Relicap with `ModelRewriter` (Core test package: re-IDs a model with ground truth, scrambles or abbreviates names, splits stations, adds `Term_` junctions, removes switches, scales parameters): no certain match was ever wrong; identical copy 99.4 % certain; all changes combined 46.6 % certain, 43.7 % probable (1 wrong). Tests: `IdMapperTest`, `NamesTest`, `CimModelLoaderTest`, `IdMapCommandTest`.
 
 ### SPARQL
 
@@ -325,7 +342,9 @@ it, as `ShaclRuleTesterTest` covers the replacement.
 | 8 | `serve` | Local HTTP daemon (JDK HttpServer, localhost:7474), bearer token, Host/Origin checks, bounded queue |
 | 9 | `mcp` | MCP 2024-11-05 stdio server, 10 typed tools |
 
-All 13 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25. Each release also publishes that JAR as the Docker image `ghcr.io/griddigit-ci/cimpal` (see `docs/cli/docker.md`).
+`id-map` (2026-10-13, branch `feature/id-mapping`) is the 14th: ID mapping between two models of the same grid, see *ID mapping* above.
+
+All 14 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25. Each release also publishes that JAR as the Docker image `ghcr.io/griddigit-ci/cimpal` (see `docs/cli/docker.md`).
 
 ### How `serve` and `mcp` execute commands (shared mechanism)
 
@@ -522,6 +541,8 @@ CimPal/
 **The Docker image has no Python.** Only the `APACHE_JENA` engine works in the container; `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` need a local install.
 
 **`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output, or the Docker image (`claude-desktop-config-docker.json`), which locks nothing on the host.
+
+**ID mapping limits (2026-10-13).** DC topology (DC busbars, DC line segments and their terminals) is not matched; converters, their DC terminals, DC nodes and converter units are. Two identical elements at one place with the same name are reported, not guessed. First real run (EirGrid + SONI 2026 EQ against the 2020 merged EIRGRIDSONI EQ, before the junction, station and confidence changes): 6.5 % mapped; the causes were PowerFactory `Term_` junctions holding a busbar section (not collapsed then), stations split per voltage level in the merged model, and six years between the models. Not re-run on the real data since; read the Summary overview and model statistics first.
 
 **`MainController` static state bag.** Several GUI tabs still share state through static fields. Do not add new static fields. The pattern of delegating from Main to Core (introduced in Phase 5) is the correct long-term direction.
 

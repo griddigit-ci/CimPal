@@ -1,0 +1,15 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap04_VoltageLevels - voltage levels, their substation and nominal voltage (kV).
+# BaseVoltage often lives in a separate file (CGMES 2.4: the EQ boundary set; CGMES 3.0:
+# common data), so load that file as a common input to get the voltages.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+
+SELECT ?voltageLevel ?substation ?nominalVoltage
+WHERE {
+  ?voltageLevel a cim:VoltageLevel .
+  OPTIONAL { ?voltageLevel cim:VoltageLevel.Substation ?substation }
+  OPTIONAL { ?voltageLevel cim:VoltageLevel.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nominalVoltage }
+}

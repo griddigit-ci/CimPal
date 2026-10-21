@@ -1,0 +1,21 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap01_Objects - every CIM object with its class, mRID and names.
+# One row per object (more if an object carries several names; the first one wins).
+# ?type is the class local name, e.g. "ACLineSegment".
+# shortName is cim: in CGMES 2.4-style data and eu: in CGMES 3.0.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+PREFIX eu:  <http://iec.ch/TC57/CIM100-European#>
+
+SELECT ?object ?type ?mRID ?name ?shortName ?description
+WHERE {
+  ?object a ?typeIri .
+  FILTER(STRSTARTS(STR(?typeIri), STR(cim:)))
+  BIND(STRAFTER(STR(?typeIri), STR(cim:)) AS ?type)
+  OPTIONAL { ?object cim:IdentifiedObject.mRID ?mRID }
+  OPTIONAL { ?object cim:IdentifiedObject.name ?name }
+  OPTIONAL { ?object cim:IdentifiedObject.shortName|eu:IdentifiedObject.shortName ?shortName }
+  OPTIONAL { ?object cim:IdentifiedObject.description ?description }
+}

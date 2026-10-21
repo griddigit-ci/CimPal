@@ -1,0 +1,19 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap05_EquipmentParameters - the values used to compare lines and equipment.
+# One row per conducting equipment: nominal voltage (kV, from its own BaseVoltage) and, for
+# series elements, r and x (ohm), bch (S) and length (km). The matcher sums them along a line
+# chain and compares the totals within a relative tolerance.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+
+SELECT DISTINCT ?equipment ?nominalVoltage ?r ?x ?bch ?length
+WHERE {
+  ?terminal cim:Terminal.ConductingEquipment ?equipment .
+  OPTIONAL { ?equipment cim:ConductingEquipment.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nominalVoltage }
+  OPTIONAL { ?equipment cim:ACLineSegment.r|cim:SeriesCompensator.r|cim:EquivalentBranch.r ?r }
+  OPTIONAL { ?equipment cim:ACLineSegment.x|cim:SeriesCompensator.x|cim:EquivalentBranch.x ?x }
+  OPTIONAL { ?equipment cim:ACLineSegment.bch ?bch }
+  OPTIONAL { ?equipment cim:Conductor.length ?length }
+}

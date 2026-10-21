@@ -1,0 +1,17 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap06_TransformerEnds - power transformer windings.
+# ratedU (kV) ranks the windings of a transformer (high, middle, low voltage side). The matcher
+# uses that rank rather than endNumber, because two tools can number the ends differently.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+
+SELECT ?end ?transformer ?endNumber ?ratedU ?ratedS ?terminal
+WHERE {
+  ?end cim:PowerTransformerEnd.PowerTransformer ?transformer .
+  OPTIONAL { ?end cim:TransformerEnd.endNumber ?endNumber }
+  OPTIONAL { ?end cim:PowerTransformerEnd.ratedU ?ratedU }
+  OPTIONAL { ?end cim:PowerTransformerEnd.ratedS ?ratedS }
+  OPTIONAL { ?end cim:TransformerEnd.Terminal ?terminal }
+}
