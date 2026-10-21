@@ -350,6 +350,19 @@ class FileExchangeApiTest {
     }
 
     @Test
+    void aRefusedUploadIsAnsweredWhileItsBodyIsStillComing() throws Exception {
+        // The 507 is decided before the body is read. Closing the connection with megabytes still
+        // unread resets it, and the client then loses the answer ("header parser received no bytes").
+        start(config().workMaxBytes(ServeServer.MIN_WORK_MAX_BYTES), writingRunner(false));
+        uploadId(randomZip(600_000));
+        byte[] large = randomZip(4_000_000);
+
+        for (int i = 0; i < 5; i++) {
+            problem(upload(large), 507);
+        }
+    }
+
+    @Test
     void everyFileRouteNeedsTheToken() throws Exception {
         start(config(), writingRunner(false));
         String id = UUID.randomUUID().toString();
