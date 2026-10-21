@@ -77,7 +77,7 @@ public class GUIhelper implements IOutputHandler {
     }
 
     public static void showUserFriendlyError(String title, String userMessage, Throwable throwable) {
-        Runnable showDialog = () -> createErrorAlert(title, userMessage, throwable).showAndWait();
+        Runnable showDialog = () -> GuiDialogs.alert(createErrorAlert(title, userMessage, throwable));
         if (Platform.isFxApplicationThread()) {
             showDialog.run();
         } else {
@@ -122,7 +122,7 @@ public class GUIhelper implements IOutputHandler {
             alert.setTitle(title);
             alert.setHeaderText(title);
             alert.setContentText(message == null ? "" : message);
-            alert.showAndWait();
+            GuiDialogs.alert(alert);
         };
         if (Platform.isFxApplicationThread()) {
             showDialog.run();

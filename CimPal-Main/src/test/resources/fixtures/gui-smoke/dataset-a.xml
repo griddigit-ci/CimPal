@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+
+  Dataset A of the Dataset Comparison smoke test: the same line, with a different name and resistance.
+-->
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:cim="http://iec.ch/TC57/CIM100#"
+         xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#">
+  <md:FullModel rdf:about="urn:uuid:dataset-a">
+    <md:Model.scenarioTime>2026-01-01T00:00:00Z</md:Model.scenarioTime>
+  </md:FullModel>
+  <cim:ACLineSegment rdf:ID="_line1">
+    <cim:IdentifiedObject.name>Line 1</cim:IdentifiedObject.name>
+    <cim:ACLineSegment.r>1.5</cim:ACLineSegment.r>
+  </cim:ACLineSegment>
+</rdf:RDF>

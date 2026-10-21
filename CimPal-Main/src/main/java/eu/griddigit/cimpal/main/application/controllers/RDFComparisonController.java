@@ -13,6 +13,7 @@ import eu.griddigit.cimpal.core.models.RDFCompareResult;
 import eu.griddigit.cimpal.main.application.MainController;
 import eu.griddigit.cimpal.main.application.rdfDiffResultController;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.GuiDialogs;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import javafx.fxml.FXML;
@@ -280,7 +281,7 @@ public class RDFComparisonController implements Initializable {
             alert.setContentText("No header in the file and the profile namespace prefix is not declared.");
             alert.setHeaderText(null);
             alert.setTitle("Error");
-            alert.showAndWait();
+            GuiDialogs.alert(alert);
             resetProgressBar();
             return;
         }
@@ -305,7 +306,7 @@ public class RDFComparisonController implements Initializable {
                 alert.setContentText("Unexpected RDFS format selected.");
                 alert.setHeaderText(null);
                 alert.setTitle("Error");
-                alert.showAndWait();
+                GuiDialogs.alert(alert);
                 resetProgressBar();
                 return;
         }
@@ -334,7 +335,7 @@ public class RDFComparisonController implements Initializable {
             alert.setHeaderText(null);
             alert.setTitle("Information");
             setProgressBar(1);
-            alert.showAndWait();
+            GuiDialogs.alert(alert);
         }
     }
 

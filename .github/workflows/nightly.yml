@@ -4,6 +4,8 @@
 #
 # Nightly checks that are too slow or too noisy for every push (TEST-5 adds its deep tests here).
 #
+# GUI tests (TEST-6): the full @Tag("gui") set of CimPal-Main under Xvfb; CI runs the smoke subset.
+#
 # Service load smoke (DEP-16): one minute of mixed jobs (validation, SPARQL, upload) against
 # `serve` from a CLI JAR built from this commit, with scripts/bench/load/run.py. Fails when a job
 # doesn't succeed or an SLO is missed (docs/guide/service.md). Runner timings are noisy, so this
@@ -24,6 +26,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # GUI smoke tests in full (TEST-6): every tab of the JavaFX GUI loads, and the Convert, RDF
+  # Comparison, Dataset Comparison, SHACL Validation, rule test and SPARQL tabs run their main action
+  # on small fixtures. CI runs only the @Tag("smoke") subset; -Pgui-all runs every @Tag("gui") test.
+  gui-full:
+    name: GUI tests (full set)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: GUI tests under Xvfb
+        run: xvfb-run -a mvn -B -Pgui-all -pl CimPal-Main -am verify
+
+      - name: Keep the test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gui-test-reports
+          path: CimPal-Main/target/surefire-reports/**
+          retention-days: 14
+          if-no-files-found: warn
+
   load-smoke:
     name: Service load smoke
     runs-on: ubuntu-latest

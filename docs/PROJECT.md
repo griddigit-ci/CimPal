@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-21 (TEST-3: convert and sparql golden-master tests; ID mapping, `id-map`)  
+**Last updated:** 2026-10-21 (TEST-6: GUI smoke tests and the `GuiDialogs` seam; before it TEST-3 convert/sparql tests, ID mapping)  
 **Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -207,6 +207,7 @@ Precision first: every rule needs a unique answer on both sides, and a match is 
 | `eu.griddigit.cimpal.main.core.ModelManipulationFactory` | Main | Instance data manipulation. `generateDataFromXlsV2` now delegates to `InstanceDataBuilder`. |
 | `eu.griddigit.cimpal.main.core.InstanceDataFactory` | Main | Save instance data. `saveInstanceData` now delegates to `InstanceDataWriter` for serialisation. |
 | `eu.griddigit.cimpal.main.application.MainController` | Main | Global static state bag. Do not add new static fields. Many tabs use it as a clipboard. |
+| `eu.griddigit.cimpal.main.gui.GuiDialogs` | Main | The one place a native file dialog or modal alert is shown (open, openMultiple, save, directory, alert, confirm). `ModelFactory.fileChooserCustom`/`folderChooserCustom`/`fileSaveCustom` and `GUIhelper`'s dialogs go through it. Its backend is swapped only by the GUI smoke tests (TEST-6). |
 
 ---
 
@@ -230,8 +231,21 @@ The shared Claude Code setup is committed under `.claude/`:
 
 **CI** (added by CI-1): `.github/workflows/ci.yml` runs `mvn -B verify` on windows-latest and
 ubuntu-latest (under Xvfb) for every push and PR to `devel` and `master`. It publishes a per-module
-test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest` is tagged `gui`
-(exclude with `-DexcludedGroups=gui`). A third job, "Docker image", is described below.
+test summary and uploads surefire reports. The JavaFX tests are tagged `gui`; a plain `verify` (CI
+too) runs only those also tagged `smoke` (every tab loads; the Main pom's default `excludedGroups`
+is `gui & !smoke`). The full set, with each tab's main action, runs nightly (`nightly.yml`, job
+"GUI tests (full set)") or locally with `-Pgui-all`; `-DexcludedGroups=gui` skips them all on a
+headless machine and then also skips Main's coverage ratchet (profile `no-gui-tests`), since Main's
+coverage comes mostly from them. A third job, "Docker image", is described below.
+
+**GUI smoke tests** (added by TEST-6): one `<Controller>SmokeTest` per tab of `CimPalGui.fxml`
+under `CimPal-Main/src/test/java/.../application/controllers/`, plus `MainGuiFxmlLoadTest` for the
+whole window. Plain JUnit, no TestFX/Monocle: `@GuiSmoke` (tag `gui`, `FxTestSupport` extension,
+60 s timeout, same thread) starts the toolkit once, swaps `ScriptedDialogs` in as the `GuiDialogs`
+backend, puts an in-memory `Preferences` tree into `MainController.prefs`, and restores every
+public static of `MainController`, `System.out`/`err` and the backend afterwards. A file dialog the
+test did not script, or a window left open, fails the test. Fixtures are in
+`src/test/resources/fixtures/gui-smoke/`.
 
 **Test harness** (added by TEST-1):
 - Shared test helpers are in Core's `eu.griddigit.cimpal.core.testsupport`: `TestModels`,
@@ -431,6 +445,7 @@ One row per bigger implementation, newest first (CLAUDE.md, *After every impleme
 
 | Date | WP / PR | What changed for users | Docs | Skill |
 |---|---|---|---|---|
+| 2026-10-21 | TEST-6 | No behaviour change for users. GUI smoke tests: every tab (13, incl. ID Mapping) loads, and Convert, RDF Comparison, Dataset Comparison, SHACL Validation, rule test and SPARQL run their main action headlessly; new `GuiDialogs` seam for file dialogs and alerts. Developers: `mvn verify` runs the `smoke` subset, `-Pgui-all` the full `gui` set (nightly job), `-DexcludedGroups=gui` skips them and Main's coverage ratchet | PROJECT.md, CLAUDE.md, plans/testing/TEST-6.md, plans/README.md, ci.yml, nightly.yml | no |
 | 2026-10-21 | TEST-3 (convert + sparql) | No behaviour change: golden-master tests for `RDFConverter` and `SparqlTools` (snapshots `convert/`, `sparql/`), two suspected bugs recorded as `@Disabled` tests (C1 orphan enum member labels in the detailed union, C2 JSON-LD "ordered" ignored) | PROJECT.md, plans/testing/TEST-3.md, plans/README.md | no |
 | 2026-10-21 | ID mapping (branch `feature/id-mapping`) | New `id-map` command and GUI tab **Dataset ▸ ID Mapping**: maps the IDs of model 1 onto model 2 of the same grid and writes Matched (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, …), Unmatched and Summary sheets with certain / probable / not matched percentages; SPARQL query library in `CimPal-Core/src/main/resources/idmapping/queries`; config template `configs/id-map.json`; not exposed through serve/mcp/run | cli/id-map.md, cli/index.md, configs/id-map.json | yes |
 | 2026-10-20 | DOC-2 | `manifest --config` (keys `dir`, `files`, `accessUrl`, `output`), so `manifest` works through `mcp`, `serve` and `run`; MCP tool schemas and the OpenAPI document list every key each command reads, plus `overwrite` where a command writes a file (a test keeps them equal to the commands' config loaders); `validate` takes `incrementalTimestamps` from a config and `--dry-run` shows it; through serve/mcp/run, `manifest`'s files, scanned files and default output are checked against the allowed roots (security review), and file names in `dcat:accessURL` are percent-encoded. Docs: the mapping CSV format is commas between columns and `;` inside them (the `|` example was wrong), all 13 commands and every template listed, compare's `N/A` wording, the MCP agent loop without the manual workflow, a new root README feature list | cli/README.md, cli/index.md, cli/manifest.md, cli/mcp.md, cli/validate.md, cli/compare.md, cli/serve.md, cli/ci-pipeline.md, README.md, configs/manifest.json, configs/validate-mapping-cgmes30.json | yes |
@@ -568,6 +583,13 @@ Every token stands for a client (`TokenSource.Client`: a name and admin or not).
 - **Fairness:** `JobScheduler`. Each submit queues one interchangeable *turn* on the workers; a turn runs the oldest queued job whose owner is under `maxRunning`, or parks without holding a worker, and a finished job re-queues one parked turn. Decided: oldest eligible, not round-robin.
 - **Attribution:** JSON logs carry `client`; `cimpal_jobs_finished_total` and `cimpal_requests_total` gain a `client` label, and `cimpal_quota_refused_total` counts 429s. Tests: `ClientIsolationTest` (the cross-client 404 matrix, quotas, and a scan of logs and metrics for tokens), `JobSchedulerTest`, `ClientQuotasTest`, `TokenSourceTest`.
 
+### GUI dialogs seam and smoke tests (TEST-6)
+
+- **No TestFX/Monocle** (D1): plain JUnit with `FxTestSupport` (start the toolkit once, run work on the FX thread with a 30 s timeout, look nodes up by fx:id after a CSS pass, wait for windows on a listener and for workers on the alert they raise). The tests click the real buttons (`ButtonBase.fire()`), so a renamed `onAction` or fx:id fails them.
+- **`GuiDialogs`** (D2, the only production change): a static facade with a swappable `Backend` (`SYSTEM` by default; `useBackendForTesting`/`resetBackend` are package-private, so only `FxTestSupport` can swap it and nothing else can install a backend that auto-approves `confirm`, which fails closed on no button or CANCEL). `openMultiple` returns null for an empty selection, as the real dialog does on cancel. It is a static field outside `MainController`. Callers keep building their `FileChooser`/`Alert`; only the `show…` call moves. `SparqlQueryTabController` also stopped calling `getScene().getWindow()` on a tab that has no scene.
+- **Scope** (D3): action tests for Convert, RDF Comparison, Dataset Comparison, SHACL Validation (combined workflow), the rule test (Constraints Operations) and SPARQL; load and initial state for Visualisation, RDFS Union, AI Assistant (no network: remote knowledge is off in the in-memory preferences), RDFS to SHACL, Generate, Task Wizard and ID Mapping.
+- **Tags** (D4): `gui` on every class, `smoke` on the load tests. The Main pom's `excludedGroups` property defaults to `gui & !smoke`, `-Pgui-all` sets it to a tag nobody uses, and an exact `-DexcludedGroups=gui` activates profile `no-gui-tests`, which skips Main's `coverage-ratchet` check (without GUI tests Main measures 4.3 % lines against a 7 % floor).
+
 ---
 
 ## Key file locations
@@ -681,9 +703,15 @@ CimPal/
 
 **`SparqlTools.loadModelFromXML` reads files against the CIM16 schema URI** (`http://iec.ch/TC57/2013/CIM-schema-cim16`), so `rdf:ID` objects become `cim:_id` IRIs in the CIM namespace (CGMES 3.0 files too), and results show them as `cim:_t1`. Pinned by `SparqlToolsTest`; maintainer to confirm it is intended.
 
-**`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
+**GUI tests may time out in the Claude Code desktop environment** (`MainGuiFxmlLoadTest`, seen 2026-10-05 on unmodified `HEAD`). On 2026-10-21 all 20 GUI tests passed there repeatedly (TEST-6). Ubuntu CI under Xvfb is the authoritative run; if they time out locally, use `-DexcludedGroups=gui`.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%; the convert and sparql groups raise it to 58.1% / 43.9% (2026-10-21). CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
+**Dialogs not yet behind `GuiDialogs` (TEST-6).** Only the dialogs on the tested paths were routed: `ModelFactory`'s choosers, `GUIhelper`'s alerts, and the direct alerts and choosers of the RDF Comparison, Dataset Comparison and SPARQL tabs. About 95 other direct `showAndWait`/`show*Dialog` calls remain (most in `MainController`, `RDFStoSHACLController`, `ExcelToSHACLController`, `ShaclTools`, the wizard pages and the PSS/E compare), plus the SPARQL tab's workspace picker and Git commit-message dialog (not `Alert`s). A smoke test that reaches one of them fails after 30 s naming the open window, rather than hanging. Route them when their tabs get action tests.
+
+**Main's `ModelFactory.unzip` has no ZIP limits (found in the TEST-6 security review, follow-up security fix).** `CimPal-Main` `util/ModelFactory.unzip` (used by the Dataset Comparison tab) reads every entry with no entry-count or total-uncompressed-size limit, unlike Core's `ModelFactory`/`ZipBudget` (`MAX_ZIP_ENTRIES`, `MAX_TOTAL_UNCOMPRESSED_BYTES`), and for a folder entry it only shows an alert and carries on. A crafted archive opened in the GUI can exhaust memory. Fix: route it through Core's ZIP reading or `ZipBudget`.
+
+**GUI tests touch the user's real preferences in two places (TEST-6).** `MainController.initialize` (the whole-window test) and `RDFStoSHACLController.initialize` open `Preferences.userRoot().node("CimPal")` themselves and write the defaults if it is missing; the smoke tests restore `MainController.prefs` afterwards but cannot keep those two from reading or creating the node. `RDFStoSHACLController` also keeps its own static `prefs` field.
+
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%; the convert and sparql groups raise it to 58.1% / 43.9% (2026-10-21). Main: 7.8% / 4.6% before TEST-6; with the smoke subset (what `verify` and CI run) 8.0% / 4.8% (floor 0.0753 / 0.0426), with the full GUI set (`-Pgui-all`) 11.5% / 7.7%; the ratchet floor follows the smoke subset. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
 **Timestamped report times are snapped to minute 30 of the hour (by design, maintainer to confirm).** `ValidationTools.normalizeTimestampToReportTime` sets every report time to `HH:30:00Z`, so `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. It looks like the market-time-unit convention (the middle of the hour). The TEST-3 snapshots pin it.
 
