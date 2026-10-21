@@ -85,6 +85,39 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Integration tests (*IT) that fork a JVM, e.g. the SIGTERM drain of serve (DEP-6). They
+                 run against the compiled classes, not the shaded JAR, and on the plain classpath
+                 so the forked JVM can be started with java.class.path. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.3</version>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                    <useManifestOnlyJar>false</useManifestOnlyJar>
+                    <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- The shade plugin below overwrites CimPal-CLI.jar with the fat jar. Without
+                 forceCreation the next build (no clean) sees that jar as newer than the classes,
+                 keeps it, and shades it again, so the old Core classes inside it win over the new
+                 Core jar. Always rebuild the plain jar first. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <forceCreation>true</forceCreation>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -167,12 +200,37 @@
             <artifactId>slf4j-simple</artifactId>
             <version>2.0.18</version>
         </dependency>
+        <!-- The serve job store in a database (DEP-11, D-14): PostgreSQL only. -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.7</version>
+        </dependency>
         <!-- Shared test helpers from CimPal-Core (eu.griddigit.cimpal.core.testsupport). -->
         <dependency>
             <groupId>eu.griddigit.CimPal</groupId>
             <artifactId>CimPal-Core</artifactId>
             <version>${cimpal.version}</version>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- The JDBC job store against H2 in PostgreSQL mode (unit tests) and a real PostgreSQL (ITs, Docker). -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.3.232</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>1.21.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.21.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>

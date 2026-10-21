@@ -41,9 +41,10 @@ jobs:
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
-          gh release create "${{ github.ref_name }}" `
-            --title "${{ github.ref_name }}" `
+          gh release create "$env:TAG" `
+            --title "$env:TAG" `
             --generate-notes `
             CimPal-Main/target/CimPal.exe `
             CimPal-Main/target/CimPal.jar `
@@ -177,3 +178,83 @@ jobs:
           provenance: mode=max
           # SBOM attestation with a pinned scanner image.
           attests: type=sbom,generator=docker/buildkit-syft-scanner:1.12.0@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
+  # The Python packages (cimpal-client, airflow-provider-cimpal): built from the tagged commit once
+  # the GitHub release exists, checked (the pom version must equal the tag), and published below.
+  python-dists:
+    name: Python packages
+    needs: build-and-release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/python-dists.yml
+
+  # PyPI trusted publishing (OIDC): no token is stored; PyPI accepts these uploads only from this
+  # workflow in the environment 'pypi', whose required reviewer approves each release. cimpal-client
+  # goes first, since the provider requires it at the same version; skip-existing makes a re-run
+  # after a partial upload safe. The action adds signed provenance (attestations).
+  pypi:
+    name: Publish to PyPI
+    needs: python-dists
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cimpal-client
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download cimpal-client
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-client
+          path: dist-client
+
+      - name: Download airflow-provider-cimpal
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-provider
+          path: dist-provider
+
+      - name: Publish cimpal-client
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist-client/
+          skip-existing: true
+
+      - name: Publish airflow-provider-cimpal
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist-provider/
+          skip-existing: true
+
+      # skip-existing makes a re-run after a partial upload safe; this makes sure that what PyPI
+      # holds is byte for byte what was built and checked here.
+      - name: PyPI holds exactly these files
+        env:
+          INDEX: https://pypi.org
+        run: |
+          python3 - <<'EOF'
+          import hashlib, json, os, pathlib, time, urllib.request
+          index = os.environ["INDEX"]
+          files = [p for d in ("dist-client", "dist-provider") for p in sorted(pathlib.Path(d).iterdir())]
+          for path in files:
+              name, version = path.name.split("-")[:2]
+              if version.endswith(".tar.gz"):
+                  version = version[: -len(".tar.gz")]
+              project = name.replace("_", "-")
+              local = hashlib.sha256(path.read_bytes()).hexdigest()
+              for attempt in range(10):
+                  try:
+                      with urllib.request.urlopen(f"{index}/pypi/{project}/{version}/json", timeout=30) as r:
+                          remote = {u["filename"]: u["digests"]["sha256"] for u in json.load(r)["urls"]}
+                      if path.name in remote:
+                          break
+                  except OSError:
+                      pass
+                  time.sleep(15)
+              else:
+                  raise SystemExit(f"{path.name} is not listed on {index}")
+              if remote[path.name] != local:
+                  raise SystemExit(f"{path.name} on {index} differs from the file built in this run")
+              print(f"{path.name}: identical on {index}")
+          EOF

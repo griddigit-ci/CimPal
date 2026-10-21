@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * SPARQL SERVICE must never reach the network (SEC-2, gap G3). Finding recorded in
- * docs/plans/SEC-2.md: Jena 6.2 ARQ executes SERVICE by default, also to loopback, bypassing the
+ * docs/plans/security/SEC-2.md: Jena 6.2 ARQ executes SERVICE by default, also to loopback, bypassing the
  * egress allowlist.
  */
 class SparqlServicePolicyTest {

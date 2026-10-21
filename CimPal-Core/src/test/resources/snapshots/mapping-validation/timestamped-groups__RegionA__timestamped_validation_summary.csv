@@ -1,0 +1,11 @@
+## TimestampOverview
+Country,Timestamp,Report file,Validation count,Conform validations,Non-conform validations,Validation errors,Total results,Violations,Warnings,Infos,Worst severity,Check priority,Partial validations,Result limit
+RegionA,<TIMESTAMP>,validation_report_RegionA_<TIMESTAMP>.xlsx,1,0,1,0,1,1,0,0,Violation,Open - violations,0
+RegionA,<TIMESTAMP>,validation_report_RegionA_<TIMESTAMP>.xlsx,1,1,0,0,0,0,0,0,,Probably OK,0
+## TopConstraints
+Country,Timestamp,Report file,Constraint file,Source,Constraint Component,Description,Message,Severity,Count
+RegionA,<TIMESTAMP>,validation_report_RegionA_<TIMESTAMP>.xlsx,shapes.ttl,<BNODE>,sh:MinCountConstraintComponent,,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation,1
+## InputCompleteness
+Country,Timestamp,Mapping row,Constraint file,Requested input,Expected file count,Resolved file count,Status,Resolved files,Missing input,Message
+RegionA,<TIMESTAMP>,1,shapes.ttl,EQ,1,1,OK,RegionA_EQ_20260101T0000Z.xml,,All requested inputs were resolved.
+RegionA,<TIMESTAMP>,1,shapes.ttl,EQ,1,1,OK,RegionA_EQ_20260101T0100Z.xml,,All requested inputs were resolved.

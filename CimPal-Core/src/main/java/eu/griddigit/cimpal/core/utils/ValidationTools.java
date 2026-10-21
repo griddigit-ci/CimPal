@@ -82,9 +82,7 @@ public class ValidationTools {
         // whatever its entry point (SEC-2, G3).
         SparqlServicePolicy.disableRemoteServiceGlobally();
     }
-    private static volatile boolean exportTurtleValidationReports;
 
-    public static void setExportTurtleValidationReports(boolean enabled) { exportTurtleValidationReports = enabled; }
 
 
     /**
@@ -111,6 +109,18 @@ public class ValidationTools {
     // Cache for XML files downloaded from remote URLs (GitHub / HTTP)
     private static final Path REMOTE_XML_CACHE_DIR = initRemoteXmlCacheDir();
     private static final Map<String, Path> REMOTE_XML_FILE_CACHE = new ConcurrentHashMap<>();
+
+    /** The remote imports cache of the run on this thread ({@link RunScope}), else the process-wide one. */
+    static Map<String, Model> remoteImportsCache() {
+        RunScope scope = RunScope.current();
+        return scope == null ? REMOTE_IMPORTS_CACHE : scope.remoteImports;
+    }
+
+    /** As {@link #remoteImportsCache()}, for remote model files. */
+    private static Map<String, Path> remoteXmlFileCache() {
+        RunScope scope = RunScope.current();
+        return scope == null ? REMOTE_XML_FILE_CACHE : scope.remoteXmlFiles;
+    }
 
     /**
      * Hosts the application may fetch remote shapes and instance data from. An import URI
@@ -202,10 +212,13 @@ public class ValidationTools {
      * {@link #clearRemoteDiskCaches()} to discard those as well.
      */
     public static void clearRemoteCaches() {
-        int shapes = REMOTE_IMPORTS_CACHE.size();
-        int xml = REMOTE_XML_FILE_CACHE.size();
-        REMOTE_IMPORTS_CACHE.clear();
-        REMOTE_XML_FILE_CACHE.clear();
+        // Within a RunScope only that run's caches: a concurrent run keeps its own (DEP-8).
+        Map<String, Model> imports = remoteImportsCache();
+        Map<String, Path> files = remoteXmlFileCache();
+        int shapes = imports.size();
+        int xml = files.size();
+        imports.clear();
+        files.clear();
         dbg("CACHE cleared in-memory remote caches shapesEntries=" + shapes + " xmlEntries=" + xml);
     }
 
@@ -355,7 +368,7 @@ public class ValidationTools {
             throws IOException {
         return validateByTimestampedMapping(mappingCsvPath, inputPath, constraintsRoot, outputBaseDir,
                 threadCount, dataTypeMap, xmlBase, previousComparisonCsv, maxResultsPerConstraint,
-                validationEngine, exportTurtleValidationReports, true);
+                validationEngine, false, true);
     }
 
     /** As above, with the Turtle report export given per run rather than by the global switch. */
@@ -784,7 +797,7 @@ public class ValidationTools {
     ) throws IOException {
         return validateByMapping(mappingCsvPath, modelsBaseDir, constraintsRoot, outputBaseDir,
                 threadCount, dataTypeMap, xmlBase, maxResultsPerConstraint, validationEngine,
-                exportTurtleValidationReports);
+                false);
     }
 
     /** As above, with the Turtle report export given per run rather than by the global switch. */
@@ -2154,20 +2167,9 @@ public class ValidationTools {
         }
     }
 
-    /**
-     * Loopback, link-local, private, wildcard and multicast addresses, plus two ranges Java's
-     * checks miss (SEC-5): IPv6 unique-local {@code fc00::/7} ({@code isSiteLocalAddress} only
-     * covers the deprecated {@code fec0::/10}) and carrier-grade NAT {@code 100.64.0.0/10}.
-     */
+    /** The address rule, shared with serve's job callbacks (DEP-14): see {@link EgressPolicy}. */
     static boolean isNonPublicAddress(InetAddress addr) {
-        if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()
-                || addr.isAnyLocalAddress() || addr.isMulticastAddress()) {
-            return true;
-        }
-        byte[] b = addr.getAddress();
-        boolean uniqueLocal = b.length == 16 && (b[0] & 0xfe) == 0xfc;
-        boolean carrierGradeNat = b.length == 4 && (b[0] & 0xff) == 100 && (b[1] & 0xc0) == 64;
-        return uniqueLocal || carrierGradeNat;
+        return EgressPolicy.isNonPublicAddress(addr);
     }
 
     /** Applies both egress policy tiers. Use at the point a request is about to be issued. */
@@ -2259,7 +2261,7 @@ public class ValidationTools {
      * Expands a URL token (possibly containing a glob in the last segment) to a list of local Paths.
      *   No glob: downloads the single file to the local cache.
      *   Glob:    uses the GitHub Contents API to list the directory, filters by glob pattern,
-     *            then downloads each matching file.
+     *            then downloads each matching file. Any matched file that fails to download fails the token.
      */
     private static List<Path> expandUrlToken(String token) throws IOException {
         String norm = cleanToken(token).replace("\\", "/");
@@ -2301,19 +2303,48 @@ public class ValidationTools {
             return List.of();
         }
 
+        return downloadGlobMatches(entries, pattern, token, ValidationTools::downloadXmlToCache);
+    }
+
+    /** Fetches one remote XML file to a local path; {@link #downloadXmlToCache} in production. */
+    @FunctionalInterface
+    interface XmlDownloader {
+        Path download(String url) throws IOException;
+    }
+
+    /**
+     * Downloads every directory entry matching {@code pattern} and returns the local paths,
+     * sorted by file name.
+     * <p>
+     * Fails closed: if any matched file cannot be downloaded, the whole token fails with an
+     * {@link IOException}, which fails the mapping row. Previously the failed file was only
+     * logged and dropped, so the row validated a subset of its inputs and could report clean.
+     * The message names the failed files and URLs through {@link #urlForLog}, so a signed
+     * {@code download_url} never carries its token into the report.
+     */
+    static List<Path> downloadGlobMatches(List<GitHubApiEntry> entries, String pattern, String token,
+                                          XmlDownloader downloader) throws IOException {
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
 
         List<Path> matches = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
         for (GitHubApiEntry entry : entries) {
             if (entry.downloadUrl() == null || entry.downloadUrl().isBlank()) continue;
             if (!entry.name().toLowerCase(Locale.ROOT).endsWith(".xml")) continue;
             if (!matcher.matches(Paths.get(entry.name()))) continue;
             try {
-                matches.add(downloadXmlToCache(entry.downloadUrl()));
+                matches.add(downloader.download(entry.downloadUrl()));
                 dbg("expandUrlToken glob match name=" + forLog(entry.name()));
             } catch (IOException e) {
                 dbg("expandUrlToken glob download failed name=" + forLog(entry.name()) + " error=" + forLog(e.getMessage()));
+                failed.add(forLog(entry.name()) + " (" + urlForLog(entry.downloadUrl()) + ")");
             }
+        }
+
+        if (!failed.isEmpty()) {
+            throw new IOException(failed.size() + " of " + (failed.size() + matches.size())
+                    + " file(s) matched by " + urlForLog(token) + " could not be downloaded: "
+                    + String.join(", ", failed));
         }
 
         matches.sort(Comparator.comparing(p -> p.getFileName().toString()));
@@ -2336,7 +2367,7 @@ public class ValidationTools {
      * {@link #clearRemoteCaches()} drops that at each run boundary.
      */
     private static Path downloadXmlToCache(String url) throws IOException {
-        Path existing = REMOTE_XML_FILE_CACHE.get(url);
+        Path existing = remoteXmlFileCache().get(url);
         if (existing != null) {
             dbg("downloadXmlToCache memory-hit url=" + urlForLog(url));
             return existing;
@@ -2356,28 +2387,46 @@ public class ValidationTools {
                 throw new IOException("Offline mode: URL not in disk cache: " + urlForLog(rawUrl));
             }
             dbg("downloadXmlToCache offline disk-hit rawUrl=" + urlForLog(rawUrl) + " local=" + target);
-            REMOTE_XML_FILE_CACHE.put(url, target);
+            remoteXmlFileCache().put(url, target);
             return target;
         }
 
-        Properties meta = onDisk ? readCacheMeta(metaFile) : new Properties();
-        ConditionalFetch fetch = fetchHttpBytes(
-                rawUrl, meta.getProperty("etag"), meta.getProperty("last-modified"));
+        // One download of a URL at a time in this JVM: concurrent runs (DEP-8) share the disk cache.
+        synchronized (REMOTE_URL_LOCKS.computeIfAbsent("xml:" + rawUrl, k -> new Object())) {
+            onDisk = Files.exists(target);
+            Properties meta = onDisk ? readCacheMeta(metaFile) : new Properties();
+            ConditionalFetch fetch = fetchHttpBytes(
+                    rawUrl, meta.getProperty("etag"), meta.getProperty("last-modified"));
 
-        if (fetch.notModified() && onDisk) {
-            dbg("downloadXmlToCache 304 not modified, using disk cache rawUrl=" + urlForLog(rawUrl)
-                    + " local=" + target);
-        } else {
-            createPrivateDirectory(REMOTE_XML_CACHE_DIR);
-            Path tmp = resolveInCacheDir(REMOTE_XML_CACHE_DIR, fileName + ".tmp");
-            Files.write(tmp, fetch.body());
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
-            writeCacheMeta(metaFile, fetch.etag(), fetch.lastModified());
-            dbg("downloadXmlToCache saved bytes=" + fetch.body().length
-                    + " revalidated=" + onDisk + " local=" + target);
+            if (fetch.notModified() && onDisk) {
+                dbg("downloadXmlToCache 304 not modified, using disk cache rawUrl=" + urlForLog(rawUrl)
+                        + " local=" + target);
+            } else {
+                createPrivateDirectory(REMOTE_XML_CACHE_DIR);
+                // A temp file of its own, never one another download is writing.
+                Path tmp = Files.createTempFile(REMOTE_XML_CACHE_DIR, fileName + ".", ".tmp");
+                try {
+                    Files.write(tmp, fetch.body());
+                    Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+                    writeCacheMeta(metaFile, fetch.etag(), fetch.lastModified());
+                } catch (java.nio.file.FileSystemException e) {
+                    // Windows refuses to replace a file another run has open. The cached copy may
+                    // be used only if it is what was just fetched; a stale version would validate
+                    // against old content without anyone noticing, so that fails instead.
+                    if (!sameContent(target, fetch.body())) {
+                        throw new IOException("Could not update the cached copy of " + urlForLog(rawUrl)
+                                + " (in use by another run?); refusing to use an older version", e);
+                    }
+                    dbg("downloadXmlToCache target in use, same content, keeping it local=" + target);
+                } finally {
+                    Files.deleteIfExists(tmp);
+                }
+                dbg("downloadXmlToCache saved bytes=" + fetch.body().length
+                        + " revalidated=" + onDisk + " local=" + target);
+            }
         }
 
-        REMOTE_XML_FILE_CACHE.put(url, target);
+        remoteXmlFileCache().put(url, target);
         return target;
     }
 
@@ -2394,6 +2443,16 @@ public class ValidationTools {
     }
 
     /** The cache validators recorded for a cached file, empty when there are none or it is corrupt. */
+    /** True when {@code file} exists and holds exactly {@code body}. */
+    static boolean sameContent(Path file, byte[] body) {
+        try {
+            return Files.isRegularFile(file) && Files.size(file) == body.length
+                    && java.util.Arrays.equals(Files.readAllBytes(file), body);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     private static Properties readCacheMeta(Path metaFile) {
         Properties meta = new Properties();
         if (!Files.exists(metaFile)) {
@@ -2594,7 +2653,7 @@ public class ValidationTools {
         }
     }
 
-    private record GitHubApiEntry(String name, String downloadUrl) {}
+    record GitHubApiEntry(String name, String downloadUrl) {}
 
     /**
      * Minimal JSON parser for the GitHub Contents API array response.
@@ -2762,7 +2821,7 @@ public class ValidationTools {
             Model tmp;
             try {
                 if (isRemote) {
-                    boolean inRunCacheHit = REMOTE_IMPORTS_CACHE.containsKey(key);
+                    boolean inRunCacheHit = remoteImportsCache().containsKey(key);
                     long fetchStart = System.currentTimeMillis();
                     tmp = loadRemoteCached(key);
                     if (inRunCacheHit) {
@@ -3032,13 +3091,13 @@ public class ValidationTools {
     }
 
     private static Model loadRemoteCached(String url) throws IOException {
-        Model existing = REMOTE_IMPORTS_CACHE.get(url);
+        Model existing = remoteImportsCache().get(url);
         if (existing != null) {
             return copyWithPrefixes(existing);
         }
         Object lock = REMOTE_URL_LOCKS.computeIfAbsent(url, k -> new Object());
         synchronized (lock) {
-            Model existing2 = REMOTE_IMPORTS_CACHE.get(url);
+            Model existing2 = remoteImportsCache().get(url);
             if (existing2 != null) {
                 return copyWithPrefixes(existing2);
             }
@@ -3047,7 +3106,7 @@ public class ValidationTools {
             Model fetched = fetchRemoteModel(url);
             dbg("SHAPES remote fetch done url=" + urlForLog(url)
                     + " triples=" + fetched.size(), fetchStart);
-            REMOTE_IMPORTS_CACHE.put(url, fetched);
+            remoteImportsCache().put(url, fetched);
             return copyWithPrefixes(fetched);
         }
     }

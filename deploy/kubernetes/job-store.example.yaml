@@ -1,0 +1,41 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Jobs that survive a restart (DEP-11): serve keeps its jobs in your PostgreSQL. Not part of
+# kustomization.yaml; see README.md, "Jobs that survive a restart". The database itself is yours
+# (a managed PostgreSQL, or an operator); serve creates its tables at start.
+#
+# 1. Create the password secret outside the manifests, so no password is ever committed:
+#      kubectl -n cimpal create secret generic cimpal-db --from-file=password=db-password
+# 2. Add this patch to kustomization.yaml (patches: - path: job-store.example.yaml), with your
+#    database host and name.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cimpal
+  namespace: cimpal
+spec:
+  template:
+    spec:
+      containers:
+        - name: cimpal
+          env:
+            - name: CIMPAL_JOB_STORE
+              value: jdbc
+            - name: CIMPAL_JOB_STORE_URL
+              # verify-full: the database's certificate is checked against its name.
+              value: jdbc:postgresql://postgres.example.internal:5432/cimpal?sslmode=verify-full
+            - name: CIMPAL_JOB_STORE_USER
+              value: cimpal
+            - name: CIMPAL_JOB_STORE_PASSWORD_FILE
+              value: /var/run/secrets/cimpal-db/password
+          volumeMounts:
+            - name: db-password
+              mountPath: /var/run/secrets/cimpal-db
+              readOnly: true
+      volumes:
+        - name: db-password
+          secret:
+            secretName: cimpal-db
+            defaultMode: 0440

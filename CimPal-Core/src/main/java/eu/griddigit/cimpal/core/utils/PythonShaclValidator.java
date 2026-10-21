@@ -37,6 +37,16 @@ final class PythonShaclValidator {
 
     record Outcome(List<SHACLValidationResult> results, boolean conforms, Model report) { }
 
+    /** Secrets of serve's environment that a Python child must not inherit (DEP-11 review). */
+    static final java.util.Set<String> SECRET_ENV = java.util.Set.of("CIMPAL_API_TOKEN", "CIMPAL_JOB_STORE_PASSWORD",
+            "GITHUB_TOKEN");
+
+    /** {@code builder} with {@link #SECRET_ENV} removed from the child's environment. */
+    static ProcessBuilder withoutSecrets(ProcessBuilder builder) {
+        builder.environment().keySet().removeIf(SECRET_ENV::contains);
+        return builder;
+    }
+
     static Outcome validate(ValidationEngine engine, Model shapesModel, Model dataModel)
             throws IOException, InterruptedException {
         if (engine == ValidationEngine.APACHE_JENA) {
@@ -48,7 +58,7 @@ final class PythonShaclValidator {
         List<String> command = new ArrayList<>(pythonCommand(engine));
         command.add("-u");
         command.add(extractWorker().toString());
-        Process process = new ProcessBuilder(command).start();
+        Process process = withoutSecrets(new ProcessBuilder(command)).start();
 
         StringBuilder stderr = new StringBuilder();
         Thread stderrReader = Thread.ofVirtual().start(() -> copy(process.getErrorStream(), stderr));
@@ -112,7 +122,7 @@ final class PythonShaclValidator {
                 List<String> check = new ArrayList<>(candidate);
                 check.add("-c");
                 check.add("import " + requiredModule);
-                p = new ProcessBuilder(check).start();
+                p = withoutSecrets(new ProcessBuilder(check)).start();
             } catch (IOException ignored) {
                 continue;
             }

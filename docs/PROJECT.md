@@ -5,8 +5,8 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-13  
-**Update rule:** Edit this file at the end of every implementation session. Sections that change most often: *Implementation status*, *Next steps*, *Known issues*.
+**Last updated:** 2026-10-21 (ID mapping, `id-map`)  
+**Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
 
@@ -65,6 +65,8 @@ Key dependency versions:
 - SLF4J 2.0.18 (logging)
 - JUnit Jupiter 5.13.1 (tests)
 
+Main and CLI are fat JARs: `maven-shade-plugin` (`shadedArtifactAttached=false`) overwrites `CimPal.jar` / `CimPal-CLI.jar` with the shaded jar, and launch4j wraps `CimPal.jar` into `CimPal.exe`. Both modules set `maven-jar-plugin` `forceCreation` (2026-10-19). Without it, a build without `clean` kept the previous fat jar as "up to date" and shaded it again, so the old Core classes inside it won. Seen after merging PR #78: the rebuilt GUI still had the old comparison wording, and `original-CimPal.jar` was 212 MB instead of 2.3 MB. Release CI builds from a fresh checkout and was not affected.
+
 ### Module dependency graph
 
 ```
@@ -112,6 +114,8 @@ All packages follow `eu.griddigit.CimPal.*` with capital C in CimPal. The fat JA
 - A data or shapes ZIP with nothing to read fails instead of contributing nothing. Other RDF files in a shapes ZIP are named in the report warnings, which the GUI shows in its finish dialog.
 
 The CLI runs it as `validate --workflow combined` (added 2026-10-07), with `--constraint-files` and `--data-files` (config keys `constraintFiles`, `dataFiles`) and the template `configs/validate-combined.json`. Its JSON summary keeps `cimpal-validate-summary/1`: `totals` count the workbook's rows, one per constraint file, and `results`, `byConstraintFile`, `partial` and `warnings` are added. An input that can't be read (a parse error, which now names the file, a missing `owl:imports`, an archive without matching files) ends the run with exit 2 and writes nothing, and so does a run that would check nothing (`SHACLValidationReport.checkedNothing()`: no active target shape, or no data triples); a report that can't be written ends with exit 3. `SHACLValidationReport.writeReportsTo` names the workbook and the `.ttl` for the GUI and the CLI alike, and `SHACLValidationOptions.runStats` counts the data for `--stats`. Covered by `SHACLValidatorTest`, `SHACLValidationReportTest`, `ShapeArchiveTest`, `ZipBudgetTest`, `ShapeSourceTest`, and in the CLI by `ValidateCommandTest`, `PathGuardTest` and `OutOfMemoryExitTest`.
+
+**Comparison workbook formulas (2026-10-15).** The timestamped workflow's `validation_comparison__*.xlsx` (`ValidationExcelWriter.ComparisonExcelWriter`) was asked to show how its percentages are calculated (REE feedback). Every number on its Charts sheet is now an Excel formula: dataset counts are `SUMIFS` over the run sheets, shares are `IF(SUM=0,0,x/SUM*100)` (no more `#DIV/0!`), and the compliance rates are `COUNTIFS` over a new *Compliance basis* sheet (one row per run, region and dataset). Before, the compliance rates were numbers computed in Java. Each table has an italic description row, the column headers have hover comments, and the formula results are cached at save time. Criteria are written as escaped literals, so `*`, `?` and `~` in dataset names match literally; Excel compares them case-insensitively, unlike the Java grouping. The *Compliance basis* sheet is skipped when the file is read as the previous comparison. Covered by `ValidationExcelWriterComparisonTest` and the `timestamped-*__validation_comparison` snapshots. On 2026-10-19 the workbook's "Dataset" became **"Sets of data"** (headers, chart axes, descriptions, header notes; one mapping row = model files validated against one constraint set), and the compliance tables' region columns are headed `<region> (%)`. Old files still load as the previous comparison, which is read by column index. *Regenerate comparison* (`ValidationTools.regenerateComparisonXlsx`) failed on large reports with POI's `RecordFormatException` (100 MB per part), because `readStatisticsSheet` / `readTimestampOverview` loaded the whole workbook; they now stream only the sheet they need (`ValidationExcelWriter.readSheetRows`, POI's SAX `XSSFReader`).
 
 **SHACL rule test (moved and rewritten 2026-10-05).** The SHACL Validation tab's *Validate by manual selection* workflow (before that the *SHACL tester* tab) never validated datasets: it checks that each rule fires on its NonConform models and on none of its Conform models. It is now the fourth section of **SHACL ▸ Constraints Operations**, *Test SHACL rules against Conform / NonConform models* (`ShaclRuleTestPane.fxml`, `ShaclRuleTestController`), and the CLI's `validate --workflow manual`, `--shacl-files`, the MCP `shaclConstraintFiles` field, `validate-manual.json` and `pipeline-shape-dev.json` are gone (`--workflow manual` exits 2 with a pointer). `ShaclRuleTester` replaces `ShaclAutoTester`, `SHACLValidationLogger` and `SHACLRuleTestData`, fixing:
 - Since `f547550` (2026-03-04) every run threw a `NullPointerException` at the first finding: the rule's `sh:name` was looked up from the shortened source-shape label. Rules are now matched by the source shape node.
@@ -269,7 +273,18 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - SPARQL `SERVICE` is refused (`SparqlServicePolicy`) and switched off globally in the CLI, the GUI and `ValidationTools`. Shapes with `SERVICE` are refused before they go to the Python engines, and the Python worker disables rdflib `SERVICE`. Jena 6.2 runs `SERVICE` by default (finding in `SEC-2.md`).
 - `serve` now passes `--format json` only to the four commands that support it. Before, the other six endpoints always failed with "Unknown option".
 
-**Docker image** (added by CI-3, `docs/plans/CI-3.md`):
+**Characterisation tests, validation group** (TEST-3, written 2026-10-02, merged into devel 2026-10-09):
+- `SHACLValidatorTest` and `MappingValidatorTest` pin the current output of `SHACLValidator` and `MappingValidator` (mapping and timestamped) as golden files under `snapshots/shacl-validator` and `snapshots/mapping-validation`.
+- They cover CGMES 2.4 and 3.0 presets, empty and malformed input, row errors, result limits, ZIP input and a previous comparison workbook.
+- `Snapshots` also normalises sheet names, and has `assertExcelEqualsIgnoringRowOrder`.
+- The `ShaclAutoTesterTest` written alongside was dropped, because PR #53 replaced `ShaclAutoTester`, and `ShaclRuleTesterTest` covers the replacement.
+
+**Characterisation tests, rdfs2shacl + excel2shacl + organize** (TEST-3, written 2026-10-02, merged into devel 2026-10-09):
+- `SHACLFromRDFTest`, `ShaclFromXlsTest` and `ShaclOrganizerTest` pin the current output as golden files under `snapshots/rdfs2shacl/`, `excel2shacl/` and `organize/`.
+- The RDFS inputs are two synthetic profiles in `fixtures/shacl-generation/` (RDFS 2020 with CIM100, RDFS 2019 with CIM16).
+- The Core test-jar now also carries `fixtures/**`, which `RdfsToShaclCommandTest` in the CLI uses.
+
+**Docker image** (added by CI-3, `docs/plans/ci/CI-3.md`):
 - `CimPal-CLI/docker/Dockerfile` copies the built `CimPal-CLI.jar` onto `eclipse-temurin:25-jre-noble`
   (pinned by digest). Maven never runs inside Docker.
 - The image runs as `10001:10001` (`cimpal`) in `/data`, which is also the default root for `mcp`
@@ -317,13 +332,25 @@ GHCR package must be made public. DEP-1 and DEP-2 are done and released in 2026.
 (automation options and Airflow examples) is merged (PR #60) and goes out with the next release; the
 KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. DEP-4 (external
 user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintainer review. DEP-5
-(async `/v1` job API and OpenAPI spec) is in review on `feature/dep-5-async-jobs`. Next on the
-deployment track: DEP-6 (service deployment) and DEP-7 (file exchange).
+(async `/v1` job API and OpenAPI spec) is merged (PR #62), and DEP-6 (service deployment: proxy names,
+token files, probes, SIGTERM drain, JSON logs, metrics, Compose and Kubernetes examples) is merged
+(PR #64). DEP-7 (file exchange: uploads, job workspaces, downloads) is merged (PR #66), and so are
+TEST-3's validation and SHACL generation groups (PR #65) and `validate --workflow combined` with
+folders (PR #67). DEP-8 (`serve --workers N`, concurrent commands in one JVM, decision D-8 yes) is
+merged (PR #69), and so is DEP-9 (Python SDK `cimpal-client` in `clients/python/`, Apache-2.0 per D-11,
+PR #70). DEP-10 (Airflow provider `airflow-provider-cimpal` in `clients/airflow/`, Airflow 3.2+ per D-12)
+is merged (PR #71); PyPI publishing for both Python packages is in PR #72. Next: phase D3, making the REST
+service (option 2) a shared production service: `docs/plans/deployment/OPTION-2-ROADMAP.md` lists the gaps
+and the order (a release first, then DEP-13 client identity, DEP-11 durable job store, DEP-14 idempotency and
+webhooks, DEP-16 load tests, DEP-12 shared queue across replicas, DEP-15 job isolation). DEP-13 (named tokens,
+job and upload ownership, per-client quotas, D-17) is merged (PR #75). DEP-11 (durable job store in PostgreSQL,
+D-14, D-18) is merged (PR #76); its PostgreSQL ITs run only where Docker is available (CI). DEP-14
+(idempotent submits and uploads, signed completion callbacks, D-19) and DEP-16 (load tests, SLOs, alert rules;
+tooling done, the full capacity runs still open, they need Docker on the measuring laptop) are merged (PR #79,
+DEP-16 via #81). DEP-12 (shared queue across replicas) is in progress.
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
-with SEC-2 path checks and a JSON summary, is open. TEST-3 (`aca6238`) adds a golden test,
-`ShaclAutoTesterTest`, for the `ShaclAutoTester` that PR #53 deletes: whichever merges second drops
-it, as `ShaclRuleTesterTest` covers the replacement.
+with SEC-2 path checks and a JSON summary, is open.
 
 ---
 
@@ -346,6 +373,27 @@ it, as `ShaclRuleTesterTest` covers the replacement.
 
 All 14 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25. Each release also publishes that JAR as the Docker image `ghcr.io/griddigit-ci/cimpal` (see `docs/cli/docker.md`).
 
+### Python SDK (`clients/python/`, DEP-9)
+
+`cimpal-client` (import `cimpal_client`, Python 3.10+, **Apache-2.0**, unlike the EUPL engine) calls the `/v1` API. Its version is `<cimpal.version>` from the root `pom.xml`, read by hatchling at build time.
+- `_generated/`: generated from `cimpal-v1.json` by a pinned `openapi-python-client` (`scripts/regenerate.py`; CI runs `--check`). The generator can't do `application/zip`, so uploads and the archive download are missing there.
+- `CimPal` / `AsyncCimPal` (facade): their own httpx requests, returning the generated models. One place for problem-details errors, retries (503 and never-sent requests; other transport errors only for GET, so a job is never submitted twice) and streaming downloads (output names checked to stay in the target folder).
+- Tests: respx unit tests, and integration tests that start `java -jar CimPal-CLI.jar serve`. CI: the `python-sdk*` jobs in `integrations.yml`.
+- Publishing: `release.yml` builds both Python packages through the reusable `python-dists.yml`: the tagged commit must be on master and the pom version must equal the tag; the toolchain is hash-locked (`.github/python-build-requirements.txt`, builds without isolation); `twine check --strict` and the provider's pin are checked. After the upload, the job checks that PyPI holds exactly the built files. It publishes them in its `pypi` job with PyPI trusted publishing, after a maintainer approves the `pypi` environment. `testpypi.yml` is a manual rehearsal with `.dev<run>` versions. Both trusted publishers must be registered on (Test)PyPI once (`clients/python/README.md`, Releasing).
+
+### Airflow provider (`clients/airflow/`, DEP-10)
+
+`airflow-provider-cimpal` (import `cimpal_provider`, **Apache-2.0**, Airflow 3.2+) is built on `cimpal-client`, which it requires at exactly its own version (a hatch build hook pins it).
+- **Contents:**
+  - the `cimpal` connection type, declared in `get_provider_info()` (`conn-fields`, `ui-field-behaviour`, read by Airflow 3.2+);
+  - `CimPalHook`;
+  - `CimPalJobOperator` and `CimPalValidateOperator` (polling or deferrable; small XCom; `fail_on_violations`; `on_kill`);
+  - `CimPalJobTrigger` (an absolute deadline, so a restarted triggerer doesn't extend it);
+  - `CimPalJobSensor`.
+- **Errors:** 401/403/400/404/410 and job exit 2 raise `AirflowFailException` (no retries); busy, timeouts and exit 3 raise `AirflowException`.
+- **`_logic.py`:** everything that needs no Airflow, tested on Windows too. Its `PATH_FIELDS` mirrors `PathGuard.FIELDS`, and `tests/test_logic.py` parses `PathGuard.java` to keep the two equal.
+- **Windows:** Airflow doesn't run there (no `fork`), so the Airflow tests run only in CI. That is the `airflow-provider` job on Airflow 3.2.2 and 3.3.2, including `dag.test()` (polling and deferrable) against a real `serve`.
+
 ### How `serve` and `mcp` execute commands (shared mechanism)
 
 Both `ServeCommand` and `McpCommand` use the same in-process execution pattern:
@@ -366,6 +414,28 @@ When `validate --format json --samples N` (default N=3 in JSON mode):
 - Aggregated per (sourceShape, sourceConstraintComponent): count + bounded focus nodes
 - Included in JSON as `"shapes": [...]`, sorted by count descending
 - Source: `ValidateCommand.extractShapeGroups()` — all logic in the CLI, zero Core changes
+
+---
+
+## Change log
+
+One row per bigger implementation, newest first (CLAUDE.md, *After every implementation*). `Skill` = yes when the change affects how CimPal is run or explained; the cimpal skill (`Claude_contents\CimPal\cimpal-skill`) and the Desktop project notes are refreshed from these rows. Rows before 2026-10-20 were seeded from the WP files.
+
+| Date | WP / PR | What changed for users | Docs | Skill |
+|---|---|---|---|---|
+| 2026-10-21 | ID mapping (branch `feature/id-mapping`) | New `id-map` command and GUI tab **Dataset ▸ ID Mapping**: maps the IDs of model 1 onto model 2 of the same grid and writes Matched (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, …), Unmatched and Summary sheets with certain / probable / not matched percentages; SPARQL query library in `CimPal-Core/src/main/resources/idmapping/queries`; config template `configs/id-map.json`; not exposed through serve/mcp/run | cli/id-map.md, cli/index.md, configs/id-map.json | yes |
+| 2026-10-20 | DOC-2 | `manifest --config` (keys `dir`, `files`, `accessUrl`, `output`), so `manifest` works through `mcp`, `serve` and `run`; MCP tool schemas and the OpenAPI document list every key each command reads, plus `overwrite` where a command writes a file (a test keeps them equal to the commands' config loaders); `validate` takes `incrementalTimestamps` from a config and `--dry-run` shows it; through serve/mcp/run, `manifest`'s files, scanned files and default output are checked against the allowed roots (security review), and file names in `dcat:accessURL` are percent-encoded. Docs: the mapping CSV format is commas between columns and `;` inside them (the `|` example was wrong), all 13 commands and every template listed, compare's `N/A` wording, the MCP agent loop without the manual workflow, a new root README feature list | cli/README.md, cli/index.md, cli/manifest.md, cli/mcp.md, cli/validate.md, cli/compare.md, cli/serve.md, cli/ci-pipeline.md, README.md, configs/manifest.json, configs/validate-mapping-cgmes30.json | yes |
+| 2026-10-20 | Desktop (no code) | Change log introduced; drift found while running CLI 2026.10.6.1 recorded under *Known issues*; DOC-2 written | PROJECT.md, CLAUDE.md, plans | yes |
+| 2026-10-19 | DEP-16 (PR #81 → #79) | `/metrics` adds `cimpal_http_responses_total{code}`, `cimpal_http_request_duration_seconds{kind}`, `cimpal_job_queue_wait_seconds`, `cimpal_queue_size`, `cimpal_stalled`, `cimpal_work_used_bytes`/`_max_bytes`; service levels (99.5 % availability, API p95 < 200 ms, queue wait p95 < 5 min); Prometheus alert rules in `deploy/monitoring/`; load tool `scripts/bench/load/`; preliminary service capacity figures | cli/serve.md, guide/service.md, guide/sizing.md, deploy/monitoring | yes |
+| 2026-10-19 | DEP-14 (PR #79) | `Idempotency-Key` on `POST /v1/jobs` and `/v1/uploads` (`--idempotency-ttl`); opt-in HMAC-signed completion callbacks (`callback.url`, `--callback-secrets`, `callbackAllow` in `--client-quotas`); SDK `verify_callback()`, automatic keys in SDK and Airflow provider | cli/serve.md, guide/python-sdk.md, guide/airflow.md, guide/security.md | yes |
+| ≤ 2026-10-19 | DEP-13 (PR #75) | Named clients `name:role:token` in `--token-from-file`; per-client ownership of jobs/uploads (404 for others); `--client-quotas` (maxQueued, maxRunning, maxUploadBytes, maxWorkBytes, requestsPerMinute → 429/413/507); admin-only `/shutdown`, `/metrics`, `?owner=` | cli/serve.md, guide/service.md | yes |
+| 2026-10-19 | DEP-11 (PR #76) | `--job-store jdbc` PostgreSQL (`--job-store-url/-user/-password-file/-pool`, `CIMPAL_JOB_STORE*`); jobs, results, logs, uploads survive restarts; a job that was running ends `failed` with the error "Interrupted: …" unless `--requeue-interrupted` queues it again; one instance per database | cli/serve.md, guide/configuration.md | yes |
+| ≤ 2026-10-19 | DEP-10 (PR #71, #72) | `airflow-provider-cimpal` (Airflow 3.2+): connection type, hook, `CimPalJobOperator`, `CimPalValidateOperator`, trigger, sensor; PyPI publishing | guide/airflow.md | yes |
+| ≤ 2026-10-19 | DEP-9 (PR #70) | Python SDK `cimpal-client` (`CimPal`, `AsyncCimPal`: upload, submit, wait, result, log, cancel, downloads) generated from the OpenAPI document | guide/python-sdk.md | yes |
+| ≤ 2026-10-19 | DEP-8 (PR #69) | `serve --workers N` (≤64) with heap admission `--max-concurrent-heap-bytes`; per-job path policy, caches and output | cli/serve.md, guide/sizing.md | yes |
+| ≤ 2026-10-19 | DEP-7 (PR #66) | File exchange: `POST /v1/uploads` (ZIP), `inputUpload` jobs, `/v1/jobs/{id}/files`, `/archive`; `--work-root`, `--no-file-exchange`, `--max-upload-bytes`, `--upload-ttl`, `--work-max-bytes`, `--request-read-time` | cli/serve.md | yes |
+| ≤ 2026-10-19 | DEP-6 (PR #64) | Service deployment: `--allowed-host`, `--token-from-file` with reload, `/ready`, SIGTERM drain `--shutdown-grace`, `--log-format json`, `--metrics`, Compose/Kubernetes examples in `deploy/` | guide/service.md, cli/serve.md | yes |
+| ≤ 2026-10-19 | DEP-5 (PR #62) | Async `/v1` job API (`POST/GET /v1/jobs`, result, log, cancel), OpenAPI 3.1 at `/v1/openapi.json`, RFC 9457 errors, `--job-timeout`, `--max-jobs`, `--job-ttl`, `--job-log-lines`, `--max-result-bytes` | cli/serve.md | yes |
 
 ---
 
@@ -393,14 +463,15 @@ The Jackson `readTree()` + `.path("key")` pattern silently ignores unrecognized 
 
 ### `serve` job API (`/v1`, DEP-5)
 
-`POST /v1/jobs` queues a command on the same single worker and the same queue slots as the
+`POST /v1/jobs` queues a command on the same workers and the same queue slots as the
 synchronous endpoints, and answers 202 with a job id (random UUID). Classes in
 `eu.griddigit.CimPal.cli.command`:
 - `JobManager`: the in-memory store, with TTL and `--max-jobs` eviction and `--job-timeout`.
 - `Job`: synchronized state transitions, and the result, kept up to `--max-result-bytes`.
 - `JobLog`: a ring buffer of progress lines.
-- `StderrTee`: while a job runs, it copies `System.err` lines into the job's log. Lines from the
-  server's own threads are skipped. This is safe only because one command runs at a time.
+- `StderrTee`: the job's `System.err`, bound to the job's threads through `CliStreams` (DEP-8): it
+  copies their lines into the job's log and passes them on. Lines from the server's own threads are
+  skipped.
 - `Problem`: RFC 9457 problem+json bodies.
 - `CommandSchemas`: the per-command config schemas, shared by `mcp` and the OpenAPI document.
 
@@ -409,9 +480,84 @@ The OpenAPI 3.1 document is `CimPal-CLI/src/main/resources/openapi/cimpal-v1.jso
 `ServeServer.V1_ROUTES`, and that its config schemas equal `CommandSchemas`; regenerate the schemas
 with `-Dopenapi.update=true`. `JobApiTest` checks that every documented response is exercised.
 
-### `serve` uses single-threaded executor
+### `serve` as a service (DEP-6)
 
-Commands run on one worker thread (`ServeServer`), with a bounded queue and a pool of HTTP handler threads in front of it. This avoids races on `ValidationTools` static flags (`exportTurtleValidationReports`, `DEBUG`). A single validation run already saturates CPU via its own internal worker pool, so sequential requests is the right trade-off for local developer use. Any concurrent REST API implementation must address this differently — see REST API section below.
+What makes `serve` deployable behind a proxy (`docs/guide/service.md`, `deploy/`):
+- **Host check:** `--allowed-host` adds public names (`ServeSecurity.isAllowedHost`, `allowedHostEntry`).
+- **Tokens:** a `TokenSource` holds them: a fixed token, or `FileTokens` for `--token-from-file` /
+  `CIMPAL_API_TOKEN_FILE`. That file is read-only to `serve`, holds up to two tokens, and is
+  reloaded lazily by an `InstantSource`; on a failed reload the tokens read last stay in force.
+- **Probes:** `/ready` reports readiness.
+- **Metrics:** `/metrics` (with `--metrics`) is Prometheus text, written by hand in `ServeMetrics`.
+- **Logs:** everything goes through `ServeLog`, as text or as JSON lines. In JSON mode,
+  `System.err` is wrapped, so the commands' own lines become `output` events.
+- **SIGTERM:** a `sun.misc.Signal` handler (`ServeSignals`, `requires jdk.unsupported`) runs the
+  `/shutdown` path. `ServeCommand` waits up to `--shutdown-grace` and exits 3 if a command is
+  still running.
+- **Tests:** `ServeSignalIT` (failsafe, POSIX only) forks a JVM with `ServeSignalItMain` to test
+  the drain. Failsafe needs `package`, so it doesn't run on this Windows machine while Claude
+  Desktop locks the JAR.
+
+### `serve` file exchange (DEP-7)
+
+Uploads and downloads for callers without a shared file system (`docs/cli/serve.md`, *File exchange*):
+- **Extraction:** Core's `ZipExtractor` extracts an untrusted ZIP to a new folder.
+  - Names: `safeZipEntryName`, plus device names, trailing dots and blanks, and case-insensitive duplicates.
+  - Size: `ZipBudget` limits and a 100:1 ratio check.
+  - Writes: `CREATE_NEW`/`NOFOLLOW_LINKS` with a real-path check of each folder; the folder is removed on any failure.
+- **Path isolation:** `PathPolicy.Builder.exclude` refuses a folder inside the roots, unless a root itself lies inside it (the more specific root wins).
+  - The shared policy of `serve` excludes `--work-root`.
+  - The policy of an upload job (`RootOptions.jobPolicy`) reads its upload and the `--read-root`s, writes its `out/`, and excludes the rest of the work area.
+- **`WorkArea`** (CLI) owns `<work-root>/uploads` and `jobs/<jobId>/out`.
+  - It holds the in-memory metadata, the disk budget (reserved before streaming) and the upload TTL (not while a job uses the upload).
+  - A workspace is deleted when `JobManager` evicts its job (`onRemoved`). Both folders are emptied at start.
+- **ServeServer:**
+  - `POST /v1/uploads` is the only non-JSON POST.
+  - `inputUpload` gets a workspace prepared under a pre-allocated job id before the path check (`PathGuard.placeOutputs` puts relative or missing outputs under `out/`).
+  - The download path is split from the raw URI and each segment decoded on its own.
+  - Runners and checks get the workspace through default-method overloads, so existing callers are unchanged.
+- **Request time:** `--request-read-time` sets `sun.net.httpserver.maxReqTime` (JVM-wide, read once).
+
+### `serve` workers (DEP-8)
+
+Commands run on `--workers` threads (`ServeServer`, default 1), with a bounded queue and a pool of HTTP handler threads in front of it. What a command touches is per run, and the threads it starts inherit it (`InheritableThreadLocal`, closed when the run ends):
+- `PathPolicy.runWith`: the path policy. `serve` holds `PathPolicy.requireContext()`, so a check on a thread without a policy (or with an ended one) is refused rather than unrestricted.
+- `RunScope.runIn` (Core): the remote-import and XML download caches of `ValidationTools`; without a scope (GUI, plain CLI) the process-wide caches are used. Downloads go to a unique temp file per call, under a per-URL lock.
+- `CliStreams.bind` (CLI): `System.out`/`System.err` are routing streams installed once; a bound thread writes to its job's buffer and log. It replaced every `System.setOut`/`setErr` swap in `serve`, `mcp`, `run` and `validate --format json`. The label of the binding is the job id in the JSON log.
+- `AdmissionGate`: a command starts only while the estimated heap (10× input size, at least 64 MiB, `ServeCommand.estimateHeap`) of the running ones plus its own fits `--max-concurrent-heap-bytes`; FIFO; a command alone always starts.
+- `MutableStaticsTest` fails on any new non-final static field in Core or the CLI that isn't on its reviewed list, and on any static field holding threads (executor, thread, timer, `HttpClient`): such threads would outlive the job that created them and carry its streams and path policy into another job (DEP-13); `ConcurrencyIT` (failsafe) compares 24 mixed jobs under four workers with one.
+
+### `serve` job store (DEP-11)
+
+`ServeServer` keeps `/v1` jobs in a `JobStore`: `MemoryJobStore` (the default, the former `JobManager`) or `JdbcJobStore` (`--job-store jdbc`, PostgreSQL, D-14). The store is the source of truth for a job's status; `JobScheduler` (in memory, per process) still decides which queued job runs next.
+- **Transitions** are single conditional `UPDATE`s (`… WHERE id = ? AND status = 'queued'`); every SQL text is fixed and prepared (`JdbcJobStoreTest.everyStatementIsPreparedFromFixedText`).
+- **Schema:** `db/V1__jobs.sql`, applied by `JdbcMigrator` (`cimpal_schema_version`; a newer schema is refused). Tables `cimpal_jobs` (with `owner`, `config`, `upload_id`, and `node`/`lease_until` for DEP-12), `cimpal_job_log`, `cimpal_uploads`. Plain SQL that H2 in PostgreSQL mode also runs (the unit tests).
+- **Connections:** `JdbcPool`, a small fixed pool; the password only ever goes to the driver (`--job-store-password-file` or `CIMPAL_JOB_STORE_PASSWORD[_FILE]`, never the command line; a URL with `password=` is refused).
+- **Restart (D-18):** `recover()` fails running jobs as "Interrupted" (or requeues them with `--requeue-interrupted`) and returns the queued ones, which `ServeServer.requeue` hands to the workers. `WorkArea` is not emptied in durable mode: `restore()` matches upload and job folders with the database (deletes what has no record, forgets records without folders, answers 410 for lost outputs). A durable `close()` leaves queued jobs queued.
+- **Failures:** `JobStore.Unavailable` → 503 + `Retry-After` (`ServeServer.route`/`storeUnavailable`), `/ready` 503 while `usable()` is false, `cimpal_job_store_errors_total`.
+- **Logs** go to an in-memory ring while a job runs (read from there) and to the database in batches of 64 and at the end.
+- **Tests:** `JobApiTest`, `FileExchangeApiTest` and `ClientIsolationTest` run on both stores (`@ParameterizedClass` over `TestStores`, H2); `JdbcJobStoreTest`, `JobStoreRestartTest`, `JobStoreOutageTest`; `JdbcJobStorePostgresIT` and `JobStoreRestartPostgresIT` repeat the store and restart tests on PostgreSQL 17 via Testcontainers (skipped without Docker).
+
+### `serve` idempotency and callbacks (DEP-14)
+
+- **`Idempotency-Key`** on `POST /v1/jobs` and `/v1/uploads` (`ServeServer.submitOnce`, `receiveUpload`): an `IdempotencyStore` per `JobStore` (memory, or the `cimpal_idempotency` table, schema V2) maps (client, key) to the request's fingerprint (SHA-256 of method, path and body or upload bytes) and the job or upload id, reserved *before* the job is made. A repeat gets that job (202) or upload (201); another request with the key 422; one still in progress 409 + `Retry-After: 1`; a key whose job exists but wasn't completed (a crash in between) gives that job; a refused request gives its key back; a reservation older than `IdempotencyStore.STALE` (10 min) is free. `--idempotency-ttl` (24 h).
+- **Clients:** the SDK sends a fresh key per `submit()`/`upload()` call (or `idempotency_key=`) and then retries those POSTs like a GET (`RetryPolicy` with `idempotent`), including 409 + Retry-After. The Airflow provider's key is a hash of DAG, task, run, try and map index (per try, as decided).
+- **Callbacks (D-19):** `Callbacks` validates `callback.url` at submit (https, no user or fragment, under the client's `callbackAllow` prefixes from `--client-quotas`, a signing secret from `--callback-secrets`, public addresses only via Core's `EgressPolicy`, which `ValidationTools` now uses too). A worker thread arms callbacks of jobs that became final, delivers due ones (signed `CimPal-Signature: t=…,v1=HMAC-SHA256(secret, t.body)`, `Redirect.NEVER`, the address check again before every attempt), and retries 10 s doubling to 1 h for 24 h. `CallbackStore` (memory, or `cimpal_callbacks`) records attempts; `GET /v1/jobs/{id}` shows `callback`; `cimpal_callbacks_total{outcome}`. The SDK's `verify_callback()` checks signatures; a shared test vector keeps both sides in step.
+- **Tests:** `IdempotencyTest` and `CallbackTest` (both stores), additions to `ClientIsolationTest`, `JobStoreRestartTest`, `ClientQuotasTest`; SDK `test_callbacks.py` and retry tests; provider key tests.
+
+### `serve` load tests and SLOs (DEP-16)
+
+- **Load tool** (`scripts/bench/load/`): `run.py` drives `/v1` with `AsyncCimPal` (open Poisson or closed load; scenarios small/medium validation, SPARQL, upload round trip), probes `GET /v1/health` and `/v1/jobs/{id}`, samples `/metrics`, and writes CSVs, `summary.json` and `report.md`; `--start-server` launches the JAR pinned to N CPUs. `sweep.py` runs the capacity experiments and publishes to `docs/guide/sizing-data/`.
+- **Metrics added to `ServeMetrics`:** `cimpal_http_responses_total{code}` (429/503 apart), `cimpal_http_request_duration_seconds{kind=api|transfer|command}` (in `ServeServer.handle`), `cimpal_job_queue_wait_seconds`, `cimpal_queue_size`, `cimpal_stalled`, `cimpal_work_used_bytes`/`_max_bytes`.
+- **SLOs** (`docs/guide/service.md`, Service levels) and **alert rules** (`deploy/monitoring/`, promtool-tested in `integrations.yml`). **Nightly** (`nightly.yml`): a one-minute load smoke with `--fail-on-slo`.
+
+### `serve` clients (DEP-13)
+
+Every token stands for a client (`TokenSource.Client`: a name and admin or not). A fixed token, `CIMPAL_API_TOKEN` and a bare token line are client `default`, an admin, so single-token setups behave as before. A token file line `name:role:token` names a client (D-17).
+- **Ownership:** `Job.owner` and `WorkArea.Upload.owner`. `ServeServer.requireClient` authenticates every request and stores the name on the exchange for the log. Every `/v1/jobs/{id}…` and `/v1/uploads/{id}` route answers the same 404 for another client's object as for a missing one; `WorkArea.prepare(jobId, uploadId, owner)` refuses another client's upload. `/shutdown` and `/metrics` need an admin; `GET /v1/jobs` lists the caller's jobs, or any client's for an admin (`?owner=`).
+- **Quotas:** `ClientQuotas` (`--client-quotas` JSON, read at start): `maxQueued` (429), `maxRunning`, `maxUploadBytes` (413), `maxWorkBytes` (507, counted per owner in `WorkArea`), `requestsPerMinute` (429, token bucket). Defaults are the server's flags, and `maxQueued` has none of its own, so without a file nothing changes.
+- **Fairness:** `JobScheduler`. Each submit queues one interchangeable *turn* on the workers; a turn runs the oldest queued job whose owner is under `maxRunning`, or parks without holding a worker, and a finished job re-queues one parked turn. Decided: oldest eligible, not round-robin.
+- **Attribution:** JSON logs carry `client`; `cimpal_jobs_finished_total` and `cimpal_requests_total` gain a `client` label, and `cimpal_quota_refused_total` counts 429s. Tests: `ClientIsolationTest` (the cross-client 404 matrix, quotas, and a scan of logs and metrics for tokens), `JobSchedulerTest`, `ClientQuotasTest`, `TokenSourceTest`.
 
 ---
 
@@ -490,7 +636,15 @@ CimPal/
 
 ## Known issues and limitations
 
-**Findings reported by TEST-2, fixed by SEC-5** (details in `docs/plans/TEST-2.md` and `SEC-5.md`):
+**`manifest` access URLs.** `--access-url` only shapes `dcat:accessURL` as `file:<folder>/<file>`: a relative path is used as the folder, a `file:` URI or absolute folder gives its last folder name, and an `https://` URL is ignored (`ManifestGenerator.compactAccessUrl`). Documented in `docs/cli/manifest.md`; whether an http(s) base should be supported is open.
+
+**`serve` job store limits (DEP-11).** One instance per database until DEP-12 (two `serve` on one database would each run the queued jobs they loaded at start). After a crash the last (up to 63) log lines of a running job may be missing. A job that couldn't start because the database failed stays queued in the database and runs only after the next start. The PostgreSQL ITs only run where Docker is available (CI on Ubuntu; not on the maintainer's Windows machine yet).
+
+**`serve` clients share the folders (DEP-13).** Ownership separates `/v1` jobs, uploads and their outputs. In shared-folder mode (a job without `inputUpload`) every client reads and writes the same `--root` folders, so clients that must not see each other's files should use uploads only, or separate instances. Quotas are read at start only (the token file reloads, `--client-quotas` doesn't). OIDC/JWT tokens are a possible follow-up.
+
+**`AdmissionGateTest.aCommandThatDoesNotFitWaitsAndSmallerOnesBehindItDoNotOvertake` is flaky (seen 2026-10-15).** Each waiting thread appends to the order list only after `acquire` returns, so the second thread admitted can append first. The gate itself is FIFO; the test needs to record the order inside the gate (or wait for each ticket in turn).
+
+**Findings reported by TEST-2, fixed by SEC-5** (details in `docs/plans/testing/TEST-2.md` and `SEC-5.md`):
 - An unresolvable or refused `owl:imports` now fails the row or validation instead of warning.
 - All CLI CSV output uses `CsvCells.escape`.
 - Zip limits are counted while reading, with a per-entry cap, and also apply in `modelLoadPerFiles`.
@@ -506,11 +660,19 @@ CimPal/
 - Fixed 2026-10-07, when the CLI's combined workflow wired `SHACLValidator` into `serve`/`mcp`/`run`: it now checks every shape and data file against an active `PathPolicy` before touching it, and `PathGuard` checks `constraintFiles` and `dataFiles` element by element. An `owl:imports` candidate outside the roots is no longer probed: `PathPolicy.mayReadIfActive` tests it without touching the file system, so an import outside the roots fails the same way whether or not the file exists.
 - Open from the CLI combined-workflow review (2026-10-07): Jena's JSON-LD reader may fetch a remote `@context` outside the egress gate (`.jsonld` inputs to `convert`, `sparql` and now `validate --workflow combined`); to verify and, if so, block while a `PathPolicy` is active. The `clearRemoteCaches()` call at the start of a combined run has no test: the egress gate only allows GitHub hosts, so no local stub can serve an import.
 
+**SHACL generation suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test; the details are in `docs/plans/testing/TEST-3.md`:
+- `SHACLFromRDF` references an undeclared `…CardinalityIO` group.
+- The `rdfs2shacl` `--io-uri` default puts the IdentifiedObject shapes in the CIM namespace.
+- excel2shacl writes length limits as `"32.0"^^xsd:integer`.
+- An unreadable workbook gives empty shapes instead of an error.
+
 **`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
-**Timestamped report name is 30 minutes off (observed, unverified).** In `MappingValidatorTest`, the input `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. The snapshot pins this behaviour. Check whether it is intended (a half-hour slot?) when TEST-3 covers timestamped validation.
+**Timestamped report times are snapped to minute 30 of the hour (by design, maintainer to confirm).** `ValidationTools.normalizeTimestampToReportTime` sets every report time to `HH:30:00Z`, so `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. It looks like the market-time-unit convention (the middle of the hour). The TEST-3 snapshots pin it.
+
+**Single-dataset workbook row order varies between runs.** `SHACLValidationReport.writeExcel` writes results in the engine's result order, which isn't stable. The TEST-3 snapshots compare those rows sorted (`Snapshots.assertExcelEqualsIgnoringRowOrder`).
 
 **`ValidateCommand`'s mapping/timestamped workflows now delegate to `MappingValidator` (2026-09-25).** They previously called `ValidationTools.validateByMapping`/`validateByTimestampedMapping` directly, built independently of (and two days before) the `MappingValidator`/`SHACLValidator` builder API added on 2026-09-23. Refactored so the CLI stops duplicating orchestration that now has a reusable home; verified with a real smoke-test run (synthetic model + SHACL shape, both text and `--format json --samples` modes) — flags, exit codes, JSON schema, and Excel/Turtle report output are unchanged. (`validate --workflow manual` was removed on 2026-10-05; see *SHACL rule test* above.) No automated regression test exists for this yet (see "Test coverage is sparse" above); the smoke-test fixtures used to verify this were not committed.
 
@@ -526,17 +688,13 @@ CimPal/
 
 **`manifest` can't run through `serve`, `mcp` or `run`** (no `--config` option), although `mcp` advertises the tool.
 
-**`sparql` reads `.zip` models without the archive limits** in `ModelFactory`. A large zip through `serve`/`mcp` can exhaust memory. Candidate for TEST-2 or a follow-up.
-
-**An unresolvable `owl:imports` is only a warning.** The row is validated with those shapes missing. Network imports now fail the row, but the general case needs fixing (TEST-2).
-
 **`mcp`/`serve` with Claude Desktop need `--root`.** After SEC-2, the CimPal MCP server only accepts paths under its working directory unless `--root` is given. Update `claude_desktop_config.json`; see `CimPal-CLI/configs/claude-desktop-config.json`.
 
 **A `serve` command that times out keeps running.** The caller gets 504, but the command isn't interrupted (that could leave truncated reports), so the worker stays busy until it finishes. `/health` then reports `"status":"stalled"`. Restart the server if a command hangs.
 
 **`serve` limits connection time, not connection count.** A local process that keeps opening slow connections can still slow the server down. Each one is closed after 60 s (`sun.net.httpserver.maxReqTime`).
 
-**`serve` serialises all requests.** The single-threaded executor prevents concurrent validation runs. For team use (multiple users sharing one server) this is a bottleneck. Addressed in the REST API plan below.
+**`serve --workers` shares one JVM.** An out-of-memory error ends every running command (exit 3), and `--stats` CPU, heap and GC figures cover all running commands. Replicas with one worker each stay the recommended production shape. Common-pool threads (`parallelStream` in `ModelFactory`) don't inherit a run's policy or output binding: their path checks are refused under `serve`, `mcp` and `run`, and their output goes to the process streams. Today they only parse in-memory streams.
 
 **The Docker image has no Python.** Only the `APACHE_JENA` engine works in the container; `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` need a local install.
 
@@ -551,7 +709,8 @@ CimPal/
 ## REST API — discovery and implementation plan
 
 > **Superseded by the deployment track.** The asynchronous job API was built in DEP-5
-> (`docs/plans/deployment/DEP-5.md`); see *`serve` job API* above and `docs/cli/serve.md`. The
+> (`docs/plans/deployment/DEP-5.md`) and made deployable in DEP-6; see *`serve` job API* and
+> *`serve` as a service* above and `docs/cli/serve.md`. The
 > remaining service work is in DEP-6 to DEP-10. The analysis below is kept for background.
 
 ### Context

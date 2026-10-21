@@ -1,0 +1,15 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# TLS with Caddy's own local CA, for a demo. For a real name, replace the site address with it
+# (e.g. cimpal.example.com) and drop "tls internal": Caddy then gets a public certificate.
+# Caddy passes the client's Host header on unchanged, so CimPal's --allowed-host must match it.
+
+https://localhost:8443 {
+	tls internal
+	request_body {
+		max_size 2MB
+	}
+	reverse_proxy cimpal:7474
+}

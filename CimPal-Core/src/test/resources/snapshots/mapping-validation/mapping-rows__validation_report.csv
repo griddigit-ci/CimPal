@@ -1,0 +1,20 @@
+## Validation results
+Dataset,XML files,Constraint file,Focus node,Path,Value,Value kind,Source,Constraint Component,Message,Severity,Description,Order,Name,Group
+bad.xml,bad.xml,shapes.ttl,_1,ex:size,,,<BNODE>,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+## Validation statistics
+Dataset,XML files,Constraint file,All,Warnings,Infos,Violations,Conforms,Validation error,Missing XML files,Chart name,Validation scope
+ok.xml,ok.xml,shapes.ttl,0,0,0,0,TRUE,,,Conforming,Complete
+bad.xml,bad.xml,shapes.ttl,1,0,0,1,FALSE,,,Violating,Complete
+broken.xml,broken.xml,shapes.ttl,0,0,0,0,FALSE,"org.apache.jena.riot.RiotException: [line: 1, col: 76] Unqualified typed node element not allowed: <unclosed>",,,Complete
+UNKNOWN,,shapes.ttl,0,0,0,0,FALSE,java.io.IOException: No XML matched mapping tokens,missing.xml,,Complete
+ok.xml,ok.xml,nope.ttl,0,0,0,0,FALSE,java.io.FileNotFoundException: TTL not found: <BASE>/constraints/nope.ttl,,,Complete
+## StatisticsConstraint
+Dataset,Path,Source,Count,Constraint Component,Message,Severity,Description,Order,Name,Group
+bad.xml,ex:size,<BNODE>,1,sh:MinCountConstraintComponent,minCount[1]: Invalid cardinality: expected min 1: Got count = 0,sh:Violation
+## Charts
+Dataset,Warnings,Infos,Violations,,Dataset (all),Warnings,Infos,Violations
+Violating,0,0,1,,Conforming,0,0,0
+,,,,,Violating,0,0,1
+,,,,,broken.xml,0,0,0
+,,,,,UNKNOWN,0,0,0
+,,,,,ok.xml,0,0,0

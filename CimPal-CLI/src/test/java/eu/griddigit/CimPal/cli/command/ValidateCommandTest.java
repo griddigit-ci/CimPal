@@ -67,6 +67,32 @@ class ValidateCommandTest {
         }
     }
 
+    /** DOC-2: incremental timestamps can come from a config (mcp, serve, run) and the dry run shows them. */
+    @Test
+    void dryRunShowsIncrementalTimestampsFromTheConfigOrTheFlag() throws Exception {
+        Path config = Files.writeString(tempDir.resolve("validate.json"), """
+                {"workflow": "timestamped", "incrementalTimestamps": true}
+                """);
+
+        assertThat(dryRun("--config", config.toString())).containsPattern("incrementalTimestamps\\s*: true");
+        assertThat(dryRun("--workflow", "timestamped")).containsPattern("incrementalTimestamps\\s*: false");
+        assertThat(dryRun("--workflow", "timestamped", "--incremental-timestamps"))
+                .containsPattern("incrementalTimestamps\\s*: true");
+    }
+
+    private static String dryRun(String... options) {
+        PrintStream original = System.out;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+            String[] args = Stream.concat(Stream.of("validate", "--dry-run"), Stream.of(options)).toArray(String[]::new);
+            assertThat(new CommandLine(new CimPalCli()).execute(args)).isEqualTo(ExitCode.OK);
+        } finally {
+            System.setOut(original);
+        }
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
     @Test
     void shaclFilesOptionIsGone() {
         CommandLine validate = new CommandLine(new CimPalCli()).getSubcommands().get("validate");
@@ -195,6 +221,39 @@ class ValidateCommandTest {
         assertThat(Path.of(summary.path("turtleReport").asString()))
                 .isEqualTo(report.resolveSibling(report.getFileName().toString().replace(".xlsx", ".ttl")))
                 .isRegularFile();
+    }
+
+    @Test
+    void combinedWorkflowTakesFoldersAsTheirFiles() throws Exception {
+        // As the mapping workflow takes a models folder: a folder stands for its own files.
+        combinedRunWithTwoFindings();
+        write("models/readme.txt", "not a model");
+        write("models/old/eq-old.xml", rdfXml("<ex:Thing rdf:about=\"#_3\"/>")); // sub-folders are not entered
+
+        int exitCode = validate("--workflow", "combined",
+                "--constraint-files", tempDir.resolve("constraints").toString(),
+                "--data-files", tempDir.resolve("models").toString(),
+                "--output", tempDir.resolve("out").toString(), "--xml-base", TestModels.XML_BASE, "--workers", "1",
+                "--summary-file", tempDir.resolve("summary.json").toString());
+
+        assertThat(exitCode).isEqualTo(ExitCode.VIOLATIONS);
+        JsonNode summary = JSON.readTree(tempDir.resolve("summary.json").toFile());
+        List<String> data = new java.util.ArrayList<>();
+        summary.path("run").path("inputs").path("dataFiles").forEach(f -> data.add(Path.of(f.asString()).getFileName().toString()));
+        assertThat(data).containsExactly("eq.xml", "ssh.xml");
+        assertThat(summary.path("run").path("inputs").path("constraintFiles")).hasSize(2);
+        assertThat(summary.path("results").path("violations").asInt()).as("same as naming the files").isEqualTo(2);
+    }
+
+    @Test
+    void aFolderWithNothingToUseIsBadInput() throws Exception {
+        Path shapes = write("constraints/shapes.ttl", TestModels.THING_SHAPES);
+        write("models/readme.txt", "no model here");
+
+        assertThat(validate("--workflow", "combined", "--constraint-files", shapes.toString(),
+                "--data-files", tempDir.resolve("models").toString(), "--output", tempDir.resolve("out").toString()))
+                .isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(tempDir.resolve("out")).doesNotExist();
     }
 
     @Test

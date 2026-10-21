@@ -1,0 +1,30 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# TLS ends here (D-7); serve is plain HTTP inside the cluster. ingress-nginx passes the client's
+# Host header on, which must match serve's --allowed-host.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cimpal
+  annotations:
+    # The largest job request (serve's --max-body-bytes defaults to 1 MB).
+    nginx.ingress.kubernetes.io/proxy-body-size: 2m
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - cimpal.example.com
+      secretName: cimpal-tls
+  rules:
+    - host: cimpal.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cimpal
+                port:
+                  name: http

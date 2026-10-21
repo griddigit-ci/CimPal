@@ -34,7 +34,6 @@ import java.util.zip.ZipInputStream;
 
 public class ModelFactory {
 
-    public static LinkedList<String> zipfilesnames;
 
 
     public static class InheritanceResult {
@@ -76,23 +75,26 @@ public class ModelFactory {
             boolean isZip = ext.equals("zip");
             Lang format;
 
-            List<InputStream> streams;
+            List<Map.Entry<String, InputStream>> streams;
             try {
                 if (isZip) {
-                    streams = unzip(file);
+                    // Each stream with the name of its entry: no shared list to line up (DEP-8).
+                    streams = unzipNamed(file);
                     format = Lang.RDFXML;
                 } else {
-                    streams = List.of(new ByteArrayInputStream(Files.readAllBytes(file.toPath())));
+                    streams = List.of(Map.entry(file.getName(),
+                            new ByteArrayInputStream(Files.readAllBytes(file.toPath()))));
                     format = getLangFromExtension(ext, rdfSourceFormat);
                 }
 
-                streams.parallelStream().forEach(in -> {
+                streams.parallelStream().forEach(named -> {
+                    InputStream in = named.getValue();
                     Model model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
                     RDFDataMgr.read(model, in, xmlBase, format);
 
                     String keyword = getProfileKeyword(model);
                     if ("FileHeader.rdf".equalsIgnoreCase(file.getName())) keyword = "FH";
-                    String key = buildModelKey(file, keyword, isZip, streams.indexOf(in), treeID);
+                    String key = buildModelKey(file, keyword, isZip, named.getKey(), treeID);
 
                     modelMap.put(key, model);
 
@@ -322,16 +324,14 @@ public class ModelFactory {
         }
     }
 
-    private static String buildModelKey(File file, String keyword, boolean isZip, int index, boolean treeID) {
+    private static String buildModelKey(File file, String keyword, boolean isZip, String entryName, boolean treeID) {
         if (keyword == null || keyword.isEmpty()) {
             return FilenameUtils.getName(file.getName());
         }
 
         if (treeID) {
-            if (isZip && !zipfilesnames.isEmpty()) {
-                String zipName = zipfilesnames.get(Math.min(index,
-                        zipfilesnames.size() - 1));
-                return zipName + "|" + keyword;
+            if (isZip && entryName != null) {
+                return entryName + "|" + keyword;
             } else {
                 return file.getName() + "|" + keyword;
             }
@@ -545,8 +545,15 @@ public class ModelFactory {
     }
 
     public static List<InputStream> unzip(File selectedFile) {
-        List<InputStream> inputstreamlist = new LinkedList<>();
-        zipfilesnames = new LinkedList<>();
+        return unzipNamed(selectedFile).stream().map(Map.Entry::getValue).toList();
+    }
+
+    /**
+     * {@link #unzip(File)}, each stream with the name of the entry it came from (for a nested
+     * archive, the nested archive's name).
+     */
+    static List<Map.Entry<String, InputStream>> unzipNamed(File selectedFile) {
+        List<Map.Entry<String, InputStream>> inputstreamlist = new ArrayList<>();
         ZipBudget budget = new ZipBudget();
 
         try (ZipFile zipFile = new ZipFile(selectedFile)) {
@@ -567,13 +574,13 @@ public class ModelFactory {
                     // Check if the entry is itself a ZIP file
                     if (ext.equals("zip")) {
                         // Recursively extract nested ZIP, under the shared budget
-                        inputstreamlist.addAll(
-                                unzip(new ByteArrayInputStream(content), budget, 1));
+                        for (InputStream nested : unzip(new ByteArrayInputStream(content), budget, 1)) {
+                            inputstreamlist.add(Map.entry(entryName, nested));
+                        }
                     } else {
                         // Add non-ZIP file to the list
-                        inputstreamlist.add(new ByteArrayInputStream(content));
+                        inputstreamlist.add(Map.entry(entryName, new ByteArrayInputStream(content)));
                     }
-                    zipfilesnames.add(entryName);
                 }
             }
         } catch (IOException e) {

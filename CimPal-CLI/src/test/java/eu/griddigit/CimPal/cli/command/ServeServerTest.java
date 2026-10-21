@@ -463,6 +463,15 @@ class ServeServerTest {
         HttpResponse<String> timedOut = send(authorizedPost("/validate", "{}"));
         assertThat(timedOut.statusCode()).isEqualTo(504);
 
+        // The 504 is timed from the request's arrival, the stall from the command's start a moment
+        // later: health may need a few more milliseconds to see it.
+        waitUntil(() -> {
+            try {
+                return send(HttpRequest.newBuilder(uri("/health")).GET()).body().contains("\"stalled\":true");
+            } catch (Exception e) {
+                return false;
+            }
+        });
         assertThat(send(HttpRequest.newBuilder(uri("/health")).GET()).body())
                 .contains("\"busy\":true", "\"stalled\":true", "\"status\":\"stalled\"");
         release.countDown();
@@ -576,5 +585,172 @@ class ServeServerTest {
         assertThat(response.statusCode()).isEqualTo(500);
         assertThat(response.body()).doesNotContain("Out of memory");
         assertThat(halted.getCount()).isEqualTo(1);
+    }
+
+    // ---- service deployment (DEP-6) ---------------------------------------------------------
+
+    @Test
+    void anAllowedHostPassesTheHostCheckAndOtherNamesStillGet403() throws Exception {
+        start(config().allowedHosts(Set.of(ServeSecurity.allowedHostEntry("cimpal.example.com"))));
+
+        assertThat(rawStatus("GET /health HTTP/1.1\r\nHost: cimpal.example.com\r\nConnection: close\r\n\r\n"))
+                .isEqualTo(200);
+        assertThat(rawStatus("GET /health HTTP/1.1\r\nHost: CIMPAL.example.com:443\r\nConnection: close\r\n\r\n"))
+                .isEqualTo(200);
+        assertThat(rawStatus("GET /health HTTP/1.1\r\nHost: cimpal.example.com:8443\r\nConnection: close\r\n\r\n"))
+                .isEqualTo(403);
+        assertThat(rawStatus("GET /health HTTP/1.1\r\nHost: evil.example\r\nConnection: close\r\n\r\n"))
+                .isEqualTo(403);
+    }
+
+    @Test
+    void readyStays200WithAFullQueueAndIs503OnlyWhenShuttingDown() throws Exception {
+        // One replica: a full queue must not take the only endpoint out of the load balancer.
+        CountDownLatch started = new CountDownLatch(1);
+        start(config().queueSize(0), (command, configFile) -> {
+            started.countDown();
+            release.await(30, TimeUnit.SECONDS);
+            return new ServeServer.CommandResult(0, "{}");
+        });
+        HttpResponse<String> ready = send(HttpRequest.newBuilder(uri("/ready")).GET());
+        assertThat(ready.statusCode()).isEqualTo(200);
+        assertThat(ready.body()).isEqualTo("{\"status\":\"ready\"}");
+
+        CompletableFuture<HttpResponse<String>> running = HTTP.sendAsync(authorizedPost("/sparql", "{}").build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(send(HttpRequest.newBuilder(uri("/ready")).GET()).statusCode()).isEqualTo(200);
+        assertThat(send(authorizedPost("/sparql", "{}")).statusCode()).as("the queue is full").isEqualTo(503);
+
+        release.countDown();
+        assertThat(running.get(10, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
+        server.close();
+        assertThat(server.readiness()).isEqualTo("shutting down");
+    }
+
+    @Test
+    void readyIs503WhileNoTokenCanBeAccepted() throws Exception {
+        start(config().tokens(new TokenSource() {
+            @Override
+            public Client authenticate(String authorization) {
+                return null;
+            }
+
+            @Override
+            public boolean usable() {
+                return false;
+            }
+        }));
+        HttpResponse<String> ready = send(HttpRequest.newBuilder(uri("/ready")).GET());
+        assertThat(ready.statusCode()).isEqualTo(503);
+        assertThat(ready.body()).contains("no usable token");
+    }
+
+    @Test
+    void readyAndMetricsKeepTheHostCheck() throws Exception {
+        start(config().metrics(true));
+        for (String path : new String[] {"/ready", "/metrics"}) {
+            assertThat(rawStatus("GET " + path + " HTTP/1.1\r\nHost: evil.example:" + server.port()
+                    + "\r\nAuthorization: Bearer " + TOKEN + "\r\nConnection: close\r\n\r\n")).as(path).isEqualTo(403);
+        }
+    }
+
+    @Test
+    void metricsAreOffByDefaultAndNeedTheToken() throws Exception {
+        start(config());
+        assertThat(send(HttpRequest.newBuilder(uri("/metrics")).header("Authorization", "Bearer " + TOKEN).GET())
+                .statusCode()).isEqualTo(404);
+        server.close();
+
+        start(config().metrics(true));
+        assertThat(send(HttpRequest.newBuilder(uri("/metrics")).GET()).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void metricsCountRequestsAndJobsInPrometheusText() throws Exception {
+        start(config().metrics(true), (command, configFile) -> new ServeServer.CommandResult(
+                command.equals("convert") ? 2 : 0, "{}"));
+        assertThat(send(authorizedPost("/sparql", "{}")).statusCode()).isEqualTo(200);
+        assertThat(send(authorizedPost("/convert", "{}")).statusCode()).isEqualTo(400);
+        HttpResponse<String> job = send(authorizedPost("/v1/jobs", "{\"command\":\"sparql\"}"));
+        assertThat(job.statusCode()).isEqualTo(202);
+        String id = job.body().replaceAll(".*\"jobId\":\"([^\"]+)\".*", "$1");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!send(HttpRequest.newBuilder(uri("/v1/jobs/" + id)).header("Authorization", "Bearer " + TOKEN).GET())
+                .body().contains("\"status\":\"succeeded\"")) {
+            assertThat(System.nanoTime()).isLessThan(deadline);
+            Thread.sleep(20);
+        }
+
+        HttpResponse<String> metrics = send(HttpRequest.newBuilder(uri("/metrics"))
+                .header("Authorization", "Bearer " + TOKEN).GET());
+        assertThat(metrics.statusCode()).isEqualTo(200);
+        assertThat(metrics.headers().firstValue("Content-Type")).hasValue(ServeMetrics.CONTENT_TYPE);
+        String text = metrics.body();
+        assertThat(text).contains("cimpal_requests_total{client=\"default\",command=\"sparql\",outcome=\"ok\"} 1\n",
+                "cimpal_requests_total{client=\"default\",command=\"convert\",outcome=\"bad_input\"} 1\n",
+                "cimpal_jobs_finished_total{client=\"default\",status=\"succeeded\"} 1\n",
+                "cimpal_jobs{status=\"succeeded\"} 1\n",
+                "cimpal_job_duration_seconds_count 1\n",
+                "cimpal_job_duration_seconds_bucket{le=\"+Inf\"} 1\n",
+                "cimpal_queue_depth 0\n",
+                // DEP-16: what the alert rules compare against.
+                "cimpal_http_responses_total{code=\"4xx\"} 1\n",
+                "cimpal_job_queue_wait_seconds_count 1\n",
+                "cimpal_http_request_duration_seconds_count{kind=\"command\"} 2\n",
+                "cimpal_stalled 0\n",
+                "cimpal_queue_size ");
+        assertThat(text).containsPattern("cimpal_http_responses_total\\{code=\"2xx\"} [1-9]");
+        for (String line : text.split("\n")) {
+            assertThat(line).as("exposition line").matches(
+                    "# (HELP|TYPE) [a-z_]+ .+|[a-z_]+(\\{[a-z_]+=\"[^\"]*\"(,[a-z_]+=\"[^\"]*\")*})? -?[0-9.E+-]+");
+        }
+    }
+
+    @Test
+    void theJsonLogIsOneObjectPerLineAndNeverHoldsTheToken() throws Exception {
+        java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
+        java.io.PrintStream out = new java.io.PrintStream(captured, true, StandardCharsets.UTF_8);
+        ServeLog log = ServeLog.json(out, java.time.InstantSource.system());
+        java.io.PrintStream originalErr = System.err;
+        java.io.PrintStream wrapped = log.stderr(CliStreams::label);
+        System.setErr(wrapped);
+        try {
+            start(config().log(log), (command, configFile) -> {
+                System.err.println("[INFO] Loading 1 model file(s)...");
+                System.err.println("[WARN] something odd \u001b[31m");
+                return new ServeServer.CommandResult(0, "{}");
+            });
+            send(authorizedPost("/sparql", "{}"));
+            send(post("/sparql", "application/json", "{}").header("Authorization", "Bearer wrong-" + TOKEN));
+            send(post("/sparql", "application/json", "{}"));
+            send(authorizedPost("/v1/jobs", "{\"command\":\"sparql\"}"));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (!captured.toString(StandardCharsets.UTF_8).contains("\"event\":\"job.finished\"")) {
+                assertThat(System.nanoTime()).as("job finished within 10 s").isLessThan(deadline);
+                Thread.sleep(20);
+            }
+            server.close();
+        } finally {
+            System.setErr(originalErr);
+        }
+
+        String all = captured.toString(StandardCharsets.UTF_8);
+        // Neither the token, nor the wrong one a client presented, nor the header itself.
+        assertThat(all).doesNotContain(TOKEN).doesNotContain("wrong-").doesNotContain("Bearer ")
+                .doesNotContainIgnoringCase("authorization");
+        tools.jackson.databind.ObjectMapper json = new tools.jackson.databind.ObjectMapper();
+        java.util.Set<String> events = new java.util.HashSet<>();
+        for (String line : all.split("\\R")) {
+            tools.jackson.databind.JsonNode node = json.readTree(line);
+            assertThat(node.path("ts").asString()).isNotBlank();
+            assertThat(node.path("level").asString()).isIn("info", "warn", "error");
+            assertThat(node.has("message")).isTrue();
+            events.add(node.path("event").asString());
+        }
+        assertThat(events).contains("request.rejected", "command.finished", "job.queued", "job.started",
+                "job.finished", "output", "server.stopping");
+        assertThat(all).contains("\"jobId\"").contains("\"durationMs\"").contains("\"remote\":\"127.0.0.1\"")
+                .contains("␞[31m").doesNotContain("\u001b");
     }
 }

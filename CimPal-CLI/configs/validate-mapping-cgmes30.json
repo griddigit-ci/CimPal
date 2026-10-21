@@ -6,7 +6,7 @@
   "_note_workflow": "Which validation mode to run. Options: 'mapping' (this one) or 'timestamped' (see validate-timestamped.json). The mapping workflow reads a CSV file that links model sets to their SHACL constraints.",
 
   "mappingCsv": "REPLACE_WITH_PATH/mapping.csv",
-  "_note_mappingCsv": "The CSV mapping file. No header row. Three columns separated by | or comma: (1) model file names relative to modelsDir, or GitHub raw URLs; (2) path to the .ttl constraint file relative to constraintsRoot; (3) a label for the report. Example row: 'EQ.xml,TP.xml,SV.xml | QoCDC/Level2-IGM.ttl | IGM Level 2'",
+  "_note_mappingCsv": "The CSV mapping file. Three columns separated by commas (an optional first row starting with xml_inputs is a header): (1) the model files of one validation separated by ;, relative to modelsDir, or GitHub raw URLs; (2) the .ttl constraint file relative to constraintsRoot, several separated by ;; (3) a label for the report. Example row: 'EQ.xml;TP.xml;SV.xml,QoCDC/Level2-IGM.ttl,IGM Level 2'",
 
   "modelsDir": "REPLACE_WITH_PATH/models",
   "_note_modelsDir": "Root folder containing the model ZIP or XML files. The mapping CSV column 1 paths are relative to this folder. Each .zip should contain the RDF/XML instance files for one validation run (e.g. EQ.xml, TP.xml, SV.xml).",

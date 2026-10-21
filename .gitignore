@@ -17117,3 +17117,6 @@ out/
 /.artifact-node/node_modules/.package-map.json
 /.artifact-node/node_modules/.pnpm-workspace-state-v1.json
 /.artifact-node/build-validation-differences.mjs
+
+# serve file exchange area (DEP-7), created in the working directory by default
+.cimpal-work/

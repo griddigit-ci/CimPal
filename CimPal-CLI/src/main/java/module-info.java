@@ -13,4 +13,8 @@ module CimPal.CLI {
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
     requires jdk.httpserver;
+    requires jdk.unsupported;
+    requires java.sql;
+    requires java.net.http;
+    requires org.postgresql.jdbc;
 }

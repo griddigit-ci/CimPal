@@ -1,0 +1,15 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+apiVersion: v1
+kind: Service
+metadata:
+  name: cimpal
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: cimpal
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

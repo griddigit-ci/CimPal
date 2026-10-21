@@ -10,13 +10,13 @@
     "REPLACE_WITH_PATH/constraints/EQ-constraints.ttl",
     "REPLACE_WITH_PATH/constraints/SSH-constraints.ttl"
   ],
-  "_note_constraintFiles": "The SHACL constraint files (.ttl, .rdf), or ZIP archives of them. All of them form one shapes graph, so a shape in one file can be deactivated or extended by another; their owl:imports are followed, and an import shared by several files is read once. In a ZIP, every .ttl and .rdf file is used, and relative owl:imports resolve inside the archive as they would in a folder; other RDF files in it are named in the warnings. Relative paths are relative to this config file.",
+  "_note_constraintFiles": "The SHACL constraint files (.ttl, .rdf), or ZIP archives of them. All of them form one shapes graph, so a shape in one file can be deactivated or extended by another; their owl:imports are followed, and an import shared by several files is read once. In a ZIP, every .ttl and .rdf file is used, and relative owl:imports resolve inside the archive as they would in a folder; other RDF files in it are named in the warnings. Relative paths are relative to this config file. A folder may be given instead of files: it stands for the .ttl, .rdf and .zip files directly in it.",
 
   "dataFiles": [
     "REPLACE_WITH_PATH/models/IGM.zip",
     "REPLACE_WITH_PATH/models/BoundarySet.zip"
   ],
-  "_note_dataFiles": "The instance data files (.xml), or ZIP archives of them (archives inside an archive are read too, up to three levels deep). All of them are merged into one dataset, so references between files - SSH to EQ, or to the boundary set - resolve. A ZIP without any .xml file stops the run with exit code 2 instead of passing with no data. Relative paths are relative to this config file.",
+  "_note_dataFiles": "The instance data files (.xml), or ZIP archives of them (archives inside an archive are read too, up to three levels deep). All of them are merged into one dataset, so references between files - SSH to EQ, or to the boundary set - resolve. A ZIP without any .xml file stops the run with exit code 2 instead of passing with no data. Relative paths are relative to this config file. A folder may be given instead of files: it stands for the .xml and .zip files directly in it (sub-folders are not entered).",
 
   "outputDir": "REPLACE_WITH_PATH/output",
   "_note_outputDir": "Where to write the report. Created automatically if it does not exist. The run writes one workbook, validation_report__<timestamp>.xlsx, in the layout of the mapping workflow's report, with one validation row per constraint file: each finding is listed under the file that declares its shape, and a file whose shapes found nothing is marked as conforming.",

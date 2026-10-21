@@ -38,12 +38,17 @@ java -jar CimPal-CLI.jar manifest ^
 
 ## All flags
 
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `--dir` | folder path | — | Scan this folder for `.xml`, `.rdf`, and `.ttl` files. Either `--dir` or `--files` is required. |
-| `--files` | comma-separated file paths | — | Explicit list of model files to include. Either `--dir` or `--files` is required. |
-| `--access-url` | string | value of `--dir` | The `dcat:accessURL` written into the manifest. Defaults to the `--dir` path with forward slashes. |
-| `--output` | file path | parent of models folder / `manifest.ttl` | Where to write the manifest. |
+| Flag | Config key | Type | Default | Description |
+|---|---|---|---|---|
+| `--config` | — | file path | — | JSON config file with the keys below; flags override it, relative paths resolve against the file. Keys starting with `_` are documentation. Template: `CimPal-CLI/configs/manifest.json`. |
+| `--dir` | `dir` | folder path | — | Scan this folder for `.xml`, `.rdf`, and `.ttl` files. Either `--dir` or `--files` is required. |
+| `--files` | `files` | comma-separated file paths (config: an array) | — | Explicit list of model files to include. Either `--dir` or `--files` is required. |
+| `--access-url` | `accessUrl` | string | the `--dir` path | Where the files will be found, for each file's `dcat:accessURL` (see below). |
+| `--output` | `output` | file path | parent of models folder / `manifest.ttl` | Where to write the manifest. |
+
+**`dcat:accessURL`.** Each file gets `file:<folder>/<file name>`. A relative `--access-url` such as `Instance/Grid/cimxml` is used as the folder as it is; a `file:` URI or an absolute folder (the default) gives only its last folder name; any other URL, e.g. `https://…`, is not used, and the file's own folder name is taken. An access URL already in a model's header wins over all of these.
+
+With `--config`, `manifest` runs through [`run`](run.md), `serve` (`POST /manifest`, `/v1/jobs`) and [`mcp`](mcp.md) like the other commands; there `dir`, `files` and `output` must be inside the allowed roots.
 
 ---
 

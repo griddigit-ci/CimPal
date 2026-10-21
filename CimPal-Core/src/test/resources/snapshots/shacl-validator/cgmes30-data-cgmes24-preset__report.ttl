@@ -1,0 +1,90 @@
+PREFIX cim:  <http://iec.ch/TC57/CIM100#>
+PREFIX ex:   <urn:test:shapes:>
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh:   <http://www.w3.org/ns/shacl#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+[ rdf:type     sh:ValidationReport;
+  sh:conforms  false;
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_ok>;
+                 sh:resultMessage              "Resistance must be a non-negative float";
+                 sh:resultPath                 cim:ACLineSegment.r;
+                 sh:resultSeverity             sh:Violation;
+                 sh:sourceConstraintComponent  sh:DatatypeConstraintComponent;
+                 sh:sourceShape                ex:Line.r;
+                 sh:value                      "0.25"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_bad>;
+                 sh:resultMessage              "Resistance must be a non-negative float";
+                 sh:resultPath                 cim:ACLineSegment.r;
+                 sh:resultSeverity             sh:Violation;
+                 sh:sourceConstraintComponent  sh:MinInclusiveConstraintComponent;
+                 sh:sourceShape                ex:Line.r;
+                 sh:value                      "-1.5"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_ok>;
+                 sh:resultMessage              "Resistance must be a non-negative float";
+                 sh:resultPath                 cim:ACLineSegment.r;
+                 sh:resultSeverity             sh:Violation;
+                 sh:sourceConstraintComponent  sh:MinInclusiveConstraintComponent;
+                 sh:sourceShape                ex:Line.r;
+                 sh:value                      "0.25"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_bad>;
+                 sh:resultMessage              "Resistance must be a non-negative float";
+                 sh:resultPath                 cim:ACLineSegment.r;
+                 sh:resultSeverity             sh:Violation;
+                 sh:sourceConstraintComponent  sh:DatatypeConstraintComponent;
+                 sh:sourceShape                ex:Line.r;
+                 sh:value                      "-1.5"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_ok>;
+                 sh:resultMessage              "Aggregate must be a boolean";
+                 sh:resultPath                 cim:Equipment.aggregate;
+                 sh:resultSeverity             sh:Info;
+                 sh:sourceConstraintComponent  sh:DatatypeConstraintComponent;
+                 sh:sourceShape                ex:Line.aggregate;
+                 sh:value                      "false"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_anon>;
+                 sh:resultMessage              "Resistance must be a non-negative float";
+                 sh:resultPath                 cim:ACLineSegment.r;
+                 sh:resultSeverity             sh:Violation;
+                 sh:sourceConstraintComponent  sh:DatatypeConstraintComponent;
+                 sh:sourceShape                ex:Line.r;
+                 sh:value                      "1.0"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_bad>;
+                 sh:resultMessage              "Aggregate must be a boolean";
+                 sh:resultPath                 cim:Equipment.aggregate;
+                 sh:resultSeverity             sh:Info;
+                 sh:sourceConstraintComponent  sh:DatatypeConstraintComponent;
+                 sh:sourceShape                ex:Line.aggregate;
+                 sh:value                      "maybe"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_anon>;
+                 sh:resultMessage              "Resistance must be a non-negative float";
+                 sh:resultPath                 cim:ACLineSegment.r;
+                 sh:resultSeverity             sh:Violation;
+                 sh:sourceConstraintComponent  sh:MinInclusiveConstraintComponent;
+                 sh:sourceShape                ex:Line.r;
+                 sh:value                      "1.0"
+               ];
+  sh:result    [ rdf:type                      sh:ValidationResult;
+                 sh:focusNode                  <http://iec.ch/TC57/2013/CIM-schema-cim16#_anon>;
+                 sh:resultMessage              "Name is missing";
+                 sh:resultPath                 cim:IdentifiedObject.name;
+                 sh:resultSeverity             sh:Warning;
+                 sh:sourceConstraintComponent  sh:MinCountConstraintComponent;
+                 sh:sourceShape                ex:Line.name
+               ]
+] .

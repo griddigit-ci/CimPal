@@ -140,4 +140,12 @@ class SnapshotsTest {
         assertThat(Snapshots.normalizeLiterals(first, Normalizer.blankNodeLabels())
                 .contains(null, null, first.createLiteral("kept", "en"))).isTrue();
     }
+
+    @Test
+    void rowsAreSortedWithinEachSheetBelowItsHeader() {
+        String flattened = "## A\nh1,h2\nz,1\na,2\n## B\nonly-header\n## C\nh\nc\nb\n";
+
+        assertThat(Snapshots.sortRowsWithinSheets(flattened))
+                .isEqualTo("## A\nh1,h2\na,2\nz,1\n## B\nonly-header\n## C\nh\nb\nc\n");
+    }
 }

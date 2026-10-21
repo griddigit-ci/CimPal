@@ -60,6 +60,9 @@ Details: [CLI reference: resource statistics and automation options](../cli/READ
 |---|---|---|
 | `GITHUB_TOKEN` | all | Token for fetching `owl:imports` from GitHub (higher rate limits, private repositories) |
 | `CIMPAL_API_TOKEN` | `serve` | The bearer token, at least 32 characters, instead of a generated one in a token file |
+| `CIMPAL_JOB_STORE` | `serve` | `memory` (default) or `jdbc`, as `--job-store` |
+| `CIMPAL_JOB_STORE_URL`, `CIMPAL_JOB_STORE_USER` | `serve` | The PostgreSQL job store, as `--job-store-url` and `--job-store-user` |
+| `CIMPAL_JOB_STORE_PASSWORD_FILE`, `CIMPAL_JOB_STORE_PASSWORD` | `serve` | The database password: a file (a mounted secret), or the value itself |
 | `JAVA_OPTS` | container image | Extra JVM options, after the image's defaults, e.g. `-Xmx6g` |
 | `JAVA_TOOL_OPTIONS` | any JVM | JVM options picked up by Java itself; printed on stderr, so never put secrets in it |
 | `USE_SYSTEM_CA_CERTS` | container image | `1` imports the certificates mounted at `/certificates` (TLS-inspecting proxies) |

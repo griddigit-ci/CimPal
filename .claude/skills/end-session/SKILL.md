@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 1. **Tests:** run `mvn -B verify`. Record the test count per module and compare it with the baseline
    from the start of the session. If it's red, stop and report; don't mark anything done.
-2. **`docs/plans/$ARGUMENTS.md`:**
+2. **`docs/plans/<track>/$ARGUMENTS.md`** (track folder from the ID's prefix: `A`, `DOC` → `workspace/`; `CI` → `ci/`; `SEC` → `security/`; `TEST` → `testing/`; `DEP` → `deployment/`):
    - Tick each acceptance-criteria box that is verifiably met. Leave the others unticked and say why
      in *Notes and results*.
    - Set the Status row (`In progress`, `In review` if a PR is open, `Done`, or `Blocked (<reason>)`)

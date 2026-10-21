@@ -141,13 +141,50 @@ public final class Snapshots {
         assertTextEquals(name + ".csv", flattenWorkbook(workbook, Normalizer.chain(normalizers)));
     }
 
-    /** One {@code ## <sheet>} header per sheet, then one line per row, cells joined with {@code ,}. */
+    /**
+     * Like {@link #assertExcelEquals}, but sorts the data rows of each sheet (every row after the
+     * sheet's first), for workbooks whose row order follows the engine's unordered result set.
+     */
+    public void assertExcelEqualsIgnoringRowOrder(String name, Path workbook, Normalizer... normalizers) {
+        assertTextEquals(name + ".csv", sortRowsWithinSheets(flattenWorkbook(workbook, Normalizer.chain(normalizers))));
+    }
+
+    static String sortRowsWithinSheets(String flattened) {
+        StringBuilder out = new StringBuilder();
+        List<String> rows = new ArrayList<>();
+        for (String line : flattened.split("\n", -1)) {
+            if (line.startsWith("## ") || line.isEmpty()) {
+                appendSorted(out, rows);
+                if (!line.isEmpty()) {
+                    out.append(line).append('\n');
+                }
+            } else {
+                rows.add(line);
+            }
+        }
+        appendSorted(out, rows);
+        return out.toString();
+    }
+
+    /** Appends the sheet's header row as is, then its data rows in sorted order, and clears the list. */
+    private static void appendSorted(StringBuilder out, List<String> rows) {
+        if (!rows.isEmpty()) {
+            out.append(rows.getFirst()).append('\n');
+            rows.subList(1, rows.size()).stream().sorted().forEach(row -> out.append(row).append('\n'));
+            rows.clear();
+        }
+    }
+
+    /**
+     * One {@code ## <sheet>} header per sheet, then one line per row, cells joined with {@code ,}.
+     * Sheet names pass through the normalizer too: some workbooks name a sheet after the run time.
+     */
     public static String flattenWorkbook(Path workbook, Normalizer normalizer) {
         DataFormatter formatter = new DataFormatter(java.util.Locale.ROOT);
         StringBuilder out = new StringBuilder();
         try (InputStream in = Files.newInputStream(workbook); Workbook book = WorkbookFactory.create(in)) {
             for (Sheet sheet : book) {
-                out.append("## ").append(sheet.getSheetName()).append('\n');
+                out.append("## ").append(normalizer.apply(sheet.getSheetName())).append('\n');
                 for (Row row : sheet) {
                     List<String> cells = new ArrayList<>();
                     for (int c = 0; c < row.getLastCellNum(); c++) {

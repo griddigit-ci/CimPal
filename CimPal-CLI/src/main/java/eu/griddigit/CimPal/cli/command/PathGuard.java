@@ -5,6 +5,7 @@
  */
 package eu.griddigit.CimPal.cli.command;
 
+import eu.griddigit.cimpal.core.utils.LogSanitizer;
 import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
 import eu.griddigit.cimpal.core.utils.PathPolicy;
 import tools.jackson.databind.JsonNode;
@@ -37,7 +38,7 @@ final class PathGuard {
     enum Kind {
         /** An existing file or folder that is read. */
         READ,
-        /** Like READ, but the command also accepts one string of comma-separated paths. */
+        /** Like READ, but the command also accepts one string of comma-separated paths (sparql models, manifest files). */
         READ_LIST,
         /** A file or folder that is read if it exists, else the value is text (a preset, an inline query). */
         READ_IF_EXISTS,
@@ -97,8 +98,13 @@ final class PathGuard {
                     new Field("output", "--output", Kind.WRITE_FILE))),
             Map.entry("manifest", List.of(
                     new Field("dir", "--dir", Kind.READ),
-                    new Field("files", "--files", Kind.READ),
+                    new Field("files", "--files", Kind.READ_LIST),
                     new Field("output", "--output", Kind.WRITE_FILE))));
+
+    /** True when {@code command} writes an output file, so {@code "overwrite"} applies to it. */
+    static boolean writesFiles(String command) {
+        return FIELDS.getOrDefault(command, List.of()).stream().anyMatch(f -> f.kind() == Kind.WRITE_FILE);
+    }
 
     /** Read by no command today, but resolved by {@code run}; checked so it can't point anywhere. */
     private static final Field STEP_CONFIG = new Field("config", null, Kind.READ);
@@ -110,6 +116,45 @@ final class PathGuard {
         return json.path(OVERWRITE_KEY).asBoolean(false);
     }
 
+    /** The fields of {@code command} that name an output file or folder. */
+    static List<Field> outputFields(String command) {
+        return FIELDS.getOrDefault(command, List.of()).stream()
+                .filter(f -> f.kind() == Kind.WRITE_FILE || f.kind() == Kind.WRITE_DIR)
+                .toList();
+    }
+
+    /**
+     * For a job with an uploaded input (DEP-7): a copy of {@code json} whose relative output
+     * paths are placed under {@code outDir}, and whose missing output folders become
+     * {@code outDir} itself. Absolute outputs are left as given, for {@link #check} to refuse
+     * anything outside {@code outDir}.
+     */
+    static ObjectNode placeOutputs(String command, JsonNode json, Path outDir) {
+        if (json == null || !json.isObject()) {
+            throw new PathNotAllowedException("The request must be a JSON object.");
+        }
+        ObjectNode copy = ((ObjectNode) json).deepCopy();
+        for (Field field : outputFields(command)) {
+            JsonNode value = copy.get(field.key());
+            if (value == null || value.isNull()) {
+                if (field.kind() == Kind.WRITE_DIR) {
+                    copy.put(field.key(), outDir.toString());
+                }
+            } else if (value.isString() && !value.asString().isBlank() && !PathPolicy.isUncOrDevice(value.asString())) {
+                Path given;
+                try {
+                    given = Path.of(value.asString());
+                } catch (InvalidPathException e) {
+                    continue; // check() reports it
+                }
+                if (!given.isAbsolute() && given.getRoot() == null) {
+                    copy.put(field.key(), outDir.resolve(given).toString());
+                }
+            }
+        }
+        return copy;
+    }
+
     /**
      * Returns a copy of {@code json} with every path field of {@code command} checked and made
      * absolute.
@@ -117,6 +162,15 @@ final class PathGuard {
      * @throws PathNotAllowedException naming the first refused path
      */
     static ObjectNode check(String command, JsonNode json, PathPolicy policy, Path base) {
+        return check(command, json, policy, base, false);
+    }
+
+    /**
+     * As {@link #check(String, JsonNode, PathPolicy, Path)}; with {@code baseOnly} (a job on an
+     * upload, DEP-7) a relative value that may be text or a path is looked up in {@code base}
+     * only, never in the server's working directory.
+     */
+    static ObjectNode check(String command, JsonNode json, PathPolicy policy, Path base, boolean baseOnly) {
         if (json == null || !json.isObject()) {
             throw new PathNotAllowedException("The request must be a JSON object.");
         }
@@ -129,41 +183,53 @@ final class PathGuard {
             if (value == null || value.isNull()) {
                 continue;
             }
-            copy.set(field.key(), checkValue(field, value, policy, base, overwrite));
+            copy.set(field.key(), checkValue(field, value, policy, base, overwrite, baseOnly));
         }
         return copy;
     }
 
-    private static JsonNode checkValue(Field field, JsonNode value, PathPolicy policy, Path base, boolean overwrite) {
+    private static JsonNode checkValue(Field field, JsonNode value, PathPolicy policy, Path base, boolean overwrite,
+                                       boolean baseOnly) {
         JsonNodeFactory nodes = JsonNodeFactory.instance;
         if (value.isArray()) {
             ArrayNode checked = nodes.arrayNode();
             for (JsonNode element : value) {
-                checked.add(checkOne(field, element, policy, base, overwrite));
+                checked.add(checkOne(field, element, policy, base, overwrite, baseOnly));
             }
             return checked;
         }
-        if (value.isString() && value.asString().contains(",") && field.kind() == Kind.READ_LIST) {
-            // sparql "models" also accepts one comma-separated string.
+        if (value.isString() && field.kind() == Kind.READ_LIST) {
+            // sparql "models" and manifest "files" also accept one comma-separated string, which the
+            // command splits again: each part is checked, and a checked part must not have gained a
+            // comma (a link or a short name resolving to "x,/..."), or the split would make an
+            // unchecked path of it.
             List<String> parts = new ArrayList<>();
             for (String part : value.asString().split(",")) {
                 if (!part.isBlank()) {
-                    parts.add(checkOne(field, nodes.stringNode(part.strip()), policy, base, overwrite).asString());
+                    String checked = checkOne(field, nodes.stringNode(part.strip()), policy, base, overwrite, baseOnly)
+                            .asString();
+                    if (checked.contains(",")) {
+                        throw new PathNotAllowedException("\"" + field.key() + "\" names a path that resolves to a"
+                                + " name with a comma; give the paths as a JSON array: "
+                                + LogSanitizer.forLog(part.strip()));
+                    }
+                    parts.add(checked);
                 }
             }
             return nodes.stringNode(String.join(",", parts));
         }
-        return checkOne(field, value, policy, base, overwrite);
+        return checkOne(field, value, policy, base, overwrite, baseOnly);
     }
 
-    private static JsonNode checkOne(Field field, JsonNode value, PathPolicy policy, Path base, boolean overwrite) {
+    private static JsonNode checkOne(Field field, JsonNode value, PathPolicy policy, Path base, boolean overwrite,
+                                     boolean baseOnly) {
         if (!value.isString()) {
             throw new PathNotAllowedException("\"" + field.key() + "\" must be a path string.");
         }
         String text = value.asString();
         Path checked = switch (field.kind()) {
             case READ, READ_LIST -> policy.checkRead(text, base);
-            case READ_IF_EXISTS -> checkIfPath(text, policy, base);
+            case READ_IF_EXISTS -> checkIfPath(text, policy, base, baseOnly);
             case WRITE_FILE -> policy.checkWrite(text, base, overwrite);
             case WRITE_DIR -> policy.checkWrite(text, base, true);
         };
@@ -180,7 +246,7 @@ final class PathGuard {
      * {@code base}; whichever exists is checked, so a file outside the roots can't be reached
      * through the working directory.
      */
-    private static Path checkIfPath(String text, PathPolicy policy, Path base) {
+    private static Path checkIfPath(String text, PathPolicy policy, Path base, boolean baseOnly) {
         if (PathPolicy.isUncOrDevice(text)) {
             return policy.checkRead(text, base);
         }
@@ -194,6 +260,7 @@ final class PathGuard {
             return null;
         }
         List<Path> candidates = p.isAbsolute() ? List.of(p)
+                : baseOnly ? List.of(base.resolve(p))
                 : List.of(Path.of("").toAbsolutePath().resolve(p), base.resolve(p));
         for (Path candidate : candidates) {
             if (Files.exists(candidate)) {

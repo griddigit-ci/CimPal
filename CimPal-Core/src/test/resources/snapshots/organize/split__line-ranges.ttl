@@ -1,0 +1,14 @@
+PREFIX cim:  <http://iec.ch/TC57/CIM100#>
+PREFIX ex:   <http://example.com/constraints#>
+PREFIX owl:  <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh:   <http://www.w3.org/ns/shacl#>
+
+ex:Line.r-range  a       sh:PropertyShape;
+        sh:minInclusive  0;
+        sh:name          "Line.r|Line.x";
+        sh:path          cim:ACLineSegment.r .
+
+ex:Line  a              sh:NodeShape;
+        sh:property     ex:Line.r-range;
+        sh:targetClass  cim:ACLineSegment .

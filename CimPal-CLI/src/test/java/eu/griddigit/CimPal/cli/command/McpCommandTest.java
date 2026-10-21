@@ -136,6 +136,92 @@ class McpCommandTest {
     }
 
     @Test
+    void manifestRunsAsAToolCall(@TempDir Path tempDir) throws Exception {
+        // DOC-2: manifest takes a config like the other commands, so mcp can call it.
+        Path models = Files.createDirectories(tempDir.resolve("models"));
+        Files.copy(Path.of("src/test/resources/fixtures/docker-smoke/models/conforming.xml"), models.resolve("EQ.xml"));
+        Path out = tempDir.resolve("manifest.ttl");
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
+        call.putObject("params").put("name", "manifest").putObject("arguments")
+                .put("dir", models.toString()).put("output", out.toString());
+
+        JsonNode result = toolResult(runMcp(JSON.writeValueAsString(call) + "\n", "--root", tempDir.toString()));
+
+        assertThat(result.path("isError").asBoolean()).as(result.toString()).isFalse();
+        assertThat(out).isRegularFile();
+    }
+
+    @Test
+    void manifestChecksEachFileOfACommaSeparatedList(@TempDir Path tempDir) throws Exception {
+        // manifest splits a "files" string on commas, so PathGuard must check each part, not the whole string.
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        Path model = Path.of("src/test/resources/fixtures/docker-smoke/models/conforming.xml");
+        Files.copy(model, Files.createDirectories(root.resolve("models")).resolve("EQ.xml"));
+        Path outside = Files.copy(model, tempDir.resolve("outside.xml"));
+        Path out = root.resolve("manifest.ttl");
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
+        call.putObject("params").put("name", "manifest").putObject("arguments")
+                .put("files", root.resolve("models/EQ.xml") + "," + outside).put("output", out.toString());
+
+        JsonNode result = toolResult(runMcp(JSON.writeValueAsString(call) + "\n", "--root", root.toString()));
+
+        assertThat(result.path("isError").asBoolean()).as(result.toString()).isTrue();
+        assertThat(result.path("content").get(0).path("text").asText()).contains("outside the allowed roots");
+        assertThat(out).doesNotExist();
+    }
+
+    @Test
+    void manifestWithoutAnOutputMayNotWriteOutsideTheRoots(@TempDir Path tempDir) throws Exception {
+        // The default output is next to the models folder: with the root being that folder, outside it.
+        Path root = Files.createDirectories(tempDir.resolve("models"));
+        Files.copy(Path.of("src/test/resources/fixtures/docker-smoke/models/conforming.xml"), root.resolve("EQ.xml"));
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
+        call.putObject("params").put("name", "manifest").putObject("arguments").put("dir", root.toString());
+
+        JsonNode result = toolResult(runMcp(JSON.writeValueAsString(call) + "\n", "--root", root.toString()));
+
+        assertThat(result.path("isError").asBoolean()).as(result.toString()).isTrue();
+        assertThat(tempDir.resolve("manifest.ttl")).doesNotExist();
+    }
+
+    @Test
+    void manifestDoesNotFollowALinkOutOfTheRoot(@TempDir Path tempDir) throws Exception {
+        Path root = Files.createDirectories(tempDir.resolve("root"));
+        Path models = Files.createDirectories(root.resolve("models"));
+        Path outside = Files.copy(Path.of("src/test/resources/fixtures/docker-smoke/models/conforming.xml"),
+                tempDir.resolve("secret.xml"));
+        try {
+            Files.createSymbolicLink(models.resolve("EQ.xml"), outside);
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            org.junit.jupiter.api.Assumptions.abort("symbolic links can't be created here: " + e.getMessage());
+        }
+        Path out = root.resolve("manifest.ttl");
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
+        call.putObject("params").put("name", "manifest").putObject("arguments")
+                .put("dir", models.toString()).put("output", out.toString());
+
+        JsonNode result = toolResult(runMcp(JSON.writeValueAsString(call) + "\n", "--root", root.toString()));
+
+        assertThat(result.path("isError").asBoolean()).as(result.toString()).isTrue();
+        assertThat(out).doesNotExist();
+    }
+
+    @Test
+    void theToolSchemasAreTheCommandSchemas() {
+        List<JsonNode> messages = runMcp("""
+                {"jsonrpc":"2.0","id":1,"method":"tools/list"}
+                """);
+
+        JsonNode tools = messages.getFirst().path("result").path("tools");
+        assertThat(tools).hasSize(CommandSchemas.all().size());
+        for (JsonNode tool : tools) {
+            CommandSchemas.Entry entry = CommandSchemas.byToolName(tool.path("name").asText());
+            assertThat(entry).as(tool.path("name").asText()).isNotNull();
+            assertThat(tool.path("inputSchema")).isEqualTo(entry.inputSchema());
+        }
+    }
+
+    @Test
     void combinedValidationRefusesAnImportOutsideTheRoot(@TempDir Path tempDir) throws Exception {
         // PathGuard only sees the request; the import is found by Core while the policy is active.
         Path root = Files.createDirectories(tempDir.resolve("root"));

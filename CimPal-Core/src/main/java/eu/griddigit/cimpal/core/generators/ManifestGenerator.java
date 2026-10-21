@@ -619,11 +619,31 @@ public class ManifestGenerator {
             return null;
         }
 
-        String safeFileName = fileName.replace("\\", "/").replace(" ", "%20");
+        String safeFileName = iriPath(fileName);
         if (parentFolder == null || parentFolder.isBlank()) {
             return "file:" + safeFileName;
         }
-        String safeParentFolder = parentFolder.replace("\\", "/").replace(" ", "%20");
-        return "file:" + safeParentFolder + "/" + safeFileName;
+        return "file:" + iriPath(parentFolder) + "/" + safeFileName;
+    }
+
+    /**
+     * A folder or file name as the path of a {@code file:} IRI: backslashes become slashes, and
+     * every character an IRI path may not hold ({@code <}, {@code >}, {@code "}, spaces, control
+     * characters, ...) is percent-encoded, so a crafted file name can't break out of the IRI in
+     * the Turtle output.
+     */
+    static String iriPath(String name) {
+        String path = name.replace("\\", "/");
+        StringBuilder sb = new StringBuilder();
+        for (byte b : path.getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
+            int c = b & 0xFF;
+            boolean safe = c < 0x80 && (Character.isLetterOrDigit(c) || "-._~/!$&'()*+,;=:@%".indexOf(c) >= 0);
+            if (safe) {
+                sb.append((char) c);
+            } else {
+                sb.append('%').append(String.format(java.util.Locale.ROOT, "%02X", c));
+            }
+        }
+        return sb.toString();
     }
 }

@@ -11,7 +11,7 @@ Guidance for Claude Code when working in this repository.
 ## Current work
 
 - Work is planned in Claude Desktop and handed over as work packages in `docs/plans/`. **Start with `docs/plans/README.md`**: order, status, open decisions and the standard footer.
-- A session usually begins with `Execute docs/plans/<ID>.md` in plan mode. Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
+- A session usually begins with `Execute docs/plans/<track>/<ID>.md` in plan mode (tracks: `workspace` for A/DOC, `ci`, `security`, `testing`, `deployment`). Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
 - Shared tooling in `.claude/`:
   - Path-scoped rules: `rules/security.md` for security-sensitive code, `rules/testing.md` for `src/test`.
   - Skills: `/add-regression-test`, `/security-check-change`.
@@ -89,13 +89,6 @@ Core tests run on the classpath (`useModulePath=false`) so they can reach packag
 
 Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Before refactoring Core behaviour, add characterisation tests that capture the current output. Build small synthetic RDF/SHACL fixtures under `@TempDir`, and don't depend on files outside the repo. `MappingValidatorTest` is the reference example.
 
-- **Test support** lives in Core's `eu.griddigit.cimpal.core.testsupport` (test scope). CLI and Main get it through the Core `test-jar` (`<type>test-jar</type>`, test scope). It holds:
-  - `TestModels`: synthetic EQ/SSH models and SHACL shapes.
-  - `Fixtures`: `src/test/resources/fixtures/<feature>/`.
-  - `Snapshots`: golden files under `src/test/resources/snapshots/<feature>/`. RDF is compared by isomorphism, workbooks as CSV, JSON with sorted keys.
-  - `Normalizer`: timestamps, paths, blank-node labels.
-  - `StubHttpServer`: a loopback HTTP stub.
-- **Snapshots** are only rewritten with `-Dsnapshot.update=true`. Otherwise a mismatch fails with a line diff. Review the diff before committing.
 - **Coverage ratchet:** `mvn verify` runs JaCoCo in every module, with the aggregate report in `CimPal-Coverage/target/site/jacoco-aggregate/`. It fails if a module drops below the floors in its `coverage-baseline.properties`, which are the measured value minus 0.5 pp. After coverage rises, run `scripts/Update-CoverageBaseline.ps1` and commit the updated files. Floors only go up unless `-AllowDecrease` is given, and that commit must say why.
 
 ## Git and releases
@@ -105,7 +98,17 @@ Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Bef
 - **Never run `scripts/New-ReleaseTag.ps1`** or push version tags unless explicitly asked. A pushed `YYYY.MM.DD.N` tag triggers `.github/workflows/release.yml`, which publishes a GitHub release.
 - Versions live in all six `pom.xml` files (including `CimPal-Coverage`) plus `<cimpal.version>`; only the release script changes them.
 
-## End of session
+## After every implementation (mandatory)
 
-- Update `docs/PROJECT.md` (date, *Implementation status*, *Known issues*, *Next steps*) when the change affects them.
-- When a CLI command's flags or behaviour change, update its page under `docs/cli/`.
+A "bigger implementation" is any finished WP or feature branch, and any change to a command, flag, config key, endpoint, exit code, JSON field, output file or default. After each one, before you report back, keep the docs in step with the code:
+
+1. **`docs/PROJECT.md`** — always:
+   - *Last updated* date;
+   - *Implementation status*, *Technical decisions* (new classes, design choices), *Known issues* (add new ones, remove fixed ones) and *Next steps*;
+   - one new row at the top of the *Change log* table: date, WP/PR, what changed for users (commands, flags, endpoints, behaviour), docs touched, and `skill: yes` when the change affects how CimPal is run or explained (the cimpal skill and the Desktop project notes are refreshed from these rows).
+2. **`docs/cli/<command>.md`** when a command's flags, output or exit codes changed; **`docs/guide/*`** when install, deployment, security, sizing or integration changed; **`CimPal-CLI/configs/*.json`** templates when config keys changed.
+3. **Machine-readable contracts** that must match the code: `CommandSchemas` / the MCP tool schemas, `openapi/cimpal-v1.json`, `PathGuard.FIELDS` (mirrored by the Airflow provider).
+4. **The WP file and `docs/plans/README.md`** status (see `/end-session`).
+5. Say in your summary which of these you updated, and which you deliberately left unchanged.
+
+If you find docs that disagree with the code, fix them in the same change or add them to *Known issues*; never leave a known drift unrecorded.

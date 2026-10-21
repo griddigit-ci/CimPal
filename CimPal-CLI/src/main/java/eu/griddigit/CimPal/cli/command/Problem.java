@@ -41,6 +41,8 @@ final class Problem {
             case 410 -> "Gone";
             case 413 -> "Content Too Large";
             case 415 -> "Unsupported Media Type";
+            case 422 -> "Unprocessable Content";
+            case 429 -> "Too Many Requests";
             case 503 -> "Service Unavailable";
             case 504 -> "Gateway Timeout";
             default -> status >= 500 ? "Internal Server Error" : "Error";

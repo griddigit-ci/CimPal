@@ -37,11 +37,11 @@ $MODELS_DIR = "REPLACE_WITH_PATH\models"
 
 # The CSV mapping file that links model sets to their constraint files
 $MAPPING_CSV = "REPLACE_WITH_PATH\mapping.csv"
-# NOTE: The mapping CSV has three columns (no header row required):
-#         Column 1: model file names, comma-separated (relative to MODELS_DIR), or GitHub URLs
-#         Column 2: path to the .ttl constraint file, relative to CONSTRAINTS_ROOT
+# NOTE: The mapping CSV has three comma-separated columns (no header row required):
+#         Column 1: model file names separated by ; (relative to MODELS_DIR), or GitHub URLs
+#         Column 2: the .ttl constraint file(s), separated by ;, relative to CONSTRAINTS_ROOT
 #         Column 3: a label for the report (free text)
-#       Example row: "EQ.xml,TP.xml,SV.xml | QoCDC/Level2-IGM.ttl | IGM Level 2 check"
+#       Example row: EQ.xml;TP.xml;SV.xml,QoCDC/Level2-IGM.ttl,IGM Level 2 check
 #       Example: "C:\Data\CGMES\mapping.csv"
 
 # Root folder containing all SHACL constraint (.ttl) files
