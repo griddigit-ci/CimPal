@@ -33,8 +33,9 @@ class ValidateConfig:
         Attributes:
             workflow (Union[Unset, str]): Workflow: 'mapping' (default, uses a CSV mapping file), 'timestamped' (groups by
                 timestamp) or 'combined' (validates the dataFiles as one dataset against all the constraintFiles at once).
-            mapping_csv (Union[Unset, str]): Absolute path to the CSV mapping file. Three columns: model file names |
-                constraint .ttl path | label. Required for mapping and timestamped workflows.
+            mapping_csv (Union[Unset, str]): Absolute path to the CSV mapping file: three comma-separated columns, the model
+                files (separated by ;), the constraint .ttl file(s) (separated by ;) and a label. Required for mapping and
+                timestamped workflows.
             models_dir (Union[Unset, str]): Absolute path to the root folder containing model ZIP/XML archives. Required for
                 mapping and timestamped workflows.
             constraints_root (Union[Unset, str]): Absolute path to the root folder for SHACL constraint .ttl files. Required
@@ -59,6 +60,18 @@ class ValidateConfig:
             samples (Union[Unset, int]): Focus-node samples per shape group in JSON output (default 3). Set 0 to disable
                 per-shape detail.
             export_turtle (Union[Unset, bool]): Write .ttl validation report files alongside Excel output.
+            previous_comparison (Union[Unset, str]): Absolute path to the XLSX of a previous timestamped run, used to build
+                a delta comparison sheet.
+            incremental_timestamps (Union[Unset, bool]): Timestamped workflow: reuse the Jena findings of focus nodes a
+                timestamp didn't change from the one before.
+            format_ (Union[Unset, str]): Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a
+                job's JSON result.
+            stats (Union[Unset, bool]): Report the run's resource use (time, peak heap, GC, triples loaded).
+            summary_file (Union[Unset, str]): Absolute path to also write the JSON result to, atomically, creating parent
+                folders.
+            violations_exit_code (Union[Unset, int]): Exit code when violations are found (default 1, 0..255); 0 lets a
+                scheduler treat them as data.
+            overwrite (Union[Unset, bool]): Replace an output file that already exists (default false: refused).
      """
 
     workflow: Union[Unset, str] = UNSET
@@ -75,6 +88,13 @@ class ValidateConfig:
     max_results_per_constraint: Union[Unset, int] = UNSET
     samples: Union[Unset, int] = UNSET
     export_turtle: Union[Unset, bool] = UNSET
+    previous_comparison: Union[Unset, str] = UNSET
+    incremental_timestamps: Union[Unset, bool] = UNSET
+    format_: Union[Unset, str] = UNSET
+    stats: Union[Unset, bool] = UNSET
+    summary_file: Union[Unset, str] = UNSET
+    violations_exit_code: Union[Unset, int] = UNSET
+    overwrite: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -118,6 +138,20 @@ class ValidateConfig:
 
         export_turtle = self.export_turtle
 
+        previous_comparison = self.previous_comparison
+
+        incremental_timestamps = self.incremental_timestamps
+
+        format_ = self.format_
+
+        stats = self.stats
+
+        summary_file = self.summary_file
+
+        violations_exit_code = self.violations_exit_code
+
+        overwrite = self.overwrite
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -151,6 +185,20 @@ class ValidateConfig:
             field_dict["samples"] = samples
         if export_turtle is not UNSET:
             field_dict["exportTurtle"] = export_turtle
+        if previous_comparison is not UNSET:
+            field_dict["previousComparison"] = previous_comparison
+        if incremental_timestamps is not UNSET:
+            field_dict["incrementalTimestamps"] = incremental_timestamps
+        if format_ is not UNSET:
+            field_dict["format"] = format_
+        if stats is not UNSET:
+            field_dict["stats"] = stats
+        if summary_file is not UNSET:
+            field_dict["summaryFile"] = summary_file
+        if violations_exit_code is not UNSET:
+            field_dict["violationsExitCode"] = violations_exit_code
+        if overwrite is not UNSET:
+            field_dict["overwrite"] = overwrite
 
         return field_dict
 
@@ -189,6 +237,20 @@ class ValidateConfig:
 
         export_turtle = d.pop("exportTurtle", UNSET)
 
+        previous_comparison = d.pop("previousComparison", UNSET)
+
+        incremental_timestamps = d.pop("incrementalTimestamps", UNSET)
+
+        format_ = d.pop("format", UNSET)
+
+        stats = d.pop("stats", UNSET)
+
+        summary_file = d.pop("summaryFile", UNSET)
+
+        violations_exit_code = d.pop("violationsExitCode", UNSET)
+
+        overwrite = d.pop("overwrite", UNSET)
+
         validate_config = cls(
             workflow=workflow,
             mapping_csv=mapping_csv,
@@ -204,6 +266,13 @@ class ValidateConfig:
             max_results_per_constraint=max_results_per_constraint,
             samples=samples,
             export_turtle=export_turtle,
+            previous_comparison=previous_comparison,
+            incremental_timestamps=incremental_timestamps,
+            format_=format_,
+            stats=stats,
+            summary_file=summary_file,
+            violations_exit_code=violations_exit_code,
+            overwrite=overwrite,
         )
 
 

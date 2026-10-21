@@ -11,7 +11,9 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
+from ..types import UNSET, Unset
 from typing import cast
+from typing import Union
 
 
 
@@ -31,11 +33,13 @@ class OrganizeConfig:
             shacl_files (list[str]): Absolute paths to SHACL .ttl/.rdf files to organize.
             template_xlsx (str): Absolute path to the Excel template defining the output structure.
             output_dir (str): Absolute path to the root output directory.
+            xml_base (Union[Unset, str]): Base URI for loading the SHACL files (default: empty).
      """
 
     shacl_files: list[str]
     template_xlsx: str
     output_dir: str
+    xml_base: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -51,6 +55,8 @@ class OrganizeConfig:
 
         output_dir = self.output_dir
 
+        xml_base = self.xml_base
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -59,6 +65,8 @@ class OrganizeConfig:
             "templateXlsx": template_xlsx,
             "outputDir": output_dir,
         })
+        if xml_base is not UNSET:
+            field_dict["xmlBase"] = xml_base
 
         return field_dict
 
@@ -74,10 +82,13 @@ class OrganizeConfig:
 
         output_dir = d.pop("outputDir")
 
+        xml_base = d.pop("xmlBase", UNSET)
+
         organize_config = cls(
             shacl_files=shacl_files,
             template_xlsx=template_xlsx,
             output_dir=output_dir,
+            xml_base=xml_base,
         )
 
 

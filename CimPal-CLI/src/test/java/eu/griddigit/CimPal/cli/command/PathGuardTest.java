@@ -57,6 +57,29 @@ class PathGuardTest {
     }
 
     @Test
+    void aListPartThatResolvesToANameWithACommaIsRefused() throws Exception {
+        // The command splits the checked string on commas again: "x,/secret" would become two paths.
+        Path commaDir = Files.createDirectories(root.resolve("x,"));
+        Files.writeString(commaDir.resolve("m.ttl"), "x");
+        Path link = root.resolve("link");
+        try {
+            Files.createSymbolicLink(link, commaDir);
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            org.junit.jupiter.api.Assumptions.abort("symbolic links can't be created here: " + e.getMessage());
+        }
+        String value = link.resolve("m.ttl").toString();
+
+        for (String command : List.of("sparql", "manifest")) {
+            String key = command.equals("sparql") ? "models" : "files";
+            assertThatThrownBy(() -> PathGuard.check(command, json("{\"" + key + "\":" + q(Path.of(value)) + "}"),
+                    policy, root)).as(command).isInstanceOf(PathNotAllowedException.class);
+            // As an array element it is not split again: allowed.
+            assertThat(PathGuard.check(command, json("{\"" + key + "\":[" + q(Path.of(value)) + "]}"), policy, root)
+                    .path(key).get(0).asString()).contains(",");
+        }
+    }
+
+    @Test
     void aJobOnAnUploadLooksUpRelativeValuesInItsUploadOnly() {
         // pom.xml exists in the working directory of this test (the module folder), outside the
         // roots: shared mode refuses it, a job on an upload never even looks there (DEP-7).

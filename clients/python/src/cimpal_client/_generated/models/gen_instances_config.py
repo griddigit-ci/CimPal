@@ -33,12 +33,16 @@ class GenInstancesConfig:
             output (str): Absolute path for the generated RDF/XML file.
             xml_base (Union[Unset, str]): Base URI (default: http://iec.ch/TC57/CIM100).
             strip_prefixes (Union[Unset, bool]): Remove unused namespace prefixes.
+            export_extensions (Union[Unset, bool]): Include the columns marked as extensions.
+            overwrite (Union[Unset, bool]): Replace an output file that already exists (default false: refused).
      """
 
     template_xlsx: str
     output: str
     xml_base: Union[Unset, str] = UNSET
     strip_prefixes: Union[Unset, bool] = UNSET
+    export_extensions: Union[Unset, bool] = UNSET
+    overwrite: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -54,6 +58,10 @@ class GenInstancesConfig:
 
         strip_prefixes = self.strip_prefixes
 
+        export_extensions = self.export_extensions
+
+        overwrite = self.overwrite
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -65,6 +73,10 @@ class GenInstancesConfig:
             field_dict["xmlBase"] = xml_base
         if strip_prefixes is not UNSET:
             field_dict["stripPrefixes"] = strip_prefixes
+        if export_extensions is not UNSET:
+            field_dict["exportExtensions"] = export_extensions
+        if overwrite is not UNSET:
+            field_dict["overwrite"] = overwrite
 
         return field_dict
 
@@ -81,11 +93,17 @@ class GenInstancesConfig:
 
         strip_prefixes = d.pop("stripPrefixes", UNSET)
 
+        export_extensions = d.pop("exportExtensions", UNSET)
+
+        overwrite = d.pop("overwrite", UNSET)
+
         gen_instances_config = cls(
             template_xlsx=template_xlsx,
             output=output,
             xml_base=xml_base,
             strip_prefixes=strip_prefixes,
+            export_extensions=export_extensions,
+            overwrite=overwrite,
         )
 
 

@@ -170,7 +170,7 @@ public class ValidateCommand implements Callable<Integer> {
 
     @Option(names = "--incremental-timestamps",
             description = "For timestamped validation, reuse unaffected Jena focus-node findings between consecutive timestamps.")
-    private boolean incrementalTimestamps;
+    private Boolean incrementalTimestamps;
 
     @Option(names = "--stats",
             description = "Report the run's resource use (wall/CPU time, peak heap, GC, triples loaded): "
@@ -320,6 +320,10 @@ public class ValidateCommand implements Callable<Integer> {
         if (violationsExitCode == null) {
             JsonNode n = root.path("violationsExitCode");
             if (!n.isMissingNode() && !n.isNull()) violationsExitCode = AutomationOptions.exitCodeFromConfig(n);
+        }
+        if (incrementalTimestamps == null) {
+            JsonNode n = root.path("incrementalTimestamps");
+            if (!n.isMissingNode() && !n.isNull()) incrementalTimestamps = n.asBoolean(false);
         }
         if (previousComparison == null) {
             String v = root.path("previousComparison").asText(null);
@@ -658,7 +662,7 @@ public class ValidateCommand implements Callable<Integer> {
                 .maxResultsPerConstraint(maxResults)
                 .threads(workers)
                 .exportTurtleReports(Boolean.TRUE.equals(exportTurtle))
-                .incrementalTimestampValidation(incrementalTimestamps)
+                .incrementalTimestampValidation(Boolean.TRUE.equals(incrementalTimestamps))
                 .runStats(runStats);
         if (prevPath != null) {
             optionsBuilder.previousComparisonCsv(prevPath);
@@ -1009,6 +1013,7 @@ public class ValidateCommand implements Callable<Integer> {
         System.out.println("  violationsExit   : " + AutomationOptions.violationsExitCode(violationsExitCode));
         System.out.println("  exportTurtle     : " + exportTurtle);
         System.out.println("  previousCompar.  : " + abs(previousComparison));
+        System.out.println("  incrementalTimestamps : " + Boolean.TRUE.equals(incrementalTimestamps));
     }
 
     // -------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-20 (Desktop: change log, known issues from the CLI check)  
+**Last updated:** 2026-10-20 (DOC-2: docs/CLI consistency fixes)  
 **Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -404,6 +404,7 @@ One row per bigger implementation, newest first (CLAUDE.md, *After every impleme
 
 | Date | WP / PR | What changed for users | Docs | Skill |
 |---|---|---|---|---|
+| 2026-10-20 | DOC-2 | `manifest --config` (keys `dir`, `files`, `accessUrl`, `output`), so `manifest` works through `mcp`, `serve` and `run`; MCP tool schemas and the OpenAPI document list every key each command reads, plus `overwrite` where a command writes a file (a test keeps them equal to the commands' config loaders); `validate` takes `incrementalTimestamps` from a config and `--dry-run` shows it; through serve/mcp/run, `manifest`'s files, scanned files and default output are checked against the allowed roots (security review), and file names in `dcat:accessURL` are percent-encoded. Docs: the mapping CSV format is commas between columns and `;` inside them (the `|` example was wrong), all 13 commands and every template listed, compare's `N/A` wording, the MCP agent loop without the manual workflow, a new root README feature list | cli/README.md, cli/index.md, cli/manifest.md, cli/mcp.md, cli/validate.md, cli/compare.md, cli/serve.md, cli/ci-pipeline.md, README.md, configs/manifest.json, configs/validate-mapping-cgmes30.json | yes |
 | 2026-10-20 | Desktop (no code) | Change log introduced; drift found while running CLI 2026.10.6.1 recorded under *Known issues*; DOC-2 written | PROJECT.md, CLAUDE.md, plans | yes |
 | 2026-10-19 | DEP-16 (PR #81 → #79) | `/metrics` adds `cimpal_http_responses_total{code}`, `cimpal_http_request_duration_seconds{kind}`, `cimpal_job_queue_wait_seconds`, `cimpal_queue_size`, `cimpal_stalled`, `cimpal_work_used_bytes`/`_max_bytes`; service levels (99.5 % availability, API p95 < 200 ms, queue wait p95 < 5 min); Prometheus alert rules in `deploy/monitoring/`; load tool `scripts/bench/load/`; preliminary service capacity figures | cli/serve.md, guide/service.md, guide/sizing.md, deploy/monitoring | yes |
 | 2026-10-19 | DEP-14 (PR #79) | `Idempotency-Key` on `POST /v1/jobs` and `/v1/uploads` (`--idempotency-ttl`); opt-in HMAC-signed completion callbacks (`callback.url`, `--callback-secrets`, `callbackAllow` in `--client-quotas`); SDK `verify_callback()`, automatic keys in SDK and Airflow provider | cli/serve.md, guide/python-sdk.md, guide/airflow.md, guide/security.md | yes |
@@ -615,16 +616,7 @@ CimPal/
 
 ## Known issues and limitations
 
-**Doc and behaviour drift found 2026-10-20 (Desktop, running CLI 2026.10.6.1; fixes planned in DOC-2).**
-- `manifest` through `mcp` returns `{"exitCode":2,"status":"INVALID_INPUT"}` (no `--config`), but `tools/list` still advertises it.
-- The MCP tool input schemas list only a subset of each command's keys (e.g. no `stats`, `summaryFile`, `overwrite`, `constraintFiles` for some tools), although every config key is accepted.
-- `docs/cli/mcp.md` (*The validation agent loop*) still says "call `validate` in manual mode"; that workflow was removed.
-- `docs/cli/README.md` *Available commands* lists only validate, sparql and manifest, and its *Template configs* table only four templates.
-- `docs/cli/serve.md` shows `"version":"CimPal CLI 2026.9.10.1"` in the `/health` example; the root `README.md` feature list is the old GUI list.
-- `--stats` for `validate --workflow combined` reports a `report` phase; `docs/cli/README.md` lists only `validate` and `shapeDetail`.
-- `compare --compare-type shacl` reports absence as `N/A` with "New property: …" text; `docs/cli/compare.md` documents `(not present)`.
-- `validate --dry-run` doesn't print `incrementalTimestamps`.
-- The mapping CSV accepts `|` or comma between columns; only the config template says so, not `validate --help` or `cli/validate.md` (which shows a `|` example under "three columns").
+**`manifest` access URLs.** `--access-url` only shapes `dcat:accessURL` as `file:<folder>/<file>`: a relative path is used as the folder, a `file:` URI or absolute folder gives its last folder name, and an `https://` URL is ignored (`ManifestGenerator.compactAccessUrl`). Documented in `docs/cli/manifest.md`; whether an http(s) base should be supported is open.
 
 **`serve` job store limits (DEP-11).** One instance per database until DEP-12 (two `serve` on one database would each run the queued jobs they loaded at start). After a crash the last (up to 63) log lines of a running job may be missing. A job that couldn't start because the database failed stays queued in the database and runs only after the next start. The PostgreSQL ITs only run where Docker is available (CI on Ubuntu; not on the maintainer's Windows machine yet).
 

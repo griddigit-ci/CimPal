@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In review (`feature/doc-2-consistency`) |
 | Phase | 2 (any time; small) |
 | Depends on | — (rebase on devel after DEP-11/DEP-14 are merged if they touch the same docs) |
 | Size | S |
@@ -38,11 +38,11 @@ Docs:
 
 ## Acceptance criteria (status checklist)
 
-- [ ] `manifest` runs via `mcp` (`tools/call` returns exit 0 and the manifest path) and via `POST /manifest`; test in the CLI module
-- [ ] MCP `tools/list` schemas equal the `CommandSchemas` keys; a test fails if they diverge (like `OpenApiSpecTest`)
-- [ ] `validate --dry-run` prints `incrementalTimestamps`
-- [ ] Doc items 4–9 done; `scripts/check_doc_links.py` green
-- [ ] PROJECT.md drift list updated and a *Change log* row added (`skill: yes`)
+- [x] `manifest` runs via `mcp` (`tools/call` returns exit 0 and the manifest path) and via `POST /manifest`; test in the CLI module
+- [x] MCP `tools/list` schemas equal the `CommandSchemas` keys; a test fails if they diverge (like `OpenApiSpecTest`)
+- [x] `validate --dry-run` prints `incrementalTimestamps`
+- [x] Doc items 4–9 done; `scripts/check_doc_links.py` green
+- [x] PROJECT.md drift list updated and a *Change log* row added (`skill: yes`)
 - [ ] `mvn -B verify` green; test count before/after in Notes
 
 ## Instructions for Claude Code
@@ -77,7 +77,19 @@ Standard footer (applies to every work package):
 | Date | Decision | By |
 | --- | --- | --- |
 | 2026-10-20 | Default for `manifest`: add `--config` rather than drop it from MCP/serve (maintainer may override) | Claude Desktop (proposal) |
+| 2026-10-20 | Executed as proposed: `manifest --config`. | Maintainer |
+| 2026-10-20 | MCP already built its tool schemas from `CommandSchemas`; the gap was `CommandSchemas` itself. `CommandSchemasTest` compares each schema with the keys the command's `loadConfig` reads (plus `overwrite`, which PathGuard reads for commands that write a file). | Claude Code |
+| 2026-10-20 | `incrementalTimestamps` was a flag only (no config key, so not reachable through mcp/serve/run): it is now a config key too. | Claude Code |
+| 2026-10-20 | The mapping CSV finding was wrong: columns are comma-separated only (quotes for a field with a comma), `;` separates files inside column 1 and column 2; `|` separates nothing. The docs, the template and the schema text now say so. | Claude Code |
+| 2026-10-20 | manifest's `files` may be one comma-separated string, so PathGuard checks it as `READ_LIST` (each part), as for sparql `models`; the Airflow provider's mirror follows. | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+- **Tests:** `mvn -B verify` green. Baseline (last verify on this code, DEP-16): Core 482, Main 65, CLI 464; now Core 484, Main 65, CLI 477 (2 symlink tests skip on Windows, run on Linux CI). New: `ManifestCommandTest` (4), `CommandSchemasTest` (2), `McpCommandTest` +5 (manifest as a tool, comma list checked per part, default output inside the roots, no link out of the root, tools/list = CommandSchemas), `PathGuardTest` +1, `ValidateCommandTest` +1 (dry run), Core `ManifestGeneratorIriTest` (2).
+- **Security review (`security-reviewer` agent):** making `manifest` reachable through serve/mcp/run opened paths no guard checked. Fixed with regression tests:
+  - (High) the default output (`manifest.ttl` next to the models folder, never in the request) was written without a check, outside the roots too: with a path policy active it is now checked as a write, and an existing file is not replaced.
+  - (Medium) files found by scanning `dir`, and the `files`, are checked by the active policy before they are read, so a link in an allowed folder can't lead out of the roots.
+  - (Medium) a part of a comma-separated `files`/`models` string whose real path holds a comma (a link, a short name) would be split again by the command: PathGuard refuses it (arrays are not split, so allowed).
+  - (Low) file and folder names in `dcat:accessURL` are percent-encoded (`ManifestGenerator.iriPath`); manifest's messages go through `LogSanitizer` and it no longer prints stack traces.
+- **Found while doing it:** the manifest `files` comma string passed PathGuard as one path, so `"a.xml,<outside>"` would have read a file outside the roots through serve/mcp/run once `manifest` took a config: fixed with a regression test before it shipped. `--access-url` with `https://…` is ignored by `ManifestGenerator` (documented; recorded under *Known issues*).
+- **Open:** none for DOC-2.

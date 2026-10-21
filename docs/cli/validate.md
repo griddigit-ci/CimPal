@@ -61,15 +61,19 @@ Reads a CSV mapping file that links model files to their SHACL constraint files.
 
 Required inputs: `--mapping-csv`, `--models`, `--constraints-root`, `--output`
 
-The mapping CSV has three columns (no header required):
-- **Column 1 — xml_inputs**: comma-separated model file names (relative to `--models`) or GitHub raw URLs
-- **Column 2 — ttl**: path to the constraint `.ttl` file, relative to `--constraints-root`
+The mapping CSV has three columns, separated by commas (put a field that holds a comma in double quotes). A first row starting with `xml_inputs` is taken as a header; empty rows and rows starting with `#` are skipped.
+- **Column 1 — xml_inputs**: the model files of one validation, separated by `;`, relative to `--models` (wildcards such as `g001/*EQ*.xml` and GitHub raw URLs work too; `ZIP:` in front is allowed)
+- **Column 2 — ttl**: the constraint file, relative to `--constraints-root`; several files separated by `;` form one shapes graph for that row
 - **Column 3 — notes**: free text label, appears in the report
 
-Example mapping CSV row:
+Example mapping CSV rows:
 ```
-EQ.xml,SV.xml,TP.xml | constraints/QoCDC/Level2.ttl | Level 2 quality checks
+xml_inputs,ttl,notes
+EQ.xml;SV.xml;TP.xml,constraints/QoCDC/Level2.ttl,Level 2 quality checks
+EQ.xml;SSH.xml,constraints/EQ.ttl;constraints/SSH.ttl,"EQ and SSH, together"
 ```
+
+A `|` doesn't separate anything: a row written as `EQ.xml,SV.xml | Level2.ttl | label` is read as broken columns.
 
 ### `timestamped`
 
@@ -133,6 +137,7 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--samples` | integer | `3` when JSON is produced (`--format json` or `--summary-file`) / `0` otherwise | Per-shape detail in JSON output: max focus-node samples per shape group. `0` disables shape groups entirely. For the mapping workflow, positive values auto-enable `--export-turtle`; combined takes the detail from the results in memory. |
 | `--export-turtle` | flag | off | Write a `.ttl` SHACL validation report beside each Excel report. Combined writes one, named like its workbook. |
 | `--previous-comparison` | file path | — | XLSX from a previous timestamped run, for the comparison workbook. Timestamped workflow only. |
+| `--incremental-timestamps` | flag (config `"incrementalTimestamps": true`) | off | Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't change from the one before, instead of validating every timestamp from scratch. |
 | `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 | `--summary-file` | file path | — | Also write the JSON result (exactly what `--format json` prints) to this file, atomically, creating parent folders. Works with any `--format`. Config key `summaryFile`. See [automation options](README.md#automation-options---summary-file---violations-exit-code). |
 | `--violations-exit-code` | 0–255 | `1` | Exit code when violations are found. `0` lets a scheduler (Airflow, CI) treat findings as data; exits 2 and 3 are unchanged, and so is exit 1 when a row failed with an error. Config key `violationsExitCode`. Ignored under `serve`, `mcp` and `run`. |

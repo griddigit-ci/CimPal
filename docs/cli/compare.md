@@ -151,6 +151,8 @@ Each result entry has five fields:
 
 When a value is `(not present)`, the item exists in one file but not the other. This is an addition or deletion. When both values are non-empty and different, it is a modification.
 
+`--compare-type shacl` words it differently: a missing value is `N/A`, and an item only in one file is described in the other column, e.g. `New class: …` or `New property: ex:x in class: …`. The `rdfs` types use `(not present)` as above.
+
 ---
 
 ## Exit codes

@@ -32,13 +32,16 @@ class ManifestConfig:
             dir_ (Union[Unset, str]): Absolute path to a folder containing the model files to describe.
             files (Union[Unset, list[str]]): Absolute paths to individual model files (alternative to 'dir').
             access_url (Union[Unset, str]): The dcat:accessURL written into the manifest.
-            output (Union[Unset, str]): Absolute path for the manifest .ttl file.
+            output (Union[Unset, str]): Absolute path for the manifest .ttl file (default: manifest.ttl next to the models
+                folder).
+            overwrite (Union[Unset, bool]): Replace an output file that already exists (default false: refused).
      """
 
     dir_: Union[Unset, str] = UNSET
     files: Union[Unset, list[str]] = UNSET
     access_url: Union[Unset, str] = UNSET
     output: Union[Unset, str] = UNSET
+    overwrite: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -58,6 +61,8 @@ class ManifestConfig:
 
         output = self.output
 
+        overwrite = self.overwrite
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -71,6 +76,8 @@ class ManifestConfig:
             field_dict["accessUrl"] = access_url
         if output is not UNSET:
             field_dict["output"] = output
+        if overwrite is not UNSET:
+            field_dict["overwrite"] = overwrite
 
         return field_dict
 
@@ -88,11 +95,14 @@ class ManifestConfig:
 
         output = d.pop("output", UNSET)
 
+        overwrite = d.pop("overwrite", UNSET)
+
         manifest_config = cls(
             dir_=dir_,
             files=files,
             access_url=access_url,
             output=output,
+            overwrite=overwrite,
         )
 
 

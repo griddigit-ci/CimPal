@@ -28,7 +28,7 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | 1 | [TEST-1](testing/TEST-1.md) | Test harness | CI-1 | M | Done ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
 | 1 | [SEC-1](security/SEC-1.md) | Harden serve | TEST-1 | M | In review ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) |
 | 1 | [SEC-2](security/SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | In review ([PR #45](https://github.com/griddigit-ci/CimPal/pull/45), stacked on SEC-1) |
-| 2 | [DOC-2](workspace/DOC-2.md) | Docs/CLI consistency fixes found on 2026-10-20 | — | S | Not started |
+| 2 | [DOC-2](workspace/DOC-2.md) | Docs/CLI consistency fixes found on 2026-10-20 | — | S | In review |
 | 2 | [TEST-2](testing/TEST-2.md) | Regression tests for past security findings | TEST-1 | M | In review ([PR #46](https://github.com/griddigit-ci/CimPal/pull/46); 4 findings reported) |
 | 2 | [SEC-5](security/SEC-5.md) | Fix the findings reported by TEST-2 | TEST-2, SEC-2 | S | In review (PR #49) |
 | 2 | [TEST-3](testing/TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | In progress (validation and SHACL generation groups done; other groups open) |
