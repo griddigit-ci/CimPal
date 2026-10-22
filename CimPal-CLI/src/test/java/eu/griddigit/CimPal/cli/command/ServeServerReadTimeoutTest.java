@@ -8,6 +8,7 @@ package eu.griddigit.CimPal.cli.command;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.InputStream;
 import java.net.Socket;
@@ -17,6 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,6 +72,42 @@ class ServeServerReadTimeoutTest {
             assertThat(read).as("server closed the connection").isEqualTo(-1);
             assertThat(seconds).isLessThan(15);
         }
+    }
+
+    @Test
+    void aRefusedUploadWhoseBodyStallsIsClosedAfterTheReadLimit(@TempDir Path work) throws Exception {
+        // A refused upload's body is read and dropped before the 507; a client that stops sending
+        // must not hold the handler thread beyond the read limit.
+        server = ServeServer.start(ServeServer.Config.builder()
+                .host("127.0.0.1").port(0).token(TOKEN).requestTimeout(Duration.ofSeconds(30))
+                .workRoot(work).workMaxBytes(ServeServer.MIN_WORK_MAX_BYTES).build(),
+                (command, file) -> new ServeServer.CommandResult(0, "{}"));
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+            String head = "POST /v1/uploads HTTP/1.1\r\nHost: 127.0.0.1:" + server.port() + "\r\nAuthorization: Bearer " + TOKEN
+                    + "\r\nContent-Type: application/zip\r\nContent-Length: " + (2L << 20) + "\r\n\r\n";
+            socket.getOutputStream().write(head.getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().write(new byte[10]);
+            socket.getOutputStream().flush();
+            socket.setSoTimeout(15_000);
+            long startNanos = System.nanoTime();
+            InputStream in = socket.getInputStream();
+            try {
+                while (in.read() != -1) {
+                    // an answer, if any, is fine; the connection must end
+                }
+            } catch (SocketTimeoutException e) {
+                throw new AssertionError("stalled upload body was still being waited for after 15 s");
+            } catch (java.io.IOException e) {
+                // reset by the server also counts as closed
+            }
+            assertThat(Duration.ofNanos(System.nanoTime() - startNanos).toSeconds()).isLessThan(15);
+        }
+
+        HttpResponse<String> health = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/health"))
+                        .timeout(Duration.ofSeconds(10)).build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(health.statusCode()).isEqualTo(200);
     }
 
     @Test
