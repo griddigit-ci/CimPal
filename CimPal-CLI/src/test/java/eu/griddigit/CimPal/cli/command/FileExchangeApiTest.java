@@ -19,6 +19,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -233,6 +235,34 @@ class FileExchangeApiTest {
         return out.toByteArray();
     }
 
+    /**
+     * An upload over a raw socket that declares {@code declared} bytes but sends only {@code sent}
+     * of them, then waits; returns the answer's status line and headers, lower-cased.
+     */
+    private String rawUploadHead(long declared, int sent) throws Exception {
+        try (Socket socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(10_000);
+            String head = "POST /v1/uploads HTTP/1.1\r\nHost: 127.0.0.1:" + server.port() + "\r\nAuthorization: Bearer " + TOKEN
+                    + "\r\nContent-Type: application/zip\r\nContent-Length: " + declared + "\r\n\r\n";
+            socket.getOutputStream().write(head.getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().write(new byte[sent]);
+            socket.getOutputStream().flush();
+            ByteArrayOutputStream answer = new ByteArrayOutputStream();
+            InputStream in = socket.getInputStream();
+            try {
+                for (int b; (b = in.read()) != -1; ) {
+                    answer.write(b);
+                    if (answer.toString(StandardCharsets.US_ASCII).endsWith("\r\n\r\n")) {
+                        break;
+                    }
+                }
+            } catch (SocketTimeoutException e) {
+                throw new AssertionError("no answer within 10 s while the body was still unsent");
+            }
+            return answer.toString(StandardCharsets.US_ASCII).toLowerCase(java.util.Locale.ROOT);
+        }
+    }
+
     private static void problem(HttpResponse<byte[]> response, int status) {
         assertThat(response.statusCode()).as(new String(response.body(), StandardCharsets.UTF_8)).isEqualTo(status);
         assertThat(response.headers().firstValue("Content-Type")).hasValue(Problem.CONTENT_TYPE);
@@ -360,6 +390,30 @@ class FileExchangeApiTest {
         for (int i = 0; i < 5; i++) {
             problem(upload(large), 507);
         }
+        // The dropped bodies are never stored: only the first upload is there.
+        assertThat(server.workAreaForTest().incomingCount()).isZero();
+        try (var dirs = Files.list(work.resolve("uploads"))) {
+            assertThat(dirs.filter(p -> !p.getFileName().toString().equals(".incoming")).toList()).hasSize(1);
+        }
+    }
+
+    @Test
+    void anUploadRefusedAsTooLargeIsAnsweredWithoutReadingItsBody() throws Exception {
+        // A 413 body is never read, however small the limit: the answer comes at once and closes.
+        start(config().maxUploadBytes(2048), writingRunner(false));
+
+        String head = rawUploadHead(1_000_000, 0);
+
+        assertThat(head).startsWith("http/1.1 413").contains("connection: close");
+    }
+
+    @Test
+    void aRefusedUploadOverTheDrainLimitIsAnsweredWithoutReadingItsBody() throws Exception {
+        start(config().workMaxBytes(ServeServer.MIN_WORK_MAX_BYTES), writingRunner(false));
+
+        String head = rawUploadHead(ServeServer.REFUSED_BODY_DRAIN_BYTES + 1, 0);
+
+        assertThat(head).startsWith("http/1.1 507").contains("connection: close");
     }
 
     @Test

@@ -354,7 +354,7 @@ curl -s -H "Authorization: Bearer $token" -o outputs.zip http://localhost:7474/v
 | 410 | `/v1`: the job's result was larger than `--max-result-bytes` and wasn't kept |
 | 413 | Also: an upload larger than `--max-upload-bytes` |
 | 415 | Also: an upload that isn't `application/zip`, or a ZIP sent anywhere else |
-| 507 | `/v1/uploads`: the work area is full (`--work-max-bytes`) |
+| 507 | `/v1/uploads`: the work area is full (`--work-max-bytes`). The rest of an upload up to 16 MiB is read and dropped first so the client gets the answer; a larger one gets the answer with `Connection: close` and may see the connection reset instead. |
 | 503 | Queue full (`Retry-After` header set) |
 | 504 | Command didn't finish within `--request-timeout` |
 
