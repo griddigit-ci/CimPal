@@ -1,0 +1,60 @@
+{
+  "_comment": "Template: map the IDs of one CIM model (model 1) onto another model of the same grid (model 2).",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar id-map --config this-file.json",
+
+  "model1Files": [
+    "REPLACE_WITH_PATH/Model1_part1_EQ.xml",
+    "REPLACE_WITH_PATH/Model1_part2_EQ.xml"
+  ],
+  "_note_model1Files": "The model whose IDs are mapped; its IDs fill Model1_ID. All files are read as one model. RDF/XML (.xml, .rdf) or ZIPs of them.",
+
+  "model2Files": [
+    "REPLACE_WITH_PATH/Model2_EQ.xml"
+  ],
+  "_note_model2Files": "The model the IDs are mapped to; its IDs fill Model2_ID.",
+
+  "commonFiles": [
+    "REPLACE_WITH_PATH/BoundaryEQ.zip"
+  ],
+  "_note_commonFiles": "Loaded into both sides and not mapped: the boundary set (boundary nodes anchor the tie lines) and the file with the BaseVoltages (EQ boundary for CGMES 2.4.15, common data for CGMES 3.0). Use [] for none.",
+
+  "output": "REPLACE_WITH_PATH/id_mapping.xlsx",
+  "_note_output": "The workbook: Matched (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, Model1_name, Model2_type, Method, Note), Unmatched, Summary. A .xls name gives the old format.",
+
+  "_note_nameAliases": "Optional: add \"nameAliases\": \"station-names.csv\" when substations are named differently in the two models. One substation per line, its names separated by ; or , e.g. KNOCKAN1;Knockanure.",
+
+  "_note_queryFolder": "Optional: add \"queryFolder\": \"my-queries\" with edited copies of the SPARQL queries (CimPal-Core/src/main/resources/idmapping/queries); missing files are taken from the bundled set.",
+
+  "useNames": true,
+  "_note_useNames": "Seed the matching with substations whose names are unique and equal on both sides.",
+
+  "matchSameIds": true,
+  "_note_matchSameIds": "Match objects with the same ID and class first.",
+
+  "collapseJunctions": true,
+  "_note_collapseJunctions": "Treat a substation that holds only line ends, switches and at most one busbar section, with fewer breakers than line ends (a PowerFactory Term_ point, a cable sealing end, a tee), as part of the line.",
+
+  "groupStations": true,
+  "_note_groupStations": "Treat substations joined by a transformer or switch as one station, for a model that keeps each voltage level of a station as a substation of its own (FINGLAS, FINGLAS1, FINGLAS2).",
+
+  "includeTerminals": true,
+  "includeNodes": true,
+  "includeDependents": true,
+  "includeOthers": true,
+  "_note_include": "Which objects besides substations, lines and equipment are mapped and reported: terminals, connectivity nodes, dependents (tap changers, limits, controls, units), others (limit types, regions, load groups).",
+
+  "parameterTolerance": 0.05,
+  "_note_parameterTolerance": "Relative tolerance for line r, x, bch and length (0.05 = 5 %). Differences beyond it are noted, not a reason to reject a line the topology identifies.",
+
+  "voltageTolerance": 1.0,
+  "_note_voltageTolerance": "Tolerance in kV for nominal voltages.",
+
+  "secondName": "name",
+  "_note_secondName": "What fills Model2_2nd_name: name, shortName or description.",
+
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "_note_xmlBase": "Base URI for parsing RDF/XML. CGMES 2.4.15 and 3.0 files can both use the default.",
+
+  "format": "text",
+  "_note_format": "Summary on stdout: text or json (stdout then holds only the JSON)."
+}

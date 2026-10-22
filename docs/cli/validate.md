@@ -61,15 +61,19 @@ Reads a CSV mapping file that links model files to their SHACL constraint files.
 
 Required inputs: `--mapping-csv`, `--models`, `--constraints-root`, `--output`
 
-The mapping CSV has three columns (no header required):
-- **Column 1 — xml_inputs**: comma-separated model file names (relative to `--models`) or GitHub raw URLs
-- **Column 2 — ttl**: path to the constraint `.ttl` file, relative to `--constraints-root`
+The mapping CSV has three columns, separated by commas (put a field that holds a comma in double quotes). A first row starting with `xml_inputs` is taken as a header; empty rows and rows starting with `#` are skipped.
+- **Column 1 — xml_inputs**: the model files of one validation, separated by `;`, relative to `--models` (wildcards such as `g001/*EQ*.xml` and GitHub raw URLs work too; `ZIP:` in front is allowed)
+- **Column 2 — ttl**: the constraint file, relative to `--constraints-root`; several files separated by `;` form one shapes graph for that row
 - **Column 3 — notes**: free text label, appears in the report
 
-Example mapping CSV row:
+Example mapping CSV rows:
 ```
-EQ.xml,SV.xml,TP.xml | constraints/QoCDC/Level2.ttl | Level 2 quality checks
+xml_inputs,ttl,notes
+EQ.xml;SV.xml;TP.xml,constraints/QoCDC/Level2.ttl,Level 2 quality checks
+EQ.xml;SSH.xml,constraints/EQ.ttl;constraints/SSH.ttl,"EQ and SSH, together"
 ```
+
+A `|` doesn't separate anything: a row written as `EQ.xml,SV.xml | Level2.ttl | label` is read as broken columns.
 
 ### `timestamped`
 
@@ -133,10 +137,12 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--samples` | integer | `3` when JSON is produced (`--format json` or `--summary-file`) / `0` otherwise | Per-shape detail in JSON output: max focus-node samples per shape group. `0` disables shape groups entirely. For the mapping workflow, positive values auto-enable `--export-turtle`; combined takes the detail from the results in memory. |
 | `--export-turtle` | flag | off | Write a `.ttl` SHACL validation report beside each Excel report. Combined writes one, named like its workbook. |
 | `--previous-comparison` | file path | — | XLSX from a previous timestamped run, for the comparison workbook. Timestamped workflow only. |
+| `--incremental-timestamps` | flag (config `"incrementalTimestamps": true`) | off | Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't change from the one before, instead of validating every timestamp from scratch. |
 | `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 | `--summary-file` | file path | — | Also write the JSON result (exactly what `--format json` prints) to this file, atomically, creating parent folders. Works with any `--format`. Config key `summaryFile`. See [automation options](README.md#automation-options---summary-file---violations-exit-code). |
 | `--violations-exit-code` | 0–255 | `1` | Exit code when violations are found. `0` lets a scheduler (Airflow, CI) treat findings as data; exits 2 and 3 are unchanged, and so is exit 1 when a row failed with an error. Config key `violationsExitCode`. Ignored under `serve`, `mcp` and `run`. |
 | `--dry-run` | flag | off | Print the resolved config and exit without running anything. |
+| `--python-executable` | file path | `CIMPAL_PYTHON_EXECUTABLE`, else `python` / `py -3` on `PATH` | Absolute path of the Python interpreter for the Python engines. A relative or missing path, or a UNC (network) or device path, is bad input (exit 2). There is no config key for it. See **Validation engines** below. |
 
 ---
 
@@ -182,6 +188,16 @@ If models load but produce zero violations on rules you know should fire, a wron
 | `RUST_SHACL` | Experimental. Rust-based SHACL evaluator via PyPI. Fast for its supported core subset; rejects some valid SPARQL expressions used by QoCDC shapes. |
 
 Install Python engines: `py -3 -m pip install "pyshacl[oxigraph]" shacl`
+
+**Which Python runs.** The first of these that is set:
+
+1. `--python-executable C:\Python313\python.exe` (also on `serve` and `mcp`, at start);
+2. the system property `-Dcimpal.python.executable=...`;
+3. the environment variable `CIMPAL_PYTHON_EXECUTABLE`.
+
+Each must be the absolute path of an existing local file; a bare name such as `python` is refused (exit 2 for the flag, an error for the others), because it would be looked up on `PATH`, and so is a UNC (`\\server\share\...`) or device (`\\?\...`, `\\.\...`) path. With none set, CimPal looks up `python`, then `py`, in the absolute `PATH` folders itself (never in the working directory; empty and `.` entries are skipped), asks it, with `-3` for `py`, whether it can import the engine's package, and runs the absolute `sys.executable` it reports. A candidate that doesn't answer within 10 seconds is stopped and skipped. A config file, a `serve` request or an `mcp` tool call can't set the interpreter. Each Python run logs one line on stderr, e.g. `[ENGINE] pySHACL (RDFLib — experimental) runs C:\Python313\python.exe (found on PATH via 'python')`.
+
+The engine's worker script is written to a private temporary folder that is removed when the run ends. If Python fails, also when it stops reading its input (for example a missing package), the error quotes the last 500 characters of its stderr on one line.
 
 ---
 

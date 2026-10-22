@@ -1,0 +1,36 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap02_Terminals - the topology: one row per Terminal.
+# ?node is the ConnectivityNode (node-breaker); a terminal without one falls back to its
+# TopologicalNode, so bus-branch data works when the TP file is loaded too.
+# ?role tells the matcher how to treat the equipment:
+#   branch      - series element that can form a line between substations
+#   breaker     - circuit breaker; a switch, and a station with a breaker for every line is a real
+#                 switching station rather than a junction on a line
+#   switch      - other switching device; inside a substation it is part of the bay topology
+#   busbar      - busbar section
+#   transformer - power transformer
+#   equipment   - everything else (loads, machines, shunts, injections, ...)
+# Edit the IN (...) lists to change which classes play which role.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+
+SELECT ?terminal ?equipment ?equipmentType ?role ?sequenceNumber ?node
+WHERE {
+  ?terminal cim:Terminal.ConductingEquipment ?equipment .
+  ?equipment a ?typeIri .
+  FILTER(STRSTARTS(STR(?typeIri), STR(cim:)))
+  BIND(STRAFTER(STR(?typeIri), STR(cim:)) AS ?equipmentType)
+  OPTIONAL { ?terminal cim:ACDCTerminal.sequenceNumber ?sequenceNumber }
+  OPTIONAL { ?terminal cim:Terminal.ConnectivityNode ?cn }
+  OPTIONAL { ?terminal cim:Terminal.TopologicalNode ?tn }
+  BIND(COALESCE(?cn, ?tn) AS ?node)
+  BIND(
+    IF(?typeIri IN (cim:ACLineSegment, cim:SeriesCompensator, cim:EquivalentBranch), "branch",
+    IF(?typeIri IN (cim:Breaker, cim:DisconnectingCircuitBreaker, cim:Recloser, cim:ProtectedSwitch), "breaker",
+    IF(?typeIri IN (cim:Disconnector, cim:LoadBreakSwitch, cim:Switch, cim:Fuse, cim:Jumper,
+                    cim:GroundDisconnector, cim:Sectionaliser, cim:Cut), "switch",
+    IF(?typeIri = cim:BusbarSection, "busbar",
+    IF(?typeIri = cim:PowerTransformer, "transformer", "equipment"))))) AS ?role)
+}

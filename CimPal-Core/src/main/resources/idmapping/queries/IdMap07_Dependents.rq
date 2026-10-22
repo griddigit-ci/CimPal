@@ -1,0 +1,56 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap07_Dependents - objects that belong to another object (tap changers, limit sets, limits,
+# regulating controls, generating units, curves, ...). Once the owner is matched, its dependents
+# are matched by association, class and ?key (the step of a tap changer table point, the section
+# of a shunt point, the x value of a curve point, the number of a converter DC terminal): one on
+# each side, or else by name.
+# Matching runs in rounds, so chains such as CurrentLimit -> OperationalLimitSet -> Terminal work.
+#   First block:  the dependent holds the reference   (?dependent ?p ?owner)
+#   Second block: the owner holds the reference       (?owner ?p ?dependent), reported as "^p"
+# Add a property to a VALUES list to map more dependent classes.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+
+SELECT ?dependent ?owner ?association ?key
+WHERE {
+  {
+    VALUES ?p {
+      cim:RatioTapChanger.TransformerEnd
+      cim:PhaseTapChanger.TransformerEnd
+      cim:OperationalLimitSet.Terminal
+      cim:OperationalLimitSet.Equipment
+      cim:OperationalLimit.OperationalLimitSet
+      cim:RegulatingControl.Terminal
+      cim:TieFlow.Terminal
+      cim:NonlinearShuntCompensatorPoint.NonlinearShuntCompensator
+      cim:ControlAreaGeneratingUnit.GeneratingUnit
+      cim:FossilFuel.ThermalGeneratingUnit
+      cim:CurveData.Curve
+      cim:RatioTapChangerTablePoint.RatioTapChangerTable
+      cim:PhaseTapChangerTablePoint.PhaseTapChangerTable
+      cim:ACDCConverterDCTerminal.DCConductingEquipment
+    }
+    ?dependent ?p ?owner .
+    BIND(STRAFTER(STR(?p), STR(cim:)) AS ?association)
+  }
+  UNION
+  {
+    VALUES ?p {
+      cim:RotatingMachine.GeneratingUnit
+      cim:RegulatingCondEq.RegulatingControl
+      cim:TapChanger.TapChangerControl
+      cim:SynchronousMachine.InitialReactiveCapabilityCurve
+      cim:VsConverter.CapabilityCurve
+      cim:RatioTapChanger.RatioTapChangerTable
+      cim:PhaseTapChangerTabular.PhaseTapChangerTable
+    }
+    ?owner ?p ?dependent .
+    BIND(CONCAT("^", STRAFTER(STR(?p), STR(cim:))) AS ?association)
+  }
+  OPTIONAL {
+    ?dependent cim:TapChangerTablePoint.step|cim:NonlinearShuntCompensatorPoint.sectionNumber|cim:CurveData.xvalue
+             |cim:ACDCTerminal.sequenceNumber ?key
+  }
+}

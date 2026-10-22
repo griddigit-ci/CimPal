@@ -49,7 +49,8 @@ mvn -B -pl CimPal-CLI -am package -DskipTests    # → CimPal-CLI/target/CimPal-
 mvn -B -pl CimPal-Main -am package -DskipTests   # → CimPal-Main/target/CimPal.jar + CimPal.exe
 mvn -pl CimPal-Main exec:java                    # launch the GUI (after `mvn install -DskipTests`, so sibling modules resolve)
 mvn -Psecurity-scan verify                       # OWASP dependency check (slow; fails on CVSS ≥ 7)
-mvn -B test -DexcludedGroups=gui                 # skip display-dependent JavaFX tests (@Tag("gui")) on headless machines
+mvn -B test -DexcludedGroups=gui                 # skip display-dependent JavaFX tests (@Tag("gui")) on headless machines (also skips Main's coverage ratchet)
+mvn -B -Pgui-all -pl CimPal-Main -am verify      # all GUI smoke tests; a plain build runs only the @Tag("smoke") subset (every tab loads)
 java -jar CimPal-CLI/target/CimPal-CLI.jar <subcommand> --help
 ```
 

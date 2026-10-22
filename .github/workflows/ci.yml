@@ -39,7 +39,9 @@ jobs:
           java-version: '25'
           cache: maven
 
-      # Ubuntu runs under Xvfb so the JavaFX test (tagged "gui") gets a display instead of being skipped.
+      # Ubuntu runs under Xvfb so the JavaFX tests get a display instead of being skipped. A plain
+      # verify runs the GUI smoke subset (@Tag("smoke"): every tab loads); the full "gui" set, with
+      # each tab's main action, runs in nightly.yml (TEST-6).
       - name: Build and test (Windows)
         if: runner.os == 'Windows'
         run: mvn -B verify

@@ -1376,7 +1376,7 @@
           },
           "mappingCsv" : {
             "type" : "string",
-            "description" : "Absolute path to the CSV mapping file. Three columns: model file names | constraint .ttl path | label. Required for mapping and timestamped workflows."
+            "description" : "Absolute path to the CSV mapping file: three comma-separated columns, the model files (separated by ;), the constraint .ttl file(s) (separated by ;) and a label. Required for mapping and timestamped workflows."
           },
           "modelsDir" : {
             "type" : "string",
@@ -1431,6 +1431,34 @@
           "exportTurtle" : {
             "type" : "boolean",
             "description" : "Write .ttl validation report files alongside Excel output."
+          },
+          "previousComparison" : {
+            "type" : "string",
+            "description" : "Absolute path to the XLSX of a previous timestamped run, used to build a delta comparison sheet."
+          },
+          "incrementalTimestamps" : {
+            "type" : "boolean",
+            "description" : "Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't change from the one before."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Exit code when violations are found (default 1, 0..255); 0 lets a scheduler treat them as data."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "description" : "Validate CGMES/CIM model files against SHACL constraint shapes. Returns a JSON summary with totals (conforming/violations/errors) and per-shape violation groups with sample focus nodes. Use this as the primary diagnostic step in the validation loop."
@@ -1456,6 +1484,26 @@
           "output" : {
             "type" : "string",
             "description" : "Absolute path for output file (.xlsx or .csv). If omitted, results are returned inline."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Accepted like on the other JSON commands (0..255); this command never reports findings."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "models", "query" ],
@@ -1490,6 +1538,26 @@
           "rdfFormat" : {
             "type" : "string",
             "description" : "RDF/XML sub-format: RDFXML_PLAIN (default), RDFXML_ABBREV, CIMXML, RDFS_CIMXML."
+          },
+          "sourceFormat" : {
+            "type" : "string",
+            "description" : "Source format: RDFXML, TURTLE, JSONLD (default: from the input's extension)."
+          },
+          "targetFormat" : {
+            "type" : "string",
+            "description" : "Target format: RDFXML, TURTLE, JSONLD (default: from the output's extension)."
+          },
+          "sortByPrefix" : {
+            "type" : "boolean",
+            "description" : "Sort by namespace prefix (with 'sort')."
+          },
+          "stripPrefixes" : {
+            "type" : "boolean",
+            "description" : "Leave out namespace prefix declarations."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "output" ],
@@ -1514,9 +1582,37 @@
             "type" : "boolean",
             "description" : "Rename the 'cim' namespace in fileB to match fileA before comparing. Use when comparing across CIM version boundaries."
           },
+          "normalizeProfileNs" : {
+            "type" : "boolean",
+            "description" : "Rename the profile namespace in fileB to match fileA before comparing."
+          },
+          "nsPrefix" : {
+            "type" : "string",
+            "description" : "The namespace prefix to rename with normalizeProfileNs (default: empty)."
+          },
           "output" : {
             "type" : "string",
             "description" : "Absolute path for the diff report (.xlsx or .csv)."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Exit code when differences are found (default 1, 0..255); 0 lets a scheduler treat them as data."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "fileA", "fileB" ],
@@ -1558,6 +1654,26 @@
           "output" : {
             "type" : "string",
             "description" : "Absolute path for output (.xlsx or .csv)."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Exit code when differences are found (default 1, 0..255); 0 lets a scheduler treat them as data."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "modelsA", "modelsB" ],
@@ -1592,6 +1708,34 @@
           "validateShapes" : {
             "type" : "boolean",
             "description" : "Run SHACL-SHACL validation on generated shapes and report results."
+          },
+          "exportInheritTree" : {
+            "type" : "boolean",
+            "description" : "Write an inheritance model file per profile."
+          },
+          "cimsNamespace" : {
+            "type" : "string",
+            "description" : "CIMS extensions namespace URI (default: http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#)."
+          },
+          "ioPrefix" : {
+            "type" : "string",
+            "description" : "IdentifiedObject mRID property local name (default: mRID)."
+          },
+          "ioUri" : {
+            "type" : "string",
+            "description" : "IdentifiedObject mRID property URI (default: http://iec.ch/TC57/CIM100#IdentifiedObject.mRID)."
+          },
+          "shapesBaseUri" : {
+            "type" : "string",
+            "description" : "Base URI of the generated shape graphs (default: empty)."
+          },
+          "shapesNsPrefix" : {
+            "type" : "string",
+            "description" : "Prefix of the SHACL shapes namespace (default: empty)."
+          },
+          "shapesNsUri" : {
+            "type" : "string",
+            "description" : "URI of the SHACL shapes namespace (default: empty)."
           }
         },
         "required" : [ "rdfsFiles", "outputDir" ],
@@ -1614,6 +1758,10 @@
           "outputDir" : {
             "type" : "string",
             "description" : "Absolute path to the root output directory."
+          },
+          "xmlBase" : {
+            "type" : "string",
+            "description" : "Base URI for loading the SHACL files (default: empty)."
           }
         },
         "required" : [ "shaclFiles", "templateXlsx", "outputDir" ],
@@ -1641,6 +1789,18 @@
           "nsUri" : {
             "type" : "string",
             "description" : "Namespace URI for generated shapes."
+          },
+          "cimNamespace" : {
+            "type" : "string",
+            "description" : "CIM namespace URI (default: http://iec.ch/TC57/CIM100#)."
+          },
+          "cimsNamespace" : {
+            "type" : "string",
+            "description" : "CIMS namespace URI (default: http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#)."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "rdfsFile", "excelFile", "output" ],
@@ -1664,6 +1824,14 @@
           "stripPrefixes" : {
             "type" : "boolean",
             "description" : "Remove unused namespace prefixes."
+          },
+          "exportExtensions" : {
+            "type" : "boolean",
+            "description" : "Include the columns marked as extensions."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "templateXlsx", "output" ],
@@ -1689,7 +1857,11 @@
           },
           "output" : {
             "type" : "string",
-            "description" : "Absolute path for the manifest .ttl file."
+            "description" : "Absolute path for the manifest .ttl file (default: manifest.ttl next to the models folder)."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "description" : "Generate a DCAT/CGMES manifest Turtle file describing a set of model files."

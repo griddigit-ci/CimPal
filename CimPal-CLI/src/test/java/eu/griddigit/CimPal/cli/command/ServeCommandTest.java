@@ -561,6 +561,21 @@ class ServeCommandTest {
                 null, null, null, 1, false, Map.of())).isNotNull();
     }
 
+    /** SEC-3 (G9): a relative interpreter, given by the flag or the system property, stops serve at start. */
+    @Test
+    void aRelativePythonExecutableIsBadInputAtStart() {
+        assertThat(runToExit(Map.of(), "--port", "0", "--python-executable", "python"))
+                .as(output()).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(output()).contains("absolute path");
+
+        System.setProperty("cimpal.python.executable", "py");
+        try {
+            assertThat(runToExit(Map.of(), "--port", "0")).as(output()).isEqualTo(ExitCode.INVALID_INPUT);
+        } finally {
+            System.clearProperty("cimpal.python.executable");
+        }
+    }
+
     @Test
     void aDatabaseSetUpInTheEnvironmentButNotChosenIsRefused() {
         assertThatThrownBy(() -> ServeCommand.jobStoreSettings("memory", null, null, null, null, 1, false,

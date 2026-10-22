@@ -1,0 +1,91 @@
+PREFIX cim:     <http://iec.ch/TC57/CIM100#>
+PREFIX cims:    <http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX meq:     <http://example.com/ns/MiniEquipment-EU#>
+PREFIX owl:     <http://www.w3.org/2002/07/owl#>
+PREFIX rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
+
+cim:Float  rdf:type  rdfs:Class .
+
+cim:ACLineSegment  rdf:type  rdfs:Class;
+        rdfs:subClassOf  cim:ConductingEquipment .
+
+cim:Terminal.phases  rdf:type  rdf:Property;
+        rdfs:domain  cim:Terminal;
+        rdfs:range   cim:PhaseCode .
+
+cim:PhaseCode.A  rdf:type  cim:PhaseCode .
+
+cim:Equipment  rdf:type  rdfs:Class;
+        rdfs:subClassOf  cim:IdentifiedObject .
+
+meq:Ontology  rdf:type  owl:Ontology .
+
+meq:Package_MiniEquipment
+        rdf:type  cims:ClassCategory .
+
+cim:Resistance  rdf:type  rdfs:Class .
+
+cim:Terminal.ConductingEquipment
+        rdf:type     rdf:Property;
+        rdfs:domain  cim:Terminal;
+        rdfs:range   cim:ConductingEquipment .
+
+cim:IdentifiedObject.mRID
+        rdf:type     rdf:Property;
+        rdfs:domain  cim:IdentifiedObject .
+
+cim:Resistance.multiplier
+        rdf:type     rdf:Property;
+        rdfs:domain  cim:Resistance;
+        rdfs:range   cim:UnitMultiplier .
+
+cim:ConductingEquipment
+        rdf:type         rdfs:Class;
+        rdfs:subClassOf  cim:Equipment .
+
+cim:Boolean  rdf:type  rdfs:Class .
+
+cim:Resistance.value  rdf:type  rdf:Property;
+        rdfs:domain  cim:Resistance .
+
+cim:ACLineSegment.r  rdf:type  rdf:Property;
+        rdfs:domain  cim:ACLineSegment .
+
+cim:String  rdf:type  rdfs:Class .
+
+cim:UnitMultiplier  rdf:type  rdfs:Class .
+
+cim:IdentifiedObject  rdf:type  rdfs:Class .
+
+cim:Equipment.aggregate
+        rdf:type     rdf:Property;
+        rdfs:domain  cim:Equipment .
+
+cim:PhaseCode.ABC  rdf:type  cim:PhaseCode .
+
+cim:PhaseCode  rdf:type  rdfs:Class .
+
+cim:UnitSymbol  rdf:type  rdfs:Class .
+
+cim:UnitMultiplier.none
+        rdf:type  cim:UnitMultiplier .
+
+cim:Terminal  rdf:type   rdfs:Class;
+        rdfs:subClassOf  cim:IdentifiedObject .
+
+cim:UnitSymbol.ohm  rdf:type  cim:UnitSymbol .
+
+cim:ConductingEquipment.Terminals
+        rdf:type     rdf:Property;
+        rdfs:domain  cim:ConductingEquipment;
+        rdfs:range   cim:Terminal .
+
+cim:Resistance.unit  rdf:type  rdf:Property;
+        rdfs:domain  cim:Resistance;
+        rdfs:range   cim:UnitSymbol .
+
+cim:IdentifiedObject.name
+        rdf:type     rdf:Property;
+        rdfs:domain  cim:IdentifiedObject .

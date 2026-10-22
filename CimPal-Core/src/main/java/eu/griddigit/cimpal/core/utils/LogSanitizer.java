@@ -34,8 +34,13 @@ public final class LogSanitizer {
         if (value == null) {
             return "null";
         }
-        String s = UNSAFE.matcher(value).replaceAll("␞");
+        String s = neutralise(value);
         return s.length() > MAX_LENGTH ? s.substring(0, MAX_LENGTH) + "..." : s;
+    }
+
+    /** {@code value} with every unsafe character replaced by U+241E; shared with {@link UntrustedText}. */
+    static String neutralise(String value) {
+        return UNSAFE.matcher(value).replaceAll("␞");
     }
 
     /** True when {@code value} holds a character {@link #forLog(String)} would neutralise. */

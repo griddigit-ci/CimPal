@@ -376,9 +376,9 @@ public class RunCommand implements Callable<Integer> {
         return value == null ? null : LogSanitizer.forLog(value);
     }
 
+    /** One JSON string; every control character is escaped, so the output stays valid JSON (SEC-3). */
     private static String jsonStr(String v) {
-        if (v == null) return "null";
-        return "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return ValidateCommand.jsonStr(v);
     }
 
     // -------------------------------------------------------------------------

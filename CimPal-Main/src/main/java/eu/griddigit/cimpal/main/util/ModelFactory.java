@@ -8,6 +8,7 @@ package eu.griddigit.cimpal.main.util;
 
 import eu.griddigit.cimpal.core.utils.DataTypeStreamRDF;
 import eu.griddigit.cimpal.main.application.MainController;
+import eu.griddigit.cimpal.main.gui.GuiDialogs;
 import eu.griddigit.cimpal.main.gui.PathMemory;
 import javafx.scene.control.Alert;
 import javafx.stage.DirectoryChooser;
@@ -136,7 +137,7 @@ public class ModelFactory {
                     alert.setContentText("Selected zip file contains folder. This is a violation of data exchange standard.");
                     alert.setHeaderText(null);
                     alert.setTitle("Error - violation of a zip file packaging requirement.");
-                    alert.showAndWait();
+                    GuiDialogs.alert(alert);
                 } else {
                     String destPath = selectedFile.getParent() + File.separator + entry.getName();
 
@@ -203,17 +204,17 @@ public class ModelFactory {
 
         try {
             if (typeSingleFile) {
-                file = filechooser.showOpenDialog(null);
+                file = GuiDialogs.open(filechooser, null);
             } else {
-                fileL = filechooser.showOpenMultipleDialog(null);
+                fileL = GuiDialogs.openMultiple(filechooser, null);
             }
         } catch (Exception e) {
             if (typeSingleFile) {
                 filechooser.setInitialDirectory(FileUtils.getUserDirectory());
-                file = filechooser.showOpenDialog(null);
+                file = GuiDialogs.open(filechooser, null);
             } else {
                 filechooser.setInitialDirectory(FileUtils.getUserDirectory());
-                fileL = filechooser.showOpenMultipleDialog(null);
+                fileL = GuiDialogs.openMultiple(filechooser, null);
             }
         }
 
@@ -253,10 +254,10 @@ public class ModelFactory {
         directoryChooser.setTitle(title);
 
         try {
-            selectedDirectory = directoryChooser.showDialog(null);
+            selectedDirectory = GuiDialogs.directory(directoryChooser, null);
         } catch (Exception e) {
             directoryChooser.setInitialDirectory(FileUtils.getUserDirectory());
-            selectedDirectory = directoryChooser.showDialog(null);
+            selectedDirectory = GuiDialogs.directory(directoryChooser, null);
         }
 
         if (selectedDirectory != null) {
@@ -287,10 +288,10 @@ public class ModelFactory {
         filechooser.setInitialFileName(filename);
 
         try {
-            file = filechooser.showSaveDialog(null);
+            file = GuiDialogs.save(filechooser, null);
         } catch (Exception e) {
             filechooser.setInitialDirectory(FileUtils.getUserDirectory());
-            file = filechooser.showSaveDialog(null);
+            file = GuiDialogs.save(filechooser, null);
         }
 
         if (file != null && file.getParent() != null) {

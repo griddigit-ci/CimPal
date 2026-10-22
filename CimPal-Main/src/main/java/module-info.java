@@ -32,6 +32,8 @@ module CimPal.Main {
     requires java.desktop;
     requires java.xml;
     requires java.net.http;
+    // MainGUI filters one spurious JavaFX controls log message.
+    requires java.logging;
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
     requires org.apache.jena.tdb2;

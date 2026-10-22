@@ -93,7 +93,7 @@
                   <items><MenuItem mnemonicParsing="false" onAction="#actionShowRdfComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowRdfsUnion" text="RDFS Union"/></items>
                </MenuButton>
                <MenuButton mnemonicParsing="false" text="Dataset">
-                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowDatasetComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowGenerate" text="Generate"/><MenuItem mnemonicParsing="false" onAction="#actionShowTaskWizard" text="Task Wizard"/><MenuItem mnemonicParsing="false" onAction="#actionShowValidation" text="SHACL Validation"/></items>
+                  <items><MenuItem mnemonicParsing="false" onAction="#actionShowDatasetComparison" text="Comparison"/><MenuItem mnemonicParsing="false" onAction="#actionShowIdMapping" text="ID Mapping"/><MenuItem mnemonicParsing="false" onAction="#actionShowGenerate" text="Generate"/><MenuItem mnemonicParsing="false" onAction="#actionShowTaskWizard" text="Task Wizard"/><MenuItem mnemonicParsing="false" onAction="#actionShowValidation" text="SHACL Validation"/></items>
                </MenuButton>
             </FlowPane>
             <TabPane fx:id="tabPaneWorkspace" minHeight="0.0" minWidth="0.0" styleClass="workspace-tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
@@ -107,6 +107,7 @@
                   <Tab fx:id="tabExcelToSHACL" text="Constraints Operations"/>
                   <Tab fx:id="tabCreateCompleteSM1" text="RDF Comparison"/>
                   <Tab fx:id="tabInstanceDataComparison" text="Dataset Comparison"/>
+                  <Tab fx:id="tabIdMapping" text="ID Mapping"/>
                   <Tab fx:id="tabGenerateInstanceData" text="Generate"/>
                   <Tab fx:id="tabTaskWizard" text="Task Wizard"/>
                   <Tab fx:id="tabValidationByMapping" text="SHACL Validation"/>

@@ -13,17 +13,15 @@ See [Dependencies](dependencies.md) for the full list of project dependencies.
 CimPal is an open-source Java application published by gridDigIt and licensed under the [EUPL-1.2-or-later](https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
 The application is based on Apache Jena (Apache License v2.0), TopBraid SHACL API (Apache License v2.0), and JAVAFX (GPLv2+CE license).
 
-CimPal helps CIM implementation by providing tools facilitation the work related to SHACL constraints and identification of changed between different versions of CIM.
+CimPal helps CIM and CGMES implementation: it validates model data against SHACL constraints, authors and maintains those constraints, and shows what changed between versions of profiles and data. What it does:
 
-Currently, the following features are either supported or under development:
+- **Validation** of CIM/CGMES models against SHACL: by a mapping file, by timestamp, or a set of files as one dataset, with Excel reports and JSON results.
+- **Shape authoring:** SHACL from RDFS profiles and from Excel templates, organising and testing constraint sets.
+- **Conversion** between RDF/XML, Turtle and JSON-LD, and **comparison** of RDFS profiles, SHACL shapes and instance data.
+- **SPARQL** queries over model files, CGMES instance generation and manifests.
+- **Automation:** a command-line tool and Docker image, a local REST service (`serve`) with an async job API, an MCP server for AI assistants, a Python SDK and an Apache Airflow provider.
 
--Convert from RDFS to SHACL\
--Export SHACL constraints (not full scope) from an excel template\
--Perform RDFS comparison\
--Export RDFS descriptions and cardinalities in Excel\
--Generate datatypes mapping\
--RDF convert – conversion between different RDF serializations\
--Instance data comparison (in prototype version)
+See the [capability statement](docs/guide/capabilities.md) for the details.
 
 ## Documentation
 

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="eu.griddigit.cimpal.main.application.controllers.IdMappingController"
+      minHeight="0.0" minWidth="0.0">
+  <ScrollPane fitToHeight="true" fitToWidth="true" minHeight="0.0" minWidth="0.0" VBox.vgrow="ALWAYS">
+    <VBox minHeight="0.0" minWidth="0.0" spacing="16.0" styleClass="tab-root">
+
+        <Label wrapText="true" styleClass="caption-text"
+               text="Maps the IDs of one model (model 1) onto another model of the same grid (model 2), e.g. two EQ files onto one merged EQ. Lines between substations are matched first, then the substations, then everything inside each substation by its place in the topology. The workbook lists the matches (Model1_ID, Element_type, Model2_ID, Model2_2nd_name) and, on a second sheet, what is left for a person to map."/>
+
+        <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+            <columnConstraints>
+                <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0"/>
+                <ColumnConstraints hgrow="ALWAYS" minWidth="0.0"/>
+                <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0"/>
+            </columnConstraints>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                <Label text="Model 1 files:" wrapText="true"/>
+                <Label fx:id="helpModel1Files" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfModel1Files" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="The model whose IDs are mapped (one or more EQ files, or ZIPs)"
+                       GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseModel1" text="Browse"
+                    GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                <Label text="Model 2 files:" wrapText="true"/>
+                <Label fx:id="helpModel2Files" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfModel2Files" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="The model the IDs are mapped to"
+                       GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseModel2" text="Browse"
+                    GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
+                <Label text="Common files (optional):" wrapText="true"/>
+                <Label fx:id="helpCommonFiles" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfCommonFiles" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Boundary set, common data with the BaseVoltages"
+                       GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseCommon" text="Browse"
+                    GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="3" GridPane.columnIndex="0">
+                <Label text="Name aliases (optional):" wrapText="true"/>
+                <Label fx:id="helpAliases" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfAliases" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="CSV: one substation per line, its names separated by ; or ,"
+                       GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseAliases" text="Browse"
+                    GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="4" GridPane.columnIndex="0">
+                <Label text="Output workbook:" wrapText="true"/>
+                <Label fx:id="helpOutput" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfOutput" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Where to save the mapping (.xlsx or .xls)"
+                       GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseOutput" text="Browse"
+                    GridPane.rowIndex="4" GridPane.columnIndex="2"/>
+        </GridPane>
+
+        <GridPane hgap="16.0" vgap="8.0">
+            <columnConstraints>
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="0.0"/>
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="0.0"/>
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="0.0"/>
+            </columnConstraints>
+
+            <VBox spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                <Label fx:id="helpMatching" text="?" styleClass="help-badge"/>
+                <CheckBox fx:id="cbUseNames" mnemonicParsing="false" selected="true"
+                          text="Start from substations with the same name"/>
+                <CheckBox fx:id="cbSameIds" mnemonicParsing="false" selected="true"
+                          text="Match objects with the same ID first"/>
+                <CheckBox fx:id="cbJunctions" mnemonicParsing="false" selected="true"
+                          text="Treat line-junction substations as part of the line"/>
+                <CheckBox fx:id="cbGroupStations" mnemonicParsing="false" selected="true"
+                          text="Treat substations joined by a transformer or switch as one station"/>
+            </VBox>
+
+            <VBox spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                <Label fx:id="helpReported" text="?" styleClass="help-badge"/>
+                <CheckBox fx:id="cbTerminals" mnemonicParsing="false" selected="true" text="Map terminals"/>
+                <CheckBox fx:id="cbNodes" mnemonicParsing="false" selected="true" text="Map connectivity nodes"/>
+                <CheckBox fx:id="cbDependents" mnemonicParsing="false" selected="true"
+                          text="Map tap changers, limits, controls, units"/>
+                <CheckBox fx:id="cbOthers" mnemonicParsing="false" selected="true"
+                          text="Map other objects (limit types, regions, load groups)"/>
+            </VBox>
+
+            <GridPane hgap="8.0" vgap="8.0" GridPane.rowIndex="0" GridPane.columnIndex="2">
+                <columnConstraints>
+                    <ColumnConstraints hgrow="NEVER"/>
+                    <ColumnConstraints hgrow="SOMETIMES" minWidth="0.0"/>
+                </columnConstraints>
+                <Label fx:id="helpTolerances" text="?" styleClass="help-badge" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                <Label text="Line parameter tolerance (%):" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                <TextField fx:id="tfParameterTolerance" prefColumnCount="5" text="5"
+                           GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                <Label text="Voltage tolerance (kV):" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                <TextField fx:id="tfVoltageTolerance" prefColumnCount="5" text="1"
+                           GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                <Label text="Model2_2nd_name from:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                <ChoiceBox fx:id="cbSecondName" prefWidth="140.0" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+            </GridPane>
+        </GridPane>
+
+        <Region VBox.vgrow="ALWAYS"/>
+
+        <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionReset" text="Reset"/>
+            <Button fx:id="btnRun" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false"
+                    onAction="#actionRun" text="Map IDs"/>
+        </HBox>
+    </VBox>
+  </ScrollPane>
+</VBox>

@@ -1,0 +1,1 @@
+terminal	name	sequence	equipment

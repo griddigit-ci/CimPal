@@ -35,12 +35,25 @@ class SparqlConfig:
             xml_base (Union[Unset, str]): Base URI for parsing model files (default: http://iec.ch/TC57/CIM100).
             output (Union[Unset, str]): Absolute path for output file (.xlsx or .csv). If omitted, results are returned
                 inline.
+            format_ (Union[Unset, str]): Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a
+                job's JSON result.
+            stats (Union[Unset, bool]): Report the run's resource use (time, peak heap, GC, triples loaded).
+            summary_file (Union[Unset, str]): Absolute path to also write the JSON result to, atomically, creating parent
+                folders.
+            violations_exit_code (Union[Unset, int]): Accepted like on the other JSON commands (0..255); this command never
+                reports findings.
+            overwrite (Union[Unset, bool]): Replace an output file that already exists (default false: refused).
      """
 
     models: list[str]
     query: str
     xml_base: Union[Unset, str] = UNSET
     output: Union[Unset, str] = UNSET
+    format_: Union[Unset, str] = UNSET
+    stats: Union[Unset, bool] = UNSET
+    summary_file: Union[Unset, str] = UNSET
+    violations_exit_code: Union[Unset, int] = UNSET
+    overwrite: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -58,6 +71,16 @@ class SparqlConfig:
 
         output = self.output
 
+        format_ = self.format_
+
+        stats = self.stats
+
+        summary_file = self.summary_file
+
+        violations_exit_code = self.violations_exit_code
+
+        overwrite = self.overwrite
+
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -69,6 +92,16 @@ class SparqlConfig:
             field_dict["xmlBase"] = xml_base
         if output is not UNSET:
             field_dict["output"] = output
+        if format_ is not UNSET:
+            field_dict["format"] = format_
+        if stats is not UNSET:
+            field_dict["stats"] = stats
+        if summary_file is not UNSET:
+            field_dict["summaryFile"] = summary_file
+        if violations_exit_code is not UNSET:
+            field_dict["violationsExitCode"] = violations_exit_code
+        if overwrite is not UNSET:
+            field_dict["overwrite"] = overwrite
 
         return field_dict
 
@@ -86,11 +119,26 @@ class SparqlConfig:
 
         output = d.pop("output", UNSET)
 
+        format_ = d.pop("format", UNSET)
+
+        stats = d.pop("stats", UNSET)
+
+        summary_file = d.pop("summaryFile", UNSET)
+
+        violations_exit_code = d.pop("violationsExitCode", UNSET)
+
+        overwrite = d.pop("overwrite", UNSET)
+
         sparql_config = cls(
             models=models,
             query=query,
             xml_base=xml_base,
             output=output,
+            format_=format_,
+            stats=stats,
+            summary_file=summary_file,
+            violations_exit_code=violations_exit_code,
+            overwrite=overwrite,
         )
 
 

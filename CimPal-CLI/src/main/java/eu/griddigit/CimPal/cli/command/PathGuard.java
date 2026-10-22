@@ -5,6 +5,7 @@
  */
 package eu.griddigit.CimPal.cli.command;
 
+import eu.griddigit.cimpal.core.utils.LogSanitizer;
 import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
 import eu.griddigit.cimpal.core.utils.PathPolicy;
 import tools.jackson.databind.JsonNode;
@@ -37,7 +38,7 @@ final class PathGuard {
     enum Kind {
         /** An existing file or folder that is read. */
         READ,
-        /** Like READ, but the command also accepts one string of comma-separated paths. */
+        /** Like READ, but the command also accepts one string of comma-separated paths (sparql models, manifest files). */
         READ_LIST,
         /** A file or folder that is read if it exists, else the value is text (a preset, an inline query). */
         READ_IF_EXISTS,
@@ -97,8 +98,13 @@ final class PathGuard {
                     new Field("output", "--output", Kind.WRITE_FILE))),
             Map.entry("manifest", List.of(
                     new Field("dir", "--dir", Kind.READ),
-                    new Field("files", "--files", Kind.READ),
+                    new Field("files", "--files", Kind.READ_LIST),
                     new Field("output", "--output", Kind.WRITE_FILE))));
+
+    /** True when {@code command} writes an output file, so {@code "overwrite"} applies to it. */
+    static boolean writesFiles(String command) {
+        return FIELDS.getOrDefault(command, List.of()).stream().anyMatch(f -> f.kind() == Kind.WRITE_FILE);
+    }
 
     /** Read by no command today, but resolved by {@code run}; checked so it can't point anywhere. */
     private static final Field STEP_CONFIG = new Field("config", null, Kind.READ);
@@ -192,12 +198,22 @@ final class PathGuard {
             }
             return checked;
         }
-        if (value.isString() && value.asString().contains(",") && field.kind() == Kind.READ_LIST) {
-            // sparql "models" also accepts one comma-separated string.
+        if (value.isString() && field.kind() == Kind.READ_LIST) {
+            // sparql "models" and manifest "files" also accept one comma-separated string, which the
+            // command splits again: each part is checked, and a checked part must not have gained a
+            // comma (a link or a short name resolving to "x,/..."), or the split would make an
+            // unchecked path of it.
             List<String> parts = new ArrayList<>();
             for (String part : value.asString().split(",")) {
                 if (!part.isBlank()) {
-                    parts.add(checkOne(field, nodes.stringNode(part.strip()), policy, base, overwrite, baseOnly).asString());
+                    String checked = checkOne(field, nodes.stringNode(part.strip()), policy, base, overwrite, baseOnly)
+                            .asString();
+                    if (checked.contains(",")) {
+                        throw new PathNotAllowedException("\"" + field.key() + "\" names a path that resolves to a"
+                                + " name with a comma; give the paths as a JSON array: "
+                                + LogSanitizer.forLog(part.strip()));
+                    }
+                    parts.add(checked);
                 }
             }
             return nodes.stringNode(String.join(",", parts));

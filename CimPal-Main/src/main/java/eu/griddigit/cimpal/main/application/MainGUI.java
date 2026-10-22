@@ -19,16 +19,25 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
+import java.util.logging.Logger;
+
 public class MainGUI extends Application {
 
     private Stage MainAppStage;
     private static Scene mainApp;
+    // Held strongly: java.util.logging keeps only weak references, and a collected logger loses its filter.
+    private static final Logger CONTROLS_LOGGER = Logger.getLogger("javafx.scene.control");
 
     @Override
     public void init() throws Exception {
         super.init();
         // No SPARQL SERVICE: queries typed in the GUI and SHACL-SPARQL shapes must not reach the network.
         SparqlServicePolicy.disableRemoteServiceGlobally();
+        // JavaFX's VirtualFlow compares the absolute row index with the viewport height in pixels, so
+        // scrolling to the bottom of any table with more rows than that logs a spurious
+        // "index exceeds maxCellCount" (e.g. large comparison results). Drop only that message.
+        CONTROLS_LOGGER.setFilter(rec -> rec.getMessage() == null
+                || !rec.getMessage().startsWith("index exceeds maxCellCount"));
         // Scene for the Main App
         // Load root layout from fxml file.
         Parent rootMainApp = FXMLLoader.load(getClass().getResource("/fxml/CimPalGui.fxml"));

@@ -19,6 +19,7 @@ This is the per-command reference. For installing, sizing, securing and integrat
 | [rdfs2shacl](rdfs2shacl.md) | Full reference for the `rdfs2shacl` command — RDFS → SHACL generation |
 | [compare](compare.md) | Full reference for the `compare` command — RDF diff, normalization, output formats |
 | [compare-instances](compare-instances.md) | Full reference for the `compare-instances` command — instance data diff |
+| [id-map](id-map.md) | Full reference for the `id-map` command — map the IDs of one model onto another model of the same grid |
 | [excel2shacl](excel2shacl.md) | Full reference for the `excel2shacl` command — Excel-driven SHACL generation |
 | [organize](organize.md) | Full reference for the `organize` command — SHACL reorganizer |
 | [gen-instances](gen-instances.md) | Full reference for the `gen-instances` command — Excel template → RDF/XML |
@@ -51,9 +52,11 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `rdfs2shacl.json` | RDFS to SHACL shape generation |
 | `compare.json` | RDF profile/shape comparison |
 | `compare-instances.json` | CGMES instance data comparison |
+| `id-map.json` | ID mapping between two models of the same grid |
 | `excel2shacl.json` | Excel-to-SHACL shape generation |
 | `organize.json` | SHACL organizer / canonical restructuring |
 | `gen-instances.json` | Instance data generation from Excel template |
+| `manifest.json` | DCAT/CGMES manifest of a folder or a list of model files |
 | `pipeline-full-validation.json` | Pipeline: convert to Turtle then validate |
 | `pipeline-profile-migration.json` | Pipeline: diff profiles then generate fresh shapes |
 
@@ -68,6 +71,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `rdfs2shacl` | Done — augmented RDFS 2019/2020, split datatypes, inherit tree |
 | `compare` | Done — rdfs, shacl, rdfs-cimtool, namespace normalization, Excel/CSV output |
 | `compare-instances` | Done — SV/TP/DL ignore flags, text/JSON/CSV/Excel output |
+| `id-map` | Done — line, substation and topology matching through the SPARQL query library; Matched/Unmatched/Summary workbook. Not exposed through `serve`, `mcp` or `run`. |
 | `excel2shacl` | Done — Excel + RDFS → SHACL, with Config sheet namespace support |
 | `organize` | Done — split/reorganize SHACL files per Excel template |
 | `gen-instances` | Done — generates RDF/XML instance data from CimPal Excel templates |

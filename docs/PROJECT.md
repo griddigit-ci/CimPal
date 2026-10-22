@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-20 (Desktop: change log, known issues from the CLI check)  
+**Last updated:** 2026-10-21 (SEC-3: MCP output hygiene and the Python interpreter; TEST-6: GUI smoke tests and the `GuiDialogs` seam; TEST-3 convert/sparql tests; ID mapping, `id-map`)  
 **Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -159,6 +159,23 @@ Checked on the real suites (copies; the tester writes into the suite): *SHACLTes
 | `eu.griddigit.cimpal.core.interfaces.IRDFComparator` | Core | `compare(Model a, Model b) → RDFCompareResult` |
 | `eu.griddigit.cimpal.core.models.RDFCompareResult` | Core | List of `RDFCompareResultEntry`. **Warning:** `hasDifference()` returns true when entries list is EMPTY — naming is inverted. Use `getEntries().isEmpty()` for clarity. |
 
+### ID mapping (branch `feature/id-mapping`, 2026-10-08 to 2026-10-13)
+
+Maps the IDs of one model (model 1, e.g. two EQ files) onto another model of the same grid (model 2, e.g. one merged EQ) and writes a workbook: `Matched` (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, Model1_name, Model2_type, Method, Note), `Unmatched` (reason and candidates) and `Summary` (certain / probable / not matched percentages per model, counts per class). GUI: **Dataset ▸ ID Mapping** (`IdMappingTab.fxml`, `IdMappingController`); CLI: `id-map` (`docs/cli/id-map.md`), not exposed through `serve`/`mcp`/`run`.
+
+| Class | Module | What it does |
+|---|---|---|
+| `eu.griddigit.cimpal.core.idmapping.IdMapper` + `IdMappingOptions` | Core | Builder-style entry point: `new IdMapper(options, log).run()` → `IdMappingResult` (`writeExcel(path)`, `getPfOverview()`). |
+| `QueryLibrary` + `resources/idmapping/queries/IdMap01..08_*.rq` | Core | All CIM knowledge is in these SPARQL SELECT queries (roles of classes incl. `breaker`, containment, parameters, dependents with a key, references); the Java matcher only sees their result tables (`GridData`). `--query-folder` overrides single files; `SERVICE` is refused. |
+| `CimModelLoader` | Core | Reads RDF/XML, Turtle and N-Triples files or ZIPs (via `ModelFactory.forEachZipEntry`, now public), rewriting cim16 and ucaiug namespaces to CIM100. JSON-LD is refused (remote `@context`). |
+| `Network`, `LogicalLine` | Core | Node → substation resolution; substations joined by a transformer or switch grouped into one station; junction substations (only line ends, switches, ≤ 1 busbar section, fewer breakers than line ends: PowerFactory `Term_` points) collapsed into the line; series elements chained through line-interior nodes into logical lines. |
+| `SubstationLineMatcher` | Core | Stations by name, lines between matched stations, stations from matched lines and from matched neighbours; lines by parameters only as proposals that two lines must confirm. |
+| `TopologyMatcher` + `Refinement` | Core | Seeded colour refinement inside each matched station pair and along matched lines, deepest agreement first; name-contradiction veto; class changes only at full depth; a pair is certain only if a graph anchored by trusted matches alone pins it down; partly confirmed line ends are matched last. |
+| `MatchContext.promote()` | Core | After matching: a station whose lines all match one to one and whose inside is ≥ 90 % confirmed becomes certain, then the matches that waited for it. |
+| `DerivedMatcher` | Core | Same IDs; terminals, nodes, transformer ends, containers by vote, dependents under matched owners, referenced objects by vote, others by unique name; certainty follows the source. |
+
+Precision first: every rule needs a unique answer on both sides, and a match is `certain` only when the evidence leaves no other reading (`Names.similar` lets a station code such as `AGANYGAL` confirm `Agannygal`). Checked on Relicap with `ModelRewriter` (Core test package: re-IDs a model with ground truth, scrambles or abbreviates names, splits stations, adds `Term_` junctions, removes switches, scales parameters): no certain match was ever wrong; identical copy 99.4 % certain; all changes combined 46.6 % certain, 43.7 % probable (1 wrong). Tests: `IdMapperTest`, `NamesTest`, `CimModelLoaderTest`, `IdMapCommandTest`.
+
 ### SPARQL
 
 | Class | Module | What it does |
@@ -190,6 +207,7 @@ Checked on the real suites (copies; the tester writes into the suite): *SHACLTes
 | `eu.griddigit.cimpal.main.core.ModelManipulationFactory` | Main | Instance data manipulation. `generateDataFromXlsV2` now delegates to `InstanceDataBuilder`. |
 | `eu.griddigit.cimpal.main.core.InstanceDataFactory` | Main | Save instance data. `saveInstanceData` now delegates to `InstanceDataWriter` for serialisation. |
 | `eu.griddigit.cimpal.main.application.MainController` | Main | Global static state bag. Do not add new static fields. Many tabs use it as a clipboard. |
+| `eu.griddigit.cimpal.main.gui.GuiDialogs` | Main | The one place a native file dialog or modal alert is shown (open, openMultiple, save, directory, alert, confirm). `ModelFactory.fileChooserCustom`/`folderChooserCustom`/`fileSaveCustom` and `GUIhelper`'s dialogs go through it. Its backend is swapped only by the GUI smoke tests (TEST-6). |
 
 ---
 
@@ -213,8 +231,21 @@ The shared Claude Code setup is committed under `.claude/`:
 
 **CI** (added by CI-1): `.github/workflows/ci.yml` runs `mvn -B verify` on windows-latest and
 ubuntu-latest (under Xvfb) for every push and PR to `devel` and `master`. It publishes a per-module
-test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest` is tagged `gui`
-(exclude with `-DexcludedGroups=gui`). A third job, "Docker image", is described below.
+test summary and uploads surefire reports. The JavaFX tests are tagged `gui`; a plain `verify` (CI
+too) runs only those also tagged `smoke` (every tab loads; the Main pom's default `excludedGroups`
+is `gui & !smoke`). The full set, with each tab's main action, runs nightly (`nightly.yml`, job
+"GUI tests (full set)") or locally with `-Pgui-all`; `-DexcludedGroups=gui` skips them all on a
+headless machine and then also skips Main's coverage ratchet (profile `no-gui-tests`), since Main's
+coverage comes mostly from them. A third job, "Docker image", is described below.
+
+**GUI smoke tests** (added by TEST-6): one `<Controller>SmokeTest` per tab of `CimPalGui.fxml`
+under `CimPal-Main/src/test/java/.../application/controllers/`, plus `MainGuiFxmlLoadTest` for the
+whole window. Plain JUnit, no TestFX/Monocle: `@GuiSmoke` (tag `gui`, `FxTestSupport` extension,
+60 s timeout, same thread) starts the toolkit once, swaps `ScriptedDialogs` in as the `GuiDialogs`
+backend, puts an in-memory `Preferences` tree into `MainController.prefs`, and restores every
+public static of `MainController`, `System.out`/`err` and the backend afterwards. A file dialog the
+test did not script, or a window left open, fails the test. Fixtures are in
+`src/test/resources/fixtures/gui-smoke/`.
 
 **Test harness** (added by TEST-1):
 - Shared test helpers are in Core's `eu.griddigit.cimpal.core.testsupport`: `TestModels`,
@@ -267,6 +298,11 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - The RDFS inputs are two synthetic profiles in `fixtures/shacl-generation/` (RDFS 2020 with CIM100, RDFS 2019 with CIM16).
 - The Core test-jar now also carries `fixtures/**`, which `RdfsToShaclCommandTest` in the CLI uses.
 
+**Characterisation tests, convert + sparql** (TEST-3, written 2026-10-21, branch `feature/test-3-convert-sparql`):
+- `RDFConverterTest` (+33 golden tests next to its 10 base-URI tests) pins `RDFConverter` for CGMES 2.4 and 3.0 instance data to Turtle, JSON-LD (legacy and 1.1), RDF/XML plain/abbrev/pretty, CIMXML (unsorted, sorted, by prefix, as instance data) and RDFS CIMXML; the mixed-syntax union; the detailed union (deletion stereotype, package fix, configured URIs); inheritance only/list; add OWL; strip prefixes; ontology headers; `removeDuplicateShDeclareBlankNodes`; empty, malformed and missing input. Snapshots in `snapshots/convert/`: Turtle/JSON-LD by isomorphism, RDF/XML and CIMXML also as text.
+- `SparqlToolsTest` (new, 11) pins SELECT results on CGMES 2.4 and 3.0, value rendering, empty results, the two Excel exports and the refusals. Snapshots in `snapshots/sparql/`.
+- New fixtures in `fixtures/convert/`: an RDFS 2020 delta in Turtle and an SSH file in JSON-LD (inline context).
+
 **Docker image** (added by CI-3, `docs/plans/ci/CI-3.md`):
 - `CimPal-CLI/docker/Dockerfile` copies the built `CimPal-CLI.jar` onto `eclipse-temurin:25-jre-noble`
   (pinned by digest). Maven never runs inside Docker.
@@ -303,6 +339,30 @@ test summary and uploads surefire reports. The JavaFX test `MainGuiFxmlLoadTest`
 - Pages: index, capability statement, install, quickstart, deployment modes, sizing, Airflow, security, configuration, troubleshooting, versioning and support (draft, for maintainer review), glossary.
 - Linked from the root `README.md`. `scripts/check_doc_links.py` checks the links in `.github/workflows/docs.yml`.
 
+**MCP output hygiene and the Python interpreter** (SEC-3, `docs/plans/security/SEC-3.md`, gaps G5 and G9):
+- Every `mcp` tool result passes through `McpCommand.forAgent`: each string value and field name of the
+  command's JSON (or of the envelope for commands without JSON output, and of refused-path errors) goes
+  through Core `UntrustedText.forAgent` (C0/C1 controls, NEL/LS/PS, invisible format characters such as
+  bidi overrides and tag characters, variation selectors and Hangul fillers → U+241E, cut at 300 chars with
+  `...`, no split surrogate pairs). A second content item carries a fixed untrusted-data notice;
+  `content[0].text` is still the result JSON. JSON-RPC error messages are capped the same way.
+- `sparql`, `compare`, `compare-instances` and `run` escape every control character in their JSON
+  output (they share `ValidateCommand.jsonStr`); a literal with an ESC character made `sparql --format json`
+  print invalid JSON before.
+- The Python engines' interpreter: `--python-executable` on `validate`, `serve` and `mcp` (CLI mixin
+  `PythonOptions`), `-Dcimpal.python.executable` or `CIMPAL_PYTHON_EXECUTABLE`, in that order, always an
+  absolute path of an existing local file, checked after normalising and returned as checked; UNC and
+  device paths are refused before any file system call (Core `PythonExecutable`; otherwise exit 2). No
+  config key, request field or tool argument sets it. Without one, CimPal finds `python` / `py` in the
+  absolute `PATH` folders itself (`PythonShaclValidator.searchDirs`/`findProgram`, so Windows never
+  searches the working directory), probes it with a 10 s timeout, and runs the absolute `sys.executable`
+  it prints. One `[ENGINE]` stderr line names the interpreter and its source.
+  The worker script lives in a private `Files.createTempDirectory` folder, which is also the working
+  directory of the probe and the worker, and is removed after the run (also after a failure). Python's
+  stderr is read in fixed-size chunks (at most 64 KiB kept) and reaches exception messages only as its
+  last 500 chars through `LogSanitizer.forLog`, also when Python stopped reading its input (broken pipe).
+  `mcp`'s own stderr lines quote parser messages through `forLog`.
+
 **Deployment track** (`docs/plans/deployment/`, DEP-1 to DEP-10): container, sizing, CLI automation
 options, an async `/v1` API, a Python SDK and an Airflow provider for external users. It supersedes
 the ordering of the *REST API — discovery and implementation plan* section below.
@@ -330,7 +390,11 @@ job and upload ownership, per-client quotas, D-17) is merged (PR #75). DEP-11 (d
 D-14, D-18) is merged (PR #76); its PostgreSQL ITs run only where Docker is available (CI). DEP-14
 (idempotent submits and uploads, signed completion callbacks, D-19) and DEP-16 (load tests, SLOs, alert rules;
 tooling done, the full capacity runs still open, they need Docker on the measuring laptop) are merged (PR #79,
-DEP-16 via #81). DEP-12 (shared queue across replicas) is in progress.
+DEP-16 via #81). DEP-12 (shared queue across replicas) is in progress. SEC-3 (MCP output hygiene, the
+Python interpreter by absolute path) is in review on `feature/sec-3-mcp-hygiene`; SEC-4 (re-attestation)
+can follow once SEC-1 to SEC-3 are merged.
+TEST-3's convert and sparql groups are merged (PR #84); the comparisons, gen-instances + manifest and kgcl
+groups are next. CimPal-CustomWriter has no coverage ratchet baseline yet (follow-up).
 The SHACL rule test rewrite ([PR #53](https://github.com/griddigit-ci/CimPal/pull/53), branch
 `feature/shacl-rule-tester`) needs a review; whether the rule test should come back to the CLI/MCP,
 with SEC-2 path checks and a JSON summary, is open.
@@ -352,7 +416,9 @@ with SEC-2 path checks and a JSON summary, is open.
 | 8 | `serve` | Local HTTP daemon (JDK HttpServer, localhost:7474), bearer token, Host/Origin checks, bounded queue |
 | 9 | `mcp` | MCP 2024-11-05 stdio server, 10 typed tools |
 
-All 13 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25. Each release also publishes that JAR as the Docker image `ghcr.io/griddigit-ci/cimpal` (see `docs/cli/docker.md`).
+`id-map` (2026-10-13, branch `feature/id-mapping`) is the 14th: ID mapping between two models of the same grid, see *ID mapping* above.
+
+All 14 commands in a single fat JAR (`CimPal-CLI/target/CimPal-CLI.jar`), no external runtime dependencies beyond JRE 25. Each release also publishes that JAR as the Docker image `ghcr.io/griddigit-ci/cimpal` (see `docs/cli/docker.md`).
 
 ### Python SDK (`clients/python/`, DEP-9)
 
@@ -404,6 +470,11 @@ One row per bigger implementation, newest first (CLAUDE.md, *After every impleme
 
 | Date | WP / PR | What changed for users | Docs | Skill |
 |---|---|---|---|---|
+| 2026-10-21 | SEC-3 | `mcp` tool results: every string value is cut at 300 characters (ending in `...`) and control characters and line breaks show as `␞`; a second content item says the result is untrusted data (`content[0].text` is still the JSON). New `--python-executable PATH` on `validate`, `serve` and `mcp` (also `CIMPAL_PYTHON_EXECUTABLE`, `-Dcimpal.python.executable`): an absolute path of an existing local file (UNC and device paths refused), else exit 2; never a config key or tool argument. Without it, the `python`/`py -3` found on PATH is resolved to its absolute `sys.executable`, and a `[ENGINE]` stderr line names the interpreter. The worker script runs from a private temp folder removed afterwards; Python stderr in errors is cut to its last 500 chars on one line. `sparql`, `compare`, `compare-instances` and `run` JSON output now escapes every control character (an ESC in a literal made invalid JSON) | cli/mcp.md, cli/validate.md, cli/serve.md, guide/security.md, PROJECT.md, plans | yes |
+| 2026-10-21 | TEST-6 | No behaviour change for users. GUI smoke tests: every tab (13, incl. ID Mapping) loads, and Convert, RDF Comparison, Dataset Comparison, SHACL Validation, rule test and SPARQL run their main action headlessly; new `GuiDialogs` seam for file dialogs and alerts. Developers: `mvn verify` runs the `smoke` subset, `-Pgui-all` the full `gui` set (nightly job), `-DexcludedGroups=gui` skips them and Main's coverage ratchet | PROJECT.md, CLAUDE.md, plans/testing/TEST-6.md, plans/README.md, ci.yml, nightly.yml | no |
+| 2026-10-21 | TEST-3 (convert + sparql) | No behaviour change: golden-master tests for `RDFConverter` and `SparqlTools` (snapshots `convert/`, `sparql/`), two suspected bugs recorded as `@Disabled` tests (C1 orphan enum member labels in the detailed union, C2 JSON-LD "ordered" ignored) | PROJECT.md, plans/testing/TEST-3.md, plans/README.md | no |
+| 2026-10-21 | ID mapping (branch `feature/id-mapping`) | New `id-map` command and GUI tab **Dataset ▸ ID Mapping**: maps the IDs of model 1 onto model 2 of the same grid and writes Matched (Model1_ID, Element_type, Model2_ID, Model2_2nd_name, Confidence, …), Unmatched and Summary sheets with certain / probable / not matched percentages; SPARQL query library in `CimPal-Core/src/main/resources/idmapping/queries`; config template `configs/id-map.json`; not exposed through serve/mcp/run | cli/id-map.md, cli/index.md, configs/id-map.json | yes |
+| 2026-10-20 | DOC-2 | `manifest --config` (keys `dir`, `files`, `accessUrl`, `output`), so `manifest` works through `mcp`, `serve` and `run`; MCP tool schemas and the OpenAPI document list every key each command reads, plus `overwrite` where a command writes a file (a test keeps them equal to the commands' config loaders); `validate` takes `incrementalTimestamps` from a config and `--dry-run` shows it; through serve/mcp/run, `manifest`'s files, scanned files and default output are checked against the allowed roots (security review), and file names in `dcat:accessURL` are percent-encoded. Docs: the mapping CSV format is commas between columns and `;` inside them (the `|` example was wrong), all 13 commands and every template listed, compare's `N/A` wording, the MCP agent loop without the manual workflow, a new root README feature list | cli/README.md, cli/index.md, cli/manifest.md, cli/mcp.md, cli/validate.md, cli/compare.md, cli/serve.md, cli/ci-pipeline.md, README.md, configs/manifest.json, configs/validate-mapping-cgmes30.json | yes |
 | 2026-10-20 | Desktop (no code) | Change log introduced; drift found while running CLI 2026.10.6.1 recorded under *Known issues*; DOC-2 written | PROJECT.md, CLAUDE.md, plans | yes |
 | 2026-10-19 | DEP-16 (PR #81 → #79) | `/metrics` adds `cimpal_http_responses_total{code}`, `cimpal_http_request_duration_seconds{kind}`, `cimpal_job_queue_wait_seconds`, `cimpal_queue_size`, `cimpal_stalled`, `cimpal_work_used_bytes`/`_max_bytes`; service levels (99.5 % availability, API p95 < 200 ms, queue wait p95 < 5 min); Prometheus alert rules in `deploy/monitoring/`; load tool `scripts/bench/load/`; preliminary service capacity figures | cli/serve.md, guide/service.md, guide/sizing.md, deploy/monitoring | yes |
 | 2026-10-19 | DEP-14 (PR #79) | `Idempotency-Key` on `POST /v1/jobs` and `/v1/uploads` (`--idempotency-ttl`); opt-in HMAC-signed completion callbacks (`callback.url`, `--callback-secrets`, `callbackAllow` in `--client-quotas`); SDK `verify_callback()`, automatic keys in SDK and Airflow provider | cli/serve.md, guide/python-sdk.md, guide/airflow.md, guide/security.md | yes |
@@ -538,6 +609,13 @@ Every token stands for a client (`TokenSource.Client`: a name and admin or not).
 - **Fairness:** `JobScheduler`. Each submit queues one interchangeable *turn* on the workers; a turn runs the oldest queued job whose owner is under `maxRunning`, or parks without holding a worker, and a finished job re-queues one parked turn. Decided: oldest eligible, not round-robin.
 - **Attribution:** JSON logs carry `client`; `cimpal_jobs_finished_total` and `cimpal_requests_total` gain a `client` label, and `cimpal_quota_refused_total` counts 429s. Tests: `ClientIsolationTest` (the cross-client 404 matrix, quotas, and a scan of logs and metrics for tokens), `JobSchedulerTest`, `ClientQuotasTest`, `TokenSourceTest`.
 
+### GUI dialogs seam and smoke tests (TEST-6)
+
+- **No TestFX/Monocle** (D1): plain JUnit with `FxTestSupport` (start the toolkit once, run work on the FX thread with a 30 s timeout, look nodes up by fx:id after a CSS pass, wait for windows on a listener and for workers on the alert they raise). The tests click the real buttons (`ButtonBase.fire()`), so a renamed `onAction` or fx:id fails them.
+- **`GuiDialogs`** (D2, the only production change): a static facade with a swappable `Backend` (`SYSTEM` by default; `useBackendForTesting`/`resetBackend` are package-private, so only `FxTestSupport` can swap it and nothing else can install a backend that auto-approves `confirm`, which fails closed on no button or CANCEL). `openMultiple` returns null for an empty selection, as the real dialog does on cancel. It is a static field outside `MainController`. Callers keep building their `FileChooser`/`Alert`; only the `show…` call moves. `SparqlQueryTabController` also stopped calling `getScene().getWindow()` on a tab that has no scene.
+- **Scope** (D3): action tests for Convert, RDF Comparison, Dataset Comparison, SHACL Validation (combined workflow), the rule test (Constraints Operations) and SPARQL; load and initial state for Visualisation, RDFS Union, AI Assistant (no network: remote knowledge is off in the in-memory preferences), RDFS to SHACL, Generate, Task Wizard and ID Mapping.
+- **Tags** (D4): `gui` on every class, `smoke` on the load tests. The Main pom's `excludedGroups` property defaults to `gui & !smoke`, `-Pgui-all` sets it to a tag nobody uses, and an exact `-DexcludedGroups=gui` activates profile `no-gui-tests`, which skips Main's `coverage-ratchet` check (without GUI tests Main measures 4.3 % lines against a 7 % floor).
+
 ---
 
 ## Key file locations
@@ -615,16 +693,7 @@ CimPal/
 
 ## Known issues and limitations
 
-**Doc and behaviour drift found 2026-10-20 (Desktop, running CLI 2026.10.6.1; fixes planned in DOC-2).**
-- `manifest` through `mcp` returns `{"exitCode":2,"status":"INVALID_INPUT"}` (no `--config`), but `tools/list` still advertises it.
-- The MCP tool input schemas list only a subset of each command's keys (e.g. no `stats`, `summaryFile`, `overwrite`, `constraintFiles` for some tools), although every config key is accepted.
-- `docs/cli/mcp.md` (*The validation agent loop*) still says "call `validate` in manual mode"; that workflow was removed.
-- `docs/cli/README.md` *Available commands* lists only validate, sparql and manifest, and its *Template configs* table only four templates.
-- `docs/cli/serve.md` shows `"version":"CimPal CLI 2026.9.10.1"` in the `/health` example; the root `README.md` feature list is the old GUI list.
-- `--stats` for `validate --workflow combined` reports a `report` phase; `docs/cli/README.md` lists only `validate` and `shapeDetail`.
-- `compare --compare-type shacl` reports absence as `N/A` with "New property: …" text; `docs/cli/compare.md` documents `(not present)`.
-- `validate --dry-run` doesn't print `incrementalTimestamps`.
-- The mapping CSV accepts `|` or comma between columns; only the config template says so, not `validate --help` or `cli/validate.md` (which shows a `|` example under "three columns").
+**`manifest` access URLs.** `--access-url` only shapes `dcat:accessURL` as `file:<folder>/<file>`: a relative path is used as the folder, a `file:` URI or absolute folder gives its last folder name, and an `https://` URL is ignored (`ManifestGenerator.compactAccessUrl`). Documented in `docs/cli/manifest.md`; whether an http(s) base should be supported is open.
 
 **`serve` job store limits (DEP-11).** One instance per database until DEP-12 (two `serve` on one database would each run the queued jobs they loaded at start). After a crash the last (up to 63) log lines of a running job may be missing. A job that couldn't start because the database failed stays queued in the database and runs only after the next start. The PostgreSQL ITs only run where Docker is available (CI on Ubuntu; not on the maintainer's Windows machine yet).
 
@@ -654,9 +723,21 @@ CimPal/
 - excel2shacl writes length limits as `"32.0"^^xsd:integer`.
 - An unreadable workbook gives empty shapes instead of an error.
 
-**`MainGuiFxmlLoadTest` sometimes times out in the Claude Code desktop environment** (on unmodified `HEAD` too, 2026-10-05), although the JavaFX toolkit starts in a plain JVM there; it passed in 3 s in a full `verify` later the same day. CI runs it; if it times out locally, use `-DexcludedGroups=gui`.
+**Convert suspected bugs (TEST-3, not fixed).** Each one has an `@Disabled` failing test in `RDFConverterTest`; details in `docs/plans/testing/TEST-3.md`:
+- C1: the detailed union removes only the `rdf:type` of a deleted enumeration's typed members, so their labels stay as orphans.
+- C2: the JSON-LD "ordered" option (GUI) is passed to Jena but does not change the output.
 
-**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
+**`SparqlTools.loadModelFromXML` reads files against the CIM16 schema URI** (`http://iec.ch/TC57/2013/CIM-schema-cim16`), so `rdf:ID` objects become `cim:_id` IRIs in the CIM namespace (CGMES 3.0 files too), and results show them as `cim:_t1`. Pinned by `SparqlToolsTest`; maintainer to confirm it is intended.
+
+**GUI tests may time out in the Claude Code desktop environment** (`MainGuiFxmlLoadTest`, seen 2026-10-05 on unmodified `HEAD`). On 2026-10-21 all 20 GUI tests passed there repeatedly (TEST-6). Ubuntu CI under Xvfb is the authoritative run; if they time out locally, use `-DexcludedGroups=gui`.
+
+**Dialogs not yet behind `GuiDialogs` (TEST-6).** Only the dialogs on the tested paths were routed: `ModelFactory`'s choosers, `GUIhelper`'s alerts, and the direct alerts and choosers of the RDF Comparison, Dataset Comparison and SPARQL tabs. About 95 other direct `showAndWait`/`show*Dialog` calls remain (most in `MainController`, `RDFStoSHACLController`, `ExcelToSHACLController`, `ShaclTools`, the wizard pages and the PSS/E compare), plus the SPARQL tab's workspace picker and Git commit-message dialog (not `Alert`s). A smoke test that reaches one of them fails after 30 s naming the open window, rather than hanging. Route them when their tabs get action tests.
+
+**Main's `ModelFactory.unzip` has no ZIP limits (found in the TEST-6 security review, follow-up security fix).** `CimPal-Main` `util/ModelFactory.unzip` (used by the Dataset Comparison tab) reads every entry with no entry-count or total-uncompressed-size limit, unlike Core's `ModelFactory`/`ZipBudget` (`MAX_ZIP_ENTRIES`, `MAX_TOTAL_UNCOMPRESSED_BYTES`), and for a folder entry it only shows an alert and carries on. A crafted archive opened in the GUI can exhaust memory. Fix: route it through Core's ZIP reading or `ZipBudget`.
+
+**GUI tests touch the user's real preferences in two places (TEST-6).** `MainController.initialize` (the whole-window test) and `RDFStoSHACLController.initialize` open `Preferences.userRoot().node("CimPal")` themselves and write the defaults if it is missing; the smoke tests restore `MainController.prefs` afterwards but cannot keep those two from reading or creating the node. `RDFStoSHACLController` also keeps its own static `prefs` field.
+
+**Test coverage is sparse.** Baseline 2026-09-29 (JaCoCo line/branch): Core 28.4% / 18.2%, Main 4.7% / 1.4%, CLI 3.0% / 2.2%. With the TEST-3 validation and SHACL generation groups merged (2026-10-09), Core is at 52.3% / 37.9%; the convert and sparql groups raise it to 58.1% / 43.9% (2026-10-21). Main: 7.8% / 4.6% before TEST-6; with the smoke subset (what `verify` and CI run) 8.0% / 4.8% (floor 0.0753 / 0.0426), with the full GUI set (`-Pgui-all`) 11.5% / 7.7%; the ratchet floor follows the smoke subset. CLI tests only cover `--help`, `convert` and a JSON Schema smoke test. The ratchet stops coverage from dropping, and TEST-2 to TEST-4 are meant to raise it. **Run `mvn clean verify` before `Update-CoverageBaseline.ps1`.** JaCoCo appends to `jacoco.exec` across builds, so a build without `clean` also counts tests from earlier builds, even of other branches. `19e257f` raised the Core floor to 0.4138 that way (stale TEST-3 test runs); CI measures 0.346, so `devel` went red. DEP-1 lowered it to the clean measurement (2026-10-05); merging the TEST-3 Core tests should raise it again. Before any further Core refactoring, add characterisation tests that capture the current output.
 
 **Timestamped report times are snapped to minute 30 of the hour (by design, maintainer to confirm).** `ValidationTools.normalizeTimestampToReportTime` sets every report time to `HH:30:00Z`, so `IGM_Test_EQ_20260101T0000Z.xml` produces `validation_report_IGM_Test_2026-01-01T00_30_00Z.xlsx`. It looks like the market-time-unit convention (the middle of the hour). The TEST-3 snapshots pin it.
 
@@ -674,7 +755,9 @@ CimPal/
 
 **`run` step `config` key is ignored (found in SEC-2).** No command reads a `config` key, so a step's `config` file has no effect. `run.md` documents this; it needs a fix.
 
-**`manifest` can't run through `serve`, `mcp` or `run`** (no `--config` option), although `mcp` advertises the tool.
+**`mcp` results are capped per string (SEC-3).** A value longer than 300 characters, a file path included, reaches the agent cut and ending in `...`; the full value is in the command's output files (or run the CLI). `serve` payloads are not capped or rewritten (decision D6): its clients are programs that parse the JSON, and its `/v1` results are documented byte-for-byte. An agent that reads `serve` results should treat them as untrusted data too. The cap is per value only (part of G5, decided in SEC-3): there is no cap on a result's total size or on how many elements an array has, so a query or validation with many rows still puts all of them (each value capped) into the agent's context. Use `LIMIT`, `samples` or `maxResults` to bound it.
+
+**The Python interpreter can be changed only at start (SEC-3).** `--python-executable`, `CIMPAL_PYTHON_EXECUTABLE` and `-Dcimpal.python.executable` are read when `validate`, `serve` or `mcp` starts; there is deliberately no config key or per-request field. The interpreter's own `import` path (site-packages, `PYTHONPATH` in the environment) is not restricted. The `[ENGINE]` line names the interpreter's absolute path and goes to stderr, so under `serve` it is in the job log that `GET /v1/jobs/{id}/log` returns to the job's client (accepted in the SEC-3 review: Low, the server's Python install path).
 
 **`mcp`/`serve` with Claude Desktop need `--root`.** After SEC-2, the CimPal MCP server only accepts paths under its working directory unless `--root` is given. Update `claude_desktop_config.json`; see `CimPal-CLI/configs/claude-desktop-config.json`.
 
@@ -687,6 +770,8 @@ CimPal/
 **The Docker image has no Python.** Only the `APACHE_JENA` engine works in the container; `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` need a local install.
 
 **`CimPal-CLI.jar` is locked while the MCP server runs.** When Claude Desktop has the CimPal MCP server running (`claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`, and `mvn package`/`verify` fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop, or stop the `CimPal-CLI.jar mcp` processes, before a full build. A longer-term fix could have Desktop run a copied JAR instead of the build output, or the Docker image (`claude-desktop-config-docker.json`), which locks nothing on the host.
+
+**ID mapping limits (2026-10-13).** DC topology (DC busbars, DC line segments and their terminals) is not matched; converters, their DC terminals, DC nodes and converter units are. Two identical elements at one place with the same name are reported, not guessed. First real run (EirGrid + SONI 2026 EQ against the 2020 merged EIRGRIDSONI EQ, before the junction, station and confidence changes): 6.5 % mapped; the causes were PowerFactory `Term_` junctions holding a busbar section (not collapsed then), stations split per voltage level in the merged model, and six years between the models. Not re-run on the real data since; read the Summary overview and model statistics first.
 
 **`MainController` static state bag.** Several GUI tabs still share state through static fields. Do not add new static fields. The pattern of delegating from Main to Core (introduced in Phase 5) is the correct long-term direction.
 

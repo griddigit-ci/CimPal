@@ -67,6 +67,32 @@ class ValidateCommandTest {
         }
     }
 
+    /** DOC-2: incremental timestamps can come from a config (mcp, serve, run) and the dry run shows them. */
+    @Test
+    void dryRunShowsIncrementalTimestampsFromTheConfigOrTheFlag() throws Exception {
+        Path config = Files.writeString(tempDir.resolve("validate.json"), """
+                {"workflow": "timestamped", "incrementalTimestamps": true}
+                """);
+
+        assertThat(dryRun("--config", config.toString())).containsPattern("incrementalTimestamps\\s*: true");
+        assertThat(dryRun("--workflow", "timestamped")).containsPattern("incrementalTimestamps\\s*: false");
+        assertThat(dryRun("--workflow", "timestamped", "--incremental-timestamps"))
+                .containsPattern("incrementalTimestamps\\s*: true");
+    }
+
+    private static String dryRun(String... options) {
+        PrintStream original = System.out;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+            String[] args = Stream.concat(Stream.of("validate", "--dry-run"), Stream.of(options)).toArray(String[]::new);
+            assertThat(new CommandLine(new CimPalCli()).execute(args)).isEqualTo(ExitCode.OK);
+        } finally {
+            System.setOut(original);
+        }
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
     @Test
     void shaclFilesOptionIsGone() {
         CommandLine validate = new CommandLine(new CimPalCli()).getSubcommands().get("validate");
@@ -338,5 +364,29 @@ class ValidateCommandTest {
         String value = "a\nb\tc\u0001\"d\\e";
 
         assertThat(JSON.readTree(ValidateCommand.jsonStr(value)).asString()).isEqualTo(value);
+    }
+
+    /** SEC-3 (G9): the interpreter of the Python engines is an absolute path, never a name looked up on PATH. */
+    @Test
+    void aRelativePythonExecutableIsBadInput() {
+        int exitCode = new CommandLine(new CimPalCli()).execute("validate", "--python-executable", "relative/py",
+                "--engine", "PYSHACL", "--dry-run");
+
+        assertThat(exitCode).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(System.getProperty("cimpal.python.executable")).isNull();
+    }
+
+    @Test
+    void anAbsolutePythonExecutableIsAccepted() throws Exception {
+        Path python = Files.writeString(tempDir.resolve("python"), "");
+        try {
+            int exitCode = new CommandLine(new CimPalCli()).execute("validate", "--python-executable",
+                    python.toString(), "--engine", "PYSHACL", "--dry-run");
+
+            assertThat(exitCode).isEqualTo(ExitCode.OK);
+            assertThat(System.getProperty("cimpal.python.executable")).isEqualTo(python.toString());
+        } finally {
+            System.clearProperty("cimpal.python.executable");
+        }
     }
 }
