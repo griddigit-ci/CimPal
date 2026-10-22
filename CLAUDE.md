@@ -95,6 +95,8 @@ Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Bef
 
 - Day-to-day work happens on `devel` (or feature branches off it, PR'd into `devel`). `master` is the release branch.
 - Don't commit, push, or open PRs unless asked. `.claude/settings.json` makes `git push` ask for approval every time, and denies `gh release`, the release script, and tag or force pushes.
+- **Exception, local WIP commits:** on a feature branch (never `devel` or `master`), commit locally at each milestone of a WP, so a branch switch or an interrupted session can't lose the work. Prefix the message with `WIP:`, never push them unless asked, and tidy them up (squash or reword) before the branch gets a PR.
+- **Work in a worktree** (`.claude/worktrees/<wp-id>`), not in the maintainer's checkout at the repo root: they switch branches, pull and commit there. In a worktree a session is using, the maintainer only reads.
 - **Never run `scripts/New-ReleaseTag.ps1`** or push version tags unless explicitly asked. A pushed `YYYY.MM.DD.N` tag triggers `.github/workflows/release.yml`, which publishes a GitHub release.
 - Versions live in all six `pom.xml` files (including `CimPal-Coverage`) plus `<cimpal.version>`; only the release script changes them.
 
