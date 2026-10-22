@@ -314,6 +314,15 @@ class CallbackTest {
                 () -> { }, clock);
         String id = JSON.readTree(submit(hooks() + "later").body()).path("jobId").asString();
         waitUntil(() -> received.size() == 1);
+        // The receiver has the request before the server records the 503: wait for the record, or
+        // the restart sees no attempt yet and counts the delivery as the first.
+        waitUntil(() -> {
+            try {
+                return job(id).path("callback").path("attempts").asInt() == 1;
+            } catch (Exception e) {
+                return false;
+            }
+        });
         server.close();
         first.close();
 
