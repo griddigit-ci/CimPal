@@ -5,7 +5,7 @@
 -->
 # CimPal capability statement
 
-*Last reviewed 2026-10-06 · Describes CimPal 2026.10.6.1 and later*
+*Last reviewed 2026-10-22 · Describes CimPal 2026.10.6.1 and later*
 
 **CimPal** is an open-source toolset by gridDigIt Kft. for CIM/CGMES semantic data. It validates grid models against SHACL constraints and supports the work around that: profile and shape authoring, conversion, comparison and querying. Licence: EUPL-1.2-or-later.
 
@@ -57,7 +57,7 @@ Measured with synthetic CGMES-like models: [Sizing](sizing.md).
 |---|---|
 | **A. Container or CLI per task** (Airflow `KubernetesPodOperator`, `DockerOperator`, `BashOperator`; any CI system), with exit codes, a JSON summary file and a configurable violations exit code | Available. Examples and tests in `integrations/airflow/`; see [Airflow](airflow.md). |
 | **B. CimPal as a service** (asynchronous jobs, OpenAPI `/v1`, upload and download, reverse proxy) | Available: the asynchronous job API and its OpenAPI spec ([`/v1`](../cli/serve.md#job-api-v1)), deployment behind a TLS proxy or Kubernetes Ingress with token files, probes and JSON logs ([service](service.md)), and file exchange by upload and download ([serve](../cli/serve.md#file-exchange-uploads-and-downloads)). |
-| **C. Python SDK and Airflow provider** | Planned: DEP-9, DEP-10 |
+| **C. Python SDK and Airflow provider** | Available: the [Python SDK](python-sdk.md) `cimpal-client` and the Airflow provider `airflow-provider-cimpal` ([Airflow, path C](airflow.md#path-c-the-cimpal-provider)), both on top of the `/v1` API. |
 
 ## Security posture
 
@@ -74,4 +74,4 @@ More in [Security for operators](security.md).
 
 - **Licence:** EUPL-1.2-or-later, an OSI-approved copyleft licence compatible with the GPL, LGPL, MPL and others. The full text ships with every release and in the container image (`/opt/cimpal/LICENSE.md`).
 - **Releases:** dated versions (`YYYY.M.D.N`) on GitHub Releases and GHCR.
-- **Support:** issues on GitHub; see [Versioning and support](versioning-and-support.md) for the support policy (draft) and how to report vulnerabilities.
+- **Support:** issues on GitHub; see [Versioning and support](versioning-and-support.md) for the support policy and how to report vulnerabilities.
