@@ -22,6 +22,7 @@ import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.shared.JenaException;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tools.jackson.databind.JsonNode;
@@ -194,10 +195,17 @@ public class ValidateCommand implements Callable<Integer> {
             description = "Print the resolved configuration and exit without running validation.")
     private boolean dryRun;
 
+    @CommandLine.Mixin
+    PythonOptions pythonOptions = new PythonOptions();
+
     // -------------------------------------------------------------------------
 
     @Override
     public Integer call() {
+        // SEC-3 (G9): a start-up flag only, checked before anything runs.
+        if (!pythonOptions.apply(false)) {
+            return ExitCode.INVALID_INPUT;
+        }
         try {
             // 1. Load config file if provided, filling in any flag still null
             if (configFile != null) {

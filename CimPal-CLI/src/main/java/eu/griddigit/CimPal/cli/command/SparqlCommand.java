@@ -444,15 +444,9 @@ public class SparqlCommand implements Callable<Integer> {
         return s == null ? "" : s;
     }
 
+    /** One JSON string; every control character is escaped, so the output stays valid JSON (SEC-3). */
     private static String jsonStr(String value) {
-        if (value == null) return "null";
-        return "\"" + value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t")
-                + "\"";
+        return ValidateCommand.jsonStr(value);
     }
 
     /** RFC-4180 quoting with formula neutralisation (SEC-5, finding 4); see {@link CsvCells#escape}. */

@@ -365,4 +365,28 @@ class ValidateCommandTest {
 
         assertThat(JSON.readTree(ValidateCommand.jsonStr(value)).asString()).isEqualTo(value);
     }
+
+    /** SEC-3 (G9): the interpreter of the Python engines is an absolute path, never a name looked up on PATH. */
+    @Test
+    void aRelativePythonExecutableIsBadInput() {
+        int exitCode = new CommandLine(new CimPalCli()).execute("validate", "--python-executable", "relative/py",
+                "--engine", "PYSHACL", "--dry-run");
+
+        assertThat(exitCode).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(System.getProperty("cimpal.python.executable")).isNull();
+    }
+
+    @Test
+    void anAbsolutePythonExecutableIsAccepted() throws Exception {
+        Path python = Files.writeString(tempDir.resolve("python"), "");
+        try {
+            int exitCode = new CommandLine(new CimPalCli()).execute("validate", "--python-executable",
+                    python.toString(), "--engine", "PYSHACL", "--dry-run");
+
+            assertThat(exitCode).isEqualTo(ExitCode.OK);
+            assertThat(System.getProperty("cimpal.python.executable")).isEqualTo(python.toString());
+        } finally {
+            System.clearProperty("cimpal.python.executable");
+        }
+    }
 }

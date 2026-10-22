@@ -336,6 +336,9 @@ public class ServeCommand implements Callable<Integer> {
     @CommandLine.Mixin
     RootOptions rootOptions = new RootOptions();
 
+    @CommandLine.Mixin
+    PythonOptions pythonOptions = new PythonOptions();
+
     /** Commands that accept {@code --format json}; the others print their result files' paths. */
     static final Set<String> JSON_COMMANDS = Set.of("validate", "sparql", "compare", "compare-instances");
 
@@ -362,6 +365,10 @@ public class ServeCommand implements Callable<Integer> {
     public Integer call() {
         if (!logFormat.equalsIgnoreCase("text") && !logFormat.equalsIgnoreCase("json")) {
             System.err.println("[ERROR] --log-format must be text or json.");
+            return ExitCode.INVALID_INPUT;
+        }
+        // SEC-3 (G9): the interpreter of the Python engines is set here, never by a request.
+        if (!pythonOptions.apply(true)) {
             return ExitCode.INVALID_INPUT;
         }
         if (!logFormat.equalsIgnoreCase("json")) {
