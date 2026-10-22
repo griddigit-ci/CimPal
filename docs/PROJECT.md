@@ -5,7 +5,7 @@
 -->
 # CimPal — Project Reference Document
 
-**Last updated:** 2026-10-21 (SEC-3: MCP output hygiene and the Python interpreter; TEST-6: GUI smoke tests and the `GuiDialogs` seam; TEST-3 convert/sparql tests; ID mapping, `id-map`)  
+**Last updated:** 2026-10-22 (DEP-4: support policy reviewed, `/v1` declared stable); 2026-10-21 (SEC-3: MCP output hygiene and the Python interpreter; TEST-6: GUI smoke tests and the `GuiDialogs` seam; TEST-3 convert/sparql tests; ID mapping, `id-map`)  
 **Update rule:** Edit this file after every bigger implementation (CLAUDE.md, *After every implementation*). Sections that change most often: *Change log*, *Implementation status*, *Next steps*, *Known issues*.
 
 ---
@@ -336,7 +336,7 @@ test did not script, or a window left open, fails the test. Fixtures are in
 - `integrations/airflow/`: example DAGs for KubernetesPodOperator, DockerOperator and BashOperator (Airflow 3.3.2), example data from `gen_models.py`, DAG tests; `.github/workflows/integrations.yml` runs them and the Bash DAG end to end. Guide: `docs/guide/airflow.md`.
 
 **External user guide** (DEP-4, `docs/plans/deployment/DEP-4.md`): `docs/guide/` is the task-oriented layer on top of `docs/cli/`.
-- Pages: index, capability statement, install, quickstart, deployment modes, sizing, Airflow, security, configuration, troubleshooting, versioning and support (draft, for maintainer review), glossary.
+- Pages: index, capability statement, install, quickstart, deployment modes, sizing, Airflow, security, configuration, troubleshooting, versioning and support (reviewed by the maintainer 2026-10-22: deprecation after at least three months and two releases, fixes in the newest release only, `/v1` stable), glossary.
 - Linked from the root `README.md`. `scripts/check_doc_links.py` checks the links in `.github/workflows/docs.yml`.
 
 **MCP output hygiene and the Python interpreter** (SEC-3, `docs/plans/security/SEC-3.md`, gaps G5 and G9):
@@ -374,7 +374,7 @@ required is a maintainer action. CI-3 is in review ([PR #51](https://github.com/
 GHCR package must be made public. DEP-1 and DEP-2 are done and released in 2026.10.6.1. DEP-3
 (automation options and Airflow examples) is merged (PR #60) and goes out with the next release; the
 KubernetesPodOperator and DockerOperator end-to-end walkthrough is for the maintainer. DEP-4 (external
-user guide, `docs/guide/`) is merged (PR #61); its support policy awaits maintainer review. DEP-5
+user guide, `docs/guide/`) is merged (PR #61); its support policy was reviewed on 2026-10-22. DEP-5
 (async `/v1` job API and OpenAPI spec) is merged (PR #62), and DEP-6 (service deployment: proxy names,
 token files, probes, SIGTERM drain, JSON logs, metrics, Compose and Kubernetes examples) is merged
 (PR #64). DEP-7 (file exchange: uploads, job workspaces, downloads) is merged (PR #66), and so are
@@ -470,6 +470,7 @@ One row per bigger implementation, newest first (CLAUDE.md, *After every impleme
 
 | Date | WP / PR | What changed for users | Docs | Skill |
 |---|---|---|---|---|
+| 2026-10-22 | DEP-4 | Support policy final (no longer a draft): stable interfaces (commands and options, config keys, exit codes, JSON with a `schema` id, the container image) now include the `/v1` job API, whose breaking changes would go to a `/v2` served alongside; `POST /<command>` endpoints are not covered. Deprecations: a stderr warning, then at least three months and two releases. Fixes go into the newest release only. Vulnerability reports are acknowledged within five working days. Guide pages no longer call the SDK, the Airflow provider, the OpenAPI spec and `--workers` planned | guide/versioning-and-support.md, guide/capabilities.md, guide/glossary.md, guide/service.md, PROJECT.md, plans | yes |
 | 2026-10-21 | SEC-3 | `mcp` tool results: every string value is cut at 300 characters (ending in `...`) and control characters and line breaks show as `␞`; a second content item says the result is untrusted data (`content[0].text` is still the JSON). New `--python-executable PATH` on `validate`, `serve` and `mcp` (also `CIMPAL_PYTHON_EXECUTABLE`, `-Dcimpal.python.executable`): an absolute path of an existing local file (UNC and device paths refused), else exit 2; never a config key or tool argument. Without it, the `python`/`py -3` found on PATH is resolved to its absolute `sys.executable`, and a `[ENGINE]` stderr line names the interpreter. The worker script runs from a private temp folder removed afterwards; Python stderr in errors is cut to its last 500 chars on one line. `sparql`, `compare`, `compare-instances` and `run` JSON output now escapes every control character (an ESC in a literal made invalid JSON) | cli/mcp.md, cli/validate.md, cli/serve.md, guide/security.md, PROJECT.md, plans | yes |
 | 2026-10-21 | TEST-6 | No behaviour change for users. GUI smoke tests: every tab (13, incl. ID Mapping) loads, and Convert, RDF Comparison, Dataset Comparison, SHACL Validation, rule test and SPARQL run their main action headlessly; new `GuiDialogs` seam for file dialogs and alerts. Developers: `mvn verify` runs the `smoke` subset, `-Pgui-all` the full `gui` set (nightly job), `-DexcludedGroups=gui` skips them and Main's coverage ratchet | PROJECT.md, CLAUDE.md, plans/testing/TEST-6.md, plans/README.md, ci.yml, nightly.yml | no |
 | 2026-10-21 | TEST-3 (convert + sparql) | No behaviour change: golden-master tests for `RDFConverter` and `SparqlTools` (snapshots `convert/`, `sparql/`), two suspected bugs recorded as `@Disabled` tests (C1 orphan enum member labels in the detailed union, C2 JSON-LD "ordered" ignored) | PROJECT.md, plans/testing/TEST-3.md, plans/README.md | no |
@@ -692,6 +693,8 @@ CimPal/
 ---
 
 ## Known issues and limitations
+
+**Private vulnerability reporting is off (seen 2026-10-22).** `docs/guide/versioning-and-support.md` tells reporters to use GitHub's private vulnerability reporting on `griddigit-ci/CimPal`, but it is not enabled yet; the maintainer turns it on (repository Settings → Code security). Until then the email address on that page is the working route.
 
 **`manifest` access URLs.** `--access-url` only shapes `dcat:accessURL` as `file:<folder>/<file>`: a relative path is used as the folder, a `file:` URI or absolute folder gives its last folder name, and an `https://` URL is ignored (`ManifestGenerator.compactAccessUrl`). Documented in `docs/cli/manifest.md`; whether an http(s) base should be supported is open.
 

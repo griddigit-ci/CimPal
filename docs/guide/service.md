@@ -86,7 +86,7 @@ What a CimPal service should promise its users, and what the alert rules watch (
 
 ## Limits
 
-- **One command at a time** per instance. A queue of `--queue-size` (default 4) waits; more get 503 with `Retry-After`. Several jobs in parallel in one JVM are planned as an option (DEP-8).
+- **One command at a time** per instance by default. A queue of `--queue-size` (default 4) waits; more get 503 with `Retry-After`. `--workers` runs several at once in one JVM, limited by `--max-concurrent-heap-bytes`; see [Thread safety and concurrency](../cli/serve.md#thread-safety-and-concurrency).
 - **No built-in TLS or identity provider:** clients are the names in the token file, with two roles (`client`, `admin`). Every client can run every command on the files under the allowed folders, and in shared-folder mode (no upload) all clients read and write the same folders. Ownership separates jobs, uploads and their outputs, not the shared folders: give clients that must not see each other's files uploads only, or separate instances. OIDC/JWT tokens from an organisation's identity provider are a possible later option.
 - **Remote address:** `remote` in the log is the proxy's address. `serve` doesn't trust `X-Forwarded-For`, so the proxy's own access log identifies clients.
 - **Public probes:** `/health`, `/ready`, `/v1/health` and `/v1/openapi.json` need no token, so through the proxy they show anyone the version and whether the server is busy. If that matters, block those paths at the proxy for outside clients; the orchestrator's probes reach the pod directly.

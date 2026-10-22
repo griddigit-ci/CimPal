@@ -5,7 +5,7 @@
 -->
 # Glossary
 
-*Last reviewed 2026-10-06 · Describes CimPal 2026.10.6.1 and later*
+*Last reviewed 2026-10-22 · Describes CimPal 2026.10.6.1 and later*
 
 ## CIM, CGMES and models
 
@@ -54,5 +54,5 @@
   - A sensor waits for a condition.
   - A trigger lets a deferrable operator wait without holding a worker.
 - **XCom:** how Airflow passes small values (a few KB) between tasks. CimPal's JSON summary goes there; reports go to storage.
-- **OpenAPI spec:** a machine-readable description of an HTTP API. Planned for CimPal's `/v1` API (DEP-5).
+- **OpenAPI spec:** a machine-readable description of an HTTP API. CimPal's `/v1` API publishes one at `/v1/openapi.json`.
 - **S3:** object storage. CimPal does not read S3 itself; copy the files to a volume first ([Airflow](airflow.md#files-volumes-and-s3)).
