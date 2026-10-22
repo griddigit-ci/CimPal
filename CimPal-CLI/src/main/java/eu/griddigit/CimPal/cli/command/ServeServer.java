@@ -1608,6 +1608,29 @@ final class ServeServer implements AutoCloseable {
         }
     }
 
+    /** The most of a refused upload's unread body that is read and dropped before the answer. */
+    static final long REFUSED_BODY_DRAIN_BYTES = 16L << 20;
+
+    /**
+     * Before answering an upload refused while its body is still unread because the work area is
+     * full (507); a body refused as too large (413) is never read. Closing a connection with unread data makes the operating system reset it, and
+     * on Linux the reset can discard the answer before the client reads it: it then sees a broken
+     * connection instead of the 507. A body of up to {@link #REFUSED_BODY_DRAIN_BYTES} is read and
+     * dropped (within {@code --request-read-time}), so the answer arrives; a larger or unknown one
+     * gets {@code Connection: close} as before.
+     */
+    private static void drainOrClose(HttpExchange exchange, long declared) {
+        if (declared < 0 || declared > REFUSED_BODY_DRAIN_BYTES) {
+            exchange.getResponseHeaders().set("Connection", "close");
+            return;
+        }
+        try {
+            exchange.getRequestBody().transferTo(java.io.OutputStream.nullOutputStream());
+        } catch (IOException e) {
+            exchange.getResponseHeaders().set("Connection", "close"); // the client went away or was too slow
+        }
+    }
+
     /** {@code POST /v1/uploads}: a ZIP body, streamed to disk and extracted; it belongs to {@code client}. */
     private void receiveUpload(HttpExchange exchange, String path, Client client) throws IOException {
         String type = exchange.getRequestHeaders().getFirst("Content-Type");
@@ -1645,7 +1668,9 @@ final class ServeServer implements AutoCloseable {
                     client.name(), limits.maxUploadBytes(), limits.maxWorkBytes());
         } catch (WorkArea.Refused e) {
             if (e.status() == 413) {
-                exchange.getResponseHeaders().set("Connection", "close");
+                exchange.getResponseHeaders().set("Connection", "close"); // never read a body refused as too large
+            } else {
+                drainOrClose(exchange, declared);
             }
             reject(exchange, e.status(), e.getMessage(), "POST", path);
             return;
