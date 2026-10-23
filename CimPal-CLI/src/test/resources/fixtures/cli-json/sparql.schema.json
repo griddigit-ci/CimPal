@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/griddigit-ci/CimPal/schemas/cimpal-sparql-result/1",
+  "$comment": "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+. The JSON document of sparql --format json (and --summary-file) (TEST-4). Additive: new fields may appear in later versions; none are removed or renamed.",
+  "title": "CimPal SPARQL result",
+  "type": "object",
+  "required": ["columns", "rows"],
+  "properties": {
+    "columns": {"type": "array", "items": {"type": "string"}},
+    "rows": {
+      "type": "array",
+      "description": "One object per solution: each column name to its value as text (empty when unbound).",
+      "items": {"type": "object", "additionalProperties": {"type": "string"}}
+    },
+    "stats": {"type": "object", "description": "With --stats; see stats.schema.json."}
+  }
+}

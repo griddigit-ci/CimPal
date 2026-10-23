@@ -6,12 +6,9 @@
 package eu.griddigit.CimPal.cli;
 
 import com.networknt.schema.Error;
-import com.networknt.schema.InputFormat;
-import com.networknt.schema.Schema;
-import com.networknt.schema.SchemaRegistry;
-import com.networknt.schema.SpecificationVersion;
-import eu.griddigit.cimpal.core.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.FieldSource;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -19,17 +16,17 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Proves the JSON Schema setup that the CLI contract tests (TEST-4) build on: a schema loaded
- * from test fixtures accepts a conforming document and reports a non-conforming one.
+ * Proves the JSON Schema setup that the CLI contract tests (TEST-4) build on: each schema loads,
+ * accepts a conforming document and reports a non-conforming one.
  */
 class JsonSchemaSmokeTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    private static final List<String> SCHEMAS = CliSchemas.ALL;
+
     private static List<Error> validate(String document) {
-        Schema schema = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
-                .getSchema(Fixtures.read("cli-json", "summary.schema.json"), InputFormat.JSON);
-        return schema.validate(JSON.readTree(document));
+        return CliSchemas.errors("summary.schema.json", JSON.readTree(document));
     }
 
     @Test
@@ -46,5 +43,22 @@ class JsonSchemaSmokeTest {
                 """)).extracting(Error::toString)
                 .anySatisfy(message -> assertThat(message).contains("exitCode"))
                 .anySatisfy(message -> assertThat(message).contains("violations"));
+    }
+
+    @ParameterizedTest
+    @FieldSource("SCHEMAS")
+    void everySchemaLoadsAndRefusesAnEmptyObjectAndAnArray(String schemaFile) {
+        assertThat(CliSchemas.errors(schemaFile, JSON.readTree("{}"))).as(schemaFile).isNotEmpty();
+        assertThat(CliSchemas.errors(schemaFile, JSON.readTree("[]"))).as(schemaFile).isNotEmpty();
+    }
+
+    @Test
+    void theSparqlSchemaAcceptsRowsAndRefusesANonTextValue() {
+        assertThat(CliSchemas.errors("sparql.schema.json", JSON.readTree("""
+                {"columns": ["s"], "rows": [{"s": "urn:x"}]}
+                """))).isEmpty();
+        assertThat(CliSchemas.errors("sparql.schema.json", JSON.readTree("""
+                {"columns": ["s"], "rows": [{"s": 1}]}
+                """))).isNotEmpty();
     }
 }

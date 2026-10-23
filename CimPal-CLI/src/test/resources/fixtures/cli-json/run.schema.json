@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/griddigit-ci/CimPal/schemas/cimpal-pipeline-result/1",
+  "$comment": "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+. The JSON document of run --format json (TEST-4). Additive: new fields may appear in later versions; none are removed or renamed.",
+  "title": "CimPal pipeline result",
+  "type": "object",
+  "required": ["schema", "timestamp", "pipeline", "totalSteps", "steps", "summary"],
+  "properties": {
+    "schema": {"const": "cimpal-pipeline-result/1"},
+    "timestamp": {"type": "string", "minLength": 1},
+    "pipeline": {"type": "string"},
+    "totalSteps": {"type": "integer", "minimum": 1},
+    "steps": {
+      "type": "array",
+      "description": "The steps that ran, in order; skipped steps are not listed.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "command", "exitCode", "status"],
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": ["string", "null"]},
+          "command": {"type": ["string", "null"]},
+          "exitCode": {"type": "integer", "minimum": 0},
+          "status": {"enum": ["OK", "VIOLATIONS", "INVALID_INPUT", "ERROR"]}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["passed", "violations", "failed", "skipped", "stopped"],
+      "properties": {
+        "passed": {"type": "integer", "minimum": 0},
+        "violations": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "skipped": {"type": "integer", "minimum": 0},
+        "stopped": {"type": "boolean"}
+      }
+    }
+  }
+}
