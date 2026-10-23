@@ -87,7 +87,9 @@
             </plugin>
             <!-- Integration tests (*IT) that fork a JVM, e.g. the SIGTERM drain of serve (DEP-6). They
                  run against the compiled classes, not the shaded JAR, and on the plain classpath
-                 so the forked JVM can be started with java.class.path. -->
+                 so the forked JVM can be started with java.class.path. The exception is
+                 PackagedJarIT (TEST-4), which runs the shaded JAR (bound to package, so built
+                 before integration-test) with java -jar. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -96,6 +98,11 @@
                     <useModulePath>false</useModulePath>
                     <useManifestOnlyJar>false</useManifestOnlyJar>
                     <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                    <systemPropertyVariables>
+                        <!-- PackagedJarIT (TEST-4) runs the shaded JAR as a real process. -->
+                        <cimpal.cliJar>${project.build.directory}/CimPal-CLI.jar</cimpal.cliJar>
+                        <cimpal.expectedVersion>${project.version}</cimpal.expectedVersion>
+                    </systemPropertyVariables>
                 </configuration>
                 <executions>
                     <execution>

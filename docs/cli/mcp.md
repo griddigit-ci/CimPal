@@ -140,6 +140,23 @@ Tool call responses use the standard MCP content format:
 
 `isError` is `true` when the command exits with code 2 (bad input) or 3 (internal error). A `violationsExitCode` in the arguments is ignored here; `hasViolations` in the result says whether violations were found. A `summaryFile` argument is allowed (checked like any output path), though the tool result already carries the same JSON.
 
+### JSON-RPC errors
+
+Each input line is one JSON-RPC 2.0 message. Malformed or unexpected messages get these answers (since TEST-4, 2026-10-22):
+
+| Message | Answer |
+|---|---|
+| Not valid JSON, or more than one JSON value on the line | error `-32700` (Parse error), `"id": null` |
+| Not a JSON object (batches, i.e. arrays, are not supported in MCP 2024-11-05), or an `id` that is not a string or number (`"id": null` included: MCP doesn't allow it, and its answer would look like a parse error's) | error `-32600` (Invalid Request), `"id": null`; nothing runs |
+| A request (with `id`) without a string `method` | error `-32600` (Invalid Request) with that `id` |
+| A request whose `method` is unknown | error `-32601` (Method not found) with that `id` |
+| `tools/call` with an unknown tool name | error `-32602` (Invalid params) |
+| A request whose handler fails unexpectedly, also with a stack overflow (e.g. very deeply nested data in an input file) | error `-32603` (Internal error) with that `id` and a generic message (the details go to stderr); the server keeps reading. Before TEST-4 a stack overflow ended the server. |
+| A notification (no `id`), known or unknown | no answer; a tool is never run for a notification |
+| A response from the client (`result` or `error`, no `method`) | no answer |
+
+Before TEST-4 a handler failure was answered as a `-32700` parse error with `"id": null`, a message without `method` got `-32601`, an unknown notification got an error answer, and a `tools/call` sent as a notification (or with `"id": null`) ran the tool. With `--debug`, the logged traffic has control characters and line breaks shown as `␞`, like every other log line. Error messages are capped and kept on one line like tool results. A command that fails (exit 2 or 3) is not a JSON-RPC error: it is a tool result with `"isError": true`.
+
 ---
 
 ## Response format

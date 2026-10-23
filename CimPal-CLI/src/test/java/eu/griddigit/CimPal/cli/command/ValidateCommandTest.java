@@ -376,6 +376,52 @@ class ValidateCommandTest {
         assertThat(System.getProperty("cimpal.python.executable")).isNull();
     }
 
+    // ---- TEST-4: the --format json contract and exit 3 --------------------------------------
+
+    /** A mapping validation of one violating Thing, plus {@code extra} arguments. */
+    private String[] mappingRun(String... extra) throws Exception {
+        write("mapping/models/data.xml", TestModels.VIOLATING_THING_MODEL);
+        write("mapping/constraints/shapes.ttl", TestModels.THING_SHAPES);
+        write("mapping/mapping.csv", "xml_inputs,ttl,notes\ndata.xml,shapes.ttl,Thing check\n");
+        List<String> args = new java.util.ArrayList<>(List.of("validate", "--workflow", "mapping",
+                "--mapping-csv", tempDir.resolve("mapping/mapping.csv").toString(),
+                "--models", tempDir.resolve("mapping/models").toString(),
+                "--constraints-root", tempDir.resolve("mapping/constraints").toString(),
+                "--output", tempDir.resolve("mapping/out").toString(),
+                "--xml-base", TestModels.XML_BASE, "--workers", "1"));
+        args.addAll(List.of(extra));
+        return args.toArray(String[]::new);
+    }
+
+    @Test
+    void jsonModePrintsOnlyTheSummaryForTheMappingAndCombinedWorkflows() throws Exception {
+        List<String> combined = new java.util.ArrayList<>(List.of(combinedRunWithTwoFindings("--format", "json")));
+        combined.addFirst("validate");
+
+        for (String[] args : List.of(mappingRun("--format", "json"), combined.toArray(String[]::new))) {
+            eu.griddigit.CimPal.cli.CliRun.Result run = eu.griddigit.CimPal.cli.CliRun.run(args);
+
+            assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.VIOLATIONS);
+            JsonNode summary = run.json(); // exactly one document: a progress line would fail here
+            assertThat(eu.griddigit.CimPal.cli.CliSchemas.errors("validate.schema.json", summary))
+                    .as(summary.toString()).isEmpty();
+            assertThat(summary.path("hasViolations").asBoolean()).isTrue();
+            assertThat(summary.path("totals").path("violations").asInt()).isPositive();
+        }
+    }
+
+    @Test
+    void aSummaryFileThatCannotBeWrittenIsAnInternalErrorWithNothingOnStdout() throws Exception {
+        // D3: a natural failure: the summary file's parent is a file.
+        Path blocker = write("blocker", "a file, not a folder");
+
+        eu.griddigit.CimPal.cli.CliRun.Result run = eu.griddigit.CimPal.cli.CliRun.run(
+                mappingRun("--format", "json", "--summary-file", blocker.resolve("summary.json").toString()));
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.INTERNAL_ERROR);
+        assertThat(run.stdout()).isEmpty();
+    }
+
     @Test
     void anAbsolutePythonExecutableIsAccepted() throws Exception {
         Path python = Files.writeString(tempDir.resolve("python"), "");

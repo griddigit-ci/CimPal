@@ -105,6 +105,48 @@ class ServeCommandTest {
                 .build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    /**
+     * TEST-4 security review: serve created a missing --root (as the parent of its default work
+     * folder) and wrote its token file before any root was checked, so a mistyped root or an
+     * unmounted volume started a server on an empty folder. mcp and run refuse it.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"plain", "mixed-separators", "traversal", "unc"})
+    void aRootThatDoesNotExistIsBadInputAndNothingIsCreated(String spelling) throws Exception {
+        String missing = switch (spelling) {
+            case "plain" -> tempDir.resolve("no-such-root").toString();
+            case "mixed-separators" -> tempDir.toString().replace('\\', '/') + "/no-such\\root";
+            case "traversal" -> tempDir.resolve("x").resolve("..").resolve("no-such-root").toString();
+            default -> {
+                // A UNC root is only probed on Windows (through localhost, never another host).
+                org.junit.jupiter.api.Assumptions.assumeTrue(
+                        System.getProperty("os.name", "").toLowerCase().startsWith("windows"), "Windows only");
+                yield "\\\\localhost\\cimpal-no-such-share\\data";
+            }
+        };
+        Path tokenFile = tempDir.resolve("serve.token");
+        ServeCommand command = new ServeCommand();
+        command.environment = Map.of();
+        command.onTerm = onTerm -> false;
+        CompletableFuture<ServeServer> started = new CompletableFuture<>();
+        command.onStarted = started::complete;
+        // No --work-root: the default work folder lies in the first root.
+        CompletableFuture<Integer> exit = CompletableFuture.supplyAsync(() -> new CommandLine(command).execute(
+                "--host", "127.0.0.1", "--port", "0", "--token-file", tokenFile.toString(), "--root", missing));
+        CompletableFuture.anyOf(started, exit).get(30, TimeUnit.SECONDS);
+        if (started.isDone()) {
+            shutdown(started.get(), Files.readString(tokenFile));
+            exit.get(10, TimeUnit.SECONDS);
+        }
+
+        assertThat(started).as("serve must not start; output: %s", output()).isNotDone();
+        assertThat(exit.get()).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(output()).contains("Root does not exist");
+        try (java.util.stream.Stream<Path> created = Files.list(tempDir)) {
+            assertThat(created.toList()).as("nothing created, no token file").isEmpty();
+        }
+    }
+
     @Test
     void writesTheTokenFileNeverPrintsTheTokenAndRemovesTheFileOnShutdown() throws Exception {
         Path tokenFile = tempDir.resolve("serve.token");

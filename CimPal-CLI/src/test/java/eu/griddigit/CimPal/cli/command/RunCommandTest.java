@@ -103,6 +103,72 @@ class RunCommandTest {
         assertThat(result.exitCode()).isEqualTo(ExitCode.INVALID_INPUT);
     }
 
+    // ---- TEST-4: the --format json contract and the pipeline exit codes --------------------
+
+    private static final String SHAPE_PREFIX = "@prefix sh: <http://www.w3.org/ns/shacl#> .\n";
+
+    /** A pipeline of {@code steps} (JSON objects) written next to the inputs; returns its path. */
+    private Path pipelineOf(String... steps) throws Exception {
+        Files.writeString(tempDir.resolve("m.ttl"), "<urn:x:a> <urn:x:p> \"one\" .\n");
+        Files.writeString(tempDir.resolve("a.ttl"), SHAPE_PREFIX + "<urn:x:a> a sh:NodeShape ; sh:name \"x\" .\n");
+        Files.writeString(tempDir.resolve("b.ttl"), SHAPE_PREFIX + "<urn:x:a> a sh:NodeShape ; sh:name \"y\" .\n");
+        return Files.writeString(tempDir.resolve("pipeline.json"),
+                "{\"name\":\"contract\",\"_comment\":\"ignored\",\"steps\":[" + String.join(",", steps) + "]}");
+    }
+
+    private static final String QUERY_STEP = "{\"id\":\"query\",\"command\":\"sparql\",\"models\":[\"m.ttl\"],"
+            + "\"query\":\"SELECT ?o WHERE { ?s ?p ?o }\",\"output\":\"rows.csv\",\"overwrite\":true}";
+    private static final String COMPARE_STEP = "{\"id\":\"diff\",\"command\":\"compare\",\"fileA\":\"a.ttl\","
+            + "\"fileB\":\"b.ttl\"}";
+    private static final String FAILING_STEP = "{\"id\":\"broken\",\"command\":\"sparql\",\"models\":[\"missing.ttl\"],"
+            + "\"query\":\"SELECT ?o WHERE { ?s ?p ?o }\"}";
+
+    @Test
+    void jsonModePrintsOnlyThePipelineDocument() throws Exception {
+        Path file = pipelineOf(QUERY_STEP, COMPARE_STEP);
+
+        eu.griddigit.CimPal.cli.CliRun.Result run = eu.griddigit.CimPal.cli.CliRun.run("run", "--format", "json",
+                "--root", tempDir.toString(), file.toString());
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.VIOLATIONS);
+        tools.jackson.databind.JsonNode json = run.json(); // the steps' own output went to stderr
+        assertThat(eu.griddigit.CimPal.cli.CliSchemas.errors("run.schema.json", json)).as(json.toString()).isEmpty();
+        assertThat(json.path("steps")).extracting(s -> s.path("status").asString()).containsExactly("OK", "VIOLATIONS");
+        assertThat(json.path("summary").path("violations").asInt()).isEqualTo(1);
+        assertThat(tempDir.resolve("rows.csv")).isRegularFile();
+    }
+
+    @Test
+    void aFailingStepStopsThePipelineWithExitThree() throws Exception {
+        // run reports a step that failed (exit 2 or 3) as exit 3, and skips the rest (docs/cli/run.md).
+        Path file = pipelineOf(FAILING_STEP, QUERY_STEP);
+
+        eu.griddigit.CimPal.cli.CliRun.Result run = eu.griddigit.CimPal.cli.CliRun.run("run", "--format", "json",
+                "--root", tempDir.toString(), file.toString());
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.INTERNAL_ERROR);
+        tools.jackson.databind.JsonNode json = run.json();
+        assertThat(json.path("steps")).singleElement()
+                .satisfies(s -> assertThat(s.path("exitCode").asInt()).isEqualTo(ExitCode.INVALID_INPUT));
+        assertThat(json.path("summary").path("skipped").asInt()).isEqualTo(1);
+        assertThat(json.path("summary").path("stopped").asBoolean()).isTrue();
+        assertThat(tempDir.resolve("rows.csv")).doesNotExist();
+    }
+
+    @Test
+    void underscoreKeysInAStepChangeNothing() throws Exception {
+        // _query would be a bad query if a step read it; _models a missing file.
+        String commented = QUERY_STEP.replace("{\"id\"",
+                "{\"_comment\":\"doc\",\"_query\":\"not SPARQL\",\"_models\":[\"missing.ttl\"],\"id\"");
+        Path file = pipelineOf(commented);
+
+        eu.griddigit.CimPal.cli.CliRun.Result run = eu.griddigit.CimPal.cli.CliRun.run("run", "--format", "json",
+                "--root", tempDir.toString(), file.toString());
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.OK);
+        assertThat(Files.readString(tempDir.resolve("rows.csv"))).contains("one");
+    }
+
     @Test
     void nestedRunInvocationIsRefusedByTheDepthGuard() throws Exception {
         Path inner = pipeline("convert");

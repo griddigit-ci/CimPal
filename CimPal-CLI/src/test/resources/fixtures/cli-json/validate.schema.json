@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/griddigit-ci/CimPal/schemas/cimpal-validate-summary/1",
+  "$comment": "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+. The JSON document of validate --format json (and --summary-file), all three workflows (TEST-4). Additive: new fields may appear in later versions; none are removed or renamed.",
+  "title": "CimPal validate result",
+  "type": "object",
+  "required": ["schema", "run", "totals", "hasViolations"],
+  "properties": {
+    "schema": {"const": "cimpal-validate-summary/1"},
+    "run": {
+      "type": "object",
+      "required": ["timestamp", "workflow", "inputs", "options"],
+      "properties": {
+        "timestamp": {"type": "string", "minLength": 1},
+        "workflow": {"enum": ["mapping", "timestamped", "combined"]},
+        "inputs": {
+          "type": "object",
+          "required": ["outputDir"],
+          "properties": {
+            "mappingCsv": {"type": "string"},
+            "modelsDir": {"type": "string"},
+            "constraintsRoot": {"type": ["string", "null"]},
+            "constraintFiles": {"type": "array", "items": {"type": "string"}},
+            "dataFiles": {"type": "array", "items": {"type": "string"}},
+            "outputDir": {"type": "string"}
+          }
+        },
+        "options": {
+          "type": "object",
+          "required": ["xmlBase", "engine", "workers", "maxResultsPerConstraint"],
+          "properties": {
+            "datatypeMap": {"type": ["string", "null"]},
+            "xmlBase": {"type": ["string", "null"]},
+            "engine": {"type": ["string", "null"]},
+            "workers": {"type": "integer"},
+            "maxResultsPerConstraint": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": ["conforming", "violations", "errors", "total"],
+      "properties": {
+        "conforming": {"type": "integer", "minimum": 0},
+        "violations": {"type": "integer", "minimum": 0},
+        "errors": {"type": "integer", "minimum": 0},
+        "total": {"type": "integer", "minimum": 0}
+      }
+    },
+    "hasViolations": {"type": "boolean"},
+    "partial": {"type": "boolean"},
+    "results": {"$ref": "#/$defs/severityCounts"},
+    "byConstraintFile": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["constraintFile", "conforms", "results"],
+        "properties": {
+          "constraintFile": {"type": "string"},
+          "conforms": {"type": "boolean"},
+          "results": {"$ref": "#/$defs/severityCounts"}
+        }
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "shapes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["shapeId", "constraint", "path", "count", "sampleFocusNodes"],
+        "properties": {
+          "shapeId": {"type": ["string", "null"]},
+          "constraint": {"type": ["string", "null"]},
+          "path": {"type": ["string", "null"]},
+          "count": {"type": "integer", "minimum": 0},
+          "sampleFocusNodes": {"type": "array", "items": {"type": ["string", "null"]}}
+        }
+      }
+    },
+    "report": {"type": "string", "description": "The Excel report (mapping and combined workflows)."},
+    "reports": {"type": "array", "items": {"type": "string"}, "description": "The reports of the timestamped workflow."},
+    "turtleReport": {"type": "string"},
+    "stats": {"type": "object", "description": "With --stats; see stats.schema.json."}
+  },
+  "anyOf": [{"required": ["report"]}, {"required": ["reports"]}],
+  "$defs": {
+    "severityCounts": {
+      "type": "object",
+      "required": ["total", "violations", "warnings", "infos"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "violations": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "infos": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
