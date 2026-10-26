@@ -576,7 +576,7 @@ public class ManifestGenerator {
         return List.of(ResourceFactory.createResource(compact));
     }
 
-    private static String compactAccessUrl(String rawAccessUrl, File sourceFile) {
+    static String compactAccessUrl(String rawAccessUrl, File sourceFile) {
         String parentFolder = null;
         String fileName = null;
 
@@ -596,6 +596,11 @@ public class ManifestGenerator {
                     fileName = p.getFileName() != null ? p.getFileName().toString() : null;
                     Path parent = p.getParent();
                     parentFolder = (parent != null && parent.getFileName() != null) ? parent.getFileName().toString() : null;
+                } else if (uri.getScheme() == null && raw.startsWith("/")) {
+                    // An absolute POSIX folder: only its last name, as for a file: URI or a
+                    // Windows path, so the server's folder layout stays out of the manifest.
+                    Path folder = Path.of(raw);
+                    parentFolder = folder.getFileName() != null ? folder.getFileName().toString() : null;
                 } else if (uri.getScheme() == null) {
                     // Plain relative path supplied by the caller (e.g. a repo-relative model
                     // folder such as "Instance/Belgovia/Grid/cimxml"): use it verbatim as the
