@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (decision D-8: yes, 2026-10-12) |
+| Status | Done ([PR #69](https://github.com/griddigit-ci/CimPal/pull/69); decision D-8: yes, 2026-10-12) |
 | Phase | D1 |
 | Depends on | DEP-5; decision D-8 |
 | Size | L |

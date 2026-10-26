@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (PR #76) |
+| Status | Done ([PR #76](https://github.com/griddigit-ci/CimPal/pull/76)) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | DEP-5, DEP-7, DEP-8; decisions D-14, D-18 |
 | Size | L |

@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (`feature/doc-2-consistency`) |
+| Status | Done ([PR #82](https://github.com/griddigit-ci/CimPal/pull/82)) |
 | Phase | 2 (any time; small) |
 | Depends on | — (rebase on devel after DEP-11/DEP-14 are merged if they touch the same docs) |
 | Size | S |

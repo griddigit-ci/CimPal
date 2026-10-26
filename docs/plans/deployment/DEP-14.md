@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (`feature/dep-14-idempotency-webhooks`, stacked on DEP-11) |
+| Status | Done ([PR #79](https://github.com/griddigit-ci/CimPal/pull/79)) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | DEP-5, DEP-9; DEP-11 for durable keys (an in-memory variant works before it); DEP-13 for per-client keys and webhook URLs; decision D-19 |
 | Size | M |

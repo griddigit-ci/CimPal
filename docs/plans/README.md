@@ -26,19 +26,19 @@ Order: CI and test harness first, then the two High server gaps, then broad test
 | 0 | [DOC-1](workspace/DOC-1.md) | Plans folder restructure | — | S | Done (branch `docs/option2-roadmap`) |
 | 0 | [CI-1](ci/CI-1.md) | PR build and test | — | S | Done ([PR #40](https://github.com/griddigit-ci/CimPal/pull/40)) |
 | 1 | [TEST-1](testing/TEST-1.md) | Test harness | CI-1 | M | Done ([PR #43](https://github.com/griddigit-ci/CimPal/pull/43)) |
-| 1 | [SEC-1](security/SEC-1.md) | Harden serve | TEST-1 | M | In review ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) |
-| 1 | [SEC-2](security/SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | In review ([PR #45](https://github.com/griddigit-ci/CimPal/pull/45), stacked on SEC-1) |
-| 2 | [DOC-2](workspace/DOC-2.md) | Docs/CLI consistency fixes found on 2026-10-20 | — | S | In review |
-| 2 | [TEST-2](testing/TEST-2.md) | Regression tests for past security findings | TEST-1 | M | In review ([PR #46](https://github.com/griddigit-ci/CimPal/pull/46); 4 findings reported) |
-| 2 | [SEC-5](security/SEC-5.md) | Fix the findings reported by TEST-2 | TEST-2, SEC-2 | S | In review (PR #49) |
-| 2 | [TEST-3](testing/TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | In progress (validation and SHACL generation groups merged; convert and sparql groups on `feature/test-3-convert-sparql`; comparisons, gen-instances + manifest and kgcl open) |
-| 2 | [TEST-4](testing/TEST-4.md) | CLI contract, packaged JAR and protocol tests | TEST-1 | M | In review ([PR #89](https://github.com/griddigit-ci/CimPal/pull/89); MCP JSON-RPC error codes, `serve` missing-root and two `manifest` fixes included) |
-| 3 | [SEC-3](security/SEC-3.md) | MCP output hygiene and external engines | SEC-2 | S | In review (branch `feature/sec-3-mcp-hygiene`, not pushed) |
+| 1 | [SEC-1](security/SEC-1.md) | Harden serve | TEST-1 | M | Done ([PR #44](https://github.com/griddigit-ci/CimPal/pull/44)) |
+| 1 | [SEC-2](security/SEC-2.md) | Allowed roots and SPARQL SERVICE | TEST-1 | M | Done ([PR #45](https://github.com/griddigit-ci/CimPal/pull/45)) |
+| 2 | [DOC-2](workspace/DOC-2.md) | Docs/CLI consistency fixes found on 2026-10-20 | — | S | Done ([PR #82](https://github.com/griddigit-ci/CimPal/pull/82)) |
+| 2 | [TEST-2](testing/TEST-2.md) | Regression tests for past security findings | TEST-1 | M | Done ([PR #46](https://github.com/griddigit-ci/CimPal/pull/46); its 4 findings fixed by SEC-5) |
+| 2 | [SEC-5](security/SEC-5.md) | Fix the findings reported by TEST-2 | TEST-2, SEC-2 | S | Done ([PR #49](https://github.com/griddigit-ci/CimPal/pull/49)) |
+| 2 | [TEST-3](testing/TEST-3.md) | Characterisation (golden-master) tests | TEST-1 | L (one session per feature group) | In progress (validation, SHACL generation, convert and sparql groups merged, the last two in [PR #84](https://github.com/griddigit-ci/CimPal/pull/84); comparisons, gen-instances + manifest and kgcl open) |
+| 2 | [TEST-4](testing/TEST-4.md) | CLI contract, packaged JAR and protocol tests | TEST-1 | M | Done ([PR #89](https://github.com/griddigit-ci/CimPal/pull/89); MCP JSON-RPC error codes, `serve` missing-root and two `manifest` fixes included) |
+| 3 | [SEC-3](security/SEC-3.md) | MCP output hygiene and external engines | SEC-2 | S | Done ([PR #86](https://github.com/griddigit-ci/CimPal/pull/86)) |
 | 3 | [CI-2](ci/CI-2.md) | Supply chain and release integrity | CI-1 | M | Not started |
-| 3 | [CI-3](ci/CI-3.md) | Docker image | CI-1, SEC-1 | M | In review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) |
+| 3 | [CI-3](ci/CI-3.md) | Docker image | CI-1, SEC-1 | M | Done ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) |
 | 3 | [SEC-4](security/SEC-4.md) | Governance and re-attestation | SEC-1, SEC-2, SEC-3 | S (maintainer signs) | Not started |
 | 4 | [TEST-5](testing/TEST-5.md) | Nightly deep tests | TEST-3 | M | Not started |
-| 4 | [TEST-6](testing/TEST-6.md) | GUI smoke tests | TEST-1 | M | In review (`feature/test-6-gui-smoke`) |
+| 4 | [TEST-6](testing/TEST-6.md) | GUI smoke tests | TEST-1 | M | Done ([PR #85](https://github.com/griddigit-ci/CimPal/pull/85)) |
 
 ## Deployment track
 
@@ -56,12 +56,12 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 | D1 | [DEP-8](deployment/DEP-8.md) | Concurrent workers in one JVM (optional) | DEP-5, D-8 | L | Done (PR #69) |
 | D2 | [DEP-9](deployment/DEP-9.md) | Python SDK `cimpal-client` | DEP-5, DEP-7 | M | Done (PR #70) |
 | D2 | [DEP-10](deployment/DEP-10.md) | Airflow provider | DEP-9, DEP-3 | M | Done (PR #71; PyPI publishing in PR #72) |
-| D3 | [DEP-11](deployment/DEP-11.md) | Durable job store (PostgreSQL) | DEP-5, DEP-7, DEP-8; D-14, D-18 | L | In review (PR #76) |
-| D3 | [DEP-12](deployment/DEP-12.md) | Shared queue across replicas (horizontal scale-out) | DEP-11; D-15, D-16 | L | Not started |
+| D3 | [DEP-11](deployment/DEP-11.md) | Durable job store (PostgreSQL) | DEP-5, DEP-7, DEP-8; D-14, D-18 | L | Done ([PR #76](https://github.com/griddigit-ci/CimPal/pull/76)) |
+| D3 | [DEP-12](deployment/DEP-12.md) | Shared queue across replicas (horizontal scale-out) | DEP-11; D-15, D-16 | L | Blocked (parked; unfinished work on local branch `feature/dep-12-shared-queue`) |
 | D3 | [DEP-13](deployment/DEP-13.md) | Client identity, job ownership and quotas | DEP-6; D-17 | M | Done ([PR #75](https://github.com/griddigit-ci/CimPal/pull/75)) |
-| D3 | [DEP-14](deployment/DEP-14.md) | Idempotent submission and completion webhooks | DEP-11 (soft), DEP-13 (soft); D-19 | M | In review (stacked on DEP-11) |
+| D3 | [DEP-14](deployment/DEP-14.md) | Idempotent submission and completion webhooks | DEP-11 (soft), DEP-13 (soft); D-19 | M | Done ([PR #79](https://github.com/griddigit-ci/CimPal/pull/79)) |
 | D3 | [DEP-15](deployment/DEP-15.md) | Job isolation: one child process per job | DEP-8 | M–L | Not started |
-| D3 | [DEP-16](deployment/DEP-16.md) | Load tests, capacity model and SLOs | DEP-2, DEP-9 | M | In progress (tooling done; full runs open) |
+| D3 | [DEP-16](deployment/DEP-16.md) | Load tests, capacity model and SLOs | DEP-2, DEP-9 | M | In progress (tooling merged in [PR #81](https://github.com/griddigit-ci/CimPal/pull/81); full runs open, need Docker) |
 
 Recommended order for phase D3 (see the roadmap): a release first, then DEP-13 → DEP-11 → DEP-14 → DEP-16 → DEP-12 → DEP-15.
 

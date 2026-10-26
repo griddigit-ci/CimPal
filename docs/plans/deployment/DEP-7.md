@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (PR into `devel`) |
+| Status | Done ([PR #66](https://github.com/griddigit-ci/CimPal/pull/66)) |
 | Phase | D1 |
 | Depends on | DEP-5 |
 | Size | M–L |

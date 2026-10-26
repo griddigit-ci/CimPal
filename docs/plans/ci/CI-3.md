@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) |
+| Status | Done ([PR #51](https://github.com/griddigit-ci/CimPal/pull/51)) |
 | Phase | 3 |
 | Depends on | CI-1. SEC-1 before `serve` is advertised for network use; CI-2 for release gating. |
 | Size | M |

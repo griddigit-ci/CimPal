@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | Blocked (parked; unfinished work on local branch `feature/dep-12-shared-queue`) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | **DEP-11** (durable job store); DEP-16 baseline recommended first; decisions D-15, D-16, D-18 |
 | Size | L |
