@@ -53,8 +53,8 @@ class ConfigFileEquivalenceTest {
         Normalizer normalizer = Normalizer.chain(value -> value.replace(escaped, "<BASE>"), Normalizer.paths(dir),
                 Normalizer.timestamps(), Normalizer.blankNodeLabels(),
                 Normalizer.regex("urn:uuid:[0-9a-fA-F-]{36}", "urn:uuid:normalized"),
-                // The catalog's dct:identifier is its UUID without leading digits (Known issues).
-                Normalizer.regex("\"[0-9a-fA-F]{0,8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\"",
+                // ... and gives the catalog that UUID as its dct:identifier.
+                Normalizer.regex("\"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\"",
                         "\"normalized\""));
         Map<String, String> outputs = new java.util.TreeMap<>();
         for (String output : scenario.outputs()) {
