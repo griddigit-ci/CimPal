@@ -6,10 +6,13 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.CimPalCli;
+import eu.griddigit.CimPal.cli.CliRun;
+import eu.griddigit.CimPal.cli.CliSchemas;
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.testsupport.StubHttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -48,6 +51,54 @@ class SparqlCommandTest {
             String cell = text.lines().skip(1).findFirst().orElseThrow();
             assertThat(cell.startsWith("\"") ? cell.substring(1) : cell).as(text).startsWith("'=HYPERLINK");
         }
+    }
+
+    // ---- TEST-4: the --format json contract and exit codes ----------------------------------
+
+    @Test
+    void jsonModePrintsOneDocumentWithTheRowsInQueryOrder() throws Exception {
+        Path model = Files.writeString(tempDir.resolve("m.ttl"),
+                "<urn:x:b> <urn:x:p> \"two\" .\n<urn:x:a> <urn:x:p> \"one\" .\n");
+
+        CliRun.Result run = CliRun.run("sparql", "--models", model.toString(),
+                "--query", "SELECT ?s ?o WHERE { ?s <urn:x:p> ?o } ORDER BY ?o", "--format", "json");
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.OK);
+        JsonNode json = run.json();
+        assertThat(CliSchemas.errors("sparql.schema.json", json)).isEmpty();
+        assertThat(json.path("columns")).extracting(JsonNode::asString).containsExactly("s", "o");
+        assertThat(json.path("rows")).extracting(row -> row.path("o").asString()).containsExactly("one", "two");
+    }
+
+    /**
+     * A query with a syntax error is the caller's mistake, but Jena's {@code QueryParseException}
+     * is not an {@code IllegalArgumentException}, so the command reports it as exit 3 with a stack
+     * trace.
+     */
+    @org.junit.jupiter.api.Disabled("Suspected bug (TEST-4): a SPARQL syntax error is exit 3 (internal error), not 2")
+    @Test
+    void aQueryThatDoesNotParseIsBadInputWithNothingOnStdout() throws Exception {
+        Path model = Files.writeString(tempDir.resolve("m.ttl"), "<urn:a> <urn:p> \"x\" .\n");
+
+        CliRun.Result run = CliRun.run("sparql", "--models", model.toString(), "--query", "SELECT WHERE {",
+                "--format", "json");
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(run.stdout()).isEmpty();
+    }
+
+    @Test
+    void anOutputThatCannotBeWrittenIsAnInternalError() throws Exception {
+        // D3: a natural failure, no hook: the parent of the output is a file.
+        Path model = Files.writeString(tempDir.resolve("m.ttl"), "<urn:a> <urn:p> \"x\" .\n");
+        Path blocker = Files.writeString(tempDir.resolve("blocker"), "a file, not a folder");
+
+        CliRun.Result run = CliRun.run("sparql", "--models", model.toString(), "--query",
+                "SELECT ?o WHERE { ?s ?p ?o }", "--format", "json",
+                "--summary-file", blocker.resolve("summary.json").toString());
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.INTERNAL_ERROR);
+        assertThat(run.stdout()).isEmpty();
     }
 
     @Test

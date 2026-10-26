@@ -6,6 +6,8 @@
 package eu.griddigit.CimPal.cli.command;
 
 import eu.griddigit.CimPal.cli.CimPalCli;
+import eu.griddigit.CimPal.cli.CliFixtures;
+import eu.griddigit.CimPal.cli.CliRun;
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.testsupport.TestModels;
 import org.junit.jupiter.api.Test;
@@ -425,5 +427,224 @@ class McpCommandTest {
         assertThat(mcpExitCode("--root", tempDir.toString(), "--python-executable", "python"))
                 .isEqualTo(ExitCode.INVALID_INPUT);
         assertThat(System.getProperty("cimpal.python.executable")).isNull();
+    }
+
+    // ---- tools/call for every tool (TEST-4) ----
+
+    @Test
+    void toolsListOffersAToolForEveryCommandThatServeRuns() {
+        List<JsonNode> messages = runMcp("""
+                {"jsonrpc":"2.0","id":1,"method":"tools/list"}
+                """);
+
+        java.util.Set<String> commands = new java.util.TreeSet<>();
+        for (JsonNode tool : messages.getFirst().path("result").path("tools")) {
+            commands.add(CommandSchemas.byToolName(tool.path("name").asString()).command());
+        }
+        assertThat(commands).isEqualTo(new java.util.TreeSet<>(ServeServer.COMMANDS));
+    }
+
+    static final List<String> TOOLS = CommandSchemas.all().stream().map(CommandSchemas.Entry::toolName).toList();
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.FieldSource("TOOLS")
+    void everyToolRunsOnAFixture(String tool, @TempDir Path tempDir) throws Exception {
+        CommandSchemas.Entry entry = CommandSchemas.byToolName(tool);
+        CliFixtures.Scenario scenario = CliFixtures.scenario(entry.command(), tempDir);
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
+        call.putObject("params").put("name", tool).set("arguments", scenario.config());
+
+        List<JsonNode> messages = runMcp(JSON.writeValueAsString(call) + "\n", "--root", tempDir.toString());
+
+        JsonNode result = toolResult(messages);
+        assertThat(result.path("isError").asBoolean()).as(result.toString()).isFalse();
+        assertCappedAndLabelled(result);
+        JsonNode payload = JSON.readTree(result.path("content").get(0).path("text").asString());
+        if (entry.supportsJson()) {
+            assertThat(eu.griddigit.CimPal.cli.CliSchemas.errors(
+                    eu.griddigit.CimPal.cli.CliSchemas.schemaFile(entry.command()), payload)).as(payload.toString()).isEmpty();
+        } else {
+            assertThat(payload.path("exitCode").asInt()).as(payload.toString()).isEqualTo(scenario.exitCode());
+        }
+        for (String output : scenario.outputs()) {
+            assertThat(tempDir.resolve(output)).as(output).isRegularFile();
+        }
+    }
+
+    // ---- JSON-RPC 2.0 error handling (TEST-4, D4) ----
+
+    private static void assertError(JsonNode reply, int code, JsonNode id) {
+        assertThat(reply.path("jsonrpc").asString()).isEqualTo("2.0");
+        assertThat(reply.path("error").path("code").asInt()).as(reply.toString()).isEqualTo(code);
+        assertThat(reply.has("id")).as(reply.toString()).isTrue();
+        assertThat(reply.get("id")).as(reply.toString()).isEqualTo(id);
+        assertThat(reply.has("result")).isFalse();
+    }
+
+    @Test
+    void invalidJsonIsAParseErrorWithANullId(@TempDir Path tempDir) {
+        List<JsonNode> messages = runMcp("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\n"
+                + "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"} trailing\n", "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(2);
+        messages.forEach(reply -> assertError(reply, -32700, JSON.nullNode()));
+    }
+
+    @Test
+    void aRequestWithoutAMethodIsAnInvalidRequest(@TempDir Path tempDir) {
+        List<JsonNode> messages = runMcp("""
+                {"jsonrpc":"2.0","id":7}
+                {"jsonrpc":"2.0","id":8,"method":42}
+                {"jsonrpc":"2.0","params":{}}
+                """, "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(3);
+        assertError(messages.get(0), -32600, JSON.getNodeFactory().numberNode(7));
+        assertError(messages.get(1), -32600, JSON.getNodeFactory().numberNode(8));
+        assertError(messages.get(2), -32600, JSON.nullNode());
+    }
+
+    @Test
+    void aMessageThatIsNotAnObjectOrHasABadIdIsAnInvalidRequestWithANullId(@TempDir Path tempDir) {
+        // Batches are not part of MCP 2024-11-05; an array is refused like any other non-object.
+        List<JsonNode> messages = runMcp("""
+                [{"jsonrpc":"2.0","id":1,"method":"ping"}]
+                42
+                {"jsonrpc":"2.0","id":{"x":1},"method":"ping"}
+                """, "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(3);
+        messages.forEach(reply -> assertError(reply, -32600, JSON.nullNode()));
+    }
+
+    @Test
+    void anUnknownMethodWithAnIdIsMethodNotFound(@TempDir Path tempDir) {
+        List<JsonNode> messages = runMcp("""
+                {"jsonrpc":"2.0","id":"a-3","method":"no/such/method"}
+                """, "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(1);
+        assertError(messages.getFirst(), -32601, JSON.getNodeFactory().stringNode("a-3"));
+    }
+
+    @Test
+    void notificationsAreNeverAnswered(@TempDir Path tempDir) {
+        // No "id": a notification. Neither an unknown method nor a known one gets a reply, and a
+        // tool is not run for one; the ping after them shows the server is still reading.
+        Path out = tempDir.resolve("never.ttl");
+        List<JsonNode> messages = runMcp("""
+                {"jsonrpc":"2.0","method":"no/such/method"}
+                {"jsonrpc":"2.0","method":"notifications/initialized"}
+                {"jsonrpc":"2.0","method":"ping"}
+                {"jsonrpc":"2.0","method":"tools/call","params":{"name":"manifest","arguments":{"dir":"%s","output":"%s"}}}
+                {"jsonrpc":"2.0","id":9,"method":"ping"}
+                """.formatted(json(tempDir), json(out)), "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(1);
+        assertThat(messages.getFirst().path("id").asInt()).isEqualTo(9);
+        assertThat(messages.getFirst().has("result")).isTrue();
+        assertThat(out).doesNotExist();
+    }
+
+    @Test
+    void aResponseFromTheClientIsNotAnswered(@TempDir Path tempDir) {
+        List<JsonNode> messages = runMcp("""
+                {"jsonrpc":"2.0","id":4,"result":{}}
+                {"jsonrpc":"2.0","id":5,"error":{"code":-1,"message":"x"}}
+                {"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"the client's own parse error"}}
+                {"jsonrpc":"2.0","id":6,"method":"ping"}
+                """, "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(1);
+        assertThat(messages.getFirst().path("id").asInt()).isEqualTo(6);
+    }
+
+    /** A JSON string body for {@code path} (backslashes escaped). */
+    private static String json(Path path) {
+        return path.toString().replace("\\", "\\\\");
+    }
+
+    @Test
+    void aHandlerThatFailsIsAnInternalErrorForThatRequest(@TempDir Path tempDir) throws Exception {
+        // A natural failure inside tools/call: the JVM's temporary folder doesn't exist, so the
+        // tool's config file can't be written. Not a parse error, and the server keeps serving.
+        Path model = Files.writeString(tempDir.resolve("m.ttl"), "<urn:x:a> <urn:x:p> \"x\" .\n");
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 11).put("method", "tools/call");
+        call.putObject("params").put("name", "sparql").putObject("arguments")
+                .put("query", "SELECT ?o WHERE { ?s ?p ?o }").putArray("models").add(model.toString());
+        String stdin = JSON.writeValueAsString(call) + "\n{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"ping\"}\n";
+
+        CliRun.Result run = CliRun.fork(tempDir, List.of("-Djava.io.tmpdir=" + tempDir.resolve("no-such-folder")),
+                stdin, "mcp", "--root", tempDir.toString());
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.OK);
+        List<JsonNode> messages = run.stdout().lines().filter(l -> !l.isBlank()).map(JSON::readTree).toList();
+        assertThat(messages).as(run.stdout()).hasSize(2);
+        assertError(messages.get(0), -32603, JSON.getNodeFactory().numberNode(11));
+        assertThat(messages.get(1).path("id").asInt()).isEqualTo(12);
+        assertThat(messages.get(1).has("result")).isTrue();
+        assertThat(run.stderr()).doesNotContain("[MCP parse error]").doesNotContain("\tat ");
+        // Generic for the client: the details (here a local path) stay on the server's stderr.
+        assertThat(messages.get(0).path("error").path("message").asString())
+                .doesNotContain("no-such-folder").doesNotContain(tempDir.getFileName().toString());
+    }
+
+    // ---- TEST-4 security review: hostile JSON-RPC input ----
+
+    @Test
+    void aRequestWithANullIdIsInvalidAndRunsNothing(@TempDir Path tempDir) throws Exception {
+        // MCP: a request id must not be null. Its answer could not be told from a parse error's.
+        Path out = tempDir.resolve("never.ttl");
+        List<JsonNode> messages = runMcp("""
+                {"jsonrpc":"2.0","id":null,"method":"tools/call","params":{"name":"manifest","arguments":{"dir":"%s","output":"%s"}}}
+                """.formatted(json(tempDir), json(out)), "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(1);
+        assertError(messages.getFirst(), -32600, JSON.nullNode());
+        assertThat(out).doesNotExist();
+    }
+
+    @Test
+    void deeplyNestedJsonIsAParseErrorAndTheServerGoesOn(@TempDir Path tempDir) {
+        List<JsonNode> messages = runMcp("[".repeat(5000) + "\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}\n",
+                "--root", tempDir.toString());
+
+        assertThat(messages).hasSize(2);
+        assertError(messages.getFirst(), -32700, JSON.nullNode());
+        assertThat(messages.get(1).path("id").asInt()).isEqualTo(2);
+    }
+
+    @Test
+    void debugAndNotificationLogLinesAreSanitised(@TempDir Path tempDir) throws Exception {
+        // A raw ESC in the input line, and a notification method with ESC and a line break.
+        ObjectNode notification = JSON.createObjectNode().put("jsonrpc", "2.0").put("method", "x\u001b[31m\r\nFAKE");
+        String stderr = mcpStderr("{\"x\":\"\u001b[31mSYSTEM\"}\n" + JSON.writeValueAsString(notification) + "\n",
+                "--root", tempDir.toString(), "--debug");
+
+        assertThat(stderr.lines().filter(line -> line.startsWith("[MCP")).toList()).isNotEmpty()
+                .allSatisfy(line -> assertThat(UNSAFE.matcher(line).find()).as(line).isFalse());
+        assertThat(stderr.lines()).noneMatch(line -> line.startsWith("FAKE"));
+    }
+
+    @Test
+    void aStackOverflowInAToolIsAnInternalErrorAndTheServerGoesOn(@TempDir Path tempDir) throws Exception {
+        // Deeply nested blank nodes in an input file: the Turtle parser recurses once per level.
+        int depth = 200_000;
+        Path model = Files.writeString(tempDir.resolve("deep.ttl"),
+                "<urn:x:a> <urn:x:p> " + "[ <urn:x:p> ".repeat(depth) + "\"x\"" + " ]".repeat(depth) + " .\n");
+        ObjectNode call = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 21).put("method", "tools/call");
+        call.putObject("params").put("name", "sparql").putObject("arguments")
+                .put("query", "SELECT ?o WHERE { ?s ?p ?o }").putArray("models").add(model.toString());
+        String stdin = JSON.writeValueAsString(call) + "\n{\"jsonrpc\":\"2.0\",\"id\":22,\"method\":\"ping\"}\n";
+
+        CliRun.Result run = CliRun.fork(tempDir, List.of("-Xss256k"), stdin, "mcp", "--root", tempDir.toString());
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.OK);
+        List<JsonNode> messages = run.stdout().lines().filter(l -> !l.isBlank()).map(JSON::readTree).toList();
+        assertThat(messages).as(run.stdout()).hasSize(2);
+        // The overflow leaves the command (neither sparql nor picocli catch an Error) and reached
+        // the read loop, which ended the server before TEST-4. Now: -32603, and the server goes on.
+        assertError(messages.getFirst(), -32603, JSON.getNodeFactory().numberNode(21));
+        assertThat(messages.get(1).path("id").asInt()).isEqualTo(22);
     }
 }

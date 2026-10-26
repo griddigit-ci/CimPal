@@ -112,6 +112,7 @@ File paths in requests may only point inside the allowed folders. Every path fie
 | `--write-root <dir>` | — | Folder that outputs may be written to; its files can also be read. Repeatable. |
 | `--allow-unc` | off | Accept UNC network paths (`\server\share`). They still have to be under a root. |
 
+- Every `--root`, `--read-root` and `--write-root` must be an existing folder. A missing one ends `serve` at start with exit 2 (`Root does not exist: ...`), before anything is created or a token file is written, as `mcp` and `run` do. Before TEST-4 (2026-10-22) `serve` created a missing first `--root` as the parent of its default work folder and started on the empty folder, so a mistyped root or an unmounted volume went unnoticed.
 - Relative paths in a request resolve against the first `--root` (or the working directory).
 - `..` and absolute paths outside the roots are refused. So are links and junctions that lead outside, and Windows device names (`CON`, `NUL`, `COM1`, ...) and NTFS alternate data streams.
 - **Existing output files named in the request** (`output`) are not overwritten unless the request sets `"overwrite": true`. Output folders may already exist, and files a command creates inside its output folder (reports, generated shapes) are replaced on every run.

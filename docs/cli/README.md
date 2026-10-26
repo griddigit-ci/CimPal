@@ -114,6 +114,23 @@ For running the JSON-capable commands (`validate`, `sparql`, `compare`, `compare
 
 ---
 
+## JSON output contract (schemas)
+
+With `--format json` (and in the file `--summary-file` writes), stdout holds exactly one JSON document and nothing else; progress and warnings go to stderr. The documents follow JSON Schemas (draft 2020-12) kept in the repository, which are the published contract of that output:
+
+| Command | Schema (`CimPal-CLI/src/test/resources/fixtures/cli-json/`) | `schema` field |
+|---|---|---|
+| `validate` | `validate.schema.json` (all three workflows) | `cimpal-validate-summary/1` |
+| `sparql` | `sparql.schema.json` | none (`columns`, `rows`) |
+| `compare` | `compare.schema.json` | `cimpal-compare-result/1` |
+| `compare-instances` | `compare-instances.schema.json` | `cimpal-compare-instances-result/1` |
+| `run` | `run.schema.json` | `cimpal-pipeline-result/1` |
+| `--stats` (any of the first four) | `stats.schema.json` | none |
+
+The schemas are additive: later versions may add fields, but no field is removed or renamed and no type changes without a new `schema` version. The tests check every command's real output against them, in-process and from the packaged JAR (`CommandContractTest`, `PackagedJarIT`), and `mcp` tool results and `serve` responses carry the same documents. Under `mcp` the strings in them are capped and kept on one line (see [mcp](mcp.md#untrusted-data-in-tool-results)).
+
+---
+
 ## Exit codes
 
 Every command returns a numeric exit code. Scripts and CI systems should check this code, not the text output.
@@ -165,7 +182,9 @@ Config files are plain JSON. A few conventions apply:
 
 **`_comment`** keys are silently ignored by the CLI — they are a description of the file for humans. Put anything you like there.
 
-**`_note_*`** keys (e.g. `_note_workflow`) are also silently ignored. They are used in the template files to explain what a field means and what values are valid.
+**`_note_*`** keys (e.g. `_note_workflow`) are also silently ignored. They are used in the template files to explain what a field means and what values are valid. In fact every key starting with `_` is ignored, and so is any other key a command doesn't know: a misspelt key (`"modelDir"` for `"modelsDir"`) is not reported, it just has no effect. Check a config with `--dry-run` (where the command has it), which prints the settings the command resolved.
+
+**A config file and the same flags give the same run**: the same exit code, output and files (`ConfigFileEquivalenceTest` checks this for every command with `--config`).
 
 **Relative paths** in config files are resolved relative to the config file's own location. If the config is at `/data/runs/nightly.json` and it says `"modelsDir": "models"`, that resolves to `/data/runs/models`. Use absolute paths to avoid ambiguity.
 

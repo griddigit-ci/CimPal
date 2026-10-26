@@ -371,6 +371,15 @@ public class ServeCommand implements Callable<Integer> {
         if (!pythonOptions.apply(true)) {
             return ExitCode.INVALID_INPUT;
         }
+        // The roots must exist before anything is created in them (the default work folder) or a
+        // token file is written: a mistyped --root or an unmounted volume is bad input (TEST-4),
+        // as it is for mcp and run.
+        try {
+            rootOptions.policy(List.of(Path.of("").toAbsolutePath()));
+        } catch (IllegalArgumentException ex) {
+            System.err.println("[ERROR] " + ex.getMessage());
+            return ExitCode.INVALID_INPUT;
+        }
         if (!logFormat.equalsIgnoreCase("json")) {
             return serve(ServeLog.text());
         }

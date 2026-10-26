@@ -95,7 +95,7 @@ public class ManifestGenerator {
         catalog.addProperty(RDF.type, DCAT_CATALOG);
         catalog.addProperty(DCTERMS_TITLE, "Manifest");
         catalog.addProperty(DCTERMS_DESCRIPTION, plainLiteral("", "en"));
-        catalog.addProperty(DCTERMS_IDENTIFIER, catalog.getLocalName());
+        catalog.addProperty(DCTERMS_IDENTIFIER, identifierOf(catalog));
 
         List<File> orderedFiles = sourceFiles == null || sourceFiles.isEmpty()
                 ? sourceModels.keySet().stream()
@@ -138,7 +138,7 @@ public class ManifestGenerator {
                     values(sourceModel, fullModelHeader, MD_MODEL_DESCRIPTION));
             copyBest(dataset, DCTERMS_IDENTIFIER,
                     values(sourceModel, datasetHeader, DCTERMS_IDENTIFIER),
-                    List.of(ResourceFactory.createPlainLiteral(dataset.getLocalName())));
+                    List.of(ResourceFactory.createPlainLiteral(identifierOf(dataset))));
             copyBestAsDateTime(dataset, DCTERMS_ISSUED,
                     values(sourceModel, datasetHeader, DCTERMS_ISSUED),
                     values(sourceModel, fullModelHeader, MD_MODEL_CREATED));
@@ -432,6 +432,18 @@ public class ManifestGenerator {
         return List.of(plainLiteral(keyword));
     }
 
+    /**
+     * The {@code dct:identifier} of a catalog or dataset node: the UUID of a {@code urn:uuid:}
+     * IRI, else its local name.
+     */
+    static String identifierOf(Resource resource) {
+        String uri = resource.getURI();
+        if (uri != null && uri.regionMatches(true, 0, "urn:uuid:", 0, 9)) {
+            return uri.substring(9);
+        }
+        return resource.getLocalName();
+    }
+
     private static Resource createCatalogResource(Model manifest) {
         return manifest.createResource("urn:uuid:" + UUID.randomUUID());
     }
@@ -576,7 +588,7 @@ public class ManifestGenerator {
         return List.of(ResourceFactory.createResource(compact));
     }
 
-    private static String compactAccessUrl(String rawAccessUrl, File sourceFile) {
+    static String compactAccessUrl(String rawAccessUrl, File sourceFile) {
         String parentFolder = null;
         String fileName = null;
 
@@ -596,6 +608,11 @@ public class ManifestGenerator {
                     fileName = p.getFileName() != null ? p.getFileName().toString() : null;
                     Path parent = p.getParent();
                     parentFolder = (parent != null && parent.getFileName() != null) ? parent.getFileName().toString() : null;
+                } else if (uri.getScheme() == null && raw.startsWith("/")) {
+                    // An absolute POSIX folder: only its last name, as for a file: URI or a
+                    // Windows path, so the server's folder layout stays out of the manifest.
+                    Path folder = Path.of(raw);
+                    parentFolder = folder.getFileName() != null ? folder.getFileName().toString() : null;
                 } else if (uri.getScheme() == null) {
                     // Plain relative path supplied by the caller (e.g. a repo-relative model
                     // folder such as "Instance/Belgovia/Grid/cimxml"): use it verbatim as the

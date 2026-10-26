@@ -32,20 +32,22 @@ Capture the current behaviour of every Core feature with golden-output tests, so
 
 | Feature | Core entry point | L2 golden | L3 CLI (TEST-4) | L5 serve/mcp (TEST-4) |
 | --- | --- | --- | --- | --- |
-| SHACL validation — mapping, timestamped | `MappingValidator` | [x] | [ ] `validate` | [ ] |
+| SHACL validation — mapping, timestamped | `MappingValidator` | [x] | [x] `validate` | [x] |
 | SHACL rule test (Conform / NonConform; was "manual") | `ShaclRuleTester` | [ ] (behaviour pinned by `ShaclRuleTesterTest`, no golden yet) | — GUI only since 2026-10-05 | — |
 | Single-dataset validation | `SHACLValidator` | [x] (Jena engine; the Python engines need external installs) | — | — |
-| RDFS → SHACL (2019, 2020, closed, split datatypes) | `SHACLFromRDF` | [x] | [ ] `rdfs2shacl` | [ ] |
-| Excel → SHACL | `ShaclFromXls` | [x] | [ ] `excel2shacl` | [ ] |
-| SHACL organise | `ShaclOrganizer` | [x] | [ ] `organize` | [ ] |
-| RDF convert (XML, Turtle, JSON-LD, CIMXML, sort, union) | `RDFConverter` | [x] | [ ] `convert` | [ ] |
-| Compare RDFS / SHACL / CIMTool | `Comparison*` | [ ] | [ ] `compare` | [ ] |
-| Compare instances (DL/SV/TP ignores) | `ComparisonInstanceData` | [ ] | [ ] `compare-instances` | [ ] |
-| SPARQL SELECT + Excel/CSV export | `SparqlTools` | [x] (Excel; the CSV export is in the CLI, for TEST-4) | [ ] `sparql` | [ ] |
-| Instance generation from Excel | `InstanceDataBuilder/Writer` | [ ] | [ ] `gen-instances` | [ ] |
-| Manifest generation | `ManifestGenerator` | [ ] | [ ] `manifest` | [ ] |
-| Pipelines | `RunCommand` | — | [ ] `run` | — |
+| RDFS → SHACL (2019, 2020, closed, split datatypes) | `SHACLFromRDF` | [x] | [x] `rdfs2shacl` | [x] |
+| Excel → SHACL | `ShaclFromXls` | [x] | [x] `excel2shacl` | [x] |
+| SHACL organise | `ShaclOrganizer` | [x] | [x] `organize` | [x] |
+| RDF convert (XML, Turtle, JSON-LD, CIMXML, sort, union) | `RDFConverter` | [x] | [x] `convert` | [x] |
+| Compare RDFS / SHACL / CIMTool | `Comparison*` | [ ] | [x] `compare` | [x] |
+| Compare instances (DL/SV/TP ignores) | `ComparisonInstanceData` | [ ] | [x] `compare-instances` | [x] |
+| SPARQL SELECT + Excel/CSV export | `SparqlTools` | [x] (Excel; the CSV export is in the CLI, for TEST-4) | [x] `sparql` | [x] |
+| Instance generation from Excel | `InstanceDataBuilder/Writer` | [ ] | [x] `gen-instances` | [x] |
+| Manifest generation | `ManifestGenerator` | [ ] | [x] `manifest` | [x] |
+| Pipelines | `RunCommand` | — | [x] `run` | — |
 | KGCL export | `Kgcl*` | [ ] | — | — |
+
+L3 and L5 ticked by TEST-4 (2026-10-22): L3 is `CommandContractTest`, `ConfigFileEquivalenceTest`, the per-command `*CommandTest` classes and `PackagedJarIT` (each command from the shaded JAR); L5 is an MCP `tools/call` per tool on a fixture (`McpCommandTest.everyToolRunsOnAFixture`) plus the existing `serve` tests and `serve` + `mcp` from the packaged JAR (`PackagedJarIT`).
 
 ## Suspected bugs
 

@@ -24,6 +24,31 @@ class ManifestGeneratorIriTest {
     }
 
     @Test
+    void anAbsoluteFolderGivesOnlyItsLastNameOnEveryPlatform() {
+        // A POSIX path is a valid relative URI, so it once went into the IRI whole and the
+        // server's folder layout ended up in the manifest (seen on Linux only).
+        java.io.File model = new java.io.File("upload/other/EQ.xml");
+        assertThat(ManifestGenerator.compactAccessUrl("/srv/cimpal/work/models", model)).isEqualTo("file:models/EQ.xml");
+        assertThat(ManifestGenerator.compactAccessUrl("file:///srv/cimpal/work/models/EQ.xml", model))
+                .isEqualTo("file:models/EQ.xml");
+        assertThat(ManifestGenerator.compactAccessUrl("Instance/Grid/cimxml", model))
+                .isEqualTo("file:Instance/Grid/cimxml/EQ.xml");
+    }
+
+    @Test
+    void anIdentifierIsTheWholeUuidEvenWhenItStartsWithDigits() {
+        // Jena's local name skips characters an XML name can't start with, so a UUID starting
+        // with digits lost them (and, with a digit-only first group, its first dash too).
+        var model = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+        assertThat(ManifestGenerator.identifierOf(model.createResource("urn:uuid:12345678-90ed-4930-acae-c6620e672bcf")))
+                .isEqualTo("12345678-90ed-4930-acae-c6620e672bcf");
+        assertThat(ManifestGenerator.identifierOf(model.createResource("urn:uuid:abcdef01-2345-4930-acae-c6620e672bcf")))
+                .isEqualTo("abcdef01-2345-4930-acae-c6620e672bcf");
+        assertThat(ManifestGenerator.identifierOf(model.createResource("http://example.com/model#EQ_1")))
+                .isEqualTo("EQ_1");
+    }
+
+    @Test
     void charactersThatWouldEndTheIriAreEncoded() {
         assertThat(ManifestGenerator.iriPath("a>.xml")).isEqualTo("a%3E.xml");
         assertThat(ManifestGenerator.iriPath("a\"<b\n.xml")).isEqualTo("a%22%3Cb%0A.xml");
