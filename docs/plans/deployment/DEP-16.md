@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (`feature/dep-16-load-tests-v2`, stacked on DEP-14): tooling, metrics, rules and nightly job done; the full measurement runs are open |
+| Status | In progress: tooling, metrics, rules and nightly job merged ([PR #81](https://github.com/griddigit-ci/CimPal/pull/81)); the full measurement runs are open (need Docker) |
 | Phase | D3 (option 2 hardening, see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md)) |
 | Depends on | DEP-2 (benchmark models), DEP-9 (SDK as the load client); re-run after DEP-12 and DEP-15 |
 | Size | M |

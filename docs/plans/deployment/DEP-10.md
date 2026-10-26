@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review |
+| Status | Done ([PR #71](https://github.com/griddigit-ci/CimPal/pull/71); PyPI publishing in [PR #72](https://github.com/griddigit-ci/CimPal/pull/72)) |
 | Phase | D2 |
 | Depends on | DEP-9, DEP-3 |
 | Size | M |

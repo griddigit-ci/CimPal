@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (validation and SHACL generation groups merged into devel 2026-10-09; convert and sparql groups written 2026-10-21 on `feature/test-3-convert-sparql`; comparisons, gen-instances + manifest and kgcl not started) |
+| Status | In progress (validation and SHACL generation groups merged into devel 2026-10-09; convert and sparql groups merged 2026-10-21 ([PR #84](https://github.com/griddigit-ci/CimPal/pull/84)); comparisons, gen-instances + manifest and kgcl not started) |
 | Phase | 2 |
 | Depends on | TEST-1 |
 | Size | L (one session per feature group) |
