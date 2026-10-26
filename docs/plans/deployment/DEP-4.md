@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In progress (maintainer review of the support policy pending) |
+| Status | Done (support policy reviewed 2026-10-22; the Docker/bash quickstart still needs one run on Linux) |
 | Phase | D0 |
 | Depends on | DEP-1, DEP-2, DEP-3 |
 | Size | M |
@@ -49,7 +49,7 @@ A guide that an external organisation can follow to understand, install, size, s
 - [x] The capability statement fits on two printed pages (853 words) and makes no unbacked claims. Each security claim maps to a test, the attestation or a CLI doc; the resource numbers come from `sizing.md`.
 - [x] Planned features (service API, deployment, file exchange, concurrency, SDK, provider) are marked "Planned" with their WP ids, in `deployment-modes.md` and `capabilities.md`.
 - [x] `README.md` links to `docs/guide/index.md` (new "Documentation" section), and `docs/cli/index.md` links to the guide.
-- [ ] Support-policy text drafted and marked `<!-- maintainer review -->` in `versioning-and-support.md`; the maintainer's review is still to be recorded below.
+- [x] Support-policy text drafted, reviewed by the maintainer on 2026-10-22 (see the decisions log), and the review markers removed from `versioning-and-support.md`.
 - [x] The Markdown link check passes for `docs/guide/**`, `docs/cli/**` and `README.md`: `scripts/check_doc_links.py` in `.github/workflows/docs.yml`.
 
 ## Instructions for Claude Code
@@ -85,6 +85,8 @@ Standard footer (applies to every work package):
 | 2026-10-06 | Command check against `--help` from the `devel` build on its Maven classpath, because `CimPal-CLI.jar` was locked by the local MCP server. Same code as the JAR. | Claude Code; approved plan |
 | 2026-10-06 | The link check is a small stdlib script (`scripts/check_doc_links.py`) in a path-filtered workflow (`docs.yml`), not lychee: no new tool, and it checks heading anchors. External URLs are not fetched. | Claude Code; approved plan |
 | 2026-10-06 | Support contact: the README's existing support address (cimpal@griddigit.eu), plus GitHub private vulnerability reporting for security issues. Both are marked for maintainer confirmation; no address was invented. | Claude Code |
+| 2026-10-22 | Support policy approved as drafted: the stability promises; deprecation after at least three months and two releases; fixes in the newest release only; vulnerability reports acknowledged within five working days; contacts cimpal@griddigit.eu and GitHub private vulnerability reporting (off on 2026-10-22; the maintainer enables it). | Maintainer |
+| 2026-10-22 | The `/v1` job API is a stable interface: additive changes only, a breaking change means `/v2` served next to `/v1` for at least the deprecation period. The unversioned command endpoints `POST /<command>` stay outside the promise. | Maintainer |
 
 ## Notes and results
 
@@ -96,8 +98,8 @@ Standard footer (applies to every work package):
   - The workbook has the sheets "Validation results", "Validation statistics", "StatisticsConstraint" and "Charts".
   - With `--samples 3`: 5 shape groups with 2 findings each (10 in total), matching the generator's manifest.
 - **Link check:** 31 files, 0 broken links.
+- **Support policy review (2026-10-22):** approved as drafted, with `/v1` added as a stable interface (decisions log). Stale "planned" lines for DEP-5, DEP-8, DEP-9 and DEP-10 in `capabilities.md`, `glossary.md` and `service.md` were brought up to date at the same time.
 - **Open:**
-  - the maintainer reviews `versioning-and-support.md` (stability promises, deprecation period, supported versions, response time, contacts) and records it here;
-  - the Docker and bash quickstart are run once on Linux;
-  - `devel` should get `master`'s version bump (the guide doesn't depend on it, but `--version` on `devel` is behind);
-  - pages to extend as DEP-5..10 land: deployment modes, capabilities, airflow.
+  - the Docker and bash quickstart are run once on Linux (the Docker engine was not running on 2026-10-22);
+  - the maintainer enables GitHub private vulnerability reporting on `griddigit-ci/CimPal`, which the support page names;
+  - `devel` should get `master`'s version bump (the guide doesn't depend on it, but `--version` on `devel` is behind).
