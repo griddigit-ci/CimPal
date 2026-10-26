@@ -55,29 +55,33 @@ class AdmissionGateTest {
     void aCommandThatDoesNotFitWaitsAndSmallerOnesBehindItDoNotOvertake() throws Exception {
         AdmissionGate gate = new AdmissionGate(100 * MIB);
         AdmissionGate.Ticket big = gate.acquire(80 * MIB, () -> false);
-        List<String> order = new CopyOnWriteArrayList<>();
+        // The abandoned check runs under the gate's lock, last of all just before admission, so
+        // the last value each waiter saw is the gate's use at the moment it was let in. Recording
+        // the order after acquire returned raced: both are admitted within microseconds.
+        List<Long> seenByBig2 = new CopyOnWriteArrayList<>();
+        List<Long> seenBySmall = new CopyOnWriteArrayList<>();
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<AdmissionGate.Ticket> second = pool.submit(() -> {
-                AdmissionGate.Ticket t = gate.acquire(80 * MIB, () -> false);
-                order.add("big2");
-                return t;
-            });
+            Future<AdmissionGate.Ticket> second = pool.submit(() -> gate.acquire(80 * MIB, () -> {
+                seenByBig2.add(gate.inUse());
+                return false;
+            }));
             waitUntil(() -> gate.waitingForTest() == 1);
-            Future<AdmissionGate.Ticket> small = pool.submit(() -> {
-                AdmissionGate.Ticket t = gate.acquire(10 * MIB, () -> false);
-                order.add("small");
-                return t;
-            });
+            Future<AdmissionGate.Ticket> small = pool.submit(() -> gate.acquire(10 * MIB, () -> {
+                seenBySmall.add(gate.inUse());
+                return false;
+            }));
             waitUntil(() -> gate.waitingForTest() == 2);
             Thread.sleep(100);
             // The small one would fit (90 MiB) but is behind big2: first come, first served.
-            assertThat(order).isEmpty();
+            assertThat(second.isDone()).isFalse();
+            assertThat(small.isDone()).isFalse();
 
             big.close();
             AdmissionGate.Ticket t2 = second.get(10, TimeUnit.SECONDS);
             AdmissionGate.Ticket t3 = small.get(10, TimeUnit.SECONDS);
-            assertThat(order).containsExactly("big2", "small");
+            assertThat(seenByBig2.getLast()).as("big2 let in once big had left").isZero();
+            assertThat(seenBySmall.getLast()).as("small let in after big2").isEqualTo(80 * MIB);
             assertThat(gate.inUse()).isEqualTo(90 * MIB);
             t2.close();
             t3.close();
