@@ -19,6 +19,7 @@ import eu.griddigit.CimPal.cli.command.OrganizeCommand;
 import eu.griddigit.CimPal.cli.command.RdfsToShaclCommand;
 import eu.griddigit.CimPal.cli.command.RunCommand;
 import eu.griddigit.CimPal.cli.command.ServeCommand;
+import eu.griddigit.CimPal.cli.command.ShaclToXlsxCommand;
 import eu.griddigit.CimPal.cli.command.SparqlCommand;
 import eu.griddigit.CimPal.cli.command.ValidateCommand;
 import picocli.CommandLine;
@@ -41,6 +42,7 @@ import picocli.CommandLine.Command;
  *   <li>{@code id-map}         — map the IDs of one CIM model onto another model of the same grid
  *   <li>{@code excel2shacl}    — generate SHACL constraints from Excel + RDFS profile
  *   <li>{@code organize}       — reorganize SHACL files per Excel mapping template
+ *   <li>{@code shacl2xlsx}     — export SHACL shape files to an Excel workbook
  *   <li>{@code help}           — display help for a subcommand
  * </ul>
  *
@@ -69,6 +71,7 @@ import picocli.CommandLine.Command;
                 IdMapCommand.class,
                 ExcelToShaclCommand.class,
                 OrganizeCommand.class,
+                ShaclToXlsxCommand.class,
                 GenInstancesCommand.class,
                 RunCommand.class,
                 ServeCommand.class,
