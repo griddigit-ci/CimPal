@@ -211,7 +211,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.7</version>
+            <version>42.7.12</version>
         </dependency>
         <!-- Shared test helpers from CimPal-Core (eu.griddigit.cimpal.core.testsupport). -->
         <dependency>
