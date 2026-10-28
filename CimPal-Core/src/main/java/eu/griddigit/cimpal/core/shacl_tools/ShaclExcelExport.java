@@ -5,16 +5,13 @@
  */
 package eu.griddigit.cimpal.core.shacl_tools;
 
-import eu.griddigit.cimpal.core.utils.ExcelTools;
+import eu.griddigit.cimpal.core.utils.ExcelSheets;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFLanguages;
 import org.apache.jena.vocabulary.RDF;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.ss.util.WorkbookUtil;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.topbraid.shacl.vocabulary.SH;
 
@@ -60,8 +57,6 @@ public final class ShaclExcelExport {
     static final String SOURCE_COLUMN = "Source file";
     private static final List<String> SUMMARY_COLUMNS = List.of("PropertyShape/NodeShape ID", "Constraint Name",
             "Group", "Type", "SPARQL constraint ID", "Severity", "Message", "Constraint Description");
-    private static final String FORMULA_TRIGGERS = "=+-@\t\r";
-    private static final int MAX_SHEET_NAME = 31;
 
     private ShaclExcelExport() {
     }
@@ -308,80 +303,11 @@ public final class ShaclExcelExport {
     // -------------------------------------------------------------------------
 
     private static void writeSheet(XSSFWorkbook workbook, String wantedName, Table table) {
-        XSSFSheet sheet = workbook.createSheet(uniqueSheetName(workbook, wantedName));
-        CellStyle header = headerStyle(workbook);
-        CellStyle data = dataStyle(workbook);
-        CellStyle quoted = dataStyle(workbook);
-        quoted.setQuotePrefixed(true);
-        List<String> columns = table.columns();
-
-        Row headerRow = sheet.createRow(0);
-        for (int c = 0; c < columns.size(); c++) {
-            Cell cell = headerRow.createCell(c);
-            cell.setCellValue(ExcelTools.cellText(columns.get(c)));
-            cell.setCellStyle(header);
+        List<List<Object>> rows = new ArrayList<>();
+        for (Map<String, Object> row : table.rows()) {
+            rows.add(table.columns().stream().map(row::get).toList());
         }
-        for (int r = 0; r < table.rows().size(); r++) {
-            Row row = sheet.createRow(r + 1);
-            Map<String, Object> values = table.rows().get(r);
-            for (int c = 0; c < columns.size(); c++) {
-                Cell cell = row.createCell(c);
-                Object value = values.get(columns.get(c));
-                cell.setCellStyle(data);
-                if (value instanceof Number n) {
-                    cell.setCellValue(n.doubleValue());
-                } else {
-                    String s = ExcelTools.cellText(value == null ? "" : value.toString());
-                    cell.setCellValue(s);
-                    if (!s.isEmpty() && FORMULA_TRIGGERS.indexOf(s.charAt(0)) >= 0) cell.setCellStyle(quoted);
-                }
-            }
-        }
-        for (int c = 0; c < columns.size(); c++) {
-            sheet.autoSizeColumn(c);
-            sheet.setColumnWidth(c, Math.min(sheet.getColumnWidth(c), 120 * 256));
-        }
-        sheet.createFreezePane(0, 1);
-        if (!columns.isEmpty()) {
-            sheet.setAutoFilter(new CellRangeAddress(0, table.rows().size(), 0, columns.size() - 1));
-        }
-    }
-
-    /**
-     * {@code wanted} as a sheet name Excel accepts: characters it refuses replaced, at most 31
-     * characters, and a "~2", "~3"… suffix when the workbook already has it (names compare ignoring case).
-     */
-    static String uniqueSheetName(Workbook workbook, String wanted) {
-        String base = WorkbookUtil.createSafeSheetName(wanted == null || wanted.isBlank() ? "Sheet" : wanted, '_');
-        String name = base;
-        for (int n = 2; workbook.getSheet(name) != null; n++) {
-            String suffix = "~" + n;
-            name = base.substring(0, Math.min(base.length(), MAX_SHEET_NAME - suffix.length())) + suffix;
-        }
-        return name;
-    }
-
-    private static CellStyle headerStyle(Workbook workbook) {
-        CellStyle style = dataStyle(workbook);
-        Font font = workbook.createFont();
-        font.setBold(true);
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setFillForegroundColor(IndexedColors.SKY_BLUE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        return style;
-    }
-
-    private static CellStyle dataStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        style.setAlignment(HorizontalAlignment.LEFT);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setWrapText(true);
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        return style;
+        ExcelSheets.write(workbook, wantedName, table.columns(), rows);
     }
 
     /**

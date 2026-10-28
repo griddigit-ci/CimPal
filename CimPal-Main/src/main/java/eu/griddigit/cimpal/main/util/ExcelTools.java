@@ -292,77 +292,32 @@ public class ExcelTools {
         }
     }
 
+    /**
+     * Adds a sheet with one column per key of {@code orderList}, in that order. Each list's first
+     * element is the column header; the first column's length sets the number of rows, and a shorter
+     * column leaves empty cells. Plain numbers ("1", "2.5") become number cells, everything else stays
+     * text. The sheet is written by Core's {@link eu.griddigit.cimpal.core.utils.ExcelSheets}: a taken
+     * or invalid sheet name gets a safe, unique one, and formula-like text is quote-prefixed.
+     */
     public static XSSFWorkbook exportMapToExcel(String sheetName, Map<String, List<String>> mapInfo, List<String> orderList, XSSFWorkbook workbook) {
-        XSSFSheet sheet;
-        if (workbook.getSheet(sheetName) == null) {
-            sheet = workbook.createSheet(sheetName);
-        } else {
-            sheet = workbook.getSheet(sheetName);
+        List<String> headers = new ArrayList<>();
+        for (String key : orderList) {
+            List<String> column = mapInfo.get(key);
+            headers.add(column == null || column.isEmpty() ? key : column.getFirst());
         }
-
-        // Create cell style for header row
-        CellStyle headerCellStyle = createHeaderStyle(workbook);
-
-        // Create cell style for data rows
-        CellStyle dataCellStyle = createDataStyle(workbook);
-
-        List<String> leadingList = mapInfo.get(orderList.getFirst());
-        int columnIndex;
-        for (int rowNum = 0; rowNum < leadingList.size(); rowNum++) {
-            XSSFRow xssfRow = sheet.createRow(rowNum);
-            columnIndex = 0;
+        int rowCount = mapInfo.get(orderList.getFirst()).size() - 1;
+        List<List<Object>> rows = new ArrayList<>();
+        for (int r = 1; r <= rowCount; r++) {
+            List<Object> row = new ArrayList<>();
             for (String key : orderList) {
-                putExcelCellInfo(key, rowNum, columnIndex, xssfRow, mapInfo, headerCellStyle, dataCellStyle);
-                columnIndex = columnIndex + 1;
+                List<String> column = mapInfo.get(key);
+                row.add(column != null && r < column.size()
+                        ? eu.griddigit.cimpal.core.utils.ExcelSheets.numberOrText(column.get(r)) : null);
             }
+            rows.add(row);
         }
-
-        // Auto-size columns after populating the data
-        int maxWidthInCharacters = 120; // Maximum desired width in characters
-        int defaultCharacterWidth = 256; // Default width of one character
-        for (int i = 0; i < orderList.size(); i++) {
-            sheet.autoSizeColumn(i);
-
-            // Check the column width and adjust if needed
-            int currentWidthInUnits = sheet.getColumnWidth(i);
-            int currentWidthInCharacters = currentWidthInUnits / defaultCharacterWidth;
-
-            if (currentWidthInCharacters > maxWidthInCharacters) {
-                sheet.setColumnWidth(i, maxWidthInCharacters * defaultCharacterWidth);
-            }
-        }
-
-        // Freeze the top row
-        sheet.createFreezePane(0, 1); // Freeze the top row
-
-        // Add filter to the populated columns
-        sheet.setAutoFilter(CellRangeAddress.valueOf("A1:" + getColumnName(orderList.size() - 1) + (mapInfo.get(orderList.getFirst()).size() + 1)));
-
+        eu.griddigit.cimpal.core.utils.ExcelSheets.write(workbook, sheetName, headers, rows);
         return workbook;
-
-    }
-
-
-    private static void putExcelCellInfo(String key, int rowNum, int columnIndex, XSSFRow xssfRow, Map<String, List<String>> mapInfo, CellStyle headerCellStyle, CellStyle dataCellStyle) {
-        Object cellValue = mapInfo.get(key).get(rowNum);
-
-        XSSFCell cell = xssfRow.createCell(columnIndex);
-        String cellContent;
-        if (cellValue != null && !cellValue.toString().isEmpty()) {
-            try {
-                cellContent = String.valueOf(Double.parseDouble(cellValue.toString()));
-            } catch (NumberFormatException e) {
-                cellContent = cellValue.toString();
-            }
-        } else if (cellValue != null) {
-            cellContent = cellValue.toString();
-        } else {
-            cellContent = "";
-        }
-        cell.setCellValue(cellContent);
-
-        CellStyle cellStyle = rowNum == 0 ? headerCellStyle : dataCellStyle;
-        cell.setCellStyle(cellStyle);
     }
 
     public static CellStyle createHeaderStyle(Workbook workbook) {
