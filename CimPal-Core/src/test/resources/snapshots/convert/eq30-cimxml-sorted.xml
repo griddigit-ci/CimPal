@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#"
+    xmlns:cim="http://iec.ch/TC57/CIM100#"
+  xml:base="http://example.com/data" > 
+  <md:FullModel rdf:about="urn:uuid:00000000-0000-0000-0000-000000000001">
+    <md:Model.profile>http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/3.0</md:Model.profile>
+    <md:Model.scenarioTime>2026-01-01T00:00:00Z</md:Model.scenarioTime>
+  </md:FullModel>
+  <cim:ACLineSegment rdf:about="#_line1">
+    <cim:ACLineSegment.r>0.5</cim:ACLineSegment.r>
+    <cim:ACLineSegment.x>4.25</cim:ACLineSegment.x>
+    <cim:Equipment.EquipmentContainer rdf:resource="#_area1"/>
+    <cim:IdentifiedObject.name>Line 1</cim:IdentifiedObject.name>
+  </cim:ACLineSegment>
+  <cim:GeographicalRegion rdf:about="#_area1">
+    <cim:IdentifiedObject.name>Area &amp; &lt;1&gt;</cim:IdentifiedObject.name>
+  </cim:GeographicalRegion>
+  <cim:Terminal rdf:about="#_t1">
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+    <cim:IdentifiedObject.name>T1</cim:IdentifiedObject.name>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_line1"/>
+  </cim:Terminal>
+  <cim:Terminal rdf:about="#_t2">
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+    <cim:IdentifiedObject.name>T2</cim:IdentifiedObject.name>
+    <cim:Terminal.ConductingEquipment rdf:resource="#_line1"/>
+  </cim:Terminal>
+</rdf:RDF>

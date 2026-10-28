@@ -1,0 +1,11 @@
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh:  <http://www.w3.org/ns/shacl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+<urn:test:shapes>  a  owl:Ontology;
+        sh:declare  [ sh:namespace  "http://iec.ch/TC57/CIM100#"^^xsd:anyURI;
+                      sh:prefix     "cim"
+                    ];
+        sh:declare  [ sh:namespace  "http://iec.ch/TC57/CIM100-European#"^^xsd:anyURI;
+                      sh:prefix     "eu"
+                    ] .

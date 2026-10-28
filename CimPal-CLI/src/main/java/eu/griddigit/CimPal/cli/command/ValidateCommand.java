@@ -22,6 +22,7 @@ import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
 import org.apache.jena.datatypes.RDFDatatype;
 import org.apache.jena.shared.JenaException;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import tools.jackson.databind.JsonNode;
@@ -170,7 +171,7 @@ public class ValidateCommand implements Callable<Integer> {
 
     @Option(names = "--incremental-timestamps",
             description = "For timestamped validation, reuse unaffected Jena focus-node findings between consecutive timestamps.")
-    private boolean incrementalTimestamps;
+    private Boolean incrementalTimestamps;
 
     @Option(names = "--stats",
             description = "Report the run's resource use (wall/CPU time, peak heap, GC, triples loaded): "
@@ -194,10 +195,17 @@ public class ValidateCommand implements Callable<Integer> {
             description = "Print the resolved configuration and exit without running validation.")
     private boolean dryRun;
 
+    @CommandLine.Mixin
+    PythonOptions pythonOptions = new PythonOptions();
+
     // -------------------------------------------------------------------------
 
     @Override
     public Integer call() {
+        // SEC-3 (G9): a start-up flag only, checked before anything runs.
+        if (!pythonOptions.apply(false)) {
+            return ExitCode.INVALID_INPUT;
+        }
         try {
             // 1. Load config file if provided, filling in any flag still null
             if (configFile != null) {
@@ -321,6 +329,10 @@ public class ValidateCommand implements Callable<Integer> {
             JsonNode n = root.path("violationsExitCode");
             if (!n.isMissingNode() && !n.isNull()) violationsExitCode = AutomationOptions.exitCodeFromConfig(n);
         }
+        if (incrementalTimestamps == null) {
+            JsonNode n = root.path("incrementalTimestamps");
+            if (!n.isMissingNode() && !n.isNull()) incrementalTimestamps = n.asBoolean(false);
+        }
         if (previousComparison == null) {
             String v = root.path("previousComparison").asText(null);
             if (v != null && !v.isBlank()) previousComparison = resolveRelative(configDir, v);
@@ -394,6 +406,9 @@ public class ValidateCommand implements Callable<Integer> {
                 ok &= requireOutputDir(outputDir, "--output");
             }
             case "combined" -> {
+                // A folder stands for its files, as the mapping workflow takes a models folder.
+                constraintFiles = expandFolders(constraintFiles, CONSTRAINT_EXTENSIONS, "--constraint-files");
+                dataFiles = expandFolders(dataFiles, DATA_EXTENSIONS, "--data-files");
                 ok &= requireFiles(constraintFiles, "--constraint-files");
                 ok &= requireFiles(dataFiles, "--data-files");
                 if (constraintsRoot != null) {
@@ -429,11 +444,48 @@ public class ValidateCommand implements Callable<Integer> {
             System.err.println("[ERROR] " + flag + " is required.");
             return false;
         }
+        if (f.isDirectory()) {
+            System.err.println("[ERROR] " + flag + " names a folder with no file to use in it: " + f.getAbsolutePath()
+                    + (flag.equals("--data-files") ? " (expected .xml or .zip files)"
+                    : flag.equals("--constraint-files") ? " (expected .ttl, .rdf or .zip files)" : ""));
+            return false;
+        }
         if (!f.exists() || !f.isFile()) {
             System.err.println("[ERROR] File not found for " + flag + ": " + f.getAbsolutePath());
             return false;
         }
         return true;
+    }
+
+    /** What a folder given to the combined workflow contributes. */
+    static final List<String> CONSTRAINT_EXTENSIONS = List.of(".ttl", ".rdf", ".zip");
+    static final List<String> DATA_EXTENSIONS = List.of(".xml", ".zip");
+
+    /**
+     * Replaces each folder in {@code files} by the files directly in it whose name ends in one of
+     * {@code extensions} (any case), sorted by name; sub-folders are not entered. A folder with no
+     * such file stays as it is, so the next check reports it. Files and missing paths are kept.
+     */
+    static List<File> expandFolders(List<File> files, List<String> extensions, String flag) {
+        if (files == null) {
+            return null;
+        }
+        List<File> expanded = new ArrayList<>();
+        for (File f : files) {
+            if (!f.isDirectory()) {
+                expanded.add(f);
+                continue;
+            }
+            File[] children = f.listFiles(child -> child.isFile() && extensions.stream()
+                    .anyMatch(ext -> child.getName().toLowerCase(Locale.ROOT).endsWith(ext)));
+            if (children == null || children.length == 0) {
+                expanded.add(f);
+                continue;
+            }
+            java.util.Arrays.sort(children, Comparator.comparing(File::getName));
+            expanded.addAll(List.of(children));
+        }
+        return expanded;
     }
 
     /** At least one file, and every one of them an existing file. */
@@ -522,25 +574,17 @@ public class ValidateCommand implements Callable<Integer> {
                                 ValidationEngine validationEngine) throws Exception {
         boolean jsonOutput = "json".equalsIgnoreCase(format);
 
-        // For JSON mode: redirect System.out → System.err so validation progress
-        // messages from ValidationTools do not pollute the JSON output on stdout.
-        PrintStream origOut = System.out;
-        if (jsonOutput) {
-            System.setOut(System.err);
-        }
-
-        try {
-            return switch (workflow) {
-                case "mapping"     -> runMappingWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
-                case "timestamped" -> runTimestampedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
-                case "combined"    -> runCombinedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
-                default            -> ExitCode.INVALID_INPUT;
-            };
-        } finally {
-            if (jsonOutput) {
-                System.setOut(origOut);
-            }
-        }
+        // For JSON mode: System.out goes to stderr on this thread and those it starts, so
+        // validation progress messages from ValidationTools do not pollute the JSON on stdout.
+        // Only this run's threads are redirected (CliStreams), not the whole process (DEP-8).
+        PrintStream origOut = CliStreams.currentOut();
+        java.util.concurrent.Callable<Integer> run = () -> switch (workflow) {
+            case "mapping"     -> runMappingWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+            case "timestamped" -> runTimestampedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+            case "combined"    -> runCombinedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+            default            -> ExitCode.INVALID_INPUT;
+        };
+        return jsonOutput ? CliStreams.outToErr(run) : run.call();
     }
 
     // ---- mapping workflow ---------------------------------------------------
@@ -586,8 +630,7 @@ public class ValidateCommand implements Callable<Integer> {
             return ExitCode.INTERNAL_ERROR;
         }
         if (jsonOutput) {
-            System.setOut(origOut);
-            System.out.println(json);
+            origOut.println(json);
         } else {
             printTextSummary(summary);
             StatsJson.toStderr(runStats);
@@ -627,7 +670,7 @@ public class ValidateCommand implements Callable<Integer> {
                 .maxResultsPerConstraint(maxResults)
                 .threads(workers)
                 .exportTurtleReports(Boolean.TRUE.equals(exportTurtle))
-                .incrementalTimestampValidation(incrementalTimestamps)
+                .incrementalTimestampValidation(Boolean.TRUE.equals(incrementalTimestamps))
                 .runStats(runStats);
         if (prevPath != null) {
             optionsBuilder.previousComparisonCsv(prevPath);
@@ -643,8 +686,7 @@ public class ValidateCommand implements Callable<Integer> {
             return ExitCode.INTERNAL_ERROR;
         }
         if (jsonOutput) {
-            System.setOut(origOut);
-            System.out.println(json);
+            origOut.println(json);
         } else {
             printTextSummaryTimestamped(summary);
             StatsJson.toStderr(runStats);
@@ -710,8 +752,7 @@ public class ValidateCommand implements Callable<Integer> {
             return ExitCode.INTERNAL_ERROR;
         }
         if (jsonOutput) {
-            System.setOut(origOut);
-            System.out.println(json);
+            origOut.println(json);
         } else {
             printTextSummaryCombined(report, written);
             StatsJson.toStderr(runStats);
@@ -980,6 +1021,7 @@ public class ValidateCommand implements Callable<Integer> {
         System.out.println("  violationsExit   : " + AutomationOptions.violationsExitCode(violationsExitCode));
         System.out.println("  exportTurtle     : " + exportTurtle);
         System.out.println("  previousCompar.  : " + abs(previousComparison));
+        System.out.println("  incrementalTimestamps : " + Boolean.TRUE.equals(incrementalTimestamps));
     }
 
     // -------------------------------------------------------------------------

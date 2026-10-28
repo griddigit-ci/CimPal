@@ -12,6 +12,7 @@ import eu.griddigit.CimPal.cli.command.CompareInstancesCommand;
 import eu.griddigit.CimPal.cli.command.ConvertCommand;
 import eu.griddigit.CimPal.cli.command.ExcelToShaclCommand;
 import eu.griddigit.CimPal.cli.command.GenInstancesCommand;
+import eu.griddigit.CimPal.cli.command.IdMapCommand;
 import eu.griddigit.CimPal.cli.command.ManifestCommand;
 import eu.griddigit.CimPal.cli.command.McpCommand;
 import eu.griddigit.CimPal.cli.command.OrganizeCommand;
@@ -37,6 +38,7 @@ import picocli.CommandLine.Command;
  *   <li>{@code rdfs2shacl} — generate SHACL shapes from RDFS CIM profile definitions
  *   <li>{@code compare}          — compare two RDF model files and report differences
  *   <li>{@code compare-instances} — compare two sets of CIM instance-data model files
+ *   <li>{@code id-map}         — map the IDs of one CIM model onto another model of the same grid
  *   <li>{@code excel2shacl}    — generate SHACL constraints from Excel + RDFS profile
  *   <li>{@code organize}       — reorganize SHACL files per Excel mapping template
  *   <li>{@code help}           — display help for a subcommand
@@ -64,6 +66,7 @@ import picocli.CommandLine.Command;
                 RdfsToShaclCommand.class,
                 CompareCommand.class,
                 CompareInstancesCommand.class,
+                IdMapCommand.class,
                 ExcelToShaclCommand.class,
                 OrganizeCommand.class,
                 GenInstancesCommand.class,
@@ -87,11 +90,18 @@ public class CimPalCli {
     public static void main(String[] args) {
         // No SPARQL SERVICE: user queries and SHACL-SPARQL shapes must not reach the network (SEC-2).
         SparqlServicePolicy.disableRemoteServiceGlobally();
+        OutOfMemoryExit.prepare();
         int exitCode;
         try {
             exitCode = rethrowingOutOfMemory(new CommandLine(new CimPalCli())).execute(args);
         } catch (Throwable t) {
-            if (OutOfMemoryRethrow.find(t).isPresent()) {
+            boolean outOfMemory;
+            try {
+                outOfMemory = OutOfMemoryRethrow.find(t).isPresent();
+            } catch (OutOfMemoryError nested) {
+                outOfMemory = true; // The heap is still exhausted: looking through the causes failed.
+            }
+            if (outOfMemory) {
                 OutOfMemoryExit.halt();
             }
             throw t;

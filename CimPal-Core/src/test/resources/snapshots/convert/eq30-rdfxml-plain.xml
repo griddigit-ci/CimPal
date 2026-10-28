@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<rdf:RDF
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#"
+    xmlns:cim="http://iec.ch/TC57/CIM100#"
+    xml:base="http://example.com/data" > 
+  <rdf:Description rdf:about="#_t2">
+    <cim:Terminal.ConductingEquipment rdf:resource="#_line1"/>
+    <cim:ACDCTerminal.sequenceNumber>2</cim:ACDCTerminal.sequenceNumber>
+    <cim:IdentifiedObject.name>T2</cim:IdentifiedObject.name>
+    <rdf:type rdf:resource="http://iec.ch/TC57/CIM100#Terminal"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="#_t1">
+    <cim:Terminal.ConductingEquipment rdf:resource="#_line1"/>
+    <cim:ACDCTerminal.sequenceNumber>1</cim:ACDCTerminal.sequenceNumber>
+    <cim:IdentifiedObject.name>T1</cim:IdentifiedObject.name>
+    <rdf:type rdf:resource="http://iec.ch/TC57/CIM100#Terminal"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="urn:uuid:00000000-0000-0000-0000-000000000001">
+    <md:Model.profile>http://iec.ch/TC57/ns/CIM/CoreEquipment-EU/3.0</md:Model.profile>
+    <md:Model.scenarioTime>2026-01-01T00:00:00Z</md:Model.scenarioTime>
+    <rdf:type rdf:resource="http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="#_line1">
+    <cim:Equipment.EquipmentContainer rdf:resource="#_area1"/>
+    <cim:ACLineSegment.x>4.25</cim:ACLineSegment.x>
+    <cim:ACLineSegment.r>0.5</cim:ACLineSegment.r>
+    <cim:IdentifiedObject.name>Line 1</cim:IdentifiedObject.name>
+    <rdf:type rdf:resource="http://iec.ch/TC57/CIM100#ACLineSegment"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="#_area1">
+    <cim:IdentifiedObject.name>Area &amp; &lt;1&gt;</cim:IdentifiedObject.name>
+    <rdf:type rdf:resource="http://iec.ch/TC57/CIM100#GeographicalRegion"/>
+  </rdf:Description>
+</rdf:RDF>

@@ -5,15 +5,28 @@
 # Airflow integration (DEP-3): the example DAGs import cleanly under the pinned Airflow, and the
 # BashOperator DAG really runs the CLI against the example data. The KubernetesPodOperator and
 # DockerOperator end-to-end checks are a manual walkthrough (integrations/airflow/README.md).
+#
+# Deployment examples (DEP-6): the compose file and the Kubernetes manifests are checked
+# statically, and deploy/kubernetes/e2e-kind.sh runs them end to end on kind with an image built
+# from this commit. The Prometheus alert rules (DEP-16, deploy/monitoring) pass promtool's check
+# and unit tests, and the benchmark and load tools (scripts/bench) their self-tests.
+#
+# Python SDK (DEP-9, clients/python): lint, strict types, the generated layer matching the OpenAPI
+# document, unit tests on Python 3.10-3.13, a wheel and sdist build (never published here), and
+# integration tests against a CLI JAR built from this commit.
+#
+# Airflow provider (DEP-10, clients/airflow): on each supported Airflow 3 line (D-12), lint and
+# strict types, unit tests with a mocked server, the example DAGs, and dag.test() runs (polling and
+# deferrable) against serve from a CLI JAR built from this commit.
 name: Integrations
 
 on:
   push:
     branches: [devel, master]
-    paths: ['integrations/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
+    paths: ['integrations/**', 'deploy/**', 'clients/**', 'scripts/bench/**', 'CimPal-CLI/**', 'CimPal-Core/**', 'pom.xml', '.github/workflows/integrations.yml']
   pull_request:
     branches: [devel, master]
-    paths: ['integrations/**', 'CimPal-CLI/**', 'CimPal-Core/**', '.github/workflows/integrations.yml']
+    paths: ['integrations/**', 'deploy/**', 'clients/**', 'scripts/bench/**', 'CimPal-CLI/**', 'CimPal-Core/**', 'pom.xml', '.github/workflows/integrations.yml']
   workflow_dispatch:
 
 permissions:
@@ -72,3 +85,235 @@ jobs:
         env:
           CIMPAL_JAR: ${{ github.workspace }}/CimPal-CLI/target/CimPal-CLI.jar
         run: pytest integrations/airflow/tests -v
+
+  deploy-static:
+    name: Deployment examples (static checks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compose file
+        run: |
+          docker compose -f deploy/docker-compose/compose.yaml config --quiet
+          # Third-party images are pinned by digest.
+          ! grep -nE '^\s*image: [^$]+' deploy/docker-compose/compose.yaml | grep -v 'griddigit-ci/cimpal' | grep -v '@sha256:'
+
+      - name: Kubernetes manifests (kubeconform, strict)
+        run: >-
+          kubectl kustomize deploy/kubernetes
+          | docker run --rm -i ghcr.io/yannh/kubeconform:v0.7.0@sha256:85dbef6b4b312b99133decc9c6fc9495e9fc5f92293d4ff3b7e1b30f5611823c
+          -strict -summary -
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Benchmark and load tools (self-tests)
+        run: |
+          pip install -e clients/python
+          python -m unittest discover -s scripts/bench -p "test_*.py"
+          python -m unittest discover -s scripts/bench/load -p "test_*.py"
+
+      - name: Alert rules (promtool check and unit tests)
+        run: |
+          promtool() {
+            docker run --rm -v "$PWD/deploy/monitoring:/rules:ro" -w /rules --entrypoint promtool \
+              prom/prometheus:v3.5.1@sha256:38c3b05c3bc744ff1b0b7b4eb82196026442845e62a1e2073795565da506d7a2 "$@"
+          }
+          promtool check rules cimpal-alerts.yaml
+          promtool test rules cimpal-alerts.test.yaml
+
+  deploy-kind:
+    name: Kubernetes end to end (kind)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KIND_VERSION: v0.29.0
+      KIND_SHA256: c72eda46430f065fb45c5f70e7c957cc9209402ef309294821978677c8fb3284
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the CLI JAR
+        run: mvn -B -pl CimPal-CLI -am package -DskipTests
+
+      - name: Build the image
+        run: docker build -t cimpal:e2e -f CimPal-CLI/docker/Dockerfile .
+
+      - name: Install kind
+        run: |
+          curl -fsSLo kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_SHA256}  kind" | sha256sum -c -
+          sudo install -m 0755 kind /usr/local/bin/kind
+
+      - name: Deploy, submit a job through the Ingress, read the result
+        run: KEEP=1 IMAGE=cimpal:e2e bash deploy/kubernetes/e2e-kind.sh
+
+      - name: Cluster state on failure
+        if: failure()
+        run: |
+          kubectl get all -A || true
+          kubectl -n cimpal describe pods || true
+          kubectl -n cimpal logs deployment/cimpal --tail=200 || true
+
+  python-sdk:
+    name: Python SDK (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13']
+    defaults:
+      run:
+        working-directory: clients/python
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install the package and its dev tools
+        run: pip install -e ".[dev]"
+
+      - name: Lint and format (ruff)
+        run: |
+          ruff check src scripts tests
+          ruff format --check src scripts tests
+
+      - name: Types (mypy --strict)
+        run: mypy
+
+      - name: The generated layer matches cimpal-v1.json
+        if: matrix.python == '3.13'
+        run: python scripts/regenerate.py --check
+
+      - name: Unit tests
+        run: pytest -m "not integration" -v
+
+      - name: Build the wheel and sdist (not published)
+        if: matrix.python == '3.13'
+        run: |
+          python -m build
+          ls -l dist
+
+  python-sdk-integration:
+    name: Python SDK against serve
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the CLI JAR
+        run: mvn -B -pl CimPal-CLI -am package -DskipTests
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install the package
+        working-directory: clients/python
+        run: pip install -e ".[dev]"
+
+      - name: Integration tests (upload, submit, wait, result, download)
+        working-directory: clients/python
+        env:
+          CIMPAL_INTEGRATION_REQUIRED: '1'
+        run: pytest -m integration -v
+
+  airflow-provider:
+    name: Airflow provider (Airflow ${{ matrix.airflow }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        airflow: ['3.2.2', '3.3.2']
+    env:
+      PYTHON_VERSION: '3.12'
+      AIRFLOW_HOME: ${{ github.workspace }}/target/airflow-provider-home
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      # dag.test() serializes and runs only DAGs of the DAGs folder: the end-to-end test's DAGs.
+      AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/clients/airflow/tests/e2e_dags
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build the CLI JAR
+        run: mvn -B -pl CimPal-CLI -am package -DskipTests
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Airflow with its official constraints file, then the SDK and the provider from this commit.
+      - name: Install Airflow, cimpal-client and the provider
+        run: |
+          pip install "apache-airflow==${{ matrix.airflow }}" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow }}/constraints-${PYTHON_VERSION}.txt"
+          pip install -e clients/python -e "clients/airflow[dev]" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow }}/constraints-${PYTHON_VERSION}.txt"
+
+      - name: Lint and types
+        working-directory: clients/airflow
+        run: |
+          ruff check src tests example_dags hatch_build.py
+          ruff format --check src tests example_dags hatch_build.py
+          mypy
+
+      - name: Create the Airflow metadata database
+        run: airflow db migrate
+
+      - name: Tests (unit, example DAGs, dag.test against serve)
+        working-directory: clients/airflow
+        env:
+          CIMPAL_JAR: ${{ github.workspace }}/CimPal-CLI/target/CimPal-CLI.jar
+          CIMPAL_INTEGRATION_REQUIRED: '1'
+        run: pytest -v
+
+      - name: Build the wheel and sdist (not published)
+        if: matrix.airflow == '3.3.2'
+        working-directory: clients/airflow
+        run: |
+          python -m build
+          ls -l dist

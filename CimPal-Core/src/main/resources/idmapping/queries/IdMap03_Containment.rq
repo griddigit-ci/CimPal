@@ -1,0 +1,31 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# IdMap03_Containment - where equipment and nodes sit.
+# One row per contained object: its direct container (Bay, VoltageLevel, Substation, Line, ...)
+# and, where the container chain allows it, the VoltageLevel and the Substation.
+#   Bay -> VoltageLevel -> Substation, VoltageLevel -> Substation, or a Substation directly.
+# Objects without a container have no row; the matcher then infers the substation from the
+# equipment around the node.
+PREFIX cim: <http://iec.ch/TC57/CIM100#>
+
+SELECT ?object ?container ?containerType ?voltageLevel ?substation
+WHERE {
+  ?object cim:Equipment.EquipmentContainer
+        | cim:ConnectivityNode.ConnectivityNodeContainer
+        | cim:TopologicalNode.ConnectivityNodeContainer ?container .
+  OPTIONAL {
+    ?container a ?containerTypeIri .
+    FILTER(STRSTARTS(STR(?containerTypeIri), STR(cim:)))
+    BIND(STRAFTER(STR(?containerTypeIri), STR(cim:)) AS ?containerType)
+  }
+  OPTIONAL {
+    ?container (cim:Bay.VoltageLevel)? ?voltageLevel .
+    ?voltageLevel a cim:VoltageLevel .
+  }
+  OPTIONAL {
+    ?container (cim:Bay.VoltageLevel)?/(cim:VoltageLevel.Substation)? ?substation .
+    ?substation a cim:Substation .
+  }
+}

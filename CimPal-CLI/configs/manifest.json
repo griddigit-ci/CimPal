@@ -1,0 +1,19 @@
+{
+  "_comment": "Template: DCAT/CGMES manifest of a set of model files.",
+  "_how_to_use": "Copy to your working directory. Fill in the paths. Run: java -jar CimPal-CLI.jar manifest --config this-file.json",
+  "_when_to_use": "Use before handing a model set to a toolchain that expects a manifest.ttl next to the models folder.",
+
+  "_input_note": "Use 'dir' for every .xml, .rdf and .ttl file in one folder, OR 'files' for a list. Not both.",
+  "dir": "REPLACE_WITH_PATH/Grid/cimxml",
+
+  "_files_example": [
+    "REPLACE_WITH_PATH/Grid/cimxml/EQ.xml",
+    "REPLACE_WITH_PATH/Grid/cimxml/SSH.xml"
+  ],
+
+  "accessUrl": "",
+  "_note_accessUrl": "Folder written in front of each file name in dcat:accessURL. A relative path such as 'Instance/Grid/cimxml' is used as it is; empty takes the last folder name of 'dir'.",
+
+  "output": "",
+  "_note_output": "Where to write the manifest. Empty: manifest.ttl in the parent of the models folder."
+}

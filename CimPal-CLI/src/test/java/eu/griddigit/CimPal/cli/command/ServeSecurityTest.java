@@ -19,6 +19,7 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -177,6 +178,44 @@ class ServeSecurityTest {
         assertThat(ServeSecurity.isAllowedHost("cimpal.lan:7474", 7474, "cimpal.lan", true)).isTrue();
         assertThat(ServeSecurity.isAllowedHost("cimpal.lan:7474", 7474, "cimpal.lan", false)).isFalse();
         assertThat(ServeSecurity.isAllowedHost("other.lan:7474", 7474, "cimpal.lan", true)).isFalse();
+    }
+
+    @Test
+    void allowedHostsAreThePublicNamesOfAProxy() {
+        // DEP-6: behind a proxy the Host header carries the public name and port, not the bound ones.
+        Set<String> allowed = Set.of(ServeSecurity.allowedHostEntry("CIMPAL.example.com"),
+                ServeSecurity.allowedHostEntry("cimpal.lan:8443"), ServeSecurity.allowedHostEntry("[2001:db8::1]"));
+
+        assertThat(ServeSecurity.isAllowedHost("cimpal.example.com", 7474, "0.0.0.0", true, allowed)).isTrue();
+        assertThat(ServeSecurity.isAllowedHost("Cimpal.Example.Com:443", 7474, "0.0.0.0", true, allowed)).isTrue();
+        assertThat(ServeSecurity.isAllowedHost("cimpal.example.com:80", 7474, "0.0.0.0", true, allowed)).isTrue();
+        assertThat(ServeSecurity.isAllowedHost("cimpal.example.com:8443", 7474, "0.0.0.0", true, allowed)).isFalse();
+        assertThat(ServeSecurity.isAllowedHost("cimpal.lan:8443", 7474, "0.0.0.0", true, allowed)).isTrue();
+        assertThat(ServeSecurity.isAllowedHost("cimpal.lan", 7474, "0.0.0.0", true, allowed)).isFalse();
+        assertThat(ServeSecurity.isAllowedHost("cimpal.lan:443", 7474, "0.0.0.0", true, allowed)).isFalse();
+        assertThat(ServeSecurity.isAllowedHost("[2001:db8::1]:443", 7474, "0.0.0.0", true, allowed)).isTrue();
+        // Everything else is refused as before; loopback with the bound port still works.
+        assertThat(ServeSecurity.isAllowedHost("evil.example", 7474, "0.0.0.0", true, allowed)).isFalse();
+        assertThat(ServeSecurity.isAllowedHost("cimpal.example.com.evil.example", 7474, "0.0.0.0", true, allowed)).isFalse();
+        assertThat(ServeSecurity.isAllowedHost("x.cimpal.example.com", 7474, "0.0.0.0", true, allowed)).isFalse();
+        assertThat(ServeSecurity.isAllowedHost("localhost:7474", 7474, "0.0.0.0", true, allowed)).isTrue();
+        // Odd forms fail closed.
+        for (String odd : new String[] {"cimpal.example.com.", ":443", "cimpal.example.com:", "cimpal.example.com:0443",
+                "cimpal.example.com :443", "[2001:db8::1]:8443", "2001:db8::1"}) {
+            assertThat(ServeSecurity.isAllowedHost(odd, 7474, "0.0.0.0", true, allowed)).as(odd).isFalse();
+        }
+    }
+
+    @Test
+    void allowedHostEntriesAreHostNamesWithAnOptionalPortOnly() {
+        assertThat(ServeSecurity.allowedHostEntry(" Cimpal.Example.com:8443 ")).isEqualTo("cimpal.example.com:8443");
+        assertThat(ServeSecurity.allowedHostEntry("10.0.0.5")).isEqualTo("10.0.0.5");
+        for (String bad : new String[] {"", "https://cimpal.example.com", "cimpal.example.com/path", "*.example.com",
+                "user@cimpal.example.com", "cimpal.example.com:0", "cimpal.example.com:70000", "cimpal.example.com:x",
+                "cimpal example.com", "-cimpal.example.com", "cimpal.example.com:+443"}) {
+            assertThatThrownBy(() -> ServeSecurity.allowedHostEntry(bad)).as(bad)
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("--allowed-host");
+        }
     }
 
     @Test

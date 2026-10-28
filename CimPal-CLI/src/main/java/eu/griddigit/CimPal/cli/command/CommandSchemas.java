@@ -43,9 +43,9 @@ final class CommandSchemas {
                                         + "'timestamped' (groups by timestamp) or 'combined' (validates the "
                                         + "dataFiles as one dataset against all the constraintFiles at once)."));
                         p.set("mappingCsv", schema("string",
-                                "Absolute path to the CSV mapping file. "
-                                        + "Three columns: model file names | constraint .ttl path | label. "
-                                        + "Required for mapping and timestamped workflows."));
+                                "Absolute path to the CSV mapping file: three comma-separated columns, the model "
+                                        + "files (separated by ;), the constraint .ttl file(s) (separated by ;) and a "
+                                        + "label. Required for mapping and timestamped workflows."));
                         p.set("modelsDir", schema("string",
                                 "Absolute path to the root folder containing model ZIP/XML archives. "
                                         + "Required for mapping and timestamped workflows."));
@@ -55,10 +55,12 @@ final class CommandSchemas {
                                         + "owl:imports are then also resolved against it."));
                         p.set("constraintFiles", arraySchema(
                                 "Absolute paths to SHACL constraint files (.ttl, .rdf) or ZIP archives of them, "
-                                        + "which together form one shapes graph. Required for the combined workflow."));
+                                        + "which together form one shapes graph; a folder stands for the .ttl, .rdf and "
+                                        + ".zip files directly in it. Required for the combined workflow."));
                         p.set("dataFiles", arraySchema(
                                 "Absolute paths to instance data files (.xml) or ZIP archives of them, which "
-                                        + "together form one dataset. Required for the combined workflow."));
+                                        + "together form one dataset; a folder stands for the .xml and .zip files "
+                                        + "directly in it. Required for the combined workflow."));
                         p.set("outputDir", schema("string",
                                 "Absolute path to the output folder for Excel reports and ZIPs."));
                         p.set("datatypeMap", schema("string",
@@ -80,6 +82,13 @@ final class CommandSchemas {
                                         + "Set 0 to disable per-shape detail."));
                         p.set("exportTurtle", schema("boolean",
                                 "Write .ttl validation report files alongside Excel output."));
+                        p.set("previousComparison", schema("string",
+                                "Absolute path to the XLSX of a previous timestamped run, used to build a delta "
+                                        + "comparison sheet."));
+                        p.set("incrementalTimestamps", schema("boolean",
+                                "Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't "
+                                        + "change from the one before."));
+                        automation(p, "violations are found");
                     }),
             entry("sparql", "sparql", true,
                     "Execute a SPARQL SELECT query against one or more CIM/RDF model files. "
@@ -93,6 +102,7 @@ final class CommandSchemas {
                         p.set("output", schema("string",
                                 "Absolute path for output file (.xlsx or .csv). "
                                         + "If omitted, results are returned inline."));
+                        automation(p, null);
                     }, "models", "query"),
             entry("compare", "compare", true,
                     "Compare two RDF files (RDFS profiles or SHACL shapes) and report differences. "
@@ -106,7 +116,12 @@ final class CommandSchemas {
                         p.set("normalizeCimVersion", schema("boolean",
                                 "Rename the 'cim' namespace in fileB to match fileA before comparing. "
                                         + "Use when comparing across CIM version boundaries."));
+                        p.set("normalizeProfileNs", schema("boolean",
+                                "Rename the profile namespace in fileB to match fileA before comparing."));
+                        p.set("nsPrefix", schema("string",
+                                "The namespace prefix to rename with normalizeProfileNs (default: empty)."));
                         p.set("output", schema("string", "Absolute path for the diff report (.xlsx or .csv)."));
+                        automation(p, "differences are found");
                     }, "fileA", "fileB"),
             entry("compare_instances", "compare-instances", true,
                     "Compare two sets of CIM instance-data model files and report differences. "
@@ -120,6 +135,7 @@ final class CommandSchemas {
                         p.set("ignoreTp", schema("boolean", "Ignore TP (topology) differences."));
                         p.set("ignoreDl", schema("boolean", "Ignore DL (diagram layout) differences."));
                         p.set("output", schema("string", "Absolute path for output (.xlsx or .csv)."));
+                        automation(p, "differences are found");
                     }, "modelsA", "modelsB"),
             entry("convert", "convert", false,
                     "Convert RDF model files between formats (RDF/XML, Turtle, JSON-LD). "
@@ -135,6 +151,12 @@ final class CommandSchemas {
                         p.set("sort", schema("boolean", "Sort triples for deterministic, diffable output."));
                         p.set("rdfFormat", schema("string",
                                 "RDF/XML sub-format: RDFXML_PLAIN (default), RDFXML_ABBREV, CIMXML, RDFS_CIMXML."));
+                        p.set("sourceFormat", schema("string",
+                                "Source format: RDFXML, TURTLE, JSONLD (default: from the input's extension)."));
+                        p.set("targetFormat", schema("string",
+                                "Target format: RDFXML, TURTLE, JSONLD (default: from the output's extension)."));
+                        p.set("sortByPrefix", schema("boolean", "Sort by namespace prefix (with 'sort')."));
+                        p.set("stripPrefixes", schema("boolean", "Leave out namespace prefix declarations."));
                     }, "output"),
             entry("rdfs_to_shacl", "rdfs2shacl", false,
                     "Generate SHACL shape files from RDFS CIM profile definitions. "
@@ -151,6 +173,16 @@ final class CommandSchemas {
                                 "Write a separate datatype constraint file alongside the main shapes."));
                         p.set("validateShapes", schema("boolean",
                                 "Run SHACL-SHACL validation on generated shapes and report results."));
+                        p.set("exportInheritTree", schema("boolean", "Write an inheritance model file per profile."));
+                        p.set("cimsNamespace", schema("string", "CIMS extensions namespace URI (default: "
+                                + "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#)."));
+                        p.set("ioPrefix", schema("string",
+                                "IdentifiedObject mRID property local name (default: mRID)."));
+                        p.set("ioUri", schema("string", "IdentifiedObject mRID property URI (default: "
+                                + "http://iec.ch/TC57/CIM100#IdentifiedObject.mRID)."));
+                        p.set("shapesBaseUri", schema("string", "Base URI of the generated shape graphs (default: empty)."));
+                        p.set("shapesNsPrefix", schema("string", "Prefix of the SHACL shapes namespace (default: empty)."));
+                        p.set("shapesNsUri", schema("string", "URI of the SHACL shapes namespace (default: empty)."));
                     }, "rdfsFiles", "outputDir"),
             entry("organize", "organize", false,
                     "Reorganize SHACL constraint files according to an Excel mapping template. "
@@ -160,6 +192,7 @@ final class CommandSchemas {
                         p.set("templateXlsx", schema("string",
                                 "Absolute path to the Excel template defining the output structure."));
                         p.set("outputDir", schema("string", "Absolute path to the root output directory."));
+                        p.set("xmlBase", schema("string", "Base URI for loading the SHACL files (default: empty)."));
                     }, "shaclFiles", "templateXlsx", "outputDir"),
             entry("excel_to_shacl", "excel2shacl", false,
                     "Generate SHACL constraint shapes from an Excel spreadsheet and RDFS profile.",
@@ -170,6 +203,9 @@ final class CommandSchemas {
                         p.set("output", schema("string", "Absolute path for the generated .ttl shape file."));
                         p.set("nsPrefix", schema("string", "Namespace prefix for generated shapes."));
                         p.set("nsUri", schema("string", "Namespace URI for generated shapes."));
+                        p.set("cimNamespace", schema("string", "CIM namespace URI (default: http://iec.ch/TC57/CIM100#)."));
+                        p.set("cimsNamespace", schema("string", "CIMS namespace URI (default: "
+                                + "http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#)."));
                     }, "rdfsFile", "excelFile", "output"),
             entry("gen_instances", "gen-instances", false,
                     "Generate CIM/RDF instance data from a CimPal Excel template. "
@@ -180,6 +216,7 @@ final class CommandSchemas {
                         p.set("output", schema("string", "Absolute path for the generated RDF/XML file."));
                         p.set("xmlBase", schema("string", "Base URI (default: http://iec.ch/TC57/CIM100)."));
                         p.set("stripPrefixes", schema("boolean", "Remove unused namespace prefixes."));
+                        p.set("exportExtensions", schema("boolean", "Include the columns marked as extensions."));
                     }, "templateXlsx", "output"),
             entry("manifest", "manifest", false,
                     "Generate a DCAT/CGMES manifest Turtle file describing a set of model files.",
@@ -189,7 +226,8 @@ final class CommandSchemas {
                         p.set("files", arraySchema(
                                 "Absolute paths to individual model files (alternative to 'dir')."));
                         p.set("accessUrl", schema("string", "The dcat:accessURL written into the manifest."));
-                        p.set("output", schema("string", "Absolute path for the manifest .ttl file."));
+                        p.set("output", schema("string", "Absolute path for the manifest .ttl file "
+                                + "(default: manifest.ttl next to the models folder)."));
                     })
     );
 
@@ -215,7 +253,13 @@ final class CommandSchemas {
                                Consumer<ObjectNode> properties, String... required) {
         ObjectNode schema = JSON.createObjectNode();
         schema.put("type", "object");
-        properties.accept(schema.putObject("properties"));
+        ObjectNode props = schema.putObject("properties");
+        properties.accept(props);
+        if (PathGuard.writesFiles(command)) {
+            // Read by PathGuard in serve, mcp and run, not by the command itself.
+            props.set(PathGuard.OVERWRITE_KEY, schema("boolean",
+                    "Replace an output file that already exists (default false: refused)."));
+        }
         if (required.length > 0) {
             ArrayNode req = schema.putArray("required");
             for (String r : required) {
@@ -223,6 +267,21 @@ final class CommandSchemas {
             }
         }
         return new Entry(toolName, command, supportsJson, description, schema);
+    }
+
+    /**
+     * The keys every JSON command takes for automation: its output format, resource statistics,
+     * a summary file and, when it reports findings ({@code findings} not null), their exit code.
+     */
+    private static void automation(ObjectNode p, String findings) {
+        p.set("format", schema("string",
+                "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."));
+        p.set("stats", schema("boolean", "Report the run's resource use (time, peak heap, GC, triples loaded)."));
+        p.set("summaryFile", schema("string",
+                "Absolute path to also write the JSON result to, atomically, creating parent folders."));
+        p.set("violationsExitCode", schema("integer", findings == null
+                ? "Accepted like on the other JSON commands (0..255); this command never reports findings."
+                : "Exit code when " + findings + " (default 1, 0..255); 0 lets a scheduler treat them as data."));
     }
 
     private static ObjectNode schema(String type, String description) {

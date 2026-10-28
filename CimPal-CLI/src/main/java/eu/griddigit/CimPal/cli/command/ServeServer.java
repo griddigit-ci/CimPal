@@ -9,6 +9,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import eu.griddigit.CimPal.cli.CliVersion;
 import eu.griddigit.CimPal.cli.OutOfMemoryExit;
+import eu.griddigit.CimPal.cli.command.TokenSource.Client;
 import eu.griddigit.cimpal.core.utils.LogSanitizer;
 import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
 
@@ -29,6 +30,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +54,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The HTTP server behind {@code serve}, separated from the picocli command so it can be started
@@ -62,8 +63,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Every request passes, in order: Host allowlist (403), Origin allowlist (403), exact path
  * (404), method (405), bearer token (401, not for {@code GET /health}), {@code application/json}
  * body on POST (415), body limit (413). Commands then take a slot in a bounded queue (503 when
- * full) and run one at a time on a single worker thread, because {@code ValidationTools} keeps
- * static flags. A request that has not finished within the timeout gets 504.
+ * full) and run on {@code --workers} threads, one by default. With more than one, an
+ * {@link AdmissionGate} starts a command only while the estimated heap of the running ones fits
+ * {@code --max-concurrent-heap-bytes}, and each command's path policy, caches and output are its
+ * own (DEP-8). A request that has not finished within the timeout gets 504.
  *
  * <p>A timed-out command is left to finish rather than interrupted, because a command cut off in
  * the middle of writing could leave truncated reports behind. It keeps its queue slot until it
@@ -72,12 +75,28 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <h2>Job API ({@code /v1}, DEP-5)</h2>
  * <p>{@code POST /v1/jobs} queues a command and answers 202 at once; the caller polls
- * {@code GET /v1/jobs/{id}} and fetches {@code /result} and {@code /log}. Jobs share the worker and
- * the queue slots with the synchronous endpoints, so commands still run one at a time. Paths in a
+ * {@code GET /v1/jobs/{id}} and fetches {@code /result} and {@code /log}. Jobs share the workers and
+ * the queue slots with the synchronous endpoints. Paths in a
  * job's config are checked when it is submitted (403 then, not later). Every error under
  * {@code /v1} is {@code application/problem+json}; {@code GET /v1/health} and
  * {@code GET /v1/openapi.json} need no token. The routes are {@link #V1_ROUTES}; the OpenAPI
  * document {@code openapi/cimpal-v1.json} describes them.
+ *
+ * <h2>Service deployment (DEP-6)</h2>
+ * <p>Behind a reverse proxy, {@code --allowed-host} adds the public names the Host check accepts.
+ * The tokens come from a {@link TokenSource}, which may be a reloadable secret file.
+ * {@code GET /ready} (no token) is 200 while the server takes work and 503 when it is shutting
+ * down or its queue is full. With {@code --metrics}, {@code GET /metrics} (token) serves
+ * Prometheus text. Server events go to a {@link ServeLog}, as text or JSON lines.
+ *
+ * <h2>Clients (DEP-13)</h2>
+ * <p>Each token stands for a {@link Client}. Jobs and uploads belong to the client that created
+ * them: a client sees, lists, reads, downloads and cancels only its own, and anything else answers
+ * 404 as if it didn't exist; an admin sees everything. {@code /shutdown} and {@code /metrics} need
+ * an admin. {@link ClientQuotas} limit each client's queued and running jobs (429), uploads (413),
+ * share of the work area (507) and requests per minute (429), and {@link JobScheduler} lets other
+ * clients' jobs overtake those of a client at its {@code maxRunning}. Logs and metrics carry the
+ * client's name, never its token.
  */
 final class ServeServer implements AutoCloseable {
 
@@ -91,6 +110,8 @@ final class ServeServer implements AutoCloseable {
 
     /** Upper bounds for the operator-set limits. */
     static final int MAX_QUEUE_SIZE = 64;
+    static final int MAX_WORKERS = 64;
+    static final long MIN_CONCURRENT_HEAP_BYTES = 1L << 20;
     static final long MAX_BODY_BYTES = 64L * 1024 * 1024;
 
     /** Handler threads beyond those that can be waiting on a command. */
@@ -121,13 +142,27 @@ final class ServeServer implements AutoCloseable {
             "GET /v1/jobs/{jobId}",
             "DELETE /v1/jobs/{jobId}",
             "GET /v1/jobs/{jobId}/result",
-            "GET /v1/jobs/{jobId}/log"
+            "GET /v1/jobs/{jobId}/log",
+            "POST /v1/uploads",
+            "GET /v1/uploads/{uploadId}",
+            "DELETE /v1/uploads/{uploadId}",
+            "GET /v1/jobs/{jobId}/files",
+            "GET /v1/jobs/{jobId}/files/{path}",
+            "GET /v1/jobs/{jobId}/archive"
     );
+
+    /** File exchange limits (DEP-7). */
+    static final long MIN_UPLOAD_BYTES = 1024;
+    static final long MAX_UPLOAD_BYTES = 16L << 30;
+    static final long MIN_WORK_MAX_BYTES = 1L << 20;
+    static final String ZIP = "application/zip";
 
     private static final String OPENAPI_RESOURCE = "/openapi/cimpal-v1.json";
     private static final Pattern UUID_TEXT =
             Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** The exchange attribute that holds the authenticated client's name, for the log. */
+    private static final String CLIENT_ATTRIBUTE = "cimpal.client";
 
     /** What a command printed on stdout (its JSON) and its exit code. */
     record CommandResult(int exitCode, String stdout) {
@@ -137,6 +172,11 @@ final class ServeServer implements AutoCloseable {
     @FunctionalInterface
     interface CommandRunner {
         CommandResult run(String command, Path configFile) throws Exception;
+
+        /** For a job with an uploaded input (DEP-7); by default as without one. */
+        default CommandResult run(String command, Path configFile, WorkArea.JobWorkspace workspace) throws Exception {
+            return run(command, configFile);
+        }
     }
 
     /**
@@ -147,7 +187,23 @@ final class ServeServer implements AutoCloseable {
     interface RequestCheck {
         byte[] check(String command, byte[] body) throws Rejected;
 
+        /** For a job with an uploaded input (DEP-7); by default as without one. */
+        default byte[] check(String command, byte[] body, WorkArea.JobWorkspace workspace) throws Rejected {
+            return check(command, body);
+        }
+
         RequestCheck NONE = (command, body) -> body;
+    }
+
+    /**
+     * Estimates the heap a checked command will need, for the admission of {@code --workers}
+     * (DEP-8). {@code workspace} is the job's upload, or null.
+     */
+    @FunctionalInterface
+    interface SizeEstimator {
+        long estimate(String command, byte[] checkedBody, WorkArea.JobWorkspace workspace);
+
+        SizeEstimator NONE = (command, body, workspace) -> 0;
     }
 
     /** A request refused by a {@link RequestCheck}; the message goes to the caller. */
@@ -165,10 +221,15 @@ final class ServeServer implements AutoCloseable {
     }
 
     /** Server settings; {@link #builder()} holds the defaults. */
-    record Config(String host, int port, String token, Set<String> allowedOrigins, boolean allowRemote,
+    record Config(String host, int port, TokenSource tokens, Set<String> allowedOrigins, boolean allowRemote,
                   long maxBodyBytes, int queueSize, Duration requestTimeout,
                   Duration jobTimeout, int maxJobs, Duration jobTtl, int jobLogLines, long maxResultBytes,
-                  long jobStoreBytes) {
+                  long jobStoreBytes, Set<String> allowedHosts, boolean metrics, ServeLog log,
+                  Path workRoot, long maxUploadBytes, Duration uploadTtl, long workMaxBytes, Duration requestReadTime,
+                  int workers, long maxConcurrentHeapBytes, SizeEstimator sizeEstimator,
+                  ClientQuotas.Settings clientQuotas, JobStore jobStore, boolean requeueInterrupted,
+                  Duration idempotencyTtl, CallbackSecrets callbackSecrets, boolean callbackLoopback,
+                  Duration callbackTick, Duration callbackAttemptTimeout) {
 
         static Builder builder() {
             return new Builder();
@@ -178,7 +239,11 @@ final class ServeServer implements AutoCloseable {
             private String host = "localhost";
             private int port = 7474;
             private String token;
+            private TokenSource tokens;
             private Set<String> allowedOrigins = Set.of();
+            private Set<String> allowedHosts = Set.of();
+            private boolean metrics;
+            private ServeLog log = ServeLog.text();
             private boolean allowRemote;
             private long maxBodyBytes = 1024 * 1024;
             private int queueSize = 4;
@@ -190,10 +255,39 @@ final class ServeServer implements AutoCloseable {
             private long maxResultBytes = 16L * 1024 * 1024;
             /** Results and logs of finished jobs together; by default a quarter of the heap. */
             private long jobStoreBytes = Runtime.getRuntime().maxMemory() / 4;
+            /** Null: no file exchange (the upload and download routes answer 404). */
+            private Path workRoot;
+            private long maxUploadBytes = 2L << 30;
+            private Duration uploadTtl = Duration.ofHours(24);
+            private long workMaxBytes = 20L << 30;
+            private Duration requestReadTime = Duration.ofSeconds(REQUEST_READ_SECONDS);
+            private int workers = 1;
+            /** By default three quarters of the heap. */
+            private long maxConcurrentHeapBytes = Runtime.getRuntime().maxMemory() / 4 * 3;
+            private SizeEstimator sizeEstimator = SizeEstimator.NONE;
+            /** Per-client limits (DEP-13); by default every client gets the server's limits. */
+            private ClientQuotas.Settings clientQuotas = ClientQuotas.Settings.NONE;
+            /** Null: jobs in memory ({@link MemoryJobStore}, lost on restart). Closed by whoever made it. */
+            private JobStore jobStore;
+            private boolean requeueInterrupted;
+            /** How long an Idempotency-Key is remembered (DEP-14). */
+            private Duration idempotencyTtl = Duration.ofHours(24);
+            /** Who may ask for job callbacks, and how they are signed (DEP-14); nobody by default. */
+            private CallbackSecrets callbackSecrets = CallbackSecrets.NONE;
+            /** Tests only: callbacks to http on loopback, without the public-address check. */
+            private boolean callbackLoopback;
+            private Duration callbackTick = Duration.ofSeconds(1);
+            private Duration callbackAttemptTimeout = Duration.ofSeconds(15);
 
             Builder host(String host) { this.host = host; return this; }
             Builder port(int port) { this.port = port; return this; }
             Builder token(String token) { this.token = token; return this; }
+            /** Instead of {@link #token(String)}: e.g. a reloadable token file (DEP-6). */
+            Builder tokens(TokenSource tokens) { this.tokens = tokens; return this; }
+            /** {@code --allowed-host} values, already normalised by {@link ServeSecurity#allowedHostEntry}. */
+            Builder allowedHosts(Set<String> hosts) { this.allowedHosts = Set.copyOf(hosts); return this; }
+            Builder metrics(boolean metrics) { this.metrics = metrics; return this; }
+            Builder log(ServeLog log) { this.log = log; return this; }
             Builder allowedOrigins(Set<String> origins) { this.allowedOrigins = Set.copyOf(origins); return this; }
             Builder allowRemote(boolean allowRemote) { this.allowRemote = allowRemote; return this; }
             Builder maxBodyBytes(long maxBodyBytes) { this.maxBodyBytes = maxBodyBytes; return this; }
@@ -205,10 +299,34 @@ final class ServeServer implements AutoCloseable {
             Builder jobLogLines(int jobLogLines) { this.jobLogLines = jobLogLines; return this; }
             Builder maxResultBytes(long maxResultBytes) { this.maxResultBytes = maxResultBytes; return this; }
             Builder jobStoreBytes(long jobStoreBytes) { this.jobStoreBytes = jobStoreBytes; return this; }
+            Builder workRoot(Path workRoot) { this.workRoot = workRoot; return this; }
+            Builder maxUploadBytes(long maxUploadBytes) { this.maxUploadBytes = maxUploadBytes; return this; }
+            Builder uploadTtl(Duration uploadTtl) { this.uploadTtl = uploadTtl; return this; }
+            Builder workMaxBytes(long workMaxBytes) { this.workMaxBytes = workMaxBytes; return this; }
+            Builder requestReadTime(Duration requestReadTime) { this.requestReadTime = requestReadTime; return this; }
+            Builder workers(int workers) { this.workers = workers; return this; }
+            Builder maxConcurrentHeapBytes(long bytes) { this.maxConcurrentHeapBytes = bytes; return this; }
+            Builder sizeEstimator(SizeEstimator sizeEstimator) { this.sizeEstimator = sizeEstimator; return this; }
+            Builder clientQuotas(ClientQuotas.Settings clientQuotas) { this.clientQuotas = clientQuotas; return this; }
+            /** A durable store (DEP-11); the server doesn't close it, since running jobs still write to it after close(). */
+            Builder jobStore(JobStore jobStore) { this.jobStore = jobStore; return this; }
+            /** D-18: after a restart, run interrupted jobs again instead of failing them. */
+            Builder requeueInterrupted(boolean requeue) { this.requeueInterrupted = requeue; return this; }
+            Builder idempotencyTtl(Duration ttl) { this.idempotencyTtl = ttl; return this; }
+            Builder callbackSecrets(CallbackSecrets secrets) { this.callbackSecrets = secrets; return this; }
+            /** Tests only (no command-line option): loopback callbacks, checked every {@code tick}. */
+            Builder callbacksForTests(Duration tick) { this.callbackLoopback = true; this.callbackTick = tick; return this; }
+            /** Tests only: how long one callback attempt may take (default 15 s). */
+            Builder callbackAttemptTimeout(Duration timeout) { this.callbackAttemptTimeout = timeout; return this; }
 
             Config build() {
-                return new Config(host, port, token, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
-                        requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes);
+                TokenSource source = tokens != null ? tokens
+                        : token == null || token.isBlank() ? null : TokenSource.fixed(token);
+                return new Config(host, port, source, allowedOrigins, allowRemote, maxBodyBytes, queueSize,
+                        requestTimeout, jobTimeout, maxJobs, jobTtl, jobLogLines, maxResultBytes, jobStoreBytes,
+                        allowedHosts, metrics, log, workRoot, maxUploadBytes, uploadTtl, workMaxBytes, requestReadTime,
+                        workers, maxConcurrentHeapBytes, sizeEstimator, clientQuotas, jobStore, requeueInterrupted,
+                        idempotencyTtl, callbackSecrets, callbackLoopback, callbackTick, callbackAttemptTimeout);
             }
         }
     }
@@ -225,16 +343,28 @@ final class ServeServer implements AutoCloseable {
     private final int totalSlots;
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closing = new AtomicBoolean();
-    /** When the running command started (System.nanoTime), or 0 when the worker is idle. */
-    private final AtomicLong runningSince = new AtomicLong();
-    /** The job store of the {@code /v1} API. */
-    private final JobManager jobs;
-    /** The {@code /v1} job running on the worker, or null (a synchronous request, or idle). */
-    private volatile Job runningJob;
+    /** The commands running now; empty while the workers are idle. */
+    private final Map<Object, Running> running = new ConcurrentHashMap<>();
+    /** Keeps the estimated heap of the running commands within --max-concurrent-heap-bytes (DEP-8). */
+    private final AdmissionGate admission;
+    /** The job store of the {@code /v1} API: in memory, or a database (DEP-11). */
+    private final JobStore jobs;
     /** The worker tasks of queued jobs, so a cancelled job's task (and its body) leaves the queue at once. */
     private final Map<UUID, Future<?>> queuedTasks = new ConcurrentHashMap<>();
-    /** The runningSince value the last stall warning was logged for, so it is logged once per command. */
-    private final AtomicLong stallWarned = new AtomicLong();
+    private final ServeLog log;
+    private final ServeMetrics metrics = new ServeMetrics();
+    /** Uploads and job workspaces (DEP-7), or null without {@code --work-root}. */
+    private WorkArea workArea;
+    /** The workspace of each job that uses an upload. */
+    private final Map<UUID, WorkArea.JobWorkspace> workspaces = new ConcurrentHashMap<>();
+    /** Each client's limits (DEP-13). */
+    private final ClientQuotas quotas;
+    /** Which queued job runs next. */
+    private final JobScheduler scheduler;
+    /** Held while a submit checks its client's quota and queues the job, so two can't both pass. */
+    private final Object submitLock = new Object();
+    /** Completion callbacks (DEP-14). */
+    private final Callbacks callbacks;
 
     private ServeServer(Config config, CommandRunner runner, RequestCheck requestCheck, Runnable onOutOfMemory,
                         InstantSource clock) {
@@ -242,9 +372,11 @@ final class ServeServer implements AutoCloseable {
         this.runner = runner;
         this.requestCheck = requestCheck;
         this.onOutOfMemory = onOutOfMemory;
-        this.jobs = new JobManager(config.maxJobs(), config.jobTtl(), config.jobTimeout(), config.jobLogLines(),
-                config.jobStoreBytes(), clock);
-        this.totalSlots = config.queueSize() + 1;
+        this.log = config.log();
+        this.jobs = config.jobStore() != null ? config.jobStore()
+                : new MemoryJobStore(config.maxJobs(), config.jobTtl(), config.jobTimeout(), config.jobLogLines(),
+                        config.jobStoreBytes(), clock);
+        this.totalSlots = config.queueSize() + config.workers();
         this.slots = new Semaphore(totalSlots);
         // The JDK server reads request lines, headers and bodies on these threads too, and up to
         // totalSlots of them wait on a running or queued command. SPARE_HTTP_THREADS more stay
@@ -252,9 +384,35 @@ final class ServeServer implements AutoCloseable {
         // slow client from holding one of them indefinitely.
         this.handlers = Executors.newFixedThreadPool(totalSlots + SPARE_HTTP_THREADS,
                 daemonThreads("cimpal-serve-http"));
-        // One thread, and a queue from which a cancelled task can be removed (remove(Runnable)).
-        this.worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(),
-                daemonThreads("cimpal-serve-worker"));
+        // --workers threads, and a queue from which a cancelled task can be removed (remove(Runnable)).
+        this.worker = new ThreadPoolExecutor(config.workers(), config.workers(), 0, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(), daemonThreads("cimpal-serve-worker"));
+        this.admission = new AdmissionGate(config.maxConcurrentHeapBytes());
+        // maxQueued: no limit of a client's own unless the file sets one; the queue bounds it anyway.
+        this.quotas = new ClientQuotas(config.clientQuotas(), new ClientQuotas.Limits(ClientQuotas.NO_QUEUE_LIMIT,
+                config.workers(), config.maxUploadBytes(), config.workMaxBytes(), 0), clock);
+        this.scheduler = new JobScheduler(owner -> quotas.limits(owner).maxRunning());
+        this.callbacks = new Callbacks(jobs, config.callbackSecrets() == null ? CallbackSecrets.NONE
+                : config.callbackSecrets(), quotas, log, metrics, config.callbackLoopback(),
+                config.callbackTick() == null ? Duration.ofSeconds(1) : config.callbackTick(),
+                config.callbackAttemptTimeout() == null ? Duration.ofSeconds(15) : config.callbackAttemptTimeout());
+    }
+
+    /**
+     * A running command: its job (null for a synchronous request), when it started (System.nanoTime)
+     * and, for a job, by the job store's clock.
+     */
+    private static final class Running {
+        final Job.Snapshot job;
+        final long since;
+        Instant startedAt;
+        /** Health is polled without a token: a stall is logged once per command, not once per poll. */
+        final AtomicBoolean stallWarned = new AtomicBoolean();
+
+        Running(Job.Snapshot job, long since) {
+            this.job = job;
+            this.since = since;
+        }
     }
 
     /**
@@ -287,8 +445,42 @@ final class ServeServer implements AutoCloseable {
         Objects.requireNonNull(onOutOfMemory, "onOutOfMemory");
         Objects.requireNonNull(clock, "clock");
         validate(config);
-        limitRequestReadTime();
+        limitRequestReadTime(config.requestReadTime());
         ServeServer server = new ServeServer(config, runner, requestCheck, onOutOfMemory, clock);
+        boolean durable = server.jobs.durable();
+        List<JobStore.Queued> queued;
+        try {
+            // D-18: jobs that ran when the server stopped are failed (or queued again), before anything else.
+            queued = durable ? server.jobs.recover(config.requeueInterrupted()) : List.of();
+        } catch (JobStore.Unavailable e) {
+            server.handlers.shutdownNow();
+            server.worker.shutdownNow();
+            throw new IllegalArgumentException("Cannot recover the jobs: " + e.getMessage());
+        }
+        if (config.workRoot() != null) {
+            try {
+                server.workArea = new WorkArea(config.workRoot(), config.maxUploadBytes(), config.workMaxBytes(),
+                        config.uploadTtl(), clock, durable, server.jobs.uploadIndex());
+                if (durable) {
+                    WorkArea.Restored r = server.workArea.restore(server.jobs.uploadRecords(), server.jobs.jobRefs());
+                    if (r.deleted() > 0 || r.forgotten() > 0 || r.lost() > 0) {
+                        server.log.warn("workarea.restored", "serve: the work area and the job store disagreed: "
+                                + r.deleted() + " folder(s) without a record deleted, " + r.forgotten()
+                                + " upload record(s) without a folder dropped, " + r.lost()
+                                + " job(s) lost their outputs. Check that --work-root and the database belong together.",
+                                "deleted", (long) r.deleted(), "forgotten", (long) r.forgotten(), "lost", (long) r.lost());
+                    }
+                }
+            } catch (IOException | RuntimeException e) {
+                server.handlers.shutdownNow();
+                server.worker.shutdownNow();
+                throw new IllegalArgumentException("Cannot use --work-root " + config.workRoot() + ": " + e.getMessage());
+            }
+            server.jobs.onRemoved(id -> {
+                server.workspaces.remove(id);
+                server.workArea.deleteWorkspace(id);
+            });
+        }
         try {
             server.http = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
         } catch (IOException | RuntimeException e) {
@@ -296,9 +488,18 @@ final class ServeServer implements AutoCloseable {
             server.worker.shutdownNow();
             throw e;
         }
+        try {
+            server.requeue(queued);
+        } catch (IOException | RuntimeException e) {
+            server.handlers.shutdownNow();
+            server.worker.shutdownNow();
+            server.http.stop(0);
+            throw new IllegalArgumentException("Cannot resume the queued jobs: " + e.getMessage());
+        }
         server.http.setExecutor(server.handlers);
         server.http.createContext("/", server::handle);
         server.http.start();
+        server.callbacks.start();
         return server;
     }
 
@@ -314,14 +515,14 @@ final class ServeServer implements AutoCloseable {
      * a large body over a slow {@code --allow-remote} link) is dropped. It bounds how long a
      * connection can be held, not how many a local client can open.
      */
-    private static void limitRequestReadTime() {
+    private static void limitRequestReadTime(Duration readTime) {
         if (System.getProperty(MAX_REQ_TIME_PROPERTY) == null) {
-            System.setProperty(MAX_REQ_TIME_PROPERTY, Integer.toString(REQUEST_READ_SECONDS));
+            System.setProperty(MAX_REQ_TIME_PROPERTY, Long.toString(Math.max(1, readTime.toSeconds())));
         }
     }
 
     private static void validate(Config config) {
-        if (config.token() == null || config.token().isBlank()) {
+        if (config.tokens() == null) {
             throw new IllegalArgumentException("A token is required.");
         }
         if (!ServeSecurity.isLoopback(config.host()) && !config.allowRemote()) {
@@ -333,6 +534,23 @@ final class ServeServer implements AutoCloseable {
         }
         if (config.queueSize() < 0 || config.queueSize() > MAX_QUEUE_SIZE) {
             throw new IllegalArgumentException("--queue-size must be between 0 and " + MAX_QUEUE_SIZE + ".");
+        }
+        if (config.workers() < 1 || config.workers() > MAX_WORKERS) {
+            throw new IllegalArgumentException("--workers must be between 1 and " + MAX_WORKERS + ".");
+        }
+        if (config.maxConcurrentHeapBytes() < MIN_CONCURRENT_HEAP_BYTES) {
+            throw new IllegalArgumentException("--max-concurrent-heap-bytes must be at least "
+                    + MIN_CONCURRENT_HEAP_BYTES + ".");
+        }
+        if (config.sizeEstimator() == null) {
+            throw new IllegalArgumentException("A size estimator is required.");
+        }
+        if (config.idempotencyTtl() == null || config.idempotencyTtl().compareTo(Duration.ofMinutes(1)) < 0
+                || config.idempotencyTtl().compareTo(Duration.ofDays(30)) > 0) {
+            throw new IllegalArgumentException("--idempotency-ttl must be between PT1M and P30D.");
+        }
+        if (config.clientQuotas() == null) {
+            throw new IllegalArgumentException("Client quotas are required (ClientQuotas.Settings.NONE for none).");
         }
         if (config.requestTimeout() == null || config.requestTimeout().isNegative()
                 || config.requestTimeout().isZero()) {
@@ -357,6 +575,66 @@ final class ServeServer implements AutoCloseable {
         if (config.jobStoreBytes() < MIN_JOB_STORE_BYTES) {
             throw new IllegalArgumentException("--job-store-bytes must be at least " + MIN_JOB_STORE_BYTES + ".");
         }
+        if (config.maxUploadBytes() < MIN_UPLOAD_BYTES || config.maxUploadBytes() > MAX_UPLOAD_BYTES) {
+            throw new IllegalArgumentException("--max-upload-bytes must be between " + MIN_UPLOAD_BYTES + " and "
+                    + MAX_UPLOAD_BYTES + ".");
+        }
+        if (config.workMaxBytes() < MIN_WORK_MAX_BYTES) {
+            throw new IllegalArgumentException("--work-max-bytes must be at least " + MIN_WORK_MAX_BYTES + ".");
+        }
+        if (config.uploadTtl() == null || config.uploadTtl().isNegative() || config.uploadTtl().isZero()) {
+            throw new IllegalArgumentException("--upload-ttl must be positive.");
+        }
+        if (config.requestReadTime() == null || config.requestReadTime().toSeconds() < 1
+                || config.requestReadTime().compareTo(Duration.ofHours(2)) > 0) {
+            throw new IllegalArgumentException("--request-read-time must be between PT1S and PT2H.");
+        }
+    }
+
+    /**
+     * Hands the jobs still queued after a restart to the workers, oldest first. A job whose upload
+     * is gone, or beyond what the queue holds, is cancelled with the reason.
+     */
+    private void requeue(List<JobStore.Queued> queued) throws IOException {
+        int resumed = 0;
+        for (JobStore.Queued q : queued) {
+            UUID id = q.job().id();
+            if (!COMMANDS.contains(q.job().command())) {
+                jobs.cancel(id, "Cancelled after a restart: '" + LogSanitizer.forLog(q.job().command())
+                        + "' is not a command of the job API");
+                continue;
+            }
+            WorkArea.JobWorkspace workspace = null;
+            if (q.uploadId() != null) {
+                workspace = workArea == null ? null : workArea.workspace(id);
+                if (workspace == null) {
+                    jobs.cancel(id, "Cancelled after a restart: its upload is gone");
+                    continue;
+                }
+            }
+            if (!slots.tryAcquire()) {
+                jobs.cancel(id, "Cancelled after a restart: more jobs were queued than --queue-size allows");
+                if (workspace != null) {
+                    workArea.jobEnded(id);
+                }
+                continue;
+            }
+            if (workspace != null) {
+                workspaces.put(id, workspace);
+            }
+            scheduler.add(q.job(), q.body());
+            queuedTasks.put(id, worker.submit(this::jobTurn));
+            resumed++;
+        }
+        if (!queued.isEmpty()) {
+            log.info("jobs.recovered", "serve: " + resumed + " queued job(s) from before the restart resume",
+                    "queued", (long) resumed);
+        }
+    }
+
+    /** The work area (tests). */
+    WorkArea workAreaForTest() {
+        return workArea;
     }
 
     int port() {
@@ -364,8 +642,13 @@ final class ServeServer implements AutoCloseable {
     }
 
     /** The job store (tests). */
-    JobManager jobsForTest() {
+    JobStore jobsForTest() {
         return jobs;
+    }
+
+    /** The job queue (tests). */
+    JobScheduler schedulerForTest() {
+        return scheduler;
     }
 
     /** Tasks waiting in the worker's queue (tests: a cancelled job must not stay there). */
@@ -384,9 +667,9 @@ final class ServeServer implements AutoCloseable {
     }
 
     /**
-     * After {@link #close()}: waits up to {@code grace} for a running command to finish, so it
-     * isn't cut off in the middle of writing its reports when the JVM exits. Queued commands are
-     * not started. True when the worker is idle.
+     * After {@link #close()}: waits up to {@code grace} for the running commands to finish, so
+     * they aren't cut off in the middle of writing their reports when the JVM exits. Queued
+     * commands are not started. True when the workers are idle.
      */
     boolean awaitWorker(Duration grace) throws InterruptedException {
         return worker.awaitTermination(grace.toMillis(), TimeUnit.MILLISECONDS);
@@ -401,14 +684,30 @@ final class ServeServer implements AutoCloseable {
         if (!closing.compareAndSet(false, true)) {
             return;
         }
-        // Queued jobs never start; the running one finishes, as for synchronous requests.
-        for (Job job : jobs.queued()) {
-            if (job.cancel(jobs.now(), "Server shut down before the job started")) {
-                dropQueuedTask(job);
-                slots.release();
+        if (jobs.durable()) {
+            // DEP-11: queued jobs stay queued in the store and run after the next start.
+            log.info("server.stopping", "serve: stopping; queued jobs stay queued for the next start, running"
+                    + " commands finish");
+        } else {
+            // Queued jobs never start; running ones finish, as for synchronous requests.
+            List<Job.Snapshot> queued = List.of();
+            try {
+                queued = jobs.queued();
+            } catch (JobStore.Unavailable e) {
+                log.error("store.error", "serve: " + e.getMessage());
+            }
+            log.info("server.stopping", "serve: stopping; queued jobs are cancelled, running commands finish",
+                    "queued", (long) queued.size());
+            for (Job.Snapshot job : queued) {
+                if (jobs.cancel(job.id(), "Server shut down before the job started")) {
+                    dropQueuedTask(job);
+                    slots.release();
+                    jobCancelled(job);
+                }
             }
         }
         http.stop(0);
+        callbacks.close(); // pending callbacks stay in a durable store for the next start
         worker.shutdown();
         handlers.shutdownNow();
         stopped.countDown();
@@ -419,66 +718,129 @@ final class ServeServer implements AutoCloseable {
     // -------------------------------------------------------------------------
 
     private void handle(HttpExchange exchange) {
+        long began = System.nanoTime();
+        boolean outOfMemory = false;
         try (exchange) {
-            String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
-            // An opaque request target (e.g. "mailto:x") has no path.
-            String path = exchange.getRequestURI().getPath() == null ? "" : exchange.getRequestURI().getPath();
-
-            if (!ServeSecurity.isAllowedHost(exchange.getRequestHeaders().getFirst("Host"), port(),
-                    config.host(), config.allowRemote())) {
-                reject(exchange, 403, "Host header not allowed", method, path);
-                return;
-            }
-            String origin = exchange.getRequestHeaders().getFirst("Origin");
-            if (origin != null && !config.allowedOrigins().contains(origin)) {
-                reject(exchange, 403, "Origin not allowed", method, path);
-                return;
-            }
-            if (isV1(path)) {
-                handleV1(exchange, method, path);
-                return;
-            }
-
-            String command = path.length() > 1 && COMMANDS.contains(path.substring(1)) ? path.substring(1) : null;
-            switch (path) {
-                case "/health" -> {
-                    if (requireMethod(exchange, method, "GET", path)) {
-                        respond(exchange, 200, healthJson());
-                    }
-                }
-                case "/commands" -> {
-                    if (requireMethod(exchange, method, "GET", path) && requireToken(exchange, method, path)) {
-                        respond(exchange, 200, commandsJson());
-                    }
-                }
-                case "/shutdown" -> {
-                    if (requireMethod(exchange, method, "POST", path) && requireToken(exchange, method, path)
-                            && readJsonBody(exchange, method, path) != null) {
-                        respond(exchange, 200, "{\"status\":\"shutting down\"}");
-                        Thread stopper = new Thread(this::close, "cimpal-serve-stop");
-                        stopper.setDaemon(true);
-                        stopper.start();
-                    }
-                }
-                default -> {
-                    if (command == null) {
-                        reject(exchange, 404, "Not found", method, path);
-                    } else if (requireMethod(exchange, method, "POST", path) && requireToken(exchange, method, path)) {
-                        byte[] body = readJsonBody(exchange, method, path);
-                        if (body != null) {
-                            runCommand(exchange, command, body);
-                        }
-                    }
-                }
+            try {
+                route(exchange);
+            } catch (JobStore.Unavailable e) {
+                storeUnavailable(exchange, e); // inside the try: the exchange is still open
             }
         } catch (IOException e) {
             // Usually the client went away (closed or timed-out connection).
-            System.err.println("[WARN] serve: connection error: " + e.getClass().getSimpleName());
+            log.warn("connection.error", "serve: connection error: " + e.getClass().getSimpleName());
         } catch (Exception e) {
-            System.err.println("[ERROR] serve: request failed: " + e.getClass().getSimpleName());
+            log.error("request.failed", "serve: request failed: " + e.getClass().getSimpleName());
         } catch (OutOfMemoryError e) {
             // As for a command: the heap is exhausted and this JVM can't be trusted any more (DEP-2).
+            outOfMemory = true;
             onOutOfMemory.run();
+        } finally {
+            if (!outOfMemory) { // nothing that allocates once the heap is gone
+                metrics.response(requestKind(exchange.getRequestMethod(), exchange.getRequestURI().getPath()),
+                        exchange.getResponseCode(), (System.nanoTime() - began) / 1e9);
+            }
+        }
+    }
+
+    /** Downloads of a job's files or archive (DEP-16 request kinds). */
+    private static final java.util.regex.Pattern TRANSFER_PATH =
+            java.util.regex.Pattern.compile("/v1/jobs/[^/]+/(files/.+|archive)", java.util.regex.Pattern.DOTALL);
+
+    /** The kind of a request, for its duration (DEP-16): api, transfer or command. */
+    static String requestKind(String method, String path) {
+        if (path == null) {
+            return "api";
+        }
+        if (path.startsWith("/v1/uploads") && "POST".equalsIgnoreCase(method)
+                || TRANSFER_PATH.matcher(path).matches()) {
+            return "transfer";
+        }
+        return path.length() > 1 && COMMANDS.contains(path.substring(1)) ? "command" : "api";
+    }
+
+    /** Every request: the checks of the pipeline, then its route. */
+    private void route(HttpExchange exchange) throws IOException {
+        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
+        // An opaque request target (e.g. "mailto:x") has no path.
+        String path = exchange.getRequestURI().getPath() == null ? "" : exchange.getRequestURI().getPath();
+
+        if (!ServeSecurity.isAllowedHost(exchange.getRequestHeaders().getFirst("Host"), port(),
+                config.host(), config.allowRemote(), config.allowedHosts())) {
+            reject(exchange, 403, "Host header not allowed", method, path);
+            return;
+        }
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin != null && !config.allowedOrigins().contains(origin)) {
+            reject(exchange, 403, "Origin not allowed", method, path);
+            return;
+        }
+        if (isV1(path)) {
+            handleV1(exchange, method, path);
+            return;
+        }
+
+        String command = path.length() > 1 && COMMANDS.contains(path.substring(1)) ? path.substring(1) : null;
+        switch (path) {
+            case "/health" -> {
+                if (requireMethod(exchange, method, "GET", path)) {
+                    respond(exchange, 200, healthJson());
+                }
+            }
+            case "/ready" -> {
+                if (requireMethod(exchange, method, "GET", path)) {
+                    String state = readiness();
+                    respond(exchange, state.equals("ready") ? 200 : 503, "{\"status\":" + jsonStr(state) + "}");
+                }
+            }
+            case "/metrics" -> {
+                if (!config.metrics()) {
+                    reject(exchange, 404, "Not found (start serve with --metrics)", method, path);
+                } else if (requireMethod(exchange, method, "GET", path) && requireAdmin(exchange, method, path) != null) {
+                    respond(exchange, 200, metricsText(), ServeMetrics.CONTENT_TYPE);
+                }
+            }
+            case "/commands" -> {
+                if (requireMethod(exchange, method, "GET", path) && requireClient(exchange, method, path) != null) {
+                    respond(exchange, 200, commandsJson());
+                }
+            }
+            case "/shutdown" -> {
+                if (requireMethod(exchange, method, "POST", path) && requireAdmin(exchange, method, path) != null
+                        && readJsonBody(exchange, method, path) != null) {
+                    respond(exchange, 200, "{\"status\":\"shutting down\"}");
+                    Thread stopper = new Thread(this::close, "cimpal-serve-stop");
+                    stopper.setDaemon(true);
+                    stopper.start();
+                }
+            }
+            default -> {
+                if (command == null) {
+                    reject(exchange, 404, "Not found", method, path);
+                } else if (requireMethod(exchange, method, "POST", path)) {
+                    Client client = requireClient(exchange, method, path);
+                    byte[] body = client == null ? null : readJsonBody(exchange, method, path);
+                    if (body != null) {
+                        runCommand(exchange, command, body, client);
+                    }
+                }
+            }
+        }
+    }
+
+    /** A job store that can't be reached: 503 and Retry-After, never a hang or a half answer. */
+    private void storeUnavailable(HttpExchange exchange, JobStore.Unavailable e) {
+        log.error("store.error", "serve: " + e.getMessage());
+        try {
+            exchange.getResponseHeaders().set("Retry-After", "30");
+            String path = exchange.getRequestURI().getPath() == null ? "" : exchange.getRequestURI().getPath();
+            if (isV1(path)) {
+                respond(exchange, 503, Problem.json(503, "The job store is unavailable", null), Problem.CONTENT_TYPE);
+            } else {
+                respond(exchange, 503, error("The job store is unavailable"));
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // The answer had started already; the client sees the connection close.
         }
     }
 
@@ -492,13 +854,37 @@ final class ServeServer implements AutoCloseable {
         return false;
     }
 
-    private boolean requireToken(HttpExchange exchange, String method, String path) throws IOException {
-        if (ServeSecurity.tokenMatches(config.token(), exchange.getRequestHeaders().getFirst("Authorization"))) {
-            return true;
+    /**
+     * The client whose bearer token the request carries; null after answering 401 (no valid
+     * token) or 429 (the client's {@code requestsPerMinute} is used up).
+     */
+    private Client requireClient(HttpExchange exchange, String method, String path) throws IOException {
+        Client client = config.tokens().authenticate(exchange.getRequestHeaders().getFirst("Authorization"));
+        if (client == null) {
+            exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
+            reject(exchange, 401, "Missing or invalid bearer token", method, path);
+            return null;
         }
-        exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
-        reject(exchange, 401, "Missing or invalid bearer token", method, path);
-        return false;
+        exchange.setAttribute(CLIENT_ATTRIBUTE, client.name());
+        long wait = quotas.acquireRequest(client.name());
+        if (wait > 0) {
+            metrics.quotaRefused(client.name(), "requests_per_minute");
+            exchange.getResponseHeaders().set("Retry-After", Long.toString(wait));
+            reject(exchange, 429, "Too many requests: this client may send "
+                    + quotas.limits(client.name()).requestsPerMinute() + " per minute", method, path);
+            return null;
+        }
+        return client;
+    }
+
+    /** As {@link #requireClient}, and 403 (null) unless the client is an admin. */
+    private Client requireAdmin(HttpExchange exchange, String method, String path) throws IOException {
+        Client client = requireClient(exchange, method, path);
+        if (client != null && !client.admin()) {
+            reject(exchange, 403, "This needs an admin token", method, path);
+            return null;
+        }
+        return client;
     }
 
     /** The request body, or null after answering 415 or 413. An empty body becomes {@code {}}. */
@@ -551,18 +937,33 @@ final class ServeServer implements AutoCloseable {
                 }
             }
             case "/v1/jobs" -> {
-                if (allowMethods(exchange, method, path, "GET", "POST") && requireToken(exchange, method, path)) {
+                Client client = allowMethods(exchange, method, path, "GET", "POST")
+                        ? requireClient(exchange, method, path) : null;
+                if (client != null) {
                     if (method.equals("POST")) {
                         byte[] body = readJsonBody(exchange, method, path);
                         if (body != null) {
-                            submitJob(exchange, body);
+                            submitOnce(exchange, body, client);
                         }
                     } else {
-                        listJobs(exchange, path);
+                        listJobs(exchange, path, client);
                     }
                 }
             }
-            default -> handleJobPath(exchange, method, path);
+            case "/v1/uploads" -> {
+                Client client = allowMethods(exchange, method, path, "POST")
+                        ? requireClient(exchange, method, path) : null;
+                if (client != null && requireWorkArea(exchange, method, path)) {
+                    receiveUpload(exchange, path, client);
+                }
+            }
+            default -> {
+                if (path.startsWith("/v1/uploads/")) {
+                    handleUploadPath(exchange, method, path);
+                } else {
+                    handleJobPath(exchange, method, path);
+                }
+            }
         }
     }
 
@@ -577,19 +978,22 @@ final class ServeServer implements AutoCloseable {
         int slash = rest.indexOf('/');
         String idText = slash < 0 ? rest : rest.substring(0, slash);
         String sub = slash < 0 ? "" : rest.substring(slash + 1);
-        if (slash >= 0 && !sub.equals("result") && !sub.equals("log")) { // also a trailing "/"
+        boolean fileRoute = sub.equals("files") || sub.equals("archive") || sub.startsWith("files/");
+        if (slash >= 0 && !sub.equals("result") && !sub.equals("log") && !fileRoute) { // also a trailing "/"
             reject(exchange, 404, "Not found", method, path);
             return;
         }
         boolean allowed = sub.isEmpty()
                 ? allowMethods(exchange, method, path, "GET", "DELETE")
                 : allowMethods(exchange, method, path, "GET");
-        if (!allowed || !requireToken(exchange, method, path)) {
+        Client client = allowed ? requireClient(exchange, method, path) : null;
+        if (client == null) {
             return;
         }
         // Only the canonical lower-case form: anything else is simply not a job of this server.
-        Job job = UUID_TEXT.matcher(idText).matches() ? jobs.get(UUID.fromString(idText)) : null;
-        if (job == null) {
+        Job.Snapshot job = UUID_TEXT.matcher(idText).matches() ? jobs.get(UUID.fromString(idText)) : null;
+        // Another client's job answers exactly as one that doesn't exist (DEP-13).
+        if (job == null || !client.sees(job.owner())) {
             reject(exchange, 404, "No such job", method, path);
             return;
         }
@@ -598,15 +1002,168 @@ final class ServeServer implements AutoCloseable {
                 if (method.equals("DELETE")) {
                     cancelJob(exchange, job, path);
                 } else {
-                    respond(exchange, 200, jobJson(job.snapshot()));
+                    respond(exchange, 200, jobJson(job));
                 }
             }
             case "result" -> jobResult(exchange, job, path);
-            default -> jobLog(exchange, job, path);
+            case "log" -> jobLog(exchange, job, path);
+            case "files" -> jobFiles(exchange, job, path);
+            case "archive" -> jobArchive(exchange, job, path);
+            default -> jobFile(exchange, job, path, idText);
         }
     }
 
-    private void submitJob(HttpExchange exchange, byte[] requestBody) throws IOException {
+    /** The value of an Idempotency-Key header that isn't one; the request was answered 400. */
+    private static final String MALFORMED_KEY = new String("malformed");
+
+    /**
+     * The request's {@code Idempotency-Key} (DEP-14): null without one, {@link #MALFORMED_KEY}
+     * after answering 400. 1 to 255 visible ASCII characters (a UUID, typically).
+     */
+    private String idempotencyKey(HttpExchange exchange, String path) throws IOException {
+        String key = exchange.getRequestHeaders().getFirst("Idempotency-Key");
+        if (key == null) {
+            return null;
+        }
+        if (!validIdempotencyKey(key)) {
+            reject(exchange, 400, "Idempotency-Key must be 1 to 255 visible ASCII characters", "POST", path);
+            return MALFORMED_KEY;
+        }
+        return key;
+    }
+
+    /** 1 to 255 visible ASCII characters. */
+    static boolean validIdempotencyKey(String key) {
+        return !key.isEmpty() && key.length() <= 255 && key.chars().allMatch(c -> c >= 0x21 && c <= 0x7e);
+    }
+
+    /** SHA-256 of what identifies a request, in hex. */
+    static String fingerprint(byte[]... parts) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            for (byte[] part : parts) {
+                md.update(part);
+                md.update((byte) 0);
+            }
+            return java.util.HexFormat.of().formatHex(md.digest());
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * {@code POST /v1/jobs} with an optional {@code Idempotency-Key} (DEP-14). The key is reserved
+     * with the id the job will get before anything else happens, and completed once the job is
+     * queued; a refused request gives it back. A repeat finds the key: the same request gets the
+     * same job (202), even when the first answer was lost or the server restarted in between,
+     * another request 422, and one still in progress 409.
+     */
+    private void submitOnce(HttpExchange exchange, byte[] body, Client client) throws IOException {
+        String path = "/v1/jobs";
+        String key = idempotencyKey(exchange, path);
+        if (key == MALFORMED_KEY) {
+            return;
+        }
+        UUID jobId = jobs.newId();
+        if (key == null) {
+            submitJob(exchange, body, client, jobId);
+            return;
+        }
+        String fingerprint = fingerprint("POST".getBytes(StandardCharsets.UTF_8),
+                path.getBytes(StandardCharsets.UTF_8), body);
+        boolean reserved = reserve(exchange, client, key, fingerprint, jobId, path,
+                id -> {
+                    Job.Snapshot j = jobs.get(id);
+                    return j != null && client.sees(j.owner());
+                },
+                id -> {
+                    exchange.getResponseHeaders().set("Location", "/v1/jobs/" + id);
+                    respond(exchange, 202, jobJson(jobs.get(id)));
+                });
+        if (!reserved) {
+            return;
+        }
+        IdempotencyStore keys = jobs.idempotency();
+        boolean queued = false;
+        boolean storeFailed = false;
+        try {
+            submitJob(exchange, body, client, jobId);
+            queued = exchange.getResponseCode() == 202;
+        } catch (JobStore.Unavailable e) {
+            // The job may exist after all (a commit whose answer was lost): the key stays reserved,
+            // so a repeat finds it, or the key goes stale (IdempotencyStore.STALE) if it doesn't.
+            storeFailed = true;
+            throw e;
+        } finally {
+            try {
+                if (queued) {
+                    keys.complete(client.name(), key, jobId);
+                } else if (!storeFailed) {
+                    keys.abandon(client.name(), key, jobId);
+                }
+            } catch (JobStore.Unavailable e) {
+                // An unfinished key whose job exists is completed by the next repeat.
+                log.error("store.error", "serve: " + e.getMessage());
+            }
+        }
+    }
+
+    /** Answers a repeat with the job or upload its key made. */
+    @FunctionalInterface
+    private interface Replay {
+        void answer(UUID resourceId) throws IOException;
+    }
+
+    /**
+     * Reserves {@code key} for a request that will make {@code resourceId}: true when the caller
+     * goes ahead. Otherwise the request is answered here: the same request gets what the key made
+     * ({@code replay}), another request 422, one whose first is still in progress 409, one whose
+     * job or upload is gone 404. A key is only taken over when it has expired, or when its request
+     * died (stale) without making anything: whether it did is asked of the job store or work area,
+     * never assumed, so a lost completion can't lead to a second job.
+     */
+    private boolean reserve(HttpExchange exchange, Client client, String key, String fingerprint, UUID resourceId,
+                            String path, java.util.function.Predicate<UUID> exists, Replay replay)
+            throws IOException {
+        IdempotencyStore keys = jobs.idempotency();
+        Instant now = jobs.now();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            IdempotencyStore.Entry earlier = keys.begin(client.name(), key, fingerprint, resourceId, now);
+            if (earlier == null) {
+                return true;
+            }
+            boolean made = exists.test(earlier.resourceId());
+            if (earlier.expired(now, config.idempotencyTtl()) || (earlier.stale(now) && !made)) {
+                if (keys.retake(client.name(), key, earlier, fingerprint, resourceId, now)) {
+                    return true;
+                }
+                continue; // changed meanwhile: look again
+            }
+            if (!earlier.fingerprint().equals(fingerprint)) {
+                reject(exchange, 422, "Idempotency-Key reused with a different request", "POST", path);
+                return false;
+            }
+            if (made) {
+                if (!earlier.done()) {
+                    keys.complete(client.name(), key, earlier.resourceId()); // made before a lost completion
+                }
+                replay.answer(earlier.resourceId());
+                return false;
+            }
+            if (!earlier.done()) {
+                exchange.getResponseHeaders().set("Retry-After", "1");
+                reject(exchange, 409, "A request with this Idempotency-Key is still being processed", "POST", path);
+                return false;
+            }
+            reject(exchange, 404, "What this Idempotency-Key made no longer exists (past its TTL)", "POST", path);
+            return false;
+        }
+        exchange.getResponseHeaders().set("Retry-After", "1");
+        reject(exchange, 409, "A request with this Idempotency-Key is still being processed", "POST", path);
+        return false;
+    }
+
+    private void submitJob(HttpExchange exchange, byte[] requestBody, Client client, UUID jobId) throws IOException {
         String path = "/v1/jobs";
         JsonNode request;
         try {
@@ -620,9 +1177,10 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         for (String key : request.propertyNames()) {
-            if (!key.equals("command") && !key.equals("config") && !key.equals("label")) {
-                reject(exchange, 400, "Unknown field '" + LogSanitizer.forLog(key) + "'; allowed: command, config, label",
-                        "POST", path);
+            if (!key.equals("command") && !key.equals("config") && !key.equals("label") && !key.equals("inputUpload")
+                    && !key.equals("callback")) {
+                reject(exchange, 400, "Unknown field '" + LogSanitizer.forLog(key)
+                        + "'; allowed: command, config, label, inputUpload, callback", "POST", path);
                 return;
             }
         }
@@ -640,109 +1198,737 @@ final class ServeServer implements AutoCloseable {
         JsonNode labelNode = request.get("label");
         String label = null;
         if (labelNode != null && !labelNode.isNull()) {
-            if (!labelNode.isString() || labelNode.asString().length() > MAX_LABEL_CHARS) {
-                reject(exchange, 400, "'label' must be a string of at most " + MAX_LABEL_CHARS + " characters",
-                        "POST", path);
+            if (!labelNode.isString() || labelNode.asString().length() > MAX_LABEL_CHARS
+                    || LogSanitizer.hasUnsafeCharacters(labelNode.asString())) {
+                reject(exchange, 400, "'label' must be a string of at most " + MAX_LABEL_CHARS
+                        + " characters, without control characters", "POST", path);
                 return;
             }
             label = labelNode.asString();
+        }
+        ClientQuotas.Limits limits = quotas.limits(client.name());
+        java.net.URI callbackUrl = null;
+        JsonNode callbackNode = request.get("callback");
+        if (callbackNode != null && !callbackNode.isNull()) {
+            try {
+                callbackUrl = callbacks.accept(client.name(), callbackNode);
+            } catch (Rejected e) {
+                reject(exchange, e.status(), e.getMessage(), "POST", path);
+                return;
+            }
+        }
+        WorkArea.JobWorkspace workspace = null;
+        UUID uploadId = null;
+        JsonNode uploadNode = request.get("inputUpload");
+        if (uploadNode != null && !uploadNode.isNull()) {
+            if (!uploadNode.isString()) {
+                reject(exchange, 400, "'inputUpload' must be an upload id", "POST", path);
+                return;
+            }
+            if (!requireWorkArea(exchange, "POST", path)) {
+                return;
+            }
+            workArea.evict();
+            // Its outputs will count against the client's share: none is left for them.
+            if (workArea.usedBytes(client.name()) >= limits.maxWorkBytes()) {
+                reject(exchange, 507, "This client's share of the work area is full (maxWorkBytes "
+                        + limits.maxWorkBytes() + "); delete uploads or wait for old jobs to expire", "POST", path);
+                return;
+            }
+            String uploadText = uploadNode.asString();
+            try {
+                // Only the client's own upload (DEP-13); another client's is "no such upload".
+                uploadId = UUID_TEXT.matcher(uploadText).matches() ? UUID.fromString(uploadText) : null;
+                workspace = uploadId == null ? null : workArea.prepare(jobId, uploadId, client.name());
+            } catch (IOException | RuntimeException e) {
+                log.error("job.workspace", "serve: could not prepare a job workspace: " + e.getClass().getSimpleName());
+                reject(exchange, 500, "Could not prepare the job's workspace", "POST", path);
+                return;
+            }
+            if (workspace == null) {
+                reject(exchange, 404, "No such upload: " + LogSanitizer.forLog(uploadText), "POST", path);
+                return;
+            }
         }
         byte[] body;
         try {
             byte[] configBytes = JSON.writeValueAsBytes(config == null || config.isNull() ? JSON.createObjectNode() : config);
             // The same path policy as the synchronous endpoints, checked now rather than when it runs.
-            body = requestCheck.check(command, configBytes);
+            body = workspace == null ? requestCheck.check(command, configBytes)
+                    : requestCheck.check(command, configBytes, workspace);
         } catch (Rejected e) {
+            discardWorkspace(jobId, workspace);
             reject(exchange, e.status(), e.getMessage(), "POST", path);
+            return;
+        } catch (RuntimeException e) {
+            // e.g. a --read-root removed since start: the job policy can't be built
+            discardWorkspace(jobId, workspace);
+            log.error("job.check", "serve: checking a job failed: " + e.getClass().getSimpleName());
+            reject(exchange, 500, "Could not check the job's paths", "POST", path);
             return;
         }
         jobs.evict();
+        jobs.idempotency().evict(jobs.now().minus(config().idempotencyTtl()));
         if (closing.get()) {
+            discardWorkspace(jobId, workspace);
             reject(exchange, 503, "Server is shutting down", "POST", path);
             return;
         }
-        if (!slots.tryAcquire()) {
+        if (callbackUrl != null) {
+            // Before the job exists, so it can't end unnoticed; dropped again if the job isn't made.
+            try {
+                jobs.callbacks().register(jobId, client.name(), callbackUrl, jobs.now());
+            } catch (JobStore.Unavailable e) {
+                discardWorkspace(jobId, workspace);
+                throw e;
+            }
+        }
+        Job.Snapshot job = null;
+        int unfinished = 0;
+        boolean busy = false;
+        synchronized (submitLock) {
+            unfinished = scheduler.unfinished(client.name());
+            if (unfinished < limits.maxQueued() + limits.maxRunning()) {
+                busy = !slots.tryAcquire();
+                if (!busy) {
+                    try {
+                        job = jobs.create(jobId, command, label, client.name(), body, uploadId);
+                    } catch (JobStore.Unavailable e) {
+                        slots.release(); // never keep the slot of a job that doesn't exist
+                        discardWorkspace(jobId, workspace);
+                        throw e;
+                    }
+                    if (job == null) { // newId() rules this out; never keep the slot
+                        slots.release();
+                        busy = true;
+                    }
+                }
+                if (job != null) {
+                    if (workspace != null) {
+                        workspaces.put(jobId, workspace);
+                    }
+                    scheduler.add(job, body);
+                }
+            }
+        }
+        if (job == null) {
+            discardWorkspace(jobId, workspace);
+            if (callbackUrl != null) {
+                try {
+                    jobs.callbacks().remove(jobId);
+                } catch (JobStore.Unavailable e) {
+                    log.error("store.error", "serve: " + e.getMessage()); // a callback without a job never fires
+                }
+            }
             exchange.getResponseHeaders().set("Retry-After", "30");
-            reject(exchange, 503, "Server busy: " + config().queueSize() + " requests already waiting", "POST", path);
+            if (busy) {
+                reject(exchange, 503, "Server busy: " + config().queueSize() + " requests already waiting", "POST", path);
+            } else {
+                metrics.quotaRefused(client.name(), "max_queued");
+                reject(exchange, 429, "Too many jobs: this client has " + unfinished + " queued or running (maxQueued "
+                        + limits.maxQueued() + ", maxRunning " + limits.maxRunning() + ")", "POST", path);
+            }
             return;
         }
-        Job job = jobs.create(command, label);
+        log.info("job.queued", "serve: job " + job.id() + " (" + command + ") queued", "jobId", job.id().toString(),
+                "command", command, "client", client.name(), "remote", remote(exchange));
         try {
-            queuedTasks.put(job.id(), worker.submit(() -> runJob(job, body)));
+            queuedTasks.put(job.id(), worker.submit(this::jobTurn));
         } catch (RejectedExecutionException e) {
-            if (job.cancel(jobs.now(), "Server shut down before the job started")) {
+            if (jobs.cancel(job.id(), "Server shut down before the job started")) {
+                dropQueuedTask(job);
                 slots.release();
+                jobCancelled(job);
             }
             reject(exchange, 503, "Server is shutting down", "POST", path);
             return;
         }
-        if (job.snapshot().status() == JobStatus.CANCELLED) {
+        // The job is queued now: a store blip from here on must not answer an error (the client would resubmit it).
+        JobStatus now = statusOrQueued(job.id());
+        if (now == JobStatus.CANCELLED) {
             dropQueuedTask(job); // Cancelled (listed and deleted) before its task was recorded.
+        } else if (now != JobStatus.QUEUED) {
+            queuedTasks.remove(job.id()); // Another turn ran it already; its own turn is a spare.
+        }
+        Job.Snapshot current = job;
+        try {
+            current = Objects.requireNonNullElse(jobs.get(job.id()), job);
+        } catch (JobStore.Unavailable e) {
+            // answered from what was created
         }
         exchange.getResponseHeaders().set("Location", "/v1/jobs/" + job.id());
-        respond(exchange, 202, jobJson(job.snapshot()));
+        respond(exchange, 202, jobJson(current));
+    }
+
+    /**
+     * On a worker: one turn of the job queue. It runs the job {@link JobScheduler} picks, which
+     * need not be the one it was queued for; with none it parks (or its job was cancelled).
+     */
+    private void jobTurn() {
+        JobScheduler.Entry next = scheduler.next();
+        if (next == null) {
+            return;
+        }
+        try {
+            runJob(next.job(), next.body());
+        } finally {
+            if (scheduler.finished(next.job().owner())) {
+                try {
+                    worker.submit(this::jobTurn); // a parked turn: a queued job may run now
+                } catch (RejectedExecutionException e) {
+                    // Shutting down: close() cancels what is still queued.
+                }
+            }
+        }
+    }
+
+    /**
+     * The job's status for a worker that waits to start it; QUEUED when the store can't be asked,
+     * so a short outage doesn't abandon it (start() then decides).
+     */
+    private JobStatus statusOrQueued(UUID id) {
+        try {
+            return jobs.status(id);
+        } catch (JobStore.Unavailable e) {
+            return JobStatus.QUEUED;
+        }
+    }
+
+    /**
+     * Cancels a job this worker took but didn't start. True when it was cancelled (the caller then
+     * frees its slot); on a store failure the slot and upload are freed here, the job stays queued
+     * in the store, and false is returned, so nothing is freed twice.
+     */
+    private boolean cancelHeld(Job.Snapshot job, String reason) {
+        try {
+            return jobs.cancel(job.id(), reason);
+        } catch (JobStore.Unavailable e) {
+            log.error("store.error", "serve: job " + job.id() + " could not be cancelled: " + e.getMessage(),
+                    "jobId", job.id().toString());
+            slots.release();
+            if (workArea != null && workspaces.containsKey(job.id())) {
+                workArea.jobEnded(job.id());
+            }
+            return false;
+        }
     }
 
     /** On the worker. The job owns its queue slot from submit until this returns (or a cancel). */
-    private void runJob(Job job, byte[] body) {
+    private void runJob(Job.Snapshot job, byte[] body) {
         queuedTasks.remove(job.id());
+        if (closing.get() && jobs.durable()) {
+            slots.release(); // it stays queued in the store for the next start
+            return;
+        }
         if (closing.get()) {
             // Submitted while close() was cancelling the queue: it must not start either.
-            if (job.cancel(jobs.now(), "Server shut down before the job started")) {
+            if (cancelHeld(job, "Server shut down before the job started")) {
                 slots.release();
+                jobCancelled(job);
             }
             return;
         }
-        if (!job.start(jobs.now())) {
+        AdmissionGate.Ticket ticket;
+        try {
+            ticket = admission.acquire(estimate(job.command(), body, workspaces.get(job.id())),
+                    () -> closing.get() || statusOrQueued(job.id()) != JobStatus.QUEUED);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            ticket = null;
+        } catch (Error e) {
+            // e.g. out of memory while estimating: the job never started, and its slot is freed once.
+            if (cancelHeld(job, "Internal error before the job started")) {
+                slots.release();
+                jobCancelled(job);
+            }
+            if (OutOfMemoryRethrow.find(e).isPresent()) {
+                onOutOfMemory.run();
+            }
+            return;
+        }
+        if (ticket == null) {
+            // Cancelled while it waited for memory (whoever cancelled it released the slot), or shutting down.
+            if (closing.get() && jobs.durable() && statusOrQueued(job.id()) == JobStatus.QUEUED) {
+                slots.release(); // it stays queued in the store for the next start
+                return;
+            }
+            if (cancelHeld(job, "Server shut down before the job started")) {
+                slots.release();
+                jobCancelled(job);
+            }
+            return;
+        }
+        boolean claimed;
+        try {
+            claimed = jobs.start(job.id());
+        } catch (JobStore.Unavailable e) {
+            // It stays queued in the store and runs after a restart; this process lets it go.
+            log.error("store.error", "serve: job " + job.id() + " could not start: " + e.getMessage(),
+                    "jobId", job.id().toString());
+            ticket.close();
+            slots.release();
+            if (workArea != null && workspaces.containsKey(job.id())) {
+                workArea.jobEnded(job.id()); // its upload is free again
+            }
+            return;
+        }
+        if (!claimed) {
+            ticket.close();
             return; // Cancelled while queued: whoever cancelled it released the slot.
         }
-        runningJob = job;
-        runningSince.set(System.nanoTime());
+        long started = System.nanoTime();
+        log.info("job.started", "serve: job " + job.id() + " (" + job.command() + ") started",
+                "jobId", job.id().toString(), "command", job.command(), "client", job.owner());
+        Object key = new Object();
+        Running r = new Running(job, started);
+        r.startedAt = jobs.now();
+        running.put(key, r);
         try {
-            CommandResult result;
-            try (StderrTee.Capture ignored = StderrTee.capture(job.log())) {
-                result = runWithConfigFile(job.command(), body);
+            if (job.createdAt() != null) {
+                metrics.jobStarted(Duration.between(job.createdAt(), r.startedAt).toMillis() / 1000.0);
             }
-            job.finish(jobs.now(), result.exitCode(), result.stdout(), config.maxResultBytes());
+            CommandResult result;
+            // The job's stderr (its log) and its id for the JSON log, on this thread and those it starts.
+            try (StderrTee.Capture capture = StderrTee.capture(jobs.logSink(job.id()))) {
+                result = CliStreams.bind(null, capture.stream(), job.id().toString(),
+                        () -> runWithConfigFile(job.command(), body, workspaces.get(job.id())));
+            }
+            jobs.finish(job.id(), result.exitCode(), result.stdout(), config.maxResultBytes());
         } catch (Throwable t) {
             if (OutOfMemoryRethrow.find(t).isPresent()) {
-                job.fail(jobs.now(), "Out of memory; the server stops");
+                jobs.fail(job.id(), "Out of memory; the server stops");
                 onOutOfMemory.run();
                 return;
             }
-            System.err.println("[ERROR] serve: job " + job.id() + " (" + job.command() + ") failed: "
-                    + t.getClass().getSimpleName());
-            job.fail(jobs.now(), "Internal error while running " + job.command());
+            log.error("job.error", "serve: job " + job.id() + " (" + job.command() + ") failed: "
+                    + t.getClass().getSimpleName(), "jobId", job.id().toString(), "command", job.command(),
+                    "client", job.owner());
+            try {
+                jobs.fail(job.id(), "Internal error while running " + job.command());
+            } catch (JobStore.Unavailable e) {
+                // Still "running" in the store: a restart marks it interrupted (D-18).
+                log.error("store.error", "serve: job " + job.id() + " could not be marked failed: " + e.getMessage(),
+                        "jobId", job.id().toString());
+            }
         } finally {
-            runningJob = null;
-            runningSince.set(0);
+            running.remove(key);
+            ticket.close();
             slots.release();
+            if (workArea != null && workspaces.containsKey(job.id())) {
+                workArea.jobEnded(job.id());
+            }
+            long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            Job.Snapshot s = job;
+            try {
+                s = Objects.requireNonNullElse(jobs.get(job.id()), job);
+            } catch (JobStore.Unavailable e) {
+                // logged where it failed; the metrics and log line show what is known
+            }
+            metrics.jobFinished(job.owner(), s.status(), millis / 1000.0);
+            log.info("job.finished", "serve: job " + job.id() + " (" + job.command() + ") " + s.status().apiName(),
+                    "jobId", job.id().toString(), "command", job.command(), "client", job.owner(),
+                    "status", s.status().apiName(), "exitCode", s.exitCode(), "durationMs", millis);
         }
-        jobs.evict(); // Keep the store within --job-store-bytes as results arrive.
+        try {
+            jobs.evict(); // Keep the store within --job-store-bytes as results arrive.
+        } catch (JobStore.Unavailable e) {
+            log.error("store.error", "serve: " + e.getMessage());
+        }
     }
 
-    /** Takes a cancelled job's task out of the worker's queue, so its request body is freed now. */
-    private void dropQueuedTask(Job job) {
+    private void jobCancelled(Job.Snapshot job) {
+        if (workArea != null && workspaces.containsKey(job.id())) {
+            workArea.jobEnded(job.id()); // its upload is free to expire again
+        }
+        metrics.jobFinished(job.owner(), JobStatus.CANCELLED, -1);
+        log.info("job.finished", "serve: job " + job.id() + " (" + job.command() + ") cancelled",
+                "jobId", job.id().toString(), "command", job.command(), "client", job.owner(),
+                "status", JobStatus.CANCELLED.apiName());
+    }
+
+    /** The ids of the jobs running now (synchronous requests have none). */
+    List<String> runningJobIds() {
+        return running.values().stream().filter(r -> r.job != null).map(r -> r.job.id().toString())
+                .sorted().toList();
+    }
+
+    /** The heap a command is estimated to need; when that can't be told, all of the budget (it runs alone). */
+    private long estimate(String command, byte[] body, WorkArea.JobWorkspace workspace) {
+        try {
+            return config.sizeEstimator().estimate(command, body, workspace);
+        } catch (RuntimeException e) {
+            log.warn("admission.estimate", "serve: could not estimate the size of a " + command
+                    + " command; it runs alone: " + e.getClass().getSimpleName(), "command", command);
+            return Long.MAX_VALUE;
+        }
+    }
+
+    /**
+     * Takes a cancelled job out of the queue, so its request body is freed now, and one turn out
+     * of the worker's queue (turns are interchangeable).
+     */
+    private void dropQueuedTask(Job.Snapshot job) {
+        scheduler.remove(job.id());
         Future<?> task = queuedTasks.remove(job.id());
         if (task instanceof Runnable runnable) {
             worker.remove(runnable);
         }
     }
 
-    private void cancelJob(HttpExchange exchange, Job job, String path) throws IOException {
-        if (job.cancel(jobs.now(), "Cancelled by the client")) {
+    private void cancelJob(HttpExchange exchange, Job.Snapshot job, String path) throws IOException {
+        if (jobs.cancel(job.id(), "Cancelled by the client")) {
             dropQueuedTask(job);
             slots.release();
-            respond(exchange, 200, jobJson(job.snapshot()));
+            jobCancelled(job);
+            respond(exchange, 200, jobJson(Objects.requireNonNullElse(jobs.get(job.id()), job)));
             return;
         }
         // A running job is not interrupted: a command cut off mid-write could leave truncated reports.
-        rejectJob(exchange, 409, "Job is " + job.snapshot().status().apiName() + "; only queued jobs can be cancelled",
-                job, "DELETE", path);
+        JobStatus now = jobs.status(job.id());
+        rejectJob(exchange, 409, "Job is " + (now == null ? job.status() : now).apiName()
+                + "; only queued jobs can be cancelled", job, "DELETE", path);
     }
 
-    private void jobResult(HttpExchange exchange, Job job, String path) throws IOException {
-        Job.Snapshot s = job.snapshot();
+    // -------------------------------------------------------------------------
+    // File exchange (DEP-7)
+    // -------------------------------------------------------------------------
+
+    private boolean requireWorkArea(HttpExchange exchange, String method, String path) throws IOException {
+        if (workArea != null) {
+            return true;
+        }
+        reject(exchange, 404, "File exchange is not enabled on this server", method, path);
+        return false;
+    }
+
+    /** A workspace prepared for a job that is then not created. */
+    private void discardWorkspace(UUID jobId, WorkArea.JobWorkspace workspace) {
+        if (workspace != null) {
+            workArea.deleteWorkspace(jobId);
+        }
+    }
+
+    /** The most of a refused upload's unread body that is read and dropped before the answer. */
+    static final long REFUSED_BODY_DRAIN_BYTES = 16L << 20;
+
+    /**
+     * Before answering an upload refused while its body is still unread because the work area is
+     * full (507); a body refused as too large (413) is never read. Closing a connection with unread data makes the operating system reset it, and
+     * on Linux the reset can discard the answer before the client reads it: it then sees a broken
+     * connection instead of the 507. A body of up to {@link #REFUSED_BODY_DRAIN_BYTES} is read and
+     * dropped (within {@code --request-read-time}), so the answer arrives; a larger or unknown one
+     * gets {@code Connection: close} as before.
+     */
+    private static void drainOrClose(HttpExchange exchange, long declared) {
+        if (declared < 0 || declared > REFUSED_BODY_DRAIN_BYTES) {
+            exchange.getResponseHeaders().set("Connection", "close");
+            return;
+        }
+        try {
+            exchange.getRequestBody().transferTo(java.io.OutputStream.nullOutputStream());
+        } catch (IOException e) {
+            exchange.getResponseHeaders().set("Connection", "close"); // the client went away or was too slow
+        }
+    }
+
+    /** {@code POST /v1/uploads}: a ZIP body, streamed to disk and extracted; it belongs to {@code client}. */
+    private void receiveUpload(HttpExchange exchange, String path, Client client) throws IOException {
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        String mediaType = type == null ? "" : type.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
+        if (!mediaType.equals(ZIP)) {
+            reject(exchange, 415, "Content-Type must be " + ZIP, "POST", path);
+            return;
+        }
+        long declared = -1;
+        String length = exchange.getRequestHeaders().getFirst("Content-Length");
+        // With Transfer-Encoding the body length is not Content-Length: reserve the full limit.
+        if (length != null && exchange.getRequestHeaders().getFirst("Transfer-Encoding") == null) {
+            try {
+                declared = Long.parseLong(length.strip());
+            } catch (NumberFormatException e) {
+                reject(exchange, 400, "Invalid Content-Length", "POST", path);
+                return;
+            }
+        }
+        String key = idempotencyKey(exchange, path);
+        if (key == MALFORMED_KEY) {
+            exchange.getResponseHeaders().set("Connection", "close"); // the body was not read
+            return;
+        }
+        WorkArea.Upload upload;
+        ClientQuotas.Limits limits = quotas.limits(client.name());
+        java.security.MessageDigest digest;
+        try {
+            digest = java.security.MessageDigest.getInstance("SHA-256");
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        try {
+            upload = workArea.receive(new java.security.DigestInputStream(exchange.getRequestBody(), digest), declared,
+                    client.name(), limits.maxUploadBytes(), limits.maxWorkBytes());
+        } catch (WorkArea.Refused e) {
+            if (e.status() == 413) {
+                exchange.getResponseHeaders().set("Connection", "close"); // never read a body refused as too large
+            } else {
+                drainOrClose(exchange, declared);
+            }
+            reject(exchange, e.status(), e.getMessage(), "POST", path);
+            return;
+        }
+        if (key != null) {
+            // Only now is the request's fingerprint known: the SHA-256 of its bytes.
+            String fingerprint = fingerprint("POST".getBytes(StandardCharsets.UTF_8),
+                    path.getBytes(StandardCharsets.UTF_8), digest.digest());
+            boolean reserved;
+            try {
+                jobs.idempotency().evict(jobs.now().minus(config.idempotencyTtl()));
+                reserved = reserve(exchange, client, key, fingerprint, upload.id, path,
+                        id -> {
+                            WorkArea.Upload u = workArea.upload(id);
+                            return u != null && client.sees(u.owner);
+                        },
+                        id -> {
+                            exchange.getResponseHeaders().set("Location", "/v1/uploads/" + id);
+                            respond(exchange, 201, JSON.writeValueAsString(uploadNode(workArea.upload(id))));
+                        });
+            } catch (JobStore.Unavailable e) {
+                dropUpload(upload.id);
+                throw e;
+            }
+            if (!reserved) {
+                dropUpload(upload.id); // a repeat (or refused): the one received now is not kept
+                return;
+            }
+            try {
+                jobs.idempotency().complete(client.name(), key, upload.id);
+            } catch (JobStore.Unavailable e) {
+                log.error("store.error", "serve: " + e.getMessage()); // a repeat completes it
+            }
+        }
+        log.info("upload.received", "serve: upload " + upload.id + " (" + upload.files.size() + " files, "
+                + upload.totalBytes + " bytes)", "uploadId", upload.id.toString(), "client", client.name(),
+                "remote", remote(exchange));
+        exchange.getResponseHeaders().set("Location", "/v1/uploads/" + upload.id);
+        respond(exchange, 201, JSON.writeValueAsString(uploadNode(upload)));
+    }
+
+    /** Deletes an upload that is not answered with (a repeat, or a failed key). */
+    private void dropUpload(UUID id) {
+        try {
+            workArea.deleteUpload(id);
+        } catch (WorkArea.Refused | RuntimeException e) {
+            log.warn("upload.drop", "serve: could not drop upload " + id + ": " + e.getClass().getSimpleName());
+        }
+    }
+
+    /** {@code GET} and {@code DELETE /v1/uploads/{uploadId}}. */
+    private void handleUploadPath(HttpExchange exchange, String method, String path) throws IOException {
+        String idText = path.substring("/v1/uploads/".length());
+        if (idText.contains("/")) {
+            reject(exchange, 404, "Not found", method, path);
+            return;
+        }
+        Client client = allowMethods(exchange, method, path, "GET", "DELETE")
+                ? requireClient(exchange, method, path) : null;
+        if (client == null || !requireWorkArea(exchange, method, path)) {
+            return;
+        }
+        workArea.evict();
+        UUID id = UUID_TEXT.matcher(idText).matches() ? UUID.fromString(idText) : null;
+        WorkArea.Upload upload = id == null ? null : workArea.upload(id);
+        // Another client's upload answers exactly as one that doesn't exist (DEP-13).
+        if (upload == null || !client.sees(upload.owner)) {
+            reject(exchange, 404, "No such upload", method, path);
+            return;
+        }
+        if (method.equals("GET")) {
+            respond(exchange, 200, JSON.writeValueAsString(uploadNode(upload)));
+            return;
+        }
+        try {
+            if (!workArea.deleteUpload(id)) {
+                reject(exchange, 404, "No such upload", method, path);
+                return;
+            }
+        } catch (WorkArea.Refused e) {
+            reject(exchange, e.status(), e.getMessage(), method, path);
+            return;
+        }
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(204, -1);
+    }
+
+    private static ObjectNode uploadNode(WorkArea.Upload upload) {
+        ObjectNode node = JSON.createObjectNode();
+        node.put("uploadId", upload.id.toString());
+        ArrayNode files = node.putArray("files");
+        for (var entry : upload.files) {
+            files.addObject().put("name", entry.name()).put("size", entry.size());
+        }
+        node.put("totalBytes", upload.totalBytes);
+        node.put("createdAt", upload.createdAt.toString());
+        node.put("expiresAt", upload.expiresAt.toString());
+        return node;
+    }
+
+    /**
+     * True when {@code job} has a workspace and has ended; otherwise answers 404 (no workspace)
+     * or 409 (not finished, or cancelled) and returns false.
+     */
+    private boolean requireOutputs(HttpExchange exchange, Job.Snapshot job, String path) throws IOException {
+        if (workArea != null && workArea.outputsLost(job.id())) {
+            rejectJob(exchange, 410, "This job's outputs were lost: the work area changed while the server was down",
+                    job, "GET", path);
+            return false;
+        }
+        if (workArea == null || !workArea.hasWorkspace(job.id())) {
+            rejectJob(exchange, 404, "This job has no workspace: it read and wrote shared paths, not an upload",
+                    job, "GET", path);
+            return false;
+        }
+        Job.Snapshot s = job;
+        if (!s.finished() || s.status() == JobStatus.CANCELLED) {
+            rejectJob(exchange, 409, "Job is " + s.status().apiName() + "; it has no outputs"
+                    + (s.status() == JobStatus.CANCELLED ? "" : " yet"), job, "GET", path);
+            return false;
+        }
+        return true;
+    }
+
+    /** {@code GET /v1/jobs/{id}/files}: the files in the job's {@code out/}. */
+    private void jobFiles(HttpExchange exchange, Job.Snapshot job, String path) throws IOException {
+        if (!requireOutputs(exchange, job, path)) {
+            return;
+        }
+        ObjectNode node = JSON.createObjectNode();
+        node.put("jobId", job.id().toString());
+        ArrayNode files = node.putArray("files");
+        for (WorkArea.OutputFile f : workArea.outputs(job.id())) {
+            files.addObject().put("path", f.path()).put("size", f.size()).put("mediaType", mediaType(f.path()));
+        }
+        respond(exchange, 200, JSON.writeValueAsString(node));
+    }
+
+    /** {@code GET /v1/jobs/{id}/files/{path}}: one output file, streamed. */
+    private void jobFile(HttpExchange exchange, Job.Snapshot job, String path, String idText) throws IOException {
+        if (!requireOutputs(exchange, job, path)) {
+            return;
+        }
+        // Segments from the raw path, each decoded on its own: an encoded "/" or "\" stays inside
+        // its segment, where WorkArea.output refuses it.
+        String raw = exchange.getRequestURI().getRawPath();
+        String prefix = "/v1/jobs/" + idText + "/files/";
+        List<String> segments = new ArrayList<>();
+        if (raw != null && raw.startsWith(prefix)) {
+            for (String part : raw.substring(prefix.length()).split("/", -1)) {
+                try {
+                    segments.add(URLDecoder.decode(part.replace("+", "%2B"), StandardCharsets.UTF_8));
+                } catch (IllegalArgumentException e) {
+                    segments = List.of();
+                    break;
+                }
+            }
+        }
+        Path file = workArea.output(job.id(), segments);
+        if (file == null) {
+            rejectJob(exchange, 404, "No such output file", job, "GET", path);
+            return;
+        }
+        String name = segments.getLast();
+        exchange.getResponseHeaders().set("Content-Type", mediaType(name));
+        exchange.getResponseHeaders().set("Content-Disposition", contentDisposition(name));
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(200, Files.size(file));
+        try (OutputStream out = exchange.getResponseBody()) {
+            Files.copy(file, out);
+        }
+    }
+
+    /** {@code GET /v1/jobs/{id}/archive}: all outputs as one ZIP, streamed. */
+    private void jobArchive(HttpExchange exchange, Job.Snapshot job, String path) throws IOException {
+        if (!requireOutputs(exchange, job, path)) {
+            return;
+        }
+        List<WorkArea.OutputFile> files = workArea.outputs(job.id());
+        exchange.getResponseHeaders().set("Content-Type", ZIP);
+        exchange.getResponseHeaders().set("Content-Disposition", contentDisposition("job-" + job.id() + ".zip"));
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(200, 0);
+        java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(exchange.getResponseBody());
+        try {
+            for (WorkArea.OutputFile f : files) {
+                Path file = workArea.output(job.id(), List.of(f.path().split("/")));
+                if (file == null) {
+                    throw new IOException("output vanished during the download");
+                }
+                zip.putNextEntry(new java.util.zip.ZipEntry(f.path()));
+                Files.copy(file, zip);
+                zip.closeEntry();
+            }
+            zip.finish();
+        } catch (IOException e) {
+            // No central directory: the client gets an unreadable archive, never a complete-looking
+            // one with reports missing.
+            log.warn("download.aborted", "serve: archive of job " + job.id() + " aborted: " + e.getMessage(),
+                    "jobId", job.id().toString());
+            throw e;
+        }
+        zip.flush();
+        exchange.getResponseBody().close();
+    }
+
+    private static final Map<String, String> MEDIA_TYPES = Map.ofEntries(
+            Map.entry("json", "application/json"),
+            Map.entry("jsonld", "application/ld+json"),
+            Map.entry("ttl", "text/turtle"),
+            Map.entry("nt", "application/n-triples"),
+            Map.entry("nq", "application/n-quads"),
+            Map.entry("trig", "application/trig"),
+            Map.entry("rdf", "application/rdf+xml"),
+            Map.entry("owl", "application/rdf+xml"),
+            Map.entry("xml", "application/xml"),
+            Map.entry("csv", "text/csv"),
+            Map.entry("txt", "text/plain"),
+            Map.entry("log", "text/plain"),
+            Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            Map.entry("zip", ZIP));
+
+    /** From a fixed list by extension, never sniffed; anything else is a plain download. */
+    static String mediaType(String name) {
+        int dot = name.lastIndexOf('.');
+        String ext = dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
+        return MEDIA_TYPES.getOrDefault(ext, "application/octet-stream");
+    }
+
+    /**
+     * {@code attachment} with an ASCII-only {@code filename} (anything else becomes {@code _}) and
+     * the exact name as RFC 8187 {@code filename*}; no quote, CR or LF can reach the header.
+     */
+    static String contentDisposition(String name) {
+        StringBuilder ascii = new StringBuilder();
+        StringBuilder encoded = new StringBuilder();
+        for (char c : name.toCharArray()) {
+            boolean safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || c == '.' || c == '-' || c == '_';
+            ascii.append(safe ? c : '_');
+        }
+        for (byte b : name.getBytes(StandardCharsets.UTF_8)) {
+            char c = (char) (b & 0xff);
+            boolean attrChar = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || "!#$&+-.^_`|~".indexOf(c) >= 0;
+            if (attrChar) {
+                encoded.append(c);
+            } else {
+                encoded.append('%').append(String.format("%02X", b & 0xff));
+            }
+        }
+        return "attachment; filename=\"" + ascii + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    private void jobResult(HttpExchange exchange, Job.Snapshot job, String path) throws IOException {
+        Job.Snapshot s = job;
         if (s.resultDropped()) {
             rejectJob(exchange, 410, "The result was larger than --max-result-bytes (" + config.maxResultBytes()
                     + " bytes) and was not kept; write large results to a file (the command's output or "
@@ -754,7 +1940,7 @@ final class ServeServer implements AutoCloseable {
                     + (s.status() == JobStatus.CANCELLED ? "" : " yet"), job, "GET", path);
             return;
         }
-        String body = job.result();
+        String body = jobs.result(job.id());
         if (body == null || body.isEmpty()) {
             int exit = s.exitCode() == null ? 3 : s.exitCode();
             body = "{\"exitCode\":" + exit + ",\"status\":\"" + statusLabel(exit) + "\""
@@ -763,7 +1949,7 @@ final class ServeServer implements AutoCloseable {
         respond(exchange, 200, body);
     }
 
-    private void jobLog(HttpExchange exchange, Job job, String path) throws IOException {
+    private void jobLog(HttpExchange exchange, Job.Snapshot job, String path) throws IOException {
         long offset = 0;
         Map<String, String> query = query(exchange);
         if (query == null) {
@@ -782,7 +1968,7 @@ final class ServeServer implements AutoCloseable {
                 return;
             }
         }
-        JobLog.Slice slice = job.log().read(offset, MAX_LOG_PAGE);
+        JobLog.Slice slice = jobs.readLog(job.id(), offset, MAX_LOG_PAGE);
         ObjectNode node = JSON.createObjectNode();
         node.put("jobId", job.id().toString());
         node.put("offset", slice.offset());
@@ -793,11 +1979,20 @@ final class ServeServer implements AutoCloseable {
         respond(exchange, 200, JSON.writeValueAsString(node));
     }
 
-    private void listJobs(HttpExchange exchange, String path) throws IOException {
+    /** A client lists its own jobs; an admin every client's, or one client's with {@code ?owner=}. */
+    private void listJobs(HttpExchange exchange, String path, Client client) throws IOException {
         Map<String, String> query = query(exchange);
         if (query == null) {
             reject(exchange, 400, "Malformed query string", "GET", path);
             return;
+        }
+        String owner = client.admin() ? null : client.name();
+        if (query.containsKey("owner")) {
+            if (!client.sees(query.get("owner"))) {
+                reject(exchange, 403, "Only an admin token may list other clients' jobs", "GET", path);
+                return;
+            }
+            owner = query.get("owner");
         }
         JobStatus status = null;
         if (query.containsKey("status")) {
@@ -822,14 +2017,24 @@ final class ServeServer implements AutoCloseable {
         }
         ObjectNode node = JSON.createObjectNode();
         ArrayNode list = node.putArray("jobs");
-        for (Job job : jobs.list(status, limit)) {
-            list.add(jobNode(job.snapshot()));
+        for (Job.Snapshot job : jobs.list(status, owner, limit)) {
+            list.add(jobNode(job));
         }
         respond(exchange, 200, JSON.writeValueAsString(node));
     }
 
-    private static String jobJson(Job.Snapshot s) {
-        return JSON.writeValueAsString(jobNode(s));
+    /** One job as the API shows it, with its callback (DEP-14) when it has one. */
+    private String jobJson(Job.Snapshot s) {
+        ObjectNode node = jobNode(s);
+        try {
+            ObjectNode callback = Callbacks.view(jobs.callbacks().get(s.id()));
+            if (callback != null) {
+                node.set("callback", callback);
+            }
+        } catch (JobStore.Unavailable e) {
+            // the job itself is known; its callback state is shown when the store is back
+        }
+        return JSON.writeValueAsString(node);
     }
 
     private static ObjectNode jobNode(Job.Snapshot s) {
@@ -838,6 +2043,7 @@ final class ServeServer implements AutoCloseable {
         node.put("jobId", s.id().toString());
         node.put("command", s.command());
         node.put("label", s.label());
+        node.put("owner", s.owner());
         node.put("status", s.status().apiName());
         node.put("createdAt", s.createdAt().toString());
         node.put("startedAt", s.startedAt() == null ? null : s.startedAt().toString());
@@ -861,17 +2067,17 @@ final class ServeServer implements AutoCloseable {
     }
 
     private String v1HealthJson() {
-        long since = runningSince.get();
-        boolean busy = since != 0;
+        int runningNow = running.size();
         boolean stalled = stalled();
         ObjectNode node = JSON.createObjectNode();
         node.put("status", stalled ? "stalled" : "ok");
         node.put("version", VERSION);
         node.put("apiVersion", API_VERSION);
-        node.put("busy", busy);
+        node.put("busy", runningNow > 0);
         node.put("stalled", stalled);
-        node.put("queued", Math.max(0, inFlight() - (busy ? 1 : 0)));
-        node.put("running", busy ? 1 : 0);
+        node.put("queued", Math.max(0, inFlight() - runningNow));
+        node.put("running", runningNow);
+        node.put("workers", config.workers());
         return JSON.writeValueAsString(node);
     }
 
@@ -908,10 +2114,9 @@ final class ServeServer implements AutoCloseable {
         return false;
     }
 
-    private static void rejectJob(HttpExchange exchange, int status, String message, Job job, String method,
-                                  String path) throws IOException {
-        System.err.println("[WARN] serve: " + status + " " + LogSanitizer.forLog(method) + " "
-                + LogSanitizer.forLog(path) + " - " + message);
+    private void rejectJob(HttpExchange exchange, int status, String message, Job.Snapshot job, String method,
+                           String path) throws IOException {
+        logRejected(exchange, status, message, method, path, job.id());
         respond(exchange, status, Problem.json(status, message, job.id()), Problem.CONTENT_TYPE);
     }
 
@@ -936,7 +2141,9 @@ final class ServeServer implements AutoCloseable {
     // Synchronous command endpoints
     // -------------------------------------------------------------------------
 
-    private void runCommand(HttpExchange exchange, String command, byte[] requestBody) throws IOException {
+    private void runCommand(HttpExchange exchange, String command, byte[] requestBody, Client client)
+            throws IOException {
+        long received = System.nanoTime();
         byte[] body;
         try {
             body = requestCheck.check(command, requestBody);
@@ -945,6 +2152,7 @@ final class ServeServer implements AutoCloseable {
             return;
         }
         if (!slots.tryAcquire()) {
+            metrics.request(client.name(), command, "busy");
             exchange.getResponseHeaders().set("Retry-After", "30");
             reject(exchange, 503, "Server busy: " + config.queueSize() + " requests already waiting",
                     "POST", "/" + command);
@@ -956,14 +2164,35 @@ final class ServeServer implements AutoCloseable {
         Future<CommandResult> future;
         try {
             future = worker.submit(() -> {
-                if (!claimed.compareAndSet(false, true)) {
+                AdmissionGate.Ticket ticket;
+                try {
+                    // Abandoned when the request timed out (or the server stops) while it waited.
+                    ticket = admission.acquire(estimate(command, body, null), claimed::get);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    ticket = null;
+                } catch (Error e) {
+                    // The handler sees it as a failure (or out of memory); the slot is freed once.
+                    if (claimed.compareAndSet(false, true)) {
+                        slots.release();
+                    }
+                    throw e;
+                }
+                if (ticket == null || !claimed.compareAndSet(false, true)) {
+                    if (ticket != null) {
+                        ticket.close();
+                    } else if (claimed.compareAndSet(false, true)) {
+                        slots.release(); // interrupted: nobody else claimed the slot
+                    }
                     return null;
                 }
-                runningSince.set(System.nanoTime());
+                Object key = new Object();
+                running.put(key, new Running(null, System.nanoTime()));
                 try {
                     return runWithConfigFile(command, body);
                 } finally {
-                    runningSince.set(0);
+                    running.remove(key);
+                    ticket.close();
                     slots.release();
                 }
             });
@@ -983,6 +2212,7 @@ final class ServeServer implements AutoCloseable {
                 // Don't interrupt: a command cut off mid-write could leave truncated reports.
                 future.cancel(false);
             }
+            metrics.request(client.name(), command, "timeout");
             reject(exchange, 504, "Command did not finish within " + config.requestTimeout(), "POST", "/" + command);
             return;
         } catch (ExecutionException e) {
@@ -997,7 +2227,9 @@ final class ServeServer implements AutoCloseable {
                 onOutOfMemory.run();
                 return;
             }
-            System.err.println("[ERROR] serve: /" + command + " failed: " + e.getCause().getClass().getSimpleName());
+            metrics.request(client.name(), command, "error");
+            log.error("command.failed", "serve: /" + command + " failed: " + e.getCause().getClass().getSimpleName(),
+                    "command", command, "client", client.name(), "remote", remote(exchange));
             respond(exchange, 500, error("Internal error while running " + command));
             return;
         } catch (InterruptedException e) {
@@ -1016,14 +2248,22 @@ final class ServeServer implements AutoCloseable {
         }
         // Exit 0 and 1 (violations) are results; 2 is bad input; anything else is an error.
         int status = result.exitCode() <= 1 ? 200 : (result.exitCode() == 2 ? 400 : 500);
+        metrics.request(client.name(), command, ServeMetrics.outcome(result.exitCode()));
+        log.info("command.finished", "serve: /" + command + " exit " + result.exitCode(), "command", command,
+                "client", client.name(), "exitCode", result.exitCode(), "status", status,
+                "durationMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - received), "remote", remote(exchange));
         respond(exchange, status, responseBody);
     }
 
     private CommandResult runWithConfigFile(String command, byte[] body) throws Exception {
+        return runWithConfigFile(command, body, null);
+    }
+
+    private CommandResult runWithConfigFile(String command, byte[] body, WorkArea.JobWorkspace workspace) throws Exception {
         Path configFile = Files.createTempFile("cimpal-serve-", ".json");
         try {
             Files.write(configFile, body);
-            return runner.run(command, configFile);
+            return workspace == null ? runner.run(command, configFile) : runner.run(command, configFile, workspace);
         } finally {
             Files.deleteIfExists(configFile);
         }
@@ -1034,36 +2274,40 @@ final class ServeServer implements AutoCloseable {
     // -------------------------------------------------------------------------
 
     /**
-     * {@code status} is {@code "ok"}, or {@code "stalled"} when the running command has taken
-     * longer than the request timeout (it can't be stopped, so the worker stays blocked until it
-     * returns; restart the server). {@code busy} tells whether a command is running.
+     * {@code status} is {@code "ok"}, or {@code "stalled"} when a running command has taken
+     * longer than its timeout (it can't be stopped, so its worker stays blocked until it returns;
+     * restart the server). {@code busy} tells whether a command is running.
      */
     private String healthJson() {
-        long since = runningSince.get();
-        boolean busy = since != 0;
+        int runningNow = running.size();
         boolean stalled = stalled();
         return "{\"status\":" + jsonStr(stalled ? "stalled" : "ok") + ",\"version\":" + jsonStr(VERSION)
-                + ",\"busy\":" + busy + ",\"stalled\":" + stalled + ",\"queued\":"
-                + Math.max(0, inFlight() - (busy ? 1 : 0)) + "}";
+                + ",\"busy\":" + (runningNow > 0) + ",\"stalled\":" + stalled + ",\"queued\":"
+                + Math.max(0, inFlight() - runningNow) + "}";
     }
 
     /**
-     * True when the running command has taken longer than its limit: {@code --request-timeout}
-     * for a synchronous request, {@code --job-timeout} for a job. It can't be stopped, so the
+     * True when a running command has taken longer than its limit: {@code --request-timeout}
+     * for a synchronous request, {@code --job-timeout} for a job. It can't be stopped, so its
      * worker stays blocked until it returns; restart the server if it doesn't.
      */
     private boolean stalled() {
-        long since = runningSince.get();
-        Job job = runningJob;
-        boolean stalled = since != 0 && (job == null
-                ? System.nanoTime() - since > config.requestTimeout().toNanos()
-                : jobs.timedOut(job));
-        // Health is polled without a token: log once per command, not once per poll.
-        if (stalled && stallWarned.getAndSet(since) != since) {
-            System.err.println("[WARN] serve: the running command has exceeded its timeout; "
-                    + "restart the server if it doesn't return.");
+        boolean any = false;
+        for (Running r : running.values()) {
+            // From the clocks alone: health (no token) never reaches the job store.
+            boolean stalled = r.job == null || r.startedAt == null
+                    ? System.nanoTime() - r.since > config.requestTimeout().toNanos()
+                    : Duration.between(r.startedAt, jobs.now()).compareTo(config.jobTimeout()) > 0;
+            if (stalled) {
+                any = true;
+                if (r.stallWarned.compareAndSet(false, true)) {
+                    log.warn("stall", "serve: a running command has exceeded its timeout; "
+                            + "restart the server if it doesn't return.",
+                            "jobId", r.job == null ? null : r.job.id().toString());
+                }
+            }
         }
-        return stalled;
+        return any;
     }
 
     private static String commandsJson() {
@@ -1080,15 +2324,60 @@ final class ServeServer implements AutoCloseable {
         return sb.append("]}").toString();
     }
 
-    private static void reject(HttpExchange exchange, int status, String message, String method, String path)
+    private void reject(HttpExchange exchange, int status, String message, String method, String path)
             throws IOException {
-        System.err.println("[WARN] serve: " + status + " " + LogSanitizer.forLog(method) + " "
-                + LogSanitizer.forLog(path) + " - " + message);
+        logRejected(exchange, status, message, method, path, null);
         if (isV1(path)) {
             respond(exchange, status, Problem.json(status, message, null), Problem.CONTENT_TYPE);
         } else {
             respond(exchange, status, error(message));
         }
+    }
+
+    private void logRejected(HttpExchange exchange, int status, String message, String method, String path,
+                             UUID jobId) {
+        log.warn("request.rejected", "serve: " + status + " " + LogSanitizer.forLog(method) + " "
+                        + LogSanitizer.forLog(path) + " - " + LogSanitizer.forLog(message),
+                "status", status, "method", method, "path", path, "remote", remote(exchange),
+                "client", exchange.getAttribute(CLIENT_ATTRIBUTE), "jobId", jobId == null ? null : jobId.toString());
+    }
+
+    /** The client's address (the proxy's, behind one); never a header the client chose. */
+    private static String remote(HttpExchange exchange) {
+        return exchange.getRemoteAddress() == null || exchange.getRemoteAddress().getAddress() == null ? null
+                : exchange.getRemoteAddress().getAddress().getHostAddress();
+    }
+
+    /**
+     * {@code ready}, or why not: {@code shutting down}, or {@code no usable token} (a broken token
+     * file). A full queue doesn't count: with one replica that would take the only endpoint out of
+     * the load balancer and block polling and cancelling too; a full queue is answered per request
+     * with 503 and {@code Retry-After} instead.
+     */
+    String readiness() {
+        if (closing.get()) {
+            return "shutting down";
+        }
+        if (!config.tokens().usable()) {
+            return "no usable token";
+        }
+        return jobs.usable() ? "ready" : "job store unavailable";
+    }
+
+    private String metricsText() {
+        Map<JobStatus, Long> byStatus = new java.util.EnumMap<>(JobStatus.class);
+        try {
+            for (JobStatus status : JobStatus.values()) {
+                byStatus.put(status, jobs.count(status));
+            }
+        } catch (JobStore.Unavailable e) {
+            byStatus.clear(); // the store is down: the error counter below is what matters now
+        }
+        int runningNow = running.size();
+        return metrics.render(VERSION, byStatus, Math.max(0, inFlight() - runningNow), runningNow, config.workers())
+                + ServeMetrics.storeErrors(jobs.errors())
+                + ServeMetrics.capacity(config.queueSize(), stalled(),
+                        workArea == null ? 0 : workArea.usedBytes(), workArea == null ? 0 : config.workMaxBytes());
     }
 
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {

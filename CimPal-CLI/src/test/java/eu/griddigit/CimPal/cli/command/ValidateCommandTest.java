@@ -67,6 +67,32 @@ class ValidateCommandTest {
         }
     }
 
+    /** DOC-2: incremental timestamps can come from a config (mcp, serve, run) and the dry run shows them. */
+    @Test
+    void dryRunShowsIncrementalTimestampsFromTheConfigOrTheFlag() throws Exception {
+        Path config = Files.writeString(tempDir.resolve("validate.json"), """
+                {"workflow": "timestamped", "incrementalTimestamps": true}
+                """);
+
+        assertThat(dryRun("--config", config.toString())).containsPattern("incrementalTimestamps\\s*: true");
+        assertThat(dryRun("--workflow", "timestamped")).containsPattern("incrementalTimestamps\\s*: false");
+        assertThat(dryRun("--workflow", "timestamped", "--incremental-timestamps"))
+                .containsPattern("incrementalTimestamps\\s*: true");
+    }
+
+    private static String dryRun(String... options) {
+        PrintStream original = System.out;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
+            String[] args = Stream.concat(Stream.of("validate", "--dry-run"), Stream.of(options)).toArray(String[]::new);
+            assertThat(new CommandLine(new CimPalCli()).execute(args)).isEqualTo(ExitCode.OK);
+        } finally {
+            System.setOut(original);
+        }
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
     @Test
     void shaclFilesOptionIsGone() {
         CommandLine validate = new CommandLine(new CimPalCli()).getSubcommands().get("validate");
@@ -198,6 +224,39 @@ class ValidateCommandTest {
     }
 
     @Test
+    void combinedWorkflowTakesFoldersAsTheirFiles() throws Exception {
+        // As the mapping workflow takes a models folder: a folder stands for its own files.
+        combinedRunWithTwoFindings();
+        write("models/readme.txt", "not a model");
+        write("models/old/eq-old.xml", rdfXml("<ex:Thing rdf:about=\"#_3\"/>")); // sub-folders are not entered
+
+        int exitCode = validate("--workflow", "combined",
+                "--constraint-files", tempDir.resolve("constraints").toString(),
+                "--data-files", tempDir.resolve("models").toString(),
+                "--output", tempDir.resolve("out").toString(), "--xml-base", TestModels.XML_BASE, "--workers", "1",
+                "--summary-file", tempDir.resolve("summary.json").toString());
+
+        assertThat(exitCode).isEqualTo(ExitCode.VIOLATIONS);
+        JsonNode summary = JSON.readTree(tempDir.resolve("summary.json").toFile());
+        List<String> data = new java.util.ArrayList<>();
+        summary.path("run").path("inputs").path("dataFiles").forEach(f -> data.add(Path.of(f.asString()).getFileName().toString()));
+        assertThat(data).containsExactly("eq.xml", "ssh.xml");
+        assertThat(summary.path("run").path("inputs").path("constraintFiles")).hasSize(2);
+        assertThat(summary.path("results").path("violations").asInt()).as("same as naming the files").isEqualTo(2);
+    }
+
+    @Test
+    void aFolderWithNothingToUseIsBadInput() throws Exception {
+        Path shapes = write("constraints/shapes.ttl", TestModels.THING_SHAPES);
+        write("models/readme.txt", "no model here");
+
+        assertThat(validate("--workflow", "combined", "--constraint-files", shapes.toString(),
+                "--data-files", tempDir.resolve("models").toString(), "--output", tempDir.resolve("out").toString()))
+                .isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(tempDir.resolve("out")).doesNotExist();
+    }
+
+    @Test
     void combinedWorkflowNeedsItsConstraintAndDataFiles() throws Exception {
         Path shapes = write("constraints/shapes.ttl", TestModels.THING_SHAPES);
         Path data = write("models/eq.xml", CONFORMING_THING_MODEL);
@@ -305,5 +364,75 @@ class ValidateCommandTest {
         String value = "a\nb\tc\u0001\"d\\e";
 
         assertThat(JSON.readTree(ValidateCommand.jsonStr(value)).asString()).isEqualTo(value);
+    }
+
+    /** SEC-3 (G9): the interpreter of the Python engines is an absolute path, never a name looked up on PATH. */
+    @Test
+    void aRelativePythonExecutableIsBadInput() {
+        int exitCode = new CommandLine(new CimPalCli()).execute("validate", "--python-executable", "relative/py",
+                "--engine", "PYSHACL", "--dry-run");
+
+        assertThat(exitCode).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(System.getProperty("cimpal.python.executable")).isNull();
+    }
+
+    // ---- TEST-4: the --format json contract and exit 3 --------------------------------------
+
+    /** A mapping validation of one violating Thing, plus {@code extra} arguments. */
+    private String[] mappingRun(String... extra) throws Exception {
+        write("mapping/models/data.xml", TestModels.VIOLATING_THING_MODEL);
+        write("mapping/constraints/shapes.ttl", TestModels.THING_SHAPES);
+        write("mapping/mapping.csv", "xml_inputs,ttl,notes\ndata.xml,shapes.ttl,Thing check\n");
+        List<String> args = new java.util.ArrayList<>(List.of("validate", "--workflow", "mapping",
+                "--mapping-csv", tempDir.resolve("mapping/mapping.csv").toString(),
+                "--models", tempDir.resolve("mapping/models").toString(),
+                "--constraints-root", tempDir.resolve("mapping/constraints").toString(),
+                "--output", tempDir.resolve("mapping/out").toString(),
+                "--xml-base", TestModels.XML_BASE, "--workers", "1"));
+        args.addAll(List.of(extra));
+        return args.toArray(String[]::new);
+    }
+
+    @Test
+    void jsonModePrintsOnlyTheSummaryForTheMappingAndCombinedWorkflows() throws Exception {
+        List<String> combined = new java.util.ArrayList<>(List.of(combinedRunWithTwoFindings("--format", "json")));
+        combined.addFirst("validate");
+
+        for (String[] args : List.of(mappingRun("--format", "json"), combined.toArray(String[]::new))) {
+            eu.griddigit.CimPal.cli.CliRun.Result run = eu.griddigit.CimPal.cli.CliRun.run(args);
+
+            assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.VIOLATIONS);
+            JsonNode summary = run.json(); // exactly one document: a progress line would fail here
+            assertThat(eu.griddigit.CimPal.cli.CliSchemas.errors("validate.schema.json", summary))
+                    .as(summary.toString()).isEmpty();
+            assertThat(summary.path("hasViolations").asBoolean()).isTrue();
+            assertThat(summary.path("totals").path("violations").asInt()).isPositive();
+        }
+    }
+
+    @Test
+    void aSummaryFileThatCannotBeWrittenIsAnInternalErrorWithNothingOnStdout() throws Exception {
+        // D3: a natural failure: the summary file's parent is a file.
+        Path blocker = write("blocker", "a file, not a folder");
+
+        eu.griddigit.CimPal.cli.CliRun.Result run = eu.griddigit.CimPal.cli.CliRun.run(
+                mappingRun("--format", "json", "--summary-file", blocker.resolve("summary.json").toString()));
+
+        assertThat(run.exitCode()).as(run.stderr()).isEqualTo(ExitCode.INTERNAL_ERROR);
+        assertThat(run.stdout()).isEmpty();
+    }
+
+    @Test
+    void anAbsolutePythonExecutableIsAccepted() throws Exception {
+        Path python = Files.writeString(tempDir.resolve("python"), "");
+        try {
+            int exitCode = new CommandLine(new CimPalCli()).execute("validate", "--python-executable",
+                    python.toString(), "--engine", "PYSHACL", "--dry-run");
+
+            assertThat(exitCode).isEqualTo(ExitCode.OK);
+            assertThat(System.getProperty("cimpal.python.executable")).isEqualTo(python.toString());
+        } finally {
+            System.clearProperty("cimpal.python.executable");
+        }
     }
 }

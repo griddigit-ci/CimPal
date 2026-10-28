@@ -1,0 +1,76 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# Synthetic test profile (TEST-3): a small RDFS 2020 extension of
+# fixtures/shacl-generation/mini-equipment-2020-cim100.rdf, in Turtle, for the detailed union.
+# It carries a bigger ontology header (with dcat:keyword, which the package fix reads), a
+# "notDefined" deletion stereotype on a package, a class, an enumeration and a property, a
+# second multiplicity for ACLineSegment.r, one new class and one unused prefix.
+
+@prefix cim:    <http://iec.ch/TC57/CIM100#> .
+@prefix cims:   <http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix dcat:   <http://www.w3.org/ns/dcat#> .
+@prefix dct:    <http://purl.org/dc/terms/> .
+@prefix meq:    <http://example.com/ns/MiniEquipment-EU#> .
+@prefix mdl:    <http://example.com/ns/MiniDelta-EU#> .
+@prefix unused: <http://example.com/ns/Unused#> .
+
+mdl:Ontology a owl:Ontology ;
+    dct:title "Mini Delta Vocabulary"@en ;
+    owl:versionIRI <http://example.com/ns/MiniDelta-EU/3.0> ;
+    owl:versionInfo "3.0.1"@en ;
+    dcat:keyword "MD" .
+
+mdl:Package_notDefined a cims:ClassCategory ;
+    rdfs:label "notDefined"@en .
+
+# A class in the deletion package, with an attribute on it and an association pointing at it.
+cim:Obsolete a rdfs:Class ;
+    rdfs:label "Obsolete"@en ;
+    rdfs:subClassOf cim:IdentifiedObject ;
+    cims:belongsToCategory mdl:Package_notDefined .
+
+cim:Obsolete.rating a rdf:Property ;
+    rdfs:label "rating"@en ;
+    rdfs:domain cim:Obsolete ;
+    cims:dataType cim:Float ;
+    cims:multiplicity cims:M:0..1 .
+
+cim:Terminal.Obsolete a rdf:Property ;
+    rdfs:label "Obsolete"@en ;
+    rdfs:domain cim:Terminal ;
+    rdfs:range cim:Obsolete ;
+    cims:multiplicity cims:M:0..1 .
+
+# An enumeration in the deletion package: one member typed with rdf:type, one by naming convention.
+cim:ObsoleteKind a rdfs:Class ;
+    rdfs:label "ObsoleteKind"@en ;
+    cims:belongsToCategory mdl:Package_notDefined ;
+    cims:stereotype <http://iec.ch/TC57/NonStandard/UML#enumeration> .
+
+cim:ObsoleteKind.typed a cim:ObsoleteKind ;
+    rdfs:label "typed"@en .
+
+cim:ObsoleteKind.named cims:stereotype "enum" ;
+    rdfs:label "named"@en .
+
+# A property with the deletion stereotype itself.
+cim:Terminal.legacyCode a rdf:Property ;
+    rdfs:label "legacyCode"@en ;
+    rdfs:domain cim:Terminal ;
+    cims:dataType cim:String ;
+    cims:stereotype "notDefined" .
+
+# A second multiplicity: the detailed union keeps this one and drops the first file's.
+cim:ACLineSegment.r cims:multiplicity cims:M:0..1 .
+
+# A new class that survives the union.
+cim:Breaker a rdfs:Class ;
+    rdfs:label "Breaker"@en ;
+    rdfs:subClassOf cim:ConductingEquipment ;
+    cims:belongsToCategory meq:Package_MiniEquipment ;
+    cims:stereotype <http://iec.ch/TC57/NonStandard/UML#concrete> .

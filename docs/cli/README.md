@@ -40,9 +40,22 @@ java -jar CimPal-CLI.jar manifest --help
 
 | Command | What it does |
 |---|---|
-| `validate` | Run SHACL validation against CIM/CGMES model files |
-| `sparql` | Execute a SPARQL SELECT query against RDF model files |
-| `manifest` | Generate a DCAT/CGMES manifest Turtle file |
+| [`validate`](validate.md) | Run SHACL validation against CIM/CGMES model files (mapping, timestamped or combined workflow) |
+| [`sparql`](sparql.md) | Execute a SPARQL SELECT query against RDF model files |
+| [`compare`](compare.md) | Compare two RDFS profiles or SHACL shape sets |
+| [`compare-instances`](compare-instances.md) | Compare two sets of CGMES instance data |
+| [`id-map`](id-map.md) | Map the IDs of one model onto another model of the same grid (not available through `run`, `serve` or `mcp`) |
+| [`convert`](convert.md) | Convert RDF files between RDF/XML, Turtle and JSON-LD |
+| [`rdfs2shacl`](rdfs2shacl.md) | Generate SHACL shapes from RDFS profiles |
+| [`excel2shacl`](excel2shacl.md) | Generate SHACL shapes from an Excel sheet and an RDFS profile |
+| [`organize`](organize.md) | Reorganise SHACL files by an Excel template |
+| [`gen-instances`](gen-instances.md) | Generate CIM instance data from an Excel template |
+| [`manifest`](manifest.md) | Generate a DCAT/CGMES manifest Turtle file |
+| [`run`](run.md) | Run a pipeline of these commands from one JSON file |
+| [`serve`](serve.md) | A local HTTP server: synchronous endpoints and the `/v1` job API |
+| [`mcp`](mcp.md) | An MCP server for AI assistants, one tool per command |
+
+Every command except `serve` and `mcp` also takes its settings from a JSON file (`--config`), so `run`, `serve` and `mcp` can call it with the same keys.
 
 ---
 
@@ -65,7 +78,7 @@ Without `--stats` the output is unchanged.
 | Field | Meaning |
 |---|---|
 | `wallMs` | Wall time from the start of the command until its output is written. JVM start-up is not included. |
-| `phases` | Wall time per phase: `validate` and `shapeDetail` (validate), `load` and `query` (sparql), `load` and `compare` (the compare commands). |
+| `phases` | Wall time per phase: `validate` and `shapeDetail` (validate), plus `report` (writing the report of the combined workflow), `load` and `query` (sparql), `load` and `compare` (the compare commands). |
 | `cpuMs` | CPU time of the whole process during the run, all threads. `cpuMs / wallMs` is about the number of cores actually used. `null` where the JVM can't report it. |
 | `peakHeapBytes` | The sum of each heap pool's own peak usage. The pools (young and old generation) peak at different moments, so this is an upper bound and can be larger than `maxHeapBytes`. The smallest heap a model needs is measured by running it at a given `-Xmx`, as the [sizing guide](../guide/sizing.md) does. |
 | `maxHeapBytes` | The heap limit the run had. |
@@ -98,6 +111,23 @@ For running the JSON-capable commands (`validate`, `sparql`, `compare`, `compare
   - exits 2 (bad input) and 3 (internal error or out of memory) never change, and neither does exit 1 for a `validate` run in which a row failed with an error (e.g. an unreadable model or a failed `owl:imports`): an error is never turned into a pass;
   - a value that is not an integer from 0 to 255 is bad input (exit 2);
   - `serve`, `mcp` and `run` ignore it. They report results through HTTP status, `isError` and step status, which keep seeing exit 1.
+
+---
+
+## JSON output contract (schemas)
+
+With `--format json` (and in the file `--summary-file` writes), stdout holds exactly one JSON document and nothing else; progress and warnings go to stderr. The documents follow JSON Schemas (draft 2020-12) kept in the repository, which are the published contract of that output:
+
+| Command | Schema (`CimPal-CLI/src/test/resources/fixtures/cli-json/`) | `schema` field |
+|---|---|---|
+| `validate` | `validate.schema.json` (all three workflows) | `cimpal-validate-summary/1` |
+| `sparql` | `sparql.schema.json` | none (`columns`, `rows`) |
+| `compare` | `compare.schema.json` | `cimpal-compare-result/1` |
+| `compare-instances` | `compare-instances.schema.json` | `cimpal-compare-instances-result/1` |
+| `run` | `run.schema.json` | `cimpal-pipeline-result/1` |
+| `--stats` (any of the first four) | `stats.schema.json` | none |
+
+The schemas are additive: later versions may add fields, but no field is removed or renamed and no type changes without a new `schema` version. The tests check every command's real output against them, in-process and from the packaged JAR (`CommandContractTest`, `PackagedJarIT`), and `mcp` tool results and `serve` responses carry the same documents. Under `mcp` the strings in them are capped and kept on one line (see [mcp](mcp.md#untrusted-data-in-tool-results)).
 
 ---
 
@@ -152,7 +182,9 @@ Config files are plain JSON. A few conventions apply:
 
 **`_comment`** keys are silently ignored by the CLI — they are a description of the file for humans. Put anything you like there.
 
-**`_note_*`** keys (e.g. `_note_workflow`) are also silently ignored. They are used in the template files to explain what a field means and what values are valid.
+**`_note_*`** keys (e.g. `_note_workflow`) are also silently ignored. They are used in the template files to explain what a field means and what values are valid. In fact every key starting with `_` is ignored, and so is any other key a command doesn't know: a misspelt key (`"modelDir"` for `"modelsDir"`) is not reported, it just has no effect. Check a config with `--dry-run` (where the command has it), which prints the settings the command resolved.
+
+**A config file and the same flags give the same run**: the same exit code, output and files (`ConfigFileEquivalenceTest` checks this for every command with `--config`).
 
 **Relative paths** in config files are resolved relative to the config file's own location. If the config is at `/data/runs/nightly.json` and it says `"modelsDir": "models"`, that resolves to `/data/runs/models`. Use absolute paths to avoid ambiguity.
 
@@ -167,14 +199,7 @@ java -jar CimPal-CLI.jar validate --config nightly.json --max-results 10
 
 ## Template configs
 
-Ready-to-use templates are in `CimPal-CLI/configs/`. Copy one to your working directory, fill in the `REPLACE_WITH_PATH` placeholders with real paths, and run.
-
-| Template | Workflow |
-|---|---|
-| `validate-mapping-cgmes30.json` | Full mapping validation, CGMES 3.0 / NC 2.5 |
-| `validate-timestamped.json` | Timestamped validation with comparison to previous run |
-| `validate-combined.json` | Combined validation of one dataset against a constraint set, no mapping CSV |
-| `sparql-query.json` | SPARQL SELECT query against model files |
+Ready-to-use templates are in `CimPal-CLI/configs/`, one or more per command and two pipelines for `run`; [index.md](index.md#config-templates) lists them all. Copy one to your working directory, fill in the `REPLACE_WITH_PATH` placeholders with real paths, and run.
 
 ---
 

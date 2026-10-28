@@ -21,6 +21,11 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- GUI tests (@Tag("gui"), TEST-6) need a display. A normal build, CI included, runs only
+             those also tagged "smoke" (every tab loads); -Pgui-all runs them all (nightly), and
+             -DexcludedGroups=gui skips them all on a headless machine. Surefire reads this
+             property as its excludedGroups default, so the command line still overrides it. -->
+        <excludedGroups>gui &amp; !smoke</excludedGroups>
     </properties>
 
     <dependencyManagement>
@@ -49,6 +54,18 @@
                 </configuration>
             </plugin>
 
+            <!-- The shade plugin below overwrites CimPal.jar with the fat jar. Without
+                 forceCreation the next build (no clean) sees that jar as newer than the classes,
+                 keeps it, and shades it again, so the old Core classes inside it win over the new
+                 Core jar (and launch4j wraps them into CimPal.exe). Always rebuild the plain jar first. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <forceCreation>true</forceCreation>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -526,5 +543,44 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- Runs every GUI test, not only the smoke subset (the nightly workflow, under Xvfb on
+             Linux): mvn -B -Pgui-all -pl CimPal-Main -am verify -->
+        <profile>
+            <id>gui-all</id>
+            <properties>
+                <excludedGroups>no-gui-exclusion</excludedGroups>
+            </properties>
+        </profile>
+        <!-- With -DexcludedGroups=gui no GUI test runs, and the coverage they bring is missing, so
+             the coverage ratchet (parent pom) would fail a headless build that is otherwise fine.
+             Only that exact value switches the check off; the report is still written. -->
+        <profile>
+            <id>no-gui-tests</id>
+            <activation>
+                <property>
+                    <name>excludedGroups</name>
+                    <value>gui</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>coverage-ratchet</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

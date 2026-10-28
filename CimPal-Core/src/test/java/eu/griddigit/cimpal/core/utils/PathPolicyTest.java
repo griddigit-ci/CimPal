@@ -51,6 +51,168 @@ class PathPolicyTest {
     }
 
     @Test
+    void anExcludedFolderIsRefusedEvenInsideARoot() throws Exception {
+        // DEP-7: serve's work area lies inside a root but holds other callers' uploads and outputs.
+        Path work = Files.createDirectories(root.resolve(".cimpal-work/uploads/u1"));
+        Files.writeString(work.resolve("model.xml"), "x");
+        PathPolicy excluding = PathPolicy.builder().root(root).exclude(root.resolve(".cimpal-work")).build();
+
+        assertThat(excluding.checkRead(root.resolve("in.ttl"))).isEqualTo(realPath(root.resolve("in.ttl")));
+        assertThatThrownBy(() -> excluding.checkRead(work.resolve("model.xml")))
+                .isInstanceOf(PathNotAllowedException.class).hasMessageContaining("not available");
+        assertThatThrownBy(() -> excluding.checkRead(root.resolve("x/../.cimpal-work/uploads/u1/model.xml")))
+                .isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> excluding.checkWrite(root.resolve(".cimpal-work/jobs/j1/out/r.xlsx"), false))
+                .isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> excluding.checkWrite(root.resolve(".cimpal-work"), true))
+                .isInstanceOf(PathNotAllowedException.class);
+        PathPolicy.runWith(excluding, () -> {
+            assertThat(PathPolicy.mayReadIfActive(work.resolve("model.xml"))).isFalse();
+            assertThat(PathPolicy.mayReadIfActive(root.resolve("in.ttl"))).isTrue();
+            return null;
+        });
+    }
+
+    @Test
+    void aRootInsideAnExcludedFolderStaysUsableButNothingElseThere() throws Exception {
+        // A job's policy: its upload (read) and out/ (write) inside the excluded work area.
+        Path work = Files.createDirectories(root.resolve(".cimpal-work"));
+        Path upload = Files.createDirectories(work.resolve("uploads/mine"));
+        Path other = Files.createDirectories(work.resolve("uploads/theirs"));
+        Path out = Files.createDirectories(work.resolve("jobs/j1/out"));
+        Files.writeString(upload.resolve("eq.xml"), "x");
+        Files.writeString(other.resolve("eq.xml"), "x");
+        PathPolicy job = PathPolicy.builder().readRoot(upload).writeRoot(out).readRoot(root).exclude(work).build();
+
+        assertThat(job.checkRead(upload.resolve("eq.xml"))).isEqualTo(realPath(upload.resolve("eq.xml")));
+        assertThat(job.checkWrite(out.resolve("report.xlsx"), false).startsWith(realPath(out))).isTrue();
+        assertThat(job.checkRead(root.resolve("in.ttl"))).isEqualTo(realPath(root.resolve("in.ttl")));
+        assertThatThrownBy(() -> job.checkRead(other.resolve("eq.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> job.checkRead(upload.resolve("../theirs/eq.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> job.checkWrite(upload.resolve("new.xml"), false)).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> job.checkWrite(work.resolve("jobs/j2/out/x"), false)).isInstanceOf(PathNotAllowedException.class);
+    }
+
+    @Test
+    void aRootThatIsTheExcludedFolderItselfDoesNotReopenIt() throws Exception {
+        // serve --root D:\data --work-root D:\data must not expose the uploads to shared requests.
+        Path work = Files.createDirectories(root.resolve("uploads/u1"));
+        Files.writeString(work.resolve("eq.xml"), "x");
+        PathPolicy same = PathPolicy.builder().root(root).exclude(root).build();
+
+        assertThatThrownBy(() -> same.checkRead(work.resolve("eq.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> same.checkWrite(root.resolve("new.xml"), false)).isInstanceOf(PathNotAllowedException.class);
+    }
+
+    @Test
+    void anExcludedFolderIsRefusedThroughALinkToo() throws Exception {
+        Path work = Files.createDirectories(root.resolve(".cimpal-work"));
+        Files.writeString(work.resolve("other.xml"), "x");
+        Path link = root.resolve("shortcut");
+        try {
+            Files.createSymbolicLink(link, work);
+        } catch (Exception e) {
+            abort("symbolic links not available here: " + e.getMessage());
+        }
+        PathPolicy excluding = PathPolicy.builder().root(root).exclude(work).build();
+
+        assertThatThrownBy(() -> excluding.checkRead(link.resolve("other.xml"))).isInstanceOf(PathNotAllowedException.class);
+        assertThatThrownBy(() -> excluding.checkWrite(link.resolve("new.xml"), false)).isInstanceOf(PathNotAllowedException.class);
+    }
+
+    @Test
+    void reservedNamesAreRecognised() {
+        assertThat(PathPolicy.isReservedName("CON")).isTrue();
+        assertThat(PathPolicy.isReservedName("nul.txt")).isTrue();
+        assertThat(PathPolicy.isReservedName("Com1.xml")).isTrue();
+        assertThat(PathPolicy.isReservedName("console.xml")).isFalse();
+        assertThat(PathPolicy.isReservedName("model.xml")).isFalse();
+        assertThat(PathPolicy.isReservedName(null)).isFalse();
+    }
+
+    // ---- per-thread context (DEP-8) ----------------------------------------------------------
+
+    @Test
+    void threadsACommandStartsSeeItsPolicy() throws Exception {
+        PathPolicy.runWith(policy, () -> {
+            java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(1);
+            try {
+                assertThat(pool.submit(() -> PathPolicy.checkReadIfActive(root.resolve("in.ttl"))).get())
+                        .isEqualTo(realPath(root.resolve("in.ttl")));
+                assertThatThrownBy(() -> pool.submit(() -> PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"))).get())
+                        .hasCauseInstanceOf(PathNotAllowedException.class);
+            } finally {
+                pool.shutdownNow();
+            }
+            return null;
+        });
+    }
+
+    @Test
+    void aThreadStillHoldingAnEndedCommandsPolicyIsRefused() throws Exception {
+        // E.g. a pool thread created during one command and reused after it: fail closed.
+        java.util.concurrent.atomic.AtomicReference<Thread> later = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Throwable> seen = new java.util.concurrent.atomic.AtomicReference<>();
+        PathPolicy.runWith(policy, () -> {
+            later.set(new Thread(() -> {
+                try {
+                    PathPolicy.checkReadIfActive(root.resolve("in.ttl"));
+                } catch (Throwable t) {
+                    seen.set(t);
+                }
+            }));
+            return null;
+        });
+        later.get().start();
+        later.get().join();
+
+        assertThat(seen.get()).isInstanceOf(PathNotAllowedException.class);
+        assertThat(PathPolicy.active()).isEmpty();
+        assertThat(PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"))).as("no policy here: unchanged")
+                .isEqualTo(outside.resolve("secret.ttl"));
+    }
+
+    @Test
+    void whileAContextIsRequiredAThreadWithoutOneIsRefused() throws Exception {
+        try (PathPolicy.Requirement required = PathPolicy.requireContext()) {
+            assertThatThrownBy(() -> PathPolicy.checkReadIfActive(root.resolve("in.ttl")))
+                    .isInstanceOf(PathNotAllowedException.class);
+            assertThatThrownBy(() -> PathPolicy.checkWriteIfActive(root.resolve("x.ttl")))
+                    .isInstanceOf(PathNotAllowedException.class);
+            assertThat(PathPolicy.runWith(policy, () -> PathPolicy.checkReadIfActive(root.resolve("in.ttl"))))
+                    .isEqualTo(realPath(root.resolve("in.ttl")));
+        }
+        assertThat(PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"))).isEqualTo(outside.resolve("secret.ttl"));
+    }
+
+    @Test
+    void concurrentCommandsEachKeepTheirOwnPolicy() throws Exception {
+        PathPolicy other = PathPolicy.builder().root(outside).build();
+        java.util.concurrent.CyclicBarrier together = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(() -> PathPolicy.runWith(policy, () -> {
+                together.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                PathPolicy.checkReadIfActive(root.resolve("in.ttl"));
+                assertThatThrownBy(() -> PathPolicy.checkReadIfActive(outside.resolve("secret.ttl")))
+                        .isInstanceOf(PathNotAllowedException.class);
+                return PathPolicy.active().orElseThrow();
+            }));
+            var b = pool.submit(() -> PathPolicy.runWith(other, () -> {
+                together.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                PathPolicy.checkReadIfActive(outside.resolve("secret.ttl"));
+                assertThatThrownBy(() -> PathPolicy.checkReadIfActive(root.resolve("in.ttl")))
+                        .isInstanceOf(PathNotAllowedException.class);
+                return PathPolicy.active().orElseThrow();
+            }));
+            assertThat(a.get()).isSameAs(policy);
+            assertThat(b.get()).isSameAs(other);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void traversalOutOfTheRootIsRefused() {
         Path sneaky = root.resolve("../outside/secret.ttl");
 
@@ -228,5 +390,11 @@ class PathPolicyTest {
         } catch (Exception e) {
             throw new AssertionError(e);
         }
+    }
+
+    @Test
+    void aNullPolicyIsRefusedRatherThanRunningUnrestricted() {
+        // A null policy would leave the thread unrestricted even while a context is required.
+        assertThatThrownBy(() -> PathPolicy.runWith(null, () -> "ran")).isInstanceOf(NullPointerException.class);
     }
 }

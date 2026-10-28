@@ -39,18 +39,39 @@ Direct use of the other commands from a shell is not restricted. The operating s
 
 ## `serve`
 
-- **Token:** every request except `GET /health` needs `Authorization: Bearer <token>`. The token is new on every start: it is written to a file only your user can read, or taken from `CIMPAL_API_TOKEN`. Treat it like a password.
-- **Network:** `serve` binds to localhost. `--allow-remote` is needed for any other address, and the traffic is plain HTTP. There is no TLS inside CimPal (decision D-7), so put a TLS-terminating proxy in front if you need network access; full proxy support is planned (DEP-6).
+- **Token:** every request except the health, readiness and spec endpoints needs `Authorization: Bearer <token>`. Treat it like a password. There are three sources:
+  - by default the token is new on every start and written to a file only your user can read;
+  - it can be taken from `CIMPAL_API_TOKEN`;
+  - for a service, it is read from a secret file (`--token-from-file`, `CIMPAL_API_TOKEN_FILE`). That file is never written or deleted. It holds one or two bare tokens (for rotation), or named tokens `name:role:token` for several clients.
+- **Clients:** with named tokens, jobs and uploads belong to the client that created them. A `client` token sees only its own: another client's job or upload answers 404, exactly like one that doesn't exist, so ids don't reveal what exists. An `admin` token sees everything and is the only one that may call `/shutdown` and `/metrics`. Per-client quotas (`--client-quotas`) bound each client's queued and running jobs, uploads, work-area share and request rate (429 with `Retry-After`).
+- **Network:** `serve` binds to localhost. `--allow-remote` is needed for any other address, and the traffic is plain HTTP. There is no TLS inside CimPal (decision D-7). For network access, put a TLS-terminating reverse proxy or Ingress in front and list its public name with `--allowed-host`. See [Running CimPal as a service](service.md).
+- **Completion callbacks (DEP-14):** the only requests `serve` makes on a client's behalf. They are off unless a client has a signing secret (`--callback-secrets`) and allowed URL prefixes (`callbackAllow`). The URL must be https under an allowed prefix and resolve to public addresses only, checked at submit and before every attempt, and redirects are never followed (no SSRF into the internal network or cloud metadata). Bodies are HMAC-signed and carry no result and no token.
+- **Job store database** (`--job-store jdbc`): the password comes from a file or an environment variable, never the command line, and a URL holding one is refused. Use `sslmode=verify-full` and a user limited to CimPal's tables. The database holds jobs' checked configs, results and logs (no tokens): protect and back it up like the work volume. Every statement is prepared; request data never becomes SQL text.
+- **Logs:** tokens and the `Authorization` header are never logged; every logged value is sanitised. `--log-format json` gives one JSON object per line.
+- **Uploads and downloads (`/v1/uploads`, job outputs):**
+  - **Checked as a whole:** a ZIP is refused if any entry would leave its folder, has a reserved device name, or makes the archive expand too much. It is streamed to disk and size-capped.
+  - **Isolated:** a job on an upload reads only that upload and the server's `--read-root` folders, and writes only its own output folder. The work folder is out of reach of every request path, so callers can't see each other's files.
+  - **Downloads** never leave the job's output folder, and are sent as attachments with a fixed media type.
 - **Browsers:** a Host-header check (against DNS rebinding) and an Origin check (no CORS headers are sent; `--allow-origin` lists exceptions).
 - **Limits:** request bodies up to 1 MB, one command at a time with a queue of 4, and a 30-minute timeout per request. All are configurable.
-- **Shutdown:** `POST /shutdown` with the token, or stop the process.
+- **Shutdown:** `POST /shutdown` with an admin token, SIGTERM or Ctrl-C. Queued jobs are cancelled, and a running command gets `--shutdown-grace` (60 s) to finish.
+
+## `mcp` and AI agents
+
+- **Untrusted text:** tool results carry text from the input files, which may be written to look like instructions. Every string in a result is cut at 300 characters, control characters and line breaks are replaced, and each result comes with a notice that it is untrusted data. See [mcp](../cli/mcp.md#untrusted-data-in-tool-results).
+- **Approval:** keep the tools that write files (`convert`, `gen_instances`, `organize`, `rdfs_to_shacl`, `excel_to_shacl`, `manifest`) behind approval in the MCP client.
+- `serve` results are not rewritten; an agent that reads them should treat them as untrusted too.
+
+## Python engines
+
+The experimental `PYSHACL`, `PYSHACL_OXIGRAPH` and `RUST_SHACL` engines start a Python process. Name the interpreter by its absolute path with `--python-executable` (on `validate`, `serve`, `mcp`) or `CIMPAL_PYTHON_EXECUTABLE`; a relative name is refused. Without one, the `python` found on `PATH` is resolved to its absolute path, and that is what runs and what the `[ENGINE]` log line names. No request or tool call can choose the interpreter. The process gets no token or database password from the environment, and the worker script runs from a private temporary folder. See [validate](../cli/validate.md#validation-engines).
 
 ## Container
 
 - **User:** UID 10001, not root.
 - **Ports:** no `EXPOSE`. Publish `serve` only on the host loopback, as [docker.md](../cli/docker.md#serve) shows.
 - **Filesystem:** a read-only root filesystem works (`--read-only --tmpfs /tmp`; in Kubernetes `readOnlyRootFilesystem` plus an `emptyDir` at `/tmp`).
-- **Kubernetes:** the Airflow example pod meets Pod Security "restricted": non-root, all capabilities dropped, `RuntimeDefault` seccomp, no service-account token.
+- **Kubernetes:** the Airflow example pod and the `serve` Deployment in `deploy/kubernetes` meet Pod Security "restricted": non-root, all capabilities dropped, `RuntimeDefault` seccomp, no service-account token.
 - **Mounts:** only what the run needs. Mount the models read-only and only the output folder writable. Never mount a home folder or a drive root at `/data`.
 - **Secrets:** pass `GITHUB_TOKEN` and `CIMPAL_API_TOKEN` as environment variables without a value on the command line (`-e NAME`), or from a secret store. Don't put secrets in `JAVA_OPTS`, `JAVA_TOOL_OPTIONS` or config files.
 

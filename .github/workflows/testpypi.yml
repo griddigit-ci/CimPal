@@ -1,0 +1,133 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the EUPL-1.2-or-later.
+# SPDX-License-Identifier: EUPL-1.2+
+#
+# TestPyPI rehearsal of the PyPI release, started by hand (Actions > TestPyPI rehearsal > Run).
+# Builds both Python packages with a .dev<run number> version (no real version number is spent),
+# publishes them to test.pypi.org through trusted publishing (environment 'testpypi'), and installs
+# them back from the index to check the versions, the cimpal-client pin and the provider's entry.
+name: TestPyPI rehearsal
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-dists:
+    name: Python packages
+    uses: ./.github/workflows/python-dists.yml
+    with:
+      version-suffix: .dev${{ github.run_number }}
+
+  testpypi:
+    name: Publish to TestPyPI
+    needs: python-dists
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/cimpal-client
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download cimpal-client
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-client
+          path: dist-client
+
+      - name: Download airflow-provider-cimpal
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-provider
+          path: dist-provider
+
+      - name: Publish cimpal-client
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist-client/
+
+      - name: Publish airflow-provider-cimpal
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist-provider/
+
+      # skip-existing makes a re-run after a partial upload safe; this makes sure that what PyPI
+      # holds is byte for byte what was built and checked here.
+      - name: PyPI holds exactly these files
+        env:
+          INDEX: https://test.pypi.org
+        run: |
+          python3 - <<'EOF'
+          import hashlib, json, os, pathlib, time, urllib.request
+          index = os.environ["INDEX"]
+          files = [p for d in ("dist-client", "dist-provider") for p in sorted(pathlib.Path(d).iterdir())]
+          for path in files:
+              name, version = path.name.split("-")[:2]
+              if version.endswith(".tar.gz"):
+                  version = version[: -len(".tar.gz")]
+              project = name.replace("_", "-")
+              local = hashlib.sha256(path.read_bytes()).hexdigest()
+              for attempt in range(10):
+                  try:
+                      with urllib.request.urlopen(f"{index}/pypi/{project}/{version}/json", timeout=30) as r:
+                          remote = {u["filename"]: u["digests"]["sha256"] for u in json.load(r)["urls"]}
+                      if path.name in remote:
+                          break
+                  except OSError:
+                      pass
+                  time.sleep(15)
+              else:
+                  raise SystemExit(f"{path.name} is not listed on {index}")
+              if remote[path.name] != local:
+                  raise SystemExit(f"{path.name} on {index} differs from the file built in this run")
+              print(f"{path.name}: identical on {index}")
+          EOF
+
+  verify:
+    name: Install from TestPyPI
+    needs: [python-dists, testpypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      # cimpal-client from TestPyPI, its dependencies (httpx, attrs, dateutil) from PyPI. The
+      # provider without dependencies: Airflow is too heavy for this check, and the airflow-provider
+      # CI job tests it against Airflow.
+      - name: Install and check
+        env:
+          VERSION: ${{ needs.python-dists.outputs.version }}
+        run: |
+          python -m venv /tmp/check
+          for attempt in 1 2 3 4 5 6; do
+            if /tmp/check/bin/pip install --index-url https://test.pypi.org/simple/ --no-deps --only-binary :all: \
+                "cimpal-client==$VERSION" "airflow-provider-cimpal==$VERSION"; then
+              break
+            fi
+            if [ "$attempt" = 6 ]; then echo "::error::$VERSION is not installable from TestPyPI"; exit 1; fi
+            echo "Not on the index yet; waiting"; sleep 30
+          done
+          # cimpal-client's own dependencies, as its metadata states them, from PyPI.
+          /tmp/check/bin/python -c "from importlib.metadata import requires; print('\n'.join(requires('cimpal-client')))" > deps.txt
+          /tmp/check/bin/pip install --only-binary :all: -r deps.txt
+          /tmp/check/bin/python - <<'EOF'
+          import os
+          from importlib.metadata import requires, version
+          expected = os.environ["VERSION"]
+          import cimpal_client
+          assert cimpal_client.__version__ == expected, cimpal_client.__version__
+          assert version("airflow-provider-cimpal") == expected
+          assert f"cimpal-client=={expected}" in requires("airflow-provider-cimpal")
+          from cimpal_provider.get_provider_info import get_provider_info
+          assert get_provider_info()["connection-types"][0]["connection-type"] == "cimpal"
+          print(f"cimpal-client and airflow-provider-cimpal {expected} install from TestPyPI")
+          EOF

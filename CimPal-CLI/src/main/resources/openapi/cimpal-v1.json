@@ -4,7 +4,7 @@
     "title" : "CimPal serve job API",
     "version" : "1",
     "summary" : "Asynchronous CimPal jobs: submit, poll, fetch the result.",
-    "description" : "The job API of `cimpal serve` (DEP-5). A job runs one CimPal command with a config object; the server runs one command at a time and keeps finished jobs in memory (lost on restart). Every request needs `Authorization: Bearer <token>` except `GET /v1/health` and `GET /v1/openapi.json`. Requests must also pass the server's Host and Origin checks; a refused Host or Origin is answered with 403 on any route. Paths in a job's config must lie under the server's allowed folders (`--root`). Errors are RFC 9457 problem details.",
+    "description" : "The job API of `cimpal serve` (DEP-5). A job runs one CimPal command with a config object; the server runs up to `--workers` commands at once (one by default) and keeps finished jobs in memory (lost on restart). Every request needs `Authorization: Bearer <token>` except `GET /v1/health` and `GET /v1/openapi.json`. Requests must also pass the server's Host and Origin checks; a refused Host or Origin is answered with 403 on any route. Paths in a job's config must lie under the server's allowed folders (`--root`). Errors are RFC 9457 problem details. Each token stands for a client (DEP-13): jobs and uploads belong to the client that created them, a client sees only its own (another client's answer 404, exactly as ids that don't exist), and an admin token sees all of them. Per-client quotas answer 429 (with `Retry-After`), 413 or 507.",
     "license" : {
       "name" : "EUPL-1.2",
       "identifier" : "EUPL-1.2"
@@ -22,6 +22,9 @@
     "name" : "jobs"
   }, {
     "name" : "server"
+  }, {
+    "name" : "files",
+    "description" : "File exchange: uploads and job outputs (for callers without a shared file system)."
   } ],
   "paths" : {
     "/v1/health" : {
@@ -81,7 +84,7 @@
         },
         "responses" : {
           "202" : {
-            "description" : "Queued. `Location` is the job's URL.",
+            "description" : "Queued. `Location` is the job's URL. A repeat with the same Idempotency-Key answers the same job.",
             "headers" : {
               "Location" : {
                 "description" : "The job's URL.",
@@ -99,7 +102,7 @@
             }
           },
           "400" : {
-            "description" : "Not valid JSON, an unknown field, an unknown command, or a bad config.",
+            "description" : "Not valid JSON, an unknown field, an unknown command, or a bad config, or a malformed Idempotency-Key, or a callback that isn't allowed.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -119,7 +122,7 @@
             }
           },
           "403" : {
-            "description" : "A path in the config is outside the allowed folders, or an existing output file without `\"overwrite\": true`.",
+            "description" : "A path in the config is outside the allowed folders, or an existing output file without `\"overwrite\": true`. With `inputUpload`, the job may read only its upload and the server's read-only roots, and write only its own output folder.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -165,13 +168,72 @@
                 }
               }
             }
+          },
+          "404" : {
+            "description" : "`inputUpload` names no upload of this client (none, expired, or another client's); or the job made with this Idempotency-Key no longer exists.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "This client's quota is used up: it has `maxQueued` + `maxRunning` jobs queued or running, or its `requestsPerMinute` is used up. Other clients may still submit.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A request with this Idempotency-Key is still being processed; repeat it after Retry-After.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "This Idempotency-Key was used with a different request.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ]
       },
       "get" : {
         "tags" : [ "jobs" ],
         "operationId" : "listJobs",
-        "summary" : "Recent jobs, newest first.",
+        "summary" : "Recent jobs, newest first: the client's own, or every client's for an admin.",
         "parameters" : [ {
           "name" : "status",
           "in" : "query",
@@ -190,6 +252,15 @@
             "minimum" : 1,
             "maximum" : 1000,
             "default" : 50
+          }
+        }, {
+          "name" : "owner",
+          "in" : "query",
+          "required" : false,
+          "description" : "Only this client's jobs. A client token may name only itself; an admin token any client.",
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9._-]{1,64}$"
           }
         } ],
         "responses" : {
@@ -215,6 +286,34 @@
           },
           "401" : {
             "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "`owner` names another client, and the token is not an admin's.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -263,7 +362,25 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -300,7 +417,7 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -311,6 +428,24 @@
           },
           "409" : {
             "description" : "The job is running or finished.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -359,7 +494,7 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -380,6 +515,24 @@
           },
           "410" : {
             "description" : "The result was larger than `--max-result-bytes` and was not kept.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -449,7 +602,547 @@
             }
           },
           "404" : {
-            "description" : "No such job.",
+            "description" : "No such job, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/uploads" : {
+      "post" : {
+        "tags" : [ "files" ],
+        "operationId" : "createUpload",
+        "summary" : "Upload a ZIP of input files (models, constraints, mapping CSV) for jobs to read.",
+        "description" : "The body is streamed to disk, at most `--max-upload-bytes`, and extracted. Entries must stay inside the upload: absolute names, `..`, drive letters, device names (CON, NUL, ...), names that differ only in case, and archives that expand too much are refused as a whole. Nested ZIPs are kept as files. A job reads the upload with `inputUpload`; the upload expires `--upload-ttl` after creation once no queued or running job uses it.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/zip" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "201" : {
+            "description" : "The upload; `Location` is its URL. A repeat with the same Idempotency-Key answers the same upload.",
+            "headers" : {
+              "Location" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "description" : "`/v1/uploads/{uploadId}`"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Not a usable ZIP: unreadable, an unsafe entry name, too many entries, or too large once extracted, or a malformed Idempotency-Key.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "Larger than `--max-upload-bytes` (or this client's `maxUploadBytes`).",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415" : {
+            "description" : "The Content-Type is not `application/zip`.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "507" : {
+            "description" : "The work area is full (`--work-max-bytes`) (or this client's `maxWorkBytes`).",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A request with this Idempotency-Key is still being processed; repeat it after Retry-After.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "This Idempotency-Key was used with a different request.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "The upload made with this Idempotency-Key no longer exists.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ]
+      }
+    },
+    "/v1/uploads/{uploadId}" : {
+      "parameters" : [ {
+        "name" : "uploadId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The upload id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "getUpload",
+        "summary" : "An upload's files and lifetime.",
+        "responses" : {
+          "200" : {
+            "description" : "The upload.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such upload (or it expired), or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "files" ],
+        "operationId" : "deleteUpload",
+        "summary" : "Delete an upload.",
+        "responses" : {
+          "204" : {
+            "description" : "Deleted."
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such upload, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A queued or running job uses it.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/files" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "listJobFiles",
+        "summary" : "The output files of a job that read an upload.",
+        "responses" : {
+          "200" : {
+            "description" : "The files in the job's output folder.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FileList"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job, or the job used shared paths and has no output folder here, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/files/{path}" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      }, {
+        "name" : "path",
+        "in" : "path",
+        "required" : true,
+        "description" : "The file's path in the output folder, as `files` lists it; `/` separates folders. `..`, `.` and encoded separators are refused.",
+        "schema" : {
+          "type" : "string"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "downloadJobFile",
+        "summary" : "Download one output file.",
+        "responses" : {
+          "200" : {
+            "description" : "The file, as an attachment. The media type comes from the file extension.",
+            "headers" : {
+              "Content-Disposition" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "description" : "`attachment` with an ASCII `filename` and the exact name as `filename*`."
+              }
+            },
+            "content" : {
+              "application/octet-stream" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job or file, or the job has no output folder here, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{jobId}/archive" : {
+      "parameters" : [ {
+        "name" : "jobId",
+        "in" : "path",
+        "required" : true,
+        "description" : "The job id (a UUID).",
+        "schema" : {
+          "type" : "string",
+          "format" : "uuid"
+        }
+      } ],
+      "get" : {
+        "tags" : [ "files" ],
+        "operationId" : "downloadJobArchive",
+        "summary" : "All output files of a job as one ZIP.",
+        "responses" : {
+          "200" : {
+            "description" : "The ZIP, streamed.",
+            "content" : {
+              "application/zip" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid bearer token.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No such job, or the job has no output folder here, or it belongs to another client.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The job hasn't finished, or was cancelled.",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests: this client's `requestsPerMinute` is used up.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait.",
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -493,12 +1186,30 @@
             "type" : "string",
             "maxLength" : 200,
             "description" : "Free text to recognise the job."
+          },
+          "inputUpload" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Run on an upload (`POST /v1/uploads`) instead of shared paths: relative paths in `config` resolve inside the upload, outputs go to the job's own folder (relative or missing output paths are placed there), and the outputs are fetched with `/files` and `/archive`."
+          },
+          "callback" : {
+            "type" : [ "object", "null" ],
+            "description" : "Opt-in completion callback (DEP-14): when the job ends, the server POSTs its status and links (never its result) to url, signed with the client's secret in CimPal-Signature (t=<unix seconds>,v1=<hex HMAC-SHA256(secret, t + \".\" + body)>). The url must be https, under one of the client's allowed prefixes (callbackAllow), and resolve to public addresses only; otherwise 400. Delivered at least once, retried for 24 h.",
+            "required" : [ "url" ],
+            "additionalProperties" : false,
+            "properties" : {
+              "url" : {
+                "type" : "string",
+                "format" : "uri",
+                "maxLength" : 2048
+              }
+            }
           }
         }
       },
       "Job" : {
         "type" : "object",
-        "required" : [ "jobId", "command", "label", "status", "createdAt", "startedAt", "finishedAt", "exitCode", "hasViolations", "error", "links" ],
+        "required" : [ "jobId", "command", "label", "owner", "status", "createdAt", "startedAt", "finishedAt", "exitCode", "hasViolations", "error", "links" ],
         "properties" : {
           "jobId" : {
             "type" : "string",
@@ -510,6 +1221,10 @@
           },
           "label" : {
             "type" : [ "string", "null" ]
+          },
+          "owner" : {
+            "type" : "string",
+            "description" : "The client that submitted the job (its name in the server's token file; `default` for a single shared token)."
           },
           "status" : {
             "$ref" : "#/components/schemas/JobStatus"
@@ -550,6 +1265,10 @@
                 "type" : "string"
               }
             }
+          },
+          "callback" : {
+            "$ref" : "#/components/schemas/CallbackState",
+            "description" : "Present only when the job asked for a callback."
           }
         }
       },
@@ -595,7 +1314,7 @@
       },
       "Health" : {
         "type" : "object",
-        "required" : [ "status", "version", "apiVersion", "busy", "stalled", "queued", "running" ],
+        "required" : [ "status", "version", "apiVersion", "busy", "stalled", "queued", "running", "workers" ],
         "properties" : {
           "status" : {
             "type" : "string",
@@ -617,7 +1336,12 @@
             "type" : "integer"
           },
           "running" : {
-            "type" : "integer"
+            "type" : "integer",
+            "description" : "Commands running now, at most workers."
+          },
+          "workers" : {
+            "type" : "integer",
+            "description" : "Commands that may run at once (--workers)."
           }
         }
       },
@@ -652,7 +1376,7 @@
           },
           "mappingCsv" : {
             "type" : "string",
-            "description" : "Absolute path to the CSV mapping file. Three columns: model file names | constraint .ttl path | label. Required for mapping and timestamped workflows."
+            "description" : "Absolute path to the CSV mapping file: three comma-separated columns, the model files (separated by ;), the constraint .ttl file(s) (separated by ;) and a label. Required for mapping and timestamped workflows."
           },
           "modelsDir" : {
             "type" : "string",
@@ -667,14 +1391,14 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Absolute paths to SHACL constraint files (.ttl, .rdf) or ZIP archives of them, which together form one shapes graph. Required for the combined workflow."
+            "description" : "Absolute paths to SHACL constraint files (.ttl, .rdf) or ZIP archives of them, which together form one shapes graph; a folder stands for the .ttl, .rdf and .zip files directly in it. Required for the combined workflow."
           },
           "dataFiles" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "Absolute paths to instance data files (.xml) or ZIP archives of them, which together form one dataset. Required for the combined workflow."
+            "description" : "Absolute paths to instance data files (.xml) or ZIP archives of them, which together form one dataset; a folder stands for the .xml and .zip files directly in it. Required for the combined workflow."
           },
           "outputDir" : {
             "type" : "string",
@@ -707,6 +1431,34 @@
           "exportTurtle" : {
             "type" : "boolean",
             "description" : "Write .ttl validation report files alongside Excel output."
+          },
+          "previousComparison" : {
+            "type" : "string",
+            "description" : "Absolute path to the XLSX of a previous timestamped run, used to build a delta comparison sheet."
+          },
+          "incrementalTimestamps" : {
+            "type" : "boolean",
+            "description" : "Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't change from the one before."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Exit code when violations are found (default 1, 0..255); 0 lets a scheduler treat them as data."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "description" : "Validate CGMES/CIM model files against SHACL constraint shapes. Returns a JSON summary with totals (conforming/violations/errors) and per-shape violation groups with sample focus nodes. Use this as the primary diagnostic step in the validation loop."
@@ -732,6 +1484,26 @@
           "output" : {
             "type" : "string",
             "description" : "Absolute path for output file (.xlsx or .csv). If omitted, results are returned inline."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Accepted like on the other JSON commands (0..255); this command never reports findings."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "models", "query" ],
@@ -766,6 +1538,26 @@
           "rdfFormat" : {
             "type" : "string",
             "description" : "RDF/XML sub-format: RDFXML_PLAIN (default), RDFXML_ABBREV, CIMXML, RDFS_CIMXML."
+          },
+          "sourceFormat" : {
+            "type" : "string",
+            "description" : "Source format: RDFXML, TURTLE, JSONLD (default: from the input's extension)."
+          },
+          "targetFormat" : {
+            "type" : "string",
+            "description" : "Target format: RDFXML, TURTLE, JSONLD (default: from the output's extension)."
+          },
+          "sortByPrefix" : {
+            "type" : "boolean",
+            "description" : "Sort by namespace prefix (with 'sort')."
+          },
+          "stripPrefixes" : {
+            "type" : "boolean",
+            "description" : "Leave out namespace prefix declarations."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "output" ],
@@ -790,9 +1582,37 @@
             "type" : "boolean",
             "description" : "Rename the 'cim' namespace in fileB to match fileA before comparing. Use when comparing across CIM version boundaries."
           },
+          "normalizeProfileNs" : {
+            "type" : "boolean",
+            "description" : "Rename the profile namespace in fileB to match fileA before comparing."
+          },
+          "nsPrefix" : {
+            "type" : "string",
+            "description" : "The namespace prefix to rename with normalizeProfileNs (default: empty)."
+          },
           "output" : {
             "type" : "string",
             "description" : "Absolute path for the diff report (.xlsx or .csv)."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Exit code when differences are found (default 1, 0..255); 0 lets a scheduler treat them as data."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "fileA", "fileB" ],
@@ -834,6 +1654,26 @@
           "output" : {
             "type" : "string",
             "description" : "Absolute path for output (.xlsx or .csv)."
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a job's JSON result."
+          },
+          "stats" : {
+            "type" : "boolean",
+            "description" : "Report the run's resource use (time, peak heap, GC, triples loaded)."
+          },
+          "summaryFile" : {
+            "type" : "string",
+            "description" : "Absolute path to also write the JSON result to, atomically, creating parent folders."
+          },
+          "violationsExitCode" : {
+            "type" : "integer",
+            "description" : "Exit code when differences are found (default 1, 0..255); 0 lets a scheduler treat them as data."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "modelsA", "modelsB" ],
@@ -868,6 +1708,34 @@
           "validateShapes" : {
             "type" : "boolean",
             "description" : "Run SHACL-SHACL validation on generated shapes and report results."
+          },
+          "exportInheritTree" : {
+            "type" : "boolean",
+            "description" : "Write an inheritance model file per profile."
+          },
+          "cimsNamespace" : {
+            "type" : "string",
+            "description" : "CIMS extensions namespace URI (default: http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#)."
+          },
+          "ioPrefix" : {
+            "type" : "string",
+            "description" : "IdentifiedObject mRID property local name (default: mRID)."
+          },
+          "ioUri" : {
+            "type" : "string",
+            "description" : "IdentifiedObject mRID property URI (default: http://iec.ch/TC57/CIM100#IdentifiedObject.mRID)."
+          },
+          "shapesBaseUri" : {
+            "type" : "string",
+            "description" : "Base URI of the generated shape graphs (default: empty)."
+          },
+          "shapesNsPrefix" : {
+            "type" : "string",
+            "description" : "Prefix of the SHACL shapes namespace (default: empty)."
+          },
+          "shapesNsUri" : {
+            "type" : "string",
+            "description" : "URI of the SHACL shapes namespace (default: empty)."
           }
         },
         "required" : [ "rdfsFiles", "outputDir" ],
@@ -890,6 +1758,10 @@
           "outputDir" : {
             "type" : "string",
             "description" : "Absolute path to the root output directory."
+          },
+          "xmlBase" : {
+            "type" : "string",
+            "description" : "Base URI for loading the SHACL files (default: empty)."
           }
         },
         "required" : [ "shaclFiles", "templateXlsx", "outputDir" ],
@@ -917,6 +1789,18 @@
           "nsUri" : {
             "type" : "string",
             "description" : "Namespace URI for generated shapes."
+          },
+          "cimNamespace" : {
+            "type" : "string",
+            "description" : "CIM namespace URI (default: http://iec.ch/TC57/CIM100#)."
+          },
+          "cimsNamespace" : {
+            "type" : "string",
+            "description" : "CIMS namespace URI (default: http://iec.ch/TC57/1999/rdf-schema-extensions-19990926#)."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "rdfsFile", "excelFile", "output" ],
@@ -940,6 +1824,14 @@
           "stripPrefixes" : {
             "type" : "boolean",
             "description" : "Remove unused namespace prefixes."
+          },
+          "exportExtensions" : {
+            "type" : "boolean",
+            "description" : "Include the columns marked as extensions."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "required" : [ "templateXlsx", "output" ],
@@ -965,10 +1857,122 @@
           },
           "output" : {
             "type" : "string",
-            "description" : "Absolute path for the manifest .ttl file."
+            "description" : "Absolute path for the manifest .ttl file (default: manifest.ttl next to the models folder)."
+          },
+          "overwrite" : {
+            "type" : "boolean",
+            "description" : "Replace an output file that already exists (default false: refused)."
           }
         },
         "description" : "Generate a DCAT/CGMES manifest Turtle file describing a set of model files."
+      },
+      "Upload" : {
+        "type" : "object",
+        "required" : [ "uploadId", "files", "totalBytes", "createdAt", "expiresAt" ],
+        "properties" : {
+          "uploadId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "files" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "required" : [ "name", "size" ],
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "Path inside the upload, `/`-separated."
+                },
+                "size" : {
+                  "type" : "integer"
+                }
+              }
+            }
+          },
+          "totalBytes" : {
+            "type" : "integer"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "From then on the upload is deleted once no queued or running job uses it."
+          }
+        }
+      },
+      "FileList" : {
+        "type" : "object",
+        "required" : [ "jobId", "files" ],
+        "properties" : {
+          "jobId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "files" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "required" : [ "path", "size", "mediaType" ],
+              "properties" : {
+                "path" : {
+                  "type" : "string"
+                },
+                "size" : {
+                  "type" : "integer"
+                },
+                "mediaType" : {
+                  "type" : "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CallbackState" : {
+        "type" : "object",
+        "description" : "The job's callback: waiting while it runs, pending until delivered, then delivered or failed.",
+        "required" : [ "url", "state", "attempts", "lastStatus", "lastAttemptAt", "lastError" ],
+        "properties" : {
+          "url" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string",
+            "enum" : [ "waiting", "pending", "delivered", "failed" ]
+          },
+          "attempts" : {
+            "type" : "integer"
+          },
+          "lastStatus" : {
+            "type" : [ "integer", "null" ],
+            "description" : "The receiver's HTTP status of the last attempt."
+          },
+          "lastAttemptAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "lastError" : {
+            "type" : [ "string", "null" ]
+          }
+        }
+      }
+    },
+    "parameters" : {
+      "IdempotencyKey" : {
+        "name" : "Idempotency-Key",
+        "in" : "header",
+        "required" : false,
+        "description" : "Makes the request safe to repeat (DEP-14): the same key with the same request gives the same job or upload again, never a second one, for --idempotency-ttl (24 h). Keys are per client. 1 to 255 visible ASCII characters, e.g. a UUID per logical request, reused for its retries.",
+        "schema" : {
+          "type" : "string",
+          "minLength" : 1,
+          "maxLength" : 255,
+          "pattern" : "^[\\x21-\\x7E]+$"
+        }
       }
     }
   }

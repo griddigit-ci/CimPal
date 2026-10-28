@@ -61,15 +61,19 @@ Reads a CSV mapping file that links model files to their SHACL constraint files.
 
 Required inputs: `--mapping-csv`, `--models`, `--constraints-root`, `--output`
 
-The mapping CSV has three columns (no header required):
-- **Column 1 — xml_inputs**: comma-separated model file names (relative to `--models`) or GitHub raw URLs
-- **Column 2 — ttl**: path to the constraint `.ttl` file, relative to `--constraints-root`
+The mapping CSV has three columns, separated by commas (put a field that holds a comma in double quotes). A first row starting with `xml_inputs` is taken as a header; empty rows and rows starting with `#` are skipped.
+- **Column 1 — xml_inputs**: the model files of one validation, separated by `;`, relative to `--models` (wildcards such as `g001/*EQ*.xml` and GitHub raw URLs work too; `ZIP:` in front is allowed)
+- **Column 2 — ttl**: the constraint file, relative to `--constraints-root`; several files separated by `;` form one shapes graph for that row
 - **Column 3 — notes**: free text label, appears in the report
 
-Example mapping CSV row:
+Example mapping CSV rows:
 ```
-EQ.xml,SV.xml,TP.xml | constraints/QoCDC/Level2.ttl | Level 2 quality checks
+xml_inputs,ttl,notes
+EQ.xml;SV.xml;TP.xml,constraints/QoCDC/Level2.ttl,Level 2 quality checks
+EQ.xml;SSH.xml,constraints/EQ.ttl;constraints/SSH.ttl,"EQ and SSH, together"
 ```
+
+A `|` doesn't separate anything: a row written as `EQ.xml,SV.xml | Level2.ttl | label` is read as broken columns.
 
 ### `timestamped`
 
@@ -82,6 +86,13 @@ Required inputs: same as mapping, plus `--previous-comparison` (optional)
 
 Use this when model files are named with a date/time stamp and you want trend tracking across runs.
 
+The comparison workbook (`validation_comparison__<timestamp>.xlsx`) has one sheet per run (named after the month), a **Charts** sheet and a **Compliance basis** sheet. Every number on Charts is an Excel formula, so clicking a cell shows how it is calculated, and each table has a description row:
+The workbook calls each row of the mapping file (model files validated together against one set of constraints) **sets of data**.
+- **Per-region and Combined blocks:** warnings + violations of the sets of data, summed over all timestamps of the run (`SUMIFS` over the run sheet); the share of the sets of data in the total, in %; and the delta to the previous run.
+- **Compliance rates:** the share of sets of data with no hits in a run, as (clean sets of data ÷ validated sets of data) × 100, counted with `COUNTIFS` on the Compliance basis sheet. The region columns are headed `<region> (%)`. There are three variants: warnings and violations, violations only, and warnings only. *Combined* counts the sets of data of all regions together, so it is not the average of the regions. Infos never count.
+
+Pass this workbook as `--previous-comparison` on the next run to carry the history forward.
+
 ### `combined`
 
 Validates one dataset without a mapping CSV: the GUI's *Validate selected files together*. All the data files are merged into one dataset, so references between them (SSH to EQ, or to the boundary set) resolve, and the dataset is validated against all the constraint files at once.
@@ -90,6 +101,10 @@ Required inputs: `--constraint-files`, `--data-files`, `--output`. Optional: `--
 
 - **Constraint files:** `.ttl` or `.rdf` files, or ZIP archives of them. Together they form one shapes graph, so a shape in one file can be deactivated or extended by another, and an `owl:imports` that several files share is read once. In a ZIP, every `.ttl` and `.rdf` file is used and relative imports resolve inside the archive, as in a folder; other RDF files in it are named in the warnings. Relative imports are also resolved against `--constraints-root` when it is given, otherwise against the first constraint file's folder.
 - **Data files:** RDF/XML (`.xml`) files, or ZIP archives of them, nested archives included (up to three levels). A ZIP without any `.xml` file stops the run instead of validating nothing.
+- **Folders:** either option may also name a folder, as the mapping workflow takes a models folder. It stands for the files directly in it, sorted by name:
+  - for `--data-files`, its `.xml` and `.zip` files;
+  - for `--constraint-files`, its `.ttl`, `.rdf` and `.zip` files.
+  Sub-folders are not entered. A folder with none of these files stops the run with exit code 2. The JSON summary's `run.inputs` lists the files that were used.
 - **Report:** one `validation_report__<date>_<time>.xlsx` in `--output`, in the mapping report's layout, with one validation row per constraint file. Each finding is listed under the file that declares its shape, and a file whose shapes found nothing is marked as conforming. With `--export-turtle`, the SHACL report graph is written beside it as `validation_report__<date>_<time>.ttl`.
 - **No partial pass:** an input that can't be read stops the validation with exit code 2 and writes nothing. That includes a file that doesn't parse (the message names it), an `owl:imports` that can't be found, and a path outside the allowed roots under `serve`, `mcp` or `run`. So does a run that would check nothing: no active shape has a target, or the data holds no triples. `--violations-exit-code` never changes exit 2. A report that can't be written (a full disk, a locked workbook) ends with exit 3.
 
@@ -110,8 +125,8 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--mapping-csv` | file path | — | The CSV mapping file. Required for mapping and timestamped. |
 | `--models` | folder path | — | Root folder containing model files (ZIP, XML). Required for mapping and timestamped. |
 | `--constraints-root` | folder path | — | Root folder for constraint files. Paths in the mapping CSV are relative to this. Required for mapping and timestamped. Optional for combined: relative `owl:imports` are then also resolved against it. |
-| `--constraint-files` | file paths, comma-separated | — | Constraint files (`.ttl`, `.rdf`) or ZIP archives of them, which together form one shapes graph. Required for combined. Config key `constraintFiles`: a JSON array of paths. |
-| `--data-files` | file paths, comma-separated | — | Instance data files (`.xml`) or ZIP archives of them, which together form one dataset. Required for combined. Config key `dataFiles`: a JSON array of paths. |
+| `--constraint-files` | file or folder paths, comma-separated | — | Constraint files (`.ttl`, `.rdf`) or ZIP archives of them, which together form one shapes graph. A folder stands for the `.ttl`, `.rdf` and `.zip` files directly in it. Required for combined. Config key `constraintFiles`: a JSON array of paths. |
+| `--data-files` | file or folder paths, comma-separated | — | Instance data files (`.xml`) or ZIP archives of them, which together form one dataset. A folder stands for the `.xml` and `.zip` files directly in it. Required for combined. Config key `dataFiles`: a JSON array of paths. |
 | `--output` | folder path | — | Where to write the Excel report, ZIP bundles, and Turtle reports. Created if it does not exist. Required for every workflow. |
 | `--datatype-map` | preset or file path | `CGMES30NC25` | See **Datatype map** section below. |
 | `--xml-base` | URI | `http://iec.ch/TC57/CIM100` | Base URI used when parsing RDF/XML model files. See **XML base** section below. |
@@ -122,10 +137,12 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--samples` | integer | `3` when JSON is produced (`--format json` or `--summary-file`) / `0` otherwise | Per-shape detail in JSON output: max focus-node samples per shape group. `0` disables shape groups entirely. For the mapping workflow, positive values auto-enable `--export-turtle`; combined takes the detail from the results in memory. |
 | `--export-turtle` | flag | off | Write a `.ttl` SHACL validation report beside each Excel report. Combined writes one, named like its workbook. |
 | `--previous-comparison` | file path | — | XLSX from a previous timestamped run, for the comparison workbook. Timestamped workflow only. |
+| `--incremental-timestamps` | flag (config `"incrementalTimestamps": true`) | off | Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't change from the one before, instead of validating every timestamp from scratch. |
 | `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 | `--summary-file` | file path | — | Also write the JSON result (exactly what `--format json` prints) to this file, atomically, creating parent folders. Works with any `--format`. Config key `summaryFile`. See [automation options](README.md#automation-options---summary-file---violations-exit-code). |
 | `--violations-exit-code` | 0–255 | `1` | Exit code when violations are found. `0` lets a scheduler (Airflow, CI) treat findings as data; exits 2 and 3 are unchanged, and so is exit 1 when a row failed with an error. Config key `violationsExitCode`. Ignored under `serve`, `mcp` and `run`. |
 | `--dry-run` | flag | off | Print the resolved config and exit without running anything. |
+| `--python-executable` | file path | `CIMPAL_PYTHON_EXECUTABLE`, else `python` / `py -3` on `PATH` | Absolute path of the Python interpreter for the Python engines. A relative or missing path, or a UNC (network) or device path, is bad input (exit 2). There is no config key for it. See **Validation engines** below. |
 
 ---
 
@@ -171,6 +188,16 @@ If models load but produce zero violations on rules you know should fire, a wron
 | `RUST_SHACL` | Experimental. Rust-based SHACL evaluator via PyPI. Fast for its supported core subset; rejects some valid SPARQL expressions used by QoCDC shapes. |
 
 Install Python engines: `py -3 -m pip install "pyshacl[oxigraph]" shacl`
+
+**Which Python runs.** The first of these that is set:
+
+1. `--python-executable C:\Python313\python.exe` (also on `serve` and `mcp`, at start);
+2. the system property `-Dcimpal.python.executable=...`;
+3. the environment variable `CIMPAL_PYTHON_EXECUTABLE`.
+
+Each must be the absolute path of an existing local file; a bare name such as `python` is refused (exit 2 for the flag, an error for the others), because it would be looked up on `PATH`, and so is a UNC (`\\server\share\...`) or device (`\\?\...`, `\\.\...`) path. With none set, CimPal looks up `python`, then `py`, in the absolute `PATH` folders itself (never in the working directory; empty and `.` entries are skipped), asks it, with `-3` for `py`, whether it can import the engine's package, and runs the absolute `sys.executable` it reports. A candidate that doesn't answer within 10 seconds is stopped and skipped. A config file, a `serve` request or an `mcp` tool call can't set the interpreter. Each Python run logs one line on stderr, e.g. `[ENGINE] pySHACL (RDFLib — experimental) runs C:\Python313\python.exe (found on PATH via 'python')`.
+
+The engine's worker script is written to a private temporary folder that is removed when the run ends. If Python fails, also when it stops reading its input (for example a missing package), the error quotes the last 500 characters of its stderr on one line.
 
 ---
 

@@ -267,6 +267,7 @@ public class MainController implements Initializable {
     private TabPane tabPaneWorkspace;
     public Tab tabCreateCompleteSM1;
     public Tab tabInstanceDataComparison;
+    @FXML private Tab tabIdMapping;
     public Tab tabExcelToSHACL;
     public Tab tabRDFConvert;
     @FXML private Tab tabRdfsUnion;
@@ -416,6 +417,15 @@ public class MainController implements Initializable {
             controller.setMainController(this);
         } catch (IOException e) {
             GUIhelper.showUserFriendlyError("Instance Data Comparison tab error", "The Instance Data Comparison tab could not be loaded.", e);
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/IdMappingTab.fxml"));
+            tabIdMapping.setContent(loader.load());
+            IdMappingController controller = loader.getController();
+            controller.setMainController(this);
+        } catch (IOException e) {
+            GUIhelper.showUserFriendlyError("ID Mapping tab error", "The ID Mapping tab could not be loaded.", e);
         }
 
         try {
@@ -593,6 +603,7 @@ public class MainController implements Initializable {
     @FXML private void actionShowRdfComparison(ActionEvent event) { selectFunctionTab(tabCreateCompleteSM1); }
     @FXML private void actionShowRdfsUnion(ActionEvent event) { selectFunctionTab(tabRdfsUnion); }
     @FXML private void actionShowDatasetComparison(ActionEvent event) { selectFunctionTab(tabInstanceDataComparison); }
+    @FXML private void actionShowIdMapping(ActionEvent event) { selectFunctionTab(tabIdMapping); }
     @FXML private void actionShowGenerate(ActionEvent event) { selectFunctionTab(tabGenerateInstanceData); }
     @FXML private void actionShowTaskWizard(ActionEvent event) { selectFunctionTab(tabTaskWizard); }
     @FXML private void actionShowValidation(ActionEvent event) { selectFunctionTab(tabValidationByMapping); }

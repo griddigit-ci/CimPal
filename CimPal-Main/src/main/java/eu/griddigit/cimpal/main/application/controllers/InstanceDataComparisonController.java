@@ -13,6 +13,7 @@ import eu.griddigit.cimpal.main.application.rdfDiffResultController;
 import eu.griddigit.cimpal.main.core.ComparisonInstanceData;
 import eu.griddigit.cimpal.main.core.DataTypeMaping;
 import eu.griddigit.cimpal.main.gui.GUIhelper;
+import eu.griddigit.cimpal.main.gui.GuiDialogs;
 import eu.griddigit.cimpal.main.util.CompareFactory;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -488,7 +489,7 @@ public class InstanceDataComparisonController implements Initializable {
                     alert.setContentText("The two models are identical.");
                     alert.setHeaderText(null);
                     alert.setTitle("Information");
-                    alert.showAndWait();
+                    GuiDialogs.alert(alert);
                 }
             }
 
@@ -586,7 +587,7 @@ public class InstanceDataComparisonController implements Initializable {
                 alert.setContentText("The two models are identical.");
                 alert.setHeaderText(null);
                 alert.setTitle("Information");
-                alert.showAndWait();
+                GuiDialogs.alert(alert);
             }
         }
         setProgressBar(1);

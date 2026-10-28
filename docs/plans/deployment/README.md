@@ -80,6 +80,12 @@ Each WP lists the requirement IDs it covers.
 | R14 | A Python SDK (sync and async) with typed errors and retry on 503, its core generated from the OpenAPI spec. | DEP-9 |
 | R15 | An Airflow provider: connection type, hook, deferrable operator, trigger, sensor. XCom carries a small summary; violations either fail the task or are left for branching. | DEP-10 |
 | R16 | An external user guide: install, quickstart, deployment modes, capability statement, sizing, security for operators, Airflow, API, SDK, troubleshooting, versioning and support policy. | DEP-4 (first edition), then every WP updates its page |
+| R17 | Jobs, results, logs and uploads survive a restart or crash of the server; a job running at a crash ends as `failed` ("interrupted"), never lost or silently re-run. | DEP-11 |
+| R18 | Several replicas form one service with one queue: any replica accepts and answers any job, any free replica runs it, and a dead replica's work is not lost. | DEP-12 |
+| R19 | Requests are attributed to named clients; a client sees only its own jobs and uploads; per-client quotas. | DEP-13 |
+| R20 | Submitting and uploading are idempotent with a client-chosen key; optional signed completion callbacks. | DEP-14 |
+| R21 | A job can run in its own process: per-job memory limit, an out-of-memory error affects only that job, running jobs can be cancelled and killed on timeout. | DEP-15 |
+| R22 | Measured service capacity (throughput, queue wait, API latency, scaling with workers and replicas), published SLOs and alert rules. | DEP-16 |
 
 ### Non-functional and constraints
 
@@ -106,6 +112,14 @@ Each WP lists the requirement IDs it covers.
 | D1 | [DEP-8](DEP-8.md) | Concurrent workers in one JVM (optional) | — | DEP-5, decision D-8 | L |
 | D2 | [DEP-9](DEP-9.md) | Python SDK `cimpal-client` | R14 | DEP-5, DEP-7 | M |
 | D2 | [DEP-10](DEP-10.md) | Airflow provider | R15 | DEP-9, DEP-3 | M |
+| D3 | [DEP-11](DEP-11.md) | Durable job store (PostgreSQL) | R17 | DEP-5, DEP-7, DEP-8; D-14, D-18 | L |
+| D3 | [DEP-12](DEP-12.md) | Shared queue across replicas (horizontal scale-out) | R18 | DEP-11; D-15, D-16 | L |
+| D3 | [DEP-13](DEP-13.md) | Client identity, job ownership and quotas | R19 | DEP-6; D-17 | M |
+| D3 | [DEP-14](DEP-14.md) | Idempotent submission and completion webhooks | R20 | DEP-11 (soft), DEP-13 (soft); D-19 | M |
+| D3 | [DEP-15](DEP-15.md) | Job isolation: one child process per job | R21 | DEP-8 | M–L |
+| D3 | [DEP-16](DEP-16.md) | Load tests, capacity model and SLOs | R22 | DEP-2, DEP-9 | M |
+
+Phase D3 makes option 2 (CimPal as a REST service) a shared production service: see [OPTION-2-ROADMAP.md](OPTION-2-ROADMAP.md) for the gaps, the scaling model and the recommended order (release, then DEP-13, DEP-11, DEP-14, DEP-16, DEP-12, DEP-15).
 
 Phase D0 needs no server changes and makes Path A usable for external users. Phases D1 and D2 can follow in parallel with the remaining security and testing work. Relations to other tracks:
 
@@ -127,12 +141,18 @@ These are also listed in the master README. Each WP names the decisions it needs
 | D-5 | HTTP layer for `/v1` | Stay on the JDK `HttpServer` (SEC-1 hardening is built on it); revisit Javalin only if SSE or many endpoints make it painful | DEP-5 |
 | D-6 | File exchange | Shared volume + upload/download in v1; no native S3 in CimPal (Airflow copies S3 ↔ volume or uploads through the SDK) | DEP-7 |
 | D-7 | TLS | Terminate at the reverse proxy / ingress; no TLS inside CimPal in v1 | DEP-6 |
-| D-8 | In-JVM concurrency | Not now; scale with replicas. Do DEP-8 only if a customer needs several jobs per instance | DEP-8 |
-| D-9 | Where the Python code lives | Same repo, `clients/python/` and `clients/airflow/`, versioned with CimPal | DEP-9 |
-| D-10 | Python package names | `cimpal-client` (import `cimpal_client`) and `airflow-provider-cimpal` (import `cimpal_provider`). The `apache-airflow-providers-*` prefix is reserved for Apache community providers. | DEP-9 |
-| D-11 | Licence of the Python packages | EUPL-1.2 like the rest, or Apache-2.0 to match the Airflow ecosystem | DEP-9 |
-| D-12 | Supported Airflow versions | Airflow 3.x; add 2.10 only if a customer needs it | DEP-10 |
+| D-8 | In-JVM concurrency | **Yes** (maintainer, 2026-10-12): DEP-8 adds `serve --workers N`; replicas stay the recommended production shape | DEP-8 |
+| D-9 | Where the Python code lives | **Same repo** (maintainer, 2026-10-13): `clients/python/` and `clients/airflow/`, versioned with CimPal | DEP-9 |
+| D-10 | Python package names | **As recommended** (maintainer, 2026-10-13): `cimpal-client` (import `cimpal_client`) and `airflow-provider-cimpal` (import `cimpal_provider`). The `apache-airflow-providers-*` prefix is reserved for Apache community providers. | DEP-9 |
+| D-11 | Licence of the Python packages | **Apache-2.0 for `cimpal-client`** (maintainer, 2026-10-13): it holds no engine code and talks to the EUPL server over HTTP; an in-process wrapper of the engine would stay EUPL | DEP-9 |
+| D-12 | Supported Airflow versions | **Airflow 3 only** (maintainer, 2026-10-13); the provider needs 3.2+ (declarative connection fields) and CI tests 3.2.2 and 3.3.2. The provider is Apache-2.0 like `cimpal-client` | DEP-10 |
 | D-13 | `/v1/openapi.json` without token? | Yes: the spec has no secrets and clients need it to bootstrap | DEP-5 |
+| D-14 | Durable store technology | **PostgreSQL through JDBC** (maintainer, 2026-10-15); the in-memory store stays the default | DEP-11 |
+| D-15 | Shared queue mechanism | **The DEP-11 database** (maintainer, 2026-10-15): claims with `SKIP LOCKED`, leases; no message broker | DEP-12 |
+| D-16 | Shared files across replicas | **An RWX volume at `--work-root`** (maintainer, 2026-10-15); S3-compatible storage only if no RWX volume is available | DEP-12 |
+| D-17 | Client identity | **Named tokens** (maintainer, 2026-10-15): `name:role:token` in the token file, a bare token is client `default` (admin); quotas in a separate `--client-quotas` file; oldest-eligible fairness; OIDC/JWT later if a customer asks | DEP-13 |
+| D-18 | A job running when its node died | **Fail it** ("interrupted", maintainer, 2026-10-15); `--requeue-interrupted` as an opt-in | DEP-11, DEP-12 |
+| D-19 | Completion webhooks | **Yes, opt-in, allowlisted per client, HMAC-signed** (maintainer, 2026-10-16): `callbackAllow` in `--client-quotas`, secrets in `--callback-secrets` | DEP-14 |
 
 ## Glossary (for this track)
 

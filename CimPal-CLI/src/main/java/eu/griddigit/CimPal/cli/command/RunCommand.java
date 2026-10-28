@@ -260,14 +260,13 @@ public class RunCommand implements Callable<Integer> {
 
                 // Suppress stdout during step execution in json output mode so our
                 // pipeline JSON is not interleaved with step progress output.
-                PrintStream origOut = System.out;
-                if (jsonOutput) System.setOut(System.err);
-                try {
-                    exitCode = PathPolicy.runWith(policy,
-                            () -> CimPalCli.inProcess().execute(args));
-                } finally {
-                    if (jsonOutput) System.setOut(origOut);
-                }
+                // A path check on a thread without the step's policy is refused, not unrestricted (DEP-8).
+                java.util.concurrent.Callable<Integer> execution = () -> {
+                    try (PathPolicy.Requirement required = PathPolicy.requireContext()) {
+                        return PathPolicy.runWith(policy, () -> CimPalCli.inProcess().execute(args));
+                    }
+                };
+                exitCode = jsonOutput ? CliStreams.outToErr(execution) : execution.call();
 
             } catch (PathNotAllowedException ex) {
                 System.err.println("[ERROR] Step " + id + ": " + ex.getMessage());
@@ -377,9 +376,9 @@ public class RunCommand implements Callable<Integer> {
         return value == null ? null : LogSanitizer.forLog(value);
     }
 
+    /** One JSON string; every control character is escaped, so the output stays valid JSON (SEC-3). */
     private static String jsonStr(String v) {
-        if (v == null) return "null";
-        return "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return ValidateCommand.jsonStr(v);
     }
 
     // -------------------------------------------------------------------------

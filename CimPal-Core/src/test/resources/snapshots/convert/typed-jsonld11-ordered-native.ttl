@@ -1,0 +1,11 @@
+PREFIX cim:     <http://iec.ch/TC57/CIM100#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX ex:      <urn:test:typed#>
+PREFIX xsd:     <http://www.w3.org/2001/XMLSchema#>
+
+<http://example.com/data#_gen1>
+        cim:Equipment.aggregate     false;
+        cim:RotatingMachine.ratedS  100;
+        cim:SynchronousMachine.referencePriority
+                2;
+        ex:note                     "typed values" .

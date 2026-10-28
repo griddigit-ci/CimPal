@@ -580,8 +580,8 @@ public class CompareCommand implements Callable<Integer> {
         return CsvCells.escape(s);
     }
 
+    /** One JSON string; every control character is escaped, so the output stays valid JSON (SEC-3). */
     private static String jsonStr(String value) {
-        if (value == null) return "null";
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return ValidateCommand.jsonStr(value);
     }
 }

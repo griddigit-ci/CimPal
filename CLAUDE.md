@@ -8,13 +8,25 @@ Guidance for Claude Code when working in this repository.
 - `docs/cli/index.md` — CLI command status and per-command docs.
 - Do not redo a full codebase discovery; start from those two and the source file relevant to the task.
 
+## Git & PRs
+
+- The integration branch is `devel`, not `master`. Always open PRs against `devel` unless told otherwise, and always open them as non-draft.
+- Before starting a new work package (DEP-*, SEC-*, TEST-*), commit or stash any outstanding work. Then fetch and rebase onto the latest `origin/devel`.
+- Do each work package in its own git worktree (`git worktree add .claude/worktrees/<wp-id> -b feature/<wp-id>-<short-name> origin/devel`). Never leave finished work uncommitted in the main checkout.
+
+## Subagents
+
+- Subagents must NEVER run `git checkout`, `git switch`, `git reset`, `git stash` or any other command that changes the shared working copy.
+- Research agents are read-only: Read, Grep and `git log`/`git show` only.
+- If an agent needs a different branch, give it its own worktree.
+
 ## Current work
 
 - Work is planned in Claude Desktop and handed over as work packages in `docs/plans/`. **Start with `docs/plans/README.md`**: order, status, open decisions and the standard footer.
-- A session usually begins with `Execute docs/plans/<ID>.md` in plan mode. Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
+- A session usually begins with `Execute docs/plans/<track>/<ID>.md` in plan mode (tracks: `workspace` for A/DOC, `ci`, `security`, `testing`, `deployment`). Use `/wp-footer <ID>` at the start and `/end-session <ID>` at the end.
 - Shared tooling in `.claude/`:
   - Path-scoped rules: `rules/security.md` for security-sensitive code, `rules/testing.md` for `src/test`.
-  - Skills: `/add-regression-test`, `/security-check-change`.
+  - Skills: `/add-regression-test`, `/security-check-change`, `/ship` (commit, rebase, verify, open the PR).
   - Agents: `security-reviewer` (read-only), `test-writer`.
   - A Stop hook runs the tests of modules with changed Java files at the end of each turn.
 
@@ -49,7 +61,8 @@ mvn -B -pl CimPal-CLI -am package -DskipTests    # → CimPal-CLI/target/CimPal-
 mvn -B -pl CimPal-Main -am package -DskipTests   # → CimPal-Main/target/CimPal.jar + CimPal.exe
 mvn -pl CimPal-Main exec:java                    # launch the GUI (after `mvn install -DskipTests`, so sibling modules resolve)
 mvn -Psecurity-scan verify                       # OWASP dependency check (slow; fails on CVSS ≥ 7)
-mvn -B test -DexcludedGroups=gui                 # skip display-dependent JavaFX tests (@Tag("gui")) on headless machines
+mvn -B test -DexcludedGroups=gui                 # skip display-dependent JavaFX tests (@Tag("gui")) on headless machines (also skips Main's coverage ratchet)
+mvn -B -Pgui-all -pl CimPal-Main -am verify      # all GUI smoke tests; a plain build runs only the @Tag("smoke") subset (every tab loads)
 java -jar CimPal-CLI/target/CimPal-CLI.jar <subcommand> --help
 ```
 
@@ -85,27 +98,48 @@ Core tests run on the classpath (`useModulePath=false`) so they can reach packag
 - `validate --samples` depends on the `*__report.ttl` files written by `--export-turtle`.
 - If Claude Desktop has the CimPal MCP server running (`CimPal-CLI/configs/claude-desktop-config.json`), Windows locks `CimPal-CLI/target/CimPal-CLI.jar`. `mvn package`/`verify` then fails at CimPal-CLI with "Could not create modular JAR file". Quit Claude Desktop (or stop the `CimPal-CLI.jar mcp` processes) first.
 
+## Windows environment
+
+- This machine is Windows, and files use CRLF line endings. Use the Edit tool for source changes, not sed, heredocs or Bash string edits. Those mangle backslashes in Javadoc and escapes, and can fail silently.
+- Run `git diff` after any scripted edit to confirm it actually applied.
+- Claude Desktop is the MSIX install. Its config lives under `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json`, not `%APPDATA%\Claude`.
+- Point the Desktop MCP config at a stable copy of the CLI jar (e.g. `C:\tools\cimpal\CimPal-CLI.jar`), never at `target/`. Claude Desktop locks the jar it is running, which breaks Maven builds.
+
+## Security-sensitive code
+
+- Any path or file-access check (UNC paths, mixed `\` and `/` separators, `..`, symlinks, glob downloads) must fail closed.
+- Normalise paths with `Path.toRealPath()` before comparing them.
+- Every such fix needs a regression test that is shown failing before the fix, with cases for UNC paths, mixed separators and traversal.
+
 ## Testing
 
 Coverage is sparse (line coverage about 28% in Core, 5% in Main, 3% in CLI). Before refactoring Core behaviour, add characterisation tests that capture the current output. Build small synthetic RDF/SHACL fixtures under `@TempDir`, and don't depend on files outside the repo. `MappingValidatorTest` is the reference example.
 
-- **Test support** lives in Core's `eu.griddigit.cimpal.core.testsupport` (test scope). CLI and Main get it through the Core `test-jar` (`<type>test-jar</type>`, test scope). It holds:
-  - `TestModels`: synthetic EQ/SSH models and SHACL shapes.
-  - `Fixtures`: `src/test/resources/fixtures/<feature>/`.
-  - `Snapshots`: golden files under `src/test/resources/snapshots/<feature>/`. RDF is compared by isomorphism, workbooks as CSV, JSON with sorted keys.
-  - `Normalizer`: timestamps, paths, blank-node labels.
-  - `StubHttpServer`: a loopback HTTP stub.
-- **Snapshots** are only rewritten with `-Dsnapshot.update=true`. Otherwise a mismatch fails with a line diff. Review the diff before committing.
 - **Coverage ratchet:** `mvn verify` runs JaCoCo in every module, with the aggregate report in `CimPal-Coverage/target/site/jacoco-aggregate/`. It fails if a module drops below the floors in its `coverage-baseline.properties`, which are the measured value minus 0.5 pp. After coverage rises, run `scripts/Update-CoverageBaseline.ps1` and commit the updated files. Floors only go up unless `-AllowDecrease` is given, and that commit must say why.
+- Build with `mvn -q verify`. Run the full suite before any commit.
+- Don't guess APIs in test helpers. Grep the codebase for the real method signature first.
+- For SHACL rules, test against synthetic RDF data, and make sure BIND clauses come after the variables they use (e.g. `$this`) are bound.
 
 ## Git and releases
 
 - Day-to-day work happens on `devel` (or feature branches off it, PR'd into `devel`). `master` is the release branch.
 - Don't commit, push, or open PRs unless asked. `.claude/settings.json` makes `git push` ask for approval every time, and denies `gh release`, the release script, and tag or force pushes.
+- **Exception, local WIP commits:** on a feature branch (never `devel` or `master`), commit locally at each milestone of a WP, so a branch switch or an interrupted session can't lose the work. Prefix the message with `WIP:`, never push them unless asked, and tidy them up (squash or reword) before the branch gets a PR.
+- **Work in a worktree** (`.claude/worktrees/<wp-id>`), not in the maintainer's checkout at the repo root: they switch branches, pull and commit there. In a worktree a session is using, the maintainer only reads.
 - **Never run `scripts/New-ReleaseTag.ps1`** or push version tags unless explicitly asked. A pushed `YYYY.MM.DD.N` tag triggers `.github/workflows/release.yml`, which publishes a GitHub release.
 - Versions live in all six `pom.xml` files (including `CimPal-Coverage`) plus `<cimpal.version>`; only the release script changes them.
 
-## End of session
+## After every implementation (mandatory)
 
-- Update `docs/PROJECT.md` (date, *Implementation status*, *Known issues*, *Next steps*) when the change affects them.
-- When a CLI command's flags or behaviour change, update its page under `docs/cli/`.
+A "bigger implementation" is any finished WP or feature branch, and any change to a command, flag, config key, endpoint, exit code, JSON field, output file or default. After each one, before you report back, keep the docs in step with the code:
+
+1. **`docs/PROJECT.md`** — always:
+   - *Last updated* date;
+   - *Implementation status*, *Technical decisions* (new classes, design choices), *Known issues* (add new ones, remove fixed ones) and *Next steps*;
+   - one new row at the top of the *Change log* table: date, WP/PR, what changed for users (commands, flags, endpoints, behaviour), docs touched, and `skill: yes` when the change affects how CimPal is run or explained (the cimpal skill and the Desktop project notes are refreshed from these rows).
+2. **`docs/cli/<command>.md`** when a command's flags, output or exit codes changed; **`docs/guide/*`** when install, deployment, security, sizing or integration changed; **`CimPal-CLI/configs/*.json`** templates when config keys changed.
+3. **Machine-readable contracts** that must match the code: `CommandSchemas` / the MCP tool schemas, `openapi/cimpal-v1.json`, `PathGuard.FIELDS` (mirrored by the Airflow provider).
+4. **The WP file and `docs/plans/README.md`** status (see `/end-session`).
+5. Say in your summary which of these you updated, and which you deliberately left unchanged.
+
+If you find docs that disagree with the code, fix them in the same change or add them to *Known issues*; never leave a known drift unrecorded.

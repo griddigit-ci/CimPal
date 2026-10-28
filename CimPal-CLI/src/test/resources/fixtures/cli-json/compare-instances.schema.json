@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/griddigit-ci/CimPal/schemas/cimpal-compare-instances-result/1",
+  "$comment": "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+. The JSON document of compare-instances --format json (and --summary-file) (TEST-4). Additive: new fields may appear in later versions; none are removed or renamed.",
+  "title": "CimPal instance comparison result",
+  "type": "object",
+  "required": ["schema", "totalDifferences", "differences"],
+  "properties": {
+    "schema": {"const": "cimpal-compare-instances-result/1"},
+    "totalDifferences": {"type": "integer", "minimum": 0},
+    "differences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item", "rdfType", "property", "valueA", "valueB"],
+        "properties": {
+          "item": {"type": ["string", "null"]},
+          "rdfType": {"type": ["string", "null"]},
+          "property": {"type": ["string", "null"]},
+          "valueA": {"type": ["string", "null"]},
+          "valueB": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "stats": {"type": "object", "description": "With --stats; see stats.schema.json."}
+  }
+}

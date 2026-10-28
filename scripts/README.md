@@ -13,6 +13,8 @@ Manual, on-demand script — nothing triggers it automatically. Run it yourself 
 
 This is what starts the release process: it bumps versions, commits, tags, and pushes. The pushed tag is what triggers `.github/workflows/release.yml` on GitHub's side to build and publish the release (CimPal.exe, CimPal.jar, CimPal-CLI.jar). A second job then builds the Docker image from the released CimPal-CLI.jar, smoke-tests it, and pushes `ghcr.io/griddigit-ci/cimpal:<version>` and `:latest` (linux/amd64 and linux/arm64). If that job fails, the GitHub release is already out: fix the cause and re-run only the failed job.
 
+The release also builds the Python packages `cimpal-client` and `airflow-provider-cimpal`, and checks that the tagged commit is on master and that the pom version is the tag. Their upload to PyPI then **waits for approval**: open the run in GitHub Actions and approve the `pypi` environment (*Review deployments*). PyPI accepts the upload through trusted publishing, so no token is involved. The one-time setup and the TestPyPI rehearsal are described in `clients/python/README.md` (Releasing).
+
 What it does, step by step
 1. Refuses to run if the working tree isn't clean (avoids releasing with uncommitted changes mixed in).
 2. Reads the current version from `<cimpal.version>` in the root pom.xml.

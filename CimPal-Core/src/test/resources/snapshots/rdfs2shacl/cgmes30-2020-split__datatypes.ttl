@@ -1,0 +1,88 @@
+PREFIX cim:  <http://iec.ch/TC57/CIM100#>
+PREFIX dcat: <http://www.w3.org/ns/dcat#>
+PREFIX dct:  <http://purl.org/dc/terms/>
+PREFIX dm:   <http://iec.ch/TC57/61970-552/DifferenceModel/1#>
+PREFIX md:   <http://iec.ch/TC57/61970-552/ModelDescription/1#>
+PREFIX meq:  <http://example.com/ns/MiniEquipment-EU#>
+PREFIX owl:  <http://www.w3.org/2002/07/owl#>
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh:   <http://www.w3.org/ns/shacl#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+cim:IdentifiedObject.mRIDDatatypesGroupIO
+        rdf:type    sh:PropertyGroup;
+        rdfs:label  "DatatypesIO";
+        sh:order    1 .
+
+meq:DatatypesGroup  rdf:type  sh:PropertyGroup;
+        rdfs:label  "Datatypes";
+        sh:order    1 .
+
+cim:IdentifiedObject.mRIDIdentifiedObject.name-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:string;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        cim:IdentifiedObject.mRIDDatatypesGroupIO;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "IdentifiedObject.name-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        0.1;
+        sh:path         cim:IdentifiedObject.name;
+        sh:severity     sh:Violation .
+
+meq:ACLineSegment.r-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:float;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        meq:DatatypesGroup;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "ACLineSegment.r-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        2;
+        sh:path         cim:ACLineSegment.r;
+        sh:severity     sh:Violation .
+
+meq:Terminal  rdf:type  sh:NodeShape;
+        sh:property     cim:IdentifiedObject.mRIDIdentifiedObject.mRID-datatype , cim:IdentifiedObject.mRIDIdentifiedObject.name-datatype , meq:Terminal.phases-datatype;
+        sh:targetClass  cim:Terminal .
+
+meq:Terminal.phases-datatype
+        rdf:type        sh:PropertyShape;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        meq:DatatypesGroup;
+        sh:in           ( cim:PhaseCode.A cim:PhaseCode.ABC );
+        sh:message      "The datatype is not IRI (Internationalized Resource Identifier) or it is enumerated value not part of the profile.";
+        sh:name         "Terminal.phases-datatype";
+        sh:nodeKind     sh:IRI;
+        sh:order        -1;
+        sh:path         cim:Terminal.phases;
+        sh:severity     sh:Violation .
+
+meq:ACLineSegment  rdf:type  sh:NodeShape;
+        sh:property     meq:Equipment.aggregate-datatype , meq:ACLineSegment.r-datatype , cim:IdentifiedObject.mRIDIdentifiedObject.mRID-datatype , cim:IdentifiedObject.mRIDIdentifiedObject.name-datatype;
+        sh:targetClass  cim:ACLineSegment .
+
+cim:IdentifiedObject.mRIDIdentifiedObject.mRID-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:string;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        cim:IdentifiedObject.mRIDDatatypesGroupIO;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "IdentifiedObject.mRID-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        0.1;
+        sh:path         cim:IdentifiedObject.mRID;
+        sh:severity     sh:Violation .
+
+meq:Equipment.aggregate-datatype
+        rdf:type        sh:PropertyShape;
+        sh:datatype     xsd:boolean;
+        sh:description  "This constraint validates the datatype of the property (attribute).";
+        sh:group        meq:DatatypesGroup;
+        sh:message      "The datatype is not literal or it violates the xsd datatype.";
+        sh:name         "Equipment.aggregate-datatype";
+        sh:nodeKind     sh:Literal;
+        sh:order        3;
+        sh:path         cim:Equipment.aggregate;
+        sh:severity     sh:Violation .

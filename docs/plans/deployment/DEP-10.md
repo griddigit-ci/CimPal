@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | Done ([PR #71](https://github.com/griddigit-ci/CimPal/pull/71); PyPI publishing in [PR #72](https://github.com/griddigit-ci/CimPal/pull/72)) |
 | Phase | D2 |
 | Depends on | DEP-9, DEP-3 |
 | Size | M |
@@ -55,14 +55,14 @@ validate = CimPalValidateOperator(
 
 ## Acceptance criteria (status checklist)
 
-- [ ] Provider registers the `cimpal` connection type (visible in the Airflow UI) through `get_provider_info()`
-- [ ] Hook, operators, trigger, sensor as in the table; templated fields: `config`, `input_path`, `upload_from`, `download_outputs_to`
-- [ ] Deferrable path: trigger `serialize()` round-trip test; operator resumes with `execute_complete` and pushes the small XCom only
-- [ ] `fail_on_violations=True` raises `AirflowException` with the totals; `False` succeeds and leaves branching to the DAG
-- [ ] Failures map cleanly: 401/403 → non-retryable failure with a clear message; 503 → retried by the SDK; job `failed` → task failure with the server's problem detail
-- [ ] Unit tests with a mocked SDK; DAG integrity test for example DAGs; integration test with Airflow `dag.test()` against a real `serve` from the JAR (skipped when absent)
-- [ ] Compatible with the Airflow versions chosen in D-12 (CI matrix)
-- [ ] `docs/guide/airflow.md` path C section; comparison table of paths A/B/C (when to use which)
+- [x] Provider registers the `cimpal` connection type (visible in the Airflow UI) through `get_provider_info()` — declarative `conn-fields`/`ui-field-behaviour`, validated against Airflow's schema
+- [x] Hook, operators, trigger, sensor as in the table; templated fields: `config`, `input_path`, `upload_from`, `download_outputs_to` (and `job_label`)
+- [x] Deferrable path: trigger `serialize()` round-trip test; operator resumes with `execute_complete` and pushes the small XCom only
+- [x] `fail_on_violations=True` raises `AirflowFailException` with the totals; `False` succeeds and leaves branching to the DAG
+- [x] Failures map cleanly: 401/403 → non-retryable failure with a clear message; 503 → retried by the SDK; job `failed` → task failure with the server's problem detail
+- [x] Unit tests with a mocked server (respx); DAG integrity test for example DAGs; integration test with Airflow `dag.test()` (polling and deferrable) against a real `serve` from the JAR (required in CI)
+- [x] Compatible with the Airflow versions chosen in D-12 (CI matrix: 3.2.2 and 3.3.2)
+- [x] `docs/guide/airflow.md` path C section; comparison table of paths A/B/C (when to use which)
 
 ## Instructions for Claude Code
 
@@ -94,7 +94,43 @@ Standard footer (applies to every work package):
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-10-13 | D-12: Airflow 3 only. The provider needs **3.2+**: declarative connection fields (`conn-fields`) and `aget_connection`; CI tests 3.2.2 and 3.3.2 | Maintainer (3.x), Claude Code (3.2 minimum) |
+| 2026-10-13 | Licence Apache-2.0, like `cimpal-client` (no engine code; talks to the EUPL server through the SDK) | Maintainer |
+| 2026-10-13 | `cimpal-client` pinned to exactly the provider's version by a hatch build hook (both are the CimPal version) | Claude Code |
+| 2026-10-13 | Once a job is submitted, failures don't retry (a running job can't be stopped, so a retry would duplicate it); only exit 3 and failures before submission retry. The deferrable trigger keeps polling through passing errors until the deadline | Claude Code (security review) |
+| 2026-10-13 | `input_path` rewrites the relative paths of the command's file options, mirroring `PathGuard.FIELDS` (a test keeps them equal); text-or-path options (`datatypeMap`, `query`) are left alone | Claude Code |
+| 2026-10-13 | `label` became `job_label`: `label` is a read-only property of Airflow's operators | Claude Code |
 
 ## Notes and results
 
-(Claude Code: record findings, baseline numbers and open items here.)
+### Results
+
+- **CI** (`airflow-provider`; Airflow 3.2.2 and 3.3.2, Python 3.12): 48 tests passed on both with none skipped before the security fixes. Those runs included `dag.test()` against a real `serve` from the JAR, polling and deferrable. ruff and `mypy --strict` are clean.
+- **Locally on Windows:** only `test_logic.py` (29 tests) runs, because Airflow doesn't (no `fork`); the Airflow tests skip there. Iterating went through CI on the pushed branch, as agreed.
+- **mypy** found a real bug before CI: assigning `self.label` breaks Airflow's read-only `label` property, hence `job_label`.
+- **First CI run:** `dag.test()` refused a DAG defined inside the test. Airflow 3 runs only DAGs it serializes from the DAG bundle, so the end-to-end DAGs live in `tests/e2e_dags/` and CI points `AIRFLOW__CORE__DAGS_FOLDER` there.
+
+### Security review (2026-10-13)
+
+No High findings. Fixed, with regression tests:
+- **Medium:** an empty connection password let the SDK fall back to a `CIMPAL_API_TOKEN` in the worker's environment, sending it to whatever host the connection names. Now the connection must have a token.
+- **Medium:** a wait timeout, a server `timed_out` job and transient polling errors raised retryable errors, so a retry submitted the job again while the first kept running. Asking a timed-out job for its result also gave a misleading 409. Now:
+  - after submission only exit 3 retries;
+  - the result is fetched only for succeeded and failed jobs;
+  - the trigger keeps polling through passing errors;
+  - `execute_complete` fails a job that isn't final.
+- **Low:**
+  - the copied server log and error details are cleaned and capped;
+  - `download_outputs_to` works as a relative or symlinked path;
+  - the poll interval must be finite and at least 1 s;
+  - `verify=false` logs a warning;
+  - `test_connection` handles a missing CA bundle;
+  - CI's provider install uses Airflow's constraints.
+- **Documented rather than changed:**
+  - don't template `upload_from`/`download_outputs_to` from run conf;
+  - `input_path` joins `..` as given (the server's allowed folders are the boundary).
+
+### Open
+
+- **PyPI:** both packages are published by the release workflow (trusted publishing, maintainer approval; branch `feature/pypi-publishing`). Until the maintainer registers the two pending publishers on PyPI, the names stay unreserved: a squatter could publish `cimpal-client` at the pinned version, so do that setup soon.
+- **Connection form:** the Airflow UI was not tried by hand (the provider-info schema check and the CI install stand in for it).

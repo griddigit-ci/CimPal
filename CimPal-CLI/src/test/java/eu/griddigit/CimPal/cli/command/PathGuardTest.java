@@ -57,6 +57,63 @@ class PathGuardTest {
     }
 
     @Test
+    void aListPartThatResolvesToANameWithACommaIsRefused() throws Exception {
+        // The command splits the checked string on commas again: "x,/secret" would become two paths.
+        Path commaDir = Files.createDirectories(root.resolve("x,"));
+        Files.writeString(commaDir.resolve("m.ttl"), "x");
+        Path link = root.resolve("link");
+        try {
+            Files.createSymbolicLink(link, commaDir);
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            org.junit.jupiter.api.Assumptions.abort("symbolic links can't be created here: " + e.getMessage());
+        }
+        String value = link.resolve("m.ttl").toString();
+
+        for (String command : List.of("sparql", "manifest")) {
+            String key = command.equals("sparql") ? "models" : "files";
+            assertThatThrownBy(() -> PathGuard.check(command, json("{\"" + key + "\":" + q(Path.of(value)) + "}"),
+                    policy, root)).as(command).isInstanceOf(PathNotAllowedException.class);
+            // As an array element it is not split again: allowed.
+            assertThat(PathGuard.check(command, json("{\"" + key + "\":[" + q(Path.of(value)) + "]}"), policy, root)
+                    .path(key).get(0).asString()).contains(",");
+        }
+    }
+
+    @Test
+    void aJobOnAnUploadLooksUpRelativeValuesInItsUploadOnly() {
+        // pom.xml exists in the working directory of this test (the module folder), outside the
+        // roots: shared mode refuses it, a job on an upload never even looks there (DEP-7).
+        assertThat(Files.exists(Path.of("pom.xml"))).isTrue();
+        assertThatThrownBy(() -> PathGuard.check("sparql", json("{\"query\":\"pom.xml\"}"), policy, root))
+                .isInstanceOf(PathNotAllowedException.class);
+
+        ObjectNode checked = PathGuard.check("sparql", json("{\"query\":\"pom.xml\"}"), policy, root, true);
+        assertThat(checked.path("query").asString()).as("not a file in the upload: kept as text").isEqualTo("pom.xml");
+        ObjectNode inUpload = PathGuard.check("sparql", json("{\"query\":\"in.ttl\"}"), policy, root, true);
+        assertThat(inUpload.path("query").asString()).isEqualTo(realPath(root.resolve("in.ttl")).toString());
+    }
+
+    @Test
+    void outputsOfAJobOnAnUploadArePlacedInItsOutFolder() throws Exception {
+        Path out = Files.createDirectories(root.resolve("out"));
+        ObjectNode placed = PathGuard.placeOutputs("validate", json("{\"summaryFile\":\"s.json\",\"workflow\":\"mapping\"}"), out);
+
+        assertThat(placed.path("summaryFile").asString()).isEqualTo(out.resolve("s.json").toString());
+        assertThat(placed.path("outputDir").asString()).as("missing folder: out/ itself").isEqualTo(out.toString());
+        ObjectNode absolute = PathGuard.placeOutputs("sparql", json("{\"output\":" + q(outside.resolve("x.csv")) + "}"), out);
+        assertThat(absolute.path("output").asString()).as("left for the policy to refuse")
+                .isEqualTo(outside.resolve("x.csv").toString());
+    }
+
+    private static Path realPath(Path p) {
+        try {
+            return p.toRealPath();
+        } catch (java.io.IOException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    @Test
     void everyFileOptionOfEveryExposedCommandIsInTheRegistry() {
         CommandLine cli = new CommandLine(new CimPalCli());
         for (String command : ServeServer.COMMANDS) {

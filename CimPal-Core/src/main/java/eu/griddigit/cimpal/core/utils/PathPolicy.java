@@ -32,6 +32,8 @@ import java.util.regex.Pattern;
  *   <li>UNC paths ({@code \\server\share}, {@code //server/share}) and device paths
  *       ({@code \\.\}, {@code \\?\}) are refused unless {@link Builder#allowUnc}. Reserved Windows
  *       device names (CON, NUL, COM1, ...) and NTFS alternate data streams are always refused.</li>
+ *   <li>{@linkplain Builder#exclude Excluded} folders are refused for reads and writes even inside
+ *       a root, e.g. {@code serve}'s own work area with other callers' uploads (DEP-7).</li>
  * </ul>
  *
  * <p>The entry points also make a policy {@linkplain #runWith active} while a command runs, so
@@ -44,19 +46,22 @@ public final class PathPolicy {
     private static final Pattern DEVICE_NAME = Pattern.compile(
             "(?i)(con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3]|conin\\$|conout\\$)");
 
-    /** The policy in force for the command currently running, if any (see {@link #runWith}). */
-    private static volatile PathPolicy active;
-
     private final List<Path> readRoots;
     private final List<Path> writeRoots;
     /** Every root as given and as its real path, for {@link #mayReadIfActive}'s lexical test. */
     private final List<Path> spelledRoots;
+    /** Real paths of excluded folders, and as given (for the lexical test). */
+    private final List<Path> excluded;
+    private final List<Path> spelledExcluded;
     private final boolean allowUnc;
 
-    private PathPolicy(List<Path> readRoots, List<Path> writeRoots, List<Path> spelledRoots, boolean allowUnc) {
+    private PathPolicy(List<Path> readRoots, List<Path> writeRoots, List<Path> spelledRoots, List<Path> excluded,
+                       List<Path> spelledExcluded, boolean allowUnc) {
         this.readRoots = List.copyOf(readRoots);
         this.writeRoots = List.copyOf(writeRoots);
         this.spelledRoots = List.copyOf(spelledRoots);
+        this.excluded = List.copyOf(excluded);
+        this.spelledExcluded = List.copyOf(spelledExcluded);
         this.allowUnc = allowUnc;
     }
 
@@ -69,6 +74,8 @@ public final class PathPolicy {
         private final List<Path> readRoots = new ArrayList<>();
         private final List<Path> writeRoots = new ArrayList<>();
         private final List<Path> spelledRoots = new ArrayList<>();
+        private final List<Path> excluded = new ArrayList<>();
+        private final List<Path> spelledExcluded = new ArrayList<>();
         private boolean allowUnc;
 
         /** A root that may be read and written. */
@@ -94,6 +101,16 @@ public final class PathPolicy {
             return real;
         }
 
+        /**
+         * A folder (an existing directory) that is refused for reading and writing even where it
+         * lies inside a root, together with everything below it.
+         */
+        public Builder exclude(Path folder) {
+            excluded.add(realDirectory(folder));
+            spelledExcluded.add(folder.toAbsolutePath().normalize());
+            return this;
+        }
+
         /** Accept UNC paths ({@code \\server\share}); they still have to be under a root. */
         public Builder allowUnc(boolean allowUnc) {
             this.allowUnc = allowUnc;
@@ -104,7 +121,7 @@ public final class PathPolicy {
             if (readRoots.isEmpty() && writeRoots.isEmpty()) {
                 throw new IllegalArgumentException("A path policy needs at least one root.");
             }
-            return new PathPolicy(readRoots, writeRoots, spelledRoots, allowUnc);
+            return new PathPolicy(readRoots, writeRoots, spelledRoots, excluded, spelledExcluded, allowUnc);
         }
 
         private static Path realDirectory(Path root) {
@@ -157,6 +174,7 @@ public final class PathPolicy {
             throw new PathNotAllowedException("Input path is outside the allowed roots: "
                     + LogSanitizer.forLog(path.toString()) + rootsHint());
         }
+        refuseExcluded(real, path);
         return real;
     }
 
@@ -199,7 +217,40 @@ public final class PathPolicy {
             throw new PathNotAllowedException("Output path is outside the allowed write roots: "
                     + LogSanitizer.forLog(path.toString()) + rootsHint());
         }
+        refuseExcluded(target, path);
         return target;
+    }
+
+    /**
+     * Refuses a path in an excluded folder, unless it is also under a root that itself lies
+     * inside that folder: the more specific root wins. So a job may use its own upload and output
+     * folders inside {@code serve}'s excluded work area, and nothing else there (DEP-7).
+     */
+    private void refuseExcluded(Path real, Path given) {
+        if (!allowedDespiteExclusion(real, excluded, readRoots, writeRoots)) {
+            throw new PathNotAllowedException("Path is in a folder that is not available here: "
+                    + LogSanitizer.forLog(given.toString()));
+        }
+    }
+
+    private static boolean allowedDespiteExclusion(Path path, List<Path> excludedFolders, List<Path> rootsA,
+                                                   List<Path> rootsB) {
+        for (Path folder : excludedFolders) {
+            if (path.startsWith(folder) && !underRootInside(path, folder, rootsA) && !underRootInside(path, folder, rootsB)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean underRootInside(Path path, Path folder, List<Path> roots) {
+        for (Path root : roots) {
+            // Strictly inside: a root that is the excluded folder itself would re-open all of it.
+            if (root.startsWith(folder) && !root.equals(folder) && path.startsWith(root)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean under(Path real, List<Path> roots) {
@@ -268,11 +319,22 @@ public final class PathPolicy {
             if (!driveSpec && segment.indexOf(':') >= 0 && isWindows()) {
                 throw new PathNotAllowedException("Alternate data streams are not allowed: " + LogSanitizer.forLog(text));
             }
-            String base = segment.split("\\.", 2)[0].strip();
-            if (DEVICE_NAME.matcher(base).matches()) {
+            if (isReservedName(segment)) {
                 throw new PathNotAllowedException("Reserved device name in path: " + LogSanitizer.forLog(text));
             }
         }
+    }
+
+    /**
+     * True for a reserved Windows device name such as {@code CON}, {@code nul.txt} or
+     * {@code COM1}: the part before the first dot, ignoring case and surrounding blanks.
+     */
+    public static boolean isReservedName(String segment) {
+        if (segment == null) {
+            return false;
+        }
+        String base = segment.split("\\.", 2)[0].strip();
+        return DEVICE_NAME.matcher(base).matches();
     }
 
     private static boolean isWindows() {
@@ -281,24 +343,89 @@ public final class PathPolicy {
 
     // ---- active policy -------------------------------------------------------------------
 
-    /** The policy in force for the running command, if any. */
-    public static Optional<PathPolicy> active() {
-        return Optional.ofNullable(active);
+    /** The policy of one {@link #runWith} call; closed when the call returns. */
+    private static final class Context {
+        final PathPolicy policy;
+        volatile boolean closed;
+
+        Context(PathPolicy policy) {
+            this.policy = policy;
+        }
     }
 
     /**
-     * Runs {@code action} with {@code policy} in force, then restores the previous state.
-     * {@code serve}, {@code mcp} and {@code run} run commands one at a time, so a single
-     * process-wide slot is enough and also covers worker threads a command starts.
+     * The policy in force on this thread. Inherited by the threads a command starts (Core
+     * creates its worker pools per run, inside {@link #runWith}), so concurrent commands each
+     * see their own policy (DEP-8).
+     */
+    private static final InheritableThreadLocal<Context> CONTEXT = new InheritableThreadLocal<>();
+
+    /** While positive, every check needs a policy on its thread ({@link #requireContext}). */
+    private static final java.util.concurrent.atomic.AtomicInteger REQUIRED = new java.util.concurrent.atomic.AtomicInteger();
+
+    /**
+     * The policy for this thread, or null when none applies (direct CLI and GUI use). Fails
+     * closed: a thread that inherited the policy of a command that has ended, or a thread without
+     * one while {@link #requireContext} is held, gets an exception instead of unchecked access.
+     */
+    private static PathPolicy current() {
+        Context context = CONTEXT.get();
+        if (context != null && !context.closed) {
+            return context.policy;
+        }
+        if (context != null || REQUIRED.get() > 0) {
+            throw new PathNotAllowedException("No path policy applies on this thread ("
+                    + Thread.currentThread().getName() + "); the file is refused.");
+        }
+        return null;
+    }
+
+    /** The policy in force for the running command on this thread, if any. */
+    public static Optional<PathPolicy> active() {
+        Context context = CONTEXT.get();
+        return context == null || context.closed ? Optional.empty() : Optional.of(context.policy);
+    }
+
+    /**
+     * Runs {@code action} with {@code policy} in force on this thread and on the threads it
+     * starts, then restores the previous state. Threads still running afterwards (or created
+     * then and reused later) see the policy as closed and are refused, never unrestricted.
      */
     public static <T> T runWith(PathPolicy policy, Callable<T> action) throws Exception {
-        PathPolicy previous = active;
-        active = policy;
+        Context previous = CONTEXT.get();
+        Context context = new Context(java.util.Objects.requireNonNull(policy, "policy"));
+        CONTEXT.set(context);
         try {
             return action.call();
         } finally {
-            active = previous;
+            context.closed = true;
+            if (previous == null) {
+                CONTEXT.remove();
+            } else {
+                CONTEXT.set(previous);
+            }
         }
+    }
+
+    /**
+     * Requires a policy on every thread that checks a path until the returned handle is closed:
+     * a check on a thread without one is refused. {@code serve} holds it while it runs commands
+     * concurrently, so no code path can fall back to unrestricted access.
+     */
+    public static Requirement requireContext() {
+        REQUIRED.incrementAndGet();
+        java.util.concurrent.atomic.AtomicBoolean released = new java.util.concurrent.atomic.AtomicBoolean();
+        return () -> {
+            if (released.compareAndSet(false, true)) {
+                REQUIRED.decrementAndGet();
+            }
+        };
+    }
+
+    /** Held by {@link #requireContext()}; closing it (once counts) ends the requirement. */
+    public interface Requirement extends AutoCloseable {
+        @Override
+        void close();
     }
 
     /**
@@ -307,7 +434,7 @@ public final class PathPolicy {
      * touching them.
      */
     public static Path checkReadIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         return policy == null ? path : policy.checkRead(path);
     }
 
@@ -319,11 +446,14 @@ public final class PathPolicy {
      * passes, following links.
      */
     public static boolean mayReadIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         if (policy == null) {
             return true;
         }
-        return under(path.toAbsolutePath().normalize(), policy.spelledRoots);
+        Path normalized = path.toAbsolutePath().normalize();
+        return under(normalized, policy.spelledRoots)
+                && allowedDespiteExclusion(normalized, policy.spelledExcluded, policy.spelledRoots, List.of())
+                && allowedDespiteExclusion(normalized, policy.excluded, policy.spelledRoots, List.of());
     }
 
     /**
@@ -331,7 +461,7 @@ public final class PathPolicy {
      * without touching it; for paths that may legitimately not exist, before probing them.
      */
     public static void refuseNetworkPathIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         if (policy != null) {
             policy.rejectSpecial(path.toString());
         }
@@ -344,7 +474,7 @@ public final class PathPolicy {
      * on every run. The overwrite rule applies to output files named in the request.
      */
     public static Path checkWriteIfActive(Path path) {
-        PathPolicy policy = active;
+        PathPolicy policy = current();
         return policy == null ? path : policy.checkWrite(path, true);
     }
 }

@@ -1,0 +1,9 @@
+# Copyright (c) 2020-2026 gridDigIt Kft.
+# Licensed under the Apache License, Version 2.0.
+# SPDX-License-Identifier: Apache-2.0
+#
+# openapi-python-client settings for the low-level layer (src/cimpal_client/_generated).
+# Regenerate with scripts/regenerate.sh or scripts/regenerate.ps1, never by hand.
+project_name_override: cimpal-client
+package_name_override: _generated
+post_hooks: []

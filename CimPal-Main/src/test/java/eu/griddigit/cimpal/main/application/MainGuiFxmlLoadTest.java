@@ -5,46 +5,65 @@
  */
 package eu.griddigit.cimpal.main.application;
 
-import javafx.application.Platform;
+import eu.griddigit.cimpal.main.gui.FxTestSupport;
+import eu.griddigit.cimpal.main.gui.GuiSmoke;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
-// Needs a display (JavaFX toolkit); exclude on headless machines with -DexcludedGroups=gui.
-@Tag("gui")
+/**
+ * Loads the whole main window, as the application does, and checks that every tab got its content.
+ * MainController loads each tab's FXML itself and reports a failure in an error dialog rather than
+ * an exception, so a broken tab shows up here as a recorded error alert and an empty tab.
+ */
+@GuiSmoke
+@Tag("smoke")
 class MainGuiFxmlLoadTest {
-    private static boolean toolkitStarted;
+
+    /** fx:id to title of the tabs of CimPalGui.fxml, in the order they appear. */
+    private static final Map<String, String> TABS = new LinkedHashMap<>();
+
+    static {
+        TABS.put("tabRDFVisualisation", "Visualisation");
+        TABS.put("tabRDFConvert", "Convert");
+        TABS.put("tabRdfsUnion", "RDFS Union");
+        TABS.put("tabSPARQLQuery", "SPARQL Query");
+        TABS.put("tabAiAssistant", "AI Assistant");
+        TABS.put("tabRDFStoSHACL", "RDFS to SHACL");
+        TABS.put("tabExcelToSHACL", "Constraints Operations");
+        TABS.put("tabCreateCompleteSM1", "RDF Comparison");
+        TABS.put("tabInstanceDataComparison", "Dataset Comparison");
+        TABS.put("tabIdMapping", "ID Mapping");
+        TABS.put("tabGenerateInstanceData", "Generate");
+        TABS.put("tabTaskWizard", "Task Wizard");
+        TABS.put("tabValidationByMapping", "SHACL Validation");
+    }
 
     @Test
     void mainGuiLoadsAllTabs() throws Exception {
-        if (!toolkitStarted) {
-            try {
-                Platform.startup(() -> { });
-            } catch (IllegalStateException ignored) {
-                // Another JavaFX test already started the toolkit.
-            }
-            toolkitStarted = true;
-        }
-        CountDownLatch done = new CountDownLatch(1);
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        Platform.runLater(() -> {
-            try {
-                new FXMLLoader(getClass().getResource("/fxml/CimPalGui.fxml")).load();
-            } catch (Throwable error) {
-                failure.set(error);
-            } finally {
-                done.countDown();
-            }
+        List<Tab> tabs = FxTestSupport.callOnFx(() -> {
+            Parent root = new FXMLLoader(getClass().getResource("/fxml/CimPalGui.fxml")).load();
+            // A scene and a CSS pass create the skins, so the tab pane inside the split pane can be found.
+            new Scene(root);
+            root.applyCss();
+            return List.copyOf(((TabPane) root.lookup("#tabPaneWorkspace")).getTabs());
         });
-        assertTrue(done.await(30, TimeUnit.SECONDS), "Timed out loading CimPalGui.fxml");
-        if (failure.get() != null) {
-            throw new AssertionError("CimPalGui.fxml failed to load", failure.get());
+
+        assertThat(FxTestSupport.dialogs().errors()).as("tab loading errors").isEmpty();
+        assertThat(tabs).extracting(Tab::getId).containsExactlyElementsOf(TABS.keySet());
+        for (Tab tab : tabs) {
+            assertThat(tab.getText()).as("title of " + tab.getId()).isEqualTo(TABS.get(tab.getId()));
+            assertThat(tab.getContent()).as("content of tab '" + tab.getText() + "'").isNotNull();
         }
     }
 }

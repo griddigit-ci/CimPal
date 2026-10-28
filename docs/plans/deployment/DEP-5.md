@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (PR into `devel`) |
+| Status | Done (PR #62, merged into `devel`) |
 | Phase | D1 |
 | Depends on | SEC-1, SEC-2 (merged); TEST-4 JSON Schemas (soft) |
 | Size | L |

@@ -14,7 +14,7 @@ import java.util.List;
  * reader that polls with {@code nextOffset} never sees a line twice, and learns from
  * {@code truncated} when older lines were dropped.
  */
-final class JobLog {
+final class JobLog implements LogSink {
 
     static final int MAX_LINE_CHARS = 4000;
 
@@ -33,7 +33,8 @@ final class JobLog {
         this.ring = new String[capacity];
     }
 
-    synchronized void append(String line) {
+    @Override
+    public synchronized void append(String line) {
         String bounded = line.length() > MAX_LINE_CHARS ? line.substring(0, MAX_LINE_CHARS) + "..." : line;
         int slot = (int) (total % ring.length);
         if (ring[slot] != null) {
