@@ -886,6 +886,7 @@ public class MainController implements Initializable {
             Optional<String> result = dialog.showAndWait();
 
             if (result.isEmpty()) {
+                progressBar.setProgress(0);
                 return;
             }
 
