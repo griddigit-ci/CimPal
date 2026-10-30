@@ -1,0 +1,17 @@
+{
+  "_comment": "Template: Export SHACL shape files to an Excel workbook.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar shacl2xlsx --config this-file.json",
+  "_when_to_use": "To review, filter or share a constraint set without reading Turtle. Same export as the GUI's Tools > Export SHACL constraints information to Excel.",
+
+  "shaclFiles": [
+    "REPLACE_WITH_PATH/shapes/EQ.ttl",
+    "REPLACE_WITH_PATH/shapes/SSH.ttl"
+  ],
+  "_note_shaclFiles": "One or more SHACL files (.ttl, .rdf; JSON-LD is refused). Relative paths resolve against this file's folder.",
+
+  "output": "REPLACE_WITH_PATH/shapes.xlsx",
+  "_note_output": "The .xlsx workbook to write. Parent folders are created; an existing file is replaced.",
+
+  "layout": "summary",
+  "_note_layout": "'summary' (default): one row per constraint, one sheet per file. 'by-type': every predicate of every shape, one sheet per shape kind (NodeShapes, PropertyShapes, SPARQLConstraints, PropertyGroups), with a 'Source file' column when there are several files."
+}

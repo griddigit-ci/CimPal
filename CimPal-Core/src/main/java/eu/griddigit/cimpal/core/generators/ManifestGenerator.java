@@ -43,7 +43,8 @@ public class ManifestGenerator {
     private static final Property DCTERMS_ISSUED = ResourceFactory.createProperty(NS_DCTERMS, "issued");
     private static final Property DCTERMS_LICENSE = ResourceFactory.createProperty(NS_DCTERMS, "license");
     private static final Property DCTERMS_PUBLISHER = ResourceFactory.createProperty(NS_DCTERMS, "publisher");
-    private static final Property DCTERMS_REQUIRES = ResourceFactory.createProperty(NS_DCTERMS, "requires");
+    private static final Property DCTERMS_REPLACES = ResourceFactory.createProperty(NS_DCTERMS, "replaces");
+    private static final Property DCTERMS_REQUIRES =ResourceFactory.createProperty(NS_DCTERMS, "requires");
     private static final Property DCTERMS_RIGHTS = ResourceFactory.createProperty(NS_DCTERMS, "rights");
     private static final Property DCTERMS_RIGHTS_HOLDER = ResourceFactory.createProperty(NS_DCTERMS, "rightsHolder");
     private static final Property DCTERMS_SPATIAL = ResourceFactory.createProperty(NS_DCTERMS, "spatial");
@@ -55,7 +56,8 @@ public class ManifestGenerator {
     private static final Property DCAT_ACCESS_URL = ResourceFactory.createProperty(NS_DCAT, "accessURL");
     private static final Property DCAT_DISTRIBUTION_OF = ResourceFactory.createProperty(NS_DCAT, "isDistributionOf");
     private static final Property DCAT_DATASET_PROPERTY = ResourceFactory.createProperty(NS_DCAT, "dataset");
-    private static final Property DCAT_IS_VERSION_OF = ResourceFactory.createProperty(NS_DCAT, "isVersionOf");
+    private static final Property DCAT_REPLACES = ResourceFactory.createProperty(NS_DCAT, "replaces");
+    private static final Property DCAT_IS_VERSION_OF =ResourceFactory.createProperty(NS_DCAT, "isVersionOf");
     private static final Property DCAT_MEDIA_TYPE = ResourceFactory.createProperty(NS_DCAT, "mediaType");
     private static final Property DCAT_VERSION = ResourceFactory.createProperty(NS_DCAT, "version");
 
@@ -168,6 +170,10 @@ public class ManifestGenerator {
                     values(sourceModel, datasetHeader, DCTERMS_TYPE),
                     List.of(DEFAULT_TYPE));
 
+            // dcat:replaces is not in the DatasetMetadata vocabulary; the manifest uses dcterms:replaces.
+            copyBest(dataset, DCTERMS_REPLACES,
+                    values(sourceModel, datasetHeader, DCTERMS_REPLACES),
+                    values(sourceModel, datasetHeader, DCAT_REPLACES));
             copyBest(dataset, DCAT_IS_VERSION_OF,
                     values(sourceModel, datasetHeader, DCAT_IS_VERSION_OF));
             copyBest(dataset, DCAT.keyword,
@@ -192,7 +198,7 @@ public class ManifestGenerator {
                     values(sourceModel, fullModelHeader, MD_MODEL_DESCRIPTION));
 
             Resource accessUrlRes = coalesceResource(
-                    values(sourceModel, distributionFromDataset(sourceModel, datasetHeader), DCAT_ACCESS_URL),
+                    withoutAbsoluteLocations(values(sourceModel, distributionFromDataset(sourceModel, datasetHeader), DCAT_ACCESS_URL)),
                     compactAccessUrlValues(accessUrl, sourceFile),
                     compactAccessUrlValues(null, sourceFile),
                     List.of(DEFAULT_ACCESS_URL)
@@ -578,6 +584,29 @@ public class ManifestGenerator {
             return trimmed.equals(uri) ? node : ResourceFactory.createResource(trimmed);
         }
         return node;
+    }
+
+    /**
+     * Drops access locations that name a place on the machine that wrote them (a {@code file:}
+     * IRI with an absolute path, a POSIX or Windows absolute path), so a CI runner's checkout
+     * path never lands in the manifest; the caller falls back to the compact relative IRI.
+     */
+    private static List<RDFNode> withoutAbsoluteLocations(List<RDFNode> nodes) {
+        return nodes.stream().filter(n -> !isAbsoluteLocation(n)).toList();
+    }
+
+    static boolean isAbsoluteLocation(RDFNode node) {
+        if (node == null) {
+            return false;
+        }
+        String s = node.isLiteral() ? node.asLiteral().getLexicalForm() : node.toString();
+        s = s.trim().replace('\\', '/');
+        String lower = s.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("file:")) {
+            String rest = s.substring(5);
+            return rest.startsWith("/") || rest.matches("^[A-Za-z]:.*");
+        }
+        return s.startsWith("/") || s.matches("^[A-Za-z]:/.*");
     }
 
     private static List<RDFNode> compactAccessUrlValues(String rawAccessUrl, File sourceFile) {

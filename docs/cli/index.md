@@ -22,6 +22,7 @@ This is the per-command reference. For installing, sizing, securing and integrat
 | [id-map](id-map.md) | Full reference for the `id-map` command — map the IDs of one model onto another model of the same grid |
 | [excel2shacl](excel2shacl.md) | Full reference for the `excel2shacl` command — Excel-driven SHACL generation |
 | [organize](organize.md) | Full reference for the `organize` command — SHACL reorganizer |
+| [shacl2xlsx](shacl2xlsx.md) | Full reference for the `shacl2xlsx` command — SHACL shapes → Excel workbook |
 | [gen-instances](gen-instances.md) | Full reference for the `gen-instances` command — Excel template → RDF/XML |
 | [run](run.md) | Full reference for the `run` command — declarative JSON pipeline runner |
 | [serve](serve.md) | Full reference for the `serve` command — local HTTP daemon for agent integration |
@@ -55,6 +56,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `id-map.json` | ID mapping between two models of the same grid |
 | `excel2shacl.json` | Excel-to-SHACL shape generation |
 | `organize.json` | SHACL organizer / canonical restructuring |
+| `shacl2xlsx.json` | SHACL shapes exported to an Excel workbook |
 | `gen-instances.json` | Instance data generation from Excel template |
 | `manifest.json` | DCAT/CGMES manifest of a folder or a list of model files |
 | `pipeline-full-validation.json` | Pipeline: convert to Turtle then validate |
@@ -74,6 +76,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `id-map` | Done — line, substation and topology matching through the SPARQL query library; Matched/Unmatched/Summary workbook. Not exposed through `serve`, `mcp` or `run`. |
 | `excel2shacl` | Done — Excel + RDFS → SHACL, with Config sheet namespace support |
 | `organize` | Done — split/reorganize SHACL files per Excel template |
+| `shacl2xlsx` | Done — SHACL → Excel, `summary` or `by-type` layout; the GUI's Tools ▸ Export SHACL constraints information uses the same Core exporter. Not exposed through `serve`, `mcp` or `run`. |
 | `gen-instances` | Done — generates RDF/XML instance data from CimPal Excel templates |
 | `run` | Done — declarative JSON pipeline runner; chains any combination of commands |
 | `serve` | Done — local HTTP daemon; exposes all commands as REST endpoints for agent integration |
