@@ -46,7 +46,9 @@ java -jar CimPal-CLI.jar manifest ^
 | `--access-url` | `accessUrl` | string | the `--dir` path | Where the files will be found, for each file's `dcat:accessURL` (see below). |
 | `--output` | `output` | file path | parent of models folder / `manifest.ttl` | Where to write the manifest. |
 
-**`dcat:accessURL`.** Each file gets `file:<folder>/<file name>`. A relative `--access-url` such as `Instance/Grid/cimxml` is used as the folder as it is; a `file:` URI or an absolute folder (the default) gives only its last folder name; any other URL, e.g. `https://…`, is not used, and the file's own folder name is taken. An access URL already in a model's header wins over all of these.
+**`dcat:accessURL`.** Each file gets `file:<folder>/<file name>`. A relative `--access-url` such as `Instance/Grid/cimxml` is used as the folder as it is; a `file:` URI or an absolute folder (the default) gives only its last folder name; any other URL, e.g. `https://…`, is not used, and the file's own folder name is taken. A relative access URL already in a model's header wins over all of these; an absolute one (`file:///home/…`, `/srv/…`, `C:\…`) is ignored, so the machine that wrote the header never shows in the manifest.
+
+**`dcterms:replaces`.** A dataset header's `dcterms:replaces` is copied to the manifest. A header that uses `dcat:replaces`, which the DatasetMetadata vocabulary does not define, gets it written as `dcterms:replaces`.
 
 With `--config`, `manifest` runs through [`run`](run.md), `serve` (`POST /manifest`, `/v1/jobs`) and [`mcp`](mcp.md) like the other commands; there `dir`, `files` and `output` must be inside the allowed roots.
 
