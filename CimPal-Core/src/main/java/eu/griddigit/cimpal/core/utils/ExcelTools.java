@@ -236,7 +236,7 @@ public class ExcelTools {
      * {@code value} as cell text: null becomes empty, and text longer than a cell holds is cut to
      * fit, ending in an ellipsis, rather than refused. The cut never splits a surrogate pair.
      */
-    static String cellText(String value) {
+    public static String cellText(String value) {
         if (value == null) {
             return "";
         }
