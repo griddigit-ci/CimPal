@@ -83,10 +83,12 @@ foreach ($file in $versionFiles) {
 
 $newDate = (Get-Date).ToString("dd-MMM-yyyy", [System.Globalization.CultureInfo]::InvariantCulture)
 $aboutContent = Get-Content $aboutGuiFxml -Raw
-$updatedAbout = $aboutContent -replace 'Date: \d{2}-[A-Za-z]{3}-\d{4}', "Date: $newDate"
-if ($updatedAbout -eq $aboutContent) {
+# Test for the pattern, not for a changed result: a second release on the same
+# day leaves the date text identical.
+if ($aboutContent -notmatch 'Date: \d{2}-[A-Za-z]{3}-\d{4}') {
     throw "Could not find release date pattern in $aboutGuiFxml - aborting before partial update."
 }
+$updatedAbout = $aboutContent -replace 'Date: \d{2}-[A-Za-z]{3}-\d{4}', "Date: $newDate"
 Set-Content -Path $aboutGuiFxml -Value $updatedAbout -NoNewline
 
 Write-Host "Validating reactor after version bump..."
