@@ -63,42 +63,55 @@ if ($existing) {
 }
 $newVersion = "$datePrefix.$nextN"
 
+# The poms may already carry today's version from a bump that was committed by
+# hand but never tagged. Tag that version instead of bumping past it.
+$alreadyBumped = ($oldVersion -like "$datePrefix.*" -or $oldVersion -like "$legacyDatePrefix.*") `
+    -and -not (git tag -l $oldVersion)
+if ($alreadyBumped) {
+    $newVersion = $oldVersion
+}
+
 Write-Host "Current version: $oldVersion"
 Write-Host "New version:     $newVersion"
+if ($alreadyBumped) {
+    Write-Host "Version $oldVersion is already committed but untagged - skipping the bump, tagging it as is."
+}
 
 if ($DryRun) {
     Write-Host "Dry run - no files changed, nothing committed, nothing tagged/pushed."
     exit 0
 }
 
-$escapedOld = [regex]::Escape($oldVersion)
-foreach ($file in $versionFiles) {
-    $content = Get-Content $file -Raw
-    $updated = $content -replace $escapedOld, $newVersion
-    if ($updated -eq $content) {
-        throw "No occurrence of version $oldVersion found in $file - aborting before partial update."
+if (-not $alreadyBumped) {
+    $escapedOld = [regex]::Escape($oldVersion)
+    foreach ($file in $versionFiles) {
+        $content = Get-Content $file -Raw
+        $updated = $content -replace $escapedOld, $newVersion
+        if ($updated -eq $content) {
+            throw "No occurrence of version $oldVersion found in $file - aborting before partial update."
+        }
+        Set-Content -Path $file -Value $updated -NoNewline
     }
-    Set-Content -Path $file -Value $updated -NoNewline
-}
 
-$newDate = (Get-Date).ToString("dd-MMM-yyyy", [System.Globalization.CultureInfo]::InvariantCulture)
-$aboutContent = Get-Content $aboutGuiFxml -Raw
-# Test for the pattern, not for a changed result: a second release on the same
-# day leaves the date text identical.
-if ($aboutContent -notmatch 'Date: \d{2}-[A-Za-z]{3}-\d{4}') {
-    throw "Could not find release date pattern in $aboutGuiFxml - aborting before partial update."
-}
-$updatedAbout = $aboutContent -replace 'Date: \d{2}-[A-Za-z]{3}-\d{4}', "Date: $newDate"
-Set-Content -Path $aboutGuiFxml -Value $updatedAbout -NoNewline
+    $newDate = (Get-Date).ToString("dd-MMM-yyyy", [System.Globalization.CultureInfo]::InvariantCulture)
+    $aboutContent = Get-Content $aboutGuiFxml -Raw
+    # Test for the pattern, not for a changed result: a second release on the same
+    # day leaves the date text identical.
+    if ($aboutContent -notmatch 'Date: \d{2}-[A-Za-z]{3}-\d{4}') {
+        throw "Could not find release date pattern in $aboutGuiFxml - aborting before partial update."
+    }
+    $updatedAbout = $aboutContent -replace 'Date: \d{2}-[A-Za-z]{3}-\d{4}', "Date: $newDate"
+    Set-Content -Path $aboutGuiFxml -Value $updatedAbout -NoNewline
 
-Write-Host "Validating reactor after version bump..."
-mvn -q -N validate
-if ($LASTEXITCODE -ne 0) {
-    throw "mvn validate failed after version bump - review the pom changes before committing."
-}
+    Write-Host "Validating reactor after version bump..."
+    mvn -q -N validate
+    if ($LASTEXITCODE -ne 0) {
+        throw "mvn validate failed after version bump - review the pom changes before committing."
+    }
 
-git add $versionFiles
-git commit -m "Bump version to $newVersion"
+    git add $versionFiles
+    git commit -m "Bump version to $newVersion"
+}
 git tag -a $newVersion -m "Release $newVersion"
 
 if ($NoPush) {
