@@ -26,6 +26,8 @@ This is the per-command reference. For installing, sizing, securing and integrat
 | [rdfs-describe](rdfs-describe.md) | Full reference for the `rdfs-describe` command — RDFS profile descriptions → Excel |
 | [rdf2xlsx](rdf2xlsx.md) | Full reference for the `rdf2xlsx` command — any RDF file → Excel, one sheet per type |
 | [rdfs-serialisation](rdfs-serialisation.md) | Full reference for the `rdfs-serialisation` command — RDFS serialisation info → Turtle |
+| [shacl-check](shacl-check.md) | Full reference for the `shacl-check` command — SHACL shapes checked against SHACL-SHACL |
+| [csv2shacl](csv2shacl.md) | Full reference for the `csv2shacl` command — EA constraint CSV → SHACL .ttl |
 | [gen-instances](gen-instances.md) | Full reference for the `gen-instances` command — Excel template → RDF/XML |
 | [run](run.md) | Full reference for the `run` command — declarative JSON pipeline runner |
 | [serve](serve.md) | Full reference for the `serve` command — local HTTP daemon for agent integration |
@@ -63,6 +65,8 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `rdfs-describe.json` | RDFS profile descriptions to Excel |
 | `rdf2xlsx.json` | Any RDF file to Excel, one sheet per type |
 | `rdfs-serialisation.json` | RDFS serialisation info as Turtle |
+| `shacl-check.json` | SHACL shapes checked against SHACL-SHACL |
+| `csv2shacl.json` | SHACL .ttl restored from EA constraint CSV |
 | `gen-instances.json` | Instance data generation from Excel template |
 | `manifest.json` | DCAT/CGMES manifest of a folder or a list of model files |
 | `pipeline-full-validation.json` | Pipeline: convert to Turtle then validate |
@@ -83,6 +87,7 @@ Located in `CimPal-CLI/configs/`. Each file has inline `_note_*` annotations exp
 | `excel2shacl` | Done — Excel + RDFS → SHACL, with Config sheet namespace support |
 | `organize` | Done — split/reorganize SHACL files per Excel template |
 | `shacl2xlsx` | Done — SHACL → Excel, `summary` or `by-type` layout; the GUI's Tools ▸ Export SHACL constraints information uses the same Core exporter. Not exposed through `serve`, `mcp` or `run`. |
+| `shacl-check`, `csv2shacl` | Done — the GUI's Tools ▸ SHACL Constraints items Validate SHACL shapes and Restore ttl from constraint csv, on the same Core classes. Not exposed through `serve`, `mcp` or `run`. |
 | `rdfs-describe`, `rdf2xlsx`, `rdfs-serialisation` | Done — the GUI's Tools ▸ RDFS Profiles items (Export RDFS descriptions, Export RDF triples to xls, Generate information from RDFS), on the same Core classes. Not exposed through `serve`, `mcp` or `run`. |
 | `gen-instances` | Done — generates RDF/XML instance data from CimPal Excel templates |
 | `run` | Done — declarative JSON pipeline runner; chains any combination of commands |

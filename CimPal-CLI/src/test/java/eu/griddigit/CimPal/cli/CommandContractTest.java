@@ -29,10 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CommandContractTest {
 
-    /** Every subcommand: the 17 of the CLI documentation, plus id-map. */
+    /** Every subcommand: the 19 of the CLI documentation, plus id-map. */
     static final List<String> COMMANDS = List.of("validate", "sparql", "manifest", "convert", "rdfs2shacl", "compare",
             "compare-instances", "excel2shacl", "organize", "gen-instances", "run", "serve", "mcp", "id-map",
-            "shacl2xlsx", "rdfs-describe", "rdf2xlsx", "rdfs-serialisation");
+            "shacl2xlsx", "rdfs-describe", "rdf2xlsx", "rdfs-serialisation", "shacl-check", "csv2shacl");
 
     static final List<String> JSON_COMMANDS = CliFixtures.JSON_COMMANDS;
 

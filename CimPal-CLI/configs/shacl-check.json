@@ -1,0 +1,10 @@
+{
+  "_comment": "Template: Check SHACL shape files against the SHACL-SHACL shapes.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar shacl-check --config this-file.json",
+
+  "shaclFiles": [
+    "REPLACE_WITH_PATH/shapes/EQ.ttl",
+    "REPLACE_WITH_PATH/shapes/SSH.ttl"
+  ],
+  "_note_shaclFiles": "Shape files (.ttl, .rdf). Exit 0 when all conform, 1 when one does not, 2 when one can't be read."
+}
