@@ -1,0 +1,13 @@
+{
+  "_comment": "Template: Generate the RDFS serialisation info (RdfAbout and RdfEnum members) of RDFS profiles.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar rdfs-serialisation --config this-file.json",
+
+  "rdfsFiles": [
+    "REPLACE_WITH_PATH/profiles/EQ.rdf",
+    "REPLACE_WITH_PATH/profiles/SSH.rdf"
+  ],
+  "_note_rdfsFiles": "RDFS profiles (RDF/XML). Each needs an owl:Ontology header (RDFS 2020) or CGMES 2.4 entsoeURI items.",
+
+  "output": "REPLACE_WITH_PATH/RDFSSerialisation.ttl",
+  "_note_output": "The Turtle file to write."
+}
