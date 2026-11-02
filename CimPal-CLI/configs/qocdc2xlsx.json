@@ -1,0 +1,10 @@
+{
+  "_comment": "Template: Export the rules of a QoCDC 3.2.1 rule file to Excel.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar qocdc2xlsx --config this-file.json",
+
+  "input": "REPLACE_WITH_PATH/QoCDC_v3.2.1.xml",
+  "_note_input": "The QoCDC 3.2.1 rule file (RDF/XML, UMLRestrictionRule instances).",
+
+  "output": "REPLACE_WITH_PATH/QoCDC321.xlsx",
+  "_note_output": "The workbook: one row per rule, sorted by name."
+}

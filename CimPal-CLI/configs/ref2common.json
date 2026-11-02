@@ -1,0 +1,12 @@
+{
+  "_comment": "Template: Convert reference data (cim/nc classes) into common data as CIM/XML.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar ref2common --config this-file.json",
+
+  "rdfFiles": [
+    "REPLACE_WITH_PATH/reference/BaseVoltages.rdf"
+  ],
+  "_note_rdfFiles": "Reference data files (RDF/XML or Turtle); they are merged. They must declare a 'cim' or 'nc' prefix.",
+
+  "output": "REPLACE_WITH_PATH/CommonData.xml",
+  "_note_output": "The CIM/XML file to write, with document-local ids."
+}

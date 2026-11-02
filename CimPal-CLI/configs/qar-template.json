@@ -1,0 +1,13 @@
+{
+  "_comment": "Template: Create the QAR template workbook from model files.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar qar-template --config this-file.json",
+
+  "models": [
+    "REPLACE_WITH_PATH/igm/REE_EQ.xml",
+    "REPLACE_WITH_PATH/igm/REE_SSH.zip"
+  ],
+  "_note_models": "Model files (.xml) or .zip archives of them.",
+
+  "output": "REPLACE_WITH_PATH/QAR_template.xlsx",
+  "_note_output": "The workbook: FileName, FileProfile, MAS, FileID, sorted by MAS then file name."
+}
