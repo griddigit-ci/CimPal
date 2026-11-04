@@ -15,7 +15,6 @@ import eu.griddigit.cimpal.main.application.PssePFcompare.comparePssePF;
 import eu.griddigit.cimpal.main.application.controllers.*;
 import eu.griddigit.cimpal.main.application.controllers.sparql.SparqlQueryTabController;
 import eu.griddigit.cimpal.main.application.controllers.ai.AiAssistantTabController;
-import eu.griddigit.cimpal.main.application.datagenerator.ExportFactory;
 import eu.griddigit.cimpal.main.core.*;
 import eu.griddigit.cimpal.main.gui.*;
 import eu.griddigit.cimpal.main.workspace.WorkspaceArtifactRegistry;
@@ -701,57 +700,16 @@ public class MainController implements Initializable {
             prefs.put("LastWorkingFolder", file.getParent());
             PathMemory.remember("dialog.qocdcXml", file);
 
-            Model model = ModelFactory.createDefaultModel();
-            InputStream inputStream = new FileInputStream(file.toString());
-            RDFDataMgr.read(model, inputStream, "http://entsoe.eu/CIM/Extensions/CGM-BP/2020", Lang.RDFXML);
-
-            List<String> ruleName = new LinkedList<>();
-            List<String> ruleSeverity = new LinkedList<>();
-            List<String> ruleLevel = new LinkedList<>();
-            List<String> ruleDescription = new LinkedList<>();
-            List<String> ruleMessage = new LinkedList<>();
-
-            Property propName = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.name");
-            Property propSeverity = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.severity");
-            Property propDescription = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.description");
-            Property propLevel = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.level");
-            Property propMessage = ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule.message");
-
-            List<Statement> ruleStmts = model.listStatements(null, RDF.type, ResourceFactory.createProperty("http://entsoe.eu/CIM/Extensions/CGM-BP/2020", "#UMLRestrictionRule")).toList();
-            for (Statement ruleStmt : ruleStmts) {
-                if (model.contains(ruleStmt.getSubject(), propName)) {
-                    ruleName.add(model.getRequiredProperty(ruleStmt.getSubject(), propName).getObject().toString());
-                } else {
-                    ruleName.add("NA");
-                }
-
-                if (model.contains(ruleStmt.getSubject(), propSeverity)) {
-                    ruleSeverity.add(model.getRequiredProperty(ruleStmt.getSubject(), propSeverity).getObject().toString());
-                } else {
-                    ruleSeverity.add("NA");
-                }
-
-                if (model.contains(ruleStmt.getSubject(), propLevel)) {
-                    ruleLevel.add(model.getRequiredProperty(ruleStmt.getSubject(), propLevel).getObject().toString());
-                } else {
-                    ruleLevel.add("NA");
-                }
-
-                if (model.contains(ruleStmt.getSubject(), propDescription)) {
-                    ruleDescription.add(model.getRequiredProperty(ruleStmt.getSubject(), propDescription).getObject().toString());
-                } else {
-                    ruleDescription.add("NA");
-                }
-
-                if (model.contains(ruleStmt.getSubject(), propMessage)) {
-                    ruleMessage.add(model.getRequiredProperty(ruleStmt.getSubject(), propMessage).getObject().toString());
-                } else {
-                    ruleMessage.add("NA");
-                }
-
-
+            // Core's QocdcRules; saved where the user chooses
+            XSSFWorkbook workbook;
+            try {
+                workbook = eu.griddigit.cimpal.core.utils.QocdcRules.workbook(
+                        eu.griddigit.cimpal.core.utils.QocdcRules.load(file.toPath()));
+            } catch (Exception e) {
+                GUIhelper.showUserFriendlyError("QoCDC loading error", "Could not read " + file.getName() + ".", e);
+                return;
             }
-            ExportFactory.exportQoCDC(ruleName, ruleSeverity, ruleDescription, ruleMessage, ruleLevel, "QoCDC321", "QoCDC321", "Save QoCDC");
+            eu.griddigit.cimpal.main.util.ExcelTools.saveExcelFile(workbook, "Save QoCDC", "QoCDC321");
 
 
         }
@@ -1001,7 +959,13 @@ public class MainController implements Initializable {
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "Reference data RDF files", List.of("*.rdf"), "");
         if (file != null) {// the file is selected
             shaclNodataMap = 1; // as no mapping is to be used for this task
-            ModelManipulationFactory.generateCommonData(file);
+            try {
+                ModelManipulationFactory.generateCommonData(file);
+            } catch (IllegalArgumentException e) {
+                GUIhelper.showUserFriendlyError("Reference data conversion error", e.getMessage(), e);
+                progressBar.setProgress(0);
+                return;
+            }
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
