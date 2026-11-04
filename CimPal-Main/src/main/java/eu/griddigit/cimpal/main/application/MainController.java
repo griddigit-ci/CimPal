@@ -6,6 +6,8 @@
 package eu.griddigit.cimpal.main.application;
 
 import eu.griddigit.cimpal.core.generators.ManifestGenerator;
+import eu.griddigit.cimpal.core.shacl_tools.ShaclExcelExport;
+import eu.griddigit.cimpal.core.shacl_tools.ShaclShapeCheck;
 import eu.griddigit.cimpal.core.models.*;
 import eu.griddigit.cimpal.core.utils.AttributeInjector;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
@@ -57,6 +59,7 @@ import java.util.*;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static eu.griddigit.cimpal.main.core.ExportRDFSdescriptions.*;
 import static eu.griddigit.cimpal.main.core.ModelManipulationFactory.LoadRDFAbout;
@@ -1027,20 +1030,31 @@ public class MainController implements Initializable {
         List<File> fileL = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "SHACL Shape file", List.of("*.rdf", "*.ttl"), "");
 
         if (fileL != null) {// the file is selected
-            for (int m = 0; m < fileL.size(); m++) {
-                eu.griddigit.cimpal.main.util.ModelFactory.shapeModelLoad(m, fileL); //loads shape model
-
-                if (shaclRefModel == null) {
-                    shaclRefModel = ModelManipulationFactory.LoadSHACLSHACL();
+            shaclRefModel = eu.griddigit.cimpal.core.utils.ModelFactory.LoadSHACLSHACL();
+            for (File shapeFile : fileL) {
+                // a file that can't be read is an error, never an empty model that "conforms"
+                ShaclExcelExport.Source source;
+                try {
+                    source = ShaclExcelExport.load(shapeFile.toPath());
+                } catch (Exception e) {
+                    GUIhelper.showUserFriendlyError("SHACL loading error", "Could not read " + shapeFile.getName() + ".", e);
+                    progressBar.setProgress(0);
+                    return;
                 }
-                ValidationReport report = ShaclValidator.get().validate(shaclRefModel.getGraph(), ((Model) shapeModels.get(m)).getGraph());
-
-                if (report.conforms()) {
-                    System.out.printf("SHACL shapes: %s conform to SHACL-SHACL validation.\n", fileL.get(m).getName());
+                ShaclShapeCheck.Result result = ShaclShapeCheck.check(shapeFile.getName(), source.model(), shaclRefModel);
+                if (result.conforms()) {
+                    System.out.printf("SHACL shapes: %s conform to SHACL-SHACL validation.%n", result.name());
                 } else {
-                    System.out.printf("Validation failed. SHACL shapes: %s does not conform to the SHACL-SHACL shapes.\n", fileL.get(m).getName());
+                    System.out.printf("Validation failed. SHACL shapes: %s does not conform to the SHACL-SHACL shapes.%n", result.name());
                     System.out.println("Validation problems:");
-                    ShaclTools.printSHACLreport(report);
+                    for (ShaclShapeCheck.Finding f : result.findings()) {
+                        // the findings quote the shape file: neutralise control characters and bidi overrides
+                        System.out.printf("Focus Node: %s%nPath: %s%nSeverity: %s%nMessage: %s%nValue: %s%n%n",
+                                Stream.of(f.focusNode(), f.path(), f.severity(), f.message(), f.value())
+                                        .map(s -> eu.griddigit.cimpal.core.utils.UntrustedText.forAgent(s,
+                                                eu.griddigit.cimpal.core.utils.LogSanitizer.MAX_LENGTH))
+                                        .toArray());
+                    }
                 }
             }
 

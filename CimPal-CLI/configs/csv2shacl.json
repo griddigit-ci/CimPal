@@ -1,0 +1,12 @@
+{
+  "_comment": "Template: Restore SHACL .ttl files from EA constraint CSV files (the EA Import Format export).",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar csv2shacl --config this-file.json",
+
+  "csvFiles": [
+    "REPLACE_WITH_PATH/ea/SHACL_EA_Import_EQ.csv"
+  ],
+  "_note_csvFiles": "EA constraint CSV files with a Payload column.",
+
+  "outputDir": "REPLACE_WITH_PATH/shapes/restored",
+  "_note_outputDir": "Folder for the restored .ttl files, one per SourceFile. Files of the same name are replaced."
+}
