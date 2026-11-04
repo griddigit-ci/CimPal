@@ -935,19 +935,25 @@ public class MainController implements Initializable {
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         //open RDFS file
         List<File> file = eu.griddigit.cimpal.main.util.ModelFactory.fileChooserCustom(false, "RDF files", List.of("*.rdf"), "");
-        List<Model> listModels = new LinkedList<>();
+        List<Map.Entry<String, Model>> profiles = new LinkedList<>();
         if (file != null) {// the file is selected
             for (File fil : file) {
                 Model model = ModelFactory.createDefaultModel(); // model is the rdf file
                 try {
                     RDFDataMgr.read(model, new FileInputStream(fil), Lang.RDFXML);
-                    listModels.add(model);
+                    profiles.add(Map.entry(fil.getName(), model));
                 } catch (FileNotFoundException e) {
                     GUIhelper.showUserFriendlyError("RDFS loading error", "One of the selected RDFS files could not be opened.", e);
                     progressBar.setProgress(0);
                 }
             }
-            RdfConvert.generateRDFSserializationInfo(listModels);
+            try {
+                RdfConvert.generateRDFSserializationInfo(profiles);
+            } catch (IllegalArgumentException e) {
+                GUIhelper.showUserFriendlyError("RDFS serialisation error", e.getMessage(), e);
+                progressBar.setProgress(0);
+                return;
+            }
             progressBar.setProgress(1);
         } else {
             progressBar.setProgress(0);
