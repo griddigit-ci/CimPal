@@ -5,10 +5,16 @@
  */
 package eu.griddigit.cimpal.core.utils;
 
+import org.apache.poi.ss.SpreadsheetVersion;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.WorkbookUtil;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -24,6 +30,7 @@ public final class ExcelSheets {
     private static final String FORMULA_TRIGGERS = "=+-@\t\r";
     private static final int MAX_SHEET_NAME = 31;
     private static final int MAX_COLUMN_WIDTH = 120 * 256;
+    private static final int AUTO_SIZE_MAX_ROWS = 10_000;
     /** A number written the way it would be read back: no leading zeros, no trailing fraction zeros, no exponent. */
     private static final Pattern PLAIN_NUMBER = Pattern.compile("-?(0|[1-9]\\d{0,14})(\\.\\d{0,14}[1-9])?");
 
@@ -32,9 +39,16 @@ public final class ExcelSheets {
 
     /**
      * Adds a sheet for {@code rows} under {@code headers}. A row shorter than the headers leaves the
-     * remaining cells empty; a null value is an empty cell.
+     * remaining cells empty; a null value is an empty cell. Header text is protected like data text.
+     *
+     * @throws IllegalArgumentException when the table has more rows or columns than a sheet holds
      */
     public static Sheet write(Workbook workbook, String wantedName, List<String> headers, List<? extends List<?>> rows) {
+        SpreadsheetVersion limits = workbook.getSpreadsheetVersion();
+        if (rows.size() + 1 > limits.getMaxRows() || headers.size() > limits.getMaxColumns()) {
+            throw new IllegalArgumentException("Too large for one sheet (" + wantedName + "): " + rows.size() + " rows, "
+                    + headers.size() + " columns; at most " + (limits.getMaxRows() - 1) + " and " + limits.getMaxColumns());
+        }
         Sheet sheet = workbook.createSheet(uniqueName(workbook, wantedName));
         CellStyle header = dataStyle(workbook);
         Font bold = workbook.createFont();
@@ -43,6 +57,9 @@ public final class ExcelSheets {
         header.setAlignment(HorizontalAlignment.CENTER);
         header.setFillForegroundColor(IndexedColors.SKY_BLUE.getIndex());
         header.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        CellStyle quotedHeader = workbook.createCellStyle();
+        quotedHeader.cloneStyleFrom(header);
+        quotedHeader.setQuotePrefixed(true);
         CellStyle data = dataStyle(workbook);
         CellStyle quoted = dataStyle(workbook);
         quoted.setQuotePrefixed(true);
@@ -50,8 +67,9 @@ public final class ExcelSheets {
         Row headerRow = sheet.createRow(0);
         for (int c = 0; c < headers.size(); c++) {
             Cell cell = headerRow.createCell(c);
-            cell.setCellValue(ExcelTools.cellText(headers.get(c)));
-            cell.setCellStyle(header);
+            String s = ExcelTools.cellText(headers.get(c));
+            cell.setCellValue(s);
+            cell.setCellStyle(!s.isEmpty() && FORMULA_TRIGGERS.indexOf(s.charAt(0)) >= 0 ? quotedHeader : header);
         }
         for (int r = 0; r < rows.size(); r++) {
             Row row = sheet.createRow(r + 1);
@@ -69,9 +87,14 @@ public final class ExcelSheets {
                 }
             }
         }
+        // auto-sizing measures every cell; above AUTO_SIZE_MAX_ROWS it costs more than it is worth
         for (int c = 0; c < headers.size(); c++) {
-            sheet.autoSizeColumn(c);
-            sheet.setColumnWidth(c, Math.min(sheet.getColumnWidth(c), MAX_COLUMN_WIDTH));
+            if (rows.size() <= AUTO_SIZE_MAX_ROWS) {
+                sheet.autoSizeColumn(c);
+                sheet.setColumnWidth(c, Math.min(sheet.getColumnWidth(c), MAX_COLUMN_WIDTH));
+            } else {
+                sheet.setColumnWidth(c, 30 * 256);
+            }
         }
         sheet.createFreezePane(0, 1);
         if (!headers.isEmpty()) {
@@ -100,6 +123,25 @@ public final class ExcelSheets {
      */
     public static Object numberOrText(String text) {
         return text != null && PLAIN_NUMBER.matcher(text).matches() ? Double.valueOf(text) : text;
+    }
+
+    /**
+     * Writes the workbook to {@code file} and closes it. Parent folders are created; the file is
+     * written to a temporary sibling first and moved into place, so a failure leaves no partial file.
+     */
+    public static void save(Workbook workbook, Path file) throws IOException {
+        Path target = file.toAbsolutePath();
+        Path parent = target.getParent();
+        Files.createDirectories(parent);
+        Path temp = Files.createTempFile(parent, ".cimpal-", ".xlsx");
+        try (workbook) {
+            try (OutputStream out = Files.newOutputStream(temp)) {
+                workbook.write(out);
+            }
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temp);
+        }
     }
 
     private static CellStyle dataStyle(Workbook workbook) {

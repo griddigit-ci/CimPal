@@ -17,10 +17,8 @@ import org.topbraid.shacl.vocabulary.SH;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 /**
@@ -310,22 +308,8 @@ public final class ShaclExcelExport {
         ExcelSheets.write(workbook, wantedName, table.columns(), rows);
     }
 
-    /**
-     * Writes the workbook to {@code file} and closes it. Parent folders are created; the file is
-     * written to a temporary sibling first and moved into place, so a failure leaves no partial file.
-     */
+    /** Writes the workbook to {@code file} and closes it ({@link ExcelSheets#save}). */
     public static void write(Workbook workbook, Path file) throws IOException {
-        Path target = file.toAbsolutePath();
-        Path parent = target.getParent();
-        Files.createDirectories(parent);
-        Path temp = Files.createTempFile(parent, ".shacl-export-", ".xlsx");
-        try (workbook) {
-            try (OutputStream out = Files.newOutputStream(temp)) {
-                workbook.write(out);
-            }
-            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
-        } finally {
-            Files.deleteIfExists(temp);
-        }
+        ExcelSheets.save(workbook, file);
     }
 }

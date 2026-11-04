@@ -16,9 +16,14 @@ import eu.griddigit.CimPal.cli.command.IdMapCommand;
 import eu.griddigit.CimPal.cli.command.ManifestCommand;
 import eu.griddigit.CimPal.cli.command.McpCommand;
 import eu.griddigit.CimPal.cli.command.OrganizeCommand;
+import eu.griddigit.CimPal.cli.command.RdfToXlsxCommand;
+import eu.griddigit.CimPal.cli.command.RdfsDescribeCommand;
+import eu.griddigit.CimPal.cli.command.RdfsSerialisationCommand;
 import eu.griddigit.CimPal.cli.command.RdfsToShaclCommand;
 import eu.griddigit.CimPal.cli.command.RunCommand;
+import eu.griddigit.CimPal.cli.command.CsvToShaclCommand;
 import eu.griddigit.CimPal.cli.command.ServeCommand;
+import eu.griddigit.CimPal.cli.command.ShaclCheckCommand;
 import eu.griddigit.CimPal.cli.command.ShaclToXlsxCommand;
 import eu.griddigit.CimPal.cli.command.SparqlCommand;
 import eu.griddigit.CimPal.cli.command.ValidateCommand;
@@ -43,6 +48,11 @@ import picocli.CommandLine.Command;
  *   <li>{@code excel2shacl}    — generate SHACL constraints from Excel + RDFS profile
  *   <li>{@code organize}       — reorganize SHACL files per Excel mapping template
  *   <li>{@code shacl2xlsx}     — export SHACL shape files to an Excel workbook
+ *   <li>{@code rdfs-describe}  — export the descriptions of an RDFS profile to Excel
+ *   <li>{@code rdf2xlsx}       — export any RDF file to Excel, one sheet per rdf:type
+ *   <li>{@code rdfs-serialisation} — generate the RDFS serialisation info (RdfAbout, RdfEnum) as Turtle
+ *   <li>{@code shacl-check}    — check SHACL shape files against the SHACL-SHACL shapes
+ *   <li>{@code csv2shacl}      — restore SHACL .ttl files from EA constraint CSV files
  *   <li>{@code help}           — display help for a subcommand
  * </ul>
  *
@@ -72,6 +82,11 @@ import picocli.CommandLine.Command;
                 ExcelToShaclCommand.class,
                 OrganizeCommand.class,
                 ShaclToXlsxCommand.class,
+                RdfsDescribeCommand.class,
+                RdfToXlsxCommand.class,
+                RdfsSerialisationCommand.class,
+                ShaclCheckCommand.class,
+                CsvToShaclCommand.class,
                 GenInstancesCommand.class,
                 RunCommand.class,
                 ServeCommand.class,

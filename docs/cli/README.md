@@ -50,6 +50,11 @@ java -jar CimPal-CLI.jar manifest --help
 | [`excel2shacl`](excel2shacl.md) | Generate SHACL shapes from an Excel sheet and an RDFS profile |
 | [`organize`](organize.md) | Reorganise SHACL files by an Excel template |
 | [`shacl2xlsx`](shacl2xlsx.md) | Export SHACL shapes to an Excel workbook (not available through `run`, `serve` or `mcp`) |
+| [`rdfs-describe`](rdfs-describe.md) | Export the descriptions of an RDFS profile to Excel (CLI only) |
+| [`rdf2xlsx`](rdf2xlsx.md) | Export any RDF file to Excel, one sheet per rdf:type (CLI only) |
+| [`rdfs-serialisation`](rdfs-serialisation.md) | Generate the RDFS serialisation info (RdfAbout, RdfEnum) of profiles as Turtle (CLI only) |
+| [`shacl-check`](shacl-check.md) | Check SHACL shape files against the SHACL-SHACL shapes (CLI only) |
+| [`csv2shacl`](csv2shacl.md) | Restore SHACL .ttl files from EA constraint CSV files (CLI only) |
 | [`gen-instances`](gen-instances.md) | Generate CIM instance data from an Excel template |
 | [`manifest`](manifest.md) | Generate a DCAT/CGMES manifest Turtle file |
 | [`run`](run.md) | Run a pipeline of these commands from one JSON file |

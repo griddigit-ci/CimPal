@@ -1,0 +1,10 @@
+{
+  "_comment": "Template: Export the descriptions of an RDFS profile to Excel.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar rdfs-describe --config this-file.json",
+
+  "rdfsFile": "REPLACE_WITH_PATH/profiles/EquipmentProfile.rdf",
+  "_note_rdfsFile": "The RDFS profile (RDF/XML). Relative paths resolve against this file's folder.",
+
+  "output": "REPLACE_WITH_PATH/EQ_descriptions.xlsx",
+  "_note_output": "The .xlsx workbook to write: one row per class, property, enumeration value and package."
+}

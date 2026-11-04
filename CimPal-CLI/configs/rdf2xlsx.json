@@ -1,0 +1,10 @@
+{
+  "_comment": "Template: Export any RDF file to Excel, one sheet per rdf:type.",
+  "_how_to_use": "Copy to your working directory. Replace REPLACE_WITH_PATH values. Run: java -jar CimPal-CLI.jar rdf2xlsx --config this-file.json",
+
+  "input": "REPLACE_WITH_PATH/models/Model_EQ.xml",
+  "_note_input": "An RDF/XML (.rdf, .xml) or Turtle (.ttl) file. JSON-LD is refused.",
+
+  "output": "REPLACE_WITH_PATH/Model_EQ.xlsx",
+  "_note_output": "The .xlsx workbook to write: one sheet per type, one row per subject, one column per property."
+}
