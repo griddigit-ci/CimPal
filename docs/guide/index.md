@@ -35,6 +35,7 @@ There is also a desktop application (`CimPal.exe` / `CimPal.jar`, JavaFX) with t
 | Run it from Apache Airflow | [Airflow](airflow.md) |
 | Call a CimPal server from Python | [Python SDK](python-sdk.md) |
 | Run `serve` for a team: proxy, TLS, Kubernetes | [Running CimPal as a service](service.md) |
+| Show an organisation how CimPal runs, in 15 minutes | [Client demo](client-demo.md) |
 | Understand what it reads, writes and connects to | [Security for operators](security.md) |
 | Write config files, read exit codes and JSON output | [Configuration](configuration.md) |
 | Fix a problem | [Troubleshooting](troubleshooting.md) |
