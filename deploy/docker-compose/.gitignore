@@ -1,2 +1,8 @@
 secrets/
 data/
+# Written by the client demo (docs/guide/client-demo.md).
+inputs/
+inputs.zip
+outputs.zip
+reports/
+caddy-root.crt
