@@ -22,6 +22,9 @@ import eu.griddigit.CimPal.cli.command.RdfsSerialisationCommand;
 import eu.griddigit.CimPal.cli.command.RdfsToShaclCommand;
 import eu.griddigit.CimPal.cli.command.RunCommand;
 import eu.griddigit.CimPal.cli.command.CsvToShaclCommand;
+import eu.griddigit.CimPal.cli.command.QarTemplateCommand;
+import eu.griddigit.CimPal.cli.command.QocdcToXlsxCommand;
+import eu.griddigit.CimPal.cli.command.RefToCommonCommand;
 import eu.griddigit.CimPal.cli.command.ServeCommand;
 import eu.griddigit.CimPal.cli.command.ShaclCheckCommand;
 import eu.griddigit.CimPal.cli.command.ShaclToXlsxCommand;
@@ -53,6 +56,9 @@ import picocli.CommandLine.Command;
  *   <li>{@code rdfs-serialisation} — generate the RDFS serialisation info (RdfAbout, RdfEnum) as Turtle
  *   <li>{@code shacl-check}    — check SHACL shape files against the SHACL-SHACL shapes
  *   <li>{@code csv2shacl}      — restore SHACL .ttl files from EA constraint CSV files
+ *   <li>{@code ref2common}     — convert reference data into common data (CIM/XML)
+ *   <li>{@code qar-template}   — create the QAR template workbook from model files
+ *   <li>{@code qocdc2xlsx}     — export the rules of a QoCDC 3.2.1 rule file to Excel
  *   <li>{@code help}           — display help for a subcommand
  * </ul>
  *
@@ -87,6 +93,9 @@ import picocli.CommandLine.Command;
                 RdfsSerialisationCommand.class,
                 ShaclCheckCommand.class,
                 CsvToShaclCommand.class,
+                RefToCommonCommand.class,
+                QarTemplateCommand.class,
+                QocdcToXlsxCommand.class,
                 GenInstancesCommand.class,
                 RunCommand.class,
                 ServeCommand.class,

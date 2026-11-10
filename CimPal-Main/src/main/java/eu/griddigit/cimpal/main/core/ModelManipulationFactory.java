@@ -1425,69 +1425,21 @@ public class ModelManipulationFactory {
 //            }
 //        }
 //    }
+    /**
+     * Tools ▸ Convert Reference data to Common data: Core's
+     * {@link eu.griddigit.cimpal.core.converters.CommonDataConverter}, saved where the user chooses.
+     *
+     * @throws IllegalArgumentException when the data declares neither a cim nor an nc prefix
+     */
     public static void generateCommonData(List<File> file) throws IOException {
         Model model = eu.griddigit.cimpal.core.utils.ModelFactory.modelLoad(file, "", Lang.RDFXML, false, false).get("unionModel");
-        Map<String, String> prefixMap = model.getNsPrefixMap();
-        String cimURI = prefixMap.get("cim");
-        String nc = prefixMap.get("nc");
-        String dcat = prefixMap.get("dcat");
-        String dcterms = prefixMap.get("dcterms");
-        String skos = prefixMap.get("skos");
-
-        Model modelComData = ModelFactory.createDefaultModel();
-        modelComData.setNsPrefixes(prefixMap);
-
-
-        for (StmtIterator i = model.listStatements(null, RDF.type, (RDFNode) null); i.hasNext(); ) {
-            Statement stmt = i.next();
-            if (stmt.getObject().asResource().getNameSpace().equals(cimURI) || stmt.getObject().asResource().getNameSpace().equals(nc)) {
-                //get the rdfid
-                String rdfid = "http://delete.eu#_" + stmt.getSubject().getLocalName();
-                Resource cimres = stmt.getObject().asResource();
-                modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), RDF.type, cimres));
-                for (StmtIterator j = model.listStatements(stmt.getSubject(), null, (RDFNode) null); j.hasNext(); ) {
-                    Statement stmtProp = j.next();
-                    if ((!stmtProp.getPredicate().getNameSpace().equals(dcat) && !stmtProp.getPredicate().getNameSpace().equals(dcterms) && !stmtProp.getPredicate().getNameSpace().equals(skos)) && !stmtProp.getPredicate().equals(RDF.type)) {
-                        if (stmtProp.getObject().isResource()) {
-                            modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), stmtProp.getPredicate(), ResourceFactory.createResource("http://delete.eu#_" + stmtProp.getObject().asResource().getLocalName())));
-                        } else {
-                            modelComData.add(ResourceFactory.createStatement(ResourceFactory.createResource(rdfid), stmtProp.getPredicate(), stmtProp.getObject()));
-                        }
-                    }
-                }
-            }
-
+        Model commonData = eu.griddigit.cimpal.core.converters.CommonDataConverter.convert(model);
+        File saveFile = eu.griddigit.cimpal.main.util.ModelFactory.fileSaveCustom("RDF XML", List.of("*.xml"),
+                "Save RDF XML for", "ConvertedCommonData.xml");
+        if (saveFile == null) return;
+        try (OutputStream out = new FileOutputStream(saveFile)) {
+            eu.griddigit.cimpal.core.converters.CommonDataConverter.write(commonData, out);
         }
-
-
-        Map<String, Object> saveProperties = new HashMap<>();
-
-        saveProperties.put("filename", "test");
-        saveProperties.put("showXmlDeclaration", "true");
-        saveProperties.put("showDoctypeDeclaration", "false");
-        saveProperties.put("tab", "2");
-        saveProperties.put("relativeURIs", "same-document");
-        saveProperties.put("showXmlEncoding", "true");
-        saveProperties.put("xmlBase", "http://delete.eu#");
-        saveProperties.put("rdfFormat", CustomRDFFormat.RDFXML_CUSTOM_PLAIN_PRETTY);
-        saveProperties.put("useAboutRules", true); //switch to trigger file chooser and adding the property
-        saveProperties.put("useEnumRules", true); //switch to trigger special treatment when Enum is referenced
-        saveProperties.put("useFileDialog", true);
-        saveProperties.put("fileFolder", "C:");
-        saveProperties.put("dozip", false);
-        saveProperties.put("instanceData", "true"); //this is to only print the ID and not with namespace
-        saveProperties.put("showXmlBaseDeclaration", "false");
-        saveProperties.put("sortRDF", "true");
-        saveProperties.put("sortRDFprefix", "false"); // if true the sorting is on the prefix, if false on the localName
-
-        saveProperties.put("putHeaderOnTop", true);
-        saveProperties.put("headerClassResource", "http://iec.ch/TC57/61970-552/ModelDescription/1#FullModel");
-        saveProperties.put("extensionName", "RDF XML");
-        saveProperties.put("fileExtension", "*.xml");
-        saveProperties.put("fileDialogTitle", "Save RDF XML for");
-
-        saveProperties.replace("filename", "ConvertedCommonData.xml");
-        InstanceDataFactory.saveInstanceData(modelComData, saveProperties);
     }
 
     private static String resolveDatatype(Object datatypeCell, String value) {

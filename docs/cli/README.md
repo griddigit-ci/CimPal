@@ -55,6 +55,9 @@ java -jar CimPal-CLI.jar manifest --help
 | [`rdfs-serialisation`](rdfs-serialisation.md) | Generate the RDFS serialisation info (RdfAbout, RdfEnum) of profiles as Turtle (CLI only) |
 | [`shacl-check`](shacl-check.md) | Check SHACL shape files against the SHACL-SHACL shapes (CLI only) |
 | [`csv2shacl`](csv2shacl.md) | Restore SHACL .ttl files from EA constraint CSV files (CLI only) |
+| [`ref2common`](ref2common.md) | Convert reference data into common data as CIM/XML (CLI only) |
+| [`qar-template`](qar-template.md) | Create the QAR template workbook from model files (CLI only) |
+| [`qocdc2xlsx`](qocdc2xlsx.md) | Export the rules of a QoCDC 3.2.1 rule file to Excel (CLI only) |
 | [`gen-instances`](gen-instances.md) | Generate CIM instance data from an Excel template |
 | [`manifest`](manifest.md) | Generate a DCAT/CGMES manifest Turtle file |
 | [`run`](run.md) | Run a pipeline of these commands from one JSON file |
