@@ -37,8 +37,10 @@ Java 25 / Maven multi-module toolset by gridDigIt for CIM/CGMES semantic work: S
 ```
 CustomWriter ← Core ← Main   (JavaFX GUI, fat JAR + launch4j exe)
                   ↖ CLI      (picocli fat JAR: validate, sparql, manifest, convert, rdfs2shacl,
-                              compare, compare-instances, excel2shacl, organize, gen-instances,
-                              run, serve, mcp)
+                              compare, compare-instances, id-map, excel2shacl, organize,
+                              shacl2xlsx, rdfs-describe, rdf2xlsx, rdfs-serialisation,
+                              shacl-check, csv2shacl, ref2common, qar-template, qocdc2xlsx,
+                              gen-instances, run, serve, mcp)
 ```
 
 - **CimPal-Core** — all reusable RDF/SHACL logic. No JavaFX, no GUI imports, ever.
@@ -92,7 +94,7 @@ Core tests run on the classpath (`useModulePath=false`) so they can reach packag
 ## Gotchas
 
 - `RDFCompareResult.hasDifference()` is **inverted** (true when there are no entries). Use `getEntries().isEmpty()`; don't "fix" it without updating every caller.
-- `ValidationTools` has static flags (`exportTurtleValidationReports`, `DEBUG`), which is why `serve` uses a single-threaded executor. Anything concurrent must deal with this.
+- `ValidationTools` has static flags (`exportTurtleValidationReports`, `DEBUG`), which is why `serve` runs one command at a time by default. `--workers N` (DEP-8) runs several in one JVM; anything concurrent must deal with these flags.
 - Never call Jena `TypeMapper.reset()`, and prefer `getSafeTypeByName()`. A reset once emptied the datatype map, typed every literal as `xsd:string`, and silently broke SHACL rules that use typed literals.
 - A failed remote `owl:imports` fetch must surface as an error, never as a silent pass (a false-clean validation is the worst outcome here).
 - `validate --samples` depends on the `*__report.ttl` files written by `--export-turtle`.

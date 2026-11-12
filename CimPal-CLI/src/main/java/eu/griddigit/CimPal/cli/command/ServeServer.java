@@ -61,7 +61,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <h2>Request pipeline</h2>
  * <p>Every request passes, in order: Host allowlist (403), Origin allowlist (403), exact path
- * (404), method (405), bearer token (401, not for {@code GET /health}), {@code application/json}
+ * (404), method (405), bearer token (401, not for {@code GET /health}, {@code GET /ready} and the
+ * two public {@code /v1} routes), {@code application/json}
  * body on POST (415), body limit (413). Commands then take a slot in a bounded queue (503 when
  * full) and run on {@code --workers} threads, one by default. With more than one, an
  * {@link AdmissionGate} starts a command only while the estimated heap of the running ones fits

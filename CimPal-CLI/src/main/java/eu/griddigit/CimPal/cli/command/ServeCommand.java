@@ -88,7 +88,8 @@ import java.util.function.Consumer;
  *
  * <h2>Security</h2>
  * <p>Every start creates a new 256-bit bearer token and writes it to a user-only token file
- * (or takes it from {@code CIMPAL_API_TOKEN}). All endpoints except {@code GET /health} require
+ * (or takes it from {@code CIMPAL_API_TOKEN}). All endpoints except {@code GET /health},
+ * {@code GET /ready}, {@code GET /v1/health} and {@code GET /v1/openapi.json} require
  * {@code Authorization: Bearer <token>}. The Host header must name loopback and the bound port,
  * an Origin header must be in {@code --allow-origin}, and POST bodies must be
  * {@code application/json} and at most {@code --max-body-bytes}. See {@link ServeServer}.
