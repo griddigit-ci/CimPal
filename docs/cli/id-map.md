@@ -116,7 +116,7 @@ On the Relicap checks below, no certain match was ever wrong; the few wrong matc
 | `--voltage-tolerance` | kV | `1` | Tolerance for nominal voltages. |
 | `--second-name` | `name`, `shortName`, `description` | `name` | What fills `Model2_2nd_name`. |
 | `--xml-base` | URI | `http://iec.ch/TC57/CIM100` | Base URI for parsing RDF/XML. |
-| `--format` | `text`, `json` | `text` | Summary on stdout. With `json`, stdout holds only the JSON (`cimpal-id-map-summary/2`: certain, probable and unmatched per model and per class); progress goes to stderr. |
+| `--format` | `text`, `json` | `text` | Summary on stdout. With `json`, stdout holds only the JSON (`cimpal-id-map-summary/3`: the workbook path, certain, probable and unmatched per model, matches per method, and per element type both models' objects, certain, probable and unmatched); progress goes to stderr. |
 | `--dry-run` | flag | — | Print the resolved configuration and exit. |
 
 Config keys: `model1Files`, `model2Files`, `commonFiles` (arrays), `output`, `queryFolder`, `nameAliases`, `useNames`, `matchSameIds`, `collapseJunctions`, `groupStations`, `includeTerminals`, `includeNodes`, `includeDependents`, `includeOthers`, `parameterTolerance`, `voltageTolerance`, `secondName`, `xmlBase`, `format`. Relative paths are resolved against the config file's folder. Template: `CimPal-CLI/configs/id-map.json`.

@@ -12,7 +12,7 @@ Starts a Model Context Protocol (MCP) server that exposes all CimPal operations 
 ## Quick setup — Claude Desktop
 
 1. Find your Claude Desktop config file:
-   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`. The Microsoft Store (MSIX) install keeps it in `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json` instead. Claude Desktop's Settings ▸ Developer ▸ Edit Config opens the right one.
    - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 2. Add the `cimpal` server block:

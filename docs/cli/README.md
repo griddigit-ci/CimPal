@@ -135,6 +135,7 @@ With `--format json` (and in the file `--summary-file` writes), stdout holds exa
 | `compare-instances` | `compare-instances.schema.json` | `cimpal-compare-instances-result/1` |
 | `run` | `run.schema.json` | `cimpal-pipeline-result/1` |
 | `--stats` (any of the first four) | `stats.schema.json` | none |
+| `id-map` | none checked in yet; fields in [id-map](id-map.md) | `cimpal-id-map-summary/3` |
 
 The schemas are additive: later versions may add fields, but no field is removed or renamed and no type changes without a new `schema` version. The tests check every command's real output against them, in-process and from the packaged JAR (`CommandContractTest`, `PackagedJarIT`), and `mcp` tool results and `serve` responses carry the same documents. Under `mcp` the strings in them are capped and kept on one line (see [mcp](mcp.md#untrusted-data-in-tool-results)).
 

@@ -26,7 +26,7 @@ with CimPal("https://cimpal.example.com", token="...") as cp:
 
 - Python 3.10 or later; depends on `httpx` and `attrs`.
 - The package version is the CimPal version it was built with.
-- Licence: Apache-2.0 (this client). CimPal itself is EUPL-1.2.
+- Licence: Apache-2.0 (this client). CimPal itself is EUPL-1.2-or-later.
 - The token goes over plain `http://` only to this machine; elsewhere use `https://` or pass `allow_insecure_http=True`.
 
 ## Development

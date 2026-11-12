@@ -35,7 +35,7 @@ validate = CimPalValidateOperator(
 
 The user guide is [docs/guide/airflow.md](../../docs/guide/airflow.md) (path C). The examples are in [`example_dags/`](example_dags/).
 
-**Licence:** Apache-2.0. CimPal itself is EUPL-1.2.
+**Licence:** Apache-2.0. CimPal itself is EUPL-1.2-or-later.
 
 ## Development
 

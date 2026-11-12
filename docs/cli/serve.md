@@ -18,7 +18,7 @@ Every CLI invocation starts a fresh JVM and re-initialises Jena, the SHACL engin
 java -jar CimPal-CLI.jar serve
 ```
 
-The server starts on `localhost:7474`. It creates a new bearer token on every start and writes it to a token file that only you can read. The startup output shows the file's path, never the token. Every endpoint except `GET /health` needs the token (see [Security](#security)).
+The server starts on `localhost:7474`. It creates a new bearer token on every start and writes it to a token file that only you can read. The startup output shows the file's path, never the token. Every endpoint except the probes `GET /health` and `GET /ready`, and `GET /v1/health` and `GET /v1/openapi.json`, needs the token (see [Security](#security)).
 
 Check that it's alive (no token needed):
 ```
@@ -151,7 +151,7 @@ If Windows can't look up your account by its qualified name (for example on some
 A command that times out while still waiting in the queue never runs. A command that times out while running is left to finish, because interrupting it could leave half-written reports behind. It keeps its place in the queue until it returns, so the queue limit still holds, but its worker stays busy. Restart the server if a command hangs.
 
 Limits that protect the server itself:
-- A request (headers and body) must arrive within 60 seconds, so a client can't hold a connection open by sending slowly. Commands that run longer than that are not affected. This is the JDK setting `sun.net.httpserver.maxReqTime`; set `-Dsun.net.httpserver.maxReqTime=<seconds>` to change it. It applies to the whole JVM, and a body that takes longer than this to upload (e.g. a large body over a slow `--allow-remote` link) is dropped.
+- A request (headers and body) must arrive within `--request-read-time` (default 60 seconds, at most 2 hours), so a client can't hold a connection open by sending slowly. Commands that run longer than that are not affected. The flag sets the JDK setting `sun.net.httpserver.maxReqTime`, which applies to the whole JVM; an explicit `-Dsun.net.httpserver.maxReqTime=<seconds>` still wins. A body that takes longer than this to upload (e.g. a large body over a slow `--allow-remote` link) is dropped.
 - This bounds how long one connection is held, not how many a client opens. A local process that keeps opening slow connections can still slow the server down. That is a limit of this design, and it needs local access unless `--allow-remote` is used.
 - `--queue-size` and `--workers` can be at most 64, and `--max-body-bytes` at most 64 MB.
 
@@ -184,7 +184,7 @@ Each subcommand is exposed as a `POST` endpoint. The request body is a JSON obje
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/health` | `GET` | Returns `{"status":"ok","version":"...","busy":false,"stalled":false,"queued":0}`. `busy` means a command is running, and `queued` is the number waiting. `status` becomes `"stalled"` (and `stalled` true) when a running command has taken longer than `--request-timeout`: it can't be stopped, so restart the server if it doesn't return. `GET /v1/health` also gives `running` and `workers`. The only endpoint that needs no token. |
+| `/health` | `GET` | Returns `{"status":"ok","version":"...","busy":false,"stalled":false,"queued":0}`. `busy` means a command is running, and `queued` is the number waiting. `status` becomes `"stalled"` (and `stalled` true) when a running command has taken longer than `--request-timeout`: it can't be stopped, so restart the server if it doesn't return. `GET /v1/health` also gives `running` and `workers`. Needs no token, like `/ready`, `/v1/health` and `/v1/openapi.json`. |
 | `/ready` | `GET` | Readiness probe: 200 `{"status":"ready"}`; 503 with `"shutting down"`, or `"no usable token"` while the token file is broken. A full queue still answers 200, so a single instance stays reachable for polling and cancelling. No token needed. |
 | `/metrics` | `GET` | Only with `--metrics`: Prometheus text, see [Metrics](#metrics). Needs an admin token. |
 | `/commands` | `GET` | Lists all available command and utility endpoints. Needs the token. |
