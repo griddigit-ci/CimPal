@@ -1372,7 +1372,7 @@
         "properties" : {
           "workflow" : {
             "type" : "string",
-            "description" : "Workflow: 'mapping' (default, uses a CSV mapping file), 'timestamped' (groups by timestamp) or 'combined' (validates the dataFiles as one dataset against all the constraintFiles at once)."
+            "description" : "Workflow: 'mapping' (default, uses a CSV mapping file), 'timestamped' (groups by timestamp), 'combined' (validates the dataFiles as one dataset against all the constraintFiles at once) or 'profiles' (validates every document under modelsDir against the shapes of the profiles it declares, found in a DX-PROF profilesLibrary)."
           },
           "mappingCsv" : {
             "type" : "string",
@@ -1380,7 +1380,7 @@
           },
           "modelsDir" : {
             "type" : "string",
-            "description" : "Absolute path to the root folder containing model ZIP/XML archives. Required for mapping and timestamped workflows."
+            "description" : "Absolute path to the root folder containing model ZIP/XML archives. Required for mapping, timestamped and profiles workflows. For profiles, each first-level subfolder is validated as a group."
           },
           "constraintsRoot" : {
             "type" : "string",
@@ -1439,6 +1439,42 @@
           "incrementalTimestamps" : {
             "type" : "boolean",
             "description" : "Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't change from the one before."
+          },
+          "profilesLibrary" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Profiles workflow (required): absolute paths to folders holding DX-PROF descriptors and the SHACL files they name, e.g. a checkout of the ENTSO-E application-profiles-library."
+          },
+          "boundaryFolders" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Profiles workflow: folders of boundary data, relative to modelsDir. Validated as boundary groups and loaded as context for every other group."
+          },
+          "boundaryShapesPattern" : {
+            "type" : "string",
+            "description" : "Profiles workflow: shape files whose name contains this apply to boundary groups only (default 'EquipmentBoundary'; '' applies every shape everywhere)."
+          },
+          "commonShapes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Profiles workflow: shapes added to every group with CGMES documents, as file names in the profile library or absolute paths (default: the AllProfiles Complex shapes where the library has them; ['none'] for none)."
+          },
+          "profileNamespaces" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Profiles workflow: IRI prefixes that mark a dcterms:conformsTo value as a profile (default ['https://ap.cim4.eu/'])."
+          },
+          "allowUnmapped" : {
+            "type" : "boolean",
+            "description" : "Profiles workflow: skip documents whose profile is unknown or lacks shapes and report the run as incomplete (exit 1), instead of refusing it (exit 2)."
           },
           "format" : {
             "type" : "string",

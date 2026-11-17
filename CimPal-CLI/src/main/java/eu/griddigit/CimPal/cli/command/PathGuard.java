@@ -32,6 +32,9 @@ import java.util.Map;
  */
 final class PathGuard {
 
+    /** The validate key for explicit profile groups, refused in serve, mcp and run. */
+    static final String VALIDATE_GROUPS_KEY = "groups";
+
     /** Key that allows existing output files to be replaced. */
     static final String OVERWRITE_KEY = "overwrite";
 
@@ -62,7 +65,9 @@ final class PathGuard {
                     new Field("outputDir", "--output", Kind.WRITE_DIR),
                     new Field("datatypeMap", "--datatype-map", Kind.READ_IF_EXISTS),
                     new Field("previousComparison", "--previous-comparison", Kind.READ),
-                    new Field("summaryFile", "--summary-file", Kind.WRITE_FILE))),
+                    new Field("summaryFile", "--summary-file", Kind.WRITE_FILE),
+                    new Field("profilesLibrary", "--profiles-library", Kind.READ),
+                    new Field("commonShapes", "--common-shapes", Kind.READ_IF_EXISTS))),
             Map.entry("sparql", List.of(
                     new Field("models", "--models", Kind.READ_LIST),
                     new Field("query", "--query", Kind.READ_IF_EXISTS),
@@ -173,6 +178,12 @@ final class PathGuard {
     static ObjectNode check(String command, JsonNode json, PathPolicy policy, Path base, boolean baseOnly) {
         if (json == null || !json.isObject()) {
             throw new PathNotAllowedException("The request must be a JSON object.");
+        }
+        if ("validate".equals(command) && json.has(VALIDATE_GROUPS_KEY)) {
+            // Explicit groups hold paths inside objects, which no check here (nor the mirrors of
+            // this table) walks. They are for configuration files on the command line.
+            throw new PathNotAllowedException("\"" + VALIDATE_GROUPS_KEY + "\" is accepted from a configuration"
+                    + " file on the command line only; here the profiles workflow groups the documents by folder.");
         }
         ObjectNode copy = ((ObjectNode) json).deepCopy();
         boolean overwrite = overwrite(json);

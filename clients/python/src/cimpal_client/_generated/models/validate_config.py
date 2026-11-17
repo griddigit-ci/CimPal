@@ -32,12 +32,14 @@ class ValidateConfig:
 
         Attributes:
             workflow (Union[Unset, str]): Workflow: 'mapping' (default, uses a CSV mapping file), 'timestamped' (groups by
-                timestamp) or 'combined' (validates the dataFiles as one dataset against all the constraintFiles at once).
+                timestamp), 'combined' (validates the dataFiles as one dataset against all the constraintFiles at once) or
+                'profiles' (validates every document under modelsDir against the shapes of the profiles it declares, found in a
+                DX-PROF profilesLibrary).
             mapping_csv (Union[Unset, str]): Absolute path to the CSV mapping file: three comma-separated columns, the model
                 files (separated by ;), the constraint .ttl file(s) (separated by ;) and a label. Required for mapping and
                 timestamped workflows.
             models_dir (Union[Unset, str]): Absolute path to the root folder containing model ZIP/XML archives. Required for
-                mapping and timestamped workflows.
+                mapping, timestamped and profiles workflows. For profiles, each first-level subfolder is validated as a group.
             constraints_root (Union[Unset, str]): Absolute path to the root folder for SHACL constraint .ttl files. Required
                 for mapping and timestamped workflows; optional for combined, where relative owl:imports are then also resolved
                 against it.
@@ -64,6 +66,19 @@ class ValidateConfig:
                 a delta comparison sheet.
             incremental_timestamps (Union[Unset, bool]): Timestamped workflow: reuse the Jena findings of focus nodes a
                 timestamp didn't change from the one before.
+            profiles_library (Union[Unset, list[str]]): Profiles workflow (required): absolute paths to folders holding DX-
+                PROF descriptors and the SHACL files they name, e.g. a checkout of the ENTSO-E application-profiles-library.
+            boundary_folders (Union[Unset, list[str]]): Profiles workflow: folders of boundary data, relative to modelsDir.
+                Validated as boundary groups and loaded as context for every other group.
+            boundary_shapes_pattern (Union[Unset, str]): Profiles workflow: shape files whose name contains this apply to
+                boundary groups only (default 'EquipmentBoundary'; '' applies every shape everywhere).
+            common_shapes (Union[Unset, list[str]]): Profiles workflow: shapes added to every group with CGMES documents, as
+                file names in the profile library or absolute paths (default: the AllProfiles Complex shapes where the library
+                has them; ['none'] for none).
+            profile_namespaces (Union[Unset, list[str]]): Profiles workflow: IRI prefixes that mark a dcterms:conformsTo
+                value as a profile (default ['https://ap.cim4.eu/']).
+            allow_unmapped (Union[Unset, bool]): Profiles workflow: skip documents whose profile is unknown or lacks shapes
+                and report the run as incomplete (exit 1), instead of refusing it (exit 2).
             format_ (Union[Unset, str]): Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a
                 job's JSON result.
             stats (Union[Unset, bool]): Report the run's resource use (time, peak heap, GC, triples loaded).
@@ -90,6 +105,12 @@ class ValidateConfig:
     export_turtle: Union[Unset, bool] = UNSET
     previous_comparison: Union[Unset, str] = UNSET
     incremental_timestamps: Union[Unset, bool] = UNSET
+    profiles_library: Union[Unset, list[str]] = UNSET
+    boundary_folders: Union[Unset, list[str]] = UNSET
+    boundary_shapes_pattern: Union[Unset, str] = UNSET
+    common_shapes: Union[Unset, list[str]] = UNSET
+    profile_namespaces: Union[Unset, list[str]] = UNSET
+    allow_unmapped: Union[Unset, bool] = UNSET
     format_: Union[Unset, str] = UNSET
     stats: Union[Unset, bool] = UNSET
     summary_file: Union[Unset, str] = UNSET
@@ -142,6 +163,34 @@ class ValidateConfig:
 
         incremental_timestamps = self.incremental_timestamps
 
+        profiles_library: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.profiles_library, Unset):
+            profiles_library = self.profiles_library
+
+
+
+        boundary_folders: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.boundary_folders, Unset):
+            boundary_folders = self.boundary_folders
+
+
+
+        boundary_shapes_pattern = self.boundary_shapes_pattern
+
+        common_shapes: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.common_shapes, Unset):
+            common_shapes = self.common_shapes
+
+
+
+        profile_namespaces: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.profile_namespaces, Unset):
+            profile_namespaces = self.profile_namespaces
+
+
+
+        allow_unmapped = self.allow_unmapped
+
         format_ = self.format_
 
         stats = self.stats
@@ -189,6 +238,18 @@ class ValidateConfig:
             field_dict["previousComparison"] = previous_comparison
         if incremental_timestamps is not UNSET:
             field_dict["incrementalTimestamps"] = incremental_timestamps
+        if profiles_library is not UNSET:
+            field_dict["profilesLibrary"] = profiles_library
+        if boundary_folders is not UNSET:
+            field_dict["boundaryFolders"] = boundary_folders
+        if boundary_shapes_pattern is not UNSET:
+            field_dict["boundaryShapesPattern"] = boundary_shapes_pattern
+        if common_shapes is not UNSET:
+            field_dict["commonShapes"] = common_shapes
+        if profile_namespaces is not UNSET:
+            field_dict["profileNamespaces"] = profile_namespaces
+        if allow_unmapped is not UNSET:
+            field_dict["allowUnmapped"] = allow_unmapped
         if format_ is not UNSET:
             field_dict["format"] = format_
         if stats is not UNSET:
@@ -241,6 +302,22 @@ class ValidateConfig:
 
         incremental_timestamps = d.pop("incrementalTimestamps", UNSET)
 
+        profiles_library = cast(list[str], d.pop("profilesLibrary", UNSET))
+
+
+        boundary_folders = cast(list[str], d.pop("boundaryFolders", UNSET))
+
+
+        boundary_shapes_pattern = d.pop("boundaryShapesPattern", UNSET)
+
+        common_shapes = cast(list[str], d.pop("commonShapes", UNSET))
+
+
+        profile_namespaces = cast(list[str], d.pop("profileNamespaces", UNSET))
+
+
+        allow_unmapped = d.pop("allowUnmapped", UNSET)
+
         format_ = d.pop("format", UNSET)
 
         stats = d.pop("stats", UNSET)
@@ -268,6 +345,12 @@ class ValidateConfig:
             export_turtle=export_turtle,
             previous_comparison=previous_comparison,
             incremental_timestamps=incremental_timestamps,
+            profiles_library=profiles_library,
+            boundary_folders=boundary_folders,
+            boundary_shapes_pattern=boundary_shapes_pattern,
+            common_shapes=common_shapes,
+            profile_namespaces=profile_namespaces,
+            allow_unmapped=allow_unmapped,
             format_=format_,
             stats=stats,
             summary_file=summary_file,
