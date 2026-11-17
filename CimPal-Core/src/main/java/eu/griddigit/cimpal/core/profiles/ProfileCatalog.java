@@ -93,11 +93,14 @@ public final class ProfileCatalog {
     private final Map<String, ProfileShapes> byKey;
     private final List<ProfileShapes> profiles;
     private final List<String> gaps;
+    private final Map<String, List<Path>> filesByName;
 
-    private ProfileCatalog(Map<String, ProfileShapes> byKey, List<ProfileShapes> profiles, List<String> gaps) {
+    private ProfileCatalog(Map<String, ProfileShapes> byKey, List<ProfileShapes> profiles, List<String> gaps,
+                           Map<String, List<Path>> filesByName) {
         this.byKey = Map.copyOf(byKey);
         this.profiles = List.copyOf(profiles);
         this.gaps = List.copyOf(gaps);
+        this.filesByName = filesByName;
     }
 
     /**
@@ -142,6 +145,7 @@ public final class ProfileCatalog {
         Map<String, ProfileShapes> byKey = new TreeMap<>();
         List<ProfileShapes> profiles = new ArrayList<>();
         List<String> gaps = new ArrayList<>();
+        Map<String, List<Path>> filesByName = new HashMap<>();
         for (Path given : libraries) {
             // serve/mcp/run: checked before anything touches the folder, and read as checked.
             Path library = PathPolicy.checkReadIfActive(given);
@@ -149,6 +153,8 @@ public final class ProfileCatalog {
                 throw new FileNotFoundException("Profile library folder not found: " + label(library));
             }
             Library index = Library.walk(library.toRealPath(), maxFiles, gaps);
+            index.byName.forEach((name, files) ->
+                    filesByName.computeIfAbsent(name, n -> new ArrayList<>()).addAll(files));
             int before = profiles.size();
             for (Path candidate : index.descriptorCandidates) {
                 readDescriptor(candidate, index, profiles, gaps);
@@ -167,7 +173,15 @@ public final class ProfileCatalog {
                 }
             }
         }
-        return new ProfileCatalog(byKey, profiles, gaps);
+        return new ProfileCatalog(byKey, profiles, gaps, filesByName);
+    }
+
+    /**
+     * The files of the libraries with exactly this name, sorted: for shapes that belong to a
+     * library but that no descriptor refers to.
+     */
+    public List<Path> filesNamed(String fileName) {
+        return filesByName.getOrDefault(fileName, List.of()).stream().sorted().toList();
     }
 
     /** The profile that has {@code profileUri} as one of its keys. */

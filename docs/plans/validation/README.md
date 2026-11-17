@@ -77,7 +77,7 @@ For each reported file, the shapes are the union of the catalog entries of its d
 - **EquipmentBoundary shapes** (file name contains `EquipmentBoundary`; they are bundled into the EQ profile's PROF) are dropped, except in the boundary group. They restrict Terminal and ConnectivityNode to boundary-legal classes and produced about 28,000 false findings on full models.
 - **Common shapes** that no PROF references are added to every CGMES group: `CGMES/SHACL/61970-600-1_AllProfiles-AP-Con-Complex-SHACL.ttl`, when the file exists (APL gap, application-profiles-library issue 130).
 - **Union shapes** of the group = all shapes of all its reported files (plus common).
-- **Dataset shapes** of a file = those of its own shapes whose file name contains `-Con-Simple-` or equals `DatasetMetadata-AP-Con-SHACL.ttl`. This is only a cost filter, so the SPARQL-heavy Complex shapes are not re-run once per file.
+- **Dataset shapes** of a file = those of its own shapes whose file name contains `-Con-Simple-` or equals `DatasetMetadata-AP-Con-SHACL.ttl`. The reference calls this a cost filter, so the SPARQL-heavy Complex shapes are not re-run once per file. It is more than that: a cardinality or closed-shape constraint in any other file is dropped by the union pass and then run nowhere. **CimPal departs from the reference here** (VAL-2, D3): every shape file that applies to a document and holds `sh:minCount`, `sh:maxCount` or `sh:closed` takes part in that document's own pass, whatever its name.
 
 ### 5. Two passes (`validate_group`)
 
