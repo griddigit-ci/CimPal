@@ -16,6 +16,7 @@ module CimPal.Core {
     exports eu.griddigit.cimpal.core.diffexport;
     exports eu.griddigit.cimpal.core.stats;
     exports eu.griddigit.cimpal.core.idmapping;
+    exports eu.griddigit.cimpal.core.profiles;
 
     requires org.apache.jena.core;
     requires org.apache.jena.arq;
