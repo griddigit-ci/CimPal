@@ -102,6 +102,18 @@ Each tool accepts a JSON object with the same keys as the command's config file.
 }
 ```
 
+**Example — validate tool, profiles workflow** (shapes found from the profiles each document declares; see [validate.md](validate.md#profiles)):
+```json
+{
+  "workflow": "profiles",
+  "modelsDir": "/data/ReliCapGrid/Instance",
+  "profilesLibrary": ["/data/application-profiles-library"],
+  "boundaryFolders": ["boundaryData", "commonData"],
+  "outputDir": "/data/output"
+}
+```
+The result's `complete` says whether everything was checked; an incomplete run is never clean. Explicit `groups` are refused here (configuration files on the command line only).
+
 **Example — sparql tool:**
 ```json
 {

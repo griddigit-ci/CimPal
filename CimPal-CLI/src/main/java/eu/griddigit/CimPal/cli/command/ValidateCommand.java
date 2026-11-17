@@ -8,6 +8,8 @@ package eu.griddigit.CimPal.cli.command;
 import eu.griddigit.CimPal.cli.ExitCode;
 import eu.griddigit.cimpal.core.models.MappingValidationOptions;
 import eu.griddigit.cimpal.core.models.MappingValidationSummary;
+import eu.griddigit.cimpal.core.models.ProfileValidationOptions;
+import eu.griddigit.cimpal.core.models.ProfileValidationSummary;
 import eu.griddigit.cimpal.core.models.SHACLValidationOptions;
 import eu.griddigit.cimpal.core.models.SHACLValidationReport;
 import eu.griddigit.cimpal.core.models.SHACLValidationResult;
@@ -17,6 +19,9 @@ import eu.griddigit.cimpal.core.utils.LogSanitizer;
 import eu.griddigit.cimpal.core.utils.MappingValidator;
 import eu.griddigit.cimpal.core.utils.OutOfMemoryRethrow;
 import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
+import eu.griddigit.cimpal.core.utils.ProfileValidator;
+import eu.griddigit.cimpal.core.profiles.ProfileGroup;
+import eu.griddigit.cimpal.core.profiles.ProfileGroupPlanner;
 import eu.griddigit.cimpal.core.utils.SHACLValidator;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
@@ -57,6 +62,9 @@ import org.apache.jena.vocabulary.RDF;
  *   <li>{@code timestamped} — like mapping, but groups files by timestamp and produces per-timestamp reports
  *   <li>{@code combined}    — merge the given data files into one dataset and validate it against all the
  *                             given constraint files at once: the GUI's "Validate selected files together"
+ *   <li>{@code profiles}    — validate the documents of a folder against the shapes their declared profiles
+ *                             name in a DX-PROF profile library, in groups, with cardinality and closed-shape
+ *                             constraints evaluated per document ({@link ProfileValidator})
  * </ul>
  *
  * <p>The former {@code manual} workflow tested SHACL rules against Conform / NonConform models
@@ -69,7 +77,8 @@ import org.apache.jena.vocabulary.RDF;
  * <p>Exit codes:
  * <ul>
  *   <li>0 — no violations
- *   <li>1 — validation completed; violations found
+ *   <li>1 — validation completed; violations found. Also, never remapped by
+ *       {@code --violations-exit-code}, a profiles run that left something unchecked
  *   <li>2 — bad or missing input
  *   <li>3 — internal error
  * </ul>
@@ -82,7 +91,7 @@ import org.apache.jena.vocabulary.RDF;
 )
 public class ValidateCommand implements Callable<Integer> {
 
-    private static final String WORKFLOWS = "mapping, timestamped, combined";
+    private static final String WORKFLOWS = "mapping, timestamped, combined, profiles";
 
     // ---- config file -------------------------------------------------------
 
@@ -93,7 +102,7 @@ public class ValidateCommand implements Callable<Integer> {
     // ---- workflow ----------------------------------------------------------
 
     @Option(names = "--workflow",
-            description = "Workflow: mapping (default), timestamped or combined.")
+            description = "Workflow: mapping (default), timestamped, combined or profiles.")
     private String workflow;
 
     // ---- input paths -------------------------------------------------------
@@ -103,7 +112,7 @@ public class ValidateCommand implements Callable<Integer> {
     private File mappingCsv;
 
     @Option(names = "--models",
-            description = "Models root folder (required for mapping/timestamped workflows).")
+            description = "Models root folder (required for mapping/timestamped/profiles workflows).")
     private File modelsDir;
 
     @Option(names = "--constraints-root",
@@ -124,6 +133,43 @@ public class ValidateCommand implements Callable<Integer> {
     @Option(names = "--output",
             description = "Output folder (required).")
     private File outputDir;
+
+    // ---- profiles workflow -----------------------------------------------
+
+    @Option(names = "--profiles-library", split = ",",
+            description = "Profiles workflow: folder(s) holding DX-PROF descriptors and the SHACL files they name, "
+                    + "for example a checkout of the ENTSO-E application-profiles-library (required).")
+    private List<File> profilesLibraries;
+
+    @Option(names = "--boundary", split = ",",
+            description = "Profiles workflow: folder(s) of boundary data, relative to --models. Their documents are "
+                    + "validated as boundary groups and loaded as context for every other group.")
+    private List<String> boundaryFolders;
+
+    @Option(names = "--boundary-shapes-pattern",
+            description = "Profiles workflow: shape files whose name contains this apply to boundary groups only "
+                    + "(default EquipmentBoundary; empty applies every shape everywhere).")
+    private String boundaryShapesPattern;
+
+    @Option(names = "--common-shapes", split = ",",
+            description = "Profiles workflow: shapes added to every group with CGMES documents, as file names in "
+                    + "the profile library or as paths (default: 61970-600-1_AllProfiles-AP-Con-Complex-SHACL.ttl "
+                    + "where the library has it; 'none' for none).")
+    private List<String> commonShapes;
+
+    @Option(names = "--profile-namespace", split = ",",
+            description = "Profiles workflow: IRI prefix(es) that mark a dcterms:conformsTo value as a profile "
+                    + "(default https://ap.cim4.eu/).")
+    private List<String> profileNamespaces;
+
+    @Option(names = "--allow-unmapped",
+            description = "Profiles workflow: skip documents whose profile is unknown or lacks shapes, and report the "
+                    + "run as incomplete (exit 1), instead of refusing the run (exit 2).")
+    private Boolean allowUnmapped;
+
+    /** Profiles workflow, config file only: explicit groups replacing the grouping by folder. */
+    private JsonNode groupsConfig;
+    private Path groupsConfigDir;
 
     // ---- datatype / RDF options -------------------------------------------
 
@@ -219,7 +265,8 @@ public class ValidateCommand implements Callable<Integer> {
             // 3. Dry-run: print resolved config and exit
             if (dryRun) {
                 printDryRun();
-                return ExitCode.OK;
+                // The profiles workflow can say what it would do: its groups, without validating.
+                return "profiles".equals(workflow) ? printProfilesPlan() : ExitCode.OK;
             }
 
             // 4. Validate inputs
@@ -337,6 +384,54 @@ public class ValidateCommand implements Callable<Integer> {
             String v = root.path("previousComparison").asText(null);
             if (v != null && !v.isBlank()) previousComparison = resolveRelative(configDir, v);
         }
+        if (profilesLibraries == null) {
+            profilesLibraries = fileList(configDir, root.path("profilesLibrary"));
+        }
+        if (boundaryFolders == null) {
+            boundaryFolders = stringList(root.path("boundaryFolders"));
+        }
+        if (boundaryShapesPattern == null) {
+            JsonNode n = root.path("boundaryShapesPattern");
+            if (n.isString()) boundaryShapesPattern = n.asString();
+        }
+        if (commonShapes == null) {
+            commonShapes = stringList(root.path("commonShapes"));
+        }
+        if (profileNamespaces == null) {
+            profileNamespaces = stringList(root.path("profileNamespaces"));
+        }
+        if (allowUnmapped == null) {
+            JsonNode n = root.path("allowUnmapped");
+            if (!n.isMissingNode() && !n.isNull()) allowUnmapped = n.asBoolean(false);
+        }
+        loadGroupsConfig(root, configDir);
+    }
+
+    /**
+     * The explicit groups of the profiles workflow. Kept out of {@code loadConfig} on purpose: the
+     * request schemas of serve, mcp and run list what {@code loadConfig} reads, and they refuse this
+     * key (PathGuard), since its paths sit inside objects. It is for configuration files only.
+     */
+    private void loadGroupsConfig(JsonNode root, Path configDir) {
+        JsonNode groups = root.path(PathGuard.VALIDATE_GROUPS_KEY);
+        if (!groups.isMissingNode() && !groups.isNull()) {
+            groupsConfig = groups;
+            groupsConfigDir = configDir;
+        }
+    }
+
+    /** A config value that lists texts: an array of strings, or one string. Null when the key is absent. */
+    private static List<String> stringList(JsonNode node) {
+        if (node.isArray()) {
+            List<String> values = new ArrayList<>();
+            for (JsonNode item : node) {
+                String v = item.asText(null);
+                if (v != null && !v.isBlank()) values.add(v.strip());
+            }
+            return values;
+        }
+        String v = node.asText(null);
+        return v == null || v.isBlank() ? null : List.of(v.strip());
     }
 
     private static File resolveRelative(Path configDir, String value) {
@@ -416,6 +511,26 @@ public class ValidateCommand implements Callable<Integer> {
                 }
                 ok &= requireOutputDir(outputDir, "--output");
             }
+            case "profiles" -> {
+                ok &= requireDir(modelsDir, "--models");
+                if (profilesLibraries == null || profilesLibraries.isEmpty()) {
+                    System.err.println("[ERROR] --profiles-library is required.");
+                    ok = false;
+                } else {
+                    for (File library : profilesLibraries) {
+                        ok &= requireDir(library, "--profiles-library");
+                    }
+                }
+                ok &= requireOutputDir(outputDir, "--output");
+                // Inputs of the other workflows would be ignored here; say so rather than drop them.
+                ok &= notWithProfiles(mappingCsv != null, "--mapping-csv");
+                ok &= notWithProfiles(constraintsRoot != null, "--constraints-root");
+                ok &= notWithProfiles(constraintFiles != null && !constraintFiles.isEmpty(), "--constraint-files");
+                ok &= notWithProfiles(dataFiles != null && !dataFiles.isEmpty(), "--data-files");
+                ok &= notWithProfiles(previousComparison != null, "--previous-comparison");
+                ok &= notWithProfiles(Boolean.TRUE.equals(incrementalTimestamps), "--incremental-timestamps");
+                ok &= parseGroups();
+            }
             case "manual" -> {
                 // Configurations written for the removed workflow get a pointer, not a bare "unknown".
                 System.err.println("[ERROR] The manual workflow has been removed from the CLI. It tested SHACL "
@@ -430,6 +545,13 @@ public class ValidateCommand implements Callable<Integer> {
             }
         }
 
+        if (!"profiles".equals(workflow) && usesProfileOptions()) {
+            System.err.println("[ERROR] --profiles-library, --boundary, --boundary-shapes-pattern, --common-shapes, "
+                    + "--profile-namespace, --allow-unmapped and \"groups\" belong to the profiles workflow"
+                    + " (--workflow profiles).");
+            ok = false;
+        }
+
         if (previousComparison != null && !previousComparison.exists()) {
             System.err.println("[ERROR] Previous comparison file not found: "
                     + previousComparison.getAbsolutePath());
@@ -437,6 +559,53 @@ public class ValidateCommand implements Callable<Integer> {
         }
 
         return ok;
+    }
+
+    private static boolean notWithProfiles(boolean given, String flag) {
+        if (given) {
+            System.err.println("[ERROR] " + flag + " does not apply to the profiles workflow: the shapes come from"
+                    + " the profiles the documents declare.");
+        }
+        return !given;
+    }
+
+    private boolean usesProfileOptions() {
+        return (profilesLibraries != null && !profilesLibraries.isEmpty()) || boundaryFolders != null
+                || boundaryShapesPattern != null || commonShapes != null || profileNamespaces != null
+                || allowUnmapped != null || groupsConfig != null;
+    }
+
+    /** The explicit groups of the config file, parsed; prints what is wrong and returns false. */
+    private List<ProfileGroupPlanner.GroupSpec> groups = List.of();
+
+    private boolean parseGroups() {
+        if (groupsConfig == null) {
+            return true;
+        }
+        if (!groupsConfig.isArray() || groupsConfig.isEmpty()) {
+            System.err.println("[ERROR] \"groups\" must be a non-empty array of group objects.");
+            return false;
+        }
+        List<ProfileGroupPlanner.GroupSpec> parsed = new ArrayList<>();
+        for (JsonNode g : groupsConfig) {
+            try {
+                List<File> reported = g.isObject() ? fileList(groupsConfigDir, g.path("reported")) : null;
+                if (reported == null || reported.isEmpty()) {
+                    throw new IllegalArgumentException("each group needs \"name\" and \"reported\" (files or folders)");
+                }
+                List<File> context = fileList(groupsConfigDir, g.path("context"));
+                List<File> extra = fileList(groupsConfigDir, g.path("extraShapes"));
+                List<String> assume = stringList(g.path("assumeProfiles"));
+                parsed.add(new ProfileGroupPlanner.GroupSpec(g.path("name").asText(""), paths(reported),
+                        context == null ? List.of() : paths(context), g.path("boundary").asBoolean(false),
+                        extra == null ? List.of() : paths(extra), assume == null ? List.of() : assume));
+            } catch (IllegalArgumentException ex) {
+                System.err.println("[ERROR] \"groups\": " + LogSanitizer.forLog(ex.getMessage()));
+                return false;
+            }
+        }
+        groups = parsed;
+        return true;
     }
 
     private static boolean requireFile(File f, String flag) {
@@ -582,6 +751,7 @@ public class ValidateCommand implements Callable<Integer> {
             case "mapping"     -> runMappingWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
             case "timestamped" -> runTimestampedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
             case "combined"    -> runCombinedWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
+            case "profiles"    -> runProfilesWorkflow(dataTypeMap, validationEngine, jsonOutput, origOut);
             default            -> ExitCode.INVALID_INPUT;
         };
         return jsonOutput ? CliStreams.outToErr(run) : run.call();
@@ -760,6 +930,214 @@ public class ValidateCommand implements Callable<Integer> {
 
         return conformingFiles(report) < report.getResultsByConstraintFile().size()
                 ? AutomationOptions.violationsExitCode(violationsExitCode) : ExitCode.OK;
+    }
+
+    // ---- profiles workflow --------------------------------------------------
+
+    private ProfileValidationOptions.Builder profileOptions() {
+        ProfileValidationOptions.Builder b = ProfileValidationOptions.builder()
+                .modelsDir(modelsDir.toPath())
+                .profileLibraries(paths(profilesLibraries))
+                .xmlBase(xmlBase)
+                .engine(resolveEngine())
+                .maxResultsPerConstraint(maxResults)
+                .workers(workers)
+                .exportTurtleReports(Boolean.TRUE.equals(exportTurtle))
+                .allowUnmapped(Boolean.TRUE.equals(allowUnmapped))
+                .groups(groups)
+                .runStats(runStats);
+        if (outputDir != null) b.outputDir(outputDir.toPath());
+        if (boundaryFolders != null) b.boundaryFolders(boundaryFolders);
+        if (boundaryShapesPattern != null) b.boundaryShapesPattern(boundaryShapesPattern);
+        if (commonShapes != null) {
+            b.commonShapes(commonShapes.size() == 1 && "none".equalsIgnoreCase(commonShapes.getFirst())
+                    ? List.of() : commonShapes);
+        }
+        if (profileNamespaces != null) b.profileNamespaces(profileNamespaces);
+        return b;
+    }
+
+    /** {@code --dry-run}: the groups the run would validate, without validating. */
+    private int printProfilesPlan() {
+        if (!validateInputs()) {
+            return ExitCode.INVALID_INPUT;
+        }
+        ProfileValidator.Preview preview;
+        try {
+            preview = new ProfileValidator(profileOptions().build()).plan();
+        } catch (IOException | JenaException | IllegalArgumentException
+                 | IllegalStateException ex) {
+            System.err.println("[ERROR] " + LogSanitizer.forLog(ex.getMessage()));
+            return ExitCode.INVALID_INPUT;
+        }
+        System.out.println();
+        System.out.println("=== Groups (" + preview.plan().groups().size() + ") ===");
+        for (ProfileGroup group : preview.plan().groups()) {
+            System.out.println("  " + LogSanitizer.forLog(group.name()) + (group.boundary() ? " (boundary)" : ""));
+            group.reported().forEach(h -> System.out.println("    reported : " + LogSanitizer.forLog(h.source())));
+            group.context().forEach(h -> System.out.println("    context  : " + LogSanitizer.forLog(h.source())));
+            group.unionShapes().forEach(p -> System.out.println("    shapes   : " + p.getFileName()));
+        }
+        preview.plan().skipped().forEach(s -> System.out.println("  skipped  : " + LogSanitizer.forLog(s.source())
+                + " (" + LogSanitizer.forLog(s.reason()) + ")"));
+        preview.gaps().forEach(g -> System.out.println("  gap      : " + LogSanitizer.forLog(g)));
+        return ExitCode.OK;
+    }
+
+    private int runProfilesWorkflow(Map<String, RDFDatatype> dataTypeMap,
+                                    ValidationEngine validationEngine,
+                                    boolean jsonOutput,
+                                    PrintStream origOut) throws Exception {
+        ProfileValidationSummary summary;
+        try (StatsJson.Span ignored = StatsJson.phase(runStats, "validate")) {
+            // As the other workflows do: re-read remote imports rather than reuse what an earlier
+            // command in this JVM (serve, mcp) fetched.
+            ValidationTools.clearRemoteCaches();
+            summary = new ProfileValidator(profileOptions().datatypeMap(dataTypeMap).engine(validationEngine).build())
+                    .validate();
+        } catch (IOException | JenaException | IllegalArgumentException
+                 | IllegalStateException ex) {
+            // An input that can't be read, parsed or allowed, a profile that is not in the library,
+            // documents of which none can be validated: bad input, never a pass.
+            OutOfMemoryRethrow.ifCause(ex);
+            System.err.println("[ERROR] Validation could not run: " + LogSanitizer.forLog(ex.getMessage()));
+            return ExitCode.INVALID_INPUT;
+        }
+        summary.warnings().forEach(w -> System.err.println("[WARN] " + LogSanitizer.forLog(w)));
+        summary.gaps().forEach(g -> System.err.println("[GAP] " + LogSanitizer.forLog(g)));
+        summary.skipped().forEach(s -> System.err.println("[SKIPPED] " + LogSanitizer.forLog(s.source()) + ": "
+                + LogSanitizer.forLog(s.reason())));
+
+        List<SHACLValidationResult> all = summary.findings().stream()
+                .map(ProfileValidationSummary.Finding::result).toList();
+        List<ShapeGroup> shapeGroups = producesJson() && samples > 0 ? shapeGroups(all, samples) : List.of();
+        String json = producesJson() ? buildProfilesJson(summary, shapeGroups) : null;
+        if (summaryFile != null && !AutomationOptions.writeSummary(summaryFile, json)) {
+            return ExitCode.INTERNAL_ERROR;
+        }
+        if (jsonOutput) {
+            origOut.println(json);
+        } else {
+            printTextSummaryProfiles(summary);
+            StatsJson.toStderr(runStats);
+        }
+        return exitCodeFor(summary);
+    }
+
+    /**
+     * 1 when part of what should have been checked was not, which is never remapped (an
+     * incomplete run must not end as a pass); the {@code --violations-exit-code} for findings or
+     * a run cut short by the result limit; 0 when everything was checked and nothing found.
+     */
+    private int exitCodeFor(ProfileValidationSummary summary) {
+        if (!summary.complete()) {
+            return ExitCode.VIOLATIONS;
+        }
+        return summary.conforms() ? ExitCode.OK : AutomationOptions.violationsExitCode(violationsExitCode);
+    }
+
+    private static boolean groupConforms(ProfileValidationSummary.GroupResult group) {
+        return group.findings() == 0 && !group.partial() && !group.incomplete();
+    }
+
+    private void printTextSummaryProfiles(ProfileValidationSummary summary) {
+        long conforming = summary.groups().stream().filter(ValidateCommand::groupConforms).count();
+        SeverityCounts results = SeverityCounts.of(summary.findings().stream()
+                .map(ProfileValidationSummary.Finding::result).toList());
+        System.out.println();
+        System.out.println("=== Profile Validation Summary ===");
+        for (ProfileValidationSummary.GroupResult group : summary.groups()) {
+            System.out.println("  " + LogSanitizer.forLog(group.name()) + " : " + group.reported().size()
+                    + " document(s), " + group.findings() + " finding(s)"
+                    + (group.incomplete() ? ", INCOMPLETE" : "") + (group.partial() ? ", partial" : ""));
+        }
+        System.out.println("  Conforming : " + conforming + " of " + summary.groups().size() + " groups");
+        System.out.println("  Results    : " + results.total() + " (violations " + results.violations()
+                + ", warnings " + results.warnings() + ", infos " + results.infos() + ")");
+        System.out.println("  Skipped    : " + summary.skipped().size() + " document(s)");
+        System.out.println("  Gaps       : " + summary.gaps().size());
+        if (summary.workbook() != null) {
+            System.out.println("  Report     : " + summary.workbook().toAbsolutePath());
+        }
+        System.out.println(!summary.complete() ? "  Result     : INCOMPLETE (part of the data or shapes was not checked)"
+                : summary.conforms() ? "  Result     : ALL CONFORMING" : "  Result     : VIOLATIONS FOUND");
+    }
+
+    /**
+     * The profiles workflow's document. {@code totals} count groups, as the other workflows count
+     * workbook rows; {@code results} counts findings. {@code complete} false means part of what
+     * should have been checked was not: the run is then never clean, whatever it found.
+     */
+    private String buildProfilesJson(ProfileValidationSummary summary, List<ShapeGroup> shapeGroups) {
+        List<ProfileValidationSummary.GroupResult> groupResults = summary.groups();
+        long conforming = groupResults.stream().filter(ValidateCommand::groupConforms).count();
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"schema\": \"cimpal-validate-summary/1\",\n");
+        sb.append("  \"run\": {\n");
+        sb.append("    \"timestamp\": \"").append(Instant.now()).append("\",\n");
+        sb.append("    \"workflow\": \"profiles\",\n");
+        sb.append("    \"inputs\": {\n");
+        sb.append("      \"modelsDir\": ").append(jsonStr(abs(modelsDir))).append(",\n");
+        sb.append("      \"profilesLibrary\": ").append(jsonPaths(profilesLibraries)).append(",\n");
+        sb.append("      \"outputDir\": ").append(jsonStr(abs(outputDir))).append("\n");
+        sb.append("    },\n");
+        sb.append("    \"options\": ").append(buildOptionsJson()).append("\n");
+        sb.append("  },\n");
+        sb.append("  \"totals\": {\n");
+        sb.append("    \"conforming\": ").append(conforming).append(",\n");
+        sb.append("    \"violations\": ").append(groupResults.size() - conforming).append(",\n");
+        sb.append("    \"errors\": 0,\n");
+        sb.append("    \"total\": ").append(groupResults.size()).append("\n");
+        sb.append("  },\n");
+        sb.append("  \"hasViolations\": ").append(!summary.conforms()).append(",\n");
+        sb.append("  \"complete\": ").append(summary.complete()).append(",\n");
+        sb.append("  \"partial\": ").append(summary.partial()).append(",\n");
+        sb.append("  \"results\": ").append(SeverityCounts.of(summary.findings().stream()
+                .map(ProfileValidationSummary.Finding::result).toList()).json()).append(",\n");
+        sb.append("  \"byGroup\": [\n");
+        for (int i = 0; i < groupResults.size(); i++) {
+            ProfileValidationSummary.GroupResult g = groupResults.get(i);
+            List<SHACLValidationResult> own = summary.findings().stream()
+                    .filter(f -> f.group().equals(g.name()) && !f.documents().isEmpty())
+                    .map(ProfileValidationSummary.Finding::result).toList();
+            sb.append("    {\"group\": ").append(jsonStr(g.name()))
+                    .append(", \"conforms\": ").append(groupConforms(g))
+                    .append(", \"complete\": ").append(!g.incomplete())
+                    .append(", \"partial\": ").append(g.partial())
+                    .append(", \"reported\": ").append(jsonStrings(g.reported()))
+                    .append(", \"context\": ").append(jsonStrings(g.context()))
+                    .append(", \"shapes\": ").append(jsonStrings(g.shapes()))
+                    .append(", \"results\": ").append(SeverityCounts.of(own).json())
+                    .append(", \"contextFindings\": ").append(g.contextFindings())
+                    .append(", \"millis\": ").append(g.millis()).append("}")
+                    .append(i < groupResults.size() - 1 ? ",\n" : "\n");
+        }
+        sb.append("  ],\n");
+        List<SHACLValidationResult> aboutShapes = summary.findings().stream().filter(f -> f.documents().isEmpty())
+                .map(ProfileValidationSummary.Finding::result).toList();
+        sb.append("  \"shapeFindings\": ").append(SeverityCounts.of(aboutShapes).json()).append(",\n");
+        sb.append("  \"skipped\": [");
+        for (int i = 0; i < summary.skipped().size(); i++) {
+            ProfileGroupPlanner.Skipped s = summary.skipped().get(i);
+            sb.append(i == 0 ? "\n" : ",\n").append("    {\"document\": ").append(jsonStr(s.source()))
+                    .append(", \"reason\": ").append(jsonStr(s.reason())).append("}");
+        }
+        sb.append(summary.skipped().isEmpty() ? "],\n" : "\n  ],\n");
+        sb.append("  \"gaps\": ").append(jsonStrings(summary.gaps())).append(",\n");
+        sb.append("  \"warnings\": ").append(jsonStrings(summary.warnings())).append(",\n");
+        if (!shapeGroups.isEmpty()) {
+            sb.append("  \"shapes\": ").append(buildShapeGroupsJson(shapeGroups)).append(",\n");
+        }
+        if (!summary.turtleReports().isEmpty()) {
+            sb.append("  \"turtleReports\": ").append(jsonStrings(summary.turtleReports().stream()
+                    .map(p -> p.toAbsolutePath().toString()).toList())).append(",\n");
+        }
+        sb.append("  \"report\": ").append(summary.workbook() == null ? "null"
+                        : jsonStr(summary.workbook().toAbsolutePath().toString()))
+                .append(StatsJson.field(runStats, "\n  ")).append("\n");
+        sb.append("}");
+        return sb.toString();
     }
 
     /** Constraint files whose row of the workbook says they conform. */
@@ -1022,6 +1400,19 @@ public class ValidateCommand implements Callable<Integer> {
         System.out.println("  exportTurtle     : " + exportTurtle);
         System.out.println("  previousCompar.  : " + abs(previousComparison));
         System.out.println("  incrementalTimestamps : " + Boolean.TRUE.equals(incrementalTimestamps));
+        if ("profiles".equals(workflow)) {
+            System.out.println("  profilesLibrary  : " + absList(profilesLibraries));
+            System.out.println("  boundaryFolders  : " + (boundaryFolders == null ? "(not set)" : boundaryFolders));
+            System.out.println("  boundaryShapes   : " + (boundaryShapesPattern == null
+                    ? ProfileValidationOptions.DEFAULT_BOUNDARY_SHAPES_PATTERN + " (default)" : boundaryShapesPattern));
+            System.out.println("  commonShapes     : " + (commonShapes == null
+                    ? ProfileValidationOptions.DEFAULT_COMMON_SHAPES + " (default, where present)" : commonShapes));
+            System.out.println("  profileNamespace : " + (profileNamespaces == null ? "https://ap.cim4.eu/ (default)"
+                    : profileNamespaces));
+            System.out.println("  allowUnmapped    : " + Boolean.TRUE.equals(allowUnmapped));
+            System.out.println("  groups           : " + (groupsConfig == null ? "(by folder)"
+                    : groupsConfig.size() + " explicit"));
+        }
     }
 
     // -------------------------------------------------------------------------

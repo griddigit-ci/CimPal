@@ -333,6 +333,8 @@ job=$(curl -s -H "Authorization: Bearer $token" -H 'Content-Type: application/js
 curl -s -H "Authorization: Bearer $token" -o outputs.zip http://localhost:7474/v1/jobs/$job/archive
 ```
 
+**Profile-driven validation** (`"workflow": "profiles"`, see [validate.md](validate.md#profiles)) reads a profile library besides the models. The library is large and changes with releases, not with each job, so give it as a path under an allowed root (`--root`) rather than uploading it with every job: `"profilesLibrary": ["/srv/cimpal/apl"]`, with only the models in the upload (`"modelsDir": "models"`). Explicit `groups` are refused in requests (403); the documents are grouped by folder.
+
 ---
 
 ## HTTP status codes

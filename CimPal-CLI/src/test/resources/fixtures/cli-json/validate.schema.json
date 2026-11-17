@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/griddigit-ci/CimPal/schemas/cimpal-validate-summary/1",
-  "$comment": "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+. The JSON document of validate --format json (and --summary-file), all three workflows (TEST-4). Additive: new fields may appear in later versions; none are removed or renamed.",
+  "$comment": "Copyright (c) 2020-2026 gridDigIt Kft. Licensed under the EUPL-1.2-or-later. SPDX-License-Identifier: EUPL-1.2+. The JSON document of validate --format json (and --summary-file), all four workflows (TEST-4; profiles added by VAL-3). Additive: new fields may appear in later versions; none are removed or renamed.",
   "title": "CimPal validate result",
   "type": "object",
   "required": ["schema", "run", "totals", "hasViolations"],
@@ -12,7 +12,7 @@
       "required": ["timestamp", "workflow", "inputs", "options"],
       "properties": {
         "timestamp": {"type": "string", "minLength": 1},
-        "workflow": {"enum": ["mapping", "timestamped", "combined"]},
+        "workflow": {"enum": ["mapping", "timestamped", "combined", "profiles"]},
         "inputs": {
           "type": "object",
           "required": ["outputDir"],
@@ -22,6 +22,7 @@
             "constraintsRoot": {"type": ["string", "null"]},
             "constraintFiles": {"type": "array", "items": {"type": "string"}},
             "dataFiles": {"type": "array", "items": {"type": "string"}},
+            "profilesLibrary": {"type": "array", "items": {"type": "string"}},
             "outputDir": {"type": "string"}
           }
         },
@@ -49,7 +50,39 @@
       }
     },
     "hasViolations": {"type": "boolean"},
+    "complete": {"type": "boolean", "description": "Profiles workflow: false when part of what should have been checked was not; the run is then never clean."},
     "partial": {"type": "boolean"},
+    "byGroup": {
+      "type": "array",
+      "description": "Profiles workflow: one entry per group.",
+      "items": {
+        "type": "object",
+        "required": ["group", "conforms", "complete", "partial", "reported", "context", "shapes", "results", "contextFindings"],
+        "properties": {
+          "group": {"type": "string"},
+          "conforms": {"type": "boolean"},
+          "complete": {"type": "boolean"},
+          "partial": {"type": "boolean"},
+          "reported": {"type": "array", "items": {"type": "string"}},
+          "context": {"type": "array", "items": {"type": "string"}},
+          "shapes": {"type": "array", "items": {"type": "string"}},
+          "results": {"$ref": "#/$defs/severityCounts"},
+          "contextFindings": {"type": "integer", "minimum": 0},
+          "millis": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "shapeFindings": {"$ref": "#/$defs/severityCounts"},
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["document", "reason"],
+        "properties": {"document": {"type": "string"}, "reason": {"type": "string"}}
+      }
+    },
+    "gaps": {"type": "array", "items": {"type": "string"}},
+    "turtleReports": {"type": "array", "items": {"type": "string"}},
     "results": {"$ref": "#/$defs/severityCounts"},
     "byConstraintFile": {
       "type": "array",
@@ -78,7 +111,7 @@
         }
       }
     },
-    "report": {"type": "string", "description": "The Excel report (mapping and combined workflows)."},
+    "report": {"type": "string", "description": "The Excel report (mapping, combined and profiles workflows)."},
     "reports": {"type": "array", "items": {"type": "string"}, "description": "The reports of the timestamped workflow."},
     "turtleReport": {"type": "string"},
     "stats": {"type": "object", "description": "With --stats; see stats.schema.json."}

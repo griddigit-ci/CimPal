@@ -110,6 +110,66 @@ Required inputs: `--constraint-files`, `--data-files`, `--output`. Optional: `--
 
 Use it for the acceptance check of a dataset you received. For many datasets, or for data that arrives per timestamp, use `mapping` or `timestamped`.
 
+### `profiles`
+
+Validates every instance document under a folder against the shapes of the profiles it declares, with no mapping CSV and no list of constraint files. Each document says in its header which profiles it follows: `md:Model.profile` in a CGMES model, `dcterms:conformsTo` in a network-codes dataset. A profile library says, in its DX-PROF descriptors, which SHACL files constrain each profile. This is the method ENTSO-E's ReliCapGrid repository uses to validate all its instance files; the design and its sources are in [`docs/plans/validation/README.md`](../plans/validation/README.md).
+
+Required inputs: `--models`, `--profiles-library`, `--output`.
+
+```bash
+java -jar CimPal-CLI.jar validate --workflow profiles \
+  --models C:/Data/ReliCapGrid/Instance \
+  --profiles-library C:/Data/application-profiles-library \
+  --boundary boundaryData,commonData \
+  --output C:/Data/output --format json
+```
+
+**Profile library.** Any folder that holds DX-PROF descriptors (an RDF file with a `prof:Profile`), at any depth, and the SHACL files they name, for example a checkout of the ENTSO-E application-profiles-library with its submodules. Of each profile's resources, those with role `constraints` that conform to SHACL are used; `validation` resources and variant shape sets are not. An artifact is matched by file name inside the library only. `--profiles-library` may name several folders (one per release, say); the same profile in two of them with different shapes is bad input.
+
+**Groups.** Documents are validated in groups, so that references between them resolve:
+
+- Each first-level subfolder of `--models` is an area; documents directly in `--models` form the area `(root)`.
+- Within an area, documents that declare `md:Model.profile` form the group `cgmes-<area>` and those that declare `dcterms:conformsTo` form `nc-<area>`. The second takes the area's CGMES documents as context.
+- The folders named by `--boundary` (relative to `--models`) form `cgmes-boundary` (and `nc-boundary`), and are context for every other group.
+- A context document is loaded so references to it resolve, but its findings are reported in its own group only.
+- `--dry-run` prints the groups, their documents and their shapes without validating.
+
+A configuration file may give explicit groups instead (`groups`, see below).
+
+**Two passes per group.** The group's documents together are validated against all their shapes, for everything except `sh:minCount`, `sh:maxCount` and `sh:closed`. Then each reported document alone is validated for those three, against every shape file that applies to it and holds them. Counted over a group, a property an object repeats in a second document would break `sh:maxCount`, and one profile's list of allowed properties would reject what another profile adds. A finding is reported for the documents that hold its focus node.
+
+**Two workarounds for gaps in the ENTSO-E library**, both with defaults you can change:
+
+- `--boundary-shapes-pattern` (default `EquipmentBoundary`): shape files whose name contains it apply to boundary groups only. The EQ profile's descriptor lists the boundary shapes too, and on a full model they report every Terminal and ConnectivityNode. `""` (config `"boundaryShapesPattern": ""`) applies every shape everywhere.
+- `--common-shapes` (default `61970-600-1_AllProfiles-AP-Con-Complex-SHACL.ttl` where the library has it): shapes no descriptor refers to, added to every group with CGMES documents. Give file names of the library or paths; `none` adds none.
+
+**What is not validated, and how a run can be incomplete.**
+
+- A document that declares no profile (reference data, for example) is skipped and listed under `skipped`. When no document at all can be validated, the run stops with exit 2.
+- A document whose profile is not in the library, or whose profile lacks a shape file, stops the run with exit 2. With `--allow-unmapped` it is skipped instead and the run is **incomplete**.
+- A SPARQL constraint whose query does not parse (the ENTSO-E library has some) is taken out, reported once as a finding with the component `cimpal:InvalidSparqlConstraint`, and the rest runs; the run is incomplete.
+- Shapes that did not all load (an `owl:imports` not found) and a pass that checked nothing also make the run incomplete.
+- An incomplete run never conforms, and exits with 1 even when `--violations-exit-code` is 0.
+- `gaps` lists what the library promises but lacks, declared model dependencies (`md:Model.DependentOn`, `dcterms:requires`) that were not loaded, and folders that were not read (links).
+
+**Report.** One `validation_report__<date>_<time>.xlsx` in `--output` with one validation row per group and reported document, one row for findings about the shapes themselves, and one non-conforming row per document that was not validated. With `--export-turtle`, one `<group>__shacl_report.ttl` per group with every result of the group, context documents included.
+
+**Options of the profiles workflow only:**
+
+| Flag | Config key | Default | Description |
+|---|---|---|---|
+| `--profiles-library` | `profilesLibrary` (array) | — | Profile library folders. Required. |
+| `--boundary` | `boundaryFolders` (array) | none | Boundary folders, relative to `--models`. |
+| `--boundary-shapes-pattern` | `boundaryShapesPattern` | `EquipmentBoundary` | See above. |
+| `--common-shapes` | `commonShapes` (array) | the AllProfiles Complex shapes where present | See above. |
+| `--profile-namespace` | `profileNamespaces` (array) | `https://ap.cim4.eu/` | IRI prefixes that mark a `dcterms:conformsTo` value as a profile even when the library does not have it, so it is reported as unknown rather than ignored. |
+| `--allow-unmapped` | `allowUnmapped` | off | Skip documents with an unknown or incomplete profile; the run is incomplete. |
+| — | `groups` | by folder | Explicit groups, configuration file only. An array of objects: `name` (1 to 80 letters, digits, spaces or `. _ ( ) -`), `reported` and `context` (files or folders, relative to the configuration file), `boundary` (true keeps the boundary-only shapes), `extraShapes` (shape files added to the group), `assumeProfiles` (profile IRIs for reported documents that declare none). Refused in requests to `serve`, `mcp` and `run`. |
+
+`--mapping-csv`, `--constraints-root`, `--constraint-files`, `--data-files`, `--previous-comparison` and `--incremental-timestamps` do not apply and are refused (exit 2); the options above are refused with the other workflows.
+
+Template: [`configs/validate-profiles.json`](../../CimPal-CLI/configs/validate-profiles.json).
+
 ### Removed: `manual`
 
 The former `manual` workflow and its `--shacl-files` flag are gone. It did not validate datasets: it tested the rules of a constraint set against a folder of Conform / NonConform test models, and it is now the GUI's **SHACL ▸ Constraints Operations ▸ Test SHACL rules against Conform / NonConform models** (see the help page of that tab). `--workflow manual` exits with code 2 and says so.
@@ -121,9 +181,9 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--config` | file path | — | JSON config file. Individual flags override it. |
-| `--workflow` | `mapping` / `timestamped` / `combined` | `mapping` | Which validation mode to run. |
+| `--workflow` | `mapping` / `timestamped` / `combined` / `profiles` | `mapping` | Which validation mode to run. |
 | `--mapping-csv` | file path | — | The CSV mapping file. Required for mapping and timestamped. |
-| `--models` | folder path | — | Root folder containing model files (ZIP, XML). Required for mapping and timestamped. |
+| `--models` | folder path | — | Root folder containing model files (ZIP, XML). Required for mapping, timestamped and profiles. |
 | `--constraints-root` | folder path | — | Root folder for constraint files. Paths in the mapping CSV are relative to this. Required for mapping and timestamped. Optional for combined: relative `owl:imports` are then also resolved against it. |
 | `--constraint-files` | file or folder paths, comma-separated | — | Constraint files (`.ttl`, `.rdf`) or ZIP archives of them, which together form one shapes graph. A folder stands for the `.ttl`, `.rdf` and `.zip` files directly in it. Required for combined. Config key `constraintFiles`: a JSON array of paths. |
 | `--data-files` | file or folder paths, comma-separated | — | Instance data files (`.xml`) or ZIP archives of them, which together form one dataset. A folder stands for the `.xml` and `.zip` files directly in it. Required for combined. Config key `dataFiles`: a JSON array of paths. |
@@ -141,7 +201,8 @@ The former `manual` workflow and its `--shacl-files` flag are gone. It did not v
 | `--stats` | flag | off | Report the run's resource use: wall and CPU time, peak heap, GC time, triples loaded. A `stats` field in JSON output on stdout, otherwise a `[STATS]` line on stderr. Config key `stats`. See [resource statistics](README.md#resource-statistics---stats). |
 | `--summary-file` | file path | — | Also write the JSON result (exactly what `--format json` prints) to this file, atomically, creating parent folders. Works with any `--format`. Config key `summaryFile`. See [automation options](README.md#automation-options---summary-file---violations-exit-code). |
 | `--violations-exit-code` | 0–255 | `1` | Exit code when violations are found. `0` lets a scheduler (Airflow, CI) treat findings as data; exits 2 and 3 are unchanged, and so is exit 1 when a row failed with an error. Config key `violationsExitCode`. Ignored under `serve`, `mcp` and `run`. |
-| `--dry-run` | flag | off | Print the resolved config and exit without running anything. |
+| `--dry-run` | flag | off | Print the resolved config and exit without running anything. For profiles, also the groups the run would validate. |
+| `--profiles-library`, `--boundary`, `--boundary-shapes-pattern`, `--common-shapes`, `--profile-namespace`, `--allow-unmapped` | | | Profiles workflow only; see [`profiles`](#profiles). |
 | `--python-executable` | file path | `CIMPAL_PYTHON_EXECUTABLE`, else `python` / `py -3` on `PATH` | Absolute path of the Python interpreter for the Python engines. A relative or missing path, or a UNC (network) or device path, is bad input (exit 2). There is no config key for it. See **Validation engines** below. |
 
 ---
@@ -303,6 +364,40 @@ These fields are added:
 - **`warnings`**: problems that did not stop the run, for example RDF files in a constraints ZIP that are neither `.ttl` nor `.rdf`. They are also printed on stderr.
 - **`turtleReport`**: present only with `--export-turtle`.
 
+### Profiles workflow
+
+`run.workflow` is `profiles`, and `run.inputs` lists `modelsDir`, `profilesLibrary` and `outputDir`. `totals` count groups:
+
+- `conforming`: groups with no finding that checked everything.
+- `violations`: the other groups.
+- `errors`: always 0; a run that can't start exits with 2.
+- `total`: the number of groups.
+
+These fields are added:
+
+```json
+  "complete": true,
+  "partial": false,
+  "results": {"total": 5, "violations": 5, "warnings": 0, "infos": 0},
+  "byGroup": [
+    {"group": "cgmes-areaA", "conforms": false, "complete": true, "partial": false,
+     "reported": ["a_core.xml", "a_state.xml"], "context": ["bd.xml"],
+     "shapes": ["Core-Con-Complex.ttl", "Core-Con-Simple.ttl"],
+     "results": {"total": 2, "violations": 2, "warnings": 0, "infos": 0}, "contextFindings": 1, "millis": 812}
+  ],
+  "shapeFindings": {"total": 0, "violations": 0, "warnings": 0, "infos": 0},
+  "skipped": [{"document": "ref.xml", "reason": "no application profile declared"}],
+  "gaps": ["declared model dependency not loaded: b_core.xml -> urn:uuid:..."],
+  "warnings": [],
+  "turtleReports": ["C:/Data/output/cgmes-areaA__shacl_report.ttl"],
+  "report": "C:/Data/output/validation_report__20261117_101500.xlsx"
+```
+
+- **`complete`**: false when part of what should have been checked was not (see [`profiles`](#profiles)). `hasViolations` is then true whatever was found.
+- **`byGroup`**: one entry per group. `contextFindings` counts results met on context documents only: they are reported in those documents' own group.
+- **`shapeFindings`**: findings that belong to no document, such as a constraint whose SPARQL does not parse.
+- **`skipped`**, **`gaps`**, **`warnings`**: also printed on stderr as `[SKIPPED]`, `[GAP]` and `[WARN]` lines.
+
 ---
 
 ## Workers and memory
@@ -313,6 +408,8 @@ Each worker loads a full combined data graph into memory. A CGMES 3.0 full-grid 
 
 The combined workflow is different: it loads all its data files into one graph, and its workers share that graph and check its shapes in parallel. Its memory follows the size of the merged dataset, not the worker count.
 
+The profiles workflow parses each document once and keeps it until the last group that uses it has run. Its memory follows the largest group plus its context; the boundary is context for every group and stays loaded for the whole run.
+
 `--stats` reports what a run actually used (peak heap, triples loaded, CPU time). For heap and core recommendations by model size, see the [sizing guide](../guide/sizing.md). A run that runs out of memory ends with exit code 3, never 1.
 
 ---
@@ -322,6 +419,6 @@ The combined workflow is different: it loads all its data files into one graph, 
 | Code | Meaning |
 |---|---|
 | 0 | Validation ran — no violations |
-| 1 | Validation ran — violations found (check the Excel report) |
-| 2 | Bad input — missing file, wrong path, unknown workflow name. For combined, also an input that can't be read (a file that doesn't parse, an `owl:imports` that can't be found, an archive without the files it should hold) and a run that would check nothing |
+| 1 | Validation ran — violations found (check the Excel report). For profiles, also a run that was incomplete; that 1 is never changed by `--violations-exit-code` |
+| 2 | Bad input — missing file, wrong path, unknown workflow name. For combined, also an input that can't be read (a file that doesn't parse, an `owl:imports` that can't be found, an archive without the files it should hold) and a run that would check nothing. For profiles, also a document whose profile is not in the library (without `--allow-unmapped`), a folder where no document can be validated, inconsistent explicit groups, and shapes that do not parse for a reason other than one query |
 | 3 | Internal error — unexpected exception (check stderr); out of memory included (one `[ERROR] Out of memory` line on stderr; see [resource statistics](README.md#resource-statistics---stats)) |

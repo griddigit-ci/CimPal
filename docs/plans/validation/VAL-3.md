@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Not started |
+| Status | In review (branch local, not pushed; PR after VAL-2) |
 | Phase | V |
 | Depends on | VAL-2 |
 | Size | M |
@@ -26,15 +26,15 @@ The profile validator is usable from every integration layer: `validate --workfl
 
 ## Acceptance criteria (status checklist)
 
-- [ ] `validate --workflow profiles --models <dir> --profiles-library <dir>[,<dir>] --output <dir>` runs the VAL-2 validator (decision V-1). New options, each with a config key: `--profiles-library` (`profilesLibrary`, array), `--group-by` (`groupBy`), `--boundary` (`boundary`, array), `--boundary-shapes-pattern`, `--common-shapes` (`commonShapes`, array), `--allow-unmapped` (`allowUnmapped`), and config-only `groups`. Shared options keep their meaning; options that do not apply (`--mapping-csv`, `--constraint-files`, `--data-files`, `--previous-comparison`, `--incremental-timestamps`) are rejected with exit 2 when given with this workflow
-- [ ] `--dry-run` prints the plan: groups, reported and context files, shapes per file, skipped files, gaps, without validating
-- [ ] `--format json`: stdout is only the JSON. It has the totals the other workflows have, plus `groups`, `skipped`, `gaps` and `complete`; per-shape detail and `--samples` work as for `combined`; `--summary-file` writes the same document
-- [ ] Exit codes: 0 clean and complete, 1 violations (or `--violations-exit-code`), 2 bad input including unmapped profiles without `--allow-unmapped`, 3 internal error. Decide and document what a run with `complete: false` and no violations returns (recommended: 1, so an incomplete run can never look clean)
-- [ ] `PathGuard.FIELDS` has the new path keys: `profilesLibrary` (READ, checked element by element), `commonShapes` (READ), and the paths inside `groups`. Under `serve`/`mcp`/`run` a library, shape or data path outside the allowed roots is refused; regression tests with UNC, mixed separators and `..`
-- [ ] `CommandSchemas` (so the MCP tool schema and the OpenAPI document) describes the new workflow and keys; `CommandSchemasTest`, `JsonSchemaSmokeTest`, `CommandContractTest` and the OpenAPI equality test pass; the Airflow `tests/test_logic.py` check that parses `PathGuard.java` passes
-- [ ] Tests: `ValidateCommandTest` (flags, config file, dry run, JSON shape, exit codes), `McpCommandTest` (a tool call with `workflow: profiles`, including output capping of values copied from data), `JobApiTest` (a `/v1` job), `PathGuardTest`, one `run` pipeline step, and `PackagedJarIT` if it lists workflows
-- [ ] `serve` with uploaded inputs (DEP-7 workspaces): say in `docs/cli/serve.md` how the library is supplied (a path under an allowed root; uploading a whole APL checkout is not expected) and test that case
-- [ ] Docs and the config template updated; a *Change log* row in `docs/PROJECT.md` with `skill: yes`
+- [x] `validate --workflow profiles --models <dir> --profiles-library <dir>[,<dir>] --output <dir>` runs the VAL-2 validator (decision V-1). New options, each with a config key: `--profiles-library` (`profilesLibrary`, array), `--boundary` (`boundaryFolders`, array), `--boundary-shapes-pattern`, `--common-shapes` (`commonShapes`, array), `--profile-namespace` (`profileNamespaces`, array), `--allow-unmapped` (`allowUnmapped`), and config-only `groups`. No `--group-by`: explicit `groups` in a config file replace the folder grouping (D2). Shared options keep their meaning; options that do not apply (`--mapping-csv`, `--constraint-files`, `--data-files`, `--previous-comparison`, `--incremental-timestamps`) are rejected with exit 2 when given with this workflow
+- [x] `--dry-run` prints the plan: groups, reported and context files, shapes per file, skipped files, gaps, without validating
+- [x] `--format json`: stdout is only the JSON. It has the totals the other workflows have, plus `byGroup`, `skipped`, `gaps` and `complete`; per-shape detail and `--samples` work as for `combined`; `--summary-file` writes the same document
+- [x] Exit codes: 0 clean and complete, 1 violations (or `--violations-exit-code`), 2 bad input including unmapped profiles without `--allow-unmapped`, 3 internal error. Decide and document what a run with `complete: false` and no violations returns (recommended: 1, so an incomplete run can never look clean)
+- [x] `PathGuard.FIELDS` has the new path keys: `profilesLibrary` (READ, checked element by element), `commonShapes` (READ_IF_EXISTS: a library file name or a path). `groups` is refused in requests instead (D1). Under `serve`/`mcp`/`run` a library, shape or data path outside the allowed roots is refused; regression tests with UNC, mixed separators and `..`
+- [x] `CommandSchemas` (so the MCP tool schema and the OpenAPI document) describes the new workflow and keys; `CommandSchemasTest`, `JsonSchemaSmokeTest`, `CommandContractTest` and the OpenAPI equality test pass; the Airflow `tests/test_logic.py` check that parses `PathGuard.java` passes
+- [x] Tests in `ValidateProfilesWorkflowTest`: flags, config file with explicit groups, dry run, JSON shape against `validate.schema.json`, exit codes, an MCP tool call, a `run` pipeline step, PathGuard refusals. **Not done:** a real `/v1` job (D4); `PackagedJarIT` lists no workflows
+- [x] `serve` with uploaded inputs (DEP-7 workspaces): `docs/cli/serve.md` says how the library is supplied (a path under an allowed root). **The upload case is not tested** (D4)
+- [x] Docs and the config template updated; a *Change log* row in `docs/PROJECT.md` with `skill: yes`
 
 ## Instructions for Claude Code
 
@@ -57,5 +57,19 @@ Standard footer: see [`../README.md`](../README.md#standard-footer-for-every-wp-
 
 | Date | Decision | By |
 | --- | --- | --- |
+| 2026-11-17 | Plan approved, with explicit `groups` refused in serve, mcp and run. D8 of VAL-2 (a document without a profile is a listed skip, not incomplete) stays as it is: no answer yet. | Maintainer |
+| 2026-11-17 | D1: `groups` holds paths inside objects, which `PathGuard`, its Airflow mirror and the serve heap estimate do not walk. It is read from configuration files on the command line only (`loadGroupsConfig`, kept apart from `loadConfig` so the request schemas, which list what `loadConfig` reads, do not offer it), and `PathGuard.check` refuses a `validate` request that has it, for serve, mcp and run alike. Core checks the group paths under the policy anyway (VAL-2). | Claude Code / maintainer |
+| 2026-11-17 | D2: no `--group-by` flag. Grouping is by folder unless a config file gives `groups`. | Claude Code |
+| 2026-11-17 | D3: exit codes. 0 only when every group checked everything and found nothing; an **incomplete** run exits 1 and `--violations-exit-code` never changes that 1 (as a mapping row with an error); findings or a partial run exit with `--violations-exit-code` (default 1); bad input 2 (also an unknown profile without `--allow-unmapped`, no document that can be validated, inconsistent groups); internal error 3. | Claude Code |
+| 2026-11-17 | D4: serve was not tested with a real `/v1` job. Its path into the command is the same as mcp's and run's (`PathGuard.check`, then `validate --config` in process under the policy), and both of those are tested; `JobApiTest` uses fake runners. | Claude Code |
+| 2026-11-17 | D5: options of the other workflows are refused with `profiles`, and the profile options are refused with the other workflows (exit 2), rather than ignored. | Claude Code |
+| 2026-11-17 | Security review (security-reviewer agent, read-only): no High or Medium. Fixed: skipped-document and gap lines on stderr and in the dry run are now sanitised (Low ×2; the skip records were already sanitised when created in VAL-2, so the new test passed before the fix too). Added, as the review suggested: the `groups` refusal through mcp and through a `run` step, a network path as `commonShapes`, and network or absolute `--boundary` values that touch nothing. Not changed (Info): the command's catch-all prints the raw message and stack trace (existing, all workflows); `--dry-run --format json` prints text, as for every workflow. | Claude Code |
+| 2026-11-17 | D6: the Python client models were regenerated with the pinned generator (`openapi-python-client==0.26.1`, installed in a private environment); `regenerate.py --check` passes. Only `validate_config.py` changed. | Claude Code |
 
 ## Notes and results
+
+**Implementation (2026-11-17).** CLI: `ValidateCommand` (the `profiles` workflow: options, config keys, `loadGroupsConfig`, `parseGroups`, dry-run plan, `runProfilesWorkflow`, JSON and text output, exit codes), `PathGuard` (`profilesLibrary`, `commonShapes`, the `groups` refusal), `CommandSchemas`; `openapi/cimpal-v1.json` regenerated (`-Dopenapi.update=true`); `clients/python` model `validate_config.py` regenerated; `clients/airflow` `PATH_FIELDS`. Test resources: `cli-json/validate.schema.json` covers the new fields. New template `configs/validate-profiles.json`. Serve, mcp and run needed no code change: no production code outside `ValidateCommand` names a workflow.
+
+**Test counts (`mvn -B verify -DexcludedGroups=gui`, Windows).** Before (VAL-2 branch): Core 790, Main 78, CLI 685 (10 skipped) + 3 + 37 ITs (21 skipped). After: Core 790, Main 78, CLI 697 (10 skipped; 12 in `ValidateProfilesWorkflowTest`) + 3 + 37 ITs (21 skipped); build green. Airflow `tests/test_logic.py` (which parses `PathGuard.java`): 29 passed, 1 skipped. Python client: `regenerate.py --check` passes; its tests were not run (the test dependency `respx` is not installed here). Coverage floors not raised.
+
+**Open.** A first run on real data (an application-profiles-library checkout with submodules and ReliCapGrid's instance files). A `/v1` job with an upload (D4). VAL-2 D8 (documents without a profile) still waits for the maintainer.

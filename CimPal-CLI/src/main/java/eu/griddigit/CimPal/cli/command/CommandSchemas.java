@@ -40,15 +40,18 @@ final class CommandSchemas {
                     p -> {
                         p.set("workflow", schema("string",
                                 "Workflow: 'mapping' (default, uses a CSV mapping file), "
-                                        + "'timestamped' (groups by timestamp) or 'combined' (validates the "
-                                        + "dataFiles as one dataset against all the constraintFiles at once)."));
+                                        + "'timestamped' (groups by timestamp), 'combined' (validates the "
+                                        + "dataFiles as one dataset against all the constraintFiles at once) or "
+                                        + "'profiles' (validates every document under modelsDir against the shapes "
+                                        + "of the profiles it declares, found in a DX-PROF profilesLibrary)."));
                         p.set("mappingCsv", schema("string",
                                 "Absolute path to the CSV mapping file: three comma-separated columns, the model "
                                         + "files (separated by ;), the constraint .ttl file(s) (separated by ;) and a "
                                         + "label. Required for mapping and timestamped workflows."));
                         p.set("modelsDir", schema("string",
                                 "Absolute path to the root folder containing model ZIP/XML archives. "
-                                        + "Required for mapping and timestamped workflows."));
+                                        + "Required for mapping, timestamped and profiles workflows. For profiles, "
+                                        + "each first-level subfolder is validated as a group."));
                         p.set("constraintsRoot", schema("string",
                                 "Absolute path to the root folder for SHACL constraint .ttl files. Required for "
                                         + "mapping and timestamped workflows; optional for combined, where relative "
@@ -88,6 +91,26 @@ final class CommandSchemas {
                         p.set("incrementalTimestamps", schema("boolean",
                                 "Timestamped workflow: reuse the Jena findings of focus nodes a timestamp didn't "
                                         + "change from the one before."));
+                        p.set("profilesLibrary", arraySchema(
+                                "Profiles workflow (required): absolute paths to folders holding DX-PROF "
+                                        + "descriptors and the SHACL files they name, e.g. a checkout of the ENTSO-E "
+                                        + "application-profiles-library."));
+                        p.set("boundaryFolders", arraySchema(
+                                "Profiles workflow: folders of boundary data, relative to modelsDir. Validated as "
+                                        + "boundary groups and loaded as context for every other group."));
+                        p.set("boundaryShapesPattern", schema("string",
+                                "Profiles workflow: shape files whose name contains this apply to boundary groups "
+                                        + "only (default 'EquipmentBoundary'; '' applies every shape everywhere)."));
+                        p.set("commonShapes", arraySchema(
+                                "Profiles workflow: shapes added to every group with CGMES documents, as file names "
+                                        + "in the profile library or absolute paths (default: the AllProfiles Complex "
+                                        + "shapes where the library has them; ['none'] for none)."));
+                        p.set("profileNamespaces", arraySchema(
+                                "Profiles workflow: IRI prefixes that mark a dcterms:conformsTo value as a profile "
+                                        + "(default ['https://ap.cim4.eu/'])."));
+                        p.set("allowUnmapped", schema("boolean",
+                                "Profiles workflow: skip documents whose profile is unknown or lacks shapes and "
+                                        + "report the run as incomplete (exit 1), instead of refusing it (exit 2)."));
                         automation(p, "violations are found");
                     }),
             entry("sparql", "sparql", true,

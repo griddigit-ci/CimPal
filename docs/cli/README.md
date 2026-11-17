@@ -40,7 +40,7 @@ java -jar CimPal-CLI.jar manifest --help
 
 | Command | What it does |
 |---|---|
-| [`validate`](validate.md) | Run SHACL validation against CIM/CGMES model files (mapping, timestamped or combined workflow) |
+| [`validate`](validate.md) | Run SHACL validation against CIM/CGMES model files (mapping, timestamped, combined or profiles workflow) |
 | [`sparql`](sparql.md) | Execute a SPARQL SELECT query against RDF model files |
 | [`compare`](compare.md) | Compare two RDFS profiles or SHACL shape sets |
 | [`compare-instances`](compare-instances.md) | Compare two sets of CGMES instance data |

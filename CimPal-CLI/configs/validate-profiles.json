@@ -1,0 +1,32 @@
+{
+  "_comment": "Template: profile-driven validation. Every instance document under modelsDir is validated against the shapes of the profiles it declares (md:Model.profile, dcterms:conformsTo), found through the DX-PROF descriptors of a profile library. No mapping CSV, no list of constraint files.",
+  "_how_to_use": "Copy this file to your working directory. Replace every REPLACE_WITH_PATH value with a real path. Check the plan first: java -jar CimPal-CLI.jar validate --config this-file.json --dry-run. Then run without --dry-run.",
+  "_when_to_use": "Use this for a repository or delivery of many instance files with declared profiles, such as ENTSO-E ReliCapGrid, where writing a mapping CSV would repeat what the files and the profile library already say.",
+  "workflow": "profiles",
+  "modelsDir": "REPLACE_WITH_PATH/Instance",
+  "_note_modelsDir": "The folder of the instance documents (.xml, or .zip archives of them), searched at any depth. Each first-level subfolder is an area: its CGMES documents form the group cgmes-<area>, its network-codes datasets nc-<area>. Documents that declare no profile (reference data) are skipped and listed. Relative paths are relative to this config file.",
+  "profilesLibrary": [
+    "REPLACE_WITH_PATH/application-profiles-library"
+  ],
+  "_note_profilesLibrary": "Folders holding DX-PROF descriptors and the SHACL files they name, for example a checkout of the ENTSO-E application-profiles-library with its submodules (git clone --recurse-submodules). Several folders may be given, for example one per release.",
+  "boundaryFolders": [
+    "boundaryData",
+    "commonData"
+  ],
+  "_note_boundaryFolders": "Folders of boundary data, relative to modelsDir. Their documents are validated as the boundary group, with the boundary-only shapes, and loaded as context for every other group so references to the boundary resolve.",
+  "outputDir": "REPLACE_WITH_PATH/output",
+  "_note_outputDir": "Where to write validation_report__<timestamp>.xlsx (one row per group and document, plus rows for documents that were not validated) and, with exportTurtle, one <group>__shacl_report.ttl per group. Created if it does not exist.",
+  "datatypeMap": "CGMES30NC25",
+  "_note_datatypeMap": "Bundled datatype map used when parsing the documents: 'CGMES30NC25', 'CGMES30NC24' or 'CGMES24NC22', or an absolute path to a .properties file. Without the right map, numeric and boolean constraints report wrongly.",
+  "xmlBase": "http://iec.ch/TC57/CIM100",
+  "allowUnmapped": false,
+  "_note_allowUnmapped": "false (default): a document whose profile is not in the library, or lacks a shape file, stops the run with exit 2. true: such documents are skipped and the run is reported as incomplete (exit 1, never remapped by violationsExitCode).",
+  "_note_boundaryShapesPattern": "Optional, default \"EquipmentBoundary\": shape files whose name contains it apply to boundary groups only. \"\" applies every shape everywhere.",
+  "_note_commonShapes": "Optional, default: 61970-600-1_AllProfiles-AP-Con-Complex-SHACL.ttl where the library has it (no descriptor refers to it). A list of file names of the library or paths; [\"none\"] for none.",
+  "_note_profileNamespaces": "Optional, default [\"https://ap.cim4.eu/\"]: dcterms:conformsTo values under these prefixes are profile declarations even when the library does not have them, so they are reported as unknown rather than ignored.",
+  "_note_groups": "Optional, configuration files only: explicit groups replacing the grouping by folder, for example an assembled model that needs every area's EQ as context. [{\"name\": \"cgm\", \"reported\": [\"Instance/CGM\"], \"context\": [\"Instance/AreaA/EQ.xml\", \"Instance/boundaryData\"], \"boundary\": false, \"extraShapes\": [], \"assumeProfiles\": []}]. Paths are relative to this config file.",
+  "exportTurtle": true,
+  "format": "text",
+  "workers": 0,
+  "maxResultsPerConstraint": 0
+}

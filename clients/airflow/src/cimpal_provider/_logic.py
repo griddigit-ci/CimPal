@@ -67,6 +67,8 @@ PATH_FIELDS: dict[str, dict[str, str]] = {
         "datatypeMap": READ_IF_EXISTS,
         "previousComparison": READ,
         "summaryFile": WRITE_FILE,
+        "profilesLibrary": READ,
+        "commonShapes": READ_IF_EXISTS,
     },
     "sparql": {"models": READ_LIST, "query": READ_IF_EXISTS, "output": WRITE_FILE, "summaryFile": WRITE_FILE},
     "convert": {"input": READ, "inputFiles": READ, "output": WRITE_FILE},
