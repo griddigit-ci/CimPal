@@ -37,6 +37,11 @@ public record InstanceHeader(Path file, String entry, Kind kind, List<String> pr
         dependsOn = List.copyOf(dependsOn);
     }
 
+    /** Identifies the document within a run: the file's path, followed by the archive entry if any. */
+    public String id() {
+        return entry == null ? file.toString() : file + "!" + entry;
+    }
+
     /** The document's name for messages: the file name, followed by the archive entry if any. */
     public String source() {
         String name = file.getFileName() == null ? file.toString() : file.getFileName().toString();

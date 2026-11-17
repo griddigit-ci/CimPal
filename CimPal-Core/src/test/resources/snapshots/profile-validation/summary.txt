@@ -1,0 +1,24 @@
+group cgmes-boundary
+  reported: [bd.xml]
+  context: []
+  shapes: [Common-Complex.ttl, Core-Boundary-Con.ttl, Core-Con-Complex.ttl, Core-Con-Simple.ttl]
+  findings: 2 {Violation=2}
+group cgmes-areaA
+  reported: [a_core.xml, a_state.xml]
+  context: [bd.xml]
+  shapes: [Common-Complex.ttl, Core-Con-Complex.ttl, Core-Con-Simple.ttl, State-Con-Simple.ttl]
+  findings: 2 {Violation=2}
+group cgmes-areaB
+  reported: [b_core.xml]
+  context: [bd.xml]
+  shapes: [Common-Complex.ttl, Core-Con-Complex.ttl, Core-Con-Simple.ttl]
+  findings: 1 {Violation=1}
+finding cgmes-areaA | a_core.xml | DeviceCard-name | MaxCountConstraintComponent | D2
+finding cgmes-areaA | a_core.xml | NameLength-name | MaxLengthConstraintComponent | D3
+finding cgmes-areaB | b_core.xml | DeviceNodeRef-node | ClassConstraintComponent | E1
+finding cgmes-boundary | bd.xml | BoundaryOnly-name | PatternConstraintComponent | BPX
+finding cgmes-boundary | bd.xml | NameLength-name | MaxLengthConstraintComponent | BPL
+skipped ref.xml: no application profile declared
+gap declared model dependency not loaded: b_core.xml -> urn:uuid:not-loaded
+warning No datatype map was applied: untyped literals were validated as xsd:string, so datatype and value-range constraints on them may report incorrectly.
+complete true, partial false, conforms false
