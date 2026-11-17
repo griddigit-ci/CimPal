@@ -22,6 +22,10 @@ import eu.griddigit.cimpal.core.utils.PathNotAllowedException;
 import eu.griddigit.cimpal.core.utils.ProfileValidator;
 import eu.griddigit.cimpal.core.profiles.ProfileGroup;
 import eu.griddigit.cimpal.core.profiles.ProfileGroupPlanner;
+import eu.griddigit.cimpal.core.profiles.ProfileSarifWriter;
+import eu.griddigit.cimpal.core.profiles.ProfileSummaryMarkdown;
+import eu.griddigit.cimpal.core.utils.AtomicFiles;
+import eu.griddigit.CimPal.cli.CliVersion;
 import eu.griddigit.cimpal.core.utils.SHACLValidator;
 import eu.griddigit.cimpal.core.utils.ValidationEngine;
 import eu.griddigit.cimpal.core.utils.ValidationTools;
@@ -166,6 +170,31 @@ public class ValidateCommand implements Callable<Integer> {
             description = "Profiles workflow: skip documents whose profile is unknown or lacks shapes, and report the "
                     + "run as incomplete (exit 1), instead of refusing the run (exit 2).")
     private Boolean allowUnmapped;
+
+    @Option(names = "--sarif",
+            description = "Profiles workflow: also write the findings as SARIF 2.1.0 for GitHub code scanning "
+                    + "(upload with github/codeql-action/upload-sarif).")
+    private File sarifFile;
+
+    @Option(names = "--sarif-base",
+            description = "Profiles workflow: folder the SARIF paths are relative to, normally the repository root "
+                    + "(default: the working directory when it contains --models, else --models).")
+    private File sarifBase;
+
+    @Option(names = "--sarif-category",
+            description = "Profiles workflow: code-scanning category of the SARIF run (default cimpal-profiles); "
+                    + "runs of one repository that cover different data need different categories.")
+    private String sarifCategory;
+
+    @Option(names = "--sarif-mode",
+            description = "Profiles workflow: what one SARIF result stands for: 'rule' (default, a rule in one "
+                    + "document, at its first occurrence) or 'object' (one finding on one object).")
+    private String sarifMode;
+
+    @Option(names = "--summary-md",
+            description = "Profiles workflow: also write a Markdown summary of the run, for example for "
+                    + "$GITHUB_STEP_SUMMARY.")
+    private File summaryMarkdown;
 
     /** Profiles workflow, config file only: explicit groups replacing the grouping by folder. */
     private JsonNode groupsConfig;
@@ -404,6 +433,26 @@ public class ValidateCommand implements Callable<Integer> {
             JsonNode n = root.path("allowUnmapped");
             if (!n.isMissingNode() && !n.isNull()) allowUnmapped = n.asBoolean(false);
         }
+        if (sarifFile == null) {
+            String v = root.path("sarifFile").asText(null);
+            if (v != null && !v.isBlank()) sarifFile = resolveRelative(configDir, v);
+        }
+        if (sarifBase == null) {
+            String v = root.path("sarifBase").asText(null);
+            if (v != null && !v.isBlank()) sarifBase = resolveRelative(configDir, v);
+        }
+        if (sarifCategory == null) {
+            String v = root.path("sarifCategory").asText(null);
+            if (v != null && !v.isBlank()) sarifCategory = v;
+        }
+        if (sarifMode == null) {
+            String v = root.path("sarifMode").asText(null);
+            if (v != null && !v.isBlank()) sarifMode = v;
+        }
+        if (summaryMarkdown == null) {
+            String v = root.path("summaryMarkdown").asText(null);
+            if (v != null && !v.isBlank()) summaryMarkdown = resolveRelative(configDir, v);
+        }
         loadGroupsConfig(root, configDir);
     }
 
@@ -530,6 +579,13 @@ public class ValidateCommand implements Callable<Integer> {
                 ok &= notWithProfiles(previousComparison != null, "--previous-comparison");
                 ok &= notWithProfiles(Boolean.TRUE.equals(incrementalTimestamps), "--incremental-timestamps");
                 ok &= parseGroups();
+                if (sarifMode != null && !List.of("rule", "object").contains(sarifMode.toLowerCase(Locale.ROOT))) {
+                    System.err.println("[ERROR] --sarif-mode must be 'rule' or 'object'.");
+                    ok = false;
+                }
+                if (sarifBase != null) {
+                    ok &= requireDir(sarifBase, "--sarif-base");
+                }
             }
             case "manual" -> {
                 // Configurations written for the removed workflow get a pointer, not a bare "unknown".
@@ -547,8 +603,8 @@ public class ValidateCommand implements Callable<Integer> {
 
         if (!"profiles".equals(workflow) && usesProfileOptions()) {
             System.err.println("[ERROR] --profiles-library, --boundary, --boundary-shapes-pattern, --common-shapes, "
-                    + "--profile-namespace, --allow-unmapped and \"groups\" belong to the profiles workflow"
-                    + " (--workflow profiles).");
+                    + "--profile-namespace, --allow-unmapped, --sarif*, --summary-md and \"groups\" belong to the"
+                    + " profiles workflow (--workflow profiles).");
             ok = false;
         }
 
@@ -572,7 +628,8 @@ public class ValidateCommand implements Callable<Integer> {
     private boolean usesProfileOptions() {
         return (profilesLibraries != null && !profilesLibraries.isEmpty()) || boundaryFolders != null
                 || boundaryShapesPattern != null || commonShapes != null || profileNamespaces != null
-                || allowUnmapped != null || groupsConfig != null;
+                || allowUnmapped != null || groupsConfig != null || sarifFile != null || sarifBase != null
+                || sarifCategory != null || sarifMode != null || summaryMarkdown != null;
     }
 
     /** The explicit groups of the config file, parsed; prints what is wrong and returns false. */
@@ -1008,6 +1065,29 @@ public class ValidateCommand implements Callable<Integer> {
         summary.skipped().forEach(s -> System.err.println("[SKIPPED] " + LogSanitizer.forLog(s.source()) + ": "
                 + LogSanitizer.forLog(s.reason())));
 
+        // SARIF and Markdown first: the JSON names them, and a run whose SARIF can't be written fails.
+        try (StatsJson.Span ignored = StatsJson.phase(runStats, "report")) {
+            if (sarifFile != null) {
+                ProfileSarifWriter.Mode mode = "object".equalsIgnoreCase(sarifMode)
+                        ? ProfileSarifWriter.Mode.OBJECT : ProfileSarifWriter.Mode.RULE;
+                AtomicFiles.writeString(sarifFile.toPath(), ProfileSarifWriter.toJson(summary,
+                        new ProfileSarifWriter.Settings(sarifBasePath(), sarifCategory, mode, CliVersion.version(),
+                                xmlBase)));
+            }
+            if (summaryMarkdown != null) {
+                AtomicFiles.writeString(summaryMarkdown.toPath(), ProfileSummaryMarkdown.toMarkdown(summary));
+            }
+        } catch (IllegalArgumentException ex) {
+            // Too many results for code scanning, or documents outside the SARIF base: the request's fault.
+            System.err.println("[ERROR] " + LogSanitizer.forLog(ex.getMessage()));
+            removeStaleReports();
+            return ExitCode.INVALID_INPUT;
+        } catch (IOException ex) {
+            System.err.println("[ERROR] Could not write the SARIF or Markdown summary: " + LogSanitizer.forLog(ex.getMessage()));
+            removeStaleReports();
+            return ExitCode.INTERNAL_ERROR;
+        }
+
         List<SHACLValidationResult> all = summary.findings().stream()
                 .map(ProfileValidationSummary.Finding::result).toList();
         List<ShapeGroup> shapeGroups = producesJson() && samples > 0 ? shapeGroups(all, samples) : List.of();
@@ -1034,6 +1114,34 @@ public class ValidateCommand implements Callable<Integer> {
             return ExitCode.VIOLATIONS;
         }
         return summary.conforms() ? ExitCode.OK : AutomationOptions.violationsExitCode(violationsExitCode);
+    }
+
+    /**
+     * Removes a SARIF or summary file of an earlier run at the paths this run failed to write: an
+     * upload step that runs anyway must not send old alerts as this run's.
+     */
+    private void removeStaleReports() {
+        for (File file : new File[] {sarifFile, summaryMarkdown}) {
+            if (file != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(eu.griddigit.cimpal.core.utils.PathPolicy
+                            .checkWriteIfActive(file.toPath()));
+                } catch (IOException | RuntimeException ex) {
+                    System.err.println("[WARN] Could not remove " + LogSanitizer.forLog(file.getName())
+                            + " from an earlier run; do not upload it.");
+                }
+            }
+        }
+    }
+
+    /** The SARIF base: as given, else the working directory when it holds the models, else the models folder. */
+    private Path sarifBasePath() {
+        if (sarifBase != null) {
+            return sarifBase.toPath().toAbsolutePath().normalize();
+        }
+        Path cwd = Path.of("").toAbsolutePath().normalize();
+        Path models = modelsDir.toPath().toAbsolutePath().normalize();
+        return models.startsWith(cwd) ? cwd : models;
     }
 
     private static boolean groupConforms(ProfileValidationSummary.GroupResult group) {
@@ -1132,6 +1240,12 @@ public class ValidateCommand implements Callable<Integer> {
         if (!summary.turtleReports().isEmpty()) {
             sb.append("  \"turtleReports\": ").append(jsonStrings(summary.turtleReports().stream()
                     .map(p -> p.toAbsolutePath().toString()).toList())).append(",\n");
+        }
+        if (sarifFile != null) {
+            sb.append("  \"sarif\": ").append(jsonStr(sarifFile.getAbsolutePath())).append(",\n");
+        }
+        if (summaryMarkdown != null) {
+            sb.append("  \"summaryMarkdown\": ").append(jsonStr(summaryMarkdown.getAbsolutePath())).append(",\n");
         }
         sb.append("  \"report\": ").append(summary.workbook() == null ? "null"
                         : jsonStr(summary.workbook().toAbsolutePath().toString()))
@@ -1410,6 +1524,10 @@ public class ValidateCommand implements Callable<Integer> {
             System.out.println("  profileNamespace : " + (profileNamespaces == null ? "https://ap.cim4.eu/ (default)"
                     : profileNamespaces));
             System.out.println("  allowUnmapped    : " + Boolean.TRUE.equals(allowUnmapped));
+            System.out.println("  sarif            : " + abs(sarifFile) + (sarifFile == null ? ""
+                    : " (mode " + (sarifMode == null ? "rule" : sarifMode) + ", category "
+                    + (sarifCategory == null ? "cimpal-profiles" : sarifCategory) + ")"));
+            System.out.println("  summaryMarkdown  : " + abs(summaryMarkdown));
             System.out.println("  groups           : " + (groupsConfig == null ? "(by folder)"
                     : groupsConfig.size() + " explicit"));
         }

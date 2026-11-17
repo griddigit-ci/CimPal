@@ -83,6 +83,8 @@
     },
     "gaps": {"type": "array", "items": {"type": "string"}},
     "turtleReports": {"type": "array", "items": {"type": "string"}},
+    "sarif": {"type": "string", "description": "Profiles workflow: the SARIF file written."},
+    "summaryMarkdown": {"type": "string", "description": "Profiles workflow: the Markdown summary written."},
     "results": {"$ref": "#/$defs/severityCounts"},
     "byConstraintFile": {
       "type": "array",

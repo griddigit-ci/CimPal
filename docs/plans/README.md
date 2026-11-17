@@ -74,7 +74,7 @@ A new, profile-driven validation function beside the existing ones: shapes are c
 | V | [VAL-1](validation/VAL-1.md) | Profile catalog and header reader | — | M | In review ([PR #107](https://github.com/griddigit-ci/CimPal/pull/107)) |
 | V | [VAL-2](validation/VAL-2.md) | Profile validator (grouping, two passes, attribution) | VAL-1 | L | In review ([PR #108](https://github.com/griddigit-ci/CimPal/pull/108)) |
 | V | [VAL-3](validation/VAL-3.md) | `validate --workflow profiles` in CLI, serve, MCP, run | VAL-2 | M | In review ([PR #109](https://github.com/griddigit-ci/CimPal/pull/109)) |
-| V | [VAL-4](validation/VAL-4.md) | SARIF and run summary | VAL-3 | M | Not started |
+| V | [VAL-4](validation/VAL-4.md) | SARIF and run summary | VAL-3 | M | In review (branch `feature/val-4-sarif`) |
 
 ## Security gaps referenced by the WPs
 

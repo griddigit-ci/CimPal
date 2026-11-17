@@ -67,7 +67,10 @@ final class PathGuard {
                     new Field("previousComparison", "--previous-comparison", Kind.READ),
                     new Field("summaryFile", "--summary-file", Kind.WRITE_FILE),
                     new Field("profilesLibrary", "--profiles-library", Kind.READ),
-                    new Field("commonShapes", "--common-shapes", Kind.READ_IF_EXISTS))),
+                    new Field("commonShapes", "--common-shapes", Kind.READ_IF_EXISTS),
+                    new Field("sarifFile", "--sarif", Kind.WRITE_FILE),
+                    new Field("sarifBase", "--sarif-base", Kind.READ),
+                    new Field("summaryMarkdown", "--summary-md", Kind.WRITE_FILE))),
             Map.entry("sparql", List.of(
                     new Field("models", "--models", Kind.READ_LIST),
                     new Field("query", "--query", Kind.READ_IF_EXISTS),

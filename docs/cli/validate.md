@@ -168,6 +168,25 @@ A configuration file may give explicit groups instead (`groups`, see below).
 
 `--mapping-csv`, `--constraints-root`, `--constraint-files`, `--data-files`, `--previous-comparison` and `--incremental-timestamps` do not apply and are refused (exit 2); the options above are refused with the other workflows.
 
+**SARIF for GitHub code scanning, and a Markdown summary.**
+
+| Flag | Config key | Default | Description |
+|---|---|---|---|
+| `--sarif` | `sarifFile` | — | Write the findings as SARIF 2.1.0, for `github/codeql-action/upload-sarif`. |
+| `--sarif-base` | `sarifBase` | the working directory when it contains `--models`, else `--models` | Folder the paths in the SARIF are relative to: the repository root in CI. Every document must be in it. |
+| `--sarif-category` | `sarifCategory` | `cimpal-profiles` | Code-scanning category. Runs of one repository that cover different data (two releases, say) need different categories, or the later upload replaces the earlier one's alerts. |
+| `--sarif-mode` | `sarifMode` | `rule` | `rule`: one result per rule and document, at its first occurrence in the file, with the count and up to five objects; an alert closes when that document no longer breaks the rule. `object`: one result per finding. |
+| `--summary-md` | `summaryMarkdown` | — | Write a Markdown summary: groups, rules with counts, documents not validated, gaps, warnings. For `$GITHUB_STEP_SUMMARY`. |
+
+- **Rules:** one per source shape and constraint component, with a stable id (`DeviceCard-name/MaxCount`). The shape's `sh:name` and `sh:description` are the rule's title and description. Severity maps to the level: Violation → `error`, Warning → `warning`, Info → `note`.
+- **Locations:** the file relative to `--sarif-base`, and the line of the violated property inside the object, else the object's line. A document inside a ZIP archive points at line 1 of the archive and names the entry in the message. A finding about the shapes themselves (a constraint whose SPARQL does not parse) points at line 1 of a document of its group and says so.
+- **Fingerprints:** made of the rule, the file and, in `object` mode, the object; never the line. An alert keeps its identity when lines are added above it.
+- **Limit:** GitHub rejects a SARIF file with more than 25,000 results. A run that would give more stops with exit 2 instead of writing a file that would be rejected; `rule` mode is far below the limit on real data.
+- **Incomplete runs:** a run that skipped documents for their profile, lost constraints or was cut short adds one `error` result, rule `CimPal/IncompleteRun`, listing what was not checked, and marks its invocation unsuccessful. Code scanning closes the alerts an upload no longer reports, so without it an incomplete run would look like a fix.
+- A SARIF or summary file that cannot be written ends with exit 3 (too many results or a document outside `--sarif-base`: exit 2). Nothing is half-written (the files are written atomically), and a file of an earlier run at the same path is removed, so an upload step that runs anyway cannot send old alerts.
+
+See [ci-pipeline.md](ci-pipeline.md#github-code-scanning-profiles-workflow) for a GitHub Actions workflow.
+
 Template: [`configs/validate-profiles.json`](../../CimPal-CLI/configs/validate-profiles.json).
 
 ### Removed: `manual`
@@ -397,6 +416,7 @@ These fields are added:
 - **`byGroup`**: one entry per group. `contextFindings` counts results met on context documents only: they are reported in those documents' own group.
 - **`shapeFindings`**: findings that belong to no document, such as a constraint whose SPARQL does not parse.
 - **`skipped`**, **`gaps`**, **`warnings`**: also printed on stderr as `[SKIPPED]`, `[GAP]` and `[WARN]` lines.
+- **`sarif`**, **`summaryMarkdown`**: the files written, with `--sarif` and `--summary-md`.
 
 ---
 

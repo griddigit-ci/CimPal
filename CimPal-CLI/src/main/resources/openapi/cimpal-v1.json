@@ -1472,6 +1472,26 @@
             },
             "description" : "Profiles workflow: IRI prefixes that mark a dcterms:conformsTo value as a profile (default ['https://ap.cim4.eu/'])."
           },
+          "sarifFile" : {
+            "type" : "string",
+            "description" : "Profiles workflow: absolute path of a SARIF 2.1.0 file to write the findings to, for GitHub code scanning."
+          },
+          "sarifBase" : {
+            "type" : "string",
+            "description" : "Profiles workflow: absolute path of the folder the SARIF paths are relative to (normally the repository root; it must contain modelsDir)."
+          },
+          "sarifCategory" : {
+            "type" : "string",
+            "description" : "Profiles workflow: code-scanning category of the SARIF run (default 'cimpal-profiles')."
+          },
+          "sarifMode" : {
+            "type" : "string",
+            "description" : "Profiles workflow: 'rule' (default: one SARIF result per rule and document) or 'object' (one per finding; refused above 25,000 results)."
+          },
+          "summaryMarkdown" : {
+            "type" : "string",
+            "description" : "Profiles workflow: absolute path of a Markdown summary of the run to write."
+          },
           "allowUnmapped" : {
             "type" : "boolean",
             "description" : "Profiles workflow: skip documents whose profile is unknown or lacks shapes and report the run as incomplete (exit 1), instead of refusing it (exit 2)."
