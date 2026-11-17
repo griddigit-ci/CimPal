@@ -65,6 +65,17 @@ Plans for external users: container, sizing, the async `/v1` API, a Python SDK a
 
 Recommended order for phase D3 (see the roadmap): a release first, then DEP-13 → DEP-11 → DEP-14 → DEP-16 → DEP-12 → DEP-15.
 
+## Validation track
+
+A new, profile-driven validation function beside the existing ones: shapes are chosen per instance file from the DX-PROF descriptors of the application-profiles-library, as ENTSO-E's ReliCapGrid does. The algorithm, its sources and decisions V-1 to V-9 are in [`validation/README.md`](validation/README.md).
+
+| Phase | ID | Work package | Depends on | Size | Status |
+| --- | --- | --- | --- | --- | --- |
+| V | [VAL-1](validation/VAL-1.md) | Profile catalog and header reader | — | M | Not started |
+| V | [VAL-2](validation/VAL-2.md) | Profile validator (grouping, two passes, attribution) | VAL-1 | L | Not started |
+| V | [VAL-3](validation/VAL-3.md) | `validate --workflow profiles` in CLI, serve, MCP, run | VAL-2 | M | Not started |
+| V | [VAL-4](validation/VAL-4.md) | SARIF and run summary | VAL-3 | M | Not started |
+
 ## Security gaps referenced by the WPs
 
 The open gaps G1–G9 and the WPs that close them are listed in [`security/README.md`](security/README.md).
@@ -77,6 +88,7 @@ The open gaps G1–G9 and the WPs that close them are listed in [`security/READM
 - [ ] Which ENTSO-E conformity models may be used in nightly scale tests (licence)
 - [ ] Attestation signers (engineering owner, approver)
 - [ ] Make the GHCR package `cimpal` public after the first release that pushes it (CI-3)
+- [x] Validation track decisions V-1 to V-9: accepted as recommended, and the function must be general, not specific to ReliCapGrid (decided 2026-11-16, `validation/README.md`)
 - [ ] Phase D3 decisions D-14 to D-19 (store, queue, shared files, client identity, interrupted jobs, webhooks): recommendations in `deployment/OPTION-2-ROADMAP.md` §5
 
 ## Standard footer (for every WP session)
