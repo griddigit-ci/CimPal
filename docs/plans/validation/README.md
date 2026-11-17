@@ -36,7 +36,7 @@ Two further documents give the reasoning, not an algorithm:
 
 ### 1. Profile catalog (`prof_map.py`)
 
-Input: one or more folders holding a checkout of the application-profiles-library (APL). Layout: `<family>/PROF/*.rdf`, `<family>/SHACL/`, `<family>/RDFS/`, with family `CGMES` or `NCP`.
+Input: one or more folders holding a checkout of the application-profiles-library (APL). Layout in the reference: `<family>/PROF/*.rdf`, `<family>/SHACL/`, `<family>/RDFS/`, with family `CGMES` or `NCP`. Checked on 2026-11-16: the public APL now keeps the families as git submodules, so the same folders sit one level deeper (`CGMES/CGMES/PROF/`, `NCP/NCP/PROF/`), and the NC descriptors are named `*-AP-RDFS2020.rdf`, not `*PROF*`. CimPal therefore finds descriptors by content at any depth (see *Generality*).
 
 For each PROF file, find the `prof:Profile` node (`http://www.w3.org/ns/dx/prof/Profile`) and build one catalog entry:
 
@@ -108,7 +108,7 @@ Every `md:Model.DependentOn` (CGMES) and `dcterms:requires` (NC) edge declared i
 
 This is a general CimPal function, not a ReliCapGrid runner. ReliCapGrid and the APL are the reference and the first test case; nothing in Core may depend on their folder names, group names, file counts or release list. Concretely:
 
-- **Catalog:** any folder that holds DX-PROF descriptors works. PROF files are discovered recursively (an RDF file that contains a `prof:Profile`), not only under `<family>/PROF/`. An artifact is resolved first as an IRI relative to its PROF file, then by basename under the same library root; the APL layout (`SHACL/`, then `RDFS/`, beside `PROF/`) is the tie-breaker when a basename occurs more than once, and an ambiguity that it cannot settle is a gap, not a guess.
+- **Catalog:** any folder that holds DX-PROF descriptors works. PROF files are discovered recursively (an RDF file that contains a `prof:Profile`), not only under `<family>/PROF/`. An artifact is resolved by its file name only: the real descriptors set `xml:base` to the PROF namespace, so a bare name does not resolve relative to the file, and the NC ones give web addresses (corrected in VAL-1; the first draft said "relative to the PROF file first"). The name is looked up in the `SHACL` and then the `RDFS` folder beside the descriptor's folder, then anywhere under the same library root; a name found more than once there is a gap, not a guess.
 - **Profile declarations:** every `md:Model.profile` value is a declaration. A `dcterms:conformsTo` value is a declaration when it is a catalog key or starts with one of the profile namespaces (`--profile-namespace`, default `https://ap.cim4.eu/`, repeatable). Other `conformsTo` values are ignored.
 - **Groups:** only through the general rules of V-2 (folders, boundary folders, explicit groups). No built-in area or CGM names.
 - **Workarounds for APL gaps** (V-5) are named defaults that can be changed or switched off, and are documented as such.
