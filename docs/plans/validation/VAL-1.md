@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (branch local, not pushed; PR after [PR #106](https://github.com/griddigit-ci/CimPal/pull/106) is merged) |
+| Status | In review ([PR #107](https://github.com/griddigit-ci/CimPal/pull/107)) |
 | Phase | V |
 | Depends on | — |
 | Size | M |

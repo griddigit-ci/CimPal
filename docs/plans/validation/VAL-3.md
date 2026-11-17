@@ -8,7 +8,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | In review (branch local, not pushed; PR after VAL-2) |
+| Status | In review ([PR #109](https://github.com/griddigit-ci/CimPal/pull/109)) |
 | Phase | V |
 | Depends on | VAL-2 |
 | Size | M |
