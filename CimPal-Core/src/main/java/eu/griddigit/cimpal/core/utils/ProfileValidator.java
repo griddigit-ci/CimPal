@@ -100,6 +100,7 @@ public final class ProfileValidator {
     private static final Property SH_MAX_COUNT = ResourceFactory.createProperty(SH, "maxCount");
     private static final Property SH_CLOSED = ResourceFactory.createProperty(SH, "closed");
     private static final String WORKBOOK_PREFIX = "validation_report__";
+    private static final Property SH_RESULT_PATH = ResourceFactory.createProperty(SH, "resultPath");
     private static final Property SH_FOCUS_NODE = ResourceFactory.createProperty(SH, "focusNode");
     private static final Property SH_COMPONENT = ResourceFactory.createProperty(SH, "sourceConstraintComponent");
     private static final Resource SH_NODE_SHAPE = ResourceFactory.createResource(SH + "NodeShape");
@@ -392,22 +393,14 @@ public final class ProfileValidator {
                     // Per-document constraints come from pass 2; a detail belongs to its parent result.
                     continue;
                 }
-                Model single = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
-                copyClosure(node, single, new HashSet<>(), SH_DETAIL);
-                List<SHACLValidationResult> extracted = ShaclTools.extractSHACLValidationResults(single, unionShapes.model());
-                if (extracted.size() != 1) {
-                    // Never drop what the engine found because it cannot be read back.
-                    throw new IOException("A validation result of group " + LogSanitizer.forLog(group.name())
-                            + " could not be read from the report");
-                }
-                SHACLValidationResult result = extracted.getFirst();
+                SHACLValidationResult result = read(node, unionShapes.model(), group);
                 Statement focus = node.getProperty(SH_FOCUS_NODE);
-                List<String> holders = focus == null ? null : holders(focus.getObject().asNode(), group);
+                List<InstanceHeader> holders = focus == null ? null : holders(focus.getObject().asNode(), group);
                 if (holders == null) {
                     // In none of the group's documents: about the shapes, or a node only the report knows.
                     shapeFindings.putIfAbsent(result, group.name());
                 } else if (!holders.isEmpty()) {
-                    unique.putIfAbsent(key(result), new Finding(group.name(), holders, result));
+                    unique.putIfAbsent(key(result), finding(group, holders, result, node));
                 } else {
                     // On a context document only: reported in that document's own group, counted here.
                     contextFindings++;
@@ -435,10 +428,11 @@ public final class ProfileValidator {
                 groupPartial |= single.isPartial();
                 groupIncomplete |= single.checkedNothing();
                 copyResults(single.getReportModel(), true, fullReport, reportNode);
-                for (SHACLValidationResult result : single.getResults()) {
-                    if (isPerDataset(result.getConstraintComponent())) {
-                        unique.putIfAbsent(header.id() + "|" + key(result),
-                                new Finding(group.name(), List.of(header.source()), result));
+                Model singleReport = single.getReportModel();
+                for (Resource node : singleReport.listSubjectsWithProperty(RDF.type, SH_VALIDATION_RESULT).toList()) {
+                    if (isPerDataset(componentOf(node)) && !singleReport.contains(null, SH_DETAIL, node)) {
+                        SHACLValidationResult result = read(node, ownShapes.model(), group);
+                        unique.putIfAbsent(header.id() + "|" + key(result), finding(group, List.of(header), result, node));
                     }
                 }
                 ownShapes.broken().forEach(b -> shapeFindings.putIfAbsent(b, group.name()));
@@ -467,7 +461,7 @@ public final class ProfileValidator {
                     group.reported().stream().map(InstanceHeader::source).toList(),
                     group.context().stream().map(InstanceHeader::source).toList(),
                     new ArrayList<>(shapeNames), own.size(), contextFindings, severities, groupPartial,
-                    groupIncomplete, (System.nanoTime() - started) / 1_000_000);
+                    groupIncomplete, (System.nanoTime() - started) / 1_000_000, group.reported());
         }
 
         /** True when the file, with what it imports, holds a constraint that is evaluated per document. */
@@ -584,13 +578,13 @@ public final class ProfileValidator {
          * The reported documents of {@code group} that hold {@code focus}: as a subject, or failing
          * that as an object. Empty when only context documents hold it; null when none does.
          */
-        private List<String> holders(Node node, ProfileGroup group) {
+        private List<InstanceHeader> holders(Node node, ProfileGroup group) {
             for (boolean asSubject : new boolean[]{true, false}) {
-                List<String> reported = new ArrayList<>();
+                List<InstanceHeader> reported = new ArrayList<>();
                 boolean anywhere = false;
                 for (InstanceHeader header : group.reported()) {
                     if (holds(documents.get(header.id()), node, asSubject)) {
-                        reported.add(header.source());
+                        reported.add(header);
                         anywhere = true;
                     }
                 }
@@ -602,6 +596,28 @@ public final class ProfileValidator {
                 }
             }
             return null;
+        }
+
+        /** One result of a report, read with the shapes it came from; never dropped when it cannot be. */
+        private SHACLValidationResult read(Resource node, Model shapes, ProfileGroup group) throws IOException {
+            Model single = org.apache.jena.rdf.model.ModelFactory.createDefaultModel();
+            copyClosure(node, single, new HashSet<>(), SH_DETAIL);
+            List<SHACLValidationResult> extracted = ShaclTools.extractSHACLValidationResults(single, shapes);
+            if (extracted.size() != 1) {
+                throw new IOException("A validation result of group " + LogSanitizer.forLog(group.name())
+                        + " could not be read from the report");
+            }
+            return extracted.getFirst();
+        }
+
+        /** The finding, with the full IRIs of its focus node and path, for locating it in the files. */
+        private Finding finding(ProfileGroup group, List<InstanceHeader> holders, SHACLValidationResult result,
+                                Resource node) {
+            Statement focus = node.getProperty(SH_FOCUS_NODE);
+            Statement path = node.getProperty(SH_RESULT_PATH);
+            return new Finding(group.name(), holders.stream().map(InstanceHeader::source).toList(), result, holders,
+                    focus != null && focus.getObject().isURIResource() ? focus.getObject().asResource().getURI() : null,
+                    path != null && path.getObject().isURIResource() ? path.getObject().asResource().getURI() : null);
         }
 
         private static boolean holds(Model document, Node node, boolean asSubject) {

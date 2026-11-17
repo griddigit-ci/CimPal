@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.core.models;
 
+import eu.griddigit.cimpal.core.profiles.InstanceHeader;
 import eu.griddigit.cimpal.core.profiles.ProfileGroupPlanner;
 
 import java.nio.file.Path;
@@ -44,11 +45,13 @@ public record ProfileValidationSummary(List<GroupResult> groups, List<Finding> f
      * @param contextFindings results met on context documents only: not reported here, since each
      *                        document is reported in its own group, but in the group's Turtle report
      * @param incomplete      true when part of what the group's shapes ask for was not checked
+     * @param reportedDocuments the reported documents, with the file each is in
      */
     public record GroupResult(String name, List<String> reported, List<String> context, List<String> shapes,
                               int findings, int contextFindings, Map<String, Long> severities, boolean partial,
-                              boolean incomplete, long millis) {
+                              boolean incomplete, long millis, List<InstanceHeader> reportedDocuments) {
         public GroupResult {
+            reportedDocuments = List.copyOf(reportedDocuments);
             reported = List.copyOf(reported);
             context = List.copyOf(context);
             shapes = List.copyOf(shapes);
@@ -60,12 +63,23 @@ public record ProfileValidationSummary(List<GroupResult> groups, List<Finding> f
      * One reported result.
      *
      * @param group     the group it was found in
-     * @param documents the reported documents that hold the focus node; empty for a finding about
-     *                  the shapes themselves, which belongs to no document
+     * @param documents the reported documents that hold the focus node, by
+     *                  {@code InstanceHeader.source()}; empty for a finding about the shapes
+     *                  themselves, which belongs to no document
+     * @param headers   the same documents, with the file each is in
+     * @param focusIri  the focus node's full IRI, or null when it is not an IRI
+     * @param pathIri   the result path's full IRI, or null when it is not a single property
      */
-    public record Finding(String group, List<String> documents, SHACLValidationResult result) {
+    public record Finding(String group, List<String> documents, SHACLValidationResult result,
+                          List<InstanceHeader> headers, String focusIri, String pathIri) {
         public Finding {
             documents = List.copyOf(documents);
+            headers = List.copyOf(headers);
+        }
+
+        /** A finding known only by document names. */
+        public Finding(String group, List<String> documents, SHACLValidationResult result) {
+            this(group, documents, result, List.of(), null, null);
         }
     }
 

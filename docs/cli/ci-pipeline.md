@@ -601,3 +601,68 @@ All the inline flags above can be replaced by a JSON config file. Recommended fo
 4. Add `my-run.json` to version control alongside the shapes and mapping file.
 
 This makes the run fully reproducible: the same config + the same inputs always produce the same result.
+
+---
+
+## GitHub code scanning: profiles workflow
+
+Validate every instance file of a repository against the shapes of the profiles it declares, and publish the findings as code-scanning alerts that point at the file and line, close when the data is fixed and open again on a regression. This is the setup ENTSO-E's ReliCapGrid repository uses, with CimPal in place of its Python scripts. See [validate.md](validate.md#profiles) for the workflow itself.
+
+```yaml
+name: Profile validation
+
+on:
+  push:
+    paths: ["Instance/**", ".github/workflows/profile-validation.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # upload-sarif
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout the application profiles library
+        uses: actions/checkout@v4
+        with:
+          repository: entsoe/application-profiles-library
+          ref: main
+          path: .apl
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "25"}
+
+      - name: Validate (exit 1 = findings, which is not a failed step here)
+        run: |
+          java -jar CimPal-CLI.jar validate --workflow profiles \
+            --models Instance --profiles-library .apl \
+            --boundary boundaryData,commonData \
+            --output reports --export-turtle \
+            --sarif reports/cimpal.sarif --summary-md reports/summary.md \
+            --violations-exit-code 0
+
+      - name: Upload to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: reports/cimpal.sarif
+          category: cimpal-profiles
+
+      - name: Run summary
+        if: always()
+        run: cat reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: profile-validation, path: reports/}
+```
+
+- **`--violations-exit-code 0`** lets the upload run when there are findings. An incomplete run still exits 1 (part of the data or shapes was not checked) and bad input exits 2, so the step fails for those, and `if: always()` still uploads what was written.
+- **Paths** in the SARIF are relative to the working directory, the repository root here (`--sarif-base` to change it). GitHub can only annotate files that exist in the repository at that path; a document inside a ZIP archive is annotated on the archive.
+- **One category per kind of run.** Two jobs that validate different data (two releases, CGMES and NC with different libraries) need different `category` values (and `--sarif-category`), or the second upload replaces the first's alerts.
+- **Size.** GitHub rejects a SARIF file with more than 25,000 results; the default `--sarif-mode rule` gives one result per rule and document, well below that.

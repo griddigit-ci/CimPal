@@ -77,6 +77,16 @@ class ValidateConfig:
                 has them; ['none'] for none).
             profile_namespaces (Union[Unset, list[str]]): Profiles workflow: IRI prefixes that mark a dcterms:conformsTo
                 value as a profile (default ['https://ap.cim4.eu/']).
+            sarif_file (Union[Unset, str]): Profiles workflow: absolute path of a SARIF 2.1.0 file to write the findings to,
+                for GitHub code scanning.
+            sarif_base (Union[Unset, str]): Profiles workflow: absolute path of the folder the SARIF paths are relative to
+                (normally the repository root; it must contain modelsDir).
+            sarif_category (Union[Unset, str]): Profiles workflow: code-scanning category of the SARIF run (default 'cimpal-
+                profiles').
+            sarif_mode (Union[Unset, str]): Profiles workflow: 'rule' (default: one SARIF result per rule and document) or
+                'object' (one per finding; refused above 25,000 results).
+            summary_markdown (Union[Unset, str]): Profiles workflow: absolute path of a Markdown summary of the run to
+                write.
             allow_unmapped (Union[Unset, bool]): Profiles workflow: skip documents whose profile is unknown or lacks shapes
                 and report the run as incomplete (exit 1), instead of refusing it (exit 2).
             format_ (Union[Unset, str]): Output format: 'text' (default) or 'json'. mcp always uses json; set 'json' for a
@@ -110,6 +120,11 @@ class ValidateConfig:
     boundary_shapes_pattern: Union[Unset, str] = UNSET
     common_shapes: Union[Unset, list[str]] = UNSET
     profile_namespaces: Union[Unset, list[str]] = UNSET
+    sarif_file: Union[Unset, str] = UNSET
+    sarif_base: Union[Unset, str] = UNSET
+    sarif_category: Union[Unset, str] = UNSET
+    sarif_mode: Union[Unset, str] = UNSET
+    summary_markdown: Union[Unset, str] = UNSET
     allow_unmapped: Union[Unset, bool] = UNSET
     format_: Union[Unset, str] = UNSET
     stats: Union[Unset, bool] = UNSET
@@ -189,6 +204,16 @@ class ValidateConfig:
 
 
 
+        sarif_file = self.sarif_file
+
+        sarif_base = self.sarif_base
+
+        sarif_category = self.sarif_category
+
+        sarif_mode = self.sarif_mode
+
+        summary_markdown = self.summary_markdown
+
         allow_unmapped = self.allow_unmapped
 
         format_ = self.format_
@@ -248,6 +273,16 @@ class ValidateConfig:
             field_dict["commonShapes"] = common_shapes
         if profile_namespaces is not UNSET:
             field_dict["profileNamespaces"] = profile_namespaces
+        if sarif_file is not UNSET:
+            field_dict["sarifFile"] = sarif_file
+        if sarif_base is not UNSET:
+            field_dict["sarifBase"] = sarif_base
+        if sarif_category is not UNSET:
+            field_dict["sarifCategory"] = sarif_category
+        if sarif_mode is not UNSET:
+            field_dict["sarifMode"] = sarif_mode
+        if summary_markdown is not UNSET:
+            field_dict["summaryMarkdown"] = summary_markdown
         if allow_unmapped is not UNSET:
             field_dict["allowUnmapped"] = allow_unmapped
         if format_ is not UNSET:
@@ -316,6 +351,16 @@ class ValidateConfig:
         profile_namespaces = cast(list[str], d.pop("profileNamespaces", UNSET))
 
 
+        sarif_file = d.pop("sarifFile", UNSET)
+
+        sarif_base = d.pop("sarifBase", UNSET)
+
+        sarif_category = d.pop("sarifCategory", UNSET)
+
+        sarif_mode = d.pop("sarifMode", UNSET)
+
+        summary_markdown = d.pop("summaryMarkdown", UNSET)
+
         allow_unmapped = d.pop("allowUnmapped", UNSET)
 
         format_ = d.pop("format", UNSET)
@@ -350,6 +395,11 @@ class ValidateConfig:
             boundary_shapes_pattern=boundary_shapes_pattern,
             common_shapes=common_shapes,
             profile_namespaces=profile_namespaces,
+            sarif_file=sarif_file,
+            sarif_base=sarif_base,
+            sarif_category=sarif_category,
+            sarif_mode=sarif_mode,
+            summary_markdown=summary_markdown,
             allow_unmapped=allow_unmapped,
             format_=format_,
             stats=stats,

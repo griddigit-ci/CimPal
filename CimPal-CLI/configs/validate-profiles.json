@@ -25,6 +25,8 @@
   "_note_commonShapes": "Optional, default: 61970-600-1_AllProfiles-AP-Con-Complex-SHACL.ttl where the library has it (no descriptor refers to it). A list of file names of the library or paths; [\"none\"] for none.",
   "_note_profileNamespaces": "Optional, default [\"https://ap.cim4.eu/\"]: dcterms:conformsTo values under these prefixes are profile declarations even when the library does not have them, so they are reported as unknown rather than ignored.",
   "_note_groups": "Optional, configuration files only: explicit groups replacing the grouping by folder, for example an assembled model that needs every area's EQ as context. [{\"name\": \"cgm\", \"reported\": [\"Instance/CGM\"], \"context\": [\"Instance/AreaA/EQ.xml\", \"Instance/boundaryData\"], \"boundary\": false, \"extraShapes\": [], \"assumeProfiles\": []}]. Paths are relative to this config file.",
+  "_note_sarifFile": "Optional: \"sarifFile\": \"REPLACE_WITH_PATH/output/cimpal.sarif\" writes the findings as SARIF 2.1.0 for GitHub code scanning. With it: \"sarifBase\" (the repository root, default the working directory), \"sarifCategory\" (default \"cimpal-profiles\"), \"sarifMode\" ('rule', default, or 'object').",
+  "_note_summaryMarkdown": "Optional: \"summaryMarkdown\": \"REPLACE_WITH_PATH/output/summary.md\" writes a Markdown summary of the run (for $GITHUB_STEP_SUMMARY).",
   "exportTurtle": true,
   "format": "text",
   "workers": 0,

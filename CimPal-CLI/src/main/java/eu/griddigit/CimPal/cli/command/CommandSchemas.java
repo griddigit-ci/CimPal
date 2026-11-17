@@ -108,6 +108,19 @@ final class CommandSchemas {
                         p.set("profileNamespaces", arraySchema(
                                 "Profiles workflow: IRI prefixes that mark a dcterms:conformsTo value as a profile "
                                         + "(default ['https://ap.cim4.eu/'])."));
+                        p.set("sarifFile", schema("string",
+                                "Profiles workflow: absolute path of a SARIF 2.1.0 file to write the findings to, for "
+                                        + "GitHub code scanning."));
+                        p.set("sarifBase", schema("string",
+                                "Profiles workflow: absolute path of the folder the SARIF paths are relative to "
+                                        + "(normally the repository root; it must contain modelsDir)."));
+                        p.set("sarifCategory", schema("string",
+                                "Profiles workflow: code-scanning category of the SARIF run (default 'cimpal-profiles')."));
+                        p.set("sarifMode", schema("string",
+                                "Profiles workflow: 'rule' (default: one SARIF result per rule and document) or "
+                                        + "'object' (one per finding; refused above 25,000 results)."));
+                        p.set("summaryMarkdown", schema("string",
+                                "Profiles workflow: absolute path of a Markdown summary of the run to write."));
                         p.set("allowUnmapped", schema("boolean",
                                 "Profiles workflow: skip documents whose profile is unknown or lacks shapes and "
                                         + "report the run as incomplete (exit 1), instead of refusing it (exit 2)."));

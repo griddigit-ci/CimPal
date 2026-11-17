@@ -338,6 +338,88 @@ class ValidateProfilesWorkflowTest {
         assertThat(dryRun.stdout().lines().filter(l -> l.startsWith("[ERROR] forged"))).isEmpty();
     }
 
+    // ---- SARIF and Markdown -------------------------------------------------------------------
+
+    @Test
+    void theSarifFileFollowsTheSarifSchemaAndPointsAtTheFileAndLine() throws Exception {
+        Path sarif = tempDir.resolve("reports/cimpal.sarif");
+        Path markdown = tempDir.resolve("reports/summary.md");
+
+        CliRun.Result result = run(args("--sarif", sarif.toString(), "--summary-md", markdown.toString(),
+                "--sarif-base", tempDir.toString(), "--format", "json"));
+
+        assertThat(result.exitCode()).as(result.stderr()).isEqualTo(ExitCode.VIOLATIONS);
+        assertThat(result.json().path("sarif").asText()).isEqualTo(sarif.toAbsolutePath().toString());
+        JsonNode log = JSON.readTree(sarif.toFile());
+        com.networknt.schema.Schema schema = com.networknt.schema.SchemaRegistry
+                .withDefaultDialect(com.networknt.schema.SpecificationVersion.DRAFT_4)
+                .getSchema(eu.griddigit.cimpal.core.testsupport.Fixtures.read("sarif", "sarif-schema-2.1.0.json"),
+                        com.networknt.schema.InputFormat.JSON);
+        assertThat(schema.validate(log)).as(log.toString()).isEmpty();
+
+        JsonNode found = log.path("runs").get(0).path("results").get(0);
+        assertThat(found.path("ruleId").asText()).isEqualTo("DeviceCard-name/MaxCount");
+        JsonNode location = found.path("locations").get(0).path("physicalLocation");
+        assertThat(location.path("artifactLocation").path("uri").asText()).isEqualTo("models/areaA/a.xml");
+        // Line 7: the fixture's header ends on line 6, and D2 with both its names is one line.
+        assertThat(location.path("region").path("startLine").asInt()).isEqualTo(7);
+        assertThat(Files.readString(markdown)).contains("| `cgmes-areaA` | 1 | 1 |").contains("DeviceCard-name");
+    }
+
+    @Test
+    void perObjectSarifWithTheDefaultBaseAndATextSummary() throws Exception {
+        Path sarif = tempDir.resolve("object.sarif");
+        Path markdown = tempDir.resolve("object.md");
+
+        // No --sarif-base: the working directory does not hold these models, so --models is the base.
+        CliRun.Result result = run(args("--sarif", sarif.toString(), "--sarif-mode", "object",
+                "--sarif-category", "nightly", "--summary-md", markdown.toString()));
+
+        assertThat(result.exitCode()).as(result.stderr()).isEqualTo(ExitCode.VIOLATIONS);
+        assertThat(result.stdout()).contains("Profile Validation Summary").contains("VIOLATIONS FOUND");
+        JsonNode run = JSON.readTree(sarif.toFile()).path("runs").get(0);
+        assertThat(run.path("automationDetails").path("id").asText()).isEqualTo("nightly/");
+        assertThat(run.path("results").get(0).path("locations").get(0).path("physicalLocation")
+                .path("artifactLocation").path("uri").asText()).isEqualTo("areaA/a.xml");
+        assertThat(Files.readString(markdown)).contains("**Result: findings.**");
+
+        CliRun.Result dryRun = run(args("--sarif", sarif.toString(), "--summary-md", markdown.toString(), "--dry-run"));
+        assertThat(dryRun.stdout()).contains("sarif            : " + sarif.toAbsolutePath()).contains("mode rule");
+
+        CliRun.Result notProfiles = CliRun.run("validate", "--workflow", "combined", "--sarif", sarif.toString(),
+                "--constraint-files", sarif.toString(), "--data-files", sarif.toString(), "--output", out.toString());
+        assertThat(notProfiles.exitCode()).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(notProfiles.stderr()).contains("belong to the profiles workflow");
+    }
+
+    @Test
+    void sarifOptionsAreCheckedAndTheFilesAreWritePaths() throws Exception {
+        CliRun.Result badMode = run(args("--sarif", tempDir.resolve("x.sarif").toString(), "--sarif-mode", "all"));
+        assertThat(badMode.exitCode()).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(badMode.stderr()).contains("--sarif-mode");
+
+        // A SARIF file of an earlier run must not survive a run that could not write its own.
+        Path stale = Files.writeString(tempDir.resolve("x.sarif"), "{\"old\": true}");
+        CliRun.Result outsideBase = run(args("--sarif", stale.toString(),
+                "--sarif-base", out.toString().replace("out", "lib")));
+        assertThat(outsideBase.exitCode()).isEqualTo(ExitCode.INVALID_INPUT);
+        assertThat(outsideBase.stderr()).contains("outside the SARIF base");
+        assertThat(outsideBase.stdout()).isEmpty();
+        assertThat(stale).doesNotExist();
+
+        PathPolicy policy = PathPolicy.builder().root(tempDir).build();
+        ObjectNode request = JSON.createObjectNode().put("workflow", "profiles")
+                .put("sarifFile", tempDir.getParent().resolve("elsewhere.sarif").toString());
+        assertThatThrownBy(() -> PathGuard.check("validate", request, policy, tempDir))
+                .isInstanceOf(PathNotAllowedException.class);
+        Path existing = Files.writeString(tempDir.resolve("old.md"), "old");
+        ObjectNode replace = JSON.createObjectNode().put("summaryMarkdown", existing.toString());
+        assertThatThrownBy(() -> PathGuard.check("validate", replace, policy, tempDir))
+                .isInstanceOf(PathNotAllowedException.class);
+        assertThat(PathGuard.check("validate", replace.put("overwrite", true), policy, tempDir)
+                .path("summaryMarkdown").asText()).isNotBlank();
+    }
+
     private static JsonNode mcp(String stdin, String... options) {
         InputStream originalIn = System.in;
         PrintStream originalOut = System.out;
