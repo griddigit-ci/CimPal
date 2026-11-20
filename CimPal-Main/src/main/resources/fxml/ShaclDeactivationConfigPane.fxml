@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!--
+  The fifth section of the Constraints Operations tab, included into its Accordion. Its own file and
+  controller: it builds a configuration that imports a base constraint set and the constraint set
+  that replaces part of it, and deactivates the replaced base shapes.
+-->
+<TitledPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.ShaclDeactivationConfigController"
+            animated="false"
+            text="Create a configuration that deactivates replaced constraints">
+    <VBox spacing="8.0">
+        <Label wrapText="true" styleClass="caption-text"
+               text="Compares the base constraints (for example CGMES v3) with the constraints that replace part of them (for example a national or project extension), lists the base shapes to switch off for you to confirm or change, and writes a configuration .ttl that imports both sets and deactivates the ticked shapes with sh:deactivated true."/>
+
+        <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+            <columnConstraints>
+                <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0" />
+                <ColumnConstraints hgrow="ALWAYS" minWidth="0.0" />
+                <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0" />
+            </columnConstraints>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                <Label text="Base constraint files:" wrapText="true" />
+                <Label fx:id="helpDeactivationBaseFiles" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfDeactivationBaseFiles" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Select the CGMES constraint files of the profile (.ttl, .rdf)"
+                       GridPane.rowIndex="0" GridPane.columnIndex="1" />
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseDeactivationBaseFiles" text="Browse"
+                    GridPane.rowIndex="0" GridPane.columnIndex="2" />
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                <Label text="Replacing constraint files:" wrapText="true" />
+                <Label fx:id="helpDeactivationOverrideFiles" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfDeactivationOverrideFiles" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Select the constraint files that replace part of the base files"
+                       GridPane.rowIndex="1" GridPane.columnIndex="1" />
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseDeactivationOverrideFiles" text="Browse"
+                    GridPane.rowIndex="1" GridPane.columnIndex="2" />
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
+                <Label text="Reference files (optional):" wrapText="true" />
+                <Label fx:id="helpDeactivationReferenceFiles" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfDeactivationReferenceFiles" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Trimmed copies of the base files, if you have them (one per base file)"
+                       GridPane.rowIndex="2" GridPane.columnIndex="1" />
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseDeactivationReferenceFiles" text="Browse"
+                    GridPane.rowIndex="2" GridPane.columnIndex="2" />
+        </GridPane>
+
+        <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionResetDeactivation" text="Reset" />
+            <Button fx:id="btnRunDeactivation" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false"
+                    onAction="#actionRunDeactivation" text="Analyse" />
+        </HBox>
+    </VBox>
+</TitledPane>

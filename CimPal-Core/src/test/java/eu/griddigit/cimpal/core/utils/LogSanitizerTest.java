@@ -38,5 +38,18 @@ class LogSanitizerTest {
     @Test
     void nullIsLoggedAsNull() {
         assertThat(LogSanitizer.forLog(null)).isEqualTo("null");
+        assertThat(LogSanitizer.urlForLog(null)).isEqualTo("null");
+    }
+
+    @Test
+    void urlForLogDropsCredentialsAndQuery() {
+        assertThat(LogSanitizer.urlForLog("https://user:s3cret@example.com/a/EQ.ttl?sig=t0ken#x"))
+                .isEqualTo("https://<redacted>@example.com/a/EQ.ttl?<redacted>");
+        assertThat(LogSanitizer.urlForLog("https://example.com/a/EQ.ttl"))
+                .isEqualTo("https://example.com/a/EQ.ttl");
+        assertThat(LogSanitizer.urlForLog("https://example.com/a/me@b.ttl"))
+                .as("an @ in the path is not a credential").isEqualTo("https://example.com/a/me@b.ttl");
+        assertThat(LogSanitizer.urlForLog("https://example.com/a\nforged"))
+                .doesNotContain("\n");
     }
 }

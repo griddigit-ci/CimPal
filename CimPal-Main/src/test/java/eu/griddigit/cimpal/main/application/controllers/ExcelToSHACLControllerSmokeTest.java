@@ -5,6 +5,7 @@
  */
 package eu.griddigit.cimpal.main.application.controllers;
 
+import eu.griddigit.cimpal.core.shacl_tools.ShapeDeactivationConfig;
 import eu.griddigit.cimpal.core.testsupport.TestModels;
 import eu.griddigit.cimpal.main.gui.FxTestSupport;
 import eu.griddigit.cimpal.main.gui.FxTestSupport.Loaded;
@@ -15,6 +16,8 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -70,7 +74,8 @@ class ExcelToSHACLControllerSmokeTest {
         Loaded<ExcelToSHACLController> tab = FxTestSupport.loadTab(TAB);
 
         assertThat(tab.controller()).isNotNull();
-        for (String routine : new String[]{"paneGenerateConstraints", "paneModifyConstraints", "paneSplitConstraints", "paneTestRules"}) {
+        for (String routine : new String[]{"paneGenerateConstraints", "paneModifyConstraints", "paneSplitConstraints",
+                "paneTestRules", "paneDeactivation", "paneMerge"}) {
             assertThat(node(tab.root(), routine, TitledPane.class).getContent()).as(routine).isNotNull();
         }
         assertThat(node(tab.root(), "fcbRDFSformatForExcel", ChoiceBox.class).getValue())
@@ -78,6 +83,70 @@ class ExcelToSHACLControllerSmokeTest {
         Parent ruleTest = node(tab.root(), "paneTestRules", Parent.class);
         assertThat(node(ruleTest, "btnRunRuleTest", Button.class).isDisabled()).isFalse();
         assertThat(node(ruleTest, "cbRuleTestDatatypeMap", ChoiceBox.class).getValue()).isNotNull();
+        Parent deactivation = node(tab.root(), "paneDeactivation", Parent.class);
+        assertThat(node(deactivation, "btnRunDeactivation", Button.class).isDisabled()).isFalse();
+        Parent merge = node(tab.root(), "paneMerge", Parent.class);
+        assertThat(merge.lookupAll(".label").stream().map(label -> ((Label) label).getText()))
+                .as("a label starting with @ must be escaped in FXML, or it becomes a file location")
+                .contains("@base (optional):");
+    }
+
+    @Test
+    void deactivationAnalysisAsksForTheBaseFilesFirst() throws Exception {
+        Loaded<ExcelToSHACLController> tab = FxTestSupport.loadTab(TAB);
+        Parent deactivation = node(tab.root(), "paneDeactivation", Parent.class);
+
+        FxTestSupport.fire(node(deactivation, "btnRunDeactivation", Button.class));
+        ShownAlert warning = dialogs().awaitAlert(alert -> true, Duration.ofSeconds(10));
+
+        assertThat(warning.type()).isEqualTo(Alert.AlertType.WARNING);
+        assertThat(warning.title()).isEqualTo("Missing base constraint files");
+    }
+
+    @Test
+    void mergeWritesTheMergedFileNextToTheConfiguration() throws Exception {
+        Path base = Files.writeString(tempDir.resolve("base.ttl"), SHAPES);
+        Path config = tempDir.resolve("Configuration.ttl");
+        ShapeDeactivationConfig.write(new ShapeDeactivationConfig.Options("http://example.com/config", "config",
+                "Test", "", "", List.of(base.toUri().toString()), List.of(), Map.of(), null, null), config);
+
+        Loaded<ExcelToSHACLController> tab = FxTestSupport.loadTab(TAB);
+        Parent merge = node(tab.root(), "paneMerge", Parent.class);
+        dialogs().answerOpen(config.toFile());
+        FxTestSupport.fire(buttons(merge, "Browse").getFirst());
+        FxTestSupport.runOnFx(() -> node(merge, "tfMergeBase", TextField.class)
+                .setText("http://example.com/merged/Constraints"));
+        FxTestSupport.fire(node(merge, "btnRunMerge", Button.class));
+        ShownAlert finished = dialogs().awaitAlert(alert -> alert.title().startsWith("Merged")
+                || alert.type() == Alert.AlertType.ERROR, Duration.ofSeconds(45));
+
+        assertThat(finished.title()).as(finished.content()).isEqualTo("Merged file saved");
+        assertThat(Files.readString(tempDir.resolve("Configuration-merged.ttl")))
+                .containsPattern("(?i)@base\\s+<http://example.com/merged/Constraints>");
+    }
+
+    @Test
+    void mergeRefusesToReplaceTheConfiguration() throws Exception {
+        Path base = Files.writeString(tempDir.resolve("base.ttl"), SHAPES);
+        Path config = tempDir.resolve("Configuration.ttl");
+        ShapeDeactivationConfig.write(new ShapeDeactivationConfig.Options("http://example.com/config", "config",
+                "Test", "", "", List.of(base.toUri().toString()), List.of(), Map.of(), null, null), config);
+        String original = Files.readString(config);
+
+        Loaded<ExcelToSHACLController> tab = FxTestSupport.loadTab(TAB);
+        Parent merge = node(tab.root(), "paneMerge", Parent.class);
+        List<ButtonBase> browse = buttons(merge, "Browse");
+        dialogs().answerOpen(config.toFile());
+        FxTestSupport.fire(browse.get(0));
+        // The same file under another name (a hard link): only a comparison as files catches it.
+        Path alias = Files.createLink(tempDir.resolve("alias.ttl"), config);
+        dialogs().answerSave(alias.toFile());
+        FxTestSupport.fire(browse.get(1));
+        FxTestSupport.fire(node(merge, "btnRunMerge", Button.class));
+        ShownAlert warning = dialogs().awaitAlert(alert -> true, Duration.ofSeconds(10));
+
+        assertThat(warning.title()).isEqualTo("Same file twice");
+        assertThat(Files.readString(config)).isEqualTo(original);
     }
 
     @Test
