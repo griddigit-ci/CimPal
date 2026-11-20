@@ -745,7 +745,8 @@ instance-data validation, a separate datatypes-only shapes file, and the class i
 
 <h4>Business logic</h4>
 <p>Operations on a constraint set itself: authoring it from spreadsheets, for the cases the
-automatic RDFS&nbsp;&rarr;&nbsp;SHACL derivation cannot cover, and testing its rules. Four routines
+automatic RDFS&nbsp;&rarr;&nbsp;SHACL derivation cannot cover, testing its rules, and combining it
+with another set. Five routines
 share the tab, each in its own collapsible section with its own <em>Reset</em> and <em>Run</em>;
 filling in one does not affect the others, and only one section is open at a time.</p>
 <ol>
@@ -761,12 +762,74 @@ filling in one does not affect the others, and only one section is open at a tim
       of a constraint set fires on the models that must break it and on none of the models that
       must pass it. Here the rules are under test and the models are the fixtures: it is the
       regression test of a constraint set, run before a release or after a change to a rule.</li>
+  <li><strong>Create a configuration that deactivates replaced constraints</strong> writes the
+      configuration .ttl that imports a base constraint set (for example the CGMES v3 constraints of
+      a profile) and the set that replaces part of it (for example the header and profile
+      constraints of a national or project extension), and switches the replaced base shapes off with <code>sh:deactivated true</code>,
+      so the base files are used unchanged.</li>
+  <li><strong>Merge a configuration into one constraint file</strong> reads such a configuration and
+      the files it imports, and writes them as one .ttl without the deactivated shapes, for
+      tools or recipients that need a single file.</li>
 </ol>
 
 <p class="note">The third routine was previously a separate <em>SHACL Organizer</em> tab. The fourth
 was the <em>Validate by manual selection</em> workflow of the SHACL Validation tab, and before that
 the <em>SHACL tester</em> tab; it moved here because it tests constraints rather than
 datasets.</p>
+
+<h4>How the deactivation configuration works</h4>
+<p><em>Analyse</em> reads the files and opens a review window listing the base shapes the replacing
+files appear to take over. Nothing is deactivated without your confirmation:</p>
+<ul>
+  <li><strong>Suggested</strong> (ticked): a replacing shape has the same rule name, the part of
+      <code>sh:name</code> after the standard and profile (<code>C:301:EQ:Equipment.aggregate:notUsed</code>
+      and <code>C:EXT:EQ:Equipment.aggregate:notUsed</code>), or constrains the same property of the
+      same class with the same kind of parameter; or an optional reference file, a trimmed copy of a
+      base file, no longer has the shape or has changed it. Give one reference per base file when a
+      configuration covers several (for example 301, 452 and 600-2); each reference only judges shapes
+      in the namespaces it covers, and base files no reference covers are named in a warning.</li>
+  <li><strong>Related</strong> (not ticked): a replacing rule on the same element with another kind
+      of check, worth a look.</li>
+  <li><strong>For information</strong> (not ticked): a node shape that, in its reference file, only
+      dropped some of its property shapes; the dropped shapes are listed on their own.</li>
+  <li><strong>Same IRI - check</strong> (not ticked): a replacing file declares the same IRI, so
+      deactivating it would switch the replacing shape off too.</li>
+</ul>
+<p>Untick what should stay active, and use <em>Add constraints...</em> to pick any other base shape.
+SPARQL constraints are not listed: a shape is switched off together with the SPARQL constraints it
+uses. In the <em>Imports</em> table, double-click an IRI to replace the local file URI with the URL
+the file will be published at. CimPal's validation downloads a web import only when its URL ends in
+an RDF file extension such as <code>.ttl</code>; other web URIs are skipped, so the window warns
+about them. By default each deactivated shape is written with a comment saying why; untick
+<em>Comments</em> to leave the comments out. Tick <em>Merged file</em> to also write
+<code>&lt;name&gt;-merged.ttl</code> next to the configuration; it is built from the local files
+you picked, so it works before the web URLs can be reached. <em>Merged file @base</em> optionally
+sets its <code>@base</code> line.</p>
+
+<h4>How the merged file is built</h4>
+<p>The imported files are read with their own imports, the same way validation reads them: local
+files, and web URLs that end in an RDF file extension. If one of the configuration's imports cannot
+be read, the merge stops rather than writing a file that lacks it. Then:</p>
+<ul>
+  <li>each deactivated shape is removed, with its blank nodes and the SPARQL constraints only it
+      used, and <code>sh:property</code> references to it are dropped;</li>
+  <li>a deactivated shape that another shape uses in another way (<code>sh:node</code>,
+      <code>sh:not</code>, <code>sh:or</code>, ...) is kept with <code>sh:deactivated true</code>,
+      which validates the same, and the output names it;</li>
+  <li>the <code>owl:imports</code> of the merged files are dropped, so validating the merged file does
+      not load them again; vocabulary imports such as <code>sh:</code> stay, and so do the ontologies
+      that declare the SPARQL prefixes (a prefix declaration repeated across files is kept once);</li>
+  <li>the configuration's header is replaced by one for the merged file: its IRI with
+      <code>-merged</code>, its title with <em>(merged)</em>, its version, a new identifier and the
+      date.</li>
+</ul>
+<p>The merged file validates like the configuration. By default it goes next to the configuration
+as <code>&lt;name&gt;-merged.ttl</code>; use <em>Browse</em> for another location. It never replaces
+the configuration or one of the files merged into it, however the path is written (another letter
+case, a link): CimPal refuses and asks for another name. <em>@base (optional)</em> writes an
+<code>@base</code> line, for example <code>@base &lt;http://example.com/ns/Equipment/Constraints&gt;</code>;
+it must be an absolute IRI. It changes how the file is written, not what it says: IRIs under it may
+be written relative to it.</p>
 
 <h4>How the rule test works</h4>
 <p>The test suite folder holds one folder per rule, named exactly like the rule's

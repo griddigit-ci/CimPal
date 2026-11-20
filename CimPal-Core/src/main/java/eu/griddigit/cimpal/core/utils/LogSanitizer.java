@@ -38,6 +38,35 @@ public final class LogSanitizer {
         return s.length() > MAX_LENGTH ? s.substring(0, MAX_LENGTH) + "..." : s;
     }
 
+    /**
+     * A URL or IRI for a log line or a message to the user: credentials before the host
+     * ({@code user:token@}) and the query string are replaced by {@code <redacted>}, then the
+     * result goes through {@link #forLog(String)}.
+     */
+    public static String urlForLog(String url) {
+        if (url == null) {
+            return "null";
+        }
+        String s = url;
+        int query = s.indexOf('?');
+        if (query >= 0) {
+            s = s.substring(0, query) + "?<redacted>";
+        }
+        int scheme = s.indexOf("://");
+        if (scheme >= 0) {
+            int start = scheme + 3;
+            int end = s.indexOf('/', start);
+            if (end < 0) {
+                end = s.length();
+            }
+            int at = s.lastIndexOf('@', end - 1);
+            if (at >= start) {
+                s = s.substring(0, start) + "<redacted>@" + s.substring(at + 1);
+            }
+        }
+        return forLog(s);
+    }
+
     /** {@code value} with every unsafe character replaced by U+241E; shared with {@link UntrustedText}. */
     static String neutralise(String value) {
         return UNSAFE.matcher(value).replaceAll("␞");

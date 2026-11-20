@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2020-2026 gridDigIt Kft.
+  Licensed under the EUPL-1.2-or-later.
+  SPDX-License-Identifier: EUPL-1.2+
+-->
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!--
+  The sixth section of the Constraints Operations tab, included into its Accordion. Its own file and
+  controller: it merges a configuration's imported constraint files into one file, without the
+  shapes the configuration deactivates.
+-->
+<TitledPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="eu.griddigit.cimpal.main.application.controllers.ShaclMergeConfigController"
+            animated="false"
+            text="Merge a configuration into one constraint file">
+    <VBox spacing="8.0">
+        <Label wrapText="true" styleClass="caption-text"
+               text="Reads a configuration and the constraint files it imports, removes the shapes it deactivates (with their SPARQL constraints and the sh:property references to them) and writes everything into one .ttl file that validates like the configuration."/>
+
+        <GridPane hgap="8.0" vgap="8.0" styleClass="form-grid">
+            <columnConstraints>
+                <ColumnConstraints halignment="LEFT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0" />
+                <ColumnConstraints hgrow="ALWAYS" minWidth="0.0" />
+                <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="95.0" prefWidth="95.0" />
+            </columnConstraints>
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="0" GridPane.columnIndex="0">
+                <Label text="Configuration file:" wrapText="true" />
+                <Label fx:id="helpMergeConfigFile" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfMergeConfigFile" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Select the configuration .ttl"
+                       GridPane.rowIndex="0" GridPane.columnIndex="1" />
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseMergeConfigFile" text="Browse"
+                    GridPane.rowIndex="0" GridPane.columnIndex="2" />
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                <Label text="Merged file:" wrapText="true" />
+                <Label fx:id="helpMergeOutputFile" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfMergeOutputFile" editable="false" maxWidth="1.7976931348623157E308"
+                       promptText="Next to the configuration, as &lt;name&gt;-merged.ttl"
+                       GridPane.rowIndex="1" GridPane.columnIndex="1" />
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionBrowseMergeOutputFile" text="Browse"
+                    GridPane.rowIndex="1" GridPane.columnIndex="2" />
+
+            <HBox alignment="CENTER_LEFT" spacing="8.0" GridPane.rowIndex="2" GridPane.columnIndex="0">
+                <!-- "\@": a text starting with @ is a resource location in FXML. -->
+                <Label text="\@base (optional):" wrapText="true" />
+                <Label fx:id="helpMergeBase" text="?" styleClass="help-badge"/>
+            </HBox>
+            <TextField fx:id="tfMergeBase" maxWidth="1.7976931348623157E308"
+                       promptText="For example http://example.com/ns/Equipment/Constraints"
+                       GridPane.rowIndex="2" GridPane.columnIndex="1" />
+        </GridPane>
+
+        <HBox alignment="CENTER_RIGHT" spacing="8.0" styleClass="action-bar" VBox.vgrow="NEVER">
+            <Button minWidth="95.0" mnemonicParsing="false" onAction="#actionResetMerge" text="Reset" />
+            <Button fx:id="btnRunMerge" minWidth="110.0" styleClass="primary-action" mnemonicParsing="false"
+                    onAction="#actionRunMerge" text="Merge" />
+        </HBox>
+    </VBox>
+</TitledPane>

@@ -205,6 +205,14 @@
                      Its own file and controller; see ShaclRuleTestPane.fxml. ===== -->
                 <fx:include fx:id="paneTestRules" source="ShaclRuleTestPane.fxml"/>
 
+                <!-- ===== 5. Configuration deactivating base constraints that another set replaces.
+                     Its own file and controller; see ShaclDeactivationConfigPane.fxml. ===== -->
+                <fx:include fx:id="paneDeactivation" source="ShaclDeactivationConfigPane.fxml"/>
+
+                <!-- ===== 6. Merge a configuration's imported files into one constraint file.
+                     Its own file and controller; see ShaclMergeConfigPane.fxml. ===== -->
+                <fx:include fx:id="paneMerge" source="ShaclMergeConfigPane.fxml"/>
+
             </panes>
         </Accordion>
 

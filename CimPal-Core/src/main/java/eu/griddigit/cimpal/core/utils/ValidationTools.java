@@ -2749,6 +2749,49 @@ public class ValidationTools {
         }
     }
 
+    /**
+     * The constraint files read by {@link #loadShapesClosure}: their union, the {@code owl:imports}
+     * IRIs that were followed (their files are in the union), the documents read, in order, and
+     * the local files among them. Imports that were not followed, such as {@code sh:}, are
+     * vocabulary declarations.
+     */
+    public record ShapesClosure(Model model, Set<String> followedImports, List<String> documents,
+                                List<Path> localFiles) {}
+
+    /**
+     * Reads local constraint files with their {@code owl:imports} closure, the same way validation
+     * does: the same import resolution, egress policy and path checks, and the same failure on an
+     * import that cannot be read. For tools that merge a constraint set into one file.
+     *
+     * @param roots the files to read; relative imports are also looked up next to the first one
+     */
+    public static ShapesClosure loadShapesClosure(List<Path> roots) throws IOException {
+        if (roots.isEmpty()) {
+            throw new IOException("No SHACL constraint files were given");
+        }
+        List<LocalShapeSource> sources = roots.stream()
+                .map(path -> new LocalShapeSource(path.toAbsolutePath().normalize()))
+                .toList();
+        Path constraintsRoot = sources.getFirst().path().getParent();
+        Set<String> followed = new LinkedHashSet<>();
+        List<String> documents = new ArrayList<>();
+        List<Path> localFiles = new ArrayList<>();
+        Model model = loadShapesWithImports(sources, constraintsRoot, new HashMap<>(), (source, document) -> {
+            documents.add(source.displayName());
+            if (source instanceof LocalShapeSource local) {
+                localFiles.add(local.path());
+            }
+            document.listObjectsOfProperty(OWL.imports).forEachRemaining(node -> {
+                if (node.isURIResource()
+                        && resolveImport(node.asResource().getURI(), source, constraintsRoot) != null) {
+                    followed.add(node.asResource().getURI());
+                }
+            });
+        }).model();
+        return new ShapesClosure(model, Collections.unmodifiableSet(followed), List.copyOf(documents),
+                List.copyOf(localFiles));
+    }
+
     static LoadShapesResult loadShapesWithImports(ShapeSource root,
                                                   Path constraintsRoot,
                                                   Map<String, Model> cache) throws IOException {
