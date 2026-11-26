@@ -46,7 +46,8 @@ class ShapeConfigurationMergerTest {
     private static final String SH_PROPERTY_SHAPE = "http://www.w3.org/ns/shacl#PropertyShape";
     private static final String SH_NODE_SHAPE = "http://www.w3.org/ns/shacl#NodeShape";
     private static final String CGMES = "http://example.com/cgmes#";
-    private static final Header HEADER = new Header("http://example.com/config-merged", "Merged", null, "1",
+    private static final String MERGED_HEADER = "http://example.com/config-merged#Ontology";
+    private static final Header HEADER = new Header(MERGED_HEADER, null, "Merged", null, "1",
             Instant.parse("2026-11-16T10:00:00Z"), "urn:uuid:00000000-0000-0000-0000-000000000002", null);
 
     @TempDir
@@ -95,8 +96,15 @@ class ShapeConfigurationMergerTest {
                 "control: this is the configuration's header");
         assertFalse(model.contains(model.createResource("http://example.com/config#Ontology"), null, (RDFNode) null),
                 "the configuration's header is replaced");
-        Resource header = model.createResource("http://example.com/config-merged");
+        Resource header = model.createResource(MERGED_HEADER);
         assertTrue(model.contains(header, RDF.type, OWL.Ontology));
+        assertFalse(model.contains(model.createResource(CGMES + "Ontology"), null, (RDFNode) null),
+                "the source file's own header (equ:Ontology) is left out, with its blank nodes");
+        assertFalse(model.contains(null, DCTerms.creator, (RDFNode) null), "the blank node below it went too");
+        assertEquals(Set.of("http://example.com/cgmes", MERGED_HEADER),
+                model.listSubjectsWithProperty(RDF.type, OWL.Ontology).toList().stream()
+                        .map(Resource::getURI).collect(Collectors.toSet()),
+                "an ontology under another name (it carries the SPARQL prefixes) stays");
         assertEquals("urn:uuid:00000000-0000-0000-0000-000000000002", header.getProperty(DCTerms.identifier).getString());
 
         assertEquals(2, result.removedShapes());
@@ -169,7 +177,15 @@ class ShapeConfigurationMergerTest {
     void mergedHeaderIsDerivedFromTheConfiguration() {
         Header header = ShapeConfigurationMerger.mergedHeader("http://example.com/config#Ontology", "EQ constraints", "2",
                 " ");
-        assertEquals("http://example.com/config#Ontology-merged", header.ontologyIri());
+        assertEquals("http://example.com/config-merged#Ontology", header.ontologyIri());
+        assertEquals(ShapeConfigurationMerger.DEFAULT_HEADER_PREFIX, header.prefix());
+        assertEquals("http://example.com/config-merged#Ontology",
+                ShapeConfigurationMerger.mergedHeader("http://example.com/config", null, null, null).ontologyIri(),
+                "from the IRI typed in the review window too");
+        assertEquals("http://example.com/ns/EQ-merged#Ontology",
+                ShapeConfigurationMerger.mergedHeader("http://example.com/ns/EQ/", null, null, null).ontologyIri());
+        assertThrows(IllegalArgumentException.class, () -> new Header(MERGED_HEADER, "1bad", null, null, null, null,
+                null, null));
         assertEquals("EQ constraints (merged)", header.title());
         assertEquals("2", header.version());
         assertNull(header.base(), "a blank @base means none");
@@ -191,11 +207,72 @@ class ShapeConfigurationMergerTest {
         Model parsed = ModelFactory.createDefaultModel();
         RDFParser.fromString(turtle, Lang.TURTLE).parse(parsed);
         assertTrue(parsed.isIsomorphicWith(result.model()), "the @base changes how the file is written, not what it says");
-        assertEquals("Test configuration (merged)", parsed.createResource("http://example.com/config#Ontology-merged")
+        assertEquals("Test configuration (merged)", parsed.createResource(MERGED_HEADER)
                 .getProperty(DCTerms.title).getString(), "the header is derived from the configuration's");
 
         Result withoutBase = ShapeConfigurationMerger.mergeConfigurationWithBase(config, "");
         assertFalse(ShapeConfigurationMerger.toTurtle(withoutBase).contains("@base"));
+    }
+
+    /**
+     * The merged file's header is written first, after the prefixes, under its own prefix; even
+     * with an @base it covers, it does not become a relative IRI such as {@code <config-merged>}.
+     */
+    @Test
+    void headerComesFirstWithItsPrefix() throws Exception {
+        Path base = writeBase();
+        Path config = writeConfig(List.of(base), List.of());
+
+        Result result = ShapeConfigurationMerger.mergeConfigurationWithBase(config, "http://example.com/config");
+        String turtle = ShapeConfigurationMerger.toTurtle(result);
+
+        assertTrue(turtle.contains("@prefix merged:"), turtle.lines().limit(15).collect(Collectors.joining("\n")));
+        String firstStatement = turtle.lines().filter(line -> !line.isBlank() && !line.startsWith("@")).findFirst()
+                .orElseThrow();
+        assertTrue(firstStatement.startsWith("merged:Ontology"), firstStatement);
+        Model parsed = ModelFactory.createDefaultModel();
+        RDFParser.fromString(turtle, Lang.TURTLE).parse(parsed);
+        assertTrue(parsed.isIsomorphicWith(result.model()), "moving the header changes the order only");
+    }
+
+    /** A prefix a source file uses for another namespace is not taken over by the header. */
+    @Test
+    void headerPrefixDoesNotClashWithASourcePrefix() throws Exception {
+        Path base = write("base.ttl", """
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                @prefix merged: <http://example.com/other#> .
+                merged:Thing a sh:NodeShape ; sh:targetClass merged:T .
+                """);
+
+        Result result = ShapeConfigurationMerger.mergeFiles(List.of(base), List.of(), HEADER);
+
+        assertEquals("http://example.com/other#", result.model().getNsPrefixURI("merged"));
+        assertEquals("http://example.com/config-merged#", result.model().getNsPrefixURI("merged1"));
+        Model parsed = ModelFactory.createDefaultModel();
+        RDFParser.fromString(ShapeConfigurationMerger.toTurtle(result), Lang.TURTLE).parse(parsed);
+        assertTrue(parsed.isIsomorphicWith(result.model()));
+    }
+
+    /** A header named Ontology that a SPARQL constraint takes its prefixes from stays, reported. */
+    @Test
+    void sourceHeaderThatDeclaresSparqlPrefixesIsKept() throws Exception {
+        Path base = write("base.ttl", """
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                @prefix owl: <http://www.w3.org/2002/07/owl#> .
+                @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+                @prefix equ: <http://example.com/cgmes#> .
+                @prefix ex: <urn:test:> .
+                equ:Ontology a owl:Ontology ; sh:declare [ sh:prefix "ex" ; sh:namespace "urn:test:"^^xsd:anyURI ] .
+                equ:Thing.f-sparql a sh:PropertyShape ; sh:targetClass ex:Thing ; sh:path ex:f ;
+                    sh:sparql [ a sh:SPARQLConstraint ; sh:prefixes equ:Ontology ;
+                        sh:select "SELECT $this ?value WHERE { $this ex:f ?value . }" ] .
+                """);
+
+        Result result = ShapeConfigurationMerger.mergeFiles(List.of(base), List.of(), HEADER);
+
+        assertTrue(result.model().contains(result.model().createResource(CGMES + "Ontology"), SH.declare));
+        assertEquals(1, result.warnings().size(), result.warnings().toString());
+        assertTrue(result.warnings().getFirst().contains("sh:prefixes"));
     }
 
     // ---- refusals and failures ------------------------------------------------------
@@ -300,6 +377,9 @@ class ShapeConfigurationMergerTest {
                 @prefix ex: <urn:test:> .
                 <http://example.com/cgmes> a owl:Ontology ; owl:imports sh: ;
                     sh:declare [ sh:prefix "ex" ; sh:namespace "urn:test:"^^xsd:anyURI ] .
+                equ:Ontology a owl:Ontology ; owl:imports sh: ;
+                    <http://purl.org/dc/terms/title> "Base constraints" ;
+                    <http://purl.org/dc/terms/creator> [ <http://purl.org/dc/terms/title> "Someone" ] .
                 equ:Thing a sh:NodeShape ; sh:targetClass ex:Thing ;
                     sh:property equ:Thing.a-required , equ:Thing.b-required , equ:Thing.f-sparql .
                 equ:Thing.a-required a sh:PropertyShape ; sh:path ex:a ; sh:minCount 1 ; sh:name "C:301:EQ:Thing.a:required" .

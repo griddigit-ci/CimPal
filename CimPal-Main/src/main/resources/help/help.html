@@ -819,9 +819,14 @@ be read, the merge stops rather than writing a file that lacks it. Then:</p>
   <li>the <code>owl:imports</code> of the merged files are dropped, so validating the merged file does
       not load them again; vocabulary imports such as <code>sh:</code> stay, and so do the ontologies
       that declare the SPARQL prefixes (a prefix declaration repeated across files is kept once);</li>
-  <li>the configuration's header is replaced by one for the merged file: its IRI with
-      <code>-merged</code>, its title with <em>(merged)</em>, its version, a new identifier and the
-      date.</li>
+  <li>the headers of the merged files are left out: every resource whose local name is
+      <code>Ontology</code>, such as <code>eq:Ontology</code>. Ontologies under another name, such as
+      <code>cim:</code> with its SPARQL prefix declarations, stay; so does a header that a SPARQL
+      constraint takes its prefixes from (<code>sh:prefixes</code>), and the output says so;</li>
+  <li>the merged file gets one header of its own, written first: <code>merged:Ontology</code>, in
+      the configuration's namespace with <code>-merged</code> (for <code>http://example.com/EQ</code>,
+      <code>http://example.com/EQ-merged#Ontology</code>), with the configuration's title and
+      <em>(merged)</em>, its version, a new identifier and the date.</li>
 </ul>
 <p>The merged file validates like the configuration. By default it goes next to the configuration
 as <code>&lt;name&gt;-merged.ttl</code>; use <em>Browse</em> for another location. It never replaces

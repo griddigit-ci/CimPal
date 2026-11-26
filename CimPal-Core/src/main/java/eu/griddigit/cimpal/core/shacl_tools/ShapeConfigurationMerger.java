@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -53,23 +54,41 @@ import java.util.stream.Collectors;
  * ({@code sh:node}, {@code sh:not}, a logical list, ...) is kept with {@code sh:deactivated true}
  * instead, which validates the same, and is reported. The {@code owl:imports} that were read are
  * dropped, since their files are now in the merged file; vocabulary imports such as {@code sh:} stay.
- * The configuration's own ontology header is replaced by the merged file's.
+ * The source files' own headers (resources whose local name is {@code Ontology}, such as
+ * {@code eq:Ontology}) and the configuration's are left out; the merged file gets one header of
+ * its own ({@code merged:Ontology}), written first.
  * <p>
  * Files are read through {@link ValidationTools#loadShapesClosure}, so the same import resolution,
  * egress policy and failures apply as in validation.
  */
 public final class ShapeConfigurationMerger {
 
+    /** The prefix of the merged file's header namespace when none is given. */
+    public static final String DEFAULT_HEADER_PREFIX = "merged";
+
+    /** A resource with this local name is a source file's own header and is left out of the merge. */
+    static final String ONTOLOGY_LOCAL_NAME = "Ontology";
+
+    private static final Pattern PREFIX = Pattern.compile("[A-Za-z][A-Za-z0-9_\\-]*");
+
     /**
-     * The merged file's ontology header and {@code @base}. A null {@code issued} means now, a null
-     * {@code identifier} a random {@code urn:uuid}, a blank description one naming the files, and a
-     * blank {@code base} no {@code @base} line.
+     * The merged file's ontology header and {@code @base}. The header is written first in the
+     * file, under {@code prefix} (its namespace is the part of {@code ontologyIri} up to the last
+     * {@code #} or {@code /}). A blank prefix means {@link #DEFAULT_HEADER_PREFIX}, a null
+     * {@code issued} now, a null {@code identifier} a random {@code urn:uuid}, a blank description
+     * one naming the files, and a blank {@code base} no {@code @base} line.
      *
-     * @throws IllegalArgumentException when {@code base} is given but is not an absolute IRI
+     * @throws IllegalArgumentException when {@code base} is given but is not an absolute IRI, or the
+     *                                  prefix is not a plain Turtle prefix
      */
-    public record Header(String ontologyIri, String title, String description, String version,
+    public record Header(String ontologyIri, String prefix, String title, String description, String version,
                          Instant issued, String identifier, String base) {
         public Header {
+            prefix = prefix == null || prefix.isBlank() ? DEFAULT_HEADER_PREFIX : prefix.strip();
+            if (!PREFIX.matcher(prefix).matches()) {
+                throw new IllegalArgumentException("The header prefix must start with a letter and hold only "
+                        + "letters, digits, '_' and '-'.");
+            }
             base = base == null || base.isBlank() ? null : base.strip();
             if (base != null) {
                 String problem = ShapeDeactivationConfig.importProblem(base);
@@ -81,7 +100,7 @@ public final class ShapeConfigurationMerger {
 
         /** This header with another {@code @base} (blank for none). */
         public Header withBase(String newBase) {
-            return new Header(ontologyIri, title, description, version, issued, identifier, newBase);
+            return new Header(ontologyIri, prefix, title, description, version, issued, identifier, newBase);
         }
     }
 
@@ -89,10 +108,11 @@ public final class ShapeConfigurationMerger {
      * The merged model and what was done: the documents read, the shapes removed, the
      * deactivated shapes kept because something else references them, the {@code sh:property}
      * references dropped, any warnings, the local files merged (which the merged file must not
-     * replace) and the {@code @base} to write.
+     * replace), the {@code @base} to write and the header's IRI (written first).
      */
     public record Result(Model model, List<String> documents, int removedShapes, List<String> keptDeactivated,
-                         int droppedReferences, List<String> warnings, List<Path> inputs, String base) {
+                         int droppedReferences, List<String> warnings, List<Path> inputs, String base,
+                         String headerIri) {
     }
 
     private ShapeConfigurationMerger() {
@@ -181,11 +201,32 @@ public final class ShapeConfigurationMerger {
 
     /**
      * The header of the file merged from a configuration with this IRI, title and version, with
-     * the given {@code @base} (blank for none).
+     * the given {@code @base} (blank for none). The configuration {@code http://example.com/EQ}
+     * (or its header {@code http://example.com/EQ#Ontology}) gives
+     * {@code merged:Ontology}, with {@code merged:} for {@code http://example.com/EQ-merged#}.
      */
     public static Header mergedHeader(String configurationIri, String title, String version, String base) {
         String name = title == null || title.isBlank() ? "Constraints" : title.strip();
-        return new Header(configurationIri + "-merged", name + " (merged)", null, version, null, null, base);
+        return new Header(mergedNamespace(configurationIri) + ONTOLOGY_LOCAL_NAME, DEFAULT_HEADER_PREFIX,
+                name + " (merged)", null, version, null, null, base);
+    }
+
+    /** {@code http://example.com/EQ} and {@code http://example.com/EQ#Ontology} give {@code http://example.com/EQ-merged#}. */
+    static String mergedNamespace(String configurationIri) {
+        String stem = configurationIri.strip();
+        if (stem.endsWith("#" + ONTOLOGY_LOCAL_NAME) || stem.endsWith("/" + ONTOLOGY_LOCAL_NAME)) {
+            stem = stem.substring(0, stem.length() - ONTOLOGY_LOCAL_NAME.length() - 1);
+        }
+        while (stem.endsWith("#") || stem.endsWith("/")) {
+            stem = stem.substring(0, stem.length() - 1);
+        }
+        return stem + "-merged#";
+    }
+
+    /** The part of an IRI after its last {@code #} or {@code /}. */
+    static String localName(String iri) {
+        int cut = Math.max(iri.lastIndexOf('#'), iri.lastIndexOf('/'));
+        return iri.substring(cut + 1);
     }
 
     /**
@@ -229,6 +270,7 @@ public final class ShapeConfigurationMerger {
                 .filter(st -> st.getObject().isURIResource() && followedImports.contains(st.getResource().getURI()))
                 .toList();
         model.remove(imports);
+        dropSourceHeaders(model, warnings);
 
         Set<Resource> sparqlConstraints = new HashSet<>(model.listSubjectsWithProperty(RDF.type, SH.SPARQLConstraint).toList());
         Set<Resource> remove = new LinkedHashSet<>();
@@ -295,7 +337,50 @@ public final class ShapeConfigurationMerger {
         removeRepeatedPrefixDeclarations(model);
         addHeader(model, header, documents);
         return new Result(model, List.copyOf(documents), remove.size(), List.copyOf(kept), dropped, List.copyOf(warnings),
-                List.copyOf(inputs), header.base());
+                List.copyOf(inputs), header.base(), header.ontologyIri());
+    }
+
+    /**
+     * Leaves out the source files' own headers: every resource whose local name is
+     * {@code Ontology} ({@code eq:Ontology}, {@code equ:Ontology}, ...), with its blank nodes. The
+     * merged file gets one header of its own instead. Resources that are only typed
+     * {@code owl:Ontology} under another name, such as {@code cim:} carrying SPARQL prefix
+     * declarations, stay. So does a header that a SPARQL constraint names in {@code sh:prefixes}:
+     * its queries need its declarations, so it is kept and reported.
+     */
+    private static void dropSourceHeaders(Model model, List<String> warnings) {
+        Set<RDFNode> prefixSources = new HashSet<>(model.listObjectsOfProperty(SH.prefixes).toList());
+        List<String> kept = new ArrayList<>();
+        for (Resource subject : model.listSubjects().toList()) {
+            if (!subject.isURIResource() || !ONTOLOGY_LOCAL_NAME.equals(localName(subject.getURI()))) {
+                continue;
+            }
+            if (prefixSources.contains(subject)) {
+                kept.add(subject.getURI());
+                continue;
+            }
+            removeWithBlankNodes(model, subject);
+        }
+        if (!kept.isEmpty()) {
+            kept.sort(null);
+            warnings.add(kept.size() + " source header(s) are kept because SPARQL constraints take their prefixes "
+                    + "from them (sh:prefixes): "
+                    + kept.stream().map(LogSanitizer::forLog).collect(Collectors.joining(", ")));
+        }
+    }
+
+    /** Removes a resource's statements and the blank nodes below it that nothing else references. */
+    private static void removeWithBlankNodes(Model model, Resource resource) {
+        Deque<RDFNode> todo = new ArrayDeque<>(model.listObjectsOfProperty(resource, null).toList());
+        model.removeAll(resource, null, null);
+        while (!todo.isEmpty()) {
+            RDFNode node = todo.pop();
+            if (!node.isAnon() || model.contains(null, null, node)) {
+                continue;
+            }
+            todo.addAll(model.listObjectsOfProperty(node.asResource(), null).toList());
+            model.removeAll(node.asResource(), null, null);
+        }
     }
 
     /**
@@ -393,20 +478,64 @@ public final class ShapeConfigurationMerger {
         if (model.getNsURIPrefix(OWL.NS) == null) {
             model.setNsPrefix("owl", OWL.NS);
         }
+        // The header's own prefix, so it is written as merged:Ontology rather than as an IRI
+        // (relative to @base, <Constraints-merged>). A prefix a source file already uses for
+        // another namespace is not taken over: a number is added.
+        String iri = header.ontologyIri();
+        String namespace = iri.substring(0, Math.max(iri.lastIndexOf('#'), iri.lastIndexOf('/')) + 1);
+        if (!namespace.isEmpty() && model.getNsURIPrefix(namespace) == null) {
+            String prefix = header.prefix();
+            for (int n = 1; model.getNsPrefixURI(prefix) != null; n++) {
+                prefix = header.prefix() + n;
+            }
+            model.setNsPrefix(prefix, namespace);
+        }
     }
 
-    /** The merged model as Turtle, with its {@code @base} line when one was given. */
+    /**
+     * The merged model as Turtle, with its {@code @base} line when one was given, and the merged
+     * file's header first, right after the prefixes.
+     */
     public static String toTurtle(Result result) {
+        Resource header = result.model().createResource(result.headerIri());
+        Model head = ModelFactory.createDefaultModel().add(result.model().listStatements(header, null, (RDFNode) null));
+        Model rest = ModelFactory.createDefaultModel().add(result.model()).remove(head);
+        head.setNsPrefixes(result.model().getNsPrefixMap());
+        rest.setNsPrefixes(result.model().getNsPrefixMap());
+        // Both parts are written with the same prefixes and @base, so the header block can be
+        // placed after the directives of the rest: one Turtle document.
+        String[] restParts = splitDirectives(turtle(rest, result.base()));
+        String headBody = splitDirectives(turtle(head, result.base()))[1].strip();
+        return restParts[0] + (headBody.isEmpty() ? "" : headBody + "\n\n") + restParts[1];
+    }
+
+    private static String turtle(Model model, String base) {
         RDFWriterBuilder writer = RDFWriter.create()
                 .set(RIOT.symTurtleIndentStyle, "wide")
                 .set(RIOT.symTurtleDirectiveStyle, "rdf10")
                 .set(RIOT.symTurtleMultilineLiterals, true)
                 .lang(Lang.TURTLE)
-                .source(result.model());
-        if (result.base() != null) {
-            writer.base(result.base()).set(RIOT.symTurtleOmitBase, false);
+                .source(model);
+        if (base != null) {
+            writer.base(base).set(RIOT.symTurtleOmitBase, false);
         }
         return writer.asString();
+    }
+
+    /** Splits Turtle into its leading {@code @base}/{@code @prefix} lines (with the blank line after them) and the rest. */
+    static String[] splitDirectives(String turtle) {
+        List<String> lines = turtle.lines().toList();
+        int i = 0;
+        while (i < lines.size() && (lines.get(i).isBlank() || lines.get(i).startsWith("@prefix")
+                || lines.get(i).startsWith("@base"))) {
+            i++;
+        }
+        String directives = lines.subList(0, i).stream().map(line -> line + "\n").collect(Collectors.joining());
+        if (!directives.isEmpty() && !directives.endsWith("\n\n")) {
+            directives += "\n";
+        }
+        String body = lines.subList(i, lines.size()).stream().map(line -> line + "\n").collect(Collectors.joining());
+        return new String[]{directives, body};
     }
 
     /**
